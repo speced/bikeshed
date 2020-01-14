@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-from __future__ import division, unicode_literals
+
 import sys
 from collections import Counter
 from lxml import html
-import config
+from . import config
 
 
 
@@ -19,16 +19,16 @@ def p(msg):
     if config.quiet == float("infinity"):
         return
     try:
-        print msg
+        print(msg)
     except UnicodeEncodeError:
         if ascii is not None:
-            print ascii.encode("ascii", "replace")
+            print(ascii.encode("ascii", "replace"))
         else:
             warning = formatMessage("warning", "Your console does not understand Unicode.\n  Messages may be slightly corrupted.")
             if warning not in messages:
-                print warning
+                print(warning)
                 messages.add(warning)
-            print msg.encode("ascii", "xmlcharrefreplace")
+            print(msg.encode("ascii", "xmlcharrefreplace"))
 
 
 def die(msg, *formatArgs, **namedArgs):
