@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import division, unicode_literals
+
 import re
 from pygments.lexer import *
 from pygments.token import *
