@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import division, unicode_literals
+
 
 import argparse
 import os
@@ -338,7 +338,7 @@ def handleRefs(options, extras):
         rm = ReferenceManager()
         rm.initializeRefs()
     if options.text:
-        options.text = unicode(options.text, encoding="utf-8")
+        options.text = str(options.text, encoding="utf-8")
     refs = rm.queryAllRefs(text=options.text, linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, latestOnly=options.latestOnly, exact=options.exact)
     if config.printMode == "json":
         p(json.dumps(refs, indent=2, default=config.getjson))
