@@ -374,7 +374,7 @@ def fixIntraDocumentReferences(doc):
 
 def fixInterDocumentReferences(doc):
     for el in findAll("[spec-section]", doc):
-        spec = el.get('data-link-spec')
+        spec = el.get('data-link-spec').lower()
         section = el.get('spec-section', '')
         if spec is None:
             die("Spec-section autolink doesn't have a 'spec' attribute:\n{0}", outerHTML(el), el=el)
