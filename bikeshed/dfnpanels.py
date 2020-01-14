@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import division, unicode_literals
+
 
 from .DefaultOrderedDict import DefaultOrderedDict
 from .htmlhelpers import *
@@ -45,8 +45,6 @@ def addDfnPanels(doc, dfns):
                     refID = "ref-for-{0}".format(id)
                     el.set("id", safeID(doc, refID))
                 if i == 0:
-                    if text is None:
-                        print [outerHTML(el) for el in els]
                     appendChild(li,
                                 E.a({"href": "#" + escapeUrlFrag(refID), "data-silently-dedup": ""}, text))
                 else:
