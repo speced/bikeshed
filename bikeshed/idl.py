@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import division, unicode_literals
+
 
 import re
 
@@ -152,7 +152,7 @@ class IDLMarker(object):
                 readonly = 'data-readonly'
             else:
                 readonly = ''
-            extraParameters = '{0} data-type="{1}"'.format(readonly, unicode(rest.type).strip())
+            extraParameters = '{0} data-type="{1}"'.format(readonly, str(rest.type).strip())
         elif idlType == "dict-member":
             extraParameters = 'data-type="{0}"'.format(construct.type)
             if construct.default is not None:
@@ -243,7 +243,7 @@ def markupIDL(doc):
             # Parse once with a fresh parser, so I can spit out just this <pre>'s markup.
             widl = parser.Parser(text, ui=IDLUI(), symbolTable=symbolTable)
             marker = DebugMarker() if doc.debug else IDLMarker()
-            replaceContents(el, parseHTML(unicode(widl.markup(marker))))
+            replaceContents(el, parseHTML(str(widl.markup(marker))))
             # Parse a second time with the global one, which collects all data in the doc.
             doc.widl.parse(text)
         addClass(el, "highlight")
