@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-from __future__ import division, unicode_literals
+
 import hashlib
 import html5lib
-import HTMLParser
+import html.parser
 import re
 from collections import Counter, defaultdict
 from lxml import etree
@@ -12,7 +12,7 @@ from lxml.cssselect import CSSSelector
 from . import config
 from .messages import *
 
-unescapeParser = HTMLParser.HTMLParser()
+unescapeParser = html.parser.HTMLParser()
 
 
 def unescape(string):
@@ -70,7 +70,7 @@ def escapeUrlFrag(val):
         if validUrlUnit(char):
             result += char
         else:
-            bytes = map(ord, char.encode("utf-8"))
+            bytes = list(map(ord, char.encode("utf-8")))
             for b in bytes:
                 result += "%{:0>2x}".format(b)
     return result
@@ -197,7 +197,7 @@ def appendChild(parent, *children):
     # Appends either text or an element.
     children = list(config.flatten(children))
     for child in children:
-        if isinstance(child, basestring):
+        if isinstance(child, str):
             if len(parent) > 0:
                 parent[-1].tail = (parent[-1].tail or '') + child
             else:
@@ -219,7 +219,7 @@ def appendChild(parent, *children):
 
 def prependChild(parent, child):
     # Prepends either text or an element to the parent.
-    if isinstance(child, basestring):
+    if isinstance(child, str):
         if parent.text is None:
             parent.text = child
         else:
@@ -237,7 +237,7 @@ def insertBefore(target, *els):
     index = parent.index(target)
     prevSibling = parent[index - 1] if index > 0 else None
     for el in els:
-        if isinstance(el, basestring):
+        if isinstance(el, str):
             if prevSibling is not None:
                 prevSibling.tail = (prevSibling.tail or '') + el
             else:
@@ -252,7 +252,7 @@ def insertBefore(target, *els):
 def insertAfter(target, *els):
     parent = target.getparent()
     for el in els:
-        if isinstance(el, basestring):
+        if isinstance(el, str):
             target.tail = (target.tail or '') + el
         else:
             parent.insert(parent.index(target) + 1, el)
@@ -424,7 +424,7 @@ def nodeIter(el, clear=False, skipOddNodes=True):
     # (In other words, same as el.iter(),
     #  but returning nodes+strings rather than the stupid LXML model.)
     # Takes the same kwargs as childNodes
-    if isinstance(el, basestring):
+    if isinstance(el, str):
         yield el
         return
     if isinstance(el, etree._ElementTree):
@@ -537,12 +537,12 @@ def removeClass(el, cls):
 
 def isElement(node):
     # LXML HAS THE DUMBEST XML TREE DATA MODEL IN THE WORLD
-    return etree.iselement(node) and isinstance(node.tag, basestring)
+    return etree.iselement(node) and isinstance(node.tag, str)
 
 
 def isOddNode(node):
     # Something other than an element node or string.
-    if isinstance(node, basestring):
+    if isinstance(node, str):
         return False
     if isElement(node):
         return False
@@ -582,7 +582,7 @@ def isEmpty(el):
 
 def hasChildElements(el):
     try:
-        childElements(el).next()
+        next(childElements(el))
         return True
     except StopIteration:
         return False
@@ -739,7 +739,7 @@ def dedupIDs(doc):
     ids = defaultdict(list)
     for el in findAll("[id]", doc):
         ids[el.get('id')].append(el)
-    for dupeId,els in ids.items():
+    for dupeId,els in list(ids.items()):
         if len(els) < 2:
             # Only one instance, so nothing to do.
             continue
@@ -813,7 +813,7 @@ def nextIter(it, default=None):
     rather than throwing an error.
     '''
     try:
-        return iter(it).next()
+        return next(iter(it))
     except StopIteration:
         return default
 
@@ -828,7 +828,7 @@ def createElement(tag, attrs={}, *children):
 class ElementCreationHelper:
     def __getattr__(self, name):
         def _creater(*children):
-            if children and not (isinstance(children[0], basestring) or isElement(children[0])):
+            if children and not (isinstance(children[0], str) or isElement(children[0])):
                 attrs = children[0]
                 children = children[1:]
             else:
