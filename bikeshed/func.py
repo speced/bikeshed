@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import division, unicode_literals
+
 
 class Functor(object):
     # Pointed and Co-Pointed by default;
