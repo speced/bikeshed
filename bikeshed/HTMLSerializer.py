@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import division, unicode_literals
-import StringIO
+
+import io
 from .htmlhelpers import childNodes, isElement, outerHTML, escapeHTML, escapeAttr, hasAttrs
 from .messages import *
 
@@ -18,7 +18,7 @@ class HTMLSerializer(object):
         self.blockEls = frozenset(blockElements)
 
     def serialize(self):
-        output = StringIO.StringIO()
+        output = io.StringIO()
         writer = output.write
         writer("<!doctype html>")
         root = self.tree.getroot()
