@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import division, unicode_literals
+
 
 import re
 from collections import defaultdict
@@ -38,7 +38,7 @@ class BiblioEntry(object):
         else:
             raise
 
-        if isinstance(self.authors, basestring):
+        if isinstance(self.authors, str):
             self.authors = [self.authors]
 
     def __str__(self):
@@ -287,7 +287,7 @@ def processSpecrefBiblioFile(text, storage, order):
     obsoletedBy = {}
     for biblioKey, data in datas.items():
         biblio = {"linkText": biblioKey, "order": order}
-        if isinstance(data, basestring):
+        if isinstance(data, str):
             # Handle <legacyRef>
             biblio['biblioFormat'] = "string"
             biblio['data'] = data.replace("\n", " ")
@@ -326,44 +326,44 @@ def processSpecrefBiblioFile(text, storage, order):
 def loadBiblioDataFile(lines, storage):
     try:
         while True:
-            fullKey = lines.next()
+            fullKey = next(lines)
             prefix, key = fullKey[0], fullKey[2:].strip()
             if prefix == "d":
                 b = {
-                    "linkText": lines.next(),
-                    "date": lines.next(),
-                    "status": lines.next(),
-                    "title": lines.next(),
-                    "snapshot_url": lines.next(),
-                    "current_url": lines.next(),
-                    "obsoletedBy": lines.next(),
-                    "other": lines.next(),
-                    "etAl": lines.next() != "\n",
+                    "linkText": next(lines),
+                    "date": next(lines),
+                    "status": next(lines),
+                    "title": next(lines),
+                    "snapshot_url": next(lines),
+                    "current_url": next(lines),
+                    "obsoletedBy": next(lines),
+                    "other": next(lines),
+                    "etAl": next(lines) != "\n",
                     "order": 3,
                     "biblioFormat": "dict",
                     "authors": []
                 }
                 while True:
-                    line = lines.next()
+                    line = next(lines)
                     if line == b"-\n":
                         break
                     b['authors'].append(line)
             elif prefix == "s":
                 b = {
-                    "linkText": lines.next(),
-                    "data": lines.next(),
+                    "linkText": next(lines),
+                    "data": next(lines),
                     "biblioFormat": "string",
                     "order": 3
                 }
-                line = lines.next()  # Eat the -
+                line = next(lines)  # Eat the -
             elif prefix == "a":
                 b = {
-                    "linkText": lines.next(),
-                    "aliasOf": lines.next(),
+                    "linkText": next(lines),
+                    "aliasOf": next(lines),
                     "biblioFormat": "alias",
                     "order": 3
                 }
-                line = lines.next()  # Eat the -
+                line = next(lines)  # Eat the -
             else:
                 die("Unknown biblio prefix '{0}' on key '{1}'", prefix, fullKey)
                 continue
@@ -380,7 +380,7 @@ def levenshtein(a,b):
         a,b = b,a
         n,m = m,n
 
-    current = range(n + 1)
+    current = list(range(n + 1))
     for i in range(1,m + 1):
         previous, current = current, [i] + [0] * n
         for j in range(1,n + 1):
@@ -441,7 +441,7 @@ def dedupBiblioReferences(doc):
     '''
 
     def isShepherdRef(ref):
-        return type(ref) == SpecBasedBiblioEntry
+        return isinstance(ref, SpecBasedBiblioEntry)
 
     normSpecRefRefs = {}
     normShepherdRefs = {}
@@ -496,14 +496,14 @@ def dedupBiblioReferences(doc):
 
     # Remove all the Shepherd refs that are left in duped
     poppedKeys = defaultdict(dict)
-    for key,ref in doc.informativeRefs.items():
+    for key,ref in list(doc.informativeRefs.items()):
         if ref.url in dupedUrls:
             if isShepherdRef(ref):
                 doc.informativeRefs.pop(key)
                 poppedKeys[ref.url]["shepherd"] = key
             else:
                 poppedKeys[ref.url]["specref"] = key
-    for key,ref in doc.normativeRefs.items():
+    for key,ref in list(doc.normativeRefs.items()):
         if ref.url in dupedUrls:
             if isShepherdRef(ref):
                 doc.normativeRefs.pop(key)
@@ -517,6 +517,6 @@ def dedupBiblioReferences(doc):
         if "shepherd" not in keys or "specref" not in keys:
             continue
         if keys["shepherd"] in doc.externalRefsUsed:
-            for k,v in doc.externalRefsUsed[keys["shepherd"]].items():
+            for k,v in list(doc.externalRefsUsed[keys["shepherd"]].items()):
                 doc.externalRefsUsed[keys["specref"]][k] = v
         del doc.externalRefsUsed[keys["shepherd"]]
