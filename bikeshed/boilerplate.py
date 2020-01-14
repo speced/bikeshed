@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import division, unicode_literals
+
 import copy
 import os
 import re
@@ -201,7 +201,7 @@ def addBikeshedBoilerplate(doc):
 
 
 def addIndexSection(doc):
-    if len(findAll(config.dfnElementsSelector, doc)) == 0 and len(doc.externalRefsUsed.keys()) == 0:
+    if len(findAll(config.dfnElementsSelector, doc)) == 0 and len(list(doc.externalRefsUsed.keys())) == 0:
         return
     container = getFillContainer('index', doc=doc, default=True)
     if container is None:
@@ -212,7 +212,7 @@ def addIndexSection(doc):
     if len(findAll(config.dfnElementsSelector, doc)):
         addIndexOfLocallyDefinedTerms(doc, container)
 
-    if len(doc.externalRefsUsed.keys()):
+    if len(list(doc.externalRefsUsed.keys())):
         addIndexOfExternallyDefinedTerms(doc, container)
 
 
@@ -364,7 +364,7 @@ def addExplicitIndexes(doc):
                 ttf = (text, ref.type, "".join(ref.for_) if ref.for_ else None)
                 refsFromTtf[ttf].append(ref)
         filteredRefs = defaultdict(list)
-        for ttf, refs in refsFromTtf.items():
+        for ttf, refs in list(refsFromTtf.items()):
             refs = doc.refs.filterObsoletes(refs)
             refs = refUtils.filterOldVersions(refs)
             if refs:
@@ -435,7 +435,7 @@ def addIndexOfExternallyDefinedTerms(doc, container):
         termsUl = appendChild(specLi, E.ul())
         for text,refs in sorted(refGroups.items(), key=lambda x:x[0]):
             if len(refs) == 1:
-                ref = refs.values()[0]
+                ref = list(refs.values())[0]
                 link = makeLink(ref.text)
             else:
                 for key,ref in sorted(refs.items(), key=lambda x:x[0]):
@@ -582,7 +582,7 @@ def addPropertyIndex(doc):
 
 
 def addIDLSection(doc):
-    idlBlocks = filter(lambda x:isNormative(x, doc), findAll("pre.idl, xmp.idl", doc))
+    idlBlocks = [x for x in findAll("pre.idl, xmp.idl", doc) if isNormative(x, doc)]
     if len(idlBlocks) == 0:
         return
     html = getFillContainer('idl-index', doc=doc, default=True)
@@ -770,12 +770,12 @@ def addSpecMetadataSection(doc):
         md["Issue Tracking"] = [E.a({"href":href}, text) for text,href in doc.md.issues]
     if doc.md.editors:
         editorTerm = doc.md.editorTerm['singular']
-        md[editorTerm] = map(printEditor, doc.md.editors)
+        md[editorTerm] = list(map(printEditor, doc.md.editors))
     if doc.md.previousEditors:
         editorTerm = doc.md.editorTerm['singular']
-        md["Former " + editorTerm] = map(printEditor, doc.md.previousEditors)
+        md["Former " + editorTerm] = list(map(printEditor, doc.md.previousEditors))
     if doc.md.translations:
-        md["Translations"] = map(printTranslation, doc.md.translations)
+        md["Translations"] = list(map(printTranslation, doc.md.translations))
     if doc.md.audience:
         md["Audience"] = [", ".join(doc.md.audience)]
     if doc.md.toggleDiffs:
