@@ -91,7 +91,7 @@ def _createDiagram(command, prelude, children, text=None, line=-1):
     Each command must be {command, prelude, children}
     '''
     if command == "Diagram":
-        children = filter(None, [_createDiagram(**child) for child in children])
+        children = [_f for _f in [_createDiagram(**child) for child in children] if _f]
         return rr.Diagram(*children)
     elif command in ("T", "Terminal"):
         if children:
@@ -116,14 +116,14 @@ def _createDiagram(command, prelude, children, text=None, line=-1):
             return die("Line {0} - Sequence commands cannot have preludes.", line)
         if not children:
             return die("Line {0} - Sequence commands need at least one child.", line)
-        children = filter(None, [_createDiagram(**child) for child in children])
+        children = [_f for _f in [_createDiagram(**child) for child in children] if _f]
         return rr.Sequence(*children)
     elif command in ("Stack", ):
         if prelude:
             return die("Line {0} - Stack commands cannot have preludes.", line)
         if not children:
             return die("Line {0} - Stack commands need at least one child.", line)
-        children = filter(None, [_createDiagram(**child) for child in children])
+        children = [_f for _f in [_createDiagram(**child) for child in children] if _f]
         return rr.Stack(*children)
     elif command in ("Or", "Choice"):
         if prelude == "":
@@ -136,28 +136,28 @@ def _createDiagram(command, prelude, children, text=None, line=-1):
                 default = 0
         if not children:
             return die("Line {0} - Choice commands need at least one child.", line)
-        children = filter(None, [_createDiagram(**child) for child in children])
+        children = [_f for _f in [_createDiagram(**child) for child in children] if _f]
         return rr.Choice(default, *children)
     elif command in ("Opt", "Optional"):
         if prelude not in ("", "skip"):
             return die("Line {0} - Optional preludes must be nothing or 'skip'. Got:\n{1}", line, prelude)
         if len(children) != 1:
             return die("Line {0} - Optional commands need exactly one child.", line)
-        children = filter(None, [_createDiagram(**child) for child in children])
+        children = [_f for _f in [_createDiagram(**child) for child in children] if _f]
         return rr.Optional(*children, skip=(prelude == "skip"))
     elif command in ("Plus", "OneOrMore"):
         if prelude:
             return die("Line {0} - OneOrMore commands cannot have preludes.", line)
         if 0 == len(children) > 2:
             return die("Line {0} - OneOrMore commands must have one or two children.", line)
-        children = filter(None, [_createDiagram(**child) for child in children])
+        children = [_f for _f in [_createDiagram(**child) for child in children] if _f]
         return rr.OneOrMore(*children)
     elif command in ("Star", "ZeroOrMore"):
         if prelude:
             return die("Line {0} - ZeroOrMore commands cannot have preludes.", line)
         if 0 == len(children) > 2:
             return die("Line {0} - ZeroOrMore commands must have one or two children.", line)
-        children = filter(None, [_createDiagram(**child) for child in children])
+        children = [_f for _f in [_createDiagram(**child) for child in children] if _f]
         return rr.ZeroOrMore(*children)
     else:
         return die("Line {0} - Unknown command '{1}'.", line, command)
