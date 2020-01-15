@@ -24,5 +24,9 @@ WORKDIR /app
 COPY --from=builder /install /usr/local
 COPY --from=specdata /bikeshed-master/bikeshed/spec-data /app/bikeshed/spec-data
 
-COPY . /app
+COPY setup.py /app/
 RUN pip install --editable .
+
+COPY .git /app/.git
+COPY bikeshed.py /app/
+COPY bikeshed /app/bikeshed
