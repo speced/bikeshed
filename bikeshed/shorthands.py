@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import division, unicode_literals
+
 import re
 from .htmlhelpers import *
 from .messages import *
@@ -76,7 +76,7 @@ def transformProductionPlaceholders(doc):
                     if not correctlyOrderedRange(rangeStart, rangeEnd):
                         die("Shorthand <<{0}>> has a range whose start is not less than its end.", text, el=el)
                 except:
-                    print text
+                    print(text)
                     raise
                 interior += " [{0},{1}]".format(rangeStart, rangeEnd)
                 el.set("data-lt", "<{0}>".format(term))
@@ -104,7 +104,7 @@ def formatValue(val):
     except ValueError:
         return None
 
-    return ("−" if negative else "") + unicode(val) + unit
+    return ("−" if negative else "") + str(val) + unit
 
 def correctlyOrderedRange(start, end):
     start = numFromRangeVal(start)
@@ -170,7 +170,7 @@ def transformAutolinkShortcuts(doc):
         children = childNodes(parentEl, clear=True)
         newChildren = []
         for el in children:
-            if isinstance(el, basestring):
+            if isinstance(el, str):
                 newChildren.extend(transformText(el))
             elif isElement(el):
                 transformElement(el)
@@ -285,7 +285,7 @@ def transformProductionGrammars(doc):
         children = childNodes(parentEl, clear=True)
         newChildren = []
         for el in children:
-            if isinstance(el, basestring):
+            if isinstance(el, str):
                 newChildren.extend(transformText(el))
             elif isElement(el):
                 if el.tag != "a":
