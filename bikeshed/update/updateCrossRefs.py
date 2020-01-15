@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-from __future__ import division, unicode_literals
+
 import io
 import json
 import re
 import os
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 from collections import defaultdict
 from contextlib import closing
 
@@ -71,7 +71,7 @@ def update(path, dryRun=False):
             p = os.path.join(path, "specs.json")
             writtenPaths.add(p)
             with io.open(p, 'w', encoding="utf-8") as f:
-                f.write(unicode(json.dumps(specs, ensure_ascii=False, indent=2, sort_keys=True)))
+                f.write(json.dumps(specs, ensure_ascii=False, indent=2, sort_keys=True))
         except Exception as e:
             die("Couldn't save spec database to disk.\n{0}", e)
             return
@@ -80,7 +80,7 @@ def update(path, dryRun=False):
                 p = os.path.join(path, "headings", "headings-{0}.json".format(spec))
                 writtenPaths.add(p)
                 with io.open(p, 'w', encoding="utf-8") as f:
-                    f.write(unicode(json.dumps(specHeadings, ensure_ascii=False, indent=2, sort_keys=True)))
+                    f.write(json.dumps(specHeadings, ensure_ascii=False, indent=2, sort_keys=True))
         except Exception as e:
             die("Couldn't save headings database to disk.\n{0}", e)
             return
@@ -93,7 +93,7 @@ def update(path, dryRun=False):
             p = os.path.join(path, "methods.json")
             writtenPaths.add(p)
             with io.open(p, 'w', encoding="utf-8") as f:
-                f.write(unicode(json.dumps(methods, ensure_ascii=False, indent=2, sort_keys=True)))
+                f.write(json.dumps(methods, ensure_ascii=False, indent=2, sort_keys=True))
         except Exception as e:
             die("Couldn't save methods database to disk.\n{0}", e)
             return
@@ -101,7 +101,7 @@ def update(path, dryRun=False):
             p = os.path.join(path, "fors.json")
             writtenPaths.add(p)
             with io.open(p, 'w', encoding="utf-8") as f:
-                f.write(unicode(json.dumps(fors, ensure_ascii=False, indent=2, sort_keys=True)))
+                f.write(json.dumps(fors, ensure_ascii=False, indent=2, sort_keys=True))
         except Exception as e:
             die("Couldn't save fors database to disk.\n{0}", e)
             return
@@ -183,12 +183,12 @@ def fixupAnchor(anchor):
     anchor['linking_text'] = linkingTexts
 
     # Normalize whitespace to a single space
-    for k,v in anchor.items():
-        if isinstance(v, basestring):
+    for k,v in list(anchor.items()):
+        if isinstance(v, str):
             anchor[k] = re.sub(r"\s+", " ", v.strip())
         elif isinstance(v, list):
             for k1, v1 in enumerate(v):
-                if isinstance(v1, basestring):
+                if isinstance(v1, str):
                     anchor[k][k1] = re.sub(r"\s+", " ", v1.strip())
     return anchor
 
@@ -241,7 +241,7 @@ def cleanSpecHeadings(headings):
        Want to keep the collision data for multi-page, so I can tell when you request a non-existent page,
        but need to collapse away the collision stuff for single-page.'''
     for specHeadings in headings.values():
-        for k, v in specHeadings.items():
+        for k, v in list(specHeadings.items()):
             if k[0] == "#" and len(v) == 1 and v[0][0:2] == "/#":
                 # No collision, and this is either a single-page spec or a non-colliding front-page link
                 # Go ahead and collapse them.
@@ -305,7 +305,7 @@ def extractForsData(anchors):
                 fors[for_].add(key)
             if not anchor["for"]:
                 fors["/"].add(key)
-    for key, val in fors.items():
+    for key, val in list(fors.items()):
         fors[key] = sorted(val)
     return fors
 
@@ -339,7 +339,7 @@ def writeAnchorsFile(anchors, path):
                 for e in entries:
                     fh.write(key + "\n")
                     for field in ["type", "spec", "shortname", "level", "status", "url"]:
-                        fh.write(unicode(e.get(field, "")) + "\n")
+                        fh.write(str(e.get(field, "")) + "\n")
                     for field in ["export", "normative"]:
                         if e.get(field, False):
                             fh.write("1\n")
