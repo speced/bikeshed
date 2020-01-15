@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import division, unicode_literals
+
 import difflib
 import io
 import os
@@ -54,7 +54,7 @@ def runAllTests(Spec, testFiles=None, manualOnly=False, md=None):
     total = 0
     fails = []
     for i,testPath in enumerate(testFiles, 1):
-        justifiedI = unicode(i).rjust(len(str(len(testFiles))))
+        justifiedI = str(i).rjust(len(str(len(testFiles))))
         testName = testNameForPath(testPath)
         p("{0}/{1}: {2}".format(justifiedI, len(testFiles), testName))
         total += 1
@@ -121,7 +121,7 @@ def rebase(Spec, files=None, md=None):
     else:
         files = [os.path.join(TEST_DIR, x) for x in files]
     for i,path in enumerate(files, 1):
-        justifiedI = unicode(i).rjust(len(str(len(files))))
+        justifiedI = str(i).rjust(len(str(len(files))))
         resetSeenMessages()
         name = testNameForPath(path)
         p("{0}/{1}: Rebasing {2}".format(justifiedI, len(files), name))
