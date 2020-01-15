@@ -156,7 +156,7 @@ class IDLMarker(object):
         elif idlType == "dict-member":
             extraParameters = 'data-type="{0}"'.format(construct.type)
             if construct.default is not None:
-                value = escapeAttr("{0}".format(construct.default.value))
+                value = escapeAttr("{0}".format(construct.default.value if construct.default.value else (construct.default._open.symbol + construct.default._close.symbol)))
                 extraParameters += ' data-default="{0}"'.format(value)
         elif idlType in ["interface", "namespace", "dictionary"]:
             if construct.partial:
