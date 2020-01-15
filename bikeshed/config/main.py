@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import division, unicode_literals
+
 import collections
 import io
 import lxml
@@ -162,7 +162,7 @@ _groupFromKeyCache = {}
 
 def flatten(l):
     for el in l:
-        if isinstance(el, collections.Iterable) and not isinstance(el, basestring) and not lxml.etree.iselement(el):
+        if isinstance(el, collections.Iterable) and not isinstance(el, str) and not lxml.etree.iselement(el):
             for sub in flatten(el):
                 yield sub
         else:

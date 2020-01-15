@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import division, unicode_literals
+
 
 class Nil(object):
     '''Super-None, falsey and returns itself from every method/attribute/etc'''
@@ -10,7 +10,7 @@ class Nil(object):
     def __str__(self):
         return "Nil"
 
-    def __nonzero__(self):
+    def __bool__(self):
         return False
 
     def __call__(self, *args, **kwargs):
