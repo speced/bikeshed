@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import division, unicode_literals
+
 
 import io
 import itertools
@@ -7,7 +7,7 @@ import json
 import logging
 import os
 import re
-import urllib
+import urllib.request, urllib.parse, urllib.error
 from collections import defaultdict, namedtuple
 from functools import partial as curry
 
@@ -352,7 +352,7 @@ def fixIntraDocumentReferences(doc):
     ids = {el.get('id'):el for el in findAll("[id]", doc)}
     headingIDs = {el.get('id'):el for el in findAll("[id].heading", doc)}
     for el in findAll("a[href^='#']:not([href='#']):not(.self-link):not([data-link-type])", doc):
-        targetID = urllib.unquote(el.get("href")[1:])
+        targetID = urllib.parse.unquote(el.get("href")[1:])
         if el.get('data-section') is not None and targetID not in headingIDs:
             die("Couldn't find target document section {0}:\n{1}", targetID, outerHTML(el), el=el)
             continue
@@ -814,7 +814,7 @@ def verifyUsageOfAllLocalBiblios(doc):
     were used in the spec,
     so you can remove entries when they're no longer necessary.
     '''
-    usedBiblioKeys = set(x.lower() for x in doc.normativeRefs.keys() + doc.informativeRefs.keys())
+    usedBiblioKeys = set(x.lower() for x in list(doc.normativeRefs.keys()) + list(doc.informativeRefs.keys()))
     localBiblios = [b["linkText"].lower() for bs in doc.refs.biblios.values() for b in bs if b['order'] == 1]
     unusedBiblioKeys = []
     for b in localBiblios:
@@ -1227,8 +1227,8 @@ def formatArgumentdefTables(doc):
             argName = textContent(tds[0]).strip()
             arg = method.findArgument(argName)
             if arg:
-                appendChild(tds[1], unicode(arg.type))
-                if unicode(arg.type).strip().endswith("?"):
+                appendChild(tds[1], str(arg.type))
+                if str(arg.type).strip().endswith("?"):
                     appendChild(tds[2],
                                 E.span({"class":"yes"}, "✔"))
                 else:
@@ -1343,7 +1343,7 @@ def inlineRemoteIssues(doc):
     # Save the cache for later
     try:
         with io.open(config.scriptPath("spec-data", "github-issues.json"), 'w', encoding="utf-8") as f:
-            f.write(unicode(json.dumps(responses, ensure_ascii=False, indent=2, sort_keys=True)))
+            f.write(json.dumps(responses, ensure_ascii=False, indent=2, sort_keys=True))
     except Exception as e:
         warn("Couldn't save GitHub Issues cache to disk.\n{0}", e)
     return
