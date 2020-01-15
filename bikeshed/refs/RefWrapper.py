@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import division, unicode_literals
+
 
 import copy
 
@@ -67,6 +67,5 @@ class RefWrapper(object):
         return stripLineBreaks(refCopy)
 
 def decode(s):
-    if isinstance(s, str):
-        return unicode(s, encoding="utf-8")
+    # TODO: verify that this can be removed
     return s

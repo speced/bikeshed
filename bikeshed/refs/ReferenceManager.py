@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import division, unicode_literals
+
 
 import io
 import json
@@ -360,7 +360,7 @@ class ReferenceManager(object):
                 for argfullName, metadata in methodSignatures.items():
                     if text in metadata["args"] and (interfaceName in metadata["for"] or interfaceName is None) and metadata["shortname"] != self.shortname:
                         possibleMethods[metadata["shortname"]].append(argfullName)
-                possibleMethods = possibleMethods.values()
+                possibleMethods = list(possibleMethods.values())
                 if not possibleMethods:
                     # No method signatures with this argument/interface.
                     # Jump out and fail in a normal way.
@@ -387,13 +387,13 @@ class ReferenceManager(object):
             # Allow foo(bar) to be for'd to with just foo() if it's completely unambiguous.
             methodPrefix = methodName[:-1]
             candidates, _ = self.localRefs.queryRefs(linkType="functionish", linkFor=interfaceName)
-            methodRefs = {c.url: c for c in candidates if c.text.startswith(methodPrefix)}.values()
+            methodRefs = list({c.url: c for c in candidates if c.text.startswith(methodPrefix)}.values())
             if not methodRefs:
                 # Look for non-locals, then
                 c1,_ = self.anchorBlockRefs.queryRefs(linkType="functionish", spec=spec, status=status, statusHint=statusHint, linkFor=interfaceName, export=export, ignoreObsoletes=True)
                 c2,_ = self.foreignRefs.queryRefs(linkType="functionish", spec=spec, status=status, statusHint=statusHint, linkFor=interfaceName, export=export, ignoreObsoletes=True)
                 candidates = c1 + c2
-                methodRefs = {c.url: c for c in candidates if c.text.startswith(methodPrefix)}.values()
+                methodRefs = list({c.url: c for c in candidates if c.text.startswith(methodPrefix)}.values())
             if zeroRefsError and len(methodRefs) > 1:
                 # More than one possible foo() overload, can't tell which to link to
                 linkerror("Too many possible method targets to disambiguate '{0}/{1}'. Please specify the names of the required args, like 'foo(bar, baz)', in the 'for' attribute.", linkFor, text, el=el)

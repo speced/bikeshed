@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import division, unicode_literals
+
 
 from collections import defaultdict
 from .. import config
@@ -162,8 +162,6 @@ def stripLineBreaks(obj):
     it = obj.items() if isinstance(obj, dict) else enumerate(obj)
     for key, val in it:
         if isinstance(val, str):
-            obj[key] = unicode(val, encoding="utf-8").rstrip("\n")
-        elif isinstance(val, unicode):
             obj[key] = val.rstrip("\n")
         elif isinstance(val, dict) or isinstance(val, list):
             stripLineBreaks(val)
