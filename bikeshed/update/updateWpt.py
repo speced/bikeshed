@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-from __future__ import division, unicode_literals
+
 import io
 import json
 import os
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 from contextlib import closing
 
 from ..messages import *
@@ -11,7 +11,7 @@ from ..messages import *
 def update(path, dryRun=False):
     try:
         say("Downloading web-platform-tests data...")
-        with closing(urllib2.urlopen("https://wpt.fyi/api/manifest")) as fh:
+        with closing(urllib.request.urlopen("https://wpt.fyi/api/manifest")) as fh:
             sha = fh.info().getheader("x-wpt-sha")
             jsonData = json.load(fh, encoding="utf-8")
     except Exception as e:

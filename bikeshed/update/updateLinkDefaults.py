@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-from __future__ import division, unicode_literals
+
 import io
 import json
 import os
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 from contextlib import closing
 
 from ..messages import *
@@ -11,8 +11,8 @@ from ..messages import *
 def update(path, dryRun=False):
     try:
         say("Downloading link defaults...")
-        with closing(urllib2.urlopen("https://raw.githubusercontent.com/tabatkins/bikeshed/master/bikeshed/spec-data/readonly/link-defaults.infotree")) as fh:
-            data = unicode(fh.read(), encoding="utf-8")
+        with closing(urllib.request.urlopen("https://raw.githubusercontent.com/tabatkins/bikeshed/master/bikeshed/spec-data/readonly/link-defaults.infotree")) as fh:
+            data = str(fh.read(), encoding="utf-8")
     except Exception as e:
         die("Couldn't download link defaults data.\n{0}", e)
         return

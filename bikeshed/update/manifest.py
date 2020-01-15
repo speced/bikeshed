@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-from __future__ import division, unicode_literals
+
 
 import hashlib
 import io
 import os
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 from contextlib import closing
 from datetime import datetime
 
@@ -28,7 +28,7 @@ def createManifest(path, dryRun=False):
     if not dryRun:
         try:
             with io.open(os.path.join(path, "manifest.txt"), 'w', encoding="utf-8") as fh:
-                fh.write(unicode(datetime.utcnow()) + "\n")
+                fh.write(str(datetime.utcnow()) + "\n")
                 for p,h in sorted(manifests, key=keyManifest):
                     fh.write("{0} {1}\n".format(h, p))
         except Exception as err:
@@ -90,8 +90,8 @@ def updateByManifest(path, dryRun=False):
         warn("Couldn't find local manifest file.\n{0}", e)
         return False
     try:
-        with closing(urllib2.urlopen(ghPrefix + "manifest.txt")) as fh:
-            remoteManifest = [unicode(line, encoding="utf-8") for line in fh]
+        with closing(urllib.request.urlopen(ghPrefix + "manifest.txt")) as fh:
+            remoteManifest = [str(line, encoding="utf-8") for line in fh]
     except Exception as e:
         warn("Couldn't download remote manifest file.\n{0}", e)
         return False
@@ -123,7 +123,7 @@ def updateByManifest(path, dryRun=False):
                 os.remove(localizePath(path, filePath))
                 deletedPaths.append(filePath)
         if deletedPaths:
-            print "Deleted {0} old data file{1}.".format(len(deletedPaths), "s" if len(deletedPaths) > 1 else "")
+            print("Deleted {0} old data file{1}.".format(len(deletedPaths), "s" if len(deletedPaths) > 1 else ""))
 
     if not dryRun:
         import time
@@ -135,9 +135,9 @@ def updateByManifest(path, dryRun=False):
             remotePath = ghPrefix + filePath
             localPath = localizePath(path, filePath)
             try:
-                with closing(urllib2.urlopen(remotePath)) as fh:
-                    newFile = unicode(fh.read(), encoding="utf-8")
-            except Exception,e:
+                with closing(urllib.request.urlopen(remotePath)) as fh:
+                    newFile = str(fh.read(), encoding="utf-8")
+            except Exception as e:
                 warn("Couldn't download file '{0}'.\n{1}", remotePath, e)
                 return False
             try:
@@ -146,7 +146,7 @@ def updateByManifest(path, dryRun=False):
                     os.makedirs(dirPath)
                 with io.open(localPath, 'w', encoding="utf-8") as fh:
                     fh.write(newFile)
-            except Exception,e:
+            except Exception as e:
                 warn("Couldn't save file '{0}'.\n{1}", localPath, e)
                 return False
 
@@ -157,7 +157,7 @@ def updateByManifest(path, dryRun=False):
         try:
             with io.open(os.path.join(path, "manifest.txt"), 'w', encoding="utf-8") as fh:
                 fh.write("".join(remoteManifest))
-        except Exception,e:
+        except Exception as e:
             warn("Couldn't save new manifest file.\n{0}", e)
             return False
     say("Done!")
