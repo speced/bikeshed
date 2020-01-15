@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import division, unicode_literals
+
 
 import re
 from collections import defaultdict
@@ -47,7 +47,7 @@ dfnClassToType = {
     "http-headerdef"     : "http-header"}
 
 
-dfnTypes = frozenset(dfnClassToType.values() + ["dfn"])
+dfnTypes = frozenset(list(dfnClassToType.values()) + ["dfn"])
 maybeTypes = frozenset(["value", "type", "at-rule", "function", "selector"])
 cssTypes = frozenset(["property", "value", "at-rule", "descriptor", "type", "function", "selector"])
 markupTypes = frozenset(["element", "element-attr", "element-state", "attr-value"])
@@ -89,11 +89,11 @@ def linkTypeIn(linkTypes, targetTypes="all"):
     #  and expand into one or more base types.)
     # Called with no arguments,
     # tests if the passed type is a valid dfn/link type.
-    if isinstance(linkTypes, basestring):
+    if isinstance(linkTypes, str):
         linkTypes = linkTypeToDfnType[linkTypes]
     else:
         linkTypes = set(linkTypes)
-    if isinstance(targetTypes, basestring):
+    if isinstance(targetTypes, str):
         targetTypes = linkTypeToDfnType[targetTypes]
     else:
         targetTypes = set(targetTypes)
@@ -107,14 +107,14 @@ dfnElementsSelector = "dfn, h2[data-dfn-type], h3[data-dfn-type], h4[data-dfn-ty
 
 
 # Some of the more significant types and their patterns
-trivialPattern = re.compile(".+")
+trivialPattern = re.compile(r".+")
 typeRe = defaultdict(lambda:trivialPattern)
-typeRe["property"] = re.compile("^[\w-]+$")
-typeRe["at-rule"] = re.compile("^@[\w-]+$")
+typeRe["property"] = re.compile(r"^[\w-]+$")
+typeRe["at-rule"] = re.compile(r"^@[\w-]+$")
 typeRe["descriptor"] = typeRe["property"]
-typeRe["type"] = re.compile("^<[\w-]+>$")
-typeRe["function"] = re.compile("^[\w-]+\(.*\)$")
-typeRe["selector"] = re.compile("^::?[\w-]+(\(|$)")
+typeRe["type"] = re.compile(r"^<[\w-]+>$")
+typeRe["function"] = re.compile(r"^[\w-]+\(.*\)$")
+typeRe["selector"] = re.compile(r"^::?[\w-]+(\(|$)")
 typeRe["constructor"] = typeRe["function"]
 typeRe["method"] = typeRe["function"]
-typeRe["interface"] = re.compile("^\w+$")
+typeRe["interface"] = re.compile(r"^\w+$")
