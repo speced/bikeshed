@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import division, unicode_literals
+
 
 import glob
 import io
@@ -83,7 +83,7 @@ class Spec(object):
 
         try:
             if self.inputSource == "-":
-                self.lines = [Line(i,unicode(line, encoding="utf-8")) for i,line in enumerate(sys.stdin.readlines(), 1)]
+                self.lines = [Line(i,line) for i,line in enumerate(sys.stdin.readlines(), 1)]
             else:
                 self.lines = [Line(i,l) for i,l in enumerate(io.open(self.inputSource, 'r', encoding="utf-8").readlines(), 1)]
                 # Initialize date to the last-modified date on the file,
@@ -306,19 +306,19 @@ class Spec(object):
 
         if port:
             # Serve the folder on an HTTP server
-            import SimpleHTTPServer
-            import SocketServer
+            import http.server
+            import socketserver
             import threading
 
-            class SilentServer(SimpleHTTPServer.SimpleHTTPRequestHandler):
+            class SilentServer(http.server.SimpleHTTPRequestHandler):
                 def log_message(*args):
                     pass
 
-            SocketServer.TCPServer.allow_reuse_address = True
-            server = SocketServer.TCPServer(
+            socketserver.TCPServer.allow_reuse_address = True
+            server = socketserver.TCPServer(
               ("localhost" if localhost else "", port), SilentServer)
 
-            print "Serving at port {0}".format(port)
+            print("Serving at port {0}".format(port))
             thread = threading.Thread(target = server.serve_forever)
             thread.daemon = True
             thread.start()
