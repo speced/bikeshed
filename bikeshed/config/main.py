@@ -5,8 +5,7 @@ import io
 import lxml
 import os
 import re
-
-from ..enum import Enum
+from enum import Enum
 
 errorLevel = ["fatal"]
 quiet = True
@@ -16,7 +15,9 @@ printMode = "console"
 testAnnotationURL = "https://test.csswg.org/harness/annotate.js"
 
 
-refStatus = Enum("current", "snapshot")
+class refStatus(Enum):
+    current = "current"
+    snapshot = "snapshot"
 
 
 def englishFromList(items, conjunction="or"):
