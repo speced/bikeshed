@@ -6,6 +6,7 @@ import os
 import sys
 
 from . import config
+from . import constants
 from . import update
 from .messages import *
 
@@ -190,18 +191,18 @@ def main():
 
     options, extras = argparser.parse_known_args()
 
-    config.quiet = options.quiet
+    constants.quiet = options.quiet
     if options.silent:
-        config.quiet = float("infinity")
-    config.setErrorLevel(options.errorLevel)
-    config.dryRun = options.dryRun
+        constants.quiet = float("infinity")
+    constants.setErrorLevel(options.errorLevel)
+    constants.dryRun = options.dryRun
     if options.printMode is None:
         if "NO_COLOR" in os.environ or os.environ.get("TERM") == "dumb":
-            config.printMode = "plain"
+            constants.printMode = "plain"
         else:
-            config.printMode = "console"
+            constants.printMode = "console"
     else:
-        config.printMode = options.printMode
+        constants.printMode = options.printMode
 
     update.fixupDataFiles()
     if options.subparserName == "update":
@@ -233,7 +234,7 @@ def main():
 
 
 def handleUpdate(options, extras):
-    update.update(anchors=options.anchors, backrefs=options.backrefs, biblio=options.biblio, caniuse=options.caniuse, linkDefaults=options.linkDefaults, testSuites=options.testSuites, languages=options.languages, wpt=options.wpt, dryRun=config.dryRun, force=options.force)
+    update.update(anchors=options.anchors, backrefs=options.backrefs, biblio=options.biblio, caniuse=options.caniuse, linkDefaults=options.linkDefaults, testSuites=options.testSuites, languages=options.languages, wpt=options.wpt, dryRun=constants.dryRun, force=options.force)
 
 
 def handleSpec(options, extras):
@@ -266,7 +267,7 @@ def handleWatch(options, extras):
     from . import metadata
     from .Spec import Spec
     # Can't have an error killing the watcher
-    config.setErrorLevel("nothing")
+    constants.setErrorLevel("nothing")
     doc = Spec(inputFilename=options.infile, token=options.ghToken)
     doc.mdCommandLine = metadata.fromCommandLine(extras)
     if options.byos:
@@ -277,7 +278,7 @@ def handleWatch(options, extras):
 def handleServe(options, extras):
     from . import metadata
     from .Spec import Spec
-    config.setErrorLevel("nothing")
+    constants.setErrorLevel("nothing")
     doc = Spec(inputFilename=options.infile, token=options.ghToken)
     doc.mdCommandLine = metadata.fromCommandLine(extras)
     if options.byos:
@@ -288,8 +289,8 @@ def handleServe(options, extras):
 def handleDebug(options, extras):
     from . import metadata
     from .Spec import Spec
-    config.setErrorLevel("nothing")
-    config.quiet = 2
+    constants.setErrorLevel("nothing")
+    constants.quiet = 2
     if options.printExports:
         doc = Spec(inputFilename=options.infile)
         doc.mdCommandLine = metadata.fromCommandLine(extras)
@@ -310,15 +311,15 @@ def handleDebug(options, extras):
         doc.mdCommandLine = metadata.fromCommandLine(extras)
         doc.preprocess()
         refs = doc.refs.refs[options.linkText] + doc.refs.refs[options.linkText + "\n"]
-        config.quiet = options.quiet
-        if not config.quiet:
+        constants.quiet = options.quiet
+        if not constants.quiet:
             p("Refs for '{0}':".format(options.linkText))
         # Get ready for JSONing
         for ref in refs:
             ref['level'] = str(ref['level'])
         p(config.printjson(refs))
     elif options.refreshData:
-        config.quiet = 0
+        constants.quiet = 0
         update.updateReadonlyDataFiles()
         warn("Don't forget to bump the version number!")
 
@@ -327,8 +328,8 @@ def handleRefs(options, extras):
     from . import metadata
     from .refs.ReferenceManager import ReferenceManager
     from .Spec import Spec
-    config.setErrorLevel("nothing")
-    config.quiet = 10
+    constants.setErrorLevel("nothing")
+    constants.quiet = 10
     doc = Spec(inputFilename=options.infile)
     if doc.valid:
         doc.mdCommandLine = metadata.fromCommandLine(extras)
@@ -340,7 +341,7 @@ def handleRefs(options, extras):
     if options.text:
         options.text = str(options.text, encoding="utf-8")
     refs = rm.queryAllRefs(text=options.text, linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, latestOnly=options.latestOnly, exact=options.exact)
-    if config.printMode == "json":
+    if constants.printMode == "json":
         p(json.dumps(refs, indent=2, default=config.getjson))
     else:
         p(config.printjson(refs))
@@ -368,8 +369,8 @@ def handleTest(options, extras):
     from .Spec import Spec
     from . import test
     md = metadata.fromCommandLine(extras)
-    config.setErrorLevel("nothing")
-    config.quiet = 100
+    constants.setErrorLevel("nothing")
+    constants.quiet = 100
     if options.rebase:
         test.rebase(Spec, options.testFiles, md=md)
     else:

@@ -7,6 +7,7 @@ import re
 from collections import defaultdict
 
 from .. import config
+from .. import constants
 from .RefWrapper import RefWrapper
 from .utils import *
 
@@ -184,12 +185,12 @@ class RefSource(object):
             return refs, "for"
 
         def filterByStatus(refs, status):
-            if status in config.refStatus:
+            if status in constants.refStatus:
                 # If status is "current'", kill snapshot refs unless their spec *only* has a snapshot_url
-                if status == config.refStatus.current:
+                if status == constants.refStatus.current:
                     return [ref for ref in refs if ref.status == "current" or (ref.status == "snapshot" and self.specs.get(ref.spec,{}).get('current_url') is None)]
                 # If status is "snapshot", kill current refs if there's a corresponding snapshot ref for the same spec.
-                elif status == config.refStatus.snapshot:
+                elif status == constants.refStatus.snapshot:
                     snapshotSpecs = [ref.spec for ref in refs if ref.status == 'snapshot']
                     return [ref for ref in refs if ref.status == "snapshot" or (ref.status == "current" and ref.spec not in snapshotSpecs)]
                 else:

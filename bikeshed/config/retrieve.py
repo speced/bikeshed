@@ -5,7 +5,7 @@ import io
 import os
 
 from ..messages import *
-from .main import scriptPath, docPath, useReadonlyData
+from .main import scriptPath, docPath
 
 
 class DataFileRequester(object):

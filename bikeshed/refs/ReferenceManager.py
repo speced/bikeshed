@@ -12,6 +12,7 @@ from .RefSource import RefSource
 from .utils import *
 from .. import biblio
 from .. import config
+from .. import constants
 from .. import datablocks
 from ..htmlhelpers import *
 
@@ -61,9 +62,9 @@ class ReferenceManager(object):
         self.headings = dict()
 
         if defaultStatus is None:
-            self.defaultStatus = config.refStatus.current
+            self.defaultStatus = constants.refStatus.current
         else:
-            self.defaultStatus = config.refStatus(defaultStatus)
+            self.defaultStatus = constants.refStatus[defaultStatus]
 
         self.localRefs = RefSource("local", fileRequester=fileRequester)
         self.anchorBlockRefs = RefSource("anchor-block", fileRequester=fileRequester)
@@ -149,9 +150,9 @@ class ReferenceManager(object):
         if md.defaultRefStatus:
             self.defaultStatus = md.defaultRefStatus
         elif md.status in config.snapshotStatuses:
-            self.defaultStatus = config.refStatus.snapshot
+            self.defaultStatus = constants.refStatus.snapshot
         elif md.status in config.shortToLongStatus:
-            self.defaultStatus = config.refStatus.current
+            self.defaultStatus = constants.refStatus.current
         self.shortname = md.shortname
         self.specLevel = md.level
         self.spec = md.vshortname

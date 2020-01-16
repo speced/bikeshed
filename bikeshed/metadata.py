@@ -13,6 +13,7 @@ from functools import partial
 
 from . import attr
 from . import config
+from . import constants
 from . import datablocks
 from . import markdown
 from .DefaultOrderedDict import DefaultOrderedDict
@@ -510,11 +511,11 @@ def parseRefStatus(key, val, lineNum):
     if val == "dated":
         # Legacy term that used to be allowed
         val == "snapshot"
-    if val in config.refStatus:
+    if val in constants.refStatus:
         return val
     else:
         die("'{0}' must be either 'current' or 'snapshot'. Got '{1}'", key, val, lineNum=lineNum)
-        return config.refStatus.current
+        return constants.refStatus.current
 
 
 def parseComplainAbout(key, val, lineNum):

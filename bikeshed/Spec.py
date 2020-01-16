@@ -12,6 +12,7 @@ from . import biblio
 from . import boilerplate
 from . import caniuse
 from . import config
+from . import constants
 from . import datablocks
 from . import extensions
 from . import fingerprinting
@@ -40,7 +41,7 @@ class Spec(object):
         self.lineNumbers = lineNumbers
         if lineNumbers:
             # line-numbers are too hacky, so force this to be a dry run
-            config.dryRun = True
+            constants.dryRun = True
         if inputFilename is None:
             inputFilename = findImplicitInputFile()
         if inputFilename is None: # still
@@ -270,7 +271,7 @@ class Spec(object):
         self.printResultMessage()
         outputFilename = self.fixMissingOutputFilename(outputFilename)
         rendered = self.serialize()
-        if not config.dryRun:
+        if not constants.dryRun:
             try:
                 if outputFilename == "-":
                     sys.stdout.write(rendered.encode("utf-8"))
@@ -418,7 +419,7 @@ def findImplicitInputFile():
 
     return None
 
-config.specClass = Spec
+constants.specClass = Spec
 
 styleMdLists = '''
 /* This is a weird hack for me not yet following the commonmark spec
