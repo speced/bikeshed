@@ -13,19 +13,17 @@
 # Process URI templates per http://tools.ietf.org/html/rfc6570
 
 
-import urllib2
-import urlparse
+import urllib.request, urllib.error, urllib.parse
 import json
 import base64
 import contextlib
 import collections
-import UserString
 
-import uritemplate
+from . import uritemplate
 
-class MimeType(UserString.MutableString):
+class MimeType(collections.MutableString):
     def __init__(self, mimeType):
-        UserString.MutableString.__init__(self, mimeType)
+        collections.MutableString.__init__(self, mimeType)
         self._type = None
         self._subtype = None
         self._structure = None
@@ -61,7 +59,7 @@ class MimeType(UserString.MutableString):
     @property
     def type(self):
         return self._type
-    
+
     @type.setter
     def type(self, value):
         self._type = value
@@ -103,7 +101,7 @@ class APIResponse(object):
     def contentType(self):
         contentType = self.headers.get('content-type') if (self.headers) else None
         return MimeType(contentType.split(';')[0]) if (contentType and (';' in contentType)) else MimeType(contentType)
-    
+
     @property
     def encoding(self):
         contentType = self.headers.get('content-type') if (self.headers) else None
@@ -112,7 +110,7 @@ class APIResponse(object):
             if ('=' in encoding):
                 return encoding.split('=', 1)[1].strip()
         return 'utf-8'
-    
+
 
 class APIHints(object):
     def __init__(self, data):
@@ -124,12 +122,12 @@ class APIHints(object):
                 self.formats['GET'] = formats
             if ('PUT' in self.httpMethods):
                 self.formats['PUT'] = formats
-    
+
         if (('PATCH' in self.httpMethods) and ('accept-patch' in data)):
             self.formats['PATCH'] = [MimeType(format) for format in data['accept-patch']]
         if (('POST' in self.httpMethods) and ('accept-post' in data)):
             self.formats['POST'] = [MimeType(format) for format in data['accept-post']]
-    
+
         # TODO: ranges from 'accept-ranges'; preferece tokens from 'accept-prefer';
         #       preconditions from 'precondition-req'; auth from 'auth-req'
         self.ranges = None
@@ -144,9 +142,9 @@ class APIHints(object):
 class APIResource(object):
     def __init__(self, baseURI, uri, variables = None, hints = None):
         try:
-            self.template = uritemplate.URITemplate(urlparse.urljoin(baseURI, uri))
+            self.template = uritemplate.URITemplate(urllib.parse.urljoin(baseURI, uri))
             if (variables):
-                self.variables = {variable: urlparse.urljoin(baseURI, variables[variable]) for variable in variables}
+                self.variables = {variable: urllib.parse.urljoin(baseURI, variables[variable]) for variable in variables}
             else:
                 self.variables = {variable: '' for variable in self.template.variables}
             self.hints = hints
@@ -166,27 +164,27 @@ class APIClient(object):
         self._resources = {}
         self._versions = {}
         self._accepts = {}
-        
+
         self._loadHome()
-    
+
 
     @property
     def baseURI(self):
         return self._baseURI
-    
+
     def _loadHome(self):
         home = self._callURI('GET', self.baseURI, 'application/home+json, application/json-home, application/json')
         if (home):
             if ('application/json' == home.contentType):
                 for name in home.data:
-                    apiKey = urlparse.urljoin(self.baseURI, name)
+                    apiKey = urllib.parse.urljoin(self.baseURI, name)
                     self._resources[apiKey] = APIResource(self.baseURI, home.data[name])
             elif (('application/home+json' == home.contentType) or
                   ('application/json-home' == home.contentType)):
                 resources =  home.data.get('resources')
                 if (resources):
                     for name in resources:
-                        apiKey = urlparse.urljoin(self.baseURI, name)
+                        apiKey = urllib.parse.urljoin(self.baseURI, name)
                         data = resources[name]
                         uri = data['href'] if ('href' in data) else data.get('href-template')
                         variables = data.get('href-vars')
@@ -207,7 +205,7 @@ class APIClient(object):
         return [self.relativeURI(apiKey) for apiKey in self._resources]
 
     def resource(self, name):
-        return self._resources.get(urlparse.urljoin(self.baseURI, name))
+        return self._resources.get(urllib.parse.urljoin(self.baseURI, name))
 
     def _accept(self, resource):
         version = None
@@ -219,21 +217,21 @@ class APIClient(object):
 
     def _callURI(self, method, uri, accept, payload = None, payloadType = None):
         try:
-            request = urllib2.Request(uri, data = payload, headers = { 'Accept' : accept })
+            request = urllib.request.Request(uri, data = payload, headers = { 'Accept' : accept })
             if (self.username and self.password):
                 request.add_header('Authorization', b'Basic ' + base64.b64encode(self.username + b':' + self.password))
             if (payload and payloadType):
                 request.add_header('Content-Type', payloadType)
             request.get_method = lambda: method
-            
-            with contextlib.closing(urllib2.urlopen(request)) as response:
+
+            with contextlib.closing(urllib.request.urlopen(request)) as response:
                 return APIResponse(response)
         except Exception as e:
             pass
         return None
-    
+
     def _call(self, method, name, arguments, payload = None, payloadType = None):
-        apiKey = urlparse.urljoin(self.baseURI, name)
+        apiKey = urllib.parse.urljoin(self.baseURI, name)
 
         resource = self._resources.get(apiKey)
         if (resource):
@@ -245,20 +243,20 @@ class APIClient(object):
                     accept.subtype = version
                 return self._callURI(method, uri, accept, payload, payloadType)
         return None
-    
+
     def setVersion(self, name, version):
-        apiKey = urlparse.urljoin(self.baseURI, name)
+        apiKey = urllib.parse.urljoin(self.baseURI, name)
         self._versions[apiKey] = version
 
     def setAccept(self, name, mimeType):
-        apiKey = urlparse.urljoin(self.baseURI, name)
+        apiKey = urllib.parse.urljoin(self.baseURI, name)
         self._accepts[apiKey] = mimeType
 
     def get(self, name, **kwargs):
         return self._call('GET', name, kwargs)
-    
+
     def postForm(self, name, payload = None, **kwargs):
-        return self._call('POST', name, kwargs, urllib.urlencode(payload), 'application/x-www-form-urlencoded')
+        return self._call('POST', name, kwargs, urllib.parse.urlencode(payload), 'application/x-www-form-urlencoded')
 
     def put(self, name, payload = None, payloadType = None, **kwargs):
         return self._call('PUT', name, kwargs, payload, payloadType)
@@ -268,5 +266,3 @@ class APIClient(object):
 
     def delete(self, name, **kwargs):
         return self._call('DELETE', name, kwargs)
-
-
