@@ -10,6 +10,7 @@ from contextlib import closing
 
 from .. import biblio
 from .. import config
+from .. import constants
 from ..htmlhelpers import *
 from ..apiclient.apiclient import apiclient
 from ..DefaultOrderedDict import DefaultOrderedDict
@@ -36,7 +37,7 @@ def testNameForPath(path):
 def update(path, dryRun=False):
     return # early exit while working on this...
     say("Downloading backref data...")
-    config.quiet = float("inf")
+    constants.quiet = float("inf")
     if not dryRun:
         specs = defaultdict(dict)
         backrefs = defaultdict(lambda: defaultdict(list))
