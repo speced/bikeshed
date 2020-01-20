@@ -156,8 +156,12 @@ class IDLMarker(object):
         elif idlType == "dict-member":
             extraParameters = 'data-type="{0}"'.format(construct.type)
             if construct.default is not None:
-                value = escapeAttr("{0}".format(unicode(construct.default).split('=', 1)[1].strip()))
-                extraParameters += ' data-default="{0}"'.format(value)
+                value = unicode(construct.default).split('=', 1)[1].strip()
+                if value.startswith('['):
+                    value = '[]'
+                elif value.startswith('}'):
+                    value = '{}'
+                extraParameters += ' data-default="{0}"'.format(escapeAttr(value))
         elif idlType in ["interface", "namespace", "dictionary"]:
             if construct.partial:
                 refType = "link"
