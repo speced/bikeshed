@@ -123,6 +123,8 @@ def normalizePathSegment(pathSeg):
 def checkForOmittedTests(pathPrefix, testData, seenTestNames):
 	unseenTests = []
 	for testPath in testData.keys():
+		if ".tentative." in testPath:
+			continue
 		if prefixInPath(pathPrefix, testPath):
 			if testPath not in seenTestNames:
 				unseenTests.append(testPath)
