@@ -509,10 +509,13 @@ def addPropertyIndex(doc):
     for desc in atRules.values():
         desc.sort(key=lambda x:x["Name"])
 
-    def createRow(prop, linkType):
+    def createRow(prop, linkType, for_=None):
+        attrs = {"data-link-type":linkType}
+        if for_:
+            attrs["data-link-for"] = for_
         return E.tr(
             E.th({"scope":"row"},
-                 E.a({"data-link-type":linkType}, prop['Name'])),
+                 E.a(attrs, prop['Name'])),
             *[E.td(prop.get(column,"")) for column in columns[1:]])
     if len(props):
         # Set up the initial table columns for properties
@@ -559,18 +562,23 @@ def addPropertyIndex(doc):
                 allKeys |= set(desc.keys())
             columns.extend(sorted(allKeys - set(columns)))
             id = config.simplifyText(atRuleName) + "-descriptor-table"
-            appendChild(html,
-                        E.h3({"class":"no-num no-ref", "id":safeID(doc, id)},
-                             E.a({"data-link-type":"at-rule"}, atRuleName),
-                             " Descriptors"))
+            if atRuleName:
+                appendChild(html,
+                            E.h3({"class":"no-num no-ref", "id":safeID(doc, id)},
+                                 E.a({"data-link-type":"at-rule"}, atRuleName),
+                                 " Descriptors"))
+            else:
+                appendChild(html,
+                            E.h3({"class":"no-num no-ref", "id":safeID(doc, id)},
+                                 "Miscellaneous Descriptors"))
             appendChild(html,
                         E.div({"class":"big-element-wrapper"},
                               E.table({"class":"index"},
-                                      E.thead(
+                                E.thead(
                                   E.tr(
                                       *[E.th({"scope":"col"}, column) for column in columns])),
-                                      E.tbody(
-                                  *[createRow(desc, "descriptor") for desc in descs]))))
+                                E.tbody(
+                                  *[createRow(desc, "descriptor", for_=atRuleName) for desc in descs]))))
 
 
 def addIDLSection(doc):
