@@ -23,15 +23,24 @@ def update(path, dryRun=False):
         if testType not in ("manual", "reftest", "testharness", "wdspec"):
             # Not tests
             continue
-        paths.extend((testType, path) for path in typePaths.keys())
+        collectPaths(paths, typePaths, testType + " ")
 
     if not dryRun:
         try:
             with io.open(os.path.join(path, "wpt-tests.txt"), 'w', encoding="utf-8") as f:
                 f.write("sha: {0}\n".format(sha))
                 for path in sorted(paths):
-                    f.write("{0} {1}\n".format(*path))
+                    f.write(path+"\n")
         except Exception as e:
             die("Couldn't save web-platform-tests data to disk.\n{0}", e)
             return
     say("Success!")
+
+
+def collectPaths(pathListSoFar, pathTrie, pathPrefix):
+    for k,v in pathTrie.items():
+        if isinstance(v, dict):
+            collectPaths(pathListSoFar, v, "{0}{1}/".format(pathPrefix, k))
+        else:
+            pathListSoFar.append(pathPrefix+k)
+    return pathListSoFar
