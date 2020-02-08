@@ -18,6 +18,14 @@ def update(path, dryRun=False):
         die("Couldn't download web-platform-tests data.\n{0}", e)
         return
 
+    if "version" not in jsonData:
+        die("Can't figure out the WPT data version. Please report this to the maintainer!")
+        return
+
+    if jsonData["version"] != 8:
+        die("Bikeshed currently only knows how to handle WPT v8 manifest data, but got v{0}. Please report this to the maintainer!", jsonData["version"])
+        return
+
     paths = []
     for testType, typePaths in jsonData["items"].items():
         if testType not in ("manual", "reftest", "testharness", "wdspec"):
