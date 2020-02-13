@@ -84,6 +84,9 @@ datedStatuses = ["w3c/WD", "w3c/FPWD", "w3c/LCWD", "w3c/CR", "w3c/PR", "w3c/REC"
 unlevelledStatuses = ["LS", "LD", "DREAM", "w3c/UD", "LS-COMMIT", "LS-BRANCH", "FINDING", "DRAFT-FINDING", "whatwg/RD"]
 deadlineStatuses = ["w3c/LCWD", "w3c/PR"]
 noEDStatuses = ["LS", "LS-COMMIT", "LS-BRANCH", "LD", "FINDING", "DRAFT-FINDING", "DREAM", "iso/NP", "whatwg/RD"]
+# WG statuses can only be used if the group is a W3C working group or interest
+# group, as opposed to a community or business group.
+w3cWgStatuses = ["w3c/ED", "w3c/WD", "w3c/FPWD", "w3c/LCWD", "w3c/CR", "w3c/PR", "w3c/REC", "w3c/PER"]
 
 megaGroups = {
     "w3c": frozenset(["act-framework", "audiowg", "csswg", "dap", "fxtf", "fxtf-csswg", "geolocation", "houdini", "html", "i18n", "immersivewebcg", "immersivewebwg", "mediacapture", "mediawg", "ping", "privacycg", "processcg", "ricg", "sacg", "secondscreenwg", "serviceworkers", "svg", "texttracks", "uievents", "wasm", "web-bluetooth-cg", "webapps", "webappsec", "webauthn", "webml", "web-payments", "webperf", "webplatform", "webrtc", "webspecs", "webvr", "wicg"]),
@@ -94,6 +97,9 @@ megaGroups = {
     "priv-sec": frozenset(["audiowg", "csswg", "dap", "fxtf", "fxtf-csswg", "geolocation", "houdini", "html", "mediacapture", "mediawg", "ricg", "svg", "texttracks", "uievents", "web-bluetooth-cg", "webappsec", "webplatform", "webspecs", "whatwg"]),
     "khronos": frozenset(["webgl"])
 }
+# Community and business groups within the W3C:
+w3cCgs = frozenset(["immersivewebcg", "privacycg", "processcg", "ricg", "sacg", "web-bluetooth-cg", "wicg"])
+assert w3cCgs.issubset(megaGroups["w3c"])
 
 
 def canonicalizeStatus(rawStatus, group):
@@ -168,7 +174,15 @@ def canonicalizeStatus(rawStatus, group):
     assert "" not in possibleMgs # if it was here, the literal "in" test would have caught this bare status
     for mg in possibleMgs:
         if group in megaGroups[mg]:
-            return mg + "/" + status
+            canonStatus = mg + "/" + status
+
+            if canonStatus in w3cWgStatuses and group in w3cCgs:
+                msg = "You used Status: {0}, but that's limited to W3C working and interest groups.".format(rawStatus)
+                msg += " Your group '{0}' is a community or business group. Consider CG-DRAFT or CG-FINAL instead.".format(group)
+                warn("{0}", msg)
+
+            return canonStatus
+
     # Group isn't in any compatible org, so suggest prefixing.
     if possibleMgs:
         msg = "You used Status: {0}, but that's limited to the {1} org{2}".format(
