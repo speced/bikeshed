@@ -174,7 +174,7 @@ class IDLMarker(object):
         if idlType in config.typesUsingFor:
             if idlType == "argument" and construct.parent.idlType == "method":
                 interfaceName = construct.parent.parent.name
-                methodNames = ["{0}/{1}".format(interfaceName, m) for m in construct.parent.methodNames]
+                methodNames = ["{0}/{1}".format(interfaceName, m) for m in self.methodLinkingTexts(construct.parent)]
                 idlFor = "data-idl-for='{0}'".format(", ".join(methodNames))
             else:
                 idlFor = "data-idl-for='{0}'".format(construct.parent.fullName)
