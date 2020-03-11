@@ -9,7 +9,7 @@ from collections import defaultdict
 from contextlib import closing
 
 from .. import config
-from ..apiclient.apiclient import apiclient
+from ..json_home_client.json_home_client import Client as apiclient
 from ..messages import *
 
 

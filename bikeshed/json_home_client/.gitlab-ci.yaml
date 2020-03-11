@@ -1,0 +1,81 @@
+---
+image: python:3.6
+
+
+variables:
+  PACKAGE_NAME: ${CI_PROJECT_NAME}
+
+
+stages:
+  - lint
+  - test
+  - package
+  - deploy
+
+
+flake8:
+  stage: lint
+  before_script:
+    - pip install -e ".[dev]"
+  script:
+    - flake8 ${PACKAGE_NAME}
+
+
+mypy:
+  stage: lint
+  before_script:
+    - pip install -e ".[dev]"
+  script:
+    - mypy ${PACKAGE_NAME}
+
+
+test:
+  stage: test
+  before_script:
+    - pip install -e ".[dev]"
+    - chmod a+x test.py
+  script:
+    - ./test.py
+
+
+package:
+  stage: package
+  before_script:
+    - chmod a+x tools/set_version
+    - tools/set_version
+    - pip install --upgrade wheel
+  script:
+    - python setup.py bdist_wheel
+  artifacts:
+    paths:
+      - dist
+  only:
+    - tags
+    - /^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9-\.]+)?$/
+
+
+pdoc3:
+  stage: package
+  before_script:
+    - pip install pdoc3
+    - pip install -e .
+  script:
+    - pdoc --html --config show_type_annotations=True ${PACKAGE_NAME}
+  artifacts:
+    paths:
+      - html
+  only:
+    - tags
+    - /^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9-\.]+)?$/
+
+
+deploy:
+  stage: deploy
+  before_script:
+    - source .gitlab-ci.env
+    - pip install --upgrade wheel twine
+  script:
+    - python -m twine upload --username __token__ --password ${PYPI_API_TOKEN} --non-interactive --disable-progress-bar --repository-url ${PYPI_REPOSITORY_URL} dist/*
+  only:
+    - tags
+    - /^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9-\.]+)?$/

@@ -6,7 +6,7 @@ import os
 import urllib.request, urllib.error, urllib.parse
 from contextlib import closing
 
-from ..apiclient.apiclient import apiclient
+from ..json_home_client.json_home_client import Client as apiclient
 from ..messages import *
 
 testSuiteDataContentTypes = ["application/json", "application/vnd.csswg.shepherd.v1+json"]

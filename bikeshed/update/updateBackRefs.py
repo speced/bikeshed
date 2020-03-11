@@ -12,7 +12,7 @@ from .. import biblio
 from .. import config
 from .. import constants
 from ..htmlhelpers import *
-from ..apiclient.apiclient import apiclient
+from ..json_home_client.json_home_client import Client as apiclient
 from ..DefaultOrderedDict import DefaultOrderedDict
 from ..messages import *
 from ..Spec import Spec
