@@ -14,4 +14,4 @@ To ensure that there are no unexpected changes, compare the output of `test.py`:
 If all changes are expected, include them in your pull request:
 
        	./test.py > test-expected.txt
-       	git add test-expected.txt
+	git add test-expected.txt
