@@ -9,7 +9,7 @@ from collections import defaultdict
 from contextlib import closing
 
 from .. import biblio
-from ..apiclient.apiclient import apiclient
+from ..json_home_client.json_home_client import Client as apiclient
 from ..DefaultOrderedDict import DefaultOrderedDict
 from ..messages import *
 
