@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # coding=utf-8
 #
 #  Copyright © 2013 Hewlett-Packard Development Company, L.P.
@@ -11,15 +11,14 @@
 #  [1] http://www.w3.org/Consortium/Legal/2002/copyright-software-20021231
 #
 
-import cgi
-import codecs
+import html
 import itertools
 import sys
 
-from widlparser import parser
+import widlparser
 
 
-def debugHook(type, value, tb):
+def debug_hook(type, value, tb):
     if hasattr(sys, 'ps1') or not sys.stderr.isatty():
         # we are in interactive mode or we don't have a tty-like
         # device, so we call the default hook
@@ -29,78 +28,78 @@ def debugHook(type, value, tb):
         import pdb
         # we are NOT in interactive mode, print the exception...
         traceback.print_exception(type, value, tb)
-        print
+        print()
         # ...then start the debugger in post-mortem mode.
         pdb.pm()
 
 
 class Marker(object):
-    def markupConstruct(self, text, construct):
-        return ('<c ' + construct.idlType + '>', '</c>')
+    def markup_construct(self, text, construct):
+        return ('<c ' + construct.idl_type + '>', '</c>')
 
-    def markupType(self, text, construct):
+    def markup_type(self, text, construct):
         return ('<t>', '</t>')
 
-    def markupPrimitiveType(self, text, construct):
+    def markup_primitive_type(self, text, construct):
         return ('<p>', '</p>')
 
-    def markupBufferType(self, text, construct):
+    def markup_buffer_type(self, text, construct):
         return ('<b>', '</b>')
 
-    def markupStringType(self, text, construct):
+    def markup_string_type(self, text, construct):
         return ('<s>', '</s>')
 
-    def markupObjectType(self, text, construct):
+    def markup_object_type(self, text, construct):
         return ('<o>', '</o>')
 
-    def markupTypeName(self, text, construct):
+    def markup_type_name(self, text, construct):
         return ('<tn>', '</tn>')
 
-    def markupName(self, text, construct):
+    def markup_name(self, text, construct):
         return ('<n>', '</n>')
 
-    def markupKeyword(self, text, construct):
+    def markup_keyword(self, text, construct):
         return ('<k>', '</k>')
 
-    def markupEnumValue(self, text, construct):
+    def markup_enum_value(self, text, construct):
         return ('<ev>', '</ev>')
 
     def encode(self, text):
-        return cgi.escape(text)
+        return html.escape(text, quote=False)
 
 
 class NullMarker(object):
     def __init__(self):
-        self.text = u''
+        self.text = ''
 
-    def markupConstruct(self, text, construct):
+    def markup_construct(self, text, construct):
         return (None, None)
 
-    def markupType(self, text, type):
+    def markup_type(self, text, type):
         return (None, None)
 
-    def markupPrimitiveType(self, text, type):
+    def markup_primitive_type(self, text, type):
         return (None, None)
 
-    def markupBufferType(self, text, type):
+    def markup_buffer_type(self, text, type):
         return (None, None)
 
-    def markupStringType(self, text, type):
+    def markup_string_type(self, text, type):
         return (None, None)
 
-    def markupObjectType(self, text, type):
+    def markup_object_type(self, text, type):
         return (None, None)
 
-    def markupTypeName(self, text, construct):
+    def markup_type_name(self, text, construct):
         return ('', '')
 
-    def markupName(self, text, construct):
+    def markup_name(self, text, construct):
         return ('', '')
 
-    def markupKeyword(self, text, construct):
+    def markup_keyword(self, text, construct):
         return ('', '')
 
-    def markupEnumValue(self, text, construct):
+    def markup_enum_value(self, text, construct):
         return ('', '')
 
     def encode(self, text):
@@ -108,12 +107,12 @@ class NullMarker(object):
         return text
 
 
-class ui(object):
+class UI(object):
     def warn(self, str):
         print(str)
 
     def note(self, str):
-#        return
+        # return
         print(str)
 
 
@@ -123,7 +122,7 @@ def test_difference(input, output):
         input_lines = input.split('\n')
         output_lines = output.split('\n')
 
-        for input_line, output_line in itertools.izip_longest(input_lines, output_lines, fillvalue=''):
+        for input_line, output_line in itertools.zip_longest(input_lines, output_lines, fillvalue=''):
             if (input_line != output_line):
                 print("<" + input_line)
                 print(">" + output_line)
@@ -131,22 +130,20 @@ def test_difference(input, output):
 
 
 if __name__ == "__main__":      # called from the command line
-    sys.excepthook = debugHook
-    sys.stdout = codecs.getwriter('utf8')(sys.stdout)
-    parser = parser.Parser(ui=ui())
+    sys.excepthook = debug_hook
+    parser = widlparser.Parser(ui=UI())
 
     if (1 < len(sys.argv)):
-        for fileName in sys.argv[1:]:
-            print("Parsing: " + fileName)
-            file = open(fileName)
+        for file_name in sys.argv[1:]:
+            print("Parsing: " + file_name)
+            file = open(file_name)
             parser.reset()
             text = file.read()
             parser.parse(text)
-            assert (text == unicode(parser))
+            assert (text == str(parser))
         quit()
 
-
-    idl = u"""dictionary CSSFontFaceLoadEventInit : EventInit { sequence<CSSFontFaceRule> fontfaces = [ ]; };
+    idl = """dictionary CSSFontFaceLoadEventInit : EventInit { sequence<CSSFontFaceRule> fontfaces = [ ]; };
 interface Simple{
     serializer;
     serializer = { foo };
@@ -161,7 +158,7 @@ interface Simple{
     static Foo foo();
     Promise<ReallyISwear>? theCheckIsInTheMail();
 };"""
-    idl += u""" // this is a comment éß
+    idl += """ // this is a comment éß
 interface Multi : One  ,  Two   ,   Three     {
         attribute short one;
 };
@@ -342,8 +339,8 @@ interface Underscores {
     parser.parse(idl)
     print(repr(parser))
 
-    test_difference(idl, unicode(parser))
-    assert(unicode(parser) == idl)
+    test_difference(idl, str(parser))
+    assert(str(parser) == idl)
 
     print("MARKED UP:")
     marker = NullMarker()
@@ -351,38 +348,37 @@ interface Underscores {
     assert(marker.text == idl)
     print(parser.markup(Marker()))
 
-    print("Complexity: " + unicode(parser.complexityFactor))
-
+    print("Complexity: " + str(parser.complexity_factor))
 
     for construct in parser.constructs:
-        print(unicode(construct.idlType) + u': ' + unicode(construct.normalName))
+        print(str(construct.idl_type) + ': ' + str(construct.normal_name))
         for member in construct:
-            print('    ' + member.idlType + ': ' + unicode(member.normalName) + ' (' + unicode(member.name) + ')')
+            print('    ' + member.idl_type + ': ' + str(member.normal_name) + ' (' + str(member.name) + ')')
 
     print("FIND:")
-    print(parser.find('round').fullName)
-    print(parser.find('Foo/method/y').fullName)
-    print(parser.find('Foo.method').fullName)
-    print(parser.find('Foo(constructor)').fullName)
-    print(parser.find('longest').fullName)
-    print(parser.find('fooArg').fullName)
-    print(parser.find('Window').fullName)
-    print(parser.find('mediaText').fullName)
+    print(parser.find('round').full_name)
+    print(parser.find('Foo/method/y').full_name)
+    print(parser.find('Foo.method').full_name)
+    print(parser.find('Foo(constructor)').full_name)
+    print(parser.find('longest').full_name)
+    print(parser.find('fooArg').full_name)
+    print(parser.find('Window').full_name)
+    print(parser.find('mediaText').full_name)
     print(parser.find('Foo.method').markup(Marker()))
-    for method in parser.findAll('Foo.method'):
-        print(method.fullName)
+    for method in parser.find_all('Foo.method'):
+        print(method.full_name)
 
     print("NORMALIZE:")
-    print(parser.normalizedMethodName('foo'))
-    print(parser.normalizedMethodName('unknown'))
-    print(parser.normalizedMethodName('testMethod(short one, double two)'))
-    print(parser.normalizedMethodName('testMethod2(one, two, and a half)'))
-    print(parser.normalizedMethodName('bob(xxx)', 'LinkStyle'))
-    print(parser.normalizedMethodName('bob'))
-    print(parser.normalizedMethodName('bob()'))
-    print(', '.join(parser.normalizedMethodNames('method', 'Foo')))
-    print(', '.join(parser.normalizedMethodNames('method()', 'Foo')))
-    print(', '.join(parser.normalizedMethodNames('method(x)', 'Foo')))
-    print(', '.join(parser.normalizedMethodNames('method(x, y)', 'Foo')))
-    print(', '.join(parser.normalizedMethodNames('method (x, y, bar)', 'Foo')))
-    print(', '.join(parser.normalizedMethodNames('abort()', 'Foo')))
+    print(parser.normalized_method_name('foo'))
+    print(parser.normalized_method_name('unknown'))
+    print(parser.normalized_method_name('testMethod(short one, double two)'))
+    print(parser.normalized_method_name('testMethod2(one, two, and a half)'))
+    print(parser.normalized_method_name('bob(xxx)', 'LinkStyle'))
+    print(parser.normalized_method_name('bob'))
+    print(parser.normalized_method_name('bob()'))
+    print(', '.join(parser.normalized_method_names('method', 'Foo')))
+    print(', '.join(parser.normalized_method_names('method()', 'Foo')))
+    print(', '.join(parser.normalized_method_names('method(x)', 'Foo')))
+    print(', '.join(parser.normalized_method_names('method(x, y)', 'Foo')))
+    print(', '.join(parser.normalized_method_names('method (x, y, bar)', 'Foo')))
+    print(', '.join(parser.normalized_method_names('abort()', 'Foo')))
