@@ -2,21 +2,18 @@
 
 import hashlib
 import html5lib
-import html.parser
+import html
 import re
 from collections import Counter, defaultdict
 from lxml import etree
-from lxml import html
+from lxml.html import tostring
 from lxml.cssselect import CSSSelector
 
 from . import config
 from .messages import *
 
-unescapeParser = html.parser.HTMLParser()
-
-
 def unescape(string):
-    return unescapeParser.unescape(string)
+    return html.unescape(string)
 
 
 def findAll(sel, context):
@@ -109,7 +106,7 @@ def textContent(el, exact=False):
     if len(el) == 0:
         return el.text or ''
     if exact:
-        return html.tostring(el, method='text', with_tail=False, encoding="unicode")
+        return tostring(el, method='text', with_tail=False, encoding="unicode")
     else:
         return textContentIgnoringDecorative(el)
 
@@ -126,7 +123,7 @@ def textContentIgnoringDecorative(el):
 def innerHTML(el):
     if el is None:
         return ''
-    return (el.text or '') + ''.join(html.tostring(x, encoding="unicode") for x in el)
+    return (el.text or '') + ''.join(tostring(x, encoding="unicode") for x in el)
 
 
 def outerHTML(el, literal=False):
@@ -134,7 +131,7 @@ def outerHTML(el, literal=False):
         return ''
     if el.get("bs-autolink-syntax") is not None and not literal:
         return el.get("bs-autolink-syntax")
-    return html.tostring(el, with_tail=False, encoding="unicode")
+    return tostring(el, with_tail=False, encoding="unicode")
 
 def serializeTag(el):
     # Serialize *just* the opening tag for the element.

@@ -6,7 +6,7 @@ import os
 import urllib.request, urllib.error, urllib.parse
 from contextlib import closing
 
-from ..json_home_client.json_home_client import Client as apiclient
+from ..json_home_client.json_home_client import Client as APIClient
 from ..messages import *
 
 testSuiteDataContentTypes = ["application/json", "application/vnd.csswg.shepherd.v1+json"]
@@ -14,7 +14,7 @@ testSuiteDataContentTypes = ["application/json", "application/vnd.csswg.shepherd
 def update(path, dryRun=False):
     try:
         say("Downloading test suite data...")
-        shepherd = apiclient.APIClient("https://api.csswg.org/shepherd/", version="vnd.csswg.shepherd.v1")
+        shepherd = APIClient("https://api.csswg.org/shepherd/", version="vnd.csswg.shepherd.v1")
         res = shepherd.get("test_suites")
         if ((not res) or (406 == res.status)):
             die("This version of the test suite API is no longer supported. Please update Bikeshed.")
