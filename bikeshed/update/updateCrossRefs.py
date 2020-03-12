@@ -9,7 +9,7 @@ from collections import defaultdict
 from contextlib import closing
 
 from .. import config
-from ..json_home_client.json_home_client import Client as apiclient
+from ..json_home_client.json_home_client import Client as APIClient
 from ..messages import *
 
 
@@ -18,7 +18,7 @@ anchorDataContentTypes = ["application/json", "application/vnd.csswg.shepherd.v1
 def update(path, dryRun=False):
     try:
         say("Downloading anchor data...")
-        shepherd = apiclient.APIClient("https://api.csswg.org/shepherd/", version="vnd.csswg.shepherd.v1")
+        shepherd = APIClient("https://api.csswg.org/shepherd/", version="vnd.csswg.shepherd.v1")
         res = shepherd.get("specifications", anchors=True, draft=True)
         # http://api.csswg.org/shepherd/spec/?spec=css-flexbox-1&anchors&draft, for manual looking
         if ((not res) or (406 == res.status)):
