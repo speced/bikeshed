@@ -264,7 +264,7 @@ def decodeAnchors(linesIter):
     anchors = defaultdict(list)
     try:
         while True:
-            key = linesIter.next()[:-1]
+            key = next(linesIter)[:-1]
             a = {
                 "type": next(linesIter),
                 "spec": next(linesIter),
