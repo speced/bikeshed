@@ -17,7 +17,7 @@ def unescape(string):
 
 
 def findAll(sel, context):
-    if isinstance(context, config.specClass):
+    if isinstance(context, constants.specClass):
         context = context.document
     try:
         return CSSSelector(sel, namespaces={"svg":"http://www.w3.org/2000/svg"})(context)
