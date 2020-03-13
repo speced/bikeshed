@@ -150,13 +150,13 @@ def highlightWithWebIDL(text, el):
             die("{0}", msg.rstrip())
     class HighlightMarker(object):
         # Just applies highlighting classes to IDL stuff.
-        def markupTypeName(self, text, construct):
+        def markup_type_name(self, text, construct):
             return ('\1n\2', '\3')
-        def markupName(self, text, construct):
+        def markup_name(self, text, construct):
             return ('\1g\2', '\3')
-        def markupKeyword(self, text, construct):
+        def markup_keyword(self, text, construct):
             return ('\1b\2', '\3')
-        def markupEnumValue(self, text, construct):
+        def markup_enum_value(self, text, construct):
             return ('\1s\2', '\3')
 
     if "\1" in text or "\2" in text or "\3" in text:
