@@ -7,6 +7,5 @@ from .messages import *
 
 
 def load(doc):
-    exec(config.retrieveBoilerplateFile(doc, "bs-extensions"))
-    globals()['BSPrepTR'] = BSPrepTR
-    globals()['BSPublishAdditionalFiles'] = BSPublishAdditionalFiles
+    code = config.retrieveBoilerplateFile(doc, "bs-extensions")
+    exec(code, globals())
