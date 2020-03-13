@@ -218,7 +218,7 @@ def highlightWithPygments(text, lang, el):
     if lexer is None:
         die("'{0}' isn't a known syntax-highlighting language. See http://pygments.org/docs/lexers/. Seen on:\n{1}", lang, outerHTML(el), el=el)
         return
-    rawTokens = pygments.highlight(text, lexer, formatters.RawTokenFormatter())
+    rawTokens = str(pygments.highlight(text, lexer, formatters.RawTokenFormatter()), encoding="utf-8")
     coloredText = coloredTextFromRawTokens(rawTokens)
     return coloredText
 
