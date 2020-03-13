@@ -156,7 +156,7 @@ class IDLMarker(object):
         elif idlType == "dict-member":
             extraParameters = 'data-type="{0}"'.format(construct.type)
             if construct.default is not None:
-                value = unicode(construct.default).split('=', 1)[1].strip()
+                value = str(construct.default).split('=', 1)[1].strip()
                 if value.startswith('['):
                     value = '[]'
                 elif value.startswith('}'):
