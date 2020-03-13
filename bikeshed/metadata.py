@@ -286,7 +286,7 @@ class MetadataManager:
             macros["version"] = "https://www.w3.org/TR/{year}/{status}-{vshortname}-{cdate}/".format(**macros)
         elif self.ED:
             macros["version"] = self.ED
-        macros["annotations"] = config.testAnnotationURL
+        macros["annotations"] = constants.testAnnotationURL
         if doc and self.vshortname in doc.testSuites:
             macros["testsuite"] = doc.testSuites[self.vshortname]['vshortname']
         if self.warning and len(self.warning) >= 2:
