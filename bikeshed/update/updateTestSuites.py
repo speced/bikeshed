@@ -16,10 +16,10 @@ def update(path, dryRun=False):
         say("Downloading test suite data...")
         shepherd = APIClient("https://api.csswg.org/shepherd/", version="vnd.csswg.shepherd.v1")
         res = shepherd.get("test_suites")
-        if ((not res) or (406 == res.status)):
+        if ((not res) or (406 == res.status_code)):
             die("This version of the test suite API is no longer supported. Please update Bikeshed.")
             return
-        if res.contentType not in testSuiteDataContentTypes:
+        if res.content_type not in testSuiteDataContentTypes:
             die("Unrecognized test suite content-type '{0}'.", res.contentType)
             return
         rawTestSuiteData = res.data
