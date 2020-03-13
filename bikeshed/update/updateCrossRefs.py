@@ -21,10 +21,10 @@ def update(path, dryRun=False):
         shepherd = APIClient("https://api.csswg.org/shepherd/", version="vnd.csswg.shepherd.v1")
         res = shepherd.get("specifications", anchors=True, draft=True)
         # http://api.csswg.org/shepherd/spec/?spec=css-flexbox-1&anchors&draft, for manual looking
-        if ((not res) or (406 == res.status)):
+        if ((not res) or (406 == res.status_code)):
             die("Either this version of the anchor-data API is no longer supported, or (more likely) there was a transient network error. Try again in a little while, and/or update Bikeshed. If the error persists, please report it on GitHub.")
             return
-        if res.contentType not in anchorDataContentTypes:
+        if res.content_type not in anchorDataContentTypes:
             die("Unrecognized anchor-data content-type '{0}'.", res.contentType)
             return
         rawSpecData = res.data
