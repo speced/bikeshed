@@ -2,7 +2,7 @@
 
 import sys
 from collections import Counter
-from lxml import html
+import lxml.html
 from . import constants
 
 
@@ -58,7 +58,7 @@ def linkerror(msg, *formatArgs, **namedArgs):
             if el.get("bs-autolink-syntax"):
                 suffix = "\n{0}".format(el.get("bs-autolink-syntax"))
             else:
-                suffix = "\n{0}".format(html.tostring(namedArgs['el'], with_tail=False, encoding="unicode"))
+                suffix = "\n{0}".format(lxml.html.tostring(namedArgs['el'], with_tail=False, encoding="unicode"))
     elif namedArgs.get("lineNum", None):
         lineNum = namedArgs['lineNum']
     msg = formatMessage("link", msg.format(*formatArgs, **namedArgs)+suffix, lineNum=lineNum)
