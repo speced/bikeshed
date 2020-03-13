@@ -476,11 +476,13 @@ def dedupBiblioReferences(doc):
     # mark it for "upgrading", so the SpecRef becomes normative.
     upgradeUrls = dupedUrls & informSpecRefUrls & normShepherdUrls
     upgradeRefs = {}
+    popInformatives = []
     for key,ref in doc.informativeRefs.items():
         if ref.url in upgradeUrls and not isShepherdRef(ref):
             upgradeRefs[ref.url] = ref
-            doc.informativeRefs.pop(key)
-
+            popInformatives.append(key)
+    for key in popInformatives:
+        doc.informativeRefs.pop(key)
     for key,ref in doc.normativeRefs.items():
         if ref.url in upgradeUrls:
             doc.normativeRefs[key] = upgradeRefs[ref.url]
