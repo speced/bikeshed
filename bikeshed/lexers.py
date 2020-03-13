@@ -12,38 +12,38 @@ class CSSLexer(RegexLexer):
     flags = re.DOTALL
 
     tokens = {
-        b"root": [
-            (r"", Text, b"rules"),
+        "root": [
+            (r"", Text, "rules"),
         ],
-        b"comment": [
-            (r"\*/", Comment, b"#pop"),
+        "comment": [
+            (r"\*/", Comment, "#pop"),
             (r".", Comment)
         ],
-        b"at-rule": [
-            include(b"values"),
-            (r";", Punctuation, b"#pop"),
-            (r"{\s*}", Punctuation, b"#pop"),
-            (r"{(?=[^;}]*{)", Punctuation, (b"#pop", b"rules")),
-            (r"{(?=[^{}]*;)", Punctuation, (b"#pop", b"decls")),
-            (r"", Text, b"#pop")
+        "at-rule": [
+            include("values"),
+            (r";", Punctuation, "#pop"),
+            (r"{\s*}", Punctuation, "#pop"),
+            (r"{(?=[^;}]*{)", Punctuation, ("#pop", "rules")),
+            (r"{(?=[^{}]*;)", Punctuation, ("#pop", "decls")),
+            (r"", Text, "#pop")
         ],
-        b"rules": [
-            (r"/\*", Comment, b"comment"),
+        "rules": [
+            (r"/\*", Comment, "comment"),
             (r"\s+", Text),
-            (r"@[\w-]+", Name, b"at-rule"),
-            (r"}", Punctuation, b"#pop"),
-            (r"([^{]+)({)", bygroups(Name.Tag, Punctuation), b"decls"),
+            (r"@[\w-]+", Name, "at-rule"),
+            (r"}", Punctuation, "#pop"),
+            (r"([^{]+)({)", bygroups(Name.Tag, Punctuation), "decls"),
         ],
-        b"decls": [
+        "decls": [
             (r";", Punctuation),
-            (r"@[\w-]+", Name, b"at-rule"),
+            (r"@[\w-]+", Name, "at-rule"),
             (r"([\w-]+)\s*(:)", bygroups(Keyword, Punctuation)),
-            include(b"values"),
-            (r"}", Punctuation, b"#pop"),
+            include("values"),
+            (r"}", Punctuation, "#pop"),
             (r".+", Text)
         ],
-        b"values": [
-            (r"/\*", Comment, b"comment"),
+        "values": [
+            (r"/\*", Comment, "comment"),
             (r"[(),/]", Punctuation),
             (r"([+-]?(?:\d+(?:\.\d+)?|\d*\.\d+)[eE][+-]?(?:\d+(?:\.\d+)?|\d*\.\d+))([a-zA-Z-]+|%)", bygroups(Literal.Number, Literal)),
             (r"[+-]?(?:\d+(?:\.\d+)?|\d*\.\d+)[eE][+-]?(?:\d+(?:\.\d+)?|\d*\.\d+)", Literal.Number),
