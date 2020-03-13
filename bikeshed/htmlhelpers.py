@@ -669,7 +669,7 @@ def replaceMacros(text, macros):
         if innerText in macros:
             # For some reason I store all the macros in lowercase,
             # despite requiring them to be spelled with uppercase.
-            return macros[innerText]
+            return str(macros[innerText])
         # Nothing has matched, so start failing the macros.
         if optional:
             return ""
