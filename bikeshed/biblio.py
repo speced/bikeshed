@@ -346,7 +346,7 @@ def loadBiblioDataFile(lines, storage):
                 }
                 while True:
                     line = next(lines)
-                    if line == b"-\n":
+                    if line == "-\n":
                         break
                     b['authors'].append(line)
             elif prefix == "s":
