@@ -29,12 +29,12 @@ class BiblioEntry(object):
 
     def __attrs_post_init__(self):
         if self.preferredURL is None:
-            self.preferredURL = config.refStatus.snapshot
+            self.preferredURL = constants.refStatus.snapshot
         else:
-            self.preferredURL = config.refStatus[self.preferredURL]
-        if self.preferredURL == config.refStatus.snapshot:
+            self.preferredURL = constants.refStatus[self.preferredURL]
+        if self.preferredURL == constants.refStatus.snapshot:
             self.url = self.snapshot_url or self.current_url
-        elif self.preferredURL == config.refStatus.current:
+        elif self.preferredURL == constants.refStatus.current:
             self.url = self.current_url or self.snapshot_url
         else:
             raise
@@ -134,14 +134,14 @@ class SpecBasedBiblioEntry(BiblioEntry):
     def __init__(self, spec, preferredURL=None):
         super(SpecBasedBiblioEntry, self).__init__()
         if preferredURL is None:
-            preferredURL = config.refStatus.snapshot
+            preferredURL = constants.refStatus.snapshot
         self.spec = spec
         self.linkText = spec['vshortname']
         self._valid = True
-        preferredURL = config.refStatus[preferredURL]
-        if preferredURL == config.refStatus.snapshot:
+        preferredURL = constants.refStatus[preferredURL]
+        if preferredURL == constants.refStatus.snapshot:
             self.url = spec['snapshot_url'] or spec['current_url']
-        elif preferredURL == config.refStatus.current:
+        elif preferredURL == constants.refStatus.current:
             self.url = spec['current_url'] or spec['snapshot_url']
         else:
             raise
