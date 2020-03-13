@@ -455,7 +455,10 @@ class ReferenceManager(object):
             reportMultiplePossibleRefs(simplifyPossibleRefs(refs), linkText=text, linkType=linkType, linkFor=linkFor, defaultRef=defaultRef, el=el)
         return defaultRef
 
-    def getBiblioRef(self, text, status=None, generateFakeRef=False, el=None, quiet=False):
+    def getBiblioRef(self, text, status=None, generateFakeRef=False, el=None, quiet=False, depth=0):
+        if depth > 100:
+            die("Data error in biblio files; infinitely recursing trying to find [{0}].", text)
+            return
         key = text.lower()
         while True:
             if key not in self.biblios:
@@ -507,10 +510,13 @@ class ReferenceManager(object):
             bib = biblio.StringBiblioEntry(**candidate)
         elif candidate['biblioFormat'] == "alias":
             # Follow the chain to the real candidate
-            bib = self.getBiblioRef(candidate["aliasOf"], status=status, el=el, quiet=True)
+            bib = self.getBiblioRef(candidate["aliasOf"], status=status, el=el, quiet=True, depth=depth+1)
+            if bib is None:
+                die("Biblio ref [{0}] claims to be an alias of [{1}], which doesn't exist.", text, candidate["aliasOf"])
+                return None
         elif candidate.get("obsoletedBy", "").strip():
             # Obsoleted by - throw an error and follow the chain
-            bib = self.getBiblioRef(candidate["obsoletedBy"], status=status, el=el, quiet=True)
+            bib = self.getBiblioRef(candidate["obsoletedBy"], status=status, el=el, quiet=True, depth=depth+1)
             if not quiet:
                 die("Obsolete biblio ref: [{0}] is replaced by [{1}].", candidate["linkText"], bib.linkText)
         else:
