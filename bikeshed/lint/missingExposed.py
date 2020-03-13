@@ -18,11 +18,11 @@ def missingExposed(doc):
         return
 
     for construct in doc.widl.constructs:
-        if construct.extendedAttributes is None:
+        if construct.extended_attributes is None:
             extendedAttrs = []
         else:
-            extendedAttrs = construct.extendedAttributes
-        if construct.idlType == "namespace":
+            extendedAttrs = construct.extended_attributes
+        if construct.idl_type == "namespace":
             good = False
             for attr in extendedAttrs:
                 if attr.name == "Exposed":
@@ -30,7 +30,7 @@ def missingExposed(doc):
                     break
             if not good:
                 warn("The '{0}' namespace is missing an [Exposed] extended attribute. Does it need [Exposed=Window], or something more?", construct.name)
-        elif construct.idlType == "interface":
+        elif construct.idl_type == "interface":
             good = False
             for attr in extendedAttrs:
                 if attr.name == "Exposed":
@@ -41,7 +41,7 @@ def missingExposed(doc):
                     break
             if not good:
                 warn("The '{0}' interface is missing an [Exposed] extended attribute. Does it need [Exposed=Window], or something more?", construct.name)
-        elif construct.idlType == "callback":
+        elif construct.idl_type == "callback":
             if not hasattr(construct, "interface"):
                 # Just a callback function, it's fine
                 continue
