@@ -278,7 +278,7 @@ def decodeAnchors(linesIter):
             }
             while True:
                 line = next(linesIter)
-                if line == b"-\n":
+                if line == "-\n":
                     break
                 a['for'].append(line)
             anchors[key].append(a)
