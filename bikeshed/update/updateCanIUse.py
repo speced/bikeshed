@@ -60,7 +60,7 @@ def update(path, dryRun=False):
         basicData["features"][featureName] = url
         browserData = {}
         for browser,versions in feature["stats"].items():
-            descendingVersions = list(eversed(versions.items()))
+            descendingVersions = list(reversed(versions.items()))
             mostRecent = descendingVersions[0]
             version = simplifyVersion(mostRecent[0])
             status = simplifyStatus(mostRecent[1], featureName, browser, version)
