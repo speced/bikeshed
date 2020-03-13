@@ -26,7 +26,7 @@ def main():
                            help="Prevents the processor from actually saving anything to disk, but otherwise fully runs.")
     argparser.add_argument("--print", dest="printMode", action="store", default=None,
                            help="Print mode. Options are 'plain' (just text), 'console' (colored with console color codes), 'markup', and 'json'. Defaults to 'console'.")
-    argparser.add_argument("--die-on", dest="errorLevel", choices=[b"nothing", b"fatal", b"link-error", b"warning", b"everything"],
+    argparser.add_argument("--die-on", dest="errorLevel", choices=["nothing", "fatal", "link-error", "warning", "everything"],
                            help="Determines what sorts of errors cause Bikeshed to die (quit immediately with an error status code). Default is 'fatal'; the -f flag is a shorthand for 'nothing'")
 
     subparsers = argparser.add_subparsers(title="Subcommands", dest='subparserName')
