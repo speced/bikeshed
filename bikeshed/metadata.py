@@ -272,16 +272,16 @@ class MetadataManager:
         elif self.noAbstract:
             macros["abstract"] = ""
             macros["abstractattr"] = ""
-        macros["year"] = str(self.date.year)
-        macros["date"] = str(self.date.strftime("{0} %B %Y".format(self.date.day)), encoding="utf-8")
-        macros["date-dmmy"] = str(self.date.strftime("{0} %B %Y".format(self.date.day)), encoding="utf-8") #same as plain 'date'
-        macros["cdate"] = str(self.date.strftime("%Y%m%d"), encoding="utf-8")
-        macros["isodate"] = str(self.date.strftime("%Y-%m-%d"), encoding="utf-8")
-        macros["date-my"] = str(self.date.strftime("%b %Y"), encoding="utf-8")
-        macros["date-mmy"] = str(self.date.strftime("%B %Y"), encoding="utf-8")
+        macros["year"] = self.date.year
+        macros["date"] = self.date.strftime("{0} %B %Y".format(self.date.day))
+        macros["date-dmmy"] = self.date.strftime("{0} %B %Y".format(self.date.day)) #same as plain 'date'
+        macros["cdate"] = self.date.strftime("%Y%m%d")
+        macros["isodate"] = self.date.strftime("%Y-%m-%d")
+        macros["date-my"] = self.date.strftime("%b %Y")
+        macros["date-mmy"] = self.date.strftime("%B %Y")
         if self.deadline:
-            macros["deadline"] = str(self.deadline.strftime("{0} %B %Y".format(self.deadline.day)), encoding="utf-8")
-            macros["isodeadline"] = str(self.deadline.strftime("%Y-%m-%d"), encoding="utf-8")
+            macros["deadline"] = self.deadline.strftime("{0} %B %Y".format(self.deadline.day))
+            macros["isodeadline"] = self.deadline.strftime("%Y-%m-%d")
         if self.status in config.snapshotStatuses:
             macros["version"] = "https://www.w3.org/TR/{year}/{status}-{vshortname}-{cdate}/".format(**macros)
         elif self.ED:
@@ -849,7 +849,7 @@ def getSpecRepository(doc):
         try:
             os.chdir(source_dir)
             with open(os.devnull, "wb") as fnull:
-                remotes = subprocess.check_output(["git", "remote", "-v"], stderr=fnull)
+                remotes = str(subprocess.check_output(["git", "remote", "-v"], stderr=fnull))
             os.chdir(old_dir)
             searches = [
               r"origin\tgit@github\.([\w.-]+):([\w-]+)/([\w-]+)\.git \(\w+\)",

@@ -50,7 +50,7 @@ def handleBikeshedInclude(el, doc):
         # can't use just path, because they're relative; including "foo/bar.txt" might use "foo/bar.txt" further nested
         # can't use just content, because then you can't do the same thing twice.
         # combined does a good job unless you purposely pervert it
-        hash = hashlib.md5(path + ''.join(lines).encode("ascii", "xmlcharrefreplace")).hexdigest()
+        hash = hashlib.md5((path + ''.join(lines)).encode("ascii", "xmlcharrefreplace")).hexdigest()
         if el.get('hash'):
             # This came from another included file, check if it's a loop-include
             if hash in el.get('hash'):
