@@ -142,9 +142,12 @@ def linkTextVariations(str, linkType):
             yield "throw"
 
     if config.linkTypeIn(linkType, "idl"):
-        # Let people refer to escaped IDL names with their "real" names (without the underscore)
-        if str[:1] != "_":
+        # _or <-> or
+        if str[:1] == "_":
+            yield str[1:]
+        else:
             yield "_" + str
+
 
         # Let people refer to methods without the parens.
         # Since attrs and methods live in the same namespace, this is safe.
