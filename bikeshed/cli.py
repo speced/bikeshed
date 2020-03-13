@@ -339,7 +339,7 @@ def handleRefs(options, extras):
         rm = ReferenceManager()
         rm.initializeRefs()
     if options.text:
-        options.text = str(options.text, encoding="utf-8")
+        options.text = options.text
     refs = rm.queryAllRefs(text=options.text, linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, latestOnly=options.latestOnly, exact=options.exact)
     if constants.printMode == "json":
         p(json.dumps(refs, indent=2, default=config.getjson))
