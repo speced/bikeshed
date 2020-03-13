@@ -233,15 +233,15 @@ def markupIDL(doc):
     # One pass with a silent parser to collect the symbol table.
     symbolTable = None
     for el in idlEls:
-        p = parser.Parser(textContent(el), ui=IDLSilent(), symbolTable=symbolTable)
-        symbolTable = p.symbolTable
+        p = parser.Parser(textContent(el), ui=IDLSilent(), symbol_table=symbolTable)
+        symbolTable = p.symbol_table
     # Then a real pass to actually mark up the IDL,
     # and collect it for the index.
     for el in idlEls:
         if isNormative(el, doc):
             text = textContent(el)
             # Parse once with a fresh parser, so I can spit out just this <pre>'s markup.
-            widl = parser.Parser(text, ui=IDLUI(), symbolTable=symbolTable)
+            widl = parser.Parser(text, ui=IDLUI(), symbol_table=symbolTable)
             marker = DebugMarker() if doc.debug else IDLMarker()
             replaceContents(el, parseHTML(str(widl.markup(marker))))
             # Parse a second time with the global one, which collects all data in the doc.

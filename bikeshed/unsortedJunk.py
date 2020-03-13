@@ -627,7 +627,7 @@ def classifyDfns(doc, dfns):
                 elif dfnType in config.idlTypes:
                     # IDL methodish construct, ask the widlparser what it should have.
                     # If the method isn't in any IDL, this tries its best to normalize it anyway.
-                    names = list(doc.widl.normalizedMethodNames(primaryDfnText, el.get('data-dfn-for')))
+                    names = list(doc.widl.normalized_method_names(primaryDfnText, el.get('data-dfn-for')))
                     primaryDfnText = names[0]
                     el.set('data-lt', "|".join(names))
                 else:
@@ -637,7 +637,7 @@ def classifyDfns(doc, dfns):
             parent = el.getparent()
             parentFor = parent.get('data-dfn-for')
             if parent.get('data-dfn-type') in config.functionishTypes and parentFor is not None:
-                dfnFor = ", ".join(parentFor + "/" + name for name in doc.widl.normalizedMethodNames(textContent(parent), parentFor))
+                dfnFor = ", ".join(parentFor + "/" + name for name in doc.widl.normalized_method_names(textContent(parent), parentFor))
             elif treeAttr(el, "data-dfn-for") is None:
                 die("'argument' dfns need to specify what they're for, or have it be inferrable from their parent. Got:\n{0}", outerHTML(el), el=el)
                 continue
@@ -1217,7 +1217,7 @@ def formatElementdefTables(doc):
 
 def formatArgumentdefTables(doc):
     for table in findAll("table.argumentdef", doc):
-        forMethod = doc.widl.normalizedMethodNames(table.get("data-dfn-for"))
+        forMethod = doc.widl.normalized_method_names(table.get("data-dfn-for"))
         method = doc.widl.find(table.get("data-dfn-for"))
         if not method:
             die("Can't find method '{0}'.", forMethod, el=table)
@@ -1225,7 +1225,7 @@ def formatArgumentdefTables(doc):
         for tr in findAll("tbody > tr", table):
             tds = findAll("td", tr)
             argName = textContent(tds[0]).strip()
-            arg = method.findArgument(argName)
+            arg = method.find_argument(argName)
             if arg:
                 appendChild(tds[1], str(arg.type))
                 if str(arg.type).strip().endswith("?"):
