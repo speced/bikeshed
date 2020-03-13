@@ -21,72 +21,72 @@ class IDLSilent(object):
 class DebugMarker(object):
     # Debugging tool for IDL markup
 
-    def markupConstruct(self, text, construct):
-        return ('<construct-' + construct.idlType + '>', '</construct-' + construct.idlType + '>')
+    def markup_construct(self, text, construct):
+        return ('<construct-' + construct.idl_type + '>', '</construct-' + construct.idl_type + '>')
 
-    def markupType(self, text, construct):
-        return ('<TYPE for="' + construct.idlType + '" idlType="' + text + '">', '</TYPE>')
+    def markup_type(self, text, construct):
+        return ('<TYPE for="' + construct.idl_type + '" idlType="' + text + '">', '</TYPE>')
 
-    def markupPrimitiveType(self, text, construct):
-        return ('<PRIMITIVE for="' + construct.idlType + '" idlType="' + text + '">', '</PRIMITIVE>')
+    def markup_primitive_type(self, text, construct):
+        return ('<PRIMITIVE for="' + construct.idl_type + '" idlType="' + text + '">', '</PRIMITIVE>')
 
-    def markupBufferType(self, text, construct):
-        return ('<BUFFER for="' + construct.idlType + '" idlType="' + text + '">', '</BUFFER>')
+    def markup_buffer_type(self, text, construct):
+        return ('<BUFFER for="' + construct.idl_type + '" idlType="' + text + '">', '</BUFFER>')
 
-    def markupStringType(self, text, construct):
-        return ('<STRING for="' + construct.idlType + '" idlType="' + text + '">', '</STRING>')
+    def markup_string_type(self, text, construct):
+        return ('<STRING for="' + construct.idl_type + '" idlType="' + text + '">', '</STRING>')
 
-    def markupObjectType(self, text, construct):
-        return ('<OBJECT for="' + construct.idlType + '" idlType="' + text + '">', '</OBJECT>')
+    def markup_object_type(self, text, construct):
+        return ('<OBJECT for="' + construct.idl_type + '" idlType="' + text + '">', '</OBJECT>')
 
-    def markupTypeName(self, text, construct):
-        return ('<TYPE-NAME idlType="' + construct.idlType + '">', '</TYPE-NAME>')
+    def markup_type_name(self, text, construct):
+        return ('<TYPE-NAME idlType="' + construct.idl_type + '">', '</TYPE-NAME>')
 
-    def markupName(self, text, construct):
-        return ('<NAME idlType="' + construct.idlType + '">', '</NAME>')
+    def markup_name(self, text, construct):
+        return ('<NAME idlType="' + construct.idl_type + '">', '</NAME>')
 
-    def markupKeyword(self, text, construct):
-        return ('<KEYWORD idlType="' + construct.idlType + '">', '</KEYWORD>')
+    def markup_keyword(self, text, construct):
+        return ('<KEYWORD idlType="' + construct.idl_type + '">', '</KEYWORD>')
 
-    def markupEnumValue(self, text, construct):
+    def markup_enum_value(self, text, construct):
         return ('<ENUM-VALUE for="' + construct.name + '">', '</ENUM-VALUE>')
 
 
 class IDLMarker(object):
-    def markupConstruct(self, text, construct):
+    def markup_construct(self, text, construct):
         # Fires for every 'construct' in the WebIDL.
         # Some things are "productions", not "constructs".
         return (None, None)
 
-    def markupType(self, text, construct):
+    def markup_type(self, text, construct):
         # Fires for entire type definitions.
         # It'll contain keywords or names, or sometimes more types.
         # For example, a "type" wrapper surrounds an entire union type,
         # as well as its component types.
         return (None, None)
 
-    def markupPrimitiveType(self, text, construct):
+    def markup_primitive_type(self, text, construct):
         return ("<a data-link-type=interface>", "</a>")
 
-    def markupStringType(self, text, construct):
+    def markup_string_type(self, text, construct):
         return ("<a data-link-type=interface>", "</a>")
 
-    def markupBufferType(self, text, construct):
+    def markup_buffer_type(self, text, construct):
         return ("<a data-link-type=interface>", "</a>")
 
-    def markupObjectType(self, text, construct):
+    def markup_object_type(self, text, construct):
         return ("<a data-link-type=interface>", "</a>")
 
-    def markupTypeName(self, text, construct):
+    def markup_type_name(self, text, construct):
         # Fires for non-defining type names, such as arg types.
 
         # The names in [Exposed=Foo] are [Global] tokens, not interface names.
         # Since I don't track globals as a link target yet, don't link them at all.
-        if construct.idlType == "extended-attribute" and construct.name == "Exposed":
+        if construct.idl_type == "extended-attribute" and construct.name == "Exposed":
             return (None, None)
 
         # The name in [PutForwards=foo] is an attribute of the same interface.
-        if construct.idlType == "extended-attribute" and construct.name == "PutForwards":
+        if construct.idl_type == "extended-attribute" and construct.name == "PutForwards":
             # In [PutForwards=value] attribute DOMString foo
             # the "value" is a DOMString attr
             attr = construct.parent
@@ -101,17 +101,17 @@ class IDLMarker(object):
 
         # LegacyWindowAlias defines additional names for the construct,
         # so all the names should be forced <dfn>s, just like the interface name itself.
-        if construct.idlType == "extended-attribute" and construct.name == "LegacyWindowAlias":
+        if construct.idl_type == "extended-attribute" and construct.name == "LegacyWindowAlias":
             return ('<idl data-idl-type=interface data-lt="{0}">'.format(text), '</idl>')
 
-        if construct.idlType == "constructor":
+        if construct.idl_type == "constructor":
             # This shows up for the method name in a [NamedConstructor] extended attribute.
             # The "NamedConstructor" Name already got markup up, so ignore this one.
             return (None, None)
 
         return ('<a class=n data-link-type="idl-name">', '</a>')
 
-    def markupKeyword(self, text, construct):
+    def markup_keyword(self, text, construct):
         # Fires on the various "keywords" of WebIDL -
         # words that are part of the WebIDL syntax,
         # rather than names exposed to JS.
@@ -119,22 +119,22 @@ class IDLMarker(object):
         if text == "stringifier":
             if construct.name is None:
                 # If no name was defined, you're required to define stringification behavior.
-                return ("<a dfn for='{0}' data-lt='stringification behavior'>".format(construct.parent.fullName), "</a>")
+                return ("<a dfn for='{0}' data-lt='stringification behavior'>".format(construct.parent.full_name), "</a>")
             else:
                 # Otherwise, you *can* point to/dfn stringification behavior if you want.
-                return ("<idl data-export data-idl-type=dfn data-idl-for='{0}' data-lt='stringification behavior' id='{0}-stringification-behavior'>".format(construct.parent.fullName), "</idl>")
+                return ("<idl data-export data-idl-type=dfn data-idl-for='{0}' data-lt='stringification behavior' id='{0}-stringification-behavior'>".format(construct.parent.full_name), "</idl>")
         return (None, None)
 
-    def markupName(self, text, construct):
+    def markup_name(self, text, construct):
         # Fires for defining names: method names, arg names, interface names, etc.
-        if construct.idlType not in config.idlTypes:
+        if construct.idl_type not in config.idlTypes:
             return (None, None)
 
-        idlTitle = construct.normalName
+        idlTitle = construct.normal_name
         if idlTitle.startswith("constructor("):
             idlType = "constructor"
         else:
-            idlType = construct.idlType
+            idlType = construct.idl_type
         extraParameters = ''
         refType = "idl"
         if idlType in config.functionishTypes:
@@ -172,17 +172,17 @@ class IDLMarker(object):
             elementName = "idl"
 
         if idlType in config.typesUsingFor:
-            if idlType == "argument" and construct.parent.idlType == "method":
+            if idlType == "argument" and construct.parent.idl_type == "method":
                 interfaceName = construct.parent.parent.name
                 methodNames = ["{0}/{1}".format(interfaceName, m) for m in self.methodLinkingTexts(construct.parent)]
                 idlFor = "data-idl-for='{0}'".format(", ".join(methodNames))
             else:
-                idlFor = "data-idl-for='{0}'".format(construct.parent.fullName)
+                idlFor = "data-idl-for='{0}'".format(construct.parent.full_name)
         else:
             idlFor = ""
         return ('<{name} data-lt="{0}" data-{refType}-type="{1}" {2} {3}>'.format(idlTitle, idlType, idlFor, extraParameters, name=elementName, refType=refType), '</{0}>'.format(elementName))
 
-    def markupEnumValue(self, text, construct):
+    def markup_enum_value(self, text, construct):
         return ("<idl data-idl-type=enum-value data-idl-for='{0}' data-lt='{1}'>".format(escapeAttr(construct.name), escapeAttr(text)), "</idl>")
 
     def encode(self, text):
@@ -215,9 +215,9 @@ class IDLMarker(object):
                 for prefix in prefixes:
                     texts.append(prefix + "(" + argText + ")")
 
-        texts.append(method.normalName)
+        texts.append(method.normal_name)
         if method.name == "constructor":
-            texts.append(method.parent.name + method.normalName[11:])
+            texts.append(method.parent.name + method.normal_name[11:])
         return reversed(texts)
 
 
