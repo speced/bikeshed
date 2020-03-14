@@ -1,4 +1,4 @@
-FROM python:2.7-jessie as base
+FROM python:3.7-stretch as base
 
 # Get the latest spec-data, then cache it so we don't have to redo this on every rebuild
 from base as specdata
