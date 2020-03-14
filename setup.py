@@ -10,6 +10,8 @@ setup(
         'lxml>=4.2.5,<4.3',
         'html5lib>=1.0.1,<1.1',
         'cssselect>=1.0.3,<1.1',
+        'typing-extensions>=3.7.4.1,<3.8',
+        'uri_template>=1.1.0,<1.2',
     ],
     entry_points={'console_scripts': ['bikeshed = bikeshed:main']},
 )
