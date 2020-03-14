@@ -7,7 +7,7 @@ import json
 import os
 import re
 import subprocess
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from datetime import datetime
 from functools import partial
 
@@ -817,7 +817,7 @@ def fromCommandLine(overrides):
 def fromJson(data, source=""):
     md = MetadataManager()
     try:
-        defaults = json.loads(data)
+        defaults = json.loads(data, object_pairs_hook=OrderedDict)
     except Exception as e:
         if data != "":
             if source == "computed-metadata":
