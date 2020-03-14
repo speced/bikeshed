@@ -370,10 +370,7 @@ def addExplicitIndexes(doc):
             if refs:
                 filteredRefs[ttf[0]].extend({"url":ref.url, "disambiguator":disambiguator(ref)} for ref in refs)
 
-        # Sort the entries before generating
-        indexEntries = OrderedDict(sorted(filteredRefs.items(), key=lambda x:x[0].lower()))
-
-        appendChild(el, htmlFromIndexTerms(indexEntries))
+        appendChild(el, htmlFromIndexTerms(filteredRefs))
         el.tag = "div"
         removeAttr(el, "export", "for", "spec", "status", "type")
 
@@ -382,7 +379,17 @@ def htmlFromIndexTerms(entries):
     # entries: dict (preferably OrderedDict, if you want stability) of linkText=>{url, label, disambiguator}
     # label is used for the actual link (normally heading level), disambiguator is phrase to use when there are collisions
 
-    entries = OrderedDict(sorted(entries.items(), key=lambda x:re.sub(r'[^a-z0-9]', '', x[0].lower())))
+    def entryKey(x):
+        return (
+            # first group by approximating a human-friendly "nearness" of terms
+            re.sub(r'[^a-z0-9]', '', x[0].lower()),
+            # then within that, by case-ignoring exact text
+            x[0].lower(),
+            # and finally uniquely by exact text
+            x[0]
+        )
+
+    entries = OrderedDict(sorted(entries.items(), key=entryKey))
 
     topList = E.ul({"class":"index"})
     for text, items in entries.items():
