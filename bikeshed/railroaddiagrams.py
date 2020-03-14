@@ -18,6 +18,9 @@ def escapeAttr(val):
         return val.replace('&', '&amp;').replace("'", '&apos;').replace('"', '&quot;')
     return f"{val:g}"
 
+def escapeHtml(val):
+    return escapeAttr(val).replace('<', '&lt;')
+
 def determineGaps(outer, inner):
     diff = outer - inner
     if INTERNAL_ALIGNMENT == 'left':
@@ -64,7 +67,7 @@ class DiagramItem(object):
             if isinstance(child, DiagramItem):
                 child.writeSvg(write)
             else:
-                write(escapeAttr(child))
+                write(escapeHtml(child))
         write(f'</{self.name}>')
 
 
