@@ -61,36 +61,36 @@ def addExternalDfnPanel(termEl, ref, elsFromHref, doc):
     # Gather all the <a href>s together
     refs = DefaultOrderedDict(list)
     for el in elsFromHref[ref.url]:
-        section = sectionName(el)
-        if section is not None:
-            refs[section].append(el)
-    addClass(termEl, "dfn-paneled")
-    _,_,refID = ref.url.partition("#")
-    termID = "term-for-{0}".format(refID)
-    termEl.set("id", termID)
-    termEl.set("data-silently-dedup", "")
-    panel = E.aside({"class": "dfn-panel", "data-for": termID},
-                    E.a({"href":ref.url}, ref.url),
-                    E.b("Referenced in:"))
-    ul = appendChild(panel, E.ul())
-    for text,els in refs.items():
-        li = appendChild(ul, E.li())
-        for i,el in enumerate(els):
-            linkID = el.get("id")
-            if linkID is None:
-                linkID = "termref-for-".format(refID)
-                el.set("id", safeID(doc, linkID))
-                el.set("data-silently-dedup", "")
-            if i == 0:
-                appendChild(li,
-                            E.a({"href": "#" + escapeUrlFrag(linkID), "data-silently-dedup": ""}, text))
-            else:
-                appendChild(li,
-                            " ",
-                            E.a({"href": "#" + escapeUrlFrag(linkID), "data-silently-dedup": ""}, "(" + str(i + 1) + ")"))
-    appendChild(doc.body, panel)
-    doc.extraScripts['script-dfn-panel'] = dfnPanelScript
-    doc.extraStyles['style-dfn-panel'] = dfnPanelStyle
+        section = sectionName(el) or "Unnumbered Section"
+        refs[section].append(el)
+    if len(refs):
+        addClass(termEl, "dfn-paneled")
+        _,_,refID = ref.url.partition("#")
+        termID = "term-for-{0}".format(refID)
+        termEl.set("id", termID)
+        termEl.set("data-silently-dedup", "")
+        panel = E.aside({"class": "dfn-panel", "data-for": termID},
+                        E.a({"href":ref.url}, ref.url),
+                        E.b("Referenced in:"))
+        ul = appendChild(panel, E.ul())
+        for text,els in refs.items():
+            li = appendChild(ul, E.li())
+            for i,el in enumerate(els):
+                linkID = el.get("id")
+                if linkID is None:
+                    linkID = "termref-for-".format(refID)
+                    el.set("id", safeID(doc, linkID))
+                    el.set("data-silently-dedup", "")
+                if i == 0:
+                    appendChild(li,
+                                E.a({"href": "#" + escapeUrlFrag(linkID), "data-silently-dedup": ""}, text))
+                else:
+                    appendChild(li,
+                                " ",
+                                E.a({"href": "#" + escapeUrlFrag(linkID), "data-silently-dedup": ""}, "(" + str(i + 1) + ")"))
+        appendChild(doc.body, panel)
+        doc.extraScripts['script-dfn-panel'] = dfnPanelScript
+        doc.extraStyles['style-dfn-panel'] = dfnPanelStyle
 
 
 dfnPanelScript = '''
