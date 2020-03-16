@@ -127,14 +127,23 @@ class IDLMarker(object):
 
     def markup_name(self, text, construct):
         # Fires for defining names: method names, arg names, interface names, etc.
-        if construct.idl_type not in config.idlTypes:
+        idlType = construct.idl_type
+        if idlType not in config.idlTypes:
+            return (None, None)
+
+        if idlType == "constructor":
+            # the [Constructor] extended attr, now deprecated
+            die(f"The [Constructor] extended attribute (on {construct.parent.name}) is deprecated, please switch to a constructor() method.")
+            return (None, None)
+
+        if idlType == "argument" and construct.parent.idl_type == "constructor":
+            # Don't mark up the arguments to [Constructor] either
             return (None, None)
 
         idlTitle = construct.normal_name
-        if idlTitle.startswith("constructor("):
+        if idlType == "method" and idlTitle.startswith("constructor("):
             idlType = "constructor"
-        else:
-            idlType = construct.idl_type
+
         extraParameters = ''
         refType = "idl"
         if idlType in config.functionishTypes:
