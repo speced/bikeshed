@@ -54,8 +54,8 @@ class MetadataManager:
         self.audience = []
         self.blockElements = []
         self.boilerplate = config.BoolSet(default=True)
-        self.canonicalURL = None
         self.canIUseURLs = []
+        self.canonicalURL = None
         self.complainAbout = config.BoolSet()
         self.customTextMacros = []
         self.customWarningText = []
@@ -68,12 +68,6 @@ class MetadataManager:
         self.editors = []
         self.editorTerm = {"singular": "Editor", "plural": "Editors"}
         self.favicon = None
-        self.trackingVectorClass = "tracking-vector"
-        self.trackingVectorImage = None
-        self.trackingVectorImageWidth = "46"
-        self.trackingVectorImageHeight = "64"
-        self.trackingVectorAltText = "(This is a tracking vector.)"
-        self.trackingVectorTitle = "There is a tracking vector here."
         self.forceCrossorigin = False
         self.group = None
         self.h1 = None
@@ -114,6 +108,12 @@ class MetadataManager:
         self.title = None
         self.toggleDiffs = False
         self.TR = None
+        self.trackingVectorAltText = "(This is a tracking vector.)"
+        self.trackingVectorClass = "tracking-vector"
+        self.trackingVectorImage = None
+        self.trackingVectorImageHeight = "64"
+        self.trackingVectorImageWidth = "46"
+        self.trackingVectorTitle = "There is a tracking vector here."
         self.translateIDs = defaultdict(list)
         self.translations = []
         self.useDfnPanels = True
