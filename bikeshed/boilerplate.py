@@ -606,10 +606,11 @@ def addIDLSection(doc):
         blockCopy = copy.deepcopy(block)
         appendContents(container, blockCopy)
         appendChild(container, "\n")
-    for dfn in findAll("dfn[id]", container):
-        dfn.tag = "a"
-        dfn.set("href", "#" + dfn.get("id"))
-        del dfn.attrib["id"]
+    for el in findAll("[id]", container):
+        if el.tag == "dfn":
+            el.tag = "a"
+            el.set("href", "#" + el.get("id"))
+        del el.attrib["id"]
     addClass(container, "highlight")
 
 

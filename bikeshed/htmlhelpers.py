@@ -10,6 +10,7 @@ from lxml.html import tostring
 from lxml.cssselect import CSSSelector
 
 from . import config
+from .DefaultOrderedDict import DefaultOrderedDict
 from .messages import *
 
 def unescape(string):
@@ -732,7 +733,7 @@ def dedupIDs(doc):
 
     def findId(id):
         return find("#" + id, doc) is not None
-    ids = defaultdict(list)
+    ids = DefaultOrderedDict(list)
     for el in findAll("[id]", doc):
         ids[el.get('id')].append(el)
     for dupeId,els in list(ids.items()):
@@ -788,17 +789,12 @@ def approximateLineNumber(el, setIntermediate=True):
 def circledDigits(num):
     '''
     Converts a base-10 number into a string using unicode circled digits.
-    That is, 123 becomes u"①②③"
+    That is, 123 becomes "①②③"
     '''
     num = int(num)
     assert(num >= 0)
     digits = ["⓪","①","②","③","④","⑤","⑥","⑦","⑧","⑨"]
-    result = ""
-    if num <= 0:
-        return digits[0]
-    while(num > 0):
-        result = digits[num%10] + result
-        num = num // 10
+    result = "".join(digits[int(d)] for d in str(num))
     return result
 
 
