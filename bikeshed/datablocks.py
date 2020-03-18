@@ -326,7 +326,9 @@ def transformDescdef(lines, doc, firstLine, lineNum=None, **kwargs):
         else:
             die("The descdef for '{0}' is missing a '{1}' line.", vals.get("Name", "???"), key, lineNum=lineNum)
             continue
-    for key in vals.keys() - requiredKeys:
+    for key, val in vals.items():
+        if key in requiredKeys:
+            continue
         ret.append("<tr><th>{0}:<td>{1}".format(key, vals[key]))
     ret.append("</table>")
 
