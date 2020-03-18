@@ -26,7 +26,20 @@
   :group 'bikeshed
   :group 'faces)
 
-(defconst bikeshed-regex-autolink
+(defconst bikeshed-regex-rfc2119
+  (rx word-start
+      (group (| "must" "must not" "required" "shall" "shall not" "should"
+                "should not" "recommended" "may" "optional"))
+      word-end)
+  "Regular expression for matching RFC2119 terms.
+Group 1 matches the term.")
+
+(defface bikeshed-rfc2119-face
+  '((t (:inherit font-lock-warning-face)))
+  "Face for RFC2119 terms."
+  :group 'bikeshed-faces)
+
+(defconst bikeshed-regex-basic-autolink
   "\\(^\\|[^\\]\\)\\(\\(''\\|<[<{]\\|\\[[$=]\\|{{\\)\\([A-Za-z0-9_/() -]+\\)\\(\\$]\\|''\\|=]\\|>>\\|}[>}]\\)\\)"
   "Regular expression for matching some Bikeshed autolinks.
 Group 1 matches the character before the opening characters, if any,
@@ -36,13 +49,13 @@ Groups 3 and 5 matches the opening and closing delimiters.
 Group 4 matches the text inside the delimiters.")
 
 (defface bikeshed-autolink-face
-  '((t (:inherit font-lock-keyword-face)))
+  '((t (:inherit font-lock-builtin-face)))
   "Face for autolinks."
   :group 'bikeshed-faces)
 
-(defun bikeshed-match-autolink (last)
+(defun bikeshed-match-basic-autolink (last)
   "Match autolink from the point to LAST."
-  (when (markdown-match-inline-generic bikeshed-regex-autolink last)
+  (when (markdown-match-inline-generic bikeshed-regex-basic-autolink last)
     (let ((begin (match-beginning 2))
           (end (match-end 2)))
       (if (or (markdown-inline-code-at-pos-p begin)
@@ -63,8 +76,14 @@ Group 4 matches the text inside the delimiters.")
                               (match-beginning 5) (match-end 5)))
         t))))
 
+(defconst bikeshed-regex-anchor-autolink
+  "\\(<a>\\)\\(\\(?:.\\|\n[^\n]\\)*?\\)\\(</a>\\)"
+  "Regular expression for matching <a> autolinks.
+Groups 1 and 3 match the opening and closing tags.
+Group 2 matches the text.")
+
 (defconst bikeshed-regex-citation
-  "\\(^\\|[^\\]\\)\\(\\(\\[\\[!?\\)\\([A-Za-z0-9#-]+\\)\\(\\]\\]\\)\\)"
+  "\\(^\\|[^\\]\\)\\(\\(\\[\\[!?\\)\\([A-Za-z0-9#|. -]+\\)\\(\\]\\]\\)\\)"
   "Regular expression for matching some Bikeshed citations.
 Group 1 matches the character before the opening characters, if any,
 ensuring that it is not a backslash escape.
@@ -100,9 +119,43 @@ Group 4 matches the text inside the delimiters.")
                               (match-beginning 5) (match-end 5)))
         t))))
 
+(defconst bikeshed-regex-dfn
+  "\\(<dfn\\(?:\\s-\\(?:export\\)\\)?>\\)\\(\\(?:.\\|\n[^\n]\\)*?\\)\\(</dfn>\\)"
+  "Regular expression for matching <dfn>s.
+Groups 1 and 3 match the opening and closing tags.
+Group 2 matches the text.")
+
+(defface bikeshed-definition-face
+  '((t (:inherit font-lock-keyword-face)))
+  "Face for definitions."
+  :group 'bikeshed-faces)
+
+(defconst bikeshed-regex-var
+  "\\(|\\)\\([^|\s-]*[^|]*[^|\s-]+\\)\\(|\\)"
+  "Regular expression for matching |variables|.
+Groups 1 and 3 match the opening and closing pipes.
+Group 2 matches the variable name.")
+
+(defface bikeshed-variable-face
+  '((t (:inherit font-lock-variable-name-face)))
+  "Face for definitions."
+  :group 'bikeshed-faces)
+
 (defvar bikeshed-font-lock-keywords
-  `((bikeshed-match-autolink . ((2 'bikeshed-autolink-face)))
+  `((,bikeshed-regex-anchor-autolink . ((1 markdown-markup-properties)
+                                        (2 'bikeshed-autolink-face)
+                                        (3 markdown-markup-properties)))
+    (bikeshed-match-basic-autolink . ((1 markdown-markup-properties)
+                                      (2 'bikeshed-autolink-face)
+                                      (3 markdown-markup-properties)))
     (bikeshed-match-citation . ((2 'bikeshed-citation-face)))
+    (,bikeshed-regex-dfn . ((1 markdown-markup-properties)
+                            (2 'bikeshed-definition-face)
+                            (3 markdown-markup-properties)))
+    (,bikeshed-regex-rfc2119 . ((1 'bikeshed-rfc2119-face)))
+    (,bikeshed-regex-var . ((1 markdown-markup-properties)
+                            (2 'bikeshed-variable-face)
+                            (3 markdown-markup-properties)))
     . ,markdown-mode-font-lock-keywords)
   "Syntax highlighting for Markdown files.")
 
