@@ -4,6 +4,7 @@
 import io
 import json
 import os
+import random
 import re
 from collections import defaultdict
 from operator import itemgetter
@@ -20,13 +21,15 @@ class ReferenceManager(object):
 
     __slots__ = ["dataFile", "specs", "defaultSpecs", "ignoredSpecs", "replacedSpecs", "biblios", "loadedBiblioGroups",
         "biblioKeys", "biblioNumericSuffixes", "preferredBiblioNames", "headings", "defaultStatus", "localRefs", "anchorBlockRefs", "foreignRefs",
-        "shortname", "specLevel", "spec"]
+        "shortname", "specLevel", "spec", "testing"]
 
-    def __init__(self, defaultStatus=None, fileRequester=None):
+    def __init__(self, defaultStatus=None, fileRequester=None, testing=False):
         if fileRequester is None:
             self.dataFile = config.defaultRequester
         else:
             self.dataFile = fileRequester
+
+        self.testing = testing
 
         # Dict of {spec vshortname => spec data}
         self.specs = dict()
@@ -290,14 +293,15 @@ class ReferenceManager(object):
             if len(localRefs) == 1:
                 return localRefs[0]
             elif len(localRefs) > 1:
+                if self.testing:
+                    # Generate a stable answer
+                    chosenRef = sorted(localRefs, key=lambda x:x.url)[0]
+                else:
+                    # CHAOS MODE (so you're less likely to rely on it)
+                    chosenRef = random.choice(localRefs)
                 if error:
-                    linkerror("Multiple possible '{0}' local refs for '{1}'.\nArbitrarily chose the one with type '{2}' and for '{3}'.",
-                              linkType,
-                              text,
-                              localRefs[0].type,
-                              "' or '".join(localRefs[0].for_),
-                              el=el)
-                return localRefs[0]
+                    linkerror(f"Multiple possible '{linkType}' local refs for '{text}'.\nRandomly chose one of them; other instances might get a different random choice.", el=el)
+                return chosenRef
 
         if status == "local":
             # Already checked local refs, can early-exit now.

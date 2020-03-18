@@ -58,7 +58,7 @@ def runAllTests(Spec, testFiles=None, manualOnly=False, md=None):
         testName = testNameForPath(testPath)
         p("{0}/{1}: {2}".format(justifiedI, len(testFiles), testName))
         total += 1
-        doc = Spec(inputFilename=testPath, fileRequester=fileRequester)
+        doc = Spec(inputFilename=testPath, fileRequester=fileRequester, testing=True)
         if md is not None:
             doc.mdCommandLine = md
         addTestMetadata(doc)

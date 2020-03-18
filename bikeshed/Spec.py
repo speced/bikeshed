@@ -36,7 +36,7 @@ from .unsortedJunk import *
 
 class Spec(object):
 
-    def __init__(self, inputFilename, debug=False, token=None, lineNumbers=False, fileRequester=None):
+    def __init__(self, inputFilename, debug=False, token=None, lineNumbers=False, fileRequester=None, testing=False):
         self.valid = False
         self.lineNumbers = lineNumbers
         if lineNumbers:
@@ -50,6 +50,7 @@ class Spec(object):
         self.inputSource = inputFilename
         self.debug = debug
         self.token = token
+        self.testing = testing
         if fileRequester is None:
             self.dataFile = config.defaultRequester
         else:
@@ -60,7 +61,7 @@ class Spec(object):
     def initializeState(self):
         self.normativeRefs = {}
         self.informativeRefs = {}
-        self.refs = ReferenceManager(fileRequester=self.dataFile)
+        self.refs = ReferenceManager(fileRequester=self.dataFile, testing=self.testing)
         self.externalRefsUsed = defaultdict(lambda:defaultdict(dict))
         self.md = None
         self.mdBaseline = metadata.MetadataManager()
