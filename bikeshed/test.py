@@ -125,7 +125,7 @@ def rebase(Spec, files=None, md=None):
         resetSeenMessages()
         name = testNameForPath(path)
         p("{0}/{1}: Rebasing {2}".format(justifiedI, len(files), name))
-        doc = Spec(path, fileRequester=fileRequester)
+        doc = Spec(path, fileRequester=fileRequester, testing=True)
         if md:
             doc.mdCommandLine = md
         addTestMetadata(doc)
