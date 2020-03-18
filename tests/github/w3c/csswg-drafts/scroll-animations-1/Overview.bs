@@ -7,14 +7,17 @@ Work Status: exploring
 Group: CSSWG
 URL: https://drafts.csswg.org/scroll-animations-1/
 ED: https://drafts.csswg.org/scroll-animations-1/
-Shortname: scroll-animations
+Shortname: scroll-animations-1
 Abstract: Defines an API and markup for creating animations that are either
           triggered by or tied to the scroll offset of a scroll container.
-Editor: Brian Birtles <bbirtles@mozilla.com>
-Editor: Botond Ballo <botond@mozilla.com>
-Editor: Stephen McGruer <smcgruer@google.com>
-Editor: Antoine Quint <graouts@apple.com>
+Editor: Brian Birtles, Invited Expert, brian@birchill.co.jp, w3cid 43194
+Editor: Botond Ballo, Mozilla, botond@mozilla.com
+Editor: Antoine Quint, Apple, graouts@apple.com, w3cid 51377
+Editor: Majid Valipour, Google, majidvp@google.com, w3cid 81464
+Editor: Olga Gerchikov, Microsoft, gerchiko@microsoft.com
+
 Former editor: Mantaroh Yoshinaga
+Former editor: Stephen McGruer, Google, smcgruer@google.com
 </pre>
 <pre class=anchors>
 urlPrefix: https://w3c.github.io/web-animations/; type: dfn; spec: web-animations
@@ -69,6 +72,18 @@ Specifically, this specification allows expressing scroll-linked effects in a
 way that does not require script to run each time the effect is sampled. User
 agents that support asynchronous scrolling are allowed (but not required) to
 sample such effects asynchronously as well.
+
+## Value Definitions {#values}
+
+This specification follows the <a href="https://www.w3.org/TR/CSS2/about.html#property-defs">CSS property definition conventions</a> from [[!CSS2]]
+using the <a href="https://www.w3.org/TR/css-values-3/#value-defs">value definition syntax</a> from [[!CSS-VALUES-3]].
+Value types not defined in this specification are defined in CSS Values &amp; Units [[!CSS-VALUES-3]].
+Combination with other CSS modules may expand the definitions of these value types.
+
+In addition to the property-specific values listed in their definitions,
+all properties defined in this specification
+also accept the <a>CSS-wide keywords</a> keywords as their property value.
+For readability they have not been repeated explicitly.
 
 # Use cases # {#use-cases}
 
@@ -172,6 +187,7 @@ Using the CSS markup:
   }
   #union-circle {
     animation-name: union-circle;
+    animation-fill-mode: forwards;
     animation-timeline: scroll(element(#container), vertical, "250px", "300px");
   }
   @keyframes left-circle {
@@ -202,7 +218,7 @@ if (window.matchMedia('(prefers-reduced-motion: no-preference)').matches) {
   var right = leftCircle.animate({ transform: 'translate(350px)' }, 1000);
   right.timeline = circleTimeline;
 
-  var union = unionCircle.animate({ opacity: 1 }, 1000);
+  var union = unionCircle.animate({ opacity: 1 }, { duration: 1000, fill: "forwards" });
   union.timeline = new ScrollTimeline({
     scrollSource: scrollableElement,
     startScrollOffset: '250px',
@@ -245,6 +261,7 @@ as follows:
     height: 30px;
     background: red;
     animation: progress 1s linear;
+    animation-fill-mode: forwards;
     animation-timeline: scroll(element(#body));
   }
 }
@@ -254,7 +271,7 @@ If we use this API for this case, the example code will be as follow:
 
 <pre class='lang-javascript'>
 if (window.matchMedia('(prefers-reduced-motion: no-preference)').matches) {
-  var animation = div.animate({ width: '100%' }, 1000);
+  var animation = div.animate({ width: '100%' }, { duration: 1000, fill: "forwards" });
   animation.timeline = new ScrollTimeline(
     { startScrollOffset: '0px' }
   );
@@ -359,18 +376,16 @@ dictionary ScrollTimelineOptions {
   DOMString startScrollOffset = "auto";
   DOMString endScrollOffset = "auto";
   (double or ScrollTimelineAutoKeyword) timeRange = "auto";
-  FillMode fill = "none";
 };
 
-[Exposed=Window,
- Constructor(optional ScrollTimelineOptions options = {})]
+[Exposed=Window]
 interface ScrollTimeline : AnimationTimeline {
+  constructor(optional ScrollTimelineOptions options = {});
   readonly attribute Element scrollSource;
   readonly attribute ScrollDirection orientation;
   readonly attribute DOMString startScrollOffset;
   readonly attribute DOMString endScrollOffset;
   readonly attribute (double or ScrollTimelineAutoKeyword) timeRange;
-  readonly attribute FillMode fill;
 };
 </pre>
 
@@ -398,7 +413,7 @@ not by wall-clock time, but by the progress of scrolling in a [=scroll container
 
     1. Set the {{ScrollTimeline/scrollSource}} of |timeline| to |source|.
 
-    1. Assign the {{ScrollTimeline/orientation}}, {{ScrollTimeline/startScrollOffset}}, {{ScrollTimeline/endScrollOffset}}, {{ScrollTimeline/timeRange}}, and {{ScrollTimeline/fill}} properties of |timeline| to the corresponding value from |options|.
+    1. Assign the {{ScrollTimeline/orientation}}, {{ScrollTimeline/startScrollOffset}}, {{ScrollTimeline/endScrollOffset}}, and {{ScrollTimeline/timeRange}} properties of |timeline| to the corresponding value from |options|.
 
 </div>
 
@@ -463,39 +478,6 @@ not by wall-clock time, but by the progress of scrolling in a [=scroll container
     the mapping is then defined by mapping the scroll distance from 
     {{startScrollOffset}} to {{endScrollOffset}}, to the [=effective time range=].
 
-:   <dfn attribute for=ScrollTimeline>fill</dfn>
-::  Determines whether the timeline is active even when the scroll offset is outside
-    the range defined by [{{startScrollOffset}}, {{endScrollOffset}}].
-
-    Possible values are:
-
-    :   none
-    ::  The timeline is inactive when the scroll offset is less than {{startScrollOffset}} 
-        or greater than or equal to {{endScrollOffset}}.
-
-    :   forwards
-    ::  When the scroll offset is less than {{startScrollOffset}}, the
-        timeline is inactive.
-        When the scroll offset is greater than or equal to the
-        {{endScrollOffset}}, the timeline's [=current time=] is its
-        [=effective time range=].
-
-    :   backwards
-    ::  When the scroll offset is less than {{startScrollOffset}}, the
-        timeline's [=current time=] is 0.
-        When the scroll offset is greater than or equal to the
-        {{endScrollOffset}}, the timeline is inactive.
-
-    :   both
-    ::  When the scroll offset is less than {{startScrollOffset}}, the
-        timeline's [=current time=] is 0.
-        When the scroll offset is greater than or equal to the
-        {{endScrollOffset}}, the timeline's [=current time=] is its
-        [=effective time range=].
-
-    :   auto
-    ::  Behaves the same as <code>both</code>.
-
 </div>
 
 ### The effective time range of a {{ScrollTimeline}} ### {#efffective-time-range-algorithm}
@@ -530,25 +512,11 @@ as follows:
 1.  Otherwise, let <var>current scroll offset</var> be the current scroll offset of {{scrollSource}}
     in the direction specified by {{orientation}}.
 
-1.  If <var>current scroll offset</var> is less than {{startScrollOffset}}, return an unresolved
-    time value if {{fill}} is <code>none</code> or <code>forwards</code>, or 0 otherwise.
+1.  If <var>current scroll offset</var> is less than {{startScrollOffset}}, return 0.
 
-1.  If <var>current scroll offset</var> is greater than or equal to {{endScrollOffset}} then:
-    <div class="switch">
+    Note: TODO(<a href="https://github.com/w3c/csswg-drafts/issues/4325#issuecomment-585295758">Issue 4325</a>): Define what the correct timeline state is based on scroll offset.
 
-    : If {{endScrollOffset}} is less than the maximum scroll offset of {{scrollSource}} in
-        {{orientation}} and {{fill}} is <code>none</code> or <code>backwards</code>,
-
-    :: return an unresolved time value.
-
-    : Otherwise,
-
-    :: return the [=effective time range=].
-
-    </div>
-
-    Note: Checking for {{endScrollOffset}} being the maximum scroll offset ensures that the common
-    case of a 'whole scroller' ScrollTimeline does not become inactive when you scroll to the end.
+1.  If <var>current scroll offset</var> is greater than or equal to {{endScrollOffset}}, return [=effective time range=].
 
 1.  Return the result of evaluating the following expression:
 
@@ -577,7 +545,7 @@ Computed value: As specified
 Canonical order: per grammar
 </pre>
 
-<dfn>&lt;single-animation-timeline></dfn> = auto | scroll([element(<<id-selector>>)[, <<scroll-direction>>[, <<scroll-offset>>[, <<scroll-offset>>[, <<time>>[, <<single-animation-fill-mode>>]]]]]])
+<dfn>&lt;single-animation-timeline></dfn> = auto | scroll([element(<<id-selector>>)[, <<scroll-direction>>[, <<scroll-offset>>[, <<scroll-offset>>[, <<time>>]]]]])
 
 <dfn>&lt;scroll-direction></dfn> = auto | block | inline | horizontal | vertical
 
@@ -598,7 +566,7 @@ following effects:
 ::  The animation's [=timeline=] is a {{DocumentTimeline}}, more specifically the
     <a>default document timeline</a>.
 
-:   scroll([element(<<id-selector>>)[, <<scroll-direction>>[, <<scroll-offset>>[, <<scroll-offset>>[, <<time>>[, <<single-animation-fill-mode>>]]]]]])
+:   scroll([element(<<id-selector>>)[, <<scroll-direction>>[, <<scroll-offset>>[, <<scroll-offset>>[, <<time>>]]]]])
 ::  The animation's [=timeline=] is a {{ScrollTimeline}}.
 
     The timeline's {{scrollSource}} is the [=scroll container=] identified
@@ -611,8 +579,6 @@ following effects:
     The second <<scroll-offset>>, if provided, determines the timeline's {{endScrollOffset}}.
 
     The <<time>> value, if specified, determines the timeline's {{timeRange}}.
-
-    The <<single-animation-fill-mode>> value, if specified, determines the timeline's {{fill}}.
 
 </div>  <!-- link-for-hint="ScrollTimeline" -->
 
@@ -640,14 +606,12 @@ following effects:
         ],
         {
           duration: 1000,
-          easing: "linear"
+          easing: "linear",
+          fill: "forwards"
         });
       let timeline = new ScrollTimeline({
-        trigger: new ScrollTrigger({
-          scrollSource: document.documentElement,
-          orientation: "vertical",
-          kind: "range"
-        });
+        scrollSource: document.documentElement,
+        orientation: "vertical",
       });
       let animation = new Animation(effect, timeline);
       animation.play();
@@ -675,6 +639,7 @@ following effects:
         background-color: red;
         animation-name: progress;
         animation-duration: 1s;
+        animation-fill-mode: forwards;
         animation-timing-function: linear;
         /* Assume the HTML element has id 'root' */
         animation-timeline: scroll(element(#root), vertical);

@@ -118,15 +118,19 @@ Usage example {#example}
     // Stores the current layout shift score for the page.
     let cumulativeLayoutShiftScore = 0;
 
-    // Detects new layout shift occurrences and updates the
-    // `cumulativeLayoutShiftScore` variable.
-    const observer = new PerformanceObserver((list) => {
-      for (const entry of list.getEntries()) {
+    function updateCLS(entries) {
+      for (const entry of entries) {
         // Only count layout shifts without recent user input.
         if (!entry.hadRecentInput) {
           cumulativeLayoutShiftScore += entry.value;
         }
       }
+    }
+
+    // Detects new layout shift occurrences and updates the
+    // `cumulativeLayoutShiftScore` variable.
+    const observer = new PerformanceObserver((list) => {
+      updateCLS(list.getEntries());
     });
 
     observer.observe({type: 'layout-shift', buffered: true});
@@ -136,7 +140,7 @@ Usage example {#example}
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') {
         // Force any pending records to be dispatched.
-        observer.takeRecords();
+        updateCLS(observer.takeRecords());
 
         // Send the final score to your analytics back end
         // (assumes `sendToAnalytics` is defined elsewhere).
@@ -148,7 +152,7 @@ Usage example {#example}
 The layout shift score is only one signal, which correlates in an approximate
 manner with the user experience of "jumpiness".
 
-Developers should avoid relying on the precise value of the layout shift score,
+Developers are advised to avoid relying on the precise value of the layout shift score,
 as the metric might evolve over time, and user agents might compromise precision
 in the interest of calculation efficiency.
 

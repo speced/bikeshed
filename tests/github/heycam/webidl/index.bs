@@ -9,8 +9,9 @@ Mailing List Archives: https://lists.w3.org/Archives/Public/public-script-coord/
 Repository: heycam/webidl
 !Feedback: <a href="https://github.com/heycam/webidl">GitHub</a> (<a href="https://github.com/heycam/webidl/issues/new">new issue</a>, <a href="https://github.com/heycam/webidl/issues">open issues</a>, <a href="https://www.w3.org/Bugs/Public/buglist.cgi?product=WebAppsWG&amp;component=WebIDL&amp;resolution=---">legacy bug tracker</a>)
 ED: https://heycam.github.io/webidl/
+Editor: Edgar Chen, Mozilla Corporation, echen@mozilla.com
 Former Editor: Cameron McCormack, Mozilla Corporation, http://mcc.id.au/, cam@mcc.id.au
-Editor: Boris Zbarsky, Mozilla Corporation, bzbarsky@mit.edu
+Former Editor: Boris Zbarsky, Mozilla Corporation, bzbarsky@mit.edu
 Former Editor: Tobie Langel, https://tobie.me, tobie@unlockopen.com
 Abstract: This document defines an interface definition language, Web IDL,
 Abstract: that can be used to describe interfaces that are intended to be
@@ -4156,7 +4157,7 @@ Prose accompanying an [=interface=] with a [=pair iterator=] must define a [=/li
     (a) on interfaces that do not
     [=support indexed properties=],
     or (b) with a forEach method that instead invokes its callback like
-    Set.protoype.forEach (where the key is the same as the value).
+    Set.prototype.forEach (where the key is the same as the value).
     If you’re creating an API that needs such a forEach method, please
     <a href="https://github.com/heycam/webidl/issues/new?title=Enhancement%20request%20for%20Iterables">file an issue</a>.
 
@@ -6060,43 +6061,6 @@ of specifications using Web IDL might want to obtain a sequence of
 [=Unicode scalar values=] given a particular sequence of
 [=code units=].
 
-<div algorithm>
-
-    The following algorithm defines a way to
-    <dfn id="dfn-obtain-unicode" export lt="obtain Unicode|convert to a sequence of Unicode scalar values">convert a DOMString to a sequence of Unicode scalar values</dfn>:
-
-    1.  Let |S| be the {{DOMString}} value.
-    1.  Let |n| be the length of |S|.
-    1.  Initialize |i| to 0.
-    1.  Initialize |U| to be an empty sequence of Unicode characters.
-    1.  While |i| &lt; |n|:
-        1.  Let |c| be the [=code unit=] in |S| at index |i|.
-        1.  Depending on the value of |c|:
-            <dl class="switch">
-                 :  |c| &lt; 0xD800 or |c| &gt; 0xDFFF
-                 :: Append to |U| the Unicode character with code point |c|.
-                 :  0xDC00 ≤ |c| ≤ 0xDFFF
-                 :: Append to |U| a <span class="char">U+FFFD REPLACEMENT CHARACTER</span>.
-                 :  0xD800 ≤ |c| ≤ 0xDBFF
-                 :: <ol class="only">
-                        1.  If |i| = |n|−1, then append to |U| a <span class="char">U+FFFD REPLACEMENT CHARACTER</span>.
-                        1.  Otherwise, |i| &lt; |n|−1:
-                            1.  Let |d| be the code unit in |S| at index
-                                |i|+1.
-                            1.  If 0xDC00 ≤ |d| ≤ 0xDFFF, then:
-                                1.  Let |a| be |c| &amp; 0x3FF.
-                                1.  Let |b| be |d| &amp; 0x3FF.
-                                1.  Append to |U| the Unicode character with
-                                    code point 2<sup>16</sup>+2<sup>10</sup>|a|+|b|.
-                                1.  Set |i| to |i|+1.
-                            1.  Otherwise, |d| &lt; 0xDC00 or |d| &gt; 0xDFFF.
-                                Append to |U| a <span class="char">U+FFFD REPLACEMENT CHARACTER</span>.
-                    </ol>
-            </dl>
-        1.  Set |i| to |i|+1.
-    1.  Return |U|.
-</div>
-
 There is no way to represent a constant {{DOMString}}
 value in IDL, although {{DOMString}} [=dictionary member=] [=dictionary member/default values=]
 and [=optional argument|operation optional argument=] [=optional argument/default values=]
@@ -6276,6 +6240,9 @@ is the [=identifier=] of the enumeration.
 An [=identifier=] that identifies
 a [=callback function=] is used to refer to
 a type whose values are references to objects that are functions with the given signature.
+
+Note: If the [{{TreatNonObjectAsNull}}] [=extended attribute=] is specified on the [=definition=] of
+the [=callback function=], the values can be references to objects that are not functions.
 
 An IDL value of the callback function type is represented by a tuple of an object
 reference and a [=callback context=].
@@ -7674,7 +7641,7 @@ value when its bit pattern is interpreted as an unsigned 64 bit integer.
     1.  Let |string| be the result of [=converted to an IDL value|converting=] |V|
         to a {{DOMString}}.
     1.  Return an IDL {{USVString}} value that is the result of
-        [=obtain Unicode|converting=] |string| to a sequence of [=Unicode scalar values=].
+        [=string/convert|converting=] |string| to a sequence of [=Unicode scalar values=].
 </div>
 
 <div id="USVString-to-es" algorithm="convert an USVString to an ECMAScript value">
@@ -8803,7 +8770,7 @@ Array object references.
 
 <div algorithm>
 
-    To <dfn id="dfn-create-frozen-array" export>create a frozen array</dfn>
+    To <dfn id="dfn-create-frozen-array" lt="create a frozen array|creating a frozen array" export>create a frozen array</dfn>
     from a sequence of values of type |T|, follow these steps:
 
     1.  Let |array| be the result of
@@ -10521,16 +10488,13 @@ that does specify [{{SecureContext}}].
 
 </div>
 
-If the [{{TreatNonObjectAsNull}}]
-[=extended attribute=]
-appears on a [=callback function=],
-then it indicates that any value assigned to an [=attribute=]
-whose type is a [=nullable type|nullable=]
-[=callback function=]
-that is not an object will be converted to
-the <emu-val>null</emu-val> value.
+If the [{{TreatNonObjectAsNull}}] [=extended attribute=] appears on a [=callback function=], then
+it indicates that any value assigned to an [=attribute=] whose type is a [=nullable type|nullable=]
+[=callback function=] will be converted more loosely: if the value is not an object, it will be
+converted to null, and if the value is not [=ECMAScript/callable=], it will be converted to a
+[=callback function=] value that does nothing when called.
 
-See [[#es-nullable-type]]
+See [[#es-nullable-type]], [[#es-callback-function]] and [[#es-invoking-callback-functions]]
 for the specific requirements that the use of
 [{{TreatNonObjectAsNull}}] entails.
 
@@ -10555,7 +10519,7 @@ for the specific requirements that the use of
     </pre>
 
     In an ECMAScript implementation, assigning a value that is not
-    an object (such as a Number value)
+    an object (such as a Number value), or that is not [=ECMAScript/callable=]
     to handler1 will have different behavior from that when assigning
     to handler2:
 
@@ -10570,11 +10534,19 @@ for the specific requirements that the use of
         } catch (e) {
         }
 
+        try {
+          manager.handler1 = {};     // Throws a TypeError.
+        } catch (e) {
+        }
+
         manager.handler2 = function() { };
         manager.handler2;            // Evaluates to the function.
 
         manager.handler2 = 123;
         manager.handler2;            // Evaluates to null.
+
+        manager.handler2 = {};
+        manager.handler2;            // Evaluates to the object.
     </pre>
 </div>
 
@@ -11667,7 +11639,7 @@ in which case they are exposed on every object that [=implements=] the interface
                     {{ECMAScript/TypeError}}.
                 1.  Let |forwardId| be the identifier argument of the [{{PutForwards}}] extended
                     attribute.
-                1.  Perform [=?=] <a abstract-op>Set</a>(|Q|, |forwardId|, |V|, <emu-val>true</emu-val>).
+                1.  Perform [=?=] <a abstract-op>Set</a>(|Q|, |forwardId|, |V|, <emu-val>false</emu-val>).
                 1.  Return <emu-val>undefined</emu-val>.
             1.  Set |idlObject| to the IDL [=interface type=] value that represents a reference
                 to |esValue|.
@@ -13780,11 +13752,9 @@ described in the previous section).
     1.  If |thisArg| was not given, let |thisArg| be <emu-val>undefined</emu-val>.
     1.  Let |F| be the ECMAScript object corresponding to |callable|.
     1.  If [=!=] <a abstract-op>IsCallable</a>(|F|) is <emu-val>false</emu-val>:
-        1.  If the callback function's return type is {{void}}, return.
-
-            Note: This is only possible when the callback function came from an attribute
+        1.  Note: This is only possible when the [=callback function=] came from an attribute
             marked with [{{TreatNonObjectAsNull}}].
-
+        1.  If the callback function's return type is {{void}}, return.
         1.  Return the result of [=converted to an IDL value|converting=]
             <emu-val>undefined</emu-val> to the callback function's return type.
     1.  Let |realm| be |F|'s [=associated Realm=].
@@ -14286,7 +14256,7 @@ Note: as discussed in [[#es-DOMException-specialness]], the ECMAScript binding i
 requirements beyond the normal ones for [=interface types=].
 
 Each {{DOMException}} object has an associated <dfn for="DOMException">name</dfn> and
-<dfn for="DOMException">message</dfn>, both [=JavaScript strings=].
+<dfn for="DOMException">message</dfn>, both [=strings=].
 
 The <dfn constructor for="DOMException"><code>DOMException(|message|, |name|)</code></dfn>
 constructor, when invoked, must run these steps:

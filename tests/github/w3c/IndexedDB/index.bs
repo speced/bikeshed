@@ -128,18 +128,13 @@ in-order traversal of very large numbers of data records.
 
 
 <aside class=example id=example-open-connection>
-In the following example, the API is used to access a "library"
-database that holds books stored by their "isbn" attribute.
-Additionally, an index is maintained on the "title" attribute of the
-objects stored in the object store. This index can be used to look up
-books by title, and enforces a uniqueness constraint. Another index is
-maintained on the "author" attribute of the objects, and can be used
-to look up books by author.
+The following example uses the API to access a `"library"` database. It has a `"books"` object store that holds books records stored by their `"isbn"` property as the primary key.
 
-A connection to the database is opened. If the "library" database did
-not already exist, it is created and an event handler creates the
-object store and indexes. Finally, the opened connection is saved for
-use in subsequent examples.
+Book records have a `"title"` property. This example artificially requires that book titles are unique. The code enforces this by creating an index named `"by_title"` with the {{IDBIndexParameters/unique}} option set. This index is used to look up books by title, and will prevent adding books with non-unique titles.
+
+Book records also have an `"author"` property, which is not <span class=allow-2119>required</span> to be unique. The code creates another index named `"by_author"` to allow look-ups by this property.
+
+The code first opens a connection to the database. The <a event>`upgradeneeded`</a> event handler code creates the object store and indexes, if needed. The <a event>`success`</a> event handler code saves the opened connection for use in later examples.
 
 ```js
 const request = indexedDB.open("library");
@@ -221,8 +216,7 @@ request.onsuccess = function() {
 };
 ```
 
-The following example shows how errors could be handled when a request
-fails.
+The following example shows one way to handle errors when a request fails.
 
 ```js
 const tx = db.transaction("books", "readwrite");
@@ -245,9 +239,7 @@ The database connection can be closed when it is no longer needed.
 db.close();
 ```
 
-In the future, the database might have grown to contain other object
-stores and indexes. The following example shows one way to handle
-migrating from an older version of the database.
+In the future, the database might have grown to contain other object stores and indexes. The following example shows one way to handle migrating from an older version.
 
 ```js
 const request = indexedDB.open("library", 3); // Request version 3.
@@ -433,7 +425,7 @@ which is either null or an [=/upgrade transaction=], and is initially null.
 </div>
 
 <!-- ============================================================ -->
-### Database Connection ### {#database-connection}
+### Database connection ### {#database-connection}
 <!-- ============================================================ -->
 
 Script does not interact with [=databases=] directly. Instead,
@@ -501,7 +493,7 @@ to allow the upgrade or delete to proceed.
 
 
 <!-- ============================================================ -->
-## Object Store ## {#object-store-construct}
+## Object store ## {#object-store-construct}
 <!-- ============================================================ -->
 
 An <dfn>object store</dfn> is the primary storage mechanism for
@@ -544,7 +536,7 @@ one of three sources:
 </div>
 
 <!-- ============================================================ -->
-### Object Store Handle ### {#object-store-handle-construct}
+### Object store handle ### {#object-store-handle-construct}
 <!-- ============================================================ -->
 
 Script does not interact with [=/object stores=] directly. Instead,
@@ -737,7 +729,7 @@ of running [=compare two keys=] with |a| and |b| is 0.
 
 
 <!-- ============================================================ -->
-## Key Path ## {#key-path-construct}
+## Key path ## {#key-path-construct}
 <!-- ============================================================ -->
 
 A <dfn>key path</dfn> is a string or list of strings
@@ -857,7 +849,7 @@ one [=object-store/record=] is added to the index for each of the [=subkeys=].
 </div>
 
 <!-- ============================================================ -->
-### Index Handle ### {#index-handle-construct}
+### Index handle ### {#index-handle-construct}
 <!-- ============================================================ -->
 
 Script does not interact with [=/indexes=] directly. Instead, within
@@ -885,7 +877,7 @@ an [=/upgrade transaction=] is running.
 ## Transactions ## {#transaction-construct}
 <!-- ============================================================ -->
 
-A <dfn id=transaction-concept>Transaction</dfn> is used to interact
+A <dfn id=transaction-concept>transaction</dfn> is used to interact
 with the data in a [=database=]. Whenever data is read or written
 to the database it is done by using a [=/transaction=].
 
@@ -900,10 +892,9 @@ and data mutation operations.
 All transactions are created through a [=/connection=], which is the
 transaction's <dfn>connection</dfn>.
 
-A [=/transaction=] has a <dfn>scope</dfn> that determines the
-[=/object stores=] with which the transaction may interact. A
-transaction's scope remains fixed for the lifetime of that
-transaction.
+A [=/transaction=] has a <dfn>scope</dfn> which is a [=/set=] of [=/object stores=] that the transaction may interact with. A transaction's scope remains fixed for the lifetime of that transaction.
+
+Two [=/transactions=] have <dfn lt="overlap|overlapping scope">overlapping scope</dfn> if any [=/object store=] is in both transactions' [=transaction/scope=].
 
 A [=/transaction=] has a <dfn>mode</dfn> that determines which types
 of interactions can be performed upon that transaction. The [=transaction/mode=]
@@ -916,7 +907,7 @@ following:
     The transaction is only allowed to read data. No modifications can
     be done by this type of transaction. This has the advantage that
     several [=read-only transactions=] can run at the same time even
-    if their [=transaction/scopes=] are overlapping, i.e. if they are using the
+    if their [=transaction/scopes=] are [=overlapping=], i.e. if they are using the
     same object stores. This type of transaction can be created any
     time once a database has been opened.
 
@@ -925,7 +916,7 @@ following:
     The transaction is allowed to read, modify and delete data from
     existing object stores. However object stores and indexes can't be
     added or removed. Multiple {{"readwrite"}} transactions
-    can't run at the same time if their [=transaction/scopes=] are overlapping
+    can't run at the same time if their [=transaction/scopes=] are [=overlapping=]
     since that would mean that they can modify each other's data in
     the middle of the transaction. This type of transaction can be
     created any time once a database has been opened.
@@ -938,6 +929,21 @@ following:
     so. This type of transaction can't be manually created, but
     instead is created automatically when an
     <a event>`upgradeneeded`</a> event is fired.
+
+A [=/transaction=] has a <dfn>durability hint</dfn>. This is a hint to the user agent of whether to prioritize performance or durability when committing the transaction. The [=transaction/durability hint=] is one of the following:
+
+: {{"strict"}}
+:: The user agent may consider that the [=/transaction=] has successfully [=transaction/committed=] only after verifying that all outstanding changes have been successfully written to a persistent storage medium.
+: {{"relaxed"}}
+:: The user agent may consider that the [=/transaction=] has successfully [=transaction/committed=] as soon as all outstanding changes have been written to the operating system, without subsequent verification.
+: {{"default"}}
+:: The user agent should use its default durability behavior for the storage [=/bucket=]. This is the default for [=/transactions=] if not otherwise specified.
+
+<aside class=note>
+  In a typical implementation, {{"strict"}} is a hint to the user agent to flush any operating system I/O buffers before a {{"complete"}} event is fired. While this provides greater confidence that the changes will be persisted in case of subsequent operating system crash or power loss, flushing buffers can take significant time and consume battery life on portable devices.
+
+  Web applications are encouraged to use {{"relaxed"}} for ephemeral data such as caches or quickly changing records, and {{"strict"}} in cases where reducing the risk of data loss outweighs the impact to performance and power. Implementations are encouraged to weigh the durability hint from applications against the impact to users and devices.
+</aside>
 
 A [=/transaction=] optionally has a <dfn>cleanup event loop</dfn>
 which is an [=event loop=].
@@ -958,7 +964,7 @@ A <dfn>read/write transaction</dfn>
 is a [=/transaction=] with [=transaction/mode=] {{"readwrite"}}.
 
 <!-- ============================================================ -->
-### Transaction Lifecycle ### {#transaction-lifecycle}
+### Transaction lifecycle ### {#transaction-lifecycle}
 <!-- ============================================================ -->
 
 A [=/transaction=] has a <dfn>state</dfn>, which is one
@@ -1108,90 +1114,45 @@ They will return true if any transactions were cleaned up, or false otherwise.
   each [=/transaction=].
 </aside>
 
-<!-- ============================================================ -->
-### Transaction Scheduling ### {#transaction-scheduling}
-<!-- ============================================================ -->
-
 An event with type <dfn event>`complete`</dfn> is fired at
 a [=/transaction=] that has successfully [=transaction/committed=].
 
 An event with type <dfn event>`abort`</dfn> is fired at
 a [=/transaction=] that has [=transaction/aborted=].
 
-The following constraints define when a [=/transaction=] can be
-[=transaction/started=]:
+<!-- ============================================================ -->
+### Transaction scheduling ### {#transaction-scheduling}
+<!-- ============================================================ -->
 
-* Any number of [=read-only transactions=] are allowed to run
-    concurrently, even if the transaction's [=transaction/scope=] overlap and
-    include the same [=/object stores=]. As long as a [=read-only
-    transaction=] is running, the data that the implementation returns
-    through [=/requests=] created with that transaction must remain
-    constant. That is, two requests to read the same piece of data
-    must yield the same result both for the case when data is found
-    and the result is that data, and for the case when data is not
-    found and a lack of data is indicated.
+The following constraints define when a [=/transaction=] can be [=transaction/started=]:
 
-    <aside class=note>
-      There are a number of ways that an implementation can ensure
-      this. The implementation could prevent any <a>read/write
-      transaction</a>, whose scope overlaps the scope of the
-      [=read-only transaction=], from starting until the
-      [=read-only transaction=] finishes. Or the implementation
-      could allow the [=read-only transaction=] to see a snapshot
-      of the contents of the [=/object stores=] which is taken when
-      the [=read-only transaction=] started.
-    </aside>
+* A [=read-only transactions=] |tx| can [=transaction/start=] when there are no <a>read/write transactions</a> which:
+    * Were [=transaction/created=] before |tx|; and
+    * have [=overlapping scopes=] with |tx|; and
+    * are not [=transaction/finished=].
+* A <a>read/write transaction</a> |tx| can [=transaction/start=] when there are no [=/transactions=] which:
+    * Were [=transaction/created=] before |tx|; and
+    * have [=overlapping scopes=] with |tx|; and
+    * are not [=transaction/finished=].
 
-* Similarly, implementations must ensure that a <a>read/write
-    transaction</a> is only affected by changes to [=/object
-    stores=] that are made using the transaction itself. For
-    example, the implementation must ensure that another transaction
-    does not modify the contents of [=/object stores=] in the
-    <a>read/write transaction</a>'s [=transaction/scope=]. The implementation
-    must also ensure that if the <a>read/write transaction</a>
-    completes successfully, the changes written to [=/object
-    stores=] using the transaction can be committed to the
-    [=database=] without merge conflicts. An implementation must
-    not abort a transaction due to merge conflicts.
+Implementations may impose additional constraints. For example, implementations are not required to run non-[=overlapping=] <a>read/write transactions</a> in parallel, or may impose limits on the number of running transactions.
 
-* If multiple <a>read/write transactions</a> are attempting to access
-    the same object store (i.e. if they have overlapping [=transaction/scope=]),
-    the transaction that was [=transaction/created=] first must be the transaction
-    which gets access to the object store first. Due to the
-    requirements in the previous paragraph, this also means that it is
-    the only transaction which has access to the object store until
-    the transaction is [=transaction/finished=].
+<aside class=note>
 
-* Any transaction [=transaction/created=] after a <a>read/write transaction</a>
-    must see the changes written by the <a>read/write transaction</a>.
-    So if a <a>read/write transaction</a>, A, is created, and later
-    another transaction B, is created, and the two transactions have
-    overlapping [=transaction/scopes=], then B must see any changes made to any
-    [=/object stores=] that are part of that overlapping [=transaction/scope=].
-    Due to the requirements in the previous paragraph, this also means
-    that the B transaction does not have access to any [=/object
-    stores=] in that overlapping [=transaction/scope=] until the A transaction is
-    [=transaction/finished=].
+  These constraints imply the following:
 
-    <aside class=note>
-      Generally speaking, the above requirements mean that any
-      transaction which has an overlapping scope with a <a>read/write
-      transaction</a> and which was created after that <a>read/write
-      transaction</a>, can't run in parallel with that <a>read/write
-      transaction</a>.
-    </aside>
+  * Any number of [=read-only transactions=] are allowed to run concurrently, even if they have [=overlapping scopes=].
+  * As long as a [=read-only transaction=] is running, the data that the implementation returns through [=/requests=] created with that transaction remains constant. That is, two requests to read the same piece of data yield the same result both for the case when data is found and the result is that data, and for the case when data is not found and a lack of data is indicated.
+  * A <a>read/write transaction</a> is only affected by changes to [=/object stores=] that are made using the transaction itself. The implementation ensures that another transaction does not modify the contents of [=/object stores=] in the <a>read/write transaction</a>'s [=transaction/scope=]. The implementation also ensures that if the <a>read/write transaction</a> completes successfully, the changes written to [=/object stores=] using the transaction can be committed to the [=database=] without merge conflicts.
+  * If multiple <a>read/write transactions</a> are attempting to access the same object store (i.e. if they have [=overlapping scopes=]), the transaction that was [=transaction/created=] first is the transaction which gets access to the object store first, and it is the only transaction which has access to the object store until the transaction is [=transaction/finished=].
+  * Any transaction [=transaction/created=] after a <a>read/write transaction</a> sees the changes written by the <a>read/write transaction</a>. For example, if a <a>read/write transaction</a> A, is created, and later another transaction B, is created, and the two transactions have [=overlapping scopes=], then transaction B sees any changes made to any [=/object stores=] that are part of that [=overlapping scope=]. This also means that transaction B does not have access to any [=/object stores=] in that overlapping [=transaction/scope=] until transaction A is [=transaction/finished=].
 
-* User agents must ensure a reasonable level of fairness across
-    transactions to prevent starvation. For example, if multiple
-    [=read-only transactions=] are started one after another the
-    implementation must not indefinitely prevent a pending
-    <a>read/write transaction</a> from [=transaction/starting=].
+</aside>
 
 </div>
 
-
 <!-- ============================================================ -->
-### Upgrade Transactions ### {#upgrade-transaction-construct}
+### Upgrade transactions ### {#upgrade-transaction-construct}
 <!-- ============================================================ -->
 
 An <dfn>upgrade transaction</dfn> is a [=/transaction=] with [=transaction/mode=]
@@ -1283,7 +1244,7 @@ A [=/request=]'s [=get the parent=] algorithm returns the request's
 </aside>
 
 <!-- ============================================================ -->
-### Open Requests ### {#open-requests}
+### Open requests ### {#open-requests}
 <!-- ============================================================ -->
 
 An <dfn>open request</dfn> is a special type of [=/request=] used
@@ -1321,7 +1282,7 @@ further requests to be processed.
 </div>
 
 <!-- ============================================================ -->
-## Key Range ## {#range-construct}
+## Key range ## {#range-construct}
 <!-- ============================================================ -->
 
 Records can be retrieved from [=/object stores=] and [=/indexes=]
@@ -1517,7 +1478,7 @@ whether the cursor's [=cursor/value=] is exposed via the API.
 </div>
 
 <!-- ============================================================ -->
-## Key Generators ## {#key-generator-construct}
+## Key generators ## {#key-generator-construct}
 <!-- ============================================================ -->
 
 When a [=/object store=] is created it can be specified to use a
@@ -2392,6 +2353,7 @@ when invoked, must run these steps:
 <aside class=advisement>
   &#x1F6A7;
   The {{IDBFactory/databases()}} method is new in this edition.
+  It is supported in Chrome 71 and Edge 79.
   &#x1F6A7;
 </aside>
 
@@ -2449,7 +2411,8 @@ interface IDBDatabase : EventTarget {
   readonly attribute DOMStringList objectStoreNames;
 
   [NewObject] IDBTransaction transaction((DOMString or sequence<DOMString>) storeNames,
-                                         optional IDBTransactionMode mode = "readonly");
+                                         optional IDBTransactionMode mode = "readonly",
+                                         optional IDBTransactionOptions options = {});
   void close();
 
   [NewObject] IDBObjectStore createObjectStore(
@@ -2462,6 +2425,12 @@ interface IDBDatabase : EventTarget {
   attribute EventHandler onclose;
   attribute EventHandler onerror;
   attribute EventHandler onversionchange;
+};
+
+enum IDBTransactionDurability { "default", "strict", "relaxed" };
+
+dictionary IDBTransactionOptions {
+  IDBTransactionDurability durability = "default";
 };
 
 dictionary IDBObjectStoreParameters {
@@ -2645,13 +2614,14 @@ instance on which it was called.
 <dl class="domintro note">
     : |transaction| = |connection| .
         {{IDBDatabase/transaction()|transaction}}(|scope|
-        [, |mode| = "readonly"])
+        [, |mode| [, |options| ] ])
     ::
-        Returns a new [=/transaction=] with the given |mode|
-        ({{"readonly"}} or {{"readwrite"}})
-        and |scope| which can be a single [=/object store=]
-        [=object-store/name=] or an array of
-        [=object-store/names=].
+        Returns a new [=/transaction=] with the given
+        |scope| (which can be a single [=/object store=] [=object-store/name=] or an array of [=object-store/names=]),
+        |mode| ({{"readonly"}} or {{"readwrite"}}),
+        and additional |options| including {{IDBTransactionOptions/durability}} ({{"default"}}, {{"strict"}} or {{"relaxed"}}).
+
+        The default |mode| is {{"readonly"}} and the default {{IDBTransactionOptions/durability}} is {{"default"}}.
 
     : |connection| . {{IDBDatabase/close()|close}}()
     ::
@@ -2661,8 +2631,7 @@ instance on which it was called.
 
 <div class=algorithm>
 
-The <dfn method for=IDBDatabase>transaction(|storeNames|,
-|mode|)</dfn> method, when invoked, must run these steps:
+The <dfn method for=IDBDatabase>transaction(|storeNames|, |mode|, |options|)</dfn> method, when invoked, must run these steps:
 
 1. If a running [=/upgrade transaction=] is associated with the [=/connection=],
     [=throw=] an "{{InvalidStateError}}" {{DOMException}}.
@@ -2683,9 +2652,7 @@ The <dfn method for=IDBDatabase>transaction(|storeNames|,
 1. If |mode| is not {{"readonly"}} or {{"readwrite"}},
     [=throw=] a [=TypeError=].
 
-1. Let |transaction| be a newly [=transaction/created=] [=/transaction=] with
-    |connection|, |mode| and the set of [=/object stores=] named in
-    |scope|.
+1. Let |transaction| be a newly [=transaction/created=] [=/transaction=] with |connection|, |mode|, |options|' {{IDBTransactionOptions/durability}} member, and the set of [=/object stores=] named in |scope|.
 
 1. Set |transaction|'s [=transaction/cleanup event loop=] to the
     current [=event loop=].
@@ -2693,6 +2660,13 @@ The <dfn method for=IDBDatabase>transaction(|storeNames|,
 1. Return an {{IDBTransaction}} object representing |transaction|.
 
 </div>
+
+<aside class=advisement>
+  &#x1F6A7;
+  The {{IDBTransactionOptions/durability}} option is new in this edition.
+  It is supported in Chrome 82 and Edge 82.
+  &#x1F6A7;
+</aside>
 
 <aside class=note>
   The created |transaction| will follow the [=transaction/lifetime=]
@@ -4399,6 +4373,7 @@ return **this**'s [=cursor/request=].
 <aside class=advisement>
   &#x1F6A7;
   The {{IDBCursor/request}} attribute is new in this edition.
+  It is supported in Chrome 76 and Edge 79.
   &#x1F6A7;
 </aside>
 
@@ -4784,13 +4759,14 @@ the contents of the database.
 ## The {{IDBTransaction}} interface ## {#transaction}
 <!-- ============================================================ -->
 
-[=/transaction=] objects implement the following interface:
+[=/Transaction=] objects implement the following interface:
 
 <xmp class=idl>
 [Exposed=(Window,Worker)]
 interface IDBTransaction : EventTarget {
   readonly attribute DOMStringList objectStoreNames;
   readonly attribute IDBTransactionMode mode;
+  readonly attribute IDBTransactionDurability durability;
   [SameObject] readonly attribute IDBDatabase db;
   readonly attribute DOMException? error;
 
@@ -4823,6 +4799,11 @@ enum IDBTransactionMode {
         Returns the [=transaction/mode=] the transaction was created with
         ({{"readonly"}} or {{"readwrite"}}), or {{"versionchange"}} for
         an [=/upgrade transaction=].
+
+    : |transaction| . {{IDBTransaction/durability}}
+    ::
+        Returns the [=transaction/durability hint=] the transaction was created with
+        ({{"strict"}}, {{"relaxed"}}), or {{"default"}}).
 
     : |transaction| . {{IDBTransaction/db}}
     ::
@@ -4859,6 +4840,16 @@ attribute's getter must run these steps:
 
 The <dfn attribute for=IDBTransaction>mode</dfn> attribute's getter
 must return **this**'s [=transaction/mode=].
+
+The <dfn attribute for=IDBTransaction>durability</dfn> attribute's getter must return **this**'s [=transaction/durability hint=].
+
+<aside class=advisement>
+  &#x1F6A7;
+  The {{IDBTransaction/durability}} attribute is new in this edition.
+  It is supported in Chrome 82 and Edge 82.
+  &#x1F6A7;
+</aside>
+
 
 The <dfn attribute for=IDBTransaction>db</dfn> attribute's getter must
 return **this**'s [=transaction/connection=]'s associated [=/database=].
@@ -4965,6 +4956,8 @@ must run these steps:
 <aside class=advisement>
   &#x1F6A7;
   The {{IDBTransaction/commit()}} method is new in this edition.
+  It is supported in Chrome 76, Edge 79, and Firefox 74.
+
   &#x1F6A7;
 </aside>
 
@@ -5198,7 +5191,7 @@ To <dfn>commit a transaction</dfn> with the |transaction| to commit, run these s
     1. If |transaction|'s [=transaction/state=] is no longer [=transaction/committing=],
         then terminate these steps.
 
-    1. Attempt to write any outstanding changes made by |transaction| to the [=database=].
+    1. Attempt to write any outstanding changes made by |transaction| to the [=database=], considering |transaction|'s [=transaction/durability hint=].
 
     1. If an error occurs while writing the changes to the [=database=],
         then run [=abort a transaction=] with |transaction| and an
@@ -5658,7 +5651,7 @@ a request=].
 </aside>
 
 <!-- ============================================================ -->
-## Object Store Storage Operation ## {#object-store-storage-operation}
+## Object store storage operation ## {#object-store-storage-operation}
 <!-- ============================================================ -->
 
 <div class=algorithm>
@@ -5764,7 +5757,7 @@ To <dfn>store a record into an object store</dfn> with
 
 
 <!-- ============================================================ -->
-## Object Store Retrieval Operations ## {#object-store-retrieval-operation}
+## Object store retrieval operations ## {#object-store-retrieval-operation}
 <!-- ============================================================ -->
 
 <div class=algorithm>
@@ -5851,7 +5844,7 @@ with |store|, |range| and optional |count|, run these steps:
 
 
 <!-- ============================================================ -->
-## Index Retrieval Operations ## {#index-retrieval-operation}
+## Index retrieval operations ## {#index-retrieval-operation}
 <!-- ============================================================ -->
 
 <div class=algorithm>
@@ -5938,7 +5931,7 @@ To <dfn>retrieve multiple values from an index</dfn> with
 
 
 <!-- ============================================================ -->
-## Object Store Deletion Operation ## {#object-store-deletion-operation}
+## Object store deletion operation ## {#object-store-deletion-operation}
 <!-- ============================================================ -->
 
 <div class=algorithm>
@@ -5960,7 +5953,7 @@ with |store| and |range|, run these steps:
 
 
 <!-- ============================================================ -->
-## Record Counting Operation ## {#record-counting-operation}
+## Record counting operation ## {#record-counting-operation}
 <!-- ============================================================ -->
 
 <div class=algorithm>
@@ -5977,7 +5970,7 @@ To <dfn>count the records in a range</dfn> with |source| and
 
 
 <!-- ============================================================ -->
-## Object Store Clear Operation ## {#object-store-clear-operation}
+## Object store clear operation ## {#object-store-clear-operation}
 <!-- ============================================================ -->
 
 <div class=algorithm>
@@ -5995,7 +5988,7 @@ To <dfn>clear an object store</dfn> with |store|, run these steps:
 
 
 <!-- ============================================================ -->
-## Cursor Iteration Operation ## {#cursor-iteration-operation}
+## Cursor iteration operation ## {#cursor-iteration-operation}
 <!-- ============================================================ -->
 
 <div class=algorithm>
@@ -6601,7 +6594,7 @@ steps may throw an exception.
 
 
 <!-- ============================================================ -->
-# Privacy Considerations # {#privacy}
+# Privacy considerations # {#privacy}
 <!-- ============================================================ -->
 
 *This section is non-normative.*
@@ -6714,7 +6707,7 @@ it is promptly deleted from the underlying storage.
 
 
 <!-- ============================================================ -->
-# Security Considerations # {#security}
+# Security considerations # {#security}
 <!-- ============================================================ -->
 
 ## DNS spoofing attacks ## {#dns-spoofing-attacks}
@@ -6804,7 +6797,7 @@ format, and to reconstruct any internal state from script-visible
 state when older data is encountered.
 
 <!-- ============================================================ -->
-# Revision History # {#revision-history}
+# Revision history # {#revision-history}
 <!-- ============================================================ -->
 
 *This section is non-normative.*
@@ -6822,8 +6815,10 @@ For the revision history of the second edition, see [that document's Revision Hi
 * Added {{IDBCursor/request}} attribute. ([Issue #255](https://github.com/w3c/IndexedDB/issues/255))
 * Removed handling for nonstandard `lastModifiedDate` property of {{File}} objects. ([Issue #215](https://github.com/w3c/IndexedDB/issues/215))
 * Remove escaping {{IDBKeyRange/includes()}} method. ([Issue #294](https://github.com/w3c/IndexedDB/issues/294))
-* Restrict array keys to [=/Array exotic objects=] (i.e. disallow proxies). ([Issue #309](https://github.com/w3c/IndexedDB/issues/309])
+* Restrict array keys to [=/Array exotic objects=] (i.e. disallow proxies). ([Issue #309](https://github.com/w3c/IndexedDB/issues/309))
 * Transactions are now temporarily made inactive during clone operations.
+* Added {{IDBTransactionOptions/durability}} option and {{IDBTransaction/durability}} attribute. ([Issue #50](https://github.com/w3c/IndexedDB/issues/50))
+* Specified [[#transaction-scheduling]] more precisely and disallow starting read/write transactions while read-only transactions with overlapping scope are running. ([Issue #253](https://github.com/w3c/IndexedDB/issues/253))
 
 <!-- ============================================================ -->
 # Acknowledgements # {#acknowledgements}
@@ -6888,6 +6883,7 @@ Yaron Tausky,
 Bevis Tseng,
 Ben Turner,
 Kyaw Tun,
+Adrienne Walker,
 Hans Wennborg,
 Shawn Wilsher,
 Brett Zamir,

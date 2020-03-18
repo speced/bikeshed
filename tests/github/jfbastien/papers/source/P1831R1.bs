@@ -1,0 +1,626 @@
+<pre class='metadata'>
+Title: Deprecating <code>volatile</code>: library
+Shortname: P1831
+Revision: 1
+Audience: LWG
+Status: P
+Group: WG21
+URL: http://wg21.link/P1831R1
+!Source: <a href="https://github.com/jfbastien/papers/blob/master/source/P1831R1.bs">github.com/jfbastien/papers/blob/master/source/P1831R1.bs</a>
+Editor: JF Bastien, Apple, jfbastien@apple.com
+No abstract: true
+Date: 2020-02-12
+Markup Shorthands: markdown yes
+</pre>
+
+<style>
+th { vertical-align: middle; }
+</style>
+
+Abstract {#abstract}
+========
+
+This paper is the library part of P1152. The Core language parts of the
+deprecation were voted into C++20 at the Cologne meeting as [[P1152R4]]. LWG was
+unable to review library wording, this paper therefore carries forward the
+library parts of [[P1152R3]].
+
+
+Edit History {#edit}
+============
+
+r0 → r1 {#r0r1}
+-------
+
+Address LWG feedback:
+
+  * Change one "they" to "it".
+  * Don't use *Mandates:* clause, use *Constraints:* instead.
+  * Clarify why we don't have a feature test macro.
+
+Wording {#word}
+=======
+
+The proposed wording follows the library approach to deprecation: library
+deprecation presents the library without the deprecated feature, and only
+mentions said feature in Annex D.
+
+No feature test macro is added, per SG10 guidance: developers cannot use a
+feature test macro to decide to do something else after this deprecation, they
+should instead fix the code even before the deprecation.
+
+Tuples [**tuple**] {#tuple}
+------------------
+
+Modify as follows.
+
+<blockquote>
+
+  Header `<tuple>` synopsis [**tuple.syn**]:
+  
+  <pre><code>
+    namespace std {
+    
+    [...]
+    
+    // [<i>tuple.helper</i>], tuple helper classes
+    template&lt;class T&gt; class tuple_size;                  // not defined
+    template&lt;class T&gt; class tuple_size&lt;const T&gt;;
+    <del>template&lt;class T&gt; class tuple_size&lt;volatile T&gt;;</del>
+    <del>template&lt;class T&gt; class tuple_size&lt;const volatile T&gt;;</del>
+    
+    template&lt;class... Types&gt; class tuple_size&lt;tuple&lt;Types...&gt;&gt;;
+    
+    template&lt;size_t I, class T&gt; class tuple_element;     // not defined
+    template&lt;size_t I, class T&gt; class tuple_element&lt;I, const T&gt;;
+    <del>template&lt;size_t I, class T&gt; class tuple_element&lt;I, volatile T&gt;;</del>
+    <del>template&lt;size_t I, class T&gt; class tuple_element&lt;I, const volatile T&gt;;</del>
+
+    [...]
+    
+    }
+    
+  </code></pre>
+  
+  [...]
+  
+  Tuple helper classes [**tuple.helper**]
+
+  <pre><code>
+  
+  &nbsp;template&lt;class T&gt; class tuple_size&lt;const T&gt;;
+  <del> template&lt;class T&gt; class tuple_size&lt;volatile T&gt;;</del>
+  <del> template&lt;class T&gt; class tuple_size&lt;const volatile T&gt;;</del>
+  
+  </code></pre>
+
+  Let `TS` denote `tuple_size<T>` of the *cv*-unqualified type `T`. If the
+  expression `TS::value` is well-formed when treated as an unevaluated operand,
+  then <del>each of the three templates</del><ins>the template</ins> shall satisfy the `TransformationTrait`
+  requirements with a base characteristic of
+
+  <pre><code>integral_constant&lt;size_t, TS::value&gt;</code></pre>
+  
+  Otherwise, <del>they</del><ins>it</ins> shall have no member `value`.
+  
+  Access checking is performed as if in a context unrelated to `TS` and `T`.
+  Only the validity of the immediate context of the expression is considered. [
+  *Note:* The compilation of the expression can result in side effects such as
+  the instantiation of class template specializations and function template
+  specializations, the generation of implicitly-defined functions, and so on.
+  Such side effects are not in the "immediate context" and can result in the
+  program being ill-formed. —*end note* ]
+
+  In addition to being available via inclusion of the `<tuple>` header,
+  the <del>three templates are</del><ins>template is</ins> available when any of the
+  headers `<array>`, `<ranges>`, or `<utility>` are included.
+
+  <pre><code>
+  
+  template&lt;size_t I, class T&gt; class tuple_element&lt;I, const T&gt;;
+  <del>template&lt;size_t I, class T&gt; class tuple_element&lt;I, volatile T&gt;;</del>
+  <del>template&lt;size_t I, class T&gt; class tuple_element&lt;I, const volatile T&gt;;</del>
+
+  </code></pre>
+
+  Let `TE` denote `tuple_element_t<I, T>` of the *cv*-unqualified type `T`.
+  Then <del>each of the three templates</del><ins>the template</ins> shall satisfy
+  the `TransformationTrait` requirements with a member typedef `type` that names
+  the <del>following </del>type<del>:</del><ins> `add_const_t<TE>`.</ins>
+
+  <del><ul>
+    <li>for the first specialization, `add_const_t<TE>`,
+    <li>for the second specialization, `add_volatile_t<TE>`, and
+    <li>for the third specialization, `add_cv_t<TE>`.
+  </ul></del>
+
+  In addition to being available via inclusion of the `<tuple>` header,
+  the <del>three templates are</del><ins>template is</ins> available when any of the
+  headers `<array>`, `<ranges>`, or `<utility>` are included.
+
+</blockquote>
+
+Variants [**variant**] {#variant}
+----------------------
+
+Modify as follows.
+
+<blockquote>
+
+  `<variant>` synopsis [**variant.syn**]
+  
+  <pre><code>
+  
+  namespace std {
+  // [<i>variant.variant</i>], class template variant
+  template&lt;class... Types&gt;
+    class variant;
+
+  // [<i>variant.helper</i>], variant helper classes
+  template&lt;class T&gt; struct variant_size;                   // not defined
+  template&lt;class T&gt; struct variant_size&lt;const T&gt;;
+  <del>template&lt;class T&gt; struct variant_size&lt;volatile T&gt;;</del>
+  <del>template&lt;class T&gt; struct variant_size&lt;const volatile T&gt;;</del>
+  template&lt;class T&gt;
+    inline constexpr size_t variant_size_v = variant_size&lt;T&gt;::value;
+
+  template&lt;class... Types&gt;
+    struct variant_size&lt;variant&lt;Types...&gt;&gt;;
+
+  template&lt;size_t I, class T&gt; struct variant_alternative;  // not defined
+  template&lt;size_t I, class T&gt; struct variant_alternative&lt;I, const T&gt;;
+  <del>template&lt;size_t I, class T&gt; struct variant_alternative&lt;I, volatile T&gt;;</del>
+  <del>template&lt;size_t I, class T&gt; struct variant_alternative&lt;I, const volatile T&gt;;</del>
+
+  [...]
+  
+  }
+  
+  </code></pre>
+  
+  `variant` helper classes [**variant.helper**]
+  
+  <pre><code>template&lt;class T&gt; struct variant_size;</code></pre>
+
+  *Remark:* All specializations of `variant_size` shall satisfy the
+  `UnaryTypeTrait` requirements with a base characteristic of
+  `integral_constant<size_t, N>` for some `N`.
+
+  <pre></code>
+  
+  template&lt;class T&gt; class variant_size&lt;const T&gt;;
+  <del>template&lt;class T&gt; class variant_size&lt;volatile T&gt;;</del>
+  <del>template&lt;class T&gt; class variant_size&lt;const volatile T&gt;;</del>
+  
+  </code></pre>
+
+  Let `VS` denote `variant_size<T>` of the *cv*-unqualified type `T`. Then <del>each
+  of the three templates</del><ins>the template</ins> shall satisfy the `UnaryTypeTrait` requirements with a
+  base characteristic of `integral_constant<size_t, VS::value>`.
+
+  <pre><code>
+  template&lt;class... Types&gt;
+    struct variant_size&lt;variant&lt;Types...&gt;&gt; : integral_constant&lt;size_t, sizeof...(Types)&gt; { };
+  </code></pre>
+
+  <pre><code>
+  template&lt;size_t I, class T&gt; class variant_alternative&lt;I, const T&gt;;
+  <del>template&lt;size_t I, class T&gt; class variant_alternative&lt;I, volatile T&gt;;</del>
+  <del>template&lt;size_t I, class T&gt; class variant_alternative&lt;I, const volatile T&gt;;</del>
+  </code></pre>
+
+  Let `VA` denote `variant_alternative<I, T>` of the *cv*-unqualified type `T`.
+  Then <del>each of the three templates</del><ins>the template</ins> shall meet the `TransformationTrait`
+  requirements with a member typedef `type` that names the <del>following</del> type<del>:</del><ins> `add_const_t<VA::type>`.</ins>
+  
+  <del><ul>
+    <li>for the first specialization, `add_const_t<VA::type>`,
+    <li>for the second specialization, `add_volatile_t<VA::type>`, and
+    <li>for the third specialization, `add_cv_t<VA::type>`.
+  </ul></del>
+
+</blockquote>
+
+Atomic operations library [**atomics**] {#atomics}
+---------------------------------------
+
+Modify as follows.
+
+<blockquote>
+
+  Operations on atomic types [**atomics.types.operations**]
+  
+  [ *Note:* Many operations are `volatile`-qualified. The "volatile as device
+  register" semantics have not changed in the standard. This qualification means
+  that volatility is preserved when applying these operations to volatile
+  objects. It does not mean that operations on non-volatile objects become
+  volatile. —*end note* ]
+
+  [...]
+  
+  <pre><code>
+  bool is_lock_free() const volatile noexcept;
+  bool is_lock_free() const noexcept;
+  </code></pre>
+
+  *Returns:* `true` if the object's operations are lock-free, `false` otherwise.
+  
+  [ *Note:* The return value of the `is_lock_free` member function is consistent with the value of `is_always_lock_free` for the same type. —*end note* ]
+
+  <pre><code>
+  void store(T desired, memory_order order = memory_order::seq_cst) volatile noexcept;
+  void store(T desired, memory_order order = memory_order::seq_cst) noexcept;
+  </code></pre>
+
+  *Requires:* The `order` argument shall not be `memory_order::consume`, `memory_order::acquire`, nor `memory_order::acq_rel`.
+
+  <ins>*Constraints:* For the `volatile` overload of this function, `atomic<T>::is_always_lock_free` is `true`.</ins>
+
+  *Effects:*  Atomically replaces the value pointed to by `this` with the value of `desired`. Memory is affected according to the value of `order`.
+  
+  <pre><code>
+  T operator=(T desired) volatile noexcept;
+  T operator=(T desired) noexcept;
+  </code></pre>
+
+  <ins>*Constraints:* For the `volatile` overload of this function, `atomic<T>::is_always_lock_free` is `true`.</ins>
+
+  *Effects:*  Equivalent to `store(desired)`.
+
+  *Returns:* `desired`.
+
+  <pre><code>
+  T load(memory_order order = memory_order::seq_cst) const volatile noexcept;
+  T load(memory_order order = memory_order::seq_cst) const noexcept;
+  </code></pre>
+
+  *Requires:* The `order` argument shall not be `memory_order::release` nor `memory_order::acq_rel`.
+
+  <ins>*Constraints:* For the `volatile` overload of this function, `atomic<T>::is_always_lock_free` is `true`.</ins>
+
+  *Effects:*  Memory is affected according to the value of `order`.
+
+  *Returns:* Atomically returns the value pointed to by `this`.
+  
+  <pre><code>
+  operator T() const volatile noexcept;
+  operator T() const noexcept;
+  </code></pre>
+
+  <ins>*Constraints:* For the `volatile` overload of this function, `atomic<T>::is_always_lock_free` is `true`.</ins>
+
+  *Effects:*  Equivalent to: `return load();`
+
+  <pre><code>
+  T exchange(T desired, memory_order order = memory_order::seq_cst) volatile noexcept;
+  T exchange(T desired, memory_order order = memory_order::seq_cst) noexcept;
+  </code></pre>
+
+  <ins>*Constraints:* For the `volatile` overload of this function, `atomic<T>::is_always_lock_free` is `true`.</ins>
+
+  *Effects:*  Atomically replaces the value pointed to by `this` with `desired`. Memory is affected according to the value of `order`. These operations are atomic read-modify-write operations.
+
+  *Returns:* Atomically returns the value pointed to by `this` immediately before the effects.
+
+  <pre><code>
+  bool compare_exchange_weak(T& expected, T desired,
+                             memory_order success, memory_order failure) volatile noexcept;
+  bool compare_exchange_weak(T& expected, T desired,
+                             memory_order success, memory_order failure) noexcept;
+  bool compare_exchange_strong(T& expected, T desired,
+                               memory_order success, memory_order failure) volatile noexcept;
+  bool compare_exchange_strong(T& expected, T desired,
+                               memory_order success, memory_order failure) noexcept;
+  bool compare_exchange_weak(T& expected, T desired,
+                             memory_order order = memory_order::seq_cst) volatile noexcept;
+  bool compare_exchange_weak(T& expected, T desired,
+                             memory_order order = memory_order::seq_cst) noexcept;
+  bool compare_exchange_strong(T& expected, T desired,
+                               memory_order order = memory_order::seq_cst) volatile noexcept;
+  bool compare_exchange_strong(T& expected, T desired,
+                               memory_order order = memory_order::seq_cst) noexcept;
+  </code></pre>
+
+  *Requires:* The `failure` argument shall not be `memory_order::release` nor `memory_order::acq_rel`.
+
+  <ins>*Constraints:* For the `volatile` overload of this function, `atomic<T>::is_always_lock_free` is `true`.</ins>
+
+  *Effects:*  Retrieves the value in `expected`. It then atomically compares the value representation of the value pointed to by `this` for equality with that previously retrieved from `expected`,eand if true, replaces the value pointed to by `this` with that in `desired`. If and only if the comparison is true, memory is affected according to the value of `success`, and if the comparison is false, memory is affected according to the value of `failure`. When only one `memory_order` argument is supplied, the value of `success` is `order`, and the value of `failure` is `order` except that a value of `memory_order::acq_rel` shall be replaced by the value `memory_order::acquire` and a value of `memory_order::release` shall be replaced by the value `memory_order::relaxed`. If and only if the comparison is false then, after the atomic operation, the value in `expected` is replaced by the value pointed to by `this` during the atomic comparison. If the operation returns `true`, these operations are atomic read-modify-write operations on the memory pointed to by `this`. Otherwise, these operations are atomic load operations on that memory.
+
+  *Returns:* The result of the comparison.
+
+  [...]
+  
+  Specializations for integers [**atomics.types.int**]
+  
+  <pre><code>
+  T fetch_<i>key</i>(T operand, memory_order order = memory_order::seq_cst) volatile noexcept;
+  T fetch_<i>key</i>(T operand, memory_order order = memory_order::seq_cst) noexcept;
+  </code></pre>
+
+  <ins>*Constraints:* For the `volatile` overload of this function, `atomic<T>::is_always_lock_free` is `true`.</ins>
+
+  *Effects:* Atomically replaces the value pointed to by `this` with the result of the computation applied to the value pointed to by `this` and the given `operand`. Memory is affected according to the value of `order`. These operations are atomic read-modify-write operations.
+
+  *Returns:* Atomically, the value pointed to by `this` immediately before the effects.
+
+  *Remarks:* For signed integer types, the result is as if the object value and parameters were converted to their corresponding unsigned types, the computation performed on those types, and the result converted back to the signed type. [ *Note:* There are no undefined results arising from the computation.  —*end note* ]
+
+  <pre><code>
+  T operator <i>op</i>=(T operand) volatile noexcept;
+  T operator <i>op</i>=(T operand) noexcept;
+  </code></pre>
+
+  <ins>*Constraints:* For the `volatile` overload of this function, `atomic<T>::is_always_lock_free` is `true`.</ins>
+
+  *Effects:* Equivalent to: <code>return fetch_<i>key</i>(operand) <i>op</i> operand;</code>
+
+  Specializations for floating-point types [**atomics.types.float**]
+
+  The following operations perform arithmetic addition and subtraction computations. The key, operator, and computation correspondence are identified in [**atomic.arithmetic.computations**].
+
+  <pre><code>
+  T A::fetch_<i>key</i>(T operand, memory_order order = memory_order_seq_cst) volatile noexcept;
+  T A::fetch_<i>key</i>(T operand, memory_order order = memory_order_seq_cst) noexcept;
+  </code></pre>
+
+  <ins>*Constraints:* For the `volatile` overload of this function, `atomic<T>::is_always_lock_free` is `true`.</ins>
+
+  *Effects:* Atomically replaces the value pointed to by `this` with the result of the computation applied to the value pointed to by `this` and the given `operand`. Memory is affected according to the value of `order`. These operations are atomic read-modify-write operations.
+
+  *Returns:* Atomically, the value pointed to by `this` immediately before the effects.
+
+  *Remarks:* If the result is not a representable value for its type the result is unspecified, but the operations otherwise have no undefined behavior. Atomic arithmetic operations on <code><i>floating-point</i></code> should conform to the <code>std::numeric_limits&lt;<i>floating-point</i>&gt;</code> traits associated with the floating-point type. The floating-point environment for atomic arithmetic operations on <code><i>floating-point</i></code> may be different than the calling thread's floating-point environment.
+
+  <pre><code>
+  T operator <i>op</i>=(T operand) volatile noexcept;
+  T operator <i>op</i>=(T operand) noexcept;
+  </code></pre>
+
+  <ins>*Constraints:* For the `volatile` overload of this function, `atomic<T>::is_always_lock_free` is `true`.</ins>
+
+  *Effects:* Equivalent to: <code>return fetch_<i>key</i>(operand) <i>op</i> operand;</code>
+
+  *Remarks:* If the result is not a representable value for its type the result is unspecified, but the operations otherwise have no undefined behavior. Atomic arithmetic operations on <code><i>floating-point</i></code> should conform to the <code>std::numeric_limits&lt;<i>floating-point</i>&gt;</code> traits associated with the floating-point type. The floating-point environment for atomic arithmetic operations on <code><i>floating-point</i></code> may be different than the calling thread's floating-point environment.
+
+  Partial specialization for pointers [**atomics.types.pointer**]
+
+  <pre><code>
+  T* fetch_<i>key</i>(ptrdiff_t operand, memory_order order = memory_order::seq_cst) volatile noexcept;
+  T* fetch_<i>key</i>(ptrdiff_t operand, memory_order order = memory_order::seq_cst) noexcept;
+  </code></pre>
+
+  *Requires:* T shall be an object type, otherwise the program is ill-formed. [ *Note:* Pointer arithmetic on `void*` or function pointers is ill-formed. —*end note* ]
+
+  <ins>*Constraints:* For the `volatile` overload of this function, `atomic<T>::is_always_lock_free` is `true`.</ins>
+
+  *Effects:* Atomically replaces the value pointed to by `this` with the result of the computation applied to the value pointed to by `this` and the given `operand`. Memory is affected according to the value of `order`. These operations are atomic read-modify-write operations.
+
+  *Returns:* Atomically, the value pointed to by `this` immediately before the effects.
+
+  *Remarks:* The result may be an undefined address, but the operations otherwise have no undefined behavior.
+
+  <pre><code>
+  T* operator <i>op</i>=(ptrdiff_t operand) volatile noexcept;
+  T* operator <i>op</i>=(ptrdiff_t operand) noexcept;
+  </code></pre>
+
+  <ins>*Constraints:* For the `volatile` overload of this function, `atomic<T>::is_always_lock_free` is `true`.</ins>
+
+  *Effects:* Equivalent to: <code>return fetch_<i>key</i>(operand) <i>op</i> operand;</code>
+
+  Member operators common to integers and pointers to objects [**atomics.types.memop**]
+
+  <pre><code>
+  T operator++(int) volatile noexcept;
+  T operator++(int) noexcept;
+  </code></pre>
+
+  <ins>*Constraints:* For the `volatile` overload of this function, `atomic<T>::is_always_lock_free` is `true`.</ins>
+
+  *Effects:* Equivalent to: `return fetch_add(1);`
+
+  <pre><code>
+  T operator--(int) volatile noexcept;
+  T operator--(int) noexcept;
+  </code></pre>
+
+  <ins>*Constraints:* For the `volatile` overload of this function, `atomic<T>::is_always_lock_free` is `true`.</ins>
+
+  *Effects:* Equivalent to: `return fetch_sub(1);`
+
+  <pre><code>
+  T operator++() volatile noexcept;
+  T operator++() noexcept;
+  </code></pre>
+
+  <ins>*Constraints:* For the `volatile` overload of this function, `atomic<T>::is_always_lock_free` is `true`.</ins>
+
+  *Effects:* Equivalent to: `return fetch_add(1) + 1;`
+
+  <pre><code>
+  T operator--() volatile noexcept;
+  T operator--() noexcept;
+  </code></pre>
+
+  <ins>*Constraints:* For the `volatile` overload of this function, `atomic<T>::is_always_lock_free` is `true`.</ins>
+
+  *Effects:* Equivalent to: `return fetch_sub(1) - 1;`
+
+  Non-member functions [**atomics.nonmembers**]
+
+  A non-member function template whose name matches the pattern <code>atomic_<i>f</i></code> or the pattern <code>atomic_<i>f</i>_explicit</code> invokes the member function <code><i>f</i></code>, with the value of the first parameter as the object expression and the values of the remaining parameters (if any) as the arguments of the member function call, in order. An argument for a parameter of type `atomic<T>::value_type*` is dereferenced when passed to the member function call. If no such member function exists, the program is ill-formed.
+
+  <pre><code>
+  template&lt;class T&gt;
+    void atomic_init(volatile atomic&lt;T&gt;* object, typename atomic&lt;T&gt;::value_type desired) noexcept;
+  template&lt;class T&gt;
+    void atomic_init(atomic&lt;T&gt;* object, typename atomic&lt;T&gt;::value_type desired) noexcept;
+  </code></pre>
+
+  <ins>*Constraints:* For the `volatile` overload of this function, `atomic<T>::is_always_lock_free` is `true`.</ins>
+
+  *Effects:* Non-atomically initializes `*object` with value `desired`. This function shall only be applied to objects that have been default constructed, and then only once. [ *Note:* These semantics ensure compatibility with C. —*end note* ] [ *Note:* Concurrent access from another thread, even via an atomic operation, constitutes a data race.  —*end note* ]
+
+  [ *Note:* The non-member functions enable programmers to write code that can be compiled as either C or C++, for example in a shared header file.  —*end note* ]
+
+
+</blockquote>
+
+Annex D {#annexD}
+-------
+
+Add the following wording to Annex D:
+
+### Tuple [**depr.tuple**] ### {#depr.tuple}
+
+  Header `<tuple>` synopsis [**depr.tuple.syn**]:
+  
+  <pre><code>
+    namespace std {
+    
+    [...]
+    
+    // [<i>tuple.helper</i>], tuple helper classes
+    template&lt;class T&gt; class tuple_size&lt;volatile T&gt;;
+    template&lt;class T&gt; class tuple_size&lt;const volatile T&gt;;
+    
+    template&lt;size_t I, class T&gt; class tuple_element&lt;I, volatile T&gt;;
+    template&lt;size_t I, class T&gt; class tuple_element&lt;I, const volatile T&gt;;
+
+    [...]
+    
+    }
+    
+  </code></pre>
+
+  Tuple helper classes [**depr.tuple.helper**]
+
+  <pre><code>
+  
+  template&lt;class T&gt; class tuple_size&lt;volatile T&gt;;
+  template&lt;class T&gt; class tuple_size&lt;const volatile T&gt;;
+  
+  </code></pre>
+
+  Let `TS` denote `tuple_size<T>` of the *cv*-unqualified type `T`. If the
+  expression `TS::value` is well-formed when treated as an unevaluated operand,
+  then each of the two templates shall satisfy the `TransformationTrait`
+  requirements with a base characteristic of
+
+  <pre><code>integral_constant&lt;size_t, TS::value&gt;</code></pre>
+  
+  Otherwise, they shall have no member `value`.
+  
+  Access checking is performed as if in a context unrelated to `TS` and `T`.
+  Only the validity of the immediate context of the expression is considered.
+
+  In addition to being available via inclusion of the `<tuple>` header, the two
+  templates are available when any of the headers `<array>`, `<ranges>`, or
+  `<utility>` are included.
+
+  <pre><code>
+  
+  template&lt;size_t I, class T&gt; class tuple_element&lt;I, volatile T&gt;;
+  template&lt;size_t I, class T&gt; class tuple_element&lt;I, const volatile T&gt;;
+
+  </code></pre>
+
+  Let `TE` denote `tuple_element_t<I, T>` of the *cv*-unqualified type `T`. Then
+  each of the two templates shall satisfy the `TransformationTrait` requirements
+  with a member typedef `type` that names the following type:
+
+  <ul>
+    <li>for the first specialization, `add_volatile_t<TE>`, and
+    <li>for the second specialization, `add_cv_t<TE>`.
+  </ul>
+
+  In addition to being available via inclusion of the `<tuple>` header, the two
+  templates are available when any of the headers `<array>`, `<ranges>`, or
+  `<utility>` are included.
+
+### Variant [**depr.variant**] ### {#depr.variant}
+
+  `<variant>` synopsis [**depr.variant.syn**]
+  
+  <pre><code>
+  
+  namespace std {
+
+  // [<i>variant.helper</i>], variant helper classes
+  template&lt;class T&gt; struct variant_size&lt;volatile T&gt;;
+  template&lt;class T&gt; struct variant_size&lt;const volatile T&gt;;
+
+  template&lt;size_t I, class T&gt; struct variant_alternative&lt;I, volatile T&gt;;
+  template&lt;size_t I, class T&gt; struct variant_alternative&lt;I, const volatile T&gt;;
+  
+  }
+  
+  </code></pre>
+  
+  `variant` helper classes [**depr.variant.helper**]
+  
+
+  <pre></code>
+  
+  template&lt;class T&gt; class variant_size&lt;volatile T&gt;;
+  template&lt;class T&gt; class variant_size&lt;const volatile T&gt;;
+  
+  </code></pre>
+
+  Let `VS` denote `variant_size<T>` of the *cv*-unqualified type `T`. Then each
+  of the two templates shall satisfy the `UnaryTypeTrait` requirements with a
+  base characteristic of `integral_constant<size_t, VS::value>`.
+
+  <pre><code>
+  template&lt;size_t I, class T&gt; class variant_alternative&lt;I, volatile T&gt;;
+  template&lt;size_t I, class T&gt; class variant_alternative&lt;I, const volatile T&gt;;
+  </code></pre>
+
+  Let `VA` denote `variant_alternative<I, T>` of the *cv*-unqualified type `T`.
+  Then each of the two templates shall meet the `TransformationTrait`
+  requirements with a member typedef `type` that names the following type:
+  
+  <ul>
+    <li>for the first specialization, `add_volatile_t<VA::type>`, and
+    <li>for the second specialization, `add_cv_t<VA::type>`.
+  </ul>
+
+### Atomic operations library [**depr.atomics**] ### {#depr.atomics}
+
+If an atomic specialization has one of the following overloads, then that
+overload is available when `atomic<T>::is_always_lock_free` is `false`:
+
+<pre><code>
+  void store(T desired, memory_order order = memory_order::seq_cst) volatile noexcept;
+  T operator=(T desired) volatile noexcept;
+  T load(memory_order order = memory_order::seq_cst) const volatile noexcept;
+  operator T() const volatile noexcept;
+  T exchange(T desired, memory_order order = memory_order::seq_cst) volatile noexcept;
+  bool compare_exchange_weak(T&amp; expected, T desired, memory_order success, memory_order failure) volatile noexcept;
+  bool compare_exchange_strong(T&amp; expected, T desired, memory_order success, memory_order failure) volatile noexcept;
+  bool compare_exchange_weak(T&amp; expected, T desired, memory_order order = memory_order::seq_cst) volatile noexcept;
+  bool compare_exchange_strong(T&amp; expected, T desired, memory_order order = memory_order::seq_cst) volatile noexcept;
+  T fetch_<i>key</i>(T operand, memory_order order = memory_order::seq_cst) volatile noexcept;
+  T operator <i>op</i>=(T operand) volatile noexcept;
+  T* fetch_<i>key</i>(ptrdiff_t operand, memory_order order = memory_order::seq_cst) volatile noexcept;
+</code></pre>
+
+The following non-member function is available when
+`atomic<T>::is_always_lock_free` is `false`:
+
+  <pre><code>
+  template&lt;class T&gt;
+    void atomic_init(volatile atomic&lt;T&gt;* object, typename atomic&lt;T&gt;::value_type desired) noexcept;
+  </code></pre>
+
+<pre class=biblio>
+{
+    "P1152R4": {
+        "href": "https://wg21.link/P1152R4",
+        "title": "Deprecating volatile",
+        "authors": ["JF Bastien"],
+        "date": "22 July 2019"
+    }
+}
+</pre>

@@ -159,6 +159,8 @@ This proposal outlines an asynchronous API using Promises/async functions for th
         * ... again including for script-supplied in-scope request paths
             in [[Service-Workers|service worker]] contexts
 
+Issue: Update the above, especially w/r/t registration.
+
 <!-- ============================================================ -->
 ### Script visibility ### {#script-visibility}
 <!-- ============================================================ -->
@@ -168,6 +170,8 @@ A cookie is <dfn>script-visible</dfn> when it is in-scope and does not have the 
 <!-- ============================================================ -->
 ### Motivations ### {#intro-motivation}
 <!-- ============================================================ -->
+
+Issue: Review/rewrite this section.
 
 Some service workers [need access to cookies](https://github.com/slightlyoff/ServiceWorker/issues/707) but
 cannot use the synchronous, blocking {{Document/cookie|document.cookie}} interface as they both have no `document` and
@@ -186,6 +190,8 @@ The API must interoperate well enough with existing cookie APIs (HTTP-level, HTM
 <!-- ============================================================ -->
 ### Opinions ### {#intro-opinions}
 <!-- ============================================================ -->
+
+Issue: Review/rewrite this section.
 
 This API defaults cookie paths to `/` for cookie write operations, including deletion/expiration. The implicit relative path-scoping of cookies to `.` has caused a lot of additional complexity for relatively little gain given their security equivalence under the same-origin policy and the difficulties arising from multiple same-named cookies at overlapping paths on the same domain. Cookie paths without a trailing `/` are treated as if they had a trailing `/` appended for cookie write operations. Cookie paths must start with `/` for write operations, and must not contain any `..` path segments. Query parameters and URL fragments are not allowed in paths for cookie write operations.
 
@@ -210,6 +216,8 @@ Scripts should not have to write and then read "test cookies" to determine wheth
 <!-- ============================================================ -->
 ### Compatiblity ### {#intro-compat}
 <!-- ============================================================ -->
+
+Issue: Review/rewrite this section.
 
 Some user-agents implement non-standard extensions to cookie behavior. The intent of this specification,
 though, is to first capture a useful and interoperable (or mostly-interoperable) subset of cookie behavior implemented
@@ -401,7 +409,7 @@ cookieStore.addEventListener('change', event => {
   for (const cookie in event.changed)
     console.log(\`Cookie ${cookie.name} changed to ${cookie.value}\`);
 
-console.log(\`${event.deleted.length} deleted cookies\`);
+  console.log(\`${event.deleted.length} deleted cookies\`);
   for (const cookie in event.deleted)
     console.log(\`Cookie ${cookie.name} deleted\`);
 });
@@ -409,20 +417,26 @@ console.log(\`${event.deleted.length} deleted cookies\`);
 
 </div>
 
-[=Service workers=] have to subscribe for events during the
-[=service worker/state|install=] stage,
-and start receiving `cookiechange` events when [=service worker/state|activated=].
+In [=service workers=], `cookiechange` events are fired against the global scope, but an explicit subscription is required, associated with the service worker's registration.
 
 <div class=example>
 Register for `cookiechange` events in a service worker:
 
 ```js
-self.addEventListener('install', event => {
-  event.waitFor(async () => {
-    await cookieStore.subscribeToChanges([{
-      name: 'session',  // Get change events for session-related cookies.
-      matchType: 'starts-with',  // Matches session_id, session-id, etc.
-    }]);
+self.addEventListener('activate', (event) => {
+  event.waitUntil(async () => {
+    // Snapshot current state of subscriptions.
+    const subscriptions = await self.registration.cookies.getSubscriptions();
+
+    // Clear any existing subscriptions.
+    await self.registration.cookies.unsubscribe(subscriptions);
+
+    await self.registration.cookies.subscribe([
+      {
+        name: 'session',  // Get change events for session-related cookies.
+        matchType: 'starts-with',  // Matches session_id, session-id, etc.
+      }
+    ]);
   });
 });
 
@@ -435,8 +449,7 @@ self.addEventListener('cookiechange', event => {
 ```
 </div>
 
-
-Calls to {{CookieStore/subscribeToChanges()}} are cumulative, so that independently maintained
+Calls to {{CookieStoreManager/subscribe()}} are cumulative, so that independently maintained
 modules or libraries can set up their own subscriptions. As expected, a [=service worker=]'s
 subscriptions are persisted for with the [=service worker registration=].
 
@@ -447,7 +460,7 @@ which is is much higher than the cost of dispatching an equivalent event
 to a [=window=]. Specifically, dispatching an event to a [=service worker=] might
 require waking up the worker, which has a significant impact on battery life.
 
-The {{CookieStore/getChangeSubscriptions()}} allows a [=service worker=] to introspect
+The {{CookieStoreManager/getSubscriptions()}} allows a [=service worker=] to introspect
 the subscriptions that have been made.
 
 <div class=example>
@@ -538,12 +551,6 @@ interface CookieStore : EventTarget {
   Promise<void> delete(USVString name);
   Promise<void> delete(CookieStoreDeleteOptions options);
 
-  [Exposed=ServiceWorker]
-  Promise<void> subscribeToChanges(sequence<CookieStoreGetOptions> subscriptions);
-
-  [Exposed=ServiceWorker]
-  Promise<sequence<CookieStoreGetOptions>> getChangeSubscriptions();
-
   [Exposed=Window]
   attribute EventHandler onchange;
 };
@@ -603,9 +610,9 @@ typedef sequence<CookieListItem> CookieList;
 
 <div class=note>
   <dl class=domintro>
-    <dt>|cookie| = await cookieStore . {{CookieStore/get(name)|get}}(|name|)
-    <dt>|cookie| = await cookieStore . {{CookieStore/get(options)|get}}(|options|)
-    <dd>
+    : |cookie| = await cookieStore . {{CookieStore/get(name)|get}}(|name|)
+    : |cookie| = await cookieStore . {{CookieStore/get(options)|get}}(|options|)
+    ::
         Returns a promise resolving to the first in-scope [=script-visible=] value
         for a given cookie name (or other options).
         In a service worker context this defaults to the path of the service worker's registered scope.
@@ -663,12 +670,11 @@ The <dfn method for=CookieStore>get(|options|)</dfn> method, when invoked, must 
 
 <div class=note>
   <dl class=domintro>
-    <dt>|cookies| = await cookieStore . {{CookieStore/getAll(name)|getAll}}(|name|)
-    <dt>|cookies| = await cookieStore . {{CookieStore/getAll(options)|getAll}}(|options|)
-    <dd>
+    : |cookies| = await cookieStore . {{CookieStore/getAll(name)|getAll}}(|name|)
+    : |cookies| = await cookieStore . {{CookieStore/getAll(options)|getAll}}(|options|)
+    ::
 
-        Returns a promise resolving to the all in-scope [=script-visible=] value
-        for a given cookie name (or other options).
+        Returns a promise resolving to the all in-scope [=script-visible=] value for a given cookie name (or other options).
         In a service worker context this defaults to the path of the service worker's registered scope.
         In a document it defaults to the path of the current document and does not respect changes from {{History/replaceState()}} or {{Document/domain|document.domain}}.
 
@@ -725,9 +731,9 @@ The <dfn method for=CookieStore>getAll(|options|)</dfn> method, when invoked, mu
 
 <div class=note>
   <dl class=domintro>
-    <dt>await cookieStore . {{CookieStore/set(name, value)|set}}(|name|, |value|)
-    <dt>await cookieStore . {{CookieStore/set(options)|set}}(|options|)
-    <dd>
+    : await cookieStore . {{CookieStore/set(name, value)|set}}(|name|, |value|)
+    : await cookieStore . {{CookieStore/set(options)|set}}(|options|)
+    ::
         Writes (creates or modifies) a cookie.
 
         The options default to:
@@ -795,9 +801,9 @@ The <dfn method for=CookieStore>set(|options|)</dfn> method, when invoked, must 
 <div class=note>
 
   <dl class=domintro>
-    <dt>await cookieStore . {{CookieStore/delete(name)|delete}}(|name|)
-    <dt>await cookieStore . {{CookieStore/delete(options)|delete}}(|options|)
-    <dd>
+    : await cookieStore . {{CookieStore/delete(name)|delete}}(|name|)
+    : await cookieStore . {{CookieStore/delete(options)|delete}}(|options|)
+    ::
         Deletes (expires) a cookie with the given name or name and optional domain and path.
 
   </dl>
@@ -846,33 +852,47 @@ The <dfn method for=CookieStore>delete(|options|)</dfn> method, when invoked, mu
 
 
 <!-- ============================================================ -->
-## The {{CookieStore/subscribeToChanges()|subscribeToChanges()}} method ## {#CookieStore-subscribeToChanges}
+# The {{CookieStoreManager}} Interface # {#CookieStoreManager}
+<!-- ============================================================ -->
+
+The {{CookieStoreManager}} interface allows [=Service Workers=] to subscribe to events for cookie changes. Using the {{CookieStoreManager/subscribe()}} method is necessary to indicate that a particular [=service worker registration=] is interested in change events.
+
+<xmp class=idl>
+[Exposed=(ServiceWorker,Window),
+ SecureContext]
+interface CookieStoreManager {
+  Promise<void> subscribe(sequence<CookieStoreGetOptions> subscriptions);
+  Promise<sequence<CookieStoreGetOptions>> getSubscriptions();
+  Promise<void> unsubscribe(sequence<CookieStoreGetOptions> subscriptions);
+};
+</xmp>
+
+
+<!-- ============================================================ -->
+## The {{CookieStoreManager/subscribe()|subscribe()}} method ## {#CookieStoreManager-subscribe}
 <!-- ============================================================ -->
 
 <div class=note>
   <dl class=domintro>
-    <dt>await cookieStore .
-        {{CookieStore/subscribeToChanges()|subscribeToChanges}}(|subscriptions|)
-    <dd>
-      This method can only be called during a [=Service Worker=] install phase.
+    : await |registration| . cookies . {{CookieStoreManager/subscribe()|subscribe}}(|subscriptions|)
+    :
+    ::
 
-      Once subscribed, notifications are delivered as "`cookiechange`" events
-      fired against the [=Service Worker=]'s global scope:
+       Subscribe to changes to cookies. Subscriptions can use the same options as {{CookieStore/get()}} and {{CookieStore/getAll()}}, with optional {{CookieStoreGetOptions/name}}, {{CookieStoreGetOptions/url}} and {{CookieStoreGetOptions/matchType}} properties.
+
+       Once subscribed, notifications are delivered as "`cookiechange`" events fired against the [=Service Worker=]'s global scope:
 
   </dl>
 </div>
 
 
 <div class=algorithm>
-The <dfn method for=CookieStore>subscribeToChanges(|subscriptions|)</dfn> method, when invoked, must run these steps:
+The <dfn method for=CookieStoreManager>subscribe(|subscriptions|)</dfn> method, when invoked, must run these steps:
 
-
-1. Let |serviceWorker| be the [=context object=]'s [=global object=]'s [=service worker=].
-1. If |serviceWorker|'s [=service worker/state=] is not *installing*,
-    then return [=a promise rejected with=] a {{TypeError}}.
-1. Let |registration| be |serviceWorker|'s associated [=containing service worker registration=].
+1. Let |registration| be **this**.
 1. Let |p| be [=a new promise=].
 1. Run the following steps [=in parallel=]:
+    1. Let |subscription list| be |registration|'s associated [=cookie change subscription list=].
     1. [=list/For each=] |entry| in |subscriptions|, run these steps:
         1. Let |name| be |entry|'s {{CookieStoreGetOptions/name}} member.
         1. Let |url| be the result of [=basic URL parser|parsing=] |entry|'s {{CookieStoreGetOptions/url}} dictionary member with the [=context object=]'s [=relevant settings object=]'s [=API base URL=].
@@ -880,44 +900,107 @@ The <dfn method for=CookieStore>subscribeToChanges(|subscriptions|)</dfn> method
             then [=reject=] |p| with a {{TypeError}} and abort these steps.
         1. Let |matchType| be |entry|'s {{CookieStoreGetOptions/matchType}} member.
         1. Let |subscription| be the [=cookie change subscription=] (|name|, |url|, |matchType|).
-        1. Append |subscription| to |registration|'s associated [=cookie change subscription list=].
+        1. If |subscription list| does not already [=list/contain=] |subscription|, then [=list/append=] |subscription| to |subscription list|.
     1. [=Resolve=] |p| with undefined.
 1. Return |p|.
 
 </div>
 
 <!-- ============================================================ -->
-## The {{CookieStore/getChangeSubscriptions()}} method ## {#CookieStore-getChangeSubscriptions}
+## The {{CookieStoreManager/getSubscriptions()}} method ## {#CookieStoreManager-getSubscriptions}
 <!-- ============================================================ -->
 
 <div class=note>
   <dl class=domintro>
-    <dt>|subscriptions| = await cookieStore .
-        {{CookieStore/getChangeSubscriptions()}}
-    <dd>
-      This method returns a promise which resolves to a list of the cookie change subscriptions
-      made for this Service Worker registration.
+    : |subscriptions| = await |registration| . cookies . {{CookieStoreManager/getSubscriptions()}}
+    ::
+        This method returns a promise which resolves to a list of the cookie change subscriptions made for this Service Worker registration.
 
   </dl>
 </div>
 
 <div class=algorithm>
-The <dfn method for=CookieStore>getChangeSubscriptions()</dfn> method, when invoked, must run these steps:
+The <dfn method for=CookieStoreManager>getSubscriptions()</dfn> method, when invoked, must run these steps:
 
-1. Let |serviceWorker| be the [=context object=]'s [=global object=]'s [=service worker=].
-1. Let |registration| be |serviceWorker|'s associated [=containing service worker registration=].
+1. Let |registration| be **this**.
 1. Let |p| be [=a new promise=].
 1. Run the following steps [=in parallel=]:
     1. Let |subscriptions| be |registration|'s associated [=cookie change subscription list=].
     1. Let |result| be a new [=list=].
     1. [=list/For each=] |subscription| in |subscriptions|, run these steps:
-        1. Let |options| be a new {{CookieStoreGetOptions}} dictionary.
-        1. Set |options|'s {{CookieStoreGetOptions/name}} member to |subscription|'s [=cookie change subscription/name=].
-        1. Set |options|'s {{CookieStoreGetOptions/url}} member to |subscription|'s [=cookie change subscription/url=].
-        1. Set |options|'s {{CookieStoreGetOptions/matchType}} member to |subscription|'s [=cookie change subscription/matchType=].
+        1. [=list/Append=] «[ "name" → |subscription|'s [=cookie change subscription/name=], "url" → |subscription|'s [=cookie change subscription/url=], "matchType" → |subscription|'s [=cookie change subscription/matchType=] ]» to |result|.
     1. [=Resolve=] |p| with |result|.
 1. Return |p|.
 
+</div>
+
+<!-- ============================================================ -->
+## The {{CookieStoreManager/unsubscribe()|unsubscribe()}} method ## {#CookieStoreManager-unsubscribe}
+<!-- ============================================================ -->
+
+<div class=note>
+  <dl class=domintro>
+    : await |registration| . cookies . {{CookieStoreManager/unsubscribe()|unsubscribe}}(|subscriptions|)
+    ::
+
+        Calling this method will stop the registered service worker from receiving previously subscribed events. The |subscriptions| argument should list subscriptions in the same form passed to {{CookieStoreManager/subscribe()}} or returned from {{CookieStoreManager/getSubscriptions()}}.
+
+
+  </dl>
+</div>
+
+
+<div class=algorithm>
+The <dfn method for=CookieStoreManager>unsubscribe(|subscriptions|)</dfn> method, when invoked, must run these steps:
+
+1. Let |registration| be **this**.
+1. Let |p| be [=a new promise=].
+1. Run the following steps [=in parallel=]:
+    1. Let |subscription list| be |registration|'s associated [=cookie change subscription list=].
+    1. [=list/For each=] |entry| in |subscriptions|, run these steps:
+        1. Let |name| be |entry|'s {{CookieStoreGetOptions/name}} member.
+        1. Let |url| be the result of [=basic URL parser|parsing=] |entry|'s {{CookieStoreGetOptions/url}} dictionary member with the [=context object=]'s [=relevant settings object=]'s [=API base URL=].
+        1. If |url| does not start with |registration|'s [=service worker registration/scope url=],
+            then [=reject=] |p| with a {{TypeError}} and abort these steps.
+        1. Let |matchType| be |entry|'s {{CookieStoreGetOptions/matchType}} member.
+        1. Let |subscription| be the [=cookie change subscription=] (|name|, |url|, |matchType|).
+        1. [=list/Remove=] any [=list/item=] from |subscription list| equal to |subscription|.
+    1. [=Resolve=] |p| with undefined.
+1. Return |p|.
+
+</div>
+
+
+<!-- ============================================================ -->
+## The {{ServiceWorkerRegistration}} interface ## {#ServiceWorkerRegistration}
+<!-- ============================================================ -->
+
+The {{ServiceWorkerRegistration}} interface is extended to give access to a {{CookieStoreManager}}.
+
+<xmp class=idl>
+[Exposed=(ServiceWorker,Window)]
+partial interface ServiceWorkerRegistration {
+  readonly attribute CookieStoreManager cookies;
+};
+</xmp>
+
+
+<div class=example>
+Subscribing to cookie changes from a Service Worker script:
+
+```js
+self.registration.cookies.subscribe([{name:'session-id'}]);
+```
+</div>
+
+<div class=example>
+Subscribing to cookie changes from a script in a window context:
+
+```js
+navigator.serviceWorker.register('sw.js').then(registration => {
+  registration.cookies.subscribe([{name:'session-id'}]);
+});
+```
 </div>
 
 
@@ -929,8 +1012,7 @@ The <dfn method for=CookieStore>getChangeSubscriptions()</dfn> method, when invo
 ## The {{CookieChangeEvent}} interface ## {#CookieChangeEvent}
 <!-- ============================================================ -->
 
-A {{CookieChangeEvent}} is [=dispatched=] against {{CookieStore}} objects
-in {{Window}} contexts when any [=script-visible=] cookie changes have occurred.
+A {{CookieChangeEvent}} is [=dispatched=] against {{CookieStore}} objects in {{Window}} contexts when any [=script-visible=] cookie changes have occurred.
 
 <xmp class=idl>
 [Exposed=Window,
@@ -958,9 +1040,11 @@ An {{ExtendableCookieChangeEvent}} is [=dispatched=] against
 cookie changes have occurred which match the [=Service Worker=]'s
 [=cookie change subscription list=].
 
+Note: {{ExtendableEvent}} is used as the ancestor interface for all events in [=Service Workers=] so that the worker itself can be kept alive while the async operations are performed.
+
 <xmp class=idl>
-[Exposed=ServiceWorker
-] interface ExtendableCookieChangeEvent : ExtendableEvent {
+[Exposed=ServiceWorker]
+interface ExtendableCookieChangeEvent : ExtendableEvent {
   constructor(DOMString type, optional ExtendableCookieChangeEventInit eventInitDict = {});
   readonly attribute CookieList changed;
   readonly attribute CookieList deleted;
@@ -1020,6 +1104,23 @@ To <dfn>encode</dfn> a |string|, run [=UTF-8 encode=] on |string|.
 To <dfn>decode</dfn> a |value|, run [=UTF-8 decode without BOM=] on |value|.
 
 
+<div class=algorithm>
+To represent a date and time |dateTime| <dfn>as a timestamp</dfn>,
+return the number of milliseconds from 00:00:00 UTC, 1 January 1970 to |dateTime|
+(assuming that there are exactly 86,400,000 milliseconds per day).
+
+Note: This is the same representation used for [=time values=] in [[ECMAScript]].
+</div>
+
+
+<div class=algorithm>
+To <dfn>date serialize</dfn> a {{DOMTimeStamp}} |millis|,
+let |dateTime| be the date and time |millis| milliseconds after 00:00:00 UTC, 1 January 1970
+(assuming that there are exactly 86,400,000 milliseconds per day),
+and return a [=byte sequence=] corresponding to the closest `cookie-date` representation of |dateTime| according to [[RFC6265bis#section-5.1.1|Cookies: HTTP State Management Mechanism §Dates]].
+</div>
+
+
 <!-- ============================================================ -->
 ## Query Cookies ## {#query-cookies-algorithm}
 <!-- ============================================================ -->
@@ -1077,23 +1178,30 @@ Note: If |matchName| is the empty string and |matchType| is "{{CookieMatchType/s
 
 To <dfn>create a {{CookieListItem}}</dfn> from |cookie|, run the following steps.
 
-1. Let |item| be a new {{CookieListItem}}.
-1. Set |item|'s {{CookieListItem/name}} dictionary member to |cookie|'s [=cookie/name=] ([=decoded=]).
-1. Set |item|'s {{CookieListItem/value}} dictionary member to |cookie|'s [=cookie/value=] ([=decoded=]).
-1. Set |item|'s {{CookieListItem/domain}} dictionary member to |cookie|'s [=cookie/domain=] ([=decoded=]).
-1. Set |item|'s {{CookieListItem/path}} dictionary member to |cookie|'s [=cookie/path=] ([=decoded=]).
-1. Set |item|'s {{CookieListItem/expires}} dictionary member to |cookie|'s [=cookie/expiry-time=] ([=as a timestamp=]).
-1. Set |item|'s {{CookieListItem/secure}} dictionary member to |cookie|'s [=cookie/secure-only-flag=].
+1. Let |name| be |cookie|'s [=cookie/name=] ([=decoded=]).
+1. Let |value| be |cookie|'s [=cookie/value=] ([=decoded=]).
+1. Let |domain| be |cookie|'s [=cookie/domain=] ([=decoded=]).
+1. Let |path| be |cookie|'s [=cookie/path=] ([=decoded=]).
+1. Let |expires| be |cookie|'s [=cookie/expiry-time=] ([=as a timestamp=]).
+1. Let |secure| be |cookie|'s [=cookie/secure-only-flag=].
 1. Switch on |cookie|'s [=cookie/same-site-flag=]:
     <dl class=switch>
         : \``None`\`
-        :: Set |item|'s {{CookieListItem/sameSite}} dictionary member to "{{CookieSameSite/none}}".
+        :: Let |sameSite| be "{{CookieSameSite/none}}".
         : \``Strict`\`
-        :: Set |item|'s {{CookieListItem/sameSite}} dictionary member to "{{CookieSameSite/strict}}".
+        :: Let |sameSite| be "{{CookieSameSite/strict}}".
         : \``Lax`\`
-        :: Set |item|'s {{CookieListItem/sameSite}} dictionary member to "{{CookieSameSite/lax}}".
+        :: Let |sameSite| be "{{CookieSameSite/lax}}".
     </dl>
-1. Return |item|.
+1. Return «[
+    "name" → |name|,
+    "value" → |value|,
+    "domain" → |domain|,
+    "path" → |path|,
+    "expires" → |expires|,
+    "secure" → |secure|,
+    "sameSite" → |sameSite|
+    ]»
 
 Note: The |cookie|'s
 [=cookie/creation-time=],
@@ -1104,15 +1212,6 @@ Note: The |cookie|'s
 attributes are not exposed to script.
 
 </div>
-
-<div class=algorithm>
-To represent a date and time |dateTime| <dfn>as a timestamp</dfn>,
-return the number of milliseconds from 00:00:00 UTC, 1 January 1970 to |dateTime|,
-(assuming that there are exactly 86,400,000 milliseconds per day).
-
-Note: This is the same representation used for [=time values=] in [[ECMAScript]].
-</div>
-
 
 <!-- ============================================================ -->
 ## Set a Cookie ## {#set-cookie-algorithm}
@@ -1169,12 +1268,6 @@ run the following steps:
 
 </div>
 
-<div class=algorithm>
-To <dfn>date serialize</dfn> a {{DOMTimeStamp}} |millis|,
-let |dateTime| be the date and time |millis| milliseconds after 00:00:00 UTC, 1 January 1970
-(assuming that there are exactly 86,400,000 milliseconds per day),
-and return a [=byte sequence=] corresponding to the closest `cookie-date` representation of |dateTime| according to [[RFC6265bis#section-5.1.1|Cookies: HTTP State Management Mechanism §Dates]].
-</div>
 
 <!-- ============================================================ -->
 ## Delete a Cookie ## {#delete-cookie-algorithm}

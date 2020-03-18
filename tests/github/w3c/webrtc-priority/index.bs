@@ -1,0 +1,187 @@
+<pre class='metadata'>
+Title: WebRTC DSCP Control API
+Shortname: webrtc-priority
+Level: 1
+Status: ED
+Group: webrtc
+Repository: w3c/webrtc-priority
+URL: http://w3c.github.io/webrtc-priority/
+Editor: Harald Alvestrand, Google https://google.com, hta@google.com
+Abstract: This API defines a control surface for manipulating the network
+          control bits (DSCP bits) of outgoing WebRTC packets, and the
+          queueing priority of outgoing WebRTC packets under congestion.
+Markup Shorthands: css no
+</pre>
+</pre>
+
+# Introduction # {#intro}
+
+This document defines a "priority" field as part of the WEBRTC
+{{RTCRtpEncodingParameters}} structure, with the possible values "very-low",
+"low", "medium" and "high".
+
+This feature was originally part of the [[!WEBRTC]] specification, but was
+removed in November 2019 due to lack of implementation
+experience. It is now part of this document.
+
+In addition, this specification adds fields to {{RTCRtpEncodingParameters}}
+that allow control over the DSCP markings without affecting local
+prioritization, and vice versa.
+
+# Priority and QoS Model # {#model}
+
+Many applications have multiple media flows of the same data type and
+often some of the flows are more important than others. WebRTC uses the
+priority and Quality of Service (QoS) framework described in
+[[!RTCWEB-TRANSPORT]] and [[!TSVWG-RTCWEB-QOS]] to provide priority and
+DSCP marking for packets that will help provide QoS in some networking
+environments. The priority setting can be used to indicate the relative
+priority of various flows. The priority API allows the JavaScript
+applications to tell the browser whether a particular media flow is high,
+medium, low or of very low importance to the application by setting the
+<code>priority</code> property of
+{{RTCRtpEncodingParameters}} objects to one of the
+values defined below.
+
+# Extensions for media priority # {#media-priority}
+
+## RTCPriorityType Enum ## {#rtc-priority-type}
+<pre class="idl">
+enum RTCPriorityType {
+  "very-low",
+  "low",
+  "medium",
+  "high"
+};
+</pre>
+<table data-link-for="RTCPriorityType" data-dfn-for="RTCPriorityType"
+class="simple">
+  <tbody>
+    <tr>
+      <th colspan="2">Enumeration description</th>
+    </tr>
+    <tr>
+      <td><dfn enum-value><code>very-low</code></dfn></td>
+      <td>See [[!RTCWEB-TRANSPORT]], Sections 4.1 and 4.2. Corresponds to "below
+      normal" as defined in [[!RTCWEB-DATA]].</td>
+    </tr>
+    <tr>
+      <td><dfn enum-value><code>low</code></dfn></td>
+      <td>See [[!RTCWEB-TRANSPORT]], Sections 4.1 and 4.2. Corresponds to
+      "normal" as defined in [[!RTCWEB-DATA]].</td>
+    </tr>
+    <tr>
+      <td><dfn enum-value><code>medium</code></dfn></td>
+      <td>See [[!RTCWEB-TRANSPORT]], Sections 4.1 and 4.2. Corresponds to "high"
+      as defined in [[!RTCWEB-DATA]].</td>
+    </tr>
+    <tr>
+      <td><dfn enum-value><code>high</code></dfn></td>
+      <td>See [[!RTCWEB-TRANSPORT]], Sections 4.1 and 4.2. Corresponds to "extra
+      high" as defined in [[!RTCWEB-DATA]].</td>
+    </tr>
+  </tbody>
+</table>
+
+Applications that use this API should be aware that often better
+overall user experience is obtained by lowering the priority of things
+that are not as important rather than raising the priority of the things
+that are.
+
+## Extension to RTCRtpEncodingParameters ## {#encoding-parameters}
+<pre class='idl'>
+partial dictionary RTCRtpEncodingParameters {
+  RTCPriorityType priority;
+  RTCPriorityType networkPriority;
+};
+</pre>
+
+<dl>
+  <dt><dfn dict-member for=RTCRtpEncodingParameters><code>priority</code></dfn> of type {{RTCPriorityType}}, defaulting to
+    <code>"low"</code></dt>
+  <dd>
+    <p>
+      Indicates the priority of an {{RTCRtpSender}}, which influences the
+      bandwidth allocation among {{RTCRtpSender}} objects. It is specified
+      in [[!RTCWEB-TRANSPORT]], Section 4. The user agent is free to sub-allocate bandwidth
+      between the encodings of an {{RTCRtpSender}}.
+    </p>
+  </dd>
+</dl>
+<div link-for-hint=RTCRtpEncodingParameters>
+<dfn dict-member for=RTCRtpEncodingParameters>networkPriority</dfn> has the same
+effect as {{priority}}, except that it only affects the DSCP markings of
+the generated packets, as described in [[RTCWEB-TRANSPORT]] section 4.2.
+
+If {{networkPriority}} is unset, the DSCP markings of the generated
+packets are controlled by the {{priority}} member.
+</div>
+
+
+# Extensions for RTCDataChannel # {#datachannel}
+
+<pre class='idl'>
+partial interface RTCDataChannel {
+  readonly attribute RTCPriorityType priority;
+};
+
+partial dictionary RTCDataChannelInit {
+  RTCPriorityType priority;
+};
+
+</pre>
+## New RTCDataChannel attribute
+<dl>
+  <dt><dfn for=RTCDataChannel attribute>priority</dfn> of type {{RTCPriorityType}}, readonly</dt>
+  <dd>
+    <p>The <code>priority</code> attribute returns the priority for
+      this {{RTCDataChannel}}. The priority is assigned
+      by the user agent at channel creation time. On getting, the
+      attribute MUST return the value of the
+      \[[DataChannelPriority]] slot.</p>
+  </dd>
+</dl>
+## New RTCDataChannelInit member
+<dl>
+  <dt><dfn for=RTCDataChannelInit dict-member>priority</dfn> of type {{RTCPriorityType}}, defaulting to
+    <code>low</code></dt>
+   <dd>
+     <p>Priority of this channel.</p>
+   </dd>
+</dl>
+
+## RTCDataChannel processing steps
+
+The following steps are added to the initialization steps for DataChannel:
+
+Let DataChannel have an internal slot <dfn>\[[DataChannelPriority]]</dfn>.
+
+In the processing steps for initializing a DataChannel, insert the following
+step into processing the <var>option</var> argument:
+
+ * Initialize <var>channel</var>.<a>\[[DataChannelPriority]]</a> to <var>option</var>'s <code>priority</code> member.
+
+ * For an incoming DataChannel, initialize <var>channel</var>.<a>\[[DataChannelPriority]]</a> based on the integer priority value in <var>configuration</var>, according to the following mapping.
+
+<table class="simple">
+  <tr>
+    <th><var>configuration</var> priority value</th>
+    <th>{{RTCPriorityType}} value</th>
+  </tr>
+  <tr>
+    <td>0 to 128</td>
+    <td><code>very-low</code></td>
+  </tr>
+  <tr>
+    <td>129 to 256</td>
+    <td><code>low</code></td>
+  </tr>
+  <tr>
+    <td>257 to 512</td>
+    <td><code>medium</code></td>
+  </tr>
+  <tr>
+    <td>513 and greater</td>
+    <td><code>high</code></td>
+  </tr>
+</table>

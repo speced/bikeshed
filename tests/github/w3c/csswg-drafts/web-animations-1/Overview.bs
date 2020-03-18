@@ -194,6 +194,9 @@ urlPrefix: https://drafts.csswg.org/css-style-attr/; type: dfn; spec: css-style-
 urlPrefix: https://drafts.csswg.org/web-animations-2/; type: dfn; spec: web-animations-2
     text: iteration composite operation
     text: iteration composite operation accumulate
+urlPrefix: https://drafts.css-houdini.org/css-properties-values-api-1/; type: dfn; spec: css-properties-values-api-1
+    text: syntax definition
+    text: universal syntax definition
 </pre>
 <pre class="link-defaults">
 spec:dom; type:interface; text:DocumentOrShadowRoot
@@ -284,9 +287,9 @@ const isAnimating = elem.getAnimations().some(
     <div class='example'>
     <pre class='lang-javascript'>
 // Pause all existing animations in the document
-document.getAnimations().forEach(
-  animation =&gt; animation.pause()
-);
+for (const animation of document.getAnimations()) {
+  animation.pause()
+}
     </pre>
     </div>
 
@@ -318,13 +321,16 @@ elem.animate({ transform: 'scale(0)', opacity: 0 }, 300);
     <div class='example'>
     <pre class='lang-javascript'>
 // Print the id of any opacity animations on elem
-elem.getAnimations().filter(
-  animation =&gt;
+for (const animation of elem.getAnimations()) {
+  if (
     animation.effect instanceof KeyframeEffect &&
-    animation.effect.getKeyframes().some(
-      frame =&gt; frame.hasOwnProperty('opacity')
-    )
-).forEach(animation =&gt; console.log(animation.id));
+    animation.effect
+      .getKeyframes()
+      .some(frame =&gt; frame.hasOwnProperty('opacity'))
+  ) {
+    console.log(animation.id);
+  }
+}
     </pre>
     </div>
 
@@ -334,16 +340,18 @@ elem.getAnimations().filter(
     <div class='example'>
     <pre class='lang-javascript'>
 // Slow down and replay any transform animations
-elem.getAnimations().filter(
+const transformAnimations = elem.getAnimations().filter(
   animation =&gt;
     animation.effect instanceof KeyframeEffect &&
     animation.effect.getKeyframes().some(
       frame =&gt; frame.hasOwnProperty('transform')
     )
-).forEach(animation =&gt; {
+);
+
+for (const animation of transformAnimations) {
   animation.currentTime = 0;
   animation.updatePlaybackRate(0.5);
-});
+}
     </pre>
     </div>
 
@@ -355,18 +363,16 @@ elem.getAnimations().filter(
 <div class='example'>
 <pre class='lang-javascript'>
 // Seek to the half-way point of an animation and check that the opacity is 50%
-elem.getAnimations().forEach(
-  animation =&gt;
-    animation.currentTime =
-      animation.effect.getComputedTiming().delay +
-      animation.effect.getComputedTiming().activeDuration / 2;
-);
+for (const animation of elem.getAnimations()) {
+  const { delay, activeDuration } = animation.effect.getComputedTiming();
+  animation.currentTime = delay + activeDuration / 2;
+}
 assert.strictEqual(getComputedStyle(elem).opacity, '0.5');
 
 // Check that the loading screen is hidden after the animations finish
-elem.getAnimations().forEach(
-  animation =&gt; animation.finish()
-);
+for (const animation of elem.getAnimations()) {
+  animation.finish();
+}
 // Wait one frame so that event handlers have a chance to run
 requestAnimationFrame(() =&gt; {
   assert.strictEqual(
@@ -883,6 +889,8 @@ The procedure to <dfn>reset an animation's pending tasks</dfn> for
 1.  [=Apply any pending playback rate=] on |animation|.
 1.  <a lt="reject a Promise">Reject</a> <var>animation</var>'s <a>current ready
     promise</a> with a DOMException named "AbortError".
+1.  Set the \[[PromiseIsHandled]] internal slot of |animation|'s
+    <a>current ready promise</a> to true.
 1.  Let <var>animation</var>'s <a>current ready promise</a> be the result of
     <a lt="create a new resolved Promise">creating a new resolved Promise
     object</a> with value <var>animation</var> in the <a>relevant Realm</a> of
@@ -1719,6 +1727,8 @@ as follows:
         <var>animation</var>.
     1.  <a lt="reject a Promise">Reject</a> the <a>current finished promise</a>
         with a DOMException named "AbortError".
+    1.  Set the \[[PromiseIsHandled]] internal slot of
+        the <a>current finished promise</a> to true.
     1.  Let <a>current finished promise</a> be
         <a>a new promise</a> in the <a>relevant Realm</a> of
         <var>animation</var>.
@@ -3176,10 +3186,10 @@ is defined in [[#animation-types]].
 For <a>custom properties</a> registered
 using the {{CSS/registerProperty()}} method for the <a>current global object</a>,
 the <a>animation type</a> is <a>by computed value</a>,
-derived from the type used to define the property's {{PropertyDescriptor/syntax}}.
+derived from the type used in the property's <a>syntax definition</a>.
 Where there is no <a>computed value</a> type that corresponds
-to the property's specified {{PropertyDescriptor/syntax}}
-(e.g. when the syntax is "*")
+to the property's specified syntax
+(e.g. when the syntax is the <a>universal syntax definition</a>)
 or when the <a>custom property</a> is not registered,
 the <a>animation type</a> is <a>discrete</a>.
 
@@ -3200,6 +3210,10 @@ element and the [=target pseudo-selector=] is `null`.
 If the [=effect target=] is a [=pseudo-element=], the [=target element=] is
 its [=originating element=] and the [=target pseudo-selector=] is as required
 to specify that particular [=pseudo-element=].
+
+Note that not all [=effect targets=] specified in this manner (such as ''::part()''
+pseudo-elements and unsupported pseudo-elements) have
+computed property values defined.
 
 ### Keyframes ### {#keyframes-section}
 
@@ -3351,8 +3365,7 @@ an <a>effect target</a> for which computed property values can be calculated.
 1.  Return <var>computed keyframes</var>.
 
 
-<h4 id="the-effect-value-of-a-keyframe-animation-effect">The effect value of
-  a keyframe effect</h4>
+### The effect value of a keyframe effect ### {#the-effect-value-of-a-keyframe-animation-effect}
 
 The <a>effect value</a> of a single property referenced by a <a>keyframe
 effect</a> as one of its <a lt="target property">target properties</a>, for a
@@ -3366,6 +3379,9 @@ given <var>iteration progress</var>, <var ignore=''>current iteration</var> and
 1.  If <a>animation type</a> of the <var>target property</var> is
     <a>not animatable</a> abort this procedure
     since the effect cannot be applied.
+1.  If the  [=keyframe effect=] does not have an [=effect target=],
+    or if the [=effect target=] cannot have computed property values
+    calculated, abort this procedure.
 1.  Define the <dfn>neutral value for composition</dfn> as a value
     which, when combined with an <a>underlying value</a> using the <a
     lt="composite operation add">add</a> <a>composite
@@ -4680,9 +4696,9 @@ interface KeyframeEffect : AnimationEffect {
                 object? keyframes,
                 optional (unrestricted double or KeyframeEffectOptions) options = {});
     constructor(KeyframeEffect source);
-    attribute Element? target;
-    attribute CSSOMString? pseudoElement;
-    attribute CompositeOperation             composite;
+    attribute Element?           target;
+    attribute CSSOMString?       pseudoElement;
+    attribute CompositeOperation composite;
     sequence&lt;object&gt; getKeyframes();
     void             setKeyframes(object? keyframes);
 };
@@ -4698,6 +4714,22 @@ interface KeyframeEffect : AnimationEffect {
     1.  Create a new {{KeyframeEffect}} object, <var>effect</var>.</li>
 
     1.  Set the <a>target element</a> of <var>effect</var> to <var>target</var>.
+
+    1.  Set the [=target pseudo-selector=] to the result corresponding to the first
+        matching condition from below.
+
+        :   If <var>options</var> is a {{KeyframeEffectOptions}} object with a
+            {{KeyframeEffectOptions/pseudoElement}} property,
+        ::  Set the [=target pseudo-selector=] to the value of the
+            {{KeyframeEffectOptions/pseudoElement}} property.
+
+            When assigning this property, the error-handling defined for the
+            {{KeyframeEffect/pseudoElement}} setter on the interface is applied.
+            If the setter requires an exception to be thrown, this procedure
+            must throw the same exception and abort all further steps.
+
+        :   Otherwise,
+        ::  Set the [=target pseudo-selector=] to `null`.
 
     1.  Let <var>timing input</var> be the result corresponding to the first
         matching condition from below.
@@ -4758,7 +4790,7 @@ interface KeyframeEffect : AnimationEffect {
 
 :   <dfn constructor for=KeyframeEffect lt="KeyframeEffect(source)">KeyframeEffect (source)</dfn>
 ::  Creates a new {{KeyframeEffect}} object with the same properties
-    as {{KeyframeEffect/constructor(source)/source}}
+    as {{KeyframeEffect/KeyframeEffect(source)/source}}
     using the following procedure:
 
     1.  Create a new {{KeyframeEffect}} object, <var>effect</var>.
@@ -4807,11 +4839,31 @@ interface KeyframeEffect : AnimationEffect {
 
 :   <dfn attribute for=KeyframeEffect>pseudoElement</dfn>
 ::  The [=target pseudo-selector=].
-    This is `null` if the [=effect target=] is an {{Element}} or is itself `null`.
-    When not `null`, this must be a [=pseudo-element=] selector with
-    [[selectors-4#pseudo-element-syntax|valid syntax]].
-    This will not accept invalid values and will always return the selector in
-    its canonical form (i.e. `::before` instead of `:before`).
+    `null` if this effect has no [=effect target=] or
+    if the [=effect target=] is an element (i.e. not a pseudo-element).
+    When the [=effect target=] is a pseudo-element,
+    this specifies the pseudo-element selector (e.g. `::before`).
+
+    On setting,
+    sets the [=target pseudo-selector=] of the [=animation effect=]
+    to the provided value after applying the following exceptions:
+
+    *   If the provided value is not `null`
+        and is an invalid <<pseudo-element-selector>>,
+        the user agent must [=throw=] a {{DOMException}}
+        with error name {{SyntaxError}} and leave the
+        [=target pseudo-selector=] of this [=animation effect=] unchanged.
+
+        Note, that invalid in this context follows the definition of
+        an [=invalid selector=] defined in [[!SELECTORS-4]] such that
+        syntactically invalid pseudo-elements as well as pseudo-elements
+        for which the user agent has no usable level of support are
+        both deemed invalid.
+
+    *   If one of the legacy Selectors Level 2 single-colon selectors
+        (':before', ':after', ':first-letter', or ':first-line') is
+        specified, the [=target pseudo-selector=] must be set to the
+        equivalent two-colon selector (e.g. '::before').
 
 :   <dfn attribute for=KeyframeEffect>composite</dfn>
 ::  The <a>composite operation</a> used to composite this
