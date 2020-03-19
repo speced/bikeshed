@@ -5,6 +5,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name='bikeshed',
+    version='1.0.0',
     author='Tab Atkins-Bittner',
     description="A document-authoring tool mainly intended for web specifications.",
     long_description=long_description,
