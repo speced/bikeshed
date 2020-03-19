@@ -849,7 +849,7 @@ def getSpecRepository(doc):
         try:
             os.chdir(source_dir)
             with open(os.devnull, "wb") as fnull:
-                remotes = str(subprocess.check_output(["git", "remote", "-v"], stderr=fnull))
+                remotes = str(subprocess.check_output(["git", "remote", "-v"], stderr=fnull), encoding="utf-8")
             os.chdir(old_dir)
             searches = [
               r"origin\tgit@github\.([\w.-]+):([\w-]+)/([\w-]+)\.git \(\w+\)",

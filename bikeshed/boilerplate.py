@@ -18,12 +18,12 @@ def addBikeshedVersion(doc):
     if "generator" not in doc.md.boilerplate:
         return
     try:
-        bikeshedVersion = subprocess.check_output("git rev-parse HEAD", cwd=config.scriptPath(), shell=True).rstrip()
+        bikeshedVersion = subprocess.check_output("git rev-parse HEAD", cwd=config.scriptPath(), shell=True).decode(encoding="utf-8").rstrip()
     except Exception as e:
         warn("Couldn't discover the current Bikeshed version. Please report this error:\n{0}", e)
         return
     appendChild(doc.head,
-                E.meta({"name": "generator", "content": "Bikeshed version {0}".format(bikeshedVersion)}))
+                E.meta({"name": "generator", "content": f"Bikeshed version {bikeshedVersion}"}))
 
 
 def addCanonicalURL(doc):
@@ -51,12 +51,12 @@ def addSpecVersion(doc):
     try:
         # Check for a Git repo
         with open(os.devnull, "wb") as fnull:
-            revision = subprocess.check_output("git rev-parse HEAD", stderr=fnull, shell=True).strip()
+            revision = subprocess.check_output("git rev-parse HEAD", stderr=fnull, shell=True).decode(encoding="utf-8").strip()
     except subprocess.CalledProcessError:
         try:
             # Check for an Hg repo
             with open(os.devnull, "wb") as fnull:
-                revision = subprocess.check_output("hg parent --temp='{node}'", stderr=fnull, shell=True).strip()
+                revision = subprocess.check_output("hg parent --temp='{node}'", stderr=fnull, shell=True).decode(encoding="utf-8").strip()
         except:
             pass
     os.chdir(old_dir)
