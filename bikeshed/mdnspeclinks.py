@@ -212,13 +212,31 @@ def addSupportRow(browserCodeName, nameFromCodeName, support, supportData):
     if isinstance(thisBrowserSupport, dict):
         if "version_added" in thisBrowserSupport:
             versionAdded = thisBrowserSupport["version_added"]
+            if "prefix" in thisBrowserSupport or \
+                    'alternative_name' in thisBrowserSupport or \
+                    'partial_implementation' in thisBrowserSupport:
+                versionAdded = False
         if "version_removed" in thisBrowserSupport:
             versionRemoved = thisBrowserSupport["version_removed"]
     if isinstance(thisBrowserSupport, list):
-        if "version_added" in thisBrowserSupport[0]:
-            versionAdded = thisBrowserSupport[0]["version_added"]
-        if "version_removed" in thisBrowserSupport[0]:
-            versionRemoved = thisBrowserSupport[0]["version_removed"]
+        for versionDetails in thisBrowserSupport:
+            if "version_removed" in versionDetails:
+                versionRemoved = versionDetails["version_removed"]
+                continue
+            if "version_added" in versionDetails:
+                if versionDetails["version_added"] is False:
+                    versionAdded = False
+                    continue
+                if versionDetails["version_added"] is None:
+                    versionAdded = None
+                    continue
+                if "prefix" in versionDetails or \
+                        'alternative_name' in versionDetails or \
+                        'partial_implementation' in versionDetails:
+                    continue
+                versionAdded = versionDetails["version_added"]
+                versionRemoved = None
+                break
     statusCode = "n"
     if versionAdded is None:
         minVersion = "?"
