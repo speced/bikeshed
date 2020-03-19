@@ -7,9 +7,9 @@ import os
 import urllib.request, urllib.error, urllib.parse
 from collections import defaultdict
 from contextlib import closing
+from json_home_client import Client as APIClient
 
 from .. import config
-from ..json_home_client.json_home_client import Client as APIClient
 from ..messages import *
 
 

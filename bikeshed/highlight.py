@@ -135,7 +135,7 @@ def highlightEl(el, lang):
 
 
 def highlightWithWebIDL(text, el):
-    from .widlparser.widlparser import parser
+    from widlparser import parser
     '''
     Trick the widlparser emitter,
     which wants to output HTML via wrapping with start/end tags,

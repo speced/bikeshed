@@ -3,7 +3,7 @@
 
 import re
 
-from .widlparser.widlparser import parser
+from widlparser import parser
 from .htmlhelpers import *
 from .unsortedJunk import classifyDfns
 
