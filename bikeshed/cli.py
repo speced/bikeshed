@@ -300,12 +300,12 @@ def handleDebug(options, extras):
         doc = Spec(inputFilename=options.infile)
         doc.mdCommandLine = metadata.fromCommandLine(extras)
         doc.preprocess()
-        exec("print config.printjson({0})".format(options.jsonCode))
+        exec(f"print(config.printjson({options.jsonCode}))")
     elif options.code:
         doc = Spec(inputFilename=options.infile)
         doc.mdCommandLine = metadata.fromCommandLine(extras)
         doc.preprocess()
-        exec("print {0}".format(options.code))
+        exec(f"print({options.code})")
     elif options.linkText:
         doc = Spec(inputFilename=options.infile)
         doc.mdCommandLine = metadata.fromCommandLine(extras)
