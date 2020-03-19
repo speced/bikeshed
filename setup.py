@@ -14,5 +14,12 @@ setup(
         'widlparser>=1,<2',
         'json_home_client>=1,<2',
     ],
+    classifiers=[
+        "Development Status :: 5 - Production/Stable",
+        "License :: Public Domain",
+        "Operating System :: OS Independent",
+        "Programming Language :: Python :: 3.7",
+        "Topic :: Software Development :: Documentation",
+    ],
     entry_points={'console_scripts': ['bikeshed = bikeshed:main']},
 )
