@@ -84,16 +84,16 @@ def addMdnPanels(doc):
     #       https://github.com/whatwg/whatwg.org/pull/267 resolved
     doc.extraStyles["style-mdn-anno"] = '''
         @media (max-width: 767px) { .mdn-anno { opacity: .1 } }
-        .mdn-anno { font: 1em sans-serif; padding: 0.3em; position: absolute; z-index: 8; top: auto; right: 0.3em; background: #EEE; color: black; box-shadow: 0 0 3px #999; overflow: hidden; border-collapse: initial; border-spacing: initial; min-width: 9em; max-width: min-content; overflow-wrap: normal; word-wrap: normal; hyphens: none}
+        .mdn-anno { font: 1em sans-serif; padding: 0.3em; position: absolute; z-index: 8; top: auto; right: 0.3em; background: #EEE; color: black; box-shadow: 0 0 3px #999; overflow: hidden; border-collapse: initial; border-spacing: initial; min-width: 9em; white-space: nowrap; overflow-wrap: normal; word-wrap: normal; hyphens: none}
         .mdn-anno:not(.wrapped) { opacity: 1}
         .mdn-anno:hover { z-index: 9 }
         .mdn-anno.wrapped { min-width: 0 }
         .mdn-anno.wrapped > :not(button) { display: none; }
-        .mdn-anno > .mdn-anno-btn { cursor: pointer; border: none; color: #000; background: transparent; margin: -8px; outline: none; }
+        .mdn-anno > .mdn-anno-btn { cursor: pointer; border: none; color: #000; background: transparent; margin: -8px; float: right; padding: 10px 8px 8px 8px; outline: none; }
         .mdn-anno > .mdn-anno-btn > .less-than-two-engines-flag { color: red; padding-right: 2px; }
         .mdn-anno > .mdn-anno-btn > .all-engines-flag { color: green; padding-right: 2px; }
         .mdn-anno > .mdn-anno-btn > span { color: #fff; background-color: #000; font-weight: normal; font-family: zillaslab, Palatino, "Palatino Linotype", serif; padding: 2px 3px 0px 3px; line-height: 1.3em; vertical-align: top; }
-        .mdn-anno > .feature { margin-top: 2px; }
+        .mdn-anno > .feature { margin-top: 20px; }
         .mdn-anno > .feature:not(:first-of-type) { border-top: 1px solid #999; margin-top: 6px; padding-top: 2px; }
         .mdn-anno > .feature > .less-than-two-engines-text { color: red }
         .mdn-anno > .feature > .all-engines-text { color: green }
