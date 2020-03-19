@@ -1,8 +1,15 @@
 from setuptools import setup, find_packages
 
+with open("README.md", "r") as fh:
+    long_description = fh.read()
+
 setup(
-    name='Bikeshed',
-    author='Tab Atkins Jr.',
+    name='bikeshed',
+    author='Tab Atkins-Bittner',
+    description="A document-authoring tool mainly intended for web specifications."
+    long_description=long_description,
+    long_description_content_type="text/markdown",
+    url="https://github.com/tabatkins/bikeshed/",
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
@@ -14,6 +21,7 @@ setup(
         'widlparser>=1,<2',
         'json_home_client>=1,<2',
     ],
+    python_requires=">=3.7",
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "License :: Public Domain",
