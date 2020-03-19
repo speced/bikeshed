@@ -174,7 +174,7 @@ def addMdnPanels(doc):
                         elif engines == 2:
                             onlyTwoEngines = onlyTwoEngines + 1
                         elif engines >= len(browsersProvidingCurrentEngines):
-                            allEngines = allEngines + 1l
+                            allEngines = allEngines + 1
                     featureDiv = mdnPanelFor(feature, mdnBaseUrl, bcdBaseUrl,
                                              nameFromCodeName,
                                              browsersProvidingCurrentEngines,
