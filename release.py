@@ -11,6 +11,11 @@ def createRelease():
         print("Run this command from inside the bikeshed root folder.")
         sys.exit(1)
 
+    treeDirty = subprocess.check_output("git diff --stat", shell=True).decode(encoding="utf-8") != ""
+    if treeDirty:
+        print("Working tree is dirty. Finish committing files or stash, then try again.")
+        sys.exit(1)
+
     with open("semver.txt", 'r') as fh:
         currentVersion = fh.read().strip()
 
