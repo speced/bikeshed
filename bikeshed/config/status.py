@@ -84,9 +84,11 @@ datedStatuses = ["w3c/WD", "w3c/FPWD", "w3c/LCWD", "w3c/CR", "w3c/PR", "w3c/REC"
 unlevelledStatuses = ["LS", "LD", "DREAM", "w3c/UD", "LS-COMMIT", "LS-BRANCH", "FINDING", "DRAFT-FINDING", "whatwg/RD"]
 deadlineStatuses = ["w3c/LCWD", "w3c/PR"]
 noEDStatuses = ["LS", "LS-COMMIT", "LS-BRANCH", "LD", "FINDING", "DRAFT-FINDING", "DREAM", "iso/NP", "whatwg/RD"]
-# WG statuses can only be used if the group is a W3C working group or interest
-# group, as opposed to a community or business group.
-w3cWgStatuses = ["w3c/ED", "w3c/WD", "w3c/FPWD", "w3c/LCWD", "w3c/CR", "w3c/PR", "w3c/REC", "w3c/PER"]
+# W3C statuses can only be used by Working Groups & Interest Groups, not
+# Community Groups or Business Groups
+w3cStatuses = ["w3c/ED"]
+# W3C REC-trac statuses can only be used by W3C Working Groups
+w3cRecTrackStatuses = ["w3c/WD", "w3c/FPWD", "w3c/LCWD", "w3c/CR", "w3c/PR", "w3c/REC", "w3c/PER"]
 
 megaGroups = {
     "w3c": frozenset(["act-framework", "audiowg", "csswg", "dap", "fxtf", "fxtf-csswg", "geolocation", "houdini", "html", "i18n", "immersivewebcg", "immersivewebwg", "mediacapture", "mediawg", "ping", "privacycg", "processcg", "ricg", "sacg", "secondscreenwg", "serviceworkers", "svg", "texttracks", "uievents", "wasm", "web-bluetooth-cg", "webapps", "webappsec", "webauthn", "webml", "web-payments", "webperf", "webplatform", "webrtc", "webspecs", "webvr", "wicg"]),
@@ -100,7 +102,9 @@ megaGroups = {
 # Community and business groups within the W3C:
 w3cCgs = frozenset(["immersivewebcg", "privacycg", "processcg", "ricg", "sacg", "web-bluetooth-cg", "wicg"])
 assert w3cCgs.issubset(megaGroups["w3c"])
-
+# Interest Groups within the W3C:
+w3cIgs = frozenset(["ping"])
+assert w3cIgs.issubset(megaGroups["w3c"])
 
 def canonicalizeStatus(rawStatus, group):
     if rawStatus is None:
@@ -176,10 +180,20 @@ def canonicalizeStatus(rawStatus, group):
         if group in megaGroups[mg]:
             canonStatus = mg + "/" + status
 
-            if canonStatus in w3cWgStatuses and group in w3cCgs:
-                msg = "You used Status: {0}, but that's limited to W3C working and interest groups.".format(rawStatus)
-                msg += " Your group '{0}' is a community or business group. Consider CG-DRAFT or CG-FINAL instead.".format(group)
-                warn("{0}", msg)
+            msg = "You used Status: {0}, but that's limited to {1}. Your group '{2}' is {3}."
+            msg += " Consider {4} instead."
+
+            if group in w3cIgs and canonStatus in w3cRecTrackStatuses:
+                warn(msg, rawStatus, "W3C Working Groups", group,
+                     "an Interest Group", "ED or IG-NOTE")
+
+            if group in w3cCgs and canonStatus in w3cStatuses:
+                warn(msg, rawStatus, "W3C Working and Interest Groups", group,
+                     "a Community or Business Group", "CG-DRAFT or CG-FINAL")
+
+            if group in w3cCgs and canonStatus in w3cRecTrackStatuses:
+                warn(msg, rawStatus, "W3C Working Groups", group,
+                     "a Community or Business Group", "CG-DRAFT or CG-FINAL")
 
             return canonStatus
 
