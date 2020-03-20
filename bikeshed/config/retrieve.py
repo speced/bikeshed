@@ -19,7 +19,8 @@ class DataFileRequester(object):
     def fetch(self, *segs, **kwargs):
         str = kwargs.get("str", False)
         okayToFail = kwargs.get("okayToFail", False)
-        location = self._buildPath(*segs)
+        fileType = kwargs.get("type", self.type)
+        location = self._buildPath(segs=segs, fileType=fileType)
         try:
             if str:
                 with io.open(location, "r", encoding="utf-8") as fh:
@@ -34,13 +35,16 @@ class DataFileRequester(object):
                     return self._fail(location, str, okayToFail)
             return self._fail(location, str, okayToFail)
 
-    def walkFiles(self, *segs):
-        for root, dirs, files in os.walk(self._buildPath(*segs)):
+    def walkFiles(self, *segs, **kwargs):
+        fileType = kwargs.get("type", self.type)
+        for root, dirs, files in os.walk(self._buildPath(segs, fileType=fileType)):
             for file in files:
                 yield file
 
-    def _buildPath(self, *segs):
-        if self.type == "readonly":
+    def _buildPath(self, segs, fileType=None):
+        if fileType is None:
+            fileType = self.fileType
+        if fileType == "readonly":
             return scriptPath("spec-data", "readonly", *segs)
         else:
             return scriptPath("spec-data", *segs)
