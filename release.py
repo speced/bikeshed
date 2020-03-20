@@ -68,6 +68,10 @@ def createRelease():
             fh.write(currentVersion)
         raise
 
+    # Clean up with a final commit of the changed version files
+    subprocess.check_call("git add semver.txt bikeshed/spec-data/readonly/bikeshed-version.txt", shell=True)
+    subprocess.check_call("git commit -m 'bump version info'", shell=True)
+
 
 
 
