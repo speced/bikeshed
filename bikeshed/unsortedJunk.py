@@ -1262,7 +1262,7 @@ def inlineRemoteIssues(doc):
     if not inlineIssues:
         return
 
-    from .requests import requests
+    import requests
 
     logging.captureWarnings(True)
 

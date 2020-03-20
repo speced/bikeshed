@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name='bikeshed',
-    version='1.0.0',
+    version='1.0.1',
     author='Tab Atkins-Bittner',
     description="A document-authoring tool mainly intended for web specifications.",
     long_description=long_description,
@@ -20,6 +20,7 @@ setup(
         'cssselect>=1.1.0,<1.2',
         'widlparser>=1.0.2,<2',
         'json_home_client>=1,<2',
+        'requests>=2.23,<3',
     ],
     python_requires=">=3.7",
     classifiers=[

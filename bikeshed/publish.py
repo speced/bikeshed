@@ -11,7 +11,7 @@ from .messages import *
 
 
 def publishEchidna(doc, username, password, decision, additionalDirectories=None, cc=None):
-    from .requests import requests
+    import requests
     logging.captureWarnings(True)  # Silence SNIMissingWarning
     tar = prepareTar(doc, visibleTar=False, additionalDirectories=additionalDirectories)
     # curl 'https://labs.w3.org/echidna/api/request' --user '<username>:<password>' -F "tar=@/some/path/spec.tar" -F "decision=<decisionUrl>"

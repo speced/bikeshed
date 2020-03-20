@@ -11,7 +11,7 @@ def brokenLinks(doc):
     '''
     if not doc.md.complainAbout['broken-links']:
         return
-    from ..requests import requests
+    import requests
 
     say("Checking links, this may take a while...")
     logging.captureWarnings(True) # Silence the requests library :/
