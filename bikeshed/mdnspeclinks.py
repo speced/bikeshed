@@ -141,7 +141,7 @@ def addMdnPanels(doc):
                                             vSpecShortname + ".json"))
         p = pV if os.path.exists(pV) else p
         with io.open(p, "r", encoding="utf-8") as fh:
-            data = json.loads(unicode(fh.read()), encoding="utf-8",
+            data = json.loads(fh.read(), encoding="utf-8",
                               object_pairs_hook=OrderedDict)
             for elementID in data.keys():
                 features = data[elementID]
