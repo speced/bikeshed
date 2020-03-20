@@ -469,6 +469,10 @@ def parseCommaSeparated(key, val, lineNum):
     return [term.strip().lower() for term in val.split(',')]
 
 
+def parseIdList(key, val, lineNum):
+    return [term.strip() for term in val.split(',')]
+
+
 def parseLinkDefaults(key, val, lineNum):
     defaultSpecs = defaultdict(list)
     for default in val.split(","):
@@ -1013,7 +1017,7 @@ knownKeys = {
     "Previous Version": Metadata("Previous Version", "previousVersions", joinList, parseLiteralList),
     "Remove Multiple Links": Metadata("Remove Multiple Links", "removeMultipleLinks", joinValue, parseBoolean),
     "Repository": Metadata("Repository", "repository", joinValue, parseRepository),
-    "Required Ids": Metadata("Required Ids", "requiredIDs", joinList, parseCommaSeparated),
+    "Required Ids": Metadata("Required Ids", "requiredIDs", joinList, parseIdList),
     "Revision": Metadata("Revision", "level", joinValue, parseLevel),
     "Shortname": Metadata("Shortname", "displayShortname", joinValue, parseLiteral),
     "Slim Build Artifact": Metadata("Slim Build Artifact", "slimBuildArtifact", joinValue, parseBoolean),
