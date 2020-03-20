@@ -18,12 +18,28 @@ def addBikeshedVersion(doc):
     if "generator" not in doc.md.boilerplate:
         return
     try:
-        bikeshedVersion = subprocess.check_output("git rev-parse HEAD", cwd=config.scriptPath(), shell=True).decode(encoding="utf-8").rstrip()
+        # Check that we're in the bikeshed repo
+        origin = subprocess.check_output(
+            "git remote -v",
+            cwd=config.scriptPath(),
+            stderr=subprocess.DEVNULL,
+            shell=True).decode(encoding="utf-8")
+        if "bikeshed" not in origin:
+            # In a repo, but not bikeshed's;
+            # probably pip-installed into an environment's repo or something.
+            raise Exception()
+        # Otherwise, success, this is a -e install,
+        # so we're in Bikeshed's repo.
+        bikeshedVersion = subprocess.check_output(
+            r"git log -1 --format='Bikeshed version %h, updated %cd'",
+            cwd=config.scriptPath(),
+            stderr=subprocess.DEVNULL,
+            shell=True).decode(encoding="utf-8").strip()
     except Exception as e:
-        warn("Couldn't discover the current Bikeshed version. Please report this error:\n{0}", e)
-        return
+        # Not in Bikeshed's repo, so instead grab from the datafile.
+        bikeshedVersion = doc.dataFile.fetch("bikeshed-version.txt", type="readonly", str=True).strip()
     appendChild(doc.head,
-                E.meta({"name": "generator", "content": f"Bikeshed version {bikeshedVersion}"}))
+                E.meta({"name": "generator", "content": bikeshedVersion}))
 
 
 def addCanonicalURL(doc):
