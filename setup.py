@@ -2,10 +2,12 @@ from setuptools import setup, find_packages
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
+with open("semver.txt", "r") as fh:
+    semver = fh.read().strip()
 
 setup(
     name='bikeshed',
-    version='1.0.1',
+    version=semver,
     author='Tab Atkins-Bittner',
     description="A document-authoring tool mainly intended for web specifications.",
     long_description=long_description,
