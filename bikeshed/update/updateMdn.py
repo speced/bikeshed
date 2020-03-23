@@ -29,10 +29,10 @@ def update(path, dryRun=False):
     writtenPaths = set()
     if not dryRun:
         try:
-            mdnSpecLinksDir = os.path.join(path, "mdnspeclinks")
+            mdnSpecLinksDir = os.path.join(path, "mdn")
             if not os.path.exists(mdnSpecLinksDir):
                 os.makedirs(mdnSpecLinksDir)
-            p = os.path.join(mdnSpecLinksDir, "SPECMAP.json")
+            p = os.path.join(path, "mdn.json")
             writtenPaths.add(p)
             with io.open(p, 'w', encoding="utf-8") as fh:
                 fh.write(json.dumps(data, indent=1, ensure_ascii=False,
