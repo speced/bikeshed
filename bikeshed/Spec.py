@@ -11,6 +11,7 @@ from datetime import datetime
 from . import biblio
 from . import boilerplate
 from . import caniuse
+from . import mdnspeclinks
 from . import config
 from . import constants
 from . import datablocks
@@ -73,6 +74,7 @@ class Spec(object):
         self.typeExpansions = {}
         self.macros = defaultdict(lambda x: "???")
         self.canIUse = {}
+        self.mdnSpecLinks = {}
         self.widl = idl.getParser()
         self.testSuites = json.loads(self.dataFile.fetch("test-suites.json", str=True))
         self.languages = json.loads(self.dataFile.fetch("languages.json", str=True))
@@ -200,6 +202,7 @@ class Spec(object):
         biblio.dedupBiblioReferences(self)
         verifyUsageOfAllLocalBiblios(self)
         caniuse.addCanIUsePanels(self)
+        mdnspeclinks.addMdnPanels(self)
         boilerplate.addIndexSection(self)
         boilerplate.addExplicitIndexes(self)
         boilerplate.addStyles(self)

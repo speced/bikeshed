@@ -49,7 +49,8 @@ knownFolders = [
     "anchors",
     "biblio",
     "headings",
-    "caniuse"
+    "caniuse",
+    "mdnspeclinks"
 ]
 
 
