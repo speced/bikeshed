@@ -107,7 +107,7 @@ def addMdnPanels(doc):
         .mdn-anno > .feature > .support > span.no { color: #CCCCCC; filter: grayscale(100%); }
         .mdn-anno > .feature > .support > span.no::before { opacity: 0.5; }
         .mdn-anno > .feature > .support > span:first-of-type { padding-top: 0.5em; }
-        .mdn-anno > .feature > .support > span > span { padding: 0 0.5em; display: table-cell; vertical-align: top; }
+        .mdn-anno > .feature > .support > span > span { padding: 0 0.5em; display: table-cell; }
         .mdn-anno > .feature > .support > span > span:first-child { width: 100%; }
         .mdn-anno > .feature > .support > span > span:last-child { width: 100%; white-space: pre; padding: 0; }
         .mdn-anno > .feature > .support > span::before { content: ' '; display: table-cell; min-width: 1.5em; height: 1.5em; background: no-repeat center center; background-size: contain; text-align: right; font-size: 0.75em; font-weight: bold; }
@@ -205,6 +205,7 @@ def addSupportRow(browserCodeName, nameFromCodeName, support, supportData):
         return
     isEdgeLegacy = True if browserCodeName == "edge" else False
     isIE = True if browserCodeName == "ie" else False
+    needsFlag = False
     versionAdded = None
     versionRemoved = None
     minVersion = None
@@ -212,6 +213,8 @@ def addSupportRow(browserCodeName, nameFromCodeName, support, supportData):
     if isinstance(thisBrowserSupport, dict):
         if "version_added" in thisBrowserSupport:
             versionAdded = thisBrowserSupport["version_added"]
+            if "flags" in thisBrowserSupport:
+                needsFlag = True
             if "prefix" in thisBrowserSupport or \
                     'alternative_name' in thisBrowserSupport or \
                     'partial_implementation' in thisBrowserSupport:
@@ -234,6 +237,8 @@ def addSupportRow(browserCodeName, nameFromCodeName, support, supportData):
                         'alternative_name' in versionDetails or \
                         'partial_implementation' in versionDetails:
                     continue
+                if "flags" in thisBrowserSupport:
+                    needsFlag = True
                 versionAdded = versionDetails["version_added"]
                 versionRemoved = None
                 break
@@ -260,8 +265,9 @@ def addSupportRow(browserCodeName, nameFromCodeName, support, supportData):
             else:
                 minVersion = "None"
     browserFullName = nameFromCodeName[browserCodeName]
-    appendChild(supportData, browserCompatSpan(browserCodeName, browserFullName,
-                                               statusCode, minVersion))
+    appendChild(supportData,
+                browserCompatSpan(browserCodeName, browserFullName, statusCode,
+                                  minVersion, needsFlag))
 
 
 def mdnPanelFor(feature, mdnBaseUrl, bcdBaseUrl, nameFromCodeName,
@@ -328,11 +334,18 @@ def mdnPanelFor(feature, mdnBaseUrl, bcdBaseUrl, nameFromCodeName,
     return featureDiv
 
 
-def browserCompatSpan(browserCodeName, browserFullName, statusCode, minVersion):
+def browserCompatSpan(browserCodeName, browserFullName, statusCode, minVersion,
+                      needsFlag):
     # browserCodeName: e.g. "chrome"
     # browserFullName: e.g. "Chrome for Android"
+    minVersionAttributes = {}
+    flagSymbol = ""
+    if needsFlag:
+        flagSymbol = "\U0001f530 "
+        minVersionAttributes["title"] = \
+            "Requires setting a user preference or runtime flag."
     statusClass = {"y": "yes", "n": "no"}[statusCode]
     outer = E.span({"class": browserCodeName + " " + statusClass})
     appendChild(outer, E.span({}, browserFullName))
-    appendChild(outer, E.span({}, minVersion))
+    appendChild(outer, E.span(minVersionAttributes, flagSymbol + minVersion))
     return outer
