@@ -27,7 +27,7 @@ def addMdnPanels(doc):
         die(f"Couldn't load MDN Spec Links data for this spec.\n{e}")
         return
 
-    panels = panelsFromData(data)
+    panels = panelsFromData(doc, data)
     if panels:
         appendChild(doc.body, panels)
         doc.extraScripts["script-mdn-anno"] = '''
@@ -118,7 +118,7 @@ def addMdnPanels(doc):
             .name-slug-mismatch { color: red }
             '''  # noqa
 
-def panelsFromData(data):
+def panelsFromData(doc, data):
     mdnBaseUrl = "https://developer.mozilla.org/en-US/docs/Web/"
     bcdBaseUrl = "https://github.com/mdn/browser-compat-data/blob/master/"
 
@@ -183,7 +183,6 @@ def panelsFromData(data):
                     browsersWithBorrowedEngines,
                     browsersWithRetiredEngines,
                     browsersForMobileDevices))
-            appendChild(anno, featureDiv)
 
         mdnButton = E.button({"class": "mdn-anno-btn"})
         if lessThanTwoEngines > 0:
