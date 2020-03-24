@@ -18,6 +18,7 @@ def createRelease():
 
     with open("semver.txt", 'r') as fh:
         currentVersion = fh.read().strip()
+        semver = parseSemver(currentVersion)
 
     try:
         with open("secrets.json", 'r') as fh:
@@ -27,14 +28,24 @@ def createRelease():
         raise
 
     args = argparse.ArgumentParser(description="Releases a new Bikeshed version to pypi.org.")
-    args.add_argument("version", help=f"Version number to publish as; currently {currentVersion}")
+    args.add_argument("bump",
+        choices=["break", "feature", "bugfix"],
+        help=f"Which type of release is this?")
     args.add_argument("--test", dest="test", action="store_true", help="Upload to test.pypi.org instead.")
     options, extras = args.parse_known_args()
 
-    # Is the semver correct?
-    if parseSemver(options.version) <= parseSemver(currentVersion):
-        print(f"Specified version ({options.version}) must be greater than current version ({currentVersion}).")
-        sys.exit(1)
+    # Bump the semver
+    if options.bump == "break":
+        semver[0] += 1
+        semver[1] = 0
+        semver[2] = 0
+    elif options.bump == "feature":
+        semver[1] += 1
+        semver[2] = 0
+    elif options.bump == "bugfix":
+        semver[2] += 1
+    newVersion = '.'.join(str(x) for x in semver)
+    print(f"Bumping to {newVersion}...")
 
     # Update the hash-version
     bikeshedVersion = subprocess.check_output(
@@ -45,7 +56,7 @@ def createRelease():
 
     # Update the semver
     with open("semver.txt", 'w') as fh:
-        fh.write(options.version)
+        fh.write(newVersion)
 
     try:
         # Clear out the build artifacts, build it, upload, and clean up again.
@@ -97,7 +108,7 @@ def inBikeshedRoot():
 
 def parseSemver(s):
     # TODO: replace with the semver module
-    return tuple(int(x) for x in s.strip().split("."))
+    return [int(x) for x in s.strip().split(".")]
 
 
 if __name__ == "__main__":
