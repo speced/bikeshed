@@ -148,29 +148,23 @@ def panelsFromData(data):
     }
 
     panels = []
-    for elementID in data.keys():
-        features = data[elementID]
-        anno = E.aside({"class": "mdn-anno wrapped", "data-deco": ""})
-        panels.append(anno)
-        mdnButton = E.button({"class": "mdn-anno-btn"})
-        mdnLogo = E.span("MDN")
-        appendChild(anno, mdnButton)
-        anno.set("data-mdn-for", elementID)
+    for elementId, features in data.items():
         lessThanTwoEngines = 0
         onlyTwoEngines = 0
         allEngines = 0
+        featureDivs = []
         for feature in features:
             # TODO: This find() is expensive, but if we add an anno to
             # the document with a reference to an ID that doesn't
             # actually exist in the document, the anno won't actually
             # get displayed next to whatever feature in the spec it's
             # intended to annotate...
-            if find("[id='%s']" % elementID, doc) is None:
+            if find(f"[id='{elementId}']", doc) is None:
                 mdnSuggest = ""
                 if "slug" in feature:
                     mdnSuggest = " Update " + mdnBaseUrl \
                         + feature["slug"] + " Specifications table?"
-                warn("No \"{0}\" ID found." + mdnSuggest, elementID)
+                warn("No \"{0}\" ID found." + mdnSuggest, elementId)
                 continue
             if "engines" in feature:
                 engines = len(feature["engines"])
@@ -180,26 +174,37 @@ def panelsFromData(data):
                     onlyTwoEngines = onlyTwoEngines + 1
                 elif engines >= len(browsersProvidingCurrentEngines):
                     allEngines = allEngines + 1
-            featureDiv = mdnPanelFor(feature, mdnBaseUrl, bcdBaseUrl,
-                                     nameFromCodeName,
-                                     browsersProvidingCurrentEngines,
-                                     browsersWithBorrowedEngines,
-                                     browsersWithRetiredEngines,
-                                     browsersForMobileDevices)
+            featureDivs.append(
+                mdnPanelFor(
+                    feature,
+                    mdnBaseUrl,
+                    bcdBaseUrl,
+                    nameFromCodeName,
+                    browsersProvidingCurrentEngines,
+                    browsersWithBorrowedEngines,
+                    browsersWithRetiredEngines,
+                    browsersForMobileDevices))
             appendChild(anno, featureDiv)
+
+        mdnButton = E.button({"class": "mdn-anno-btn"})
         if lessThanTwoEngines > 0:
             appendChild(mdnButton,
-                        E.b({"class": "less-than-two-engines-flag",
-                             "title": "This feature is in less than" +
-                             " two current engines."}, u"\u26A0"))
-        elif allEngines > 0 \
-                and lessThanTwoEngines == 0 \
-                and onlyTwoEngines == 0:
+                E.b({"class": "less-than-two-engines-flag",
+                     "title": "This feature is in less than two current engines."},
+                    "\u26A0"))
+        elif allEngines > 0 and lessThanTwoEngines == 0 and onlyTwoEngines == 0:
             appendChild(mdnButton,
-                        E.b({"class": "all-engines-flag",
-                             "title": "This feature is in" +
-                             " all current engines."}, u"\u2714"))
-        appendChild(mdnButton, mdnLogo)
+                E.b({"class": "all-engines-flag",
+                     "title": "This feature is in all current engines."},
+                    "\u2714"))
+        appendChild(mdnButton, E.span("MDN"))
+
+        panels.append(
+            E.aside({"class": "mdn-anno wrapped",
+                     "data-deco": "",
+                     "data-mdn-for": elementId},
+                mdnButton,
+                featureDivs))
     return panels
 
 def addSupportRow(browserCodeName, nameFromCodeName, support, supportData):
