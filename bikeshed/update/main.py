@@ -17,7 +17,7 @@ from .. import config
 from ..messages import *
 
 
-def update(anchors=False, backrefs=False, biblio=False, caniuse=False, mdn=False, linkDefaults=False, testSuites=False, languages=False, wpt=False, path=None, dryRun=False, force=False):
+def update(anchors=False, backrefs=False, biblio=False, caniuse=False, linkDefaults=False, mdn=False, testSuites=False, languages=False, wpt=False, path=None, dryRun=False, force=False):
     if path is None:
         path = config.scriptPath("spec-data")
 
@@ -29,8 +29,8 @@ def update(anchors=False, backrefs=False, biblio=False, caniuse=False, mdn=False
             force = True
     if force:
         # If all are False, update everything
-        if  anchors == backrefs == biblio == caniuse == mdn == linkDefaults == testSuites == languages == wpt == False:
-            anchors  = backrefs  = biblio  = caniuse  = mdn = linkDefaults  = testSuites  = languages  = wpt  = True
+        if  anchors == backrefs == biblio == caniuse == linkDefaults == mdn == testSuites == languages == wpt == False:
+            anchors  = backrefs  = biblio  = caniuse  = linkDefaults  = mdn  = testSuites  = languages  = wpt  = True
 
         touchedPaths = {
             "anchors": updateCrossRefs.update(path=path, dryRun=dryRun) if anchors else None,
