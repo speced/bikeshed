@@ -70,11 +70,9 @@ def addMdnPanels(doc):
             }
             '''  # noqa
 
-        # FIXME: Update the Edge logo URL when we get
-        #       https://github.com/whatwg/whatwg.org/pull/267 resolved
         doc.extraStyles["style-mdn-anno"] = '''
             @media (max-width: 767px) { .mdn-anno { opacity: .1 } }
-            .mdn-anno { font: 1em sans-serif; padding: 0.3em; position: absolute; z-index: 8; top: auto; right: 0.3em; background: #EEE; color: black; box-shadow: 0 0 3px #999; overflow: hidden; border-collapse: initial; border-spacing: initial; min-width: 9em; white-space: nowrap; overflow-wrap: normal; word-wrap: normal; hyphens: none}
+            .mdn-anno { font: 1em sans-serif; padding: 0.3em; position: absolute; z-index: 8; right: 0.3em; background: #EEE; color: black; box-shadow: 0 0 3px #999; overflow: hidden; border-collapse: initial; border-spacing: initial; min-width: 9em; max-width: min-content; white-space: nowrap; word-wrap: normal; hyphens: none}
             .mdn-anno:not(.wrapped) { opacity: 1}
             .mdn-anno:hover { z-index: 9 }
             .mdn-anno.wrapped { min-width: 0 }
