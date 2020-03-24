@@ -162,7 +162,7 @@ def panelsFromData(data):
             if find(f"[id='{elementId}']", doc) is None:
                 msg = f"No '{elementId}' ID found."
                 if "slug" in feature:
-                    msg += f" Update {mdnBaseUrl}{feature["slug"]} Specifications Table?"
+                    msg += f" Update {mdnBaseUrl}{feature['slug']} Specifications Table?"
                 warn(msg)
                 continue
             if "engines" in feature:
@@ -294,7 +294,7 @@ def mdnPanelFor(feature, mdnBaseUrl, bcdBaseUrl, nameFromCodeName,
         if featureName is not None and not featureName.startswith("input-") and featureName != nameFromSlug:
             msg = f"BCD '{featureName}' feature has mismatched MDN URL {mdnURL}."
             if feature.get("filename") is not None:
-                msg += f" Update {bcdBaseUrl}{feature["filename"]} file?"
+                msg += f" Update {bcdBaseUrl}{feature['filename']} file?"
             warn(msg)
             slugLink = E.a({"class": "name-slug-mismatch", "href": mdnURL,
                             "title": title},

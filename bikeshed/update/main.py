@@ -7,7 +7,7 @@ from . import updateBackRefs
 from . import updateCrossRefs
 from . import updateBiblio
 from . import updateCanIUse
-from . import updateMdnSpecLinks
+from . import updateMdn
 from . import updateLinkDefaults
 from . import updateTestSuites
 from . import updateLanguages
