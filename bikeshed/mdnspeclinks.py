@@ -160,11 +160,10 @@ def panelsFromData(data):
             # get displayed next to whatever feature in the spec it's
             # intended to annotate...
             if find(f"[id='{elementId}']", doc) is None:
-                mdnSuggest = ""
+                msg = f"No '{elementId}' ID found."
                 if "slug" in feature:
-                    mdnSuggest = " Update " + mdnBaseUrl \
-                        + feature["slug"] + " Specifications table?"
-                warn("No \"{0}\" ID found." + mdnSuggest, elementId)
+                    msg += f" Update {mdnBaseUrl}{feature["slug"]} Specifications Table?"
+                warn(msg)
                 continue
             if "engines" in feature:
                 engines = len(feature["engines"])
@@ -210,8 +209,8 @@ def panelsFromData(data):
 def addSupportRow(browserCodeName, nameFromCodeName, support, supportData):
     if browserCodeName not in support:
         return
-    isEdgeLegacy = True if browserCodeName == "edge" else False
-    isIE = True if browserCodeName == "ie" else False
+    isEdgeLegacy = browserCodeName == "edge"
+    isIE = browserCodeName == "ie"
     needsFlag = False
     versionAdded = None
     versionRemoved = None
@@ -273,40 +272,36 @@ def addSupportRow(browserCodeName, nameFromCodeName, support, supportData):
                 minVersion = "None"
     browserFullName = nameFromCodeName[browserCodeName]
     appendChild(supportData,
-                browserCompatSpan(browserCodeName, browserFullName, statusCode,
-                                  minVersion, needsFlag))
+        browserCompatSpan(
+            browserCodeName,
+            browserFullName,
+            statusCode,
+            minVersion,
+            needsFlag))
 
 
 def mdnPanelFor(feature, mdnBaseUrl, bcdBaseUrl, nameFromCodeName,
                 browsersProvidingCurrentEngines, browsersWithBorrowedEngines,
                 browsersWithRetiredEngines, browsersForMobileDevices):
     featureDiv = E.div({"class": "feature"})
-    featureName = ""
-    if "name" in feature:
-        featureName = feature["name"]
+    featureName = feature.get("name", None)
     if "slug" in feature:
         slug = feature["slug"]
         displaySlug = slug.split("/", 1)[1]
-        title = ""
-        if "summary" in feature:
-            title = feature["summary"]
+        title = feature.get("summary", "")
         mdnURL = mdnBaseUrl + slug
         nameFromSlug = slug.rsplit("/", 1)[-1]
-        if featureName is not None and featureName != "" \
-                and not featureName.startswith("input-") \
-                and featureName != nameFromSlug:
-            bcdSuggest = ""
-            if "filename" in feature and feature["filename"] is not None:
-                bcdSuggest = \
-                    " Update %s%s file?" % (bcdBaseUrl, feature["filename"])
-            warn("BCD \"{0}\" feature has mismatched MDN URL {1}." + bcdSuggest,
-                 featureName, mdnURL)
+        if featureName is not None and not featureName.startswith("input-") and featureName != nameFromSlug:
+            msg = f"BCD '{featureName}' feature has mismatched MDN URL {mdnURL}."
+            if feature.get("filename") is not None:
+                msg += f" Update {bcdBaseUrl}{feature["filename"]} file?"
+            warn(msg)
             slugLink = E.a({"class": "name-slug-mismatch", "href": mdnURL,
-                            "title": title}, featureName)
+                            "title": title},
+                           featureName)
         else:
             slugLink = E.a({"href": mdnURL, "title": title}, displaySlug)
-        slugPara = E.p(slugLink)
-        appendChild(featureDiv, slugPara)
+        appendChild(featureDiv, E.p({},slugLink))
     if "engines" in feature:
         engines = len(feature["engines"])
         enginesPara = None
