@@ -37,7 +37,7 @@ def update(anchors=False, backrefs=False, biblio=False, caniuse=False, linkDefau
             "backrefs": updateBackRefs.update(path=path, dryRun=dryRun) if backrefs else None,
             "biblio": updateBiblio.update(path=path, dryRun=dryRun) if biblio else None,
             "caniuse": updateCanIUse.update(path=path, dryRun=dryRun) if caniuse else None,
-            "mdnspeclinks": updateMdnSpecLinks.update(path=path, dryRun=dryRun) if mdn else None,
+            "mdnspeclinks": updateMdn.update(path=path, dryRun=dryRun) if mdn else None,
             "linkDefaults": updateLinkDefaults.update(path=path, dryRun=dryRun) if linkDefaults else None,
             "testSuites": updateTestSuites.update(path=path, dryRun=dryRun) if testSuites else None,
             "languages": updateLanguages.update(path=path, dryRun=dryRun) if languages else None,
