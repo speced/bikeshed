@@ -1151,9 +1151,9 @@ def cleanupHTML(doc):
             el.set("data-noexport", "")
 
         if doc.md.slimBuildArtifact:
-            # Remove *all* data- attributes.
+            # Remove *all* data- attributes, except data-mdn-for attributes
             for attrName in el.attrib:
-                if attrName.startswith("data-"):
+                if attrName.startswith("data-") and attrName != "data-mdn-for":
                     removeAttr(el, attrName)
     for el in strayHeadEls:
         head.append(el)

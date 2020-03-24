@@ -95,6 +95,7 @@ def main():
     updateParser.add_argument("--backrefs", action="store_true", help="Download link backref data.")
     updateParser.add_argument("--biblio", action="store_true", help="Download biblio data.")
     updateParser.add_argument("--caniuse", action="store_true", help="Download Can I Use... data.")
+    updateParser.add_argument("--mdn", action="store_true", help="Download MDN Spec Links... data.")
     updateParser.add_argument("--link-defaults", dest="linkDefaults", action="store_true", help="Download link default data.")
     updateParser.add_argument("--test-suites", dest="testSuites", action="store_true", help="Download test suite data.")
     updateParser.add_argument("--languages", dest="languages", action="store_true", help="Download language/translation data.")
@@ -234,7 +235,7 @@ def main():
 
 
 def handleUpdate(options, extras):
-    update.update(anchors=options.anchors, backrefs=options.backrefs, biblio=options.biblio, caniuse=options.caniuse, linkDefaults=options.linkDefaults, testSuites=options.testSuites, languages=options.languages, wpt=options.wpt, dryRun=constants.dryRun, force=options.force)
+    update.update(anchors=options.anchors, backrefs=options.backrefs, biblio=options.biblio, caniuse=options.caniuse, mdn=options.mdn, linkDefaults=options.linkDefaults, testSuites=options.testSuites, languages=options.languages, wpt=options.wpt, dryRun=constants.dryRun, force=options.force)
 
 
 def handleSpec(options, extras):
