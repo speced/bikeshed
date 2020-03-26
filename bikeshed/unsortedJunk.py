@@ -1242,7 +1242,7 @@ def formatArgumentdefTables(doc):
                     appendChild(tds[3],
                                 E.span({"class":"no"}, "✘"))
             else:
-                die("Can't find the '{0}' argument of method '{1}' in the argumentdef block.", argName, method.fullName, el=table)
+                die(f"Can't find the '{argName}' argument of method '{method.full_name}' in the argumentdef block.", el=table)
                 continue
 
 
