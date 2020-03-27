@@ -10,6 +10,30 @@ from datetime import datetime
 
 from ..messages import *
 
+# Manifest creation relies on these data structures.
+# Add to them whenever new types of data files are created.
+knownFiles = [
+    "biblio-keys.json",
+    "biblio-numeric-suffixes.json",
+    "bikeshed-version.txt",
+    "fors.json",
+    "languages.json",
+    "link-defaults.infotree",
+    "mdn.json",
+    "methods.json",
+    "specs.json",
+    "test-suites.json",
+    "version.txt",
+    "wpt-tests.txt",
+]
+knownFolders = [
+    "anchors",
+    "biblio",
+    "caniuse",
+    "headings",
+    "mdn",
+]
+
 def createManifest(path, dryRun=False):
     '''Generates a manifest file for all the data files.'''
     manifests = []
@@ -33,27 +57,6 @@ def createManifest(path, dryRun=False):
                     fh.write("{0} {1}\n".format(h, p))
         except Exception as err:
             raise
-
-
-knownFiles = [
-    "biblio-keys.json",
-    "fors.json",
-    "languages.json",
-    "link-defaults.infotree",
-    "mdn.json",
-    "methods.json",
-    "specs.json",
-    "test-suites.json",
-    "wpt-tests.txt",
-]
-knownFolders = [
-    "anchors",
-    "biblio",
-    "caniuse",
-    "headings",
-    "mdn"
-]
-
 
 def keyManifest(manifest):
     name = manifest[0]
