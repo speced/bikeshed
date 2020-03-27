@@ -36,21 +36,22 @@ def createManifest(path, dryRun=False):
 
 
 knownFiles = [
-    "fors.json",
-    "specs.json",
-    "methods.json",
-    "wpt-tests.txt",
-    "languages.json",
     "biblio-keys.json",
-    "test-suites.json",
+    "fors.json",
+    "languages.json",
     "link-defaults.infotree",
+    "mdn.json",
+    "methods.json",
+    "specs.json",
+    "test-suites.json",
+    "wpt-tests.txt",
 ]
 knownFolders = [
     "anchors",
     "biblio",
-    "headings",
     "caniuse",
-    "mdnspeclinks"
+    "headings",
+    "mdn"
 ]
 
 
