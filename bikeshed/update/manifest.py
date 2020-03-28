@@ -132,8 +132,8 @@ def updateByManifest(path, dryRun=False):
 
     if not dryRun:
         import time
-        messageDelta = .5 # seconds of *processor* time, not wall time :(
-        lastMsgTime = time.clock()
+        messageDelta = 2.5 # wall time
+        lastMsgTime = time.time()
         if newPaths:
             say("Updating {0} file{1}...", len(newPaths), "s" if len(newPaths) > 1 else "")
         for i,filePath in enumerate(newPaths):
@@ -155,7 +155,7 @@ def updateByManifest(path, dryRun=False):
                 warn("Couldn't save file '{0}'.\n{1}", localPath, e)
                 return False
 
-            currFileTime = time.clock()
+            currFileTime = time.time()
             if (currFileTime - lastMsgTime) >= messageDelta:
                 say("Updated {0}/{1}...", i+1, len(newPaths))
                 lastMsgTime = currFileTime
