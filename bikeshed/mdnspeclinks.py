@@ -19,7 +19,11 @@ def addMdnPanels(doc):
             filename = doc.md.shortname+".json"
             datafile = doc.dataFile.fetch("mdn", filename, str=True)
         except IOError:
-            die(f"Couldn't find the MDN data for '{doc.md.vshortname}' nor '{doc.md.shortname}'.")
+            if doc.md.includeMdnPanels == "maybe":
+                # if "maybe", failure is fine, don't complain
+                pass
+            else:
+                die(f"Couldn't find the MDN data for '{doc.md.vshortname}' nor '{doc.md.shortname}'.")
             return
     try:
         data = json.loads(datafile, object_pairs_hook=OrderedDict)

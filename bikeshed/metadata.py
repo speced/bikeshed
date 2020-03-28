@@ -352,6 +352,15 @@ def parseBoolean(key, val, lineNum):
     return b
 
 
+def parseSoftBoolean(key, val, lineNum):
+    b = boolish(val)
+    if b is not None:
+        return b
+    if val.lower() in ["maybe", "if possible", "if needed"]:
+        return "maybe"
+    die(f"The {key} field must be boolish, or 'maybe'. Got '{val}' instead.", lineNum=lineNum)
+
+
 def boolish(val):
     if val.lower() in ("true", "yes", "y", "on"):
         return True
@@ -992,7 +1001,7 @@ knownKeys = {
     "Ignored Terms": Metadata("Ignored Terms", "ignoredTerms", joinList, parseCommaSeparated),
     "Ignored Vars": Metadata("Ignored Vars", "ignoredVars", joinList, parseCommaSeparated),
     "Include Can I Use Panels": Metadata("Include Can I Use Panels", "includeCanIUsePanels", joinValue, parseBoolean),
-    "Include Mdn Panels": Metadata("Include Mdn Panels", "includeMdnPanels", joinValue, parseBoolean),
+    "Include Mdn Panels": Metadata("Include Mdn Panels", "includeMdnPanels", joinValue, parseSoftBoolean),
     "Indent": Metadata("Indent", "indent", joinValue, parseInteger),
     "Infer Css Dfns": Metadata("Infer Css Dfns", "inferCSSDfns", joinValue, parseBoolean),
     "Informative Classes": Metadata("Informative Classes", "informativeClasses", joinList, parseCommaSeparated),
