@@ -23,6 +23,8 @@ def addCanIUsePanels(doc):
 
     atLeastOnePanel = False
     elements = findAll("[caniuse]", doc)
+    if not elements:
+        return
     validateCanIUseURLs(doc, elements)
     for dfn in elements:
         featId = dfn.get("caniuse")
