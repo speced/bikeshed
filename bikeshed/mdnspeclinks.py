@@ -291,18 +291,9 @@ def mdnPanelFor(feature, mdnBaseUrl, bcdBaseUrl, nameFromCodeName,
         displaySlug = slug.split("/", 1)[1]
         title = feature.get("summary", "")
         mdnURL = mdnBaseUrl + slug
-        nameFromSlug = slug.rsplit("/", 1)[-1]
-        if featureName is not None and not featureName.startswith("input-") and featureName != nameFromSlug:
-            msg = f"BCD '{featureName}' feature has mismatched MDN URL {mdnURL}."
-            if feature.get("filename") is not None:
-                msg += f" Update {bcdBaseUrl}{feature['filename']} file?"
-            warn(msg)
-            slugLink = E.a({"class": "name-slug-mismatch", "href": mdnURL,
-                            "title": title},
-                           featureName)
-        else:
-            slugLink = E.a({"href": mdnURL, "title": title}, displaySlug)
-        appendChild(featureDiv, E.p({},slugLink))
+        appendChild(featureDiv,
+            E.p({},
+                E.a({"href": mdnURL, "title": title}, displaySlug)))
     if "engines" in feature:
         engines = len(feature["engines"])
         enginesPara = None
