@@ -28,6 +28,8 @@ def update(path, dryRun=False):
             die("Unrecognized anchor-data content-type '{0}'.", res.contentType)
             return
         rawSpecData = res.data
+        if isinstance(rawSpecData, bytes):
+            raise Exception(f"Didn't get expected JSON data. Got:\n{rawSpecData.decode('utf-8')}")
     except Exception as e:
         die("Couldn't download anchor data.  Error was:\n{0}", str(e))
         return
