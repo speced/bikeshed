@@ -57,7 +57,6 @@ def update(path, dryRun=False):
                         " file.\n{0}", e)
                     return
                 with io.open(p, 'w', encoding='utf-8') as fh:
-                    print("    " + specFilename)
                     fh.write(fileContents)
         except Exception as e:
             die("Couldn't save MDN Spec Links data to disk.\n{0}", e)
