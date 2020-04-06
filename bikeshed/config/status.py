@@ -9,6 +9,7 @@ shortToLongStatus = {
     "LS": "Living Standard",
     "LS-COMMIT": "Commit Snapshot",
     "LS-BRANCH": "Branch Snapshot",
+    "LS-PR": "PR Preview",
     "LD": "Living Document",
     "DRAFT-FINDING": "Draft Finding",
     "FINDING": "Finding",
@@ -81,9 +82,9 @@ shortToLongStatus = {
 }
 snapshotStatuses = ["w3c/WD", "w3c/FPWD", "w3c/LCWD", "w3c/CR", "w3c/PR", "w3c/REC", "w3c/PER", "w3c/WG-NOTE", "w3c/IG-NOTE", "w3c/NOTE", "w3c/MO"]
 datedStatuses = ["w3c/WD", "w3c/FPWD", "w3c/LCWD", "w3c/CR", "w3c/PR", "w3c/REC", "w3c/PER", "w3c/WG-NOTE", "w3c/IG-NOTE", "w3c/NOTE", "w3c/MO", "whatwg/RD"]
-unlevelledStatuses = ["LS", "LD", "DREAM", "w3c/UD", "LS-COMMIT", "LS-BRANCH", "FINDING", "DRAFT-FINDING", "whatwg/RD"]
+unlevelledStatuses = ["LS", "LD", "DREAM", "w3c/UD", "LS-COMMIT", "LS-BRANCH", "LS-PR", "FINDING", "DRAFT-FINDING", "whatwg/RD"]
 deadlineStatuses = ["w3c/LCWD", "w3c/PR"]
-noEDStatuses = ["LS", "LS-COMMIT", "LS-BRANCH", "LD", "FINDING", "DRAFT-FINDING", "DREAM", "iso/NP", "whatwg/RD"]
+noEDStatuses = ["LS", "LS-COMMIT", "LS-BRANCH", "LS-PR", "LD", "FINDING", "DRAFT-FINDING", "DREAM", "iso/NP", "whatwg/RD"]
 # W3C statuses can only be used by Working Groups & Interest Groups, not
 # Community Groups or Business Groups
 w3cStatuses = ["w3c/ED"]
