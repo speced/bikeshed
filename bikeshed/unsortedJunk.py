@@ -7,7 +7,7 @@ import json
 import logging
 import os
 import re
-import urllib.request, urllib.parse, urllib.error
+import urllib.parse, urllib.error
 from collections import defaultdict, namedtuple
 from functools import partial as curry
 

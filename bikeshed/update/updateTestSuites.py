@@ -3,7 +3,6 @@
 import io
 import json
 import os
-import urllib.request, urllib.error, urllib.parse
 from contextlib import closing
 from json_home_client import Client as APIClient
 

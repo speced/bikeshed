@@ -1,18 +1,15 @@
 # -*- coding: utf-8 -*-
 
 import io
-import json
 import os
-import urllib.request, urllib.error, urllib.parse
-from contextlib import closing
+import requests
 
 from ..messages import *
 
 def update(path, dryRun=False):
     try:
         say("Downloading languages...")
-        with closing(urllib.request.urlopen("https://raw.githubusercontent.com/tabatkins/bikeshed/master/bikeshed/spec-data/readonly/languages.json")) as fh:
-            data = str(fh.read(), encoding="utf-8")
+        data = requests.get("https://raw.githubusercontent.com/tabatkins/bikeshed/master/bikeshed/spec-data/readonly/languages.json").text
     except Exception as e:
         die("Couldn't download languages data.\n{0}", e)
         return
