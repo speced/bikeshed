@@ -179,10 +179,11 @@ def addImplicitAlgorithms(doc):
     for el in findAll("[data-algorithm='']:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6)", doc):
         dfns = findAll("dfn", el)
         if len(dfns) == 1:
-            dfnFor = dfns[0].get('data-dfn-for')
             dfnName = config.firstLinkTextFromElement(dfns[0])
             el.set("data-algorithm", dfnName)
-            el.set("data-algorithm-for", dfnFor)
+            dfnFor = dfns[0].get('data-dfn-for')
+            if dfnFor:
+                el.set("data-algorithm-for", dfnFor)
         elif len(dfns) == 0:
             die("Algorithm container has no name, and there is no <dfn> to infer one from.", el=el)
         else:
