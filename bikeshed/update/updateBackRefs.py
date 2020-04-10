@@ -4,7 +4,7 @@ import io
 import json
 import re
 import os
-import urllib.request, urllib.error, urllib.parse
+import urllib.error, urllib.parse
 from collections import defaultdict
 from contextlib import closing
 

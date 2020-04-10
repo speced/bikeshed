@@ -4,9 +4,8 @@ import io
 import json
 import re
 import os
-import urllib.request, urllib.error, urllib.parse
+import requests
 from collections import defaultdict
-from contextlib import closing
 
 from .. import biblio
 from ..DefaultOrderedDict import DefaultOrderedDict
@@ -96,19 +95,16 @@ def update(path, dryRun=False):
 
 def getSpecrefData():
     try:
-        with closing(urllib.request.urlopen("https://api.specref.org/bibrefs")) as fh:
-            return str(fh.read(), encoding="utf-8")
-    except urllib.error.URLError:
+        return requests.get("https://api.specref.org/bibrefs").text
+    except requests.exceptions.RequestException:
         # SpecRef uses SNI, which old Pythons (pre-2.7.10) don't understand.
         # First try the older herokuapp.com URL.
         try:
-            with closing(urllib.request.urlopen("https://specref.herokuapp.com/bibrefs")) as fh:
-                return str(fh.read(), encoding="utf-8")
+            return requests.get("https://specref.herokuapp.com/bibrefs").text
         except:
             # Try the CSSWG proxy.
             try:
-                with closing(urllib.request.urlopen("https://api.csswg.org/bibrefs")) as fh:
-                    return str(fh.read(), encoding="utf-8")
+                return requests.get("https://api.csswg.org/bibrefs").text
             except:
                 warn("Your Python is too old (pre-2.7.10) to talk to SpecRef over HTTPS, and something's wrong with the CSSWG proxy as well. Report this to the Bikeshed repo, please?")
                 raise
@@ -120,8 +116,7 @@ def getSpecrefData():
 
 def getWG21Data():
     try:
-        with closing(urllib.request.urlopen("https://wg21.link/specref.json")) as fh:
-            return str(fh.read(), encoding="utf-8")
+        return requests.get("https://wg21.link/specref.json").text
     except Exception as e:
         die("Couldn't download the WG21 biblio data.\n{0}", e)
         return "{}"
@@ -129,8 +124,7 @@ def getWG21Data():
 
 def getCSSWGData():
     try:
-        with closing(urllib.request.urlopen("https://raw.githubusercontent.com/w3c/csswg-drafts/master/biblio.ref")) as fh:
-            return [str(line, encoding="utf-8") for line in fh.readlines()]
+        return requests.get("https://raw.githubusercontent.com/w3c/csswg-drafts/master/biblio.ref").text.splitlines()
     except Exception as e:
         die("Couldn't download the CSSWG biblio data.\n{0}", e)
         return []

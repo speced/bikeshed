@@ -2,9 +2,8 @@
 import io
 import json
 import os
-import urllib.request
+import requests
 from collections import OrderedDict
-from contextlib import closing
 
 from ..messages import *  # noqa
 
@@ -13,15 +12,13 @@ def update(path, dryRun=False):
     say("Downloading MDN Spec Links data...")
     specMapURL = "https://w3c.github.io/mdn-spec-links/SPECMAP.json"
     try:
-        with closing(urllib.request.urlopen(specMapURL)) as fh:
-            jsonString = fh.read()
+        response = requests.get(specMapURL)
     except Exception as e:
         die("Couldn't download the MDN Spec Links data.\n{0}", e)
         return
 
     try:
-        data = json.loads(jsonString, encoding="utf-8",
-                          object_pairs_hook=OrderedDict)
+        data = response.json(encoding="utf-8", object_pairs_hook=OrderedDict)
     except Exception as e:
         die("The MDN Spec Links data wasn't valid JSON for some reason." +
             " Try downloading again?\n{0}", e)
@@ -49,9 +46,7 @@ def update(path, dryRun=False):
                 writtenPaths.add(p)
                 mdnSpecLinksBaseURL = "https://w3c.github.io/mdn-spec-links/"
                 try:
-                    with closing(urllib.request.urlopen(mdnSpecLinksBaseURL +
-                                                        specFilename)) as fh:
-                        fileContents = fh.read().decode('utf-8')
+                    fileContents = requests.get(mdnSpecLinksBaseURL + specFilename).text
                 except Exception as e:
                     die("Couldn't download the MDN Spec Links " + specFilename +
                         " file.\n{0}", e)

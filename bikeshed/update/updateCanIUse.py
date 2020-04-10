@@ -3,9 +3,8 @@
 import io
 import json
 import os
-import urllib.request, urllib.error, urllib.parse
+import requests
 from collections import OrderedDict
-from contextlib import closing
 
 from ..messages import *
 
@@ -13,14 +12,13 @@ from ..messages import *
 def update(path, dryRun=False):
     say("Downloading Can I Use data...")
     try:
-        with closing(urllib.request.urlopen("https://raw.githubusercontent.com/Fyrd/caniuse/master/fulldata-json/data-2.0.json")) as fh:
-            jsonString = fh.read()
+        response = requests.get("https://raw.githubusercontent.com/Fyrd/caniuse/master/fulldata-json/data-2.0.json")
     except Exception as e:
         die("Couldn't download the Can I Use data.\n{0}", e)
         return
 
     try:
-        data = json.loads(jsonString, encoding="utf-8", object_pairs_hook=OrderedDict)
+        data = response.json(encoding="utf-8", object_pairs_hook=OrderedDict)
     except Exception as e:
         die("The Can I Use data wasn't valid JSON for some reason. Try downloading again?\n{0}", e)
         return
