@@ -179,7 +179,10 @@ def addImplicitAlgorithms(doc):
     for el in findAll("[data-algorithm='']:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6)", doc):
         dfns = findAll("dfn", el)
         if len(dfns) == 1:
-            el.set("data-algorithm", config.firstLinkTextFromElement(dfns[0]))
+            dfnFor = dfns[0].get('data-dfn-for')
+            dfnName = config.firstLinkTextFromElement(dfns[0])
+            el.set("data-algorithm", dfnName)
+            el.set("data-algorithm-for", dfnFor)
         elif len(dfns) == 0:
             die("Algorithm container has no name, and there is no <dfn> to infer one from.", el=el)
         else:
@@ -187,22 +190,33 @@ def addImplicitAlgorithms(doc):
 
 
 def checkVarHygiene(doc):
-    def nearestAlgo(var):
+    def isAlgo(el):
+        return el.get("data-algorithm") is not None
+    def nearestAlgo(el):
         # Find the nearest "algorithm" container,
         # either an ancestor with [algorithm] or the nearest heading with same.
-        algo = treeAttr(var, "data-algorithm")
-        if algo:
-            return algo or None
-        for h in relevantHeadings(var):
-            algo = h.get("data-algorithm")
-            if algo is not None and algo is not "":
-                return algo
+        if isAlgo(el):
+            return el
+        ancestor = closestAncestor(el, isAlgo)
+        if ancestor is not None:
+            return ancestor
+        for h in relevantHeadings(el):
+            if isAlgo(h):
+                return h
+    def algoName(el):
+        # Finds a uniquified algorithm name from an algo container
+        algo = nearestAlgo(el)
+        if algo is None:
+            return None
+        algoName = algo.get("data-algorithm")
+        algoFor = algo.get("data-algorithm-for")
+        return f"'{algoName}'" + (f" for {algoFor}" if algoFor else "")
 
     # Look for vars that only show up once. These are probably typos.
     singularVars = []
     varCounts = defaultdict(lambda: 0)
     for el in findAll("var:not([data-var-ignore])", doc):
-        key = foldWhitespace(textContent(el)).strip(), nearestAlgo(el)
+        key = (foldWhitespace(textContent(el)).strip(), algoName(el))
         varCounts[key] += 1
     foldedVarCounts = defaultdict(lambda: 0)
     atLeastOneAlgo = False
@@ -219,9 +233,9 @@ def checkVarHygiene(doc):
     for (var, algo),count in foldedVarCounts.items():
         if count == 1:
             if algo:
-                varLines.append("  '{0}', in algorithm '{1}'".format(var, algo))
+                varLines.append(f"  '{var}', in algorithm {algo}")
             else:
-                varLines.append("  '{0}'".format(var))
+                varLines.append(f"  '{var}'")
     if varLines:
         warn("The following <var>s were only used once in the document:\n{0}\nIf these are not typos, please add an ignore='' attribute to the <var>.", "\n".join(varLines))
 
@@ -229,9 +243,9 @@ def checkVarHygiene(doc):
         addVarClickHighlighting(doc)
 
     # Look for algorithms that show up twice; these are errors.
-    for algo, count in Counter(el.get('data-algorithm') for el in findAll("[data-algorithm]", doc)).items():
+    for algo, count in Counter(algoName(el) for el in findAll("[data-algorithm]", doc)).items():
         if count > 1:
-            die("Multiple declarations of the '{0}' algorithm.", algo)
+            die(f"Multiple declarations of the {algo} algorithm.")
             return
 
 
