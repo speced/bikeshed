@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import certifi
 import io
 import json
 import os
@@ -13,7 +14,7 @@ testSuiteDataContentTypes = ["application/json", "application/vnd.csswg.shepherd
 def update(path, dryRun=False):
     try:
         say("Downloading test suite data...")
-        shepherd = APIClient("https://api.csswg.org/shepherd/", version="vnd.csswg.shepherd.v1")
+        shepherd = APIClient("https://api.csswg.org/shepherd/", version="vnd.csswg.shepherd.v1", ca_cert_path=certifi.where())
         res = shepherd.get("test_suites")
         if ((not res) or (406 == res.status_code)):
             die("This version of the test suite API is no longer supported. Please update Bikeshed.")
