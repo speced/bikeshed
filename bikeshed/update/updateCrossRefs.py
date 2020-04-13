@@ -103,6 +103,11 @@ def update(path, dryRun=False):
     return writtenPaths
 
 
+@retrying.retry(
+    stop_max_attempt_number=3,
+    wait_fixed=1000,
+    # don't catch Ctrl-D, etc
+    retry_on_exception=lambda x:isinstance(x, Exception))
 def dataFromApi(api, *args, **kwargs):
     anchorDataContentTypes = [
         "application/json",
