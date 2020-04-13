@@ -4,6 +4,7 @@ import certifi
 import io
 import json
 import re
+import retrying
 import os
 from collections import defaultdict
 from contextlib import closing
@@ -13,31 +14,21 @@ from .. import config
 from ..messages import *
 
 
-anchorDataContentTypes = ["application/json", "application/vnd.csswg.shepherd.v1+json"]
-
 def update(path, dryRun=False):
-    try:
-        say("Downloading anchor data...")
-        shepherd = APIClient("https://api.csswg.org/shepherd/", version="vnd.csswg.shepherd.v1", ca_cert_path=certifi.where())
-        res = shepherd.get("specifications", anchors=True, draft=True)
-        # http://api.csswg.org/shepherd/spec/?spec=css-flexbox-1&anchors&draft, for manual looking
-        if ((not res) or (406 == res.status_code)):
-            die("Either this version of the anchor-data API is no longer supported, or (more likely) there was a transient network error. Try again in a little while, and/or update Bikeshed. If the error persists, please report it on GitHub.")
-            return
-        if res.content_type not in anchorDataContentTypes:
-            die("Unrecognized anchor-data content-type '{0}'.", res.contentType)
-            return
-        rawSpecData = res.data
-        if isinstance(rawSpecData, bytes):
-            raise Exception(f"Didn't get expected JSON data. Got:\n{rawSpecData.decode('utf-8')}")
-    except Exception as e:
-        die("Couldn't download anchor data.  Error was:\n{0}", str(e))
+    say("Downloading anchor data...")
+    shepherd = APIClient("https://api.csswg.org/shepherd/", version="vnd.csswg.shepherd.v1", ca_cert_path=certifi.where())
+    rawSpecData = dataFromApi(shepherd, "specifications", draft=True)
+    if not rawSpecData:
         return
 
     specs = dict()
     anchors = defaultdict(list)
     headings = defaultdict(dict)
-    for rawSpec in rawSpecData.values():
+    lastMsgTime = 0
+    for i,rawSpec in enumerate(rawSpecData.values(), 1):
+        lastMsgTime = config.doEvery(s=5, lastTime=lastMsgTime,
+            action=lambda:say(f"Downloading data for spec {i}/{len(rawSpecData)}..."))
+        rawSpec = dataFromApi(shepherd, 'specifications', draft=True, anchors=True, spec=rawSpec['name'])
         spec = genSpec(rawSpec)
         specs[spec['vshortname']] = spec
         specHeadings = headings[spec['vshortname']]
@@ -110,6 +101,26 @@ def update(path, dryRun=False):
 
     say("Success!")
     return writtenPaths
+
+
+def dataFromApi(api, *args, **kwargs):
+    anchorDataContentTypes = [
+        "application/json",
+        "application/vnd.csswg.shepherd.v1+json",
+        ]
+    res = api.get(*args, **kwargs)
+    if not res:
+        raise Exception("Unknown error fetching anchor data. This might be transient; try again in a few minutes, and if it's still broken, please report it on GitHub.")
+    data = res.data
+    if res.status_code == 406:
+        raise Exception("This version of the anchor-data API is no longer supported. Try updating Bikeshed. If the error persists, please report it on GitHub.")
+    if res.content_type not in anchorDataContentTypes:
+        raise Exception("Unrecognized anchor-data content-type '{0}'.", res.contentType)
+    if res.status_code >= 300:
+        raise Exception(f"Unknown error fetching anchor data; got status {res.status_code} and bytes:\n{data.decode('utf-8')}")
+    if isinstance(data, bytes):
+        raise Exception(f"Didn't get expected JSON data. Got:\n{data.decode('utf-8')}")
+    return data
 
 
 def linearizeAnchorTree(multiTree, list=None):

@@ -166,3 +166,21 @@ def docPath(doc, *pathSegs):
         return None
     startPath = os.path.dirname(os.path.abspath(doc.inputSource))
     return os.path.join(startPath, *pathSegs)
+
+
+def doEvery(s, action, lastTime=None):
+    # Takes an action every N seconds.
+    # Pass it the duration and the last time it took the action;
+    # it returns the time it last took the action
+    # (possibly just now).
+    # If you want to take action on first call,
+    # pass 0 as lastTime;
+    # otherwise it won't take action until N seconds.
+    import time
+    newTime = time.time()
+    if lastTime is None:
+        lastTime = newTime
+    if lastTime == 0 or newTime - lastTime > s:
+        action()
+        return newTime
+    return lastTime
