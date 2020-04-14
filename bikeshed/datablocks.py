@@ -425,7 +425,7 @@ def transformArgumentdef(lines, firstLine, lineNum=None, **kwargs):
     rootAttrs = " ".join("{0}='{1}'".format(k,escapeAttr(v)) for k,v in el.attrib.items())
     text = ('''
 <table {attrs}{lineNumAttr}>
-    <caption>Arguments for the <a method lt='{method}' for='{interface}'{lineNumAttr}>{interface}.{method}</a> method.</caption>
+    <caption>Arguments for the <a idl lt='{method}' for='{interface}'{lineNumAttr}>{interface}.{method}</a> method.</caption>
     <thead>
         <tr>
             <th>Parameter
