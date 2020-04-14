@@ -75,5 +75,5 @@ def printjsonprimitive(x):
     if x is None:
         return "null"
     if isElement(x):
-        return outerHTML(x)
+        return repr(x) + ":" + outerHTML(x)
     raise Exception(x)
