@@ -2,6 +2,7 @@
 
 
 from ..messages import printColor
+from ..htmlhelpers import outerHTML, isElement
 
 def printjson(x, indent=2, level=0):
     if isinstance(indent, int):
@@ -73,4 +74,6 @@ def printjsonprimitive(x):
         return str(x)
     if x is None:
         return "null"
+    if isElement(x):
+        return outerHTML(x)
     raise Exception(x)
