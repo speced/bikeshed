@@ -158,7 +158,7 @@ def updateByManifest(path, dryRun=False):
                 lastMsgTime = currFileTime
         try:
             with io.open(os.path.join(path, "manifest.txt"), 'w', encoding="utf-8") as fh:
-                fh.write("".join(remoteManifest))
+                fh.write("\n".join(remoteManifest))
         except Exception as e:
             warn("Couldn't save new manifest file.\n{0}", e)
             return False
