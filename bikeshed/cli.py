@@ -15,7 +15,14 @@ def main():
     if len(sys.argv) == 1:
         sys.argv.append("spec")
 
-    argparser = argparse.ArgumentParser(description="Processes spec source files into valid HTML.")
+    try:
+        with open(config.scriptPath('..', 'semver.txt'), 'r') as fh:
+            semver = fh.read().strip()
+            semverText = f"Bikeshed v{semver}: "
+    except:
+        semverText = ""
+
+    argparser = argparse.ArgumentParser(description=f"{semverText}Processes spec source files into valid HTML.")
     argparser.add_argument("-q", "--quiet", dest="quiet", action="count", default=0,
                            help="Silences one level of message, least-important first.")
     argparser.add_argument("-s", "--silent", dest="silent", action="store_true",
