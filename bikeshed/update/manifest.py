@@ -99,21 +99,30 @@ def updateByManifest(path, dryRun=False):
         warn("Couldn't download remote manifest file.\n{0}", e)
         return False
 
-    localDt = datetime.strptime(localManifest[0].strip(), "%Y-%m-%d %H:%M:%S.%f")
-    remoteDt = datetime.strptime(remoteManifest[0].strip(), "%Y-%m-%d %H:%M:%S.%f")
+    localDt = dtFromManifest(localManifest)
+    remoteDt = dtFromManifest(remoteManifest)
+    if remoteDt is None:
+        die("Something's gone wrong with the remote data; I can't read its timestamp. Please report this!")
+        return
 
-    if (remoteDt - datetime.utcnow()).days >= 2:
-        warn("Remote data is more than two days old; the update process has probably fallen over. Please report this!")
-    if localDt == remoteDt:
-        say("Local data is already up-to-date with remote ({0})", localDt.strftime("%Y-%m-%d %H:%M:%S"))
-        return True
-    elif localDt > remoteDt:
-        # No need to update, local data is more recent.
-        say("Local data is fresher ({0}) than remote ({1}), so nothing to update.", localDt.strftime("%Y-%m-%d %H:%M:%S"), remoteDt.strftime("%Y-%m-%d %H:%M:%S"))
-        return True
+    if localDt is not None:
+        if (remoteDt - datetime.utcnow()).days >= 2:
+            warn("Remote data is more than two days old; the update process has probably fallen over. Please report this!")
+        if localDt == remoteDt and localDt != 0:
+            say("Local data is already up-to-date with remote ({0})", localDt.strftime("%Y-%m-%d %H:%M:%S"))
+            return True
+        elif localDt > remoteDt:
+            # No need to update, local data is more recent.
+            say("Local data is fresher ({0}) than remote ({1}), so nothing to update.", localDt.strftime("%Y-%m-%d %H:%M:%S"), remoteDt.strftime("%Y-%m-%d %H:%M:%S"))
+            return True
 
     localFiles = dictFromManifest(localManifest)
+    if len(localFiles) == 0:
+        say("The local manifest seems borked; re-downloading everything...")
     remoteFiles = dictFromManifest(remoteManifest)
+    if len(remoteFiles) == 0:
+        die("The remote data doesn't have any data in it. Please report this!")
+        return
     newPaths = []
     for filePath,hash in remoteFiles.items():
         if hash != localFiles.get(filePath):
@@ -178,8 +187,19 @@ def dictFromManifest(lines):
     into a dict of {path:hash}.
     First line of file is a datetime string, which we skip.
     '''
+    if len(lines) < 10:
+        # There's definitely more than 10 entries in the manifest;
+        # something borked
+        return {}
     ret = {}
     for line in lines[1:]:
         hash,_,path = line.strip().partition(" ")
         ret[path] = hash
     return ret
+
+def dtFromManifest(lines):
+    try:
+        return datetime.strptime(lines[0].strip(), "%Y-%m-%d %H:%M:%S.%f")
+    except:
+        # Sigh, something borked
+        return
