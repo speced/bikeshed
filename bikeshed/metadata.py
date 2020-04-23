@@ -10,7 +10,7 @@ import subprocess
 from collections import defaultdict, OrderedDict
 from datetime import datetime, timedelta, date
 from functools import partial
-from isodate import parse_duration
+from isodate import parse_duration, Duration
 
 from . import attr
 from . import config
@@ -348,23 +348,22 @@ def parseDate(key, val, lineNum):
 def parseDateOrDuration(key, val, lineNum):
     if val == "now":
         return datetime.utcnow().date()
+    if val == "never" or boolish(val) is False:
+        return None
     try:
         if val.startswith("P"):
             return parse_duration(val)
-    except:
-        die("The {0} field looks like an ISO 8601 duration but didn't parse - got \"{1}\" instead.", key, val, lineNum=lineNum)
-        return None
-    try:
         return datetime.strptime(val, "%Y-%m-%d").date()
     except:
-        die("The {0} field must be in the format YYYY-MM-DD or an ISO 8601 duration - got \"{1}\" instead.", key, val, lineNum=lineNum)
+        die("The {0} field must be an ISO 8601 duration, a date in the format YYYY-MM-DD, now, never, false, no, n, or off. Got '{1}' instead.", key, val, lineNum=lineNum)
         return None
-
 
 def canonicalizeExpiryDate(base, expires):
     if expires is None:
         return None
     if isinstance(expires, timedelta):
+        return base + expires
+    if isinstance(expires, Duration):
         return base + expires
     if isinstance(expires, datetime):
         return expires.date()
