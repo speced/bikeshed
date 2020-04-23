@@ -5,6 +5,7 @@ import os
 import re
 import subprocess
 from collections import defaultdict, OrderedDict
+from datetime import datetime
 from . import config
 from . import dfnpanels
 from .refs import utils as refUtils
@@ -148,6 +149,18 @@ def addStatusSection(doc):
     html = config.retrieveBoilerplateFile(doc, 'status')
     html = doc.fixText(html)
     fillWith('status', parseHTML(html), doc=doc)
+
+
+def addExpiryNotice(doc):
+    if doc.md.expires is None:
+        return
+    if doc.md.date >= doc.md.expires or datetime.utcnow().date() >= doc.md.expires:
+        boilerplate = "warning-expired"
+    else:
+        boilerplate = "warning-expires"
+    html = config.retrieveBoilerplateFile(doc, boilerplate)
+    html = doc.fixText(html)
+    fillWith('warning', parseHTML(html), doc=doc)
 
 
 def addObsoletionNotice(doc):

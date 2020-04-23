@@ -8,8 +8,9 @@ import os
 import re
 import subprocess
 from collections import defaultdict, OrderedDict
-from datetime import datetime
+from datetime import datetime, timedelta, date
 from functools import partial
+from isodate import parse_duration
 
 from . import attr
 from . import config
@@ -67,6 +68,7 @@ class MetadataManager:
         self.displayShortname = None
         self.editors = []
         self.editorTerm = {"singular": "Editor", "plural": "Editors"}
+        self.expires = None
         self.favicon = None
         self.forceCrossorigin = False
         self.group = None
@@ -170,6 +172,8 @@ class MetadataManager:
         if self.repository.type == "github" and "feedback-header" in self.boilerplate and "repository-issue-tracking" in self.boilerplate:
             self.issues.append(("GitHub", self.repository.formatIssueUrl()))
         self.status = config.canonicalizeStatus(self.rawStatus, self.group)
+
+        self.expires = canonicalizeExpiryDate(self.date, self.expires)
 
         # for TR document, defaults to TR
         # fallbacks to ED
@@ -280,6 +284,13 @@ class MetadataManager:
         macros["isodate"] = self.date.strftime("%Y-%m-%d")
         macros["date-my"] = self.date.strftime("%b %Y")
         macros["date-mmy"] = self.date.strftime("%B %Y")
+        if isinstance(self.expires, date):
+            macros["expires"] = self.expires.strftime("{0} %B %Y".format(self.expires.day))
+            macros["expires-dmmy"] = self.expires.strftime("{0} %B %Y".format(self.expires.day)) #same as plain 'expires'
+            macros["cexpires"] = self.expires.strftime("%Y%m%d")
+            macros["isoexpires"] = self.expires.strftime("%Y-%m-%d")
+            macros["expires-my"] = self.expires.strftime("%b %Y")
+            macros["expires-mmy"] = self.expires.strftime("%B %Y")
         if self.deadline:
             macros["deadline"] = self.deadline.strftime("{0} %B %Y".format(self.deadline.day))
             macros["isodeadline"] = self.deadline.strftime("%Y-%m-%d")
@@ -332,6 +343,35 @@ def parseDate(key, val, lineNum):
     except:
         die("The {0} field must be in the format YYYY-MM-DD - got \"{1}\" instead.", key, val, lineNum=lineNum)
         return None
+
+
+def parseDateOrDuration(key, val, lineNum):
+    if val == "now":
+        return datetime.utcnow().date()
+    try:
+        if val.startswith("P"):
+            return parse_duration(val)
+    except:
+        die("The {0} field looks like an ISO 8601 duration but didn't parse - got \"{1}\" instead.", key, val, lineNum=lineNum)
+        return None
+    try:
+        return datetime.strptime(val, "%Y-%m-%d").date()
+    except:
+        die("The {0} field must be in the format YYYY-MM-DD or an ISO 8601 duration - got \"{1}\" instead.", key, val, lineNum=lineNum)
+        return None
+
+
+def canonicalizeExpiryDate(base, expires):
+    if expires is None:
+        return None
+    if isinstance(expires, timedelta):
+        return base + expires
+    if isinstance(expires, datetime):
+        return expires.date()
+    if isinstance(expires, date):
+        return expires
+    die("Unexpected expiry type: canonicalizeExpiryDate({0}, {1})", base, expires)
+    return None
 
 
 def parseLevel(key, val, lineNum):
@@ -992,6 +1032,7 @@ knownKeys = {
     "ED": Metadata("ED", "ED", joinValue, parseLiteral),
     "Editor": Metadata("Editor", "editors", joinList, parseEditor),
     "Editor Term": Metadata("Editor Term", "editorTerm", joinValue, parseEditorTerm),
+    "Expires": Metadata("Expires", "expires", joinValue, parseDateOrDuration),
     "Favicon": Metadata("Favicon", "favicon", joinValue, parseLiteral),
     "Force Crossorigin": Metadata("Force Crossorigin", "forceCrossorigin", joinValue, parseBoolean),
     "Former Editor": Metadata("Former Editor", "previousEditors", joinList, parseEditor),

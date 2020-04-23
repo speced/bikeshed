@@ -171,6 +171,7 @@ class Spec(object):
         boilerplate.addCopyright(self)
         boilerplate.addSpecMetadataSection(self)
         boilerplate.addAbstract(self)
+        boilerplate.addExpiryNotice(self)
         boilerplate.addObsoletionNotice(self)
         boilerplate.addAtRisk(self)
         addNoteHeaders(self)
