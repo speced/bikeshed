@@ -166,8 +166,11 @@ The following keys are bound:
 \\{bikeshed-mode-map}"
   :group 'bikeshed
   ;; bikeshed documents are typically not hard-wrapped
+  (setq fill-column most-positive-fixnum)
   (auto-fill-mode -1)
   (visual-line-mode 1)
+  ;; specs often define camelCase terms
+  (subword-mode 1)
   ;; Bikeshed custom metadata keywords start with a '!'
   (setq-local markdown-regex-declarative-metadata
               "^\\(!?[[:alpha:]][[:alpha:] _-]*?\\)\\([:=][ \t]*\\)\\(.*\\)$")
