@@ -2,6 +2,7 @@
 
 
 import difflib
+import glob
 import io
 import os
 import pipes
@@ -113,13 +114,10 @@ def equalOrEmpty(a, b):
 
 def rebase(Spec, files=None, md=None):
     fileRequester = config.DataFileRequester(type="readonly")
-    if not files:
-        files = list(sortTests(findTestFiles()))
-        if len(files) == 0:
-            p("No tests were found")
-            return True
-    else:
-        files = [os.path.join(TEST_DIR, x) for x in files]
+    files = testPaths(files)
+    if len(files) == 0:
+        p("No tests were found.")
+        return True
     for i,path in enumerate(files, 1):
         justifiedI = str(i).rjust(len(str(len(files))))
         resetSeenMessages()
@@ -131,6 +129,17 @@ def rebase(Spec, files=None, md=None):
         addTestMetadata(doc)
         doc.preprocess()
         doc.finish()
+
+def testPaths(files=None):
+    # if None, get all the test paths
+    # otherwise, glob the provided paths, rooted at the test dir
+    if not files:
+        return list(sortTests(findTestFiles()))
+    else:
+        return [path
+            for file in files
+            for path in glob.glob(os.path.join(TEST_DIR, file))
+            if path.endswith(".bs")]
 
 def addTestMetadata(doc):
     doc.mdBaseline.addData("Boilerplate", "omit feedback-header, omit generator, omit document-revision")
