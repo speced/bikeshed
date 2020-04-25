@@ -142,6 +142,11 @@ def testPaths(files=None):
             if path.endswith(".bs")]
 
 def addTestMetadata(doc):
+    from . import metadata
+
     doc.mdBaseline.addData("Boilerplate", "omit feedback-header, omit generator, omit document-revision")
-    doc.mdCommandLine.addData("Date", "1970-01-01")
-    doc.mdCommandLine.addData("Inline Github Issues", "no")
+    _, md = metadata.parse(lines=doc.lines)
+    if "Date" not in md.manuallySetKeys:
+        doc.mdCommandLine.addData("Date", "1970-01-01")
+    if "Inline Github Issue" not in md.manuallySetKeys:
+        doc.mdCommandLine.addData("Inline Github Issues", "no")
