@@ -158,9 +158,23 @@ def addExpiryNotice(doc):
         boilerplate = "warning-expired"
     else:
         boilerplate = "warning-expires"
+        doc.extraScripts['script-expires'] = expiryScript
     html = config.retrieveBoilerplateFile(doc, boilerplate)
     html = doc.fixText(html)
     fillWith('warning', parseHTML(html), doc=doc)
+    addClass(doc.body, boilerplate)
+
+expiryScript = '''
+const warning = document.querySelector('#expiry-notice');
+const expiresOn = warning.dataset.expires;
+const today = new Date().toISOString();
+if(expires < today) {
+    warning.setAttribute("open", "");
+    for(const swap of warning.querySelectorAll("[data-after-expiry]")) {
+        swap.textContent = swap.dataset.afterExpiry;
+    }
+}
+'''
 
 
 def addObsoletionNotice(doc):
