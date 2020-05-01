@@ -19,18 +19,8 @@ statusStyle = {
 
 def printIssueList(infilename=None, outfilename=None):
     if infilename is None:
-        if glob.glob("issues*.txt"):
-            # Look for digits in the filename, and use the one with the largest number if it's unique.
-            def extractNumber(filename):
-                number = re.sub("\D", "", filename)
-                return number if number else None
-            filenames = [(extractNumber(fn), fn) for fn in glob.glob("issues*.txt") if extractNumber(fn) is not None]
-            filenames.sort(reverse=True)
-            if len(filenames) > 1 and filenames[0][0] == filenames[1][0]:
-                die("Can't tell which issues-list file is the most recent. Explicitly pass a filename.")
-                return
-            infilename = filenames[0][1]
-        else:
+        infilename = findIssuesFile()
+        if infilename is None:
             printHelpMessage()
             return
     if infilename == "-":
@@ -70,6 +60,32 @@ def printIssueList(infilename=None, outfilename=None):
 
     printIssues(outfile, lines)
     printScript(outfile)
+
+
+def findIssuesFile():
+    # Look for digits in the filename, and use the one with the largest number if it's unique.
+    def extractNumber(filename):
+        number = re.sub(r"\D", "", filename)
+        return number if number else None
+
+    possibleFiles = [*glob.glob("issues*.txt"), *glob.glob("*.bsi")]
+    if len(possibleFiles) == 0:
+        die("Can't find an 'issues*.txt' or '*.bsi' file in this folder. Explicitly pass a filename.")
+        return
+    elif len(possibleFiles) == 1:
+        return possibleFiles[0]
+
+    # If there are more than one, assume they contain either an index or a YYYYMMDD date,
+    # and select the largest such value.
+    possibleFiles = [(extractNumber(fn), fn) for fn in possibleFiles if extractNumber(fn) is not None]
+    if len(possibleFiles) == 1:
+        return possibleFiles[0][1]
+
+    possibleFiles.sort(reverse=True)
+    if len(possibleFiles) == 0 or possibleFiles[0][0] == possibleFiles[1][0]:
+        die("Can't tell which issues-list file is the most recent. Explicitly pass a filename.")
+        return
+    return possibleFiles[0][1]
 
 
 def extractHeaderInfo(lines, infilename):
