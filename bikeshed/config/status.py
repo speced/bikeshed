@@ -85,14 +85,14 @@ datedStatuses = ["w3c/WD", "w3c/FPWD", "w3c/LCWD", "w3c/CR", "w3c/PR", "w3c/REC"
 unlevelledStatuses = ["LS", "LD", "DREAM", "w3c/UD", "LS-COMMIT", "LS-BRANCH", "LS-PR", "FINDING", "DRAFT-FINDING", "whatwg/RD"]
 deadlineStatuses = ["w3c/LCWD", "w3c/PR"]
 noEDStatuses = ["LS", "LS-COMMIT", "LS-BRANCH", "LS-PR", "LD", "FINDING", "DRAFT-FINDING", "DREAM", "iso/NP", "whatwg/RD"]
-# W3C statuses can only be used by Working Groups & Interest Groups, not
-# Community Groups or Business Groups
+# W3C statuses can only be used by Working Groups, Interest Groups, and
+# the TAG, but not by Community Groups or Business Groups
 w3cStatuses = ["w3c/ED"]
-# W3C REC-trac statuses can only be used by W3C Working Groups
+# W3C REC-track statuses can only be used by W3C Working Groups and the TAG
 w3cRecTrackStatuses = ["w3c/WD", "w3c/FPWD", "w3c/LCWD", "w3c/CR", "w3c/PR", "w3c/REC", "w3c/PER"]
 
 megaGroups = {
-    "w3c": frozenset(["act-framework", "audiowg", "csswg", "dap", "fxtf", "fxtf-csswg", "geolocation", "houdini", "html", "i18n", "immersivewebcg", "immersivewebwg", "mediacapture", "mediawg", "ping", "privacycg", "processcg", "ricg", "sacg", "secondscreenwg", "serviceworkers", "svg", "texttracks", "uievents", "wasm", "web-bluetooth-cg", "webapps", "webappsec", "webauthn", "webml", "web-payments", "webperf", "webplatform", "webrtc", "webspecs", "webvr", "wicg"]),
+    "w3c": frozenset(["act-framework", "audiowg", "csswg", "dap", "fxtf", "fxtf-csswg", "geolocation", "houdini", "html", "i18n", "immersivewebcg", "immersivewebwg", "mediacapture", "mediawg", "ping", "privacycg", "processcg", "ricg", "sacg", "secondscreenwg", "serviceworkers", "svg", "tag", "texttracks", "uievents", "wasm", "web-bluetooth-cg", "webapps", "webappsec", "webauthn", "webml", "web-payments", "webperf", "webplatform", "webrtc", "webspecs", "webvr", "wicg"]),
     "whatwg": frozenset(["whatwg"]),
     "tc39": frozenset(["tc39"]),
     "iso": frozenset(["wg14", "wg21"]),
@@ -185,15 +185,15 @@ def canonicalizeStatus(rawStatus, group):
             msg += " Consider {4} instead."
 
             if group in w3cIgs and canonStatus in w3cRecTrackStatuses:
-                warn(msg, rawStatus, "W3C Working Groups", group,
+                warn(msg, rawStatus, "W3C Working Groups and the TAG", group,
                      "an Interest Group", "ED or IG-NOTE")
 
             if group in w3cCgs and canonStatus in w3cStatuses:
-                warn(msg, rawStatus, "W3C Working and Interest Groups", group,
+                warn(msg, rawStatus, "W3C Working Groups, Interest Groups, and the TAG", group,
                      "a Community or Business Group", "CG-DRAFT or CG-FINAL")
 
             if group in w3cCgs and canonStatus in w3cRecTrackStatuses:
-                warn(msg, rawStatus, "W3C Working Groups", group,
+                warn(msg, rawStatus, "W3C Working Groups and the TAG", group,
                      "a Community or Business Group", "CG-DRAFT or CG-FINAL")
 
             return canonStatus
