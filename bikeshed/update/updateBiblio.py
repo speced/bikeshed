@@ -206,4 +206,5 @@ def collectNumberedNames(names):
                 prefix = prefix[:-1]
             if prefix in names:
                 prefixes[prefix].append(name)
+                prefixes[prefix] = sorted(prefixes[prefix])
     return prefixes
