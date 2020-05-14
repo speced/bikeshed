@@ -498,7 +498,7 @@ def parseEditor(key, val, lineNum):
     elif len(ambiguousPieces) == 0:
         pass
     else:
-        die("'{0}' format is '<name>, <company>?, <email-or-contact-page>?. Got:\n{1}", key, val, lineNum=lineNum)
+        die("'{0}' format is '<name>, <company>?, <email-or-contact-page>?'. Got:\n{1}", key, val, lineNum=lineNum)
         return []
     # Check if the org ends with a link
     if data['org'] is not None and " " in data['org'] and looksLinkish(data['org'].split()[-1]):
