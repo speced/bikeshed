@@ -10,7 +10,7 @@ from . import extensions
 from .messages import *
 
 
-def publishEchidna(doc, username, password, decision, additionalDirectories=None, cc=None):
+def publishEchidna(doc, username, password, decision, additionalDirectories=None, cc=None, editorial=False):
     import requests
     logging.captureWarnings(True)  # Silence SNIMissingWarning
     tar = prepareTar(doc, visibleTar=False, additionalDirectories=additionalDirectories)
@@ -20,6 +20,8 @@ def publishEchidna(doc, username, password, decision, additionalDirectories=None
     }
     if cc:
         data["cc"] = cc
+    if editorial:
+        data["editorial"] = "true"
     r = requests.post("https://labs.w3.org/echidna/api/request", auth=(username, password), data=data, files={"tar": tar.read()})
     tar.close()
     os.remove(tar.name)
