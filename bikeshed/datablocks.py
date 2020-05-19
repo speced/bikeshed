@@ -277,20 +277,20 @@ def transformPropdef(lines, doc, firstLine, lineNum=None, **kwargs):
         td = "<td>{0}".format(val)
         if key in ("Value", "New values"):
             tr = "<tr class=value>"
-            th = "<th><a href='https://drafts.csswg.org/css-values/#value-defs'>{0}:</a>".format(key)
+            th = "<th><a href='https://www.w3.org/TR/css-values/#value-defs'>{0}:</a>".format(key)
             td = "<td class=prod>{0}".format(val)
         elif key == "Initial":
-            th = "<th><a href='https://drafts.csswg.org/css-cascade/#initial-values'>{0}:</a>".format(key)
+            th = "<th><a href='https://www.w3.org/TR/css-cascade/#initial-values'>{0}:</a>".format(key)
         elif key == "Inherited":
-            th = "<th><a href='https://drafts.csswg.org/css-cascade/#inherited-property'>{0}:</a>".format(key)
+            th = "<th><a href='https://www.w3.org/TR/css-cascade/#inherited-property'>{0}:</a>".format(key)
         elif key == "Percentages":
-            th = "<th><a href='https://drafts.csswg.org/css-values/#percentages'>{0}:</a>".format(key)
+            th = "<th><a href='https://www.w3.org/TR/css-values/#percentages'>{0}:</a>".format(key)
         elif key == "Computed value":
-            th = "<th><a href='https://drafts.csswg.org/css-cascade/#computed'>{0}:</a>".format(key)
+            th = "<th><a href='https://www.w3.org/TR/css-cascade/#computed'>{0}:</a>".format(key)
         elif key in ("Animatable", "Animation type"):
-            th = "<th><a href='https://drafts.csswg.org/web-animations/#animation-type'>{0}:</a>".format(key)
+            th = "<th><a href='https://www.w3.org/TR/web-animations/#animation-type'>{0}:</a>".format(key)
         elif key == "Applies to" and val.lower() == "all elements":
-            td = "<td><a href='https://drafts.csswg.org/css-pseudo/#generated-content' title='Includes ::before and ::after pseudo-elements.'>all elements</a>"
+            td = "<td><a href='https://www.w3.org/TR/css-pseudo/#generated-content' title='Includes ::before and ::after pseudo-elements.'>all elements</a>"
         ret.append(tr+th+td)
     ret.append("</table>")
 
