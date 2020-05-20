@@ -88,18 +88,16 @@ class ReferenceManager(object):
         def initFors():
             self.foreignRefs.fors.update(json.loads(self.dataFile.fetch("fors.json", str=True)))
         initFors()
-        if doc and config.docPath(doc):
+        if doc and doc.inputSource and doc.inputSource.hasDirectory:
             datablocks.transformInfo(self.dataFile.fetch("link-defaults.infotree", str=True).split("\n"), doc)
             # Get local anchor data
             try:
-                with io.open(config.docPath(doc, "anchors.bsdata"), 'r', encoding="utf-8") as lines:
-                    datablocks.transformAnchors(lines, doc)
+                datablocks.transformAnchors(doc.inputSource.relative("anchors.bsdata").read().rawLines, doc)
             except IOError:
                 pass
 
             try:
-                with io.open(config.docPath(doc, "link-defaults.infotree"), 'r', encoding="utf-8") as lines:
-                    datablocks.transformInfo(lines, doc)
+                datablocks.transformInfo(doc.inputSource.relative("link-defaults.infotree").read().rawLines, doc)
             except IOError:
                 pass
 

@@ -4,8 +4,9 @@
 import io
 import os
 
+from ..InputSource import InputSource
 from ..messages import *
-from .main import scriptPath, docPath
+from .main import scriptPath
 
 
 class DataFileRequester(object):
@@ -76,26 +77,22 @@ def retrieveBoilerplateFile(doc, name, group=None, status=None, error=True):
         return scriptPath("boilerplate", *segs)
     statusFile = "{0}-{1}.include".format(name, status)
     genericFile = "{0}.include".format(name)
-    filenames = []
-    if docPath(doc):
-        filenames.append(docPath(doc, statusFile))
-        filenames.append(docPath(doc, genericFile))
+    sources = []
+    sources.append(doc.inputSource.relative(statusFile))
+    sources.append(doc.inputSource.relative(genericFile))
     if group:
-        filenames.append(boilerplatePath(group, statusFile))
-        filenames.append(boilerplatePath(group, genericFile))
-    filenames.append(boilerplatePath(statusFile))
-    filenames.append(boilerplatePath(genericFile))
+        sources.append(InputSource(boilerplatePath(group, statusFile)))
+        sources.append(InputSource(boilerplatePath(group, genericFile)))
+    sources.append(InputSource(boilerplatePath(statusFile)))
+    sources.append(InputSource(boilerplatePath(genericFile)))
 
-    for filename in filenames:
-        if os.path.isfile(filename):
+    for source in sources:
+        if source is not None:
             try:
-                with io.open(filename, 'r', encoding="utf-8") as fh:
-                    return fh.read()
+                return source.read().content
             except IOError:
-                if error:
-                    die("The include file for {0} disappeared underneath me.", name)
-                return ""
-            break
+                # That input doesn't exist.
+                pass
     else:
         if error:
             die("Couldn't find an appropriate include file for the {0} inclusion, given group='{1}' and status='{2}'.", name, group, status)

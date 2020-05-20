@@ -897,14 +897,11 @@ def getSpecRepository(doc):
     Currently only searches for GitHub repos.
     Returns a "shortname" of the repo, and the full url.
     '''
-    if doc and doc.inputSource and doc.inputSource != "-":
-        source_dir = config.docPath(doc)
-        old_dir = os.getcwd()
+    if doc and doc.inputSource and doc.inputSource.hasDirectory():
+        source_dir = doc.inputSource.directory()
         try:
-            os.chdir(source_dir)
             with open(os.devnull, "wb") as fnull:
-                remotes = str(subprocess.check_output(["git", "remote", "-v"], stderr=fnull), encoding="utf-8")
-            os.chdir(old_dir)
+                remotes = str(subprocess.check_output(["git", "remote", "-v"], stderr=fnull, cwd=source_dir), encoding="utf-8")
             searches = [
               r"origin\tgit@github\.([\w.-]+):([\w-]+)/([\w-]+)\.git \(\w+\)",
               r"origin\thttps://github\.([\w.-]+)/([\w-]+)/([\w-]+)\.git \(\w+\)",
@@ -917,7 +914,6 @@ def getSpecRepository(doc):
             return config.Nil()
         except subprocess.CalledProcessError:
             # check_output will throw CalledProcessError when not in a git repo
-            os.chdir(old_dir)
             return config.Nil()
 
 

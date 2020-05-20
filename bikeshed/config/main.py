@@ -161,13 +161,6 @@ def scriptPath(*pathSegs):
     return os.path.join(startPath, *pathSegs)
 
 
-def docPath(doc, *pathSegs):
-    if doc.inputSource == "-":
-        return None
-    startPath = os.path.dirname(os.path.abspath(doc.inputSource))
-    return os.path.join(startPath, *pathSegs)
-
-
 def doEvery(s, action, lastTime=None):
     # Takes an action every N seconds.
     # Pass it the duration and the last time it took the action;
