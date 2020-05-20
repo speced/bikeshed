@@ -4,7 +4,8 @@
 import re
 from collections import defaultdict
 
-from . import attr
+import attr
+
 from . import constants
 from .htmlhelpers import *
 from .messages import *

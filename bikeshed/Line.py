@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 
-from . import attr
+import attr
 
 @attr.s(slots=True)
 class Line(object):
