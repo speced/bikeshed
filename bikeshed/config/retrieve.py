@@ -78,7 +78,7 @@ def retrieveBoilerplateFile(doc, name, group=None, status=None, error=True):
     statusFile = "{0}-{1}.include".format(name, status)
     genericFile = "{0}.include".format(name)
     sources = []
-    sources.append(doc.inputSource.relative(statusFile))
+    sources.append(doc.inputSource.relative(statusFile))  # Can be None.
     sources.append(doc.inputSource.relative(genericFile))
     if group:
         sources.append(InputSource(boilerplatePath(group, statusFile)))
