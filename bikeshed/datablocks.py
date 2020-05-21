@@ -3,7 +3,8 @@
 import re
 from collections import OrderedDict, defaultdict
 
-from . import attr
+import attr
+
 from . import biblio
 from . import config
 from . import Line

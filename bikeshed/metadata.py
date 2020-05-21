@@ -10,9 +10,10 @@ import subprocess
 from collections import defaultdict, OrderedDict
 from datetime import datetime, timedelta, date
 from functools import partial
+
+import attr
 from isodate import parse_duration, Duration
 
-from . import attr
 from . import config
 from . import constants
 from . import datablocks
