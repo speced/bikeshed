@@ -7,16 +7,17 @@ import os
 import sys
 import urllib.parse
 from abc import abstractmethod
-from dataclasses import dataclass
 from datetime import date, datetime
 from typing import List, Optional
+
+import attr
 
 import requests
 
 from .Line import Line
 
 
-@dataclass
+@attr.s(auto_attribs=True)
 class InputContent:
     rawLines: List[str]
     date: Optional[date]
