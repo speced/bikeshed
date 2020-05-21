@@ -13,6 +13,7 @@ from typing import List, Optional
 import attr
 
 import requests
+import retrying
 
 from .Line import Line
 
@@ -109,11 +110,26 @@ class UrlInputSource(InputSource):
     def __str__(self) -> str:
         return self.sourceName
 
-    def read(self) -> InputContent:
-        response = requests.get(self.sourceName)
-        if response.status_code != 200:
-            # This matches the OSErrors expected by older uses of FileInputSource.
+    @retrying.retry(
+        stop_max_attempt_number=3,
+        wait_fixed=1000,
+        # Only catch exceptions from the requests library.
+        retry_on_exception=lambda e: isinstance(
+            e, requests.exceptions.RequestException
+        ),
+    )
+    def _fetch(self, *args, **kwargs):
+        response = requests.get(self.sourceName, timeout=10)
+        if response.status_code == 404:
+            # This matches the OSErrors expected by older uses of
+            # FileInputSource. It skips the retry, since the server has given us
+            # a concrete, expected answer.
             raise FileNotFoundError(errno.ENOENT, response.text, self.sourceName)
+        response.raise_for_status()
+        return response
+
+    def read(self) -> InputContent:
+        response = self._fetch(self.sourceName)
         date = None
         if "Date" in response.headers:
             # Use the response's Date header, although servers don't always set
