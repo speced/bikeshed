@@ -260,13 +260,12 @@ class Spec(object):
     def fixMissingOutputFilename(self, outputFilename):
         if outputFilename is None:
             # More sensible defaults!
-            if isinstance(self.inputSource, FileInputSource):
-                if self.inputSource.sourceName.endswith(".bs"):
-                    outputFilename = self.inputSource.sourceName[0:-3] + ".html"
-                elif self.inputSource.endswith(".src.html"):
-                    outputFilename = self.inputSource.sourceName[0:-9] + ".html"
-            elif isinstance(self.inputSource, StdinInputSource) == "-":
+            if not isinstance(self.inputSource, FileInputSource):
                 outputFilename = "-"
+            elif self.inputSource.sourceName.endswith(".bs"):
+                outputFilename = self.inputSource.sourceName[0:-3] + ".html"
+            elif self.inputSource.endswith(".src.html"):
+                outputFilename = self.inputSource.sourceName[0:-9] + ".html"
             else:
                 outputFilename = "-"
         return outputFilename
