@@ -86,6 +86,13 @@ class InputSource:
         """
         return None
 
+    def cheaplyExists(self, relativePath) -> Optional[bool]:
+        """If it's cheap to determine, returns whether relativePath exists.
+
+        Otherwise, returns None.
+        """
+        return None
+
 
 class StdinInputSource(InputSource):
     def __init__(self, sourceName: str):
@@ -165,6 +172,9 @@ class FileInputSource(InputSource):
 
     def relative(self, relativePath) -> FileInputSource:
         return FileInputSource(os.path.join(self.directory(), relativePath))
+
+    def cheaplyExists(self, relativePath) -> bool:
+        return os.access(self.relative(relativePath).sourceName, os.R_OK)
 
     def mtime(self) -> float:
         """Returns the last modification time of this source, if that's known.
