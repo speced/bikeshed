@@ -61,22 +61,22 @@ def addSpecVersion(doc):
     if "document-revision" not in doc.md.boilerplate:
         return
 
+    if not doc.inputSource.hasDirectory():
+        return
+
     revision = None
-    source_dir = config.docPath(doc)
-    old_dir = os.getcwd()
-    os.chdir(source_dir)
+    source_dir = doc.inputSource.directory()
     try:
         # Check for a Git repo
         with open(os.devnull, "wb") as fnull:
-            revision = subprocess.check_output("git rev-parse HEAD", stderr=fnull, shell=True).decode(encoding="utf-8").strip()
+            revision = subprocess.check_output("git rev-parse HEAD", stderr=fnull, shell=True, cwd=source_dir).decode(encoding="utf-8").strip()
     except subprocess.CalledProcessError:
         try:
             # Check for an Hg repo
             with open(os.devnull, "wb") as fnull:
-                revision = subprocess.check_output("hg parent --temp='{node}'", stderr=fnull, shell=True).decode(encoding="utf-8").strip()
+                revision = subprocess.check_output("hg parent --temp='{node}'", stderr=fnull, shell=True, cwd=source_dir).decode(encoding="utf-8").strip()
         except:
             pass
-    os.chdir(old_dir)
     if revision:
         appendChild(doc.head,
                     E.meta({"name":"document-revision", "content":revision}))

@@ -88,20 +88,36 @@ class ReferenceManager(object):
         def initFors():
             self.foreignRefs.fors.update(json.loads(self.dataFile.fetch("fors.json", str=True)))
         initFors()
-        if doc and config.docPath(doc):
+        if doc and doc.inputSource and doc.inputSource.hasDirectory:
             datablocks.transformInfo(self.dataFile.fetch("link-defaults.infotree", str=True).split("\n"), doc)
-            # Get local anchor data
-            try:
-                with io.open(config.docPath(doc, "anchors.bsdata"), 'r', encoding="utf-8") as lines:
-                    datablocks.transformAnchors(lines, doc)
-            except IOError:
-                pass
 
-            try:
-                with io.open(config.docPath(doc, "link-defaults.infotree"), 'r', encoding="utf-8") as lines:
-                    datablocks.transformInfo(lines, doc)
-            except IOError:
-                pass
+            # Get local anchor data
+            shouldGetLocalAnchorData = doc.md.externalInfotrees["anchors.bsdata"]
+            if not shouldGetLocalAnchorData and doc.inputSource.cheaplyExists("anchors.bsdata"):
+                warn("Found anchors.bsdata next to the specification without a matching\n"+
+                    "External Infotrees: anchors.bsdata yes\n"+
+                    "in the metadata. This data won't be found when building via a URL.")
+                # We should remove this after giving specs time to react to the warning:
+                shouldGetLocalAnchorData = True
+            if shouldGetLocalAnchorData:
+                try:
+                    datablocks.transformAnchors(doc.inputSource.relative("anchors.bsdata").read().rawLines, doc)
+                except IOError:
+                    warn("anchors.bsdata not found despite being listed in the External Infotrees metadata.")
+
+            # Get local link defaults
+            shouldGetLocalLinkDefaults = doc.md.externalInfotrees["link-defaults.infotree"]
+            if not shouldGetLocalLinkDefaults and doc.inputSource.cheaplyExists("link-defaults.infotree"):
+                warn("Found link-defaults.infotree next to the specification without a matching\n"+
+                    "External Infotrees: link-defaults.infotree yes\n"+
+                    "in the metadata. This data won't be found when building via a URL.")
+                # We should remove this after giving specs time to react to the warning:
+                shouldGetLocalLinkDefaults = True
+            if shouldGetLocalLinkDefaults:
+                try:
+                    datablocks.transformInfo(doc.inputSource.relative("link-defaults.infotree").read().rawLines, doc)
+                except IOError:
+                    warn("link-defaults.infotree not found despite being listed in the External Infotrees metadata.")
 
     def fetchHeadings(self, spec):
         if spec in self.headings:

@@ -40,8 +40,7 @@ def handleBikeshedInclude(el, doc):
     if el.get("path"):
         path = el.get("path")
         try:
-            with io.open(config.docPath(doc, path), 'r', encoding="utf-8") as f:
-                lines = f.readlines()
+            lines = doc.inputSource.relative(path).read().rawLines
         except Exception as err:
             die("Couldn't find include file '{0}'. Error was:\n{1}", path, err, el=el)
             removeNode(el)
@@ -86,8 +85,7 @@ def handleCodeInclude(el, doc):
         return
     path = el.get("path")
     try:
-        with io.open(config.docPath(doc, path), 'r', encoding="utf-8") as f:
-            lines = f.readlines()
+        lines = doc.inputSource.relative(path).read().rawLines
     except Exception as err:
         die("Couldn't find include-code file '{0}'. Error was:\n{1}", path, err, el=el)
         removeNode(el)
@@ -119,13 +117,12 @@ def handleRawInclude(el, doc):
         return
     path = el.get("path")
     try:
-        with io.open(config.docPath(doc, path), 'r', encoding="utf-8") as f:
-            lines = f.readlines()
+        content = doc.inputSource.relative(path).read().content
     except Exception as err:
         die("Couldn't find include-raw file '{0}'. Error was:\n{1}", path, err, el=el)
         removeNode(el)
         return
-    subtree = parseHTML(''.join(lines))
+    subtree = parseHTML(content)
     replaceNode(el, *subtree)
 
 def parseRangeString(rangeStr):

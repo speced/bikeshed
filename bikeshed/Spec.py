@@ -30,6 +30,7 @@ from . import shorthands
 from . import wpt
 
 from .htmlhelpers import *
+from .InputSource import InputSource, FileInputSource, StdinInputSource
 from .Line import Line
 from .messages import *
 from .refs import ReferenceManager
@@ -48,7 +49,7 @@ class Spec(object):
         if inputFilename is None: # still
             die("No input file specified, and no *.bs or *.src.html files found in current directory.\nPlease specify an input file, or use - to pipe from STDIN.")
             return
-        self.inputSource = inputFilename
+        self.inputSource = InputSource(inputFilename)
         self.debug = debug
         self.token = token
         self.testing = testing
@@ -86,13 +87,10 @@ class Spec(object):
         self.extraScripts = defaultdict(str)
 
         try:
-            if self.inputSource == "-":
-                self.lines = [Line(i,line) for i,line in enumerate(sys.stdin.readlines(), 1)]
-            else:
-                self.lines = [Line(i,l) for i,l in enumerate(io.open(self.inputSource, 'r', encoding="utf-8").readlines(), 1)]
-                # Initialize date to the last-modified date on the file,
-                # so processing repeatedly over time doesn't cause spurious date-only changes.
-                self.mdBaseline.addParsedData("Date", datetime.fromtimestamp(os.path.getmtime(self.inputSource)).date())
+            inputContent = self.inputSource.read()
+            self.lines = inputContent.lines
+            if inputContent.date is not None:
+                self.mdBaseline.addParsedData("Date", inputContent.date)
         except OSError:
             die("Couldn't find the input file at the specified location '{0}'.", self.inputSource)
             return False
@@ -262,12 +260,12 @@ class Spec(object):
     def fixMissingOutputFilename(self, outputFilename):
         if outputFilename is None:
             # More sensible defaults!
-            if self.inputSource.endswith(".bs"):
-                outputFilename = self.inputSource[0:-3] + ".html"
-            elif self.inputSource.endswith(".src.html"):
-                outputFilename = self.inputSource[0:-9] + ".html"
-            elif self.inputSource == "-":
+            if not isinstance(self.inputSource, FileInputSource):
                 outputFilename = "-"
+            elif self.inputSource.sourceName.endswith(".bs"):
+                outputFilename = self.inputSource.sourceName[0:-3] + ".html"
+            elif self.inputSource.endswith(".src.html"):
+                outputFilename = self.inputSource.sourceName[0:-9] + ".html"
             else:
                 outputFilename = "-"
         return outputFilename
@@ -305,9 +303,12 @@ class Spec(object):
 
     def watch(self, outputFilename, port=None, localhost=False):
         import time
+
         outputFilename = self.fixMissingOutputFilename(outputFilename)
-        if self.inputSource == "-" or outputFilename == "-":
-            die("Watch mode doesn't support streaming from STDIN or to STDOUT.")
+        if self.inputSource.mtime() is None:
+            die("Watch mode doesn't support {}".format(self.inputSource))
+        if outputFilename == "-":
+            die("Watch mode doesn't support streaming to STDOUT.")
             return
 
         if port:
@@ -334,13 +335,13 @@ class Spec(object):
         mdCommandLine = self.mdCommandLine
 
         try:
-            lastInputModified = os.stat(self.inputSource).st_mtime
+            lastInputModified = self.inputSource.mtime()
             self.preprocess()
             self.finish(outputFilename)
             p("==============DONE==============")
             try:
-                while(True):
-                    inputModified = os.stat(self.inputSource).st_mtime
+                while True:
+                    inputModified = self.inputSource.mtime()
                     if inputModified > lastInputModified:
                         resetSeenMessages()
                         lastInputModified = inputModified

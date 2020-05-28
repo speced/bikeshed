@@ -70,6 +70,7 @@ class MetadataManager:
         self.editors = []
         self.editorTerm = {"singular": "Editor", "plural": "Editors"}
         self.expires = None
+        self.externalInfotrees = config.BoolSet(default=False)
         self.favicon = None
         self.forceCrossorigin = False
         self.group = None
@@ -89,6 +90,7 @@ class MetadataManager:
         self.issueTrackerTemplate = None
         self.lineNumbers = False
         self.linkDefaults = defaultdict(list)
+        self.localBoilerplate = config.BoolSet(default=False)
         self.logo = ""
         self.mailingList = None
         self.mailingListArchives = None
@@ -578,6 +580,12 @@ def parseComplainAbout(key, val, lineNum):
     return ret
 
 
+def parseExternalInfotrees(key, val, lineNum):
+    return parseBoolishList(key, val.lower(), default=False,
+                            validLabels=frozenset(["anchors.bsdata", "link-defaults.infotree"]),
+                            lineNum=lineNum)
+
+
 def parseBoolishList(key, val, default=None, validLabels=None, extraValues=None, lineNum=None):
     # Parses anything defined as "label <boolish>, label <boolish>" into a passed BoolSet
     # Supply a list of valid labels if you want to have them checked,
@@ -897,14 +905,11 @@ def getSpecRepository(doc):
     Currently only searches for GitHub repos.
     Returns a "shortname" of the repo, and the full url.
     '''
-    if doc and doc.inputSource and doc.inputSource != "-":
-        source_dir = config.docPath(doc)
-        old_dir = os.getcwd()
+    if doc and doc.inputSource and doc.inputSource.hasDirectory():
+        source_dir = doc.inputSource.directory()
         try:
-            os.chdir(source_dir)
             with open(os.devnull, "wb") as fnull:
-                remotes = str(subprocess.check_output(["git", "remote", "-v"], stderr=fnull), encoding="utf-8")
-            os.chdir(old_dir)
+                remotes = str(subprocess.check_output(["git", "remote", "-v"], stderr=fnull, cwd=source_dir), encoding="utf-8")
             searches = [
               r"origin\tgit@github\.([\w.-]+):([\w-]+)/([\w-]+)\.git \(\w+\)",
               r"origin\thttps://github\.([\w.-]+)/([\w-]+)/([\w-]+)\.git \(\w+\)",
@@ -917,7 +922,6 @@ def getSpecRepository(doc):
             return config.Nil()
         except subprocess.CalledProcessError:
             # check_output will throw CalledProcessError when not in a git repo
-            os.chdir(old_dir)
             return config.Nil()
 
 
@@ -1033,6 +1037,7 @@ knownKeys = {
     "Editor": Metadata("Editor", "editors", joinList, parseEditor),
     "Editor Term": Metadata("Editor Term", "editorTerm", joinValue, parseEditorTerm),
     "Expires": Metadata("Expires", "expires", joinValue, parseDateOrDuration),
+    "External Infotrees": Metadata("External Infotrees", "externalInfotrees", joinBoolSet, parseExternalInfotrees),
     "Favicon": Metadata("Favicon", "favicon", joinValue, parseLiteral),
     "Force Crossorigin": Metadata("Force Crossorigin", "forceCrossorigin", joinValue, parseBoolean),
     "Former Editor": Metadata("Former Editor", "previousEditors", joinList, parseEditor),
@@ -1054,6 +1059,7 @@ knownKeys = {
     "Level": Metadata("Level", "level", joinValue, parseLevel),
     "Line Numbers": Metadata("Line Numbers", "lineNumbers", joinValue, parseBoolean),
     "Link Defaults": Metadata("Link Defaults", "linkDefaults", joinDdList, parseLinkDefaults),
+    "Local Boilerplate": Metadata("Local Boilerplate", "localBoilerplate", joinBoolSet, partial(parseBoolishList, default=False)),
     "Logo": Metadata("Logo", "logo", joinValue, parseLiteral),
     "Mailing List Archives": Metadata("Mailing List Archives", "mailingListArchives", joinValue, parseLiteral),
     "Mailing List": Metadata("Mailing List", "mailingList", joinValue, parseLiteral),

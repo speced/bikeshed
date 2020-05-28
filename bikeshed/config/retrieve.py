@@ -4,8 +4,9 @@
 import io
 import os
 
+from ..InputSource import InputSource
 from ..messages import *
-from .main import scriptPath, docPath
+from .main import scriptPath
 
 
 class DataFileRequester(object):
@@ -72,30 +73,37 @@ def retrieveBoilerplateFile(doc, name, group=None, status=None, error=True):
         if status == "":
             status = megaGroup
 
+    searchLocally = doc.md.localBoilerplate[name]
+
     def boilerplatePath(*segs):
         return scriptPath("boilerplate", *segs)
     statusFile = "{0}-{1}.include".format(name, status)
     genericFile = "{0}.include".format(name)
-    filenames = []
-    if docPath(doc):
-        filenames.append(docPath(doc, statusFile))
-        filenames.append(docPath(doc, genericFile))
+    sources = []
+    if searchLocally:
+        sources.append(doc.inputSource.relative(statusFile))  # Can be None.
+        sources.append(doc.inputSource.relative(genericFile))
+    else:
+        for f in (statusFile, genericFile):
+            if doc.inputSource.cheaplyExists(f):
+                warn(("Found {0} next to the specification without a matching\n"+
+                    "Local Boilerplate: {1} yes\n"+
+                    "in the metadata. This include won't be found when building via a URL.").format(f, name))
+                # We should remove this after giving specs time to react to the warning:
+                sources.append(doc.inputSource.relative(f))
     if group:
-        filenames.append(boilerplatePath(group, statusFile))
-        filenames.append(boilerplatePath(group, genericFile))
-    filenames.append(boilerplatePath(statusFile))
-    filenames.append(boilerplatePath(genericFile))
+        sources.append(InputSource(boilerplatePath(group, statusFile)))
+        sources.append(InputSource(boilerplatePath(group, genericFile)))
+    sources.append(InputSource(boilerplatePath(statusFile)))
+    sources.append(InputSource(boilerplatePath(genericFile)))
 
-    for filename in filenames:
-        if os.path.isfile(filename):
+    for source in sources:
+        if source is not None:
             try:
-                with io.open(filename, 'r', encoding="utf-8") as fh:
-                    return fh.read()
+                return source.read().content
             except IOError:
-                if error:
-                    die("The include file for {0} disappeared underneath me.", name)
-                return ""
-            break
+                # That input doesn't exist.
+                pass
     else:
         if error:
             die("Couldn't find an appropriate include file for the {0} inclusion, given group='{1}' and status='{2}'.", name, group, status)
