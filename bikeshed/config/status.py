@@ -124,7 +124,7 @@ w3cCommunityStatuses = frozenset([
 ])
 
 megaGroups = {
-    "w3c": frozenset(["act-framework", "audiowg", "csswg", "dap", "fxtf", "fxtf-csswg", "geolocation", "houdini", "html", "i18n", "immersivewebcg", "immersivewebwg", "mediacapture", "mediawg", "ping", "privacycg", "processcg", "ricg", "sacg", "secondscreenwg", "serviceworkers", "svg", "tag", "texttracks", "uievents", "wasm", "web-bluetooth-cg", "webapps", "webappsec", "webauthn", "webml", "web-payments", "webperf", "webplatform", "webrtc", "webspecs", "webvr", "wicg"]),
+    "w3c": frozenset(["act-framework", "audiowg", "browser-testing-tools", "csswg", "dap", "fxtf", "fxtf-csswg", "geolocation", "houdini", "html", "i18n", "immersivewebcg", "immersivewebwg", "mediacapture", "mediawg", "ping", "privacycg", "processcg", "ricg", "sacg", "secondscreenwg", "serviceworkers", "svg", "tag", "texttracks", "uievents", "wasm", "web-bluetooth-cg", "webapps", "webappsec", "webauthn", "webml", "web-payments", "webperf", "webplatform", "webrtc", "webspecs", "webvr", "wicg"]),
     "whatwg": frozenset(["whatwg"]),
     "tc39": frozenset(["tc39"]),
     "iso": frozenset(["wg14", "wg21"]),
