@@ -119,8 +119,8 @@ w3cTAGStatuses = frozenset([
 ]).union(w3cProcessDocumentStatuses)
 # Community and Business Groups are limited to these statuses
 w3cCommunityStatuses = frozenset([
-    "CG-DRAFT",
-    "CG-FINAL"
+    "w3c/CG-DRAFT",
+    "w3c/CG-FINAL"
 ])
 
 megaGroups = {
