@@ -126,13 +126,16 @@ def canonicalizeShortcuts(doc):
     attrFixup = {
         "export":"data-export",
         "noexport":"data-noexport",
+        "link-spec": "data-link-spec",
         "spec":"data-link-spec",
+        "link-status": "data-link-status",
         "status":"data-link-status",
         "dfn-for":"data-dfn-for",
         "link-for":"data-link-for",
         "link-for-hint":"data-link-for-hint",
         "dfn-type":"data-dfn-type",
         "link-type":"data-link-type",
+        "dfn-force": "data-dfn-force",
         "force":"data-dfn-force",
         "section":"data-section",
         "attribute-info":"data-attribute-info",
@@ -758,9 +761,10 @@ def determineLinkText(el):
 def classifyLink(el):
     linkType = determineLinkType(el)
     el.set('data-link-type', linkType)
-    linkText = determineLinkText(el)
 
+    linkText = determineLinkText(el)
     el.set('data-lt', linkText)
+
     for attr in ["data-link-status", "data-link-for", "data-link-spec", "data-link-for-hint"]:
         val = treeAttr(el, attr)
         if val is not None:
