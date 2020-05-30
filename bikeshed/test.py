@@ -94,24 +94,6 @@ def compare(suspect, golden):
     p("")
     return False
 
-def compareDicts(a, b):
-    aKeys = set(a.keys())
-    bKeys = set(b.keys())
-    if aKeys != bKeys:
-        return False
-    for key in aKeys:
-        if a[key] != b[key]:
-            return False
-    return True
-
-def equalOrEmpty(a, b):
-    if a == b:
-        return True
-    if a is not None and b is not None and "" == a.strip() == b.strip():
-        return True
-    return False
-
-
 def rebase(Spec, files=None, md=None):
     fileRequester = config.DataFileRequester(type="readonly")
     files = testPaths(files)
