@@ -375,15 +375,14 @@ def handleSource(options, extras):
 
 def handleTest(options, extras):
     from . import metadata
-    from .Spec import Spec
     from . import test
     md = metadata.fromCommandLine(extras)
     constants.setErrorLevel("nothing")
     constants.quiet = 100
     if options.rebase:
-        test.rebase(Spec, options.testFiles, md=md)
+        test.rebase(options.testFiles, md=md)
     else:
-        result = test.runAllTests(Spec, options.testFiles, manualOnly=options.manualOnly, md=md)
+        result = test.runAllTests(options.testFiles, manualOnly=options.manualOnly, md=md)
         sys.exit(0 if result else 1)
 
 

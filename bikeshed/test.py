@@ -10,8 +10,8 @@ import re
 import subprocess
 from itertools import *
 from . import config
-from .htmlhelpers import parseDocument, outerHTML, nodeIter, isElement, findAll
 from .messages import *
+from .Spec import Spec
 
 
 TEST_DIR = os.path.abspath(os.path.join(config.scriptPath(), "..", "tests"))
@@ -42,30 +42,21 @@ def sortTests(tests):
     return sorted(tests, key=lambda x:("/" in testNameForPath(x), x))
 
 
-def runAllTests(Spec, testFiles=None, manualOnly=False, md=None):
-    fileRequester = config.DataFileRequester(type="readonly")
-    if not testFiles:
-        testFiles = list(sortTests(findTestFiles(manualOnly=manualOnly)))
-        if len(testFiles) == 0:
-            p("No tests were found")
-            return True
-    else:
-        testFiles = [os.path.join(TEST_DIR, x) for x in testFiles]
+def runAllTests(patterns=None, manualOnly=False, md=None):
+    paths = testPaths(patterns)
+    if len(paths) == 0:
+        p("No tests were found")
+        return True
     numPassed = 0
     total = 0
     fails = []
-    for i,testPath in enumerate(testFiles, 1):
-        justifiedI = str(i).rjust(len(str(len(testFiles))))
-        testName = testNameForPath(testPath)
-        p("{0}/{1}: {2}".format(justifiedI, len(testFiles), testName))
+    for i,path in enumerate(paths, 1):
+        testName = testNameForPath(path)
+        p(f"{ratio(i,len(paths))}: {testName}")
         total += 1
-        doc = Spec(inputFilename=testPath, fileRequester=fileRequester, testing=True)
-        if md is not None:
-            doc.mdCommandLine = md
-        addTestMetadata(doc)
-        doc.preprocess()
+        doc = processTest(path, md)
         outputText = doc.serialize()
-        with io.open(testPath[:-2] + "html", encoding="utf-8") as golden:
+        with io.open(path[:-2] + "html", encoding="utf-8") as golden:
             goldenText = golden.read()
         if compare(outputText, goldenText):
             numPassed += 1
@@ -80,6 +71,13 @@ def runAllTests(Spec, testFiles=None, manualOnly=False, md=None):
         for fail in fails:
             p("* " + fail)
 
+def processTest(path, md=None, fileRequester=config.DataFileRequester(type="readonly")):
+    doc = Spec(inputFilename=path, fileRequester=fileRequester, testing=True)
+    if md is not None:
+        doc.mdCommandLine = md
+    addTestMetadata(doc)
+    doc.preprocess()
+    return doc
 
 def compare(suspect, golden):
     if suspect == golden:
@@ -94,33 +92,31 @@ def compare(suspect, golden):
     p("")
     return False
 
-def rebase(Spec, files=None, md=None):
-    fileRequester = config.DataFileRequester(type="readonly")
-    files = testPaths(files)
-    if len(files) == 0:
+def rebase(patterns=None, md=None):
+    paths = testPaths(patterns)
+    if len(paths) == 0:
         p("No tests were found.")
         return True
-    for i,path in enumerate(files, 1):
-        justifiedI = str(i).rjust(len(str(len(files))))
-        resetSeenMessages()
+    for i,path in enumerate(paths, 1):
         name = testNameForPath(path)
-        p("{0}/{1}: Rebasing {2}".format(justifiedI, len(files), name))
-        doc = Spec(path, fileRequester=fileRequester, testing=True)
-        if md:
-            doc.mdCommandLine = md
-        addTestMetadata(doc)
-        doc.preprocess()
+        resetSeenMessages()
+        p(f"{ratio(i,len(paths))}: Rebasing {name}")
+        doc = processTest(path, md)
         doc.finish()
 
-def testPaths(files=None):
+def ratio(i, total):
+    justifiedI = str(i).rjust(len(str(total)))
+    return f"{justifiedI}/{total}"
+
+def testPaths(patterns=None):
     # if None, get all the test paths
     # otherwise, glob the provided paths, rooted at the test dir
-    if not files:
+    if not patterns:
         return list(sortTests(findTestFiles()))
     else:
         return [path
-            for file in files
-            for path in glob.glob(os.path.join(TEST_DIR, file))
+            for pattern in patterns
+            for path in glob.glob(os.path.join(TEST_DIR, pattern))
             if path.endswith(".bs")]
 
 def addTestMetadata(doc):
