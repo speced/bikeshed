@@ -57,6 +57,12 @@ class InputSource:
     def __str__(self) -> str:
         pass
 
+    def __hash__(self):
+        return hash(str(self))
+
+    def __eq__(self, other):
+        return str(self) == str(other)
+
     @abstractmethod
     def read(self) -> InputContent:
         """Fully reads the source.
