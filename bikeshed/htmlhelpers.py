@@ -2,7 +2,6 @@
 
 import hashlib
 import html5lib
-import html
 import re
 from collections import Counter, defaultdict
 from lxml import etree
@@ -14,6 +13,7 @@ from .DefaultOrderedDict import DefaultOrderedDict
 from .messages import *
 
 def unescape(string):
+    import html
     return html.unescape(string)
 
 

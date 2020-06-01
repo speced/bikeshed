@@ -19,7 +19,7 @@ from . import extensions
 from . import fingerprinting
 from . import headings
 from . import highlight
-from . import HTMLSerializer
+from . import html
 from . import idl
 from . import includes
 from . import inlineTags
@@ -253,7 +253,7 @@ class Spec(object):
         return self
 
     def serialize(self):
-        rendered = HTMLSerializer.HTMLSerializer(self.document, self.md.opaqueElements, self.md.blockElements).serialize()
+        rendered = html.Serializer(self.md.opaqueElements, self.md.blockElements).serialize(self.document)
         rendered = finalHackyCleanup(rendered)
         return rendered
 

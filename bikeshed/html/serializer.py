@@ -2,30 +2,27 @@
 
 
 import io
-from .htmlhelpers import childNodes, isElement, outerHTML, escapeHTML, escapeAttr, hasAttrs
-from .messages import *
+from ..htmlhelpers import childNodes, isElement, outerHTML, escapeHTML, escapeAttr, hasAttrs
 
 
-class HTMLSerializer(object):
+class Serializer(object):
     inlineEls = frozenset(["a", "em", "strong", "small", "s", "cite", "q", "dfn", "abbr", "data", "time", "code", "var", "samp", "kbd", "sub", "sup", "i", "b", "u", "mark", "ruby", "bdi", "bdo", "span", "br", "wbr", "img", "meter", "progress", "math", "[]"])
     rawEls = frozenset(["xmp", "script", "style"])
     voidEls = frozenset(["area", "base", "br", "col", "command", "embed", "hr", "img", "input", "keygen", "link", "meta", "param", "source", "track", "wbr"])
     omitEndTagEls = frozenset(["td", "th", "tr", "thead", "tbody", "tfoot", "colgroup", "col", "li", "dt", "dd", "html", "head", "body"])
 
-    def __init__(self, tree, opaqueElements, blockElements):
-        self.tree = tree
+    def __init__(self, opaqueElements, blockElements):
         self.opaqueEls = frozenset(opaqueElements)
         self.blockEls = frozenset(blockElements)
 
-    def serialize(self):
+    def serialize(self, tree):
         output = io.StringIO()
         writer = output.write
         writer("<!doctype html>")
-        root = self.tree.getroot()
-        self._serializeEl(root, writer)
-        str = output.getvalue()
+        self._serializeEl(tree.getroot(), writer)
+        s = output.getvalue()
         output.close()
-        return str
+        return s
 
     def unfuckName(self, n):
         # LXML does namespaces stupidly
