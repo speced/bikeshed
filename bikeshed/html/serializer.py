@@ -2,7 +2,6 @@
 
 
 import io
-from ..messages import die
 from . import dom
 
 class Serializer(object):
@@ -107,8 +106,7 @@ class Serializer(object):
         self.startTag(tag, el, write)
         for node in dom.childNodes(el):
             if self.isElement(node):
-                die("Somehow a CDATA element got an element child:\n{0}", dom.outerHTML(el))
-                return
+                raise Exception(f"Somehow a CDATA element got an element child:\n{dom.outerHTML(el)}")
             else:
                 write(node)
         self.endTag(tag, write)

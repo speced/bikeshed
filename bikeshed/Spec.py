@@ -256,7 +256,10 @@ class Spec(object):
         return self
 
     def serialize(self):
-        rendered = html.Serializer(self.md.opaqueElements, self.md.blockElements).serialize(self.document)
+        try:
+            rendered = html.Serializer(self.md.opaqueElements, self.md.blockElements).serialize(self.document)
+        except e:
+            die("{0}", e)
         rendered = finalHackyCleanup(rendered)
         return rendered
 
