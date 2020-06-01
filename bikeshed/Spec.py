@@ -101,9 +101,9 @@ class Spec(object):
         return True
 
     def preprocess(self):
-        self.assembleDocument()
+        recursiveIncludes = self.assembleDocument()
         self.processDocument()
-        return self
+        return recursiveIncludes
 
     def assembleDocument(self):
         # Textual hacks
@@ -152,9 +152,9 @@ class Spec(object):
         self.head = find("head", self)
         self.body = find("body", self)
         correctH1(self)
-        includes.processInclusions(self)
+        recursiveIncludes = includes.processInclusions(self)
         metadata.parseDoc(self)
-        return self
+        return recursiveIncludes
 
     def processDocument(self):
         # Fill in and clean up a bunch of data
@@ -335,21 +335,21 @@ class Spec(object):
         mdCommandLine = self.mdCommandLine
 
         try:
-            lastInputModified = self.inputSource.mtime()
-            self.preprocess()
+            lastInputModified = {self.inputSource: self.inputSource.mtime()}
+            for include in self.preprocess():
+                lastInputModified[include] = include.mtime()
             self.finish(outputFilename)
             p("==============DONE==============")
             try:
                 while True:
                     inputModified = self.inputSource.mtime()
-                    if inputModified > lastInputModified:
+                    if any(input.mtime() > lastModified for input, lastModified in lastInputModified.items()):
                         resetSeenMessages()
-                        lastInputModified = inputModified
-                        formattedTime = datetime.fromtimestamp(inputModified).strftime("%H:%M:%S")
-                        p("Source file modified at {0}. Rebuilding...".format(formattedTime))
+                        p("Source file modified. Rebuilding...")
                         self.initializeState()
                         self.mdCommandLine = mdCommandLine
-                        self.preprocess()
+                        for include in self.preprocess().union(lastInputModified.keys()):
+                            lastInputModified[include] = include.mtime()
                         self.finish(outputFilename)
                         p("==============DONE==============")
                     time.sleep(1)

@@ -13,6 +13,7 @@ from .messages import *
 
 def processInclusions(doc):
     iters = 0
+    recursiveInclusions = set()
     while True:
         # Loop because an include can contain more includes.
         iters += 1
@@ -23,13 +24,16 @@ def processInclusions(doc):
         if not els:
             break
         for el in els:
-            handleBikeshedInclude(el, doc)
+            recursiveInclusions.add(handleBikeshedInclude(el, doc))
     for el in findAll("pre.include-code", doc):
-        handleCodeInclude(el, doc)
+        recursiveInclusions.add(handleCodeInclude(el, doc))
     for el in findAll("pre.include-raw", doc):
-        handleRawInclude(el, doc)
+        recursiveInclusions.add(handleRawInclude(el, doc))
+    recursiveInclusions.discard(None)
+    return recursiveInclusions
 
 def handleBikeshedInclude(el, doc):
+    includedInputSource = None
     macros = {}
     for i in itertools.count(0):
         m = el.get("macro-" + str(i))
@@ -40,7 +44,8 @@ def handleBikeshedInclude(el, doc):
     if el.get("path"):
         path = el.get("path")
         try:
-            lines = doc.inputSource.relative(path).read().rawLines
+            includedInputSource = doc.inputSource.relative(path)
+            lines = includedInputSource.read().rawLines
         except Exception as err:
             die("Couldn't find include file '{0}'. Error was:\n{1}", path, err, el=el)
             removeNode(el)
@@ -73,6 +78,7 @@ def handleBikeshedInclude(el, doc):
             childInclude.set("hash", hash)
             childInclude.set("depth", str(depth + 1))
         replaceNode(el, *subtree)
+        return includedInputSource
     else:
         die("Whoops, an include block didn't get parsed correctly, so I can't include anything.", el=el)
         removeNode(el)
@@ -84,8 +90,9 @@ def handleCodeInclude(el, doc):
         removeNode(el)
         return
     path = el.get("path")
+    includedInputSource = doc.inputSource.relative(path)
     try:
-        lines = doc.inputSource.relative(path).read().rawLines
+        lines = includedInputSource.read().rawLines
     except Exception as err:
         die("Couldn't find include-code file '{0}'. Error was:\n{1}", path, err, el=el)
         removeNode(el)
@@ -108,6 +115,7 @@ def handleCodeInclude(el, doc):
                     # but otherwise DWIM.
                     el.set("line-start", str(start))
     appendChild(el, *lines)
+    return includedInputSource
 
 
 def handleRawInclude(el, doc):
@@ -116,14 +124,16 @@ def handleRawInclude(el, doc):
         removeNode(el)
         return
     path = el.get("path")
+    includedInputSource = doc.inputSource.relative(path)
     try:
-        content = doc.inputSource.relative(path).read().content
+        content = includedInputSource.read().content
     except Exception as err:
         die("Couldn't find include-raw file '{0}'. Error was:\n{1}", path, err, el=el)
         removeNode(el)
         return
     subtree = parseHTML(content)
     replaceNode(el, *subtree)
+    return includedInputSource
 
 def parseRangeString(rangeStr):
     rangeStr = re.sub(r"\s*", "", rangeStr)
