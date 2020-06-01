@@ -11,7 +11,7 @@ from contextlib import closing
 from .. import biblio
 from .. import config
 from .. import constants
-from ..htmlhelpers import *
+from ..html import *
 from ..DefaultOrderedDict import DefaultOrderedDict
 from ..messages import *
 from ..Spec import Spec

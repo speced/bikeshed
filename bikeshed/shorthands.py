@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 
 import re
-from .htmlhelpers import *
+from . import config
+from .html import *
 from .messages import *
 
 def transformProductionPlaceholders(doc):

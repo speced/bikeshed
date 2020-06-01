@@ -10,7 +10,7 @@ from . import config
 from . import dfnpanels
 from .refs import utils as refUtils
 from .DefaultOrderedDict import DefaultOrderedDict
-from .htmlhelpers import *
+from .html import *
 from .messages import *
 
 

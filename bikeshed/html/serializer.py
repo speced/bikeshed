@@ -2,8 +2,8 @@
 
 
 import io
-from ..htmlhelpers import childNodes, isElement, outerHTML, escapeHTML, escapeAttr, hasAttrs
-
+from ..messages import die
+from . import dom
 
 class Serializer(object):
     inlineEls = frozenset(["a", "em", "strong", "small", "s", "cite", "q", "dfn", "abbr", "data", "time", "code", "var", "samp", "kbd", "sub", "sup", "i", "b", "u", "mark", "ruby", "bdi", "bdo", "span", "br", "wbr", "img", "meter", "progress", "math", "[]"])
@@ -55,7 +55,7 @@ class Serializer(object):
     def startTag(self, tag, el, write):
         if tag == "[]":
             return
-        if not hasAttrs(el):
+        if not dom.hasAttrs(el):
             write("<"+tag+">")
             return
 
@@ -65,7 +65,7 @@ class Serializer(object):
             if attrVal == "":
                 strs.append(" " + self.unfuckName(attrName))
             else:
-                strs.append(" " + self.unfuckName(attrName) + '="' + escapeAttr(attrVal) + '"')
+                strs.append(" " + self.unfuckName(attrName) + '="' + dom.escapeAttr(attrVal) + '"')
         strs.append(">")
         write("".join(strs))
 
@@ -74,10 +74,10 @@ class Serializer(object):
             write("</" + tag + ">")
 
     def isElement(self, node):
-        return isElement(node)
+        return dom.isElement(node)
 
     def isAnonBlock(self, block):
-        return not isElement(block)
+        return not dom.isElement(block)
 
     def isVoidElement(self, tag):
         return tag in self.voidEls
@@ -105,9 +105,9 @@ class Serializer(object):
 
     def _writeRawElement(self, tag, el, write):
         self.startTag(tag, el, write)
-        for node in childNodes(el):
+        for node in dom.childNodes(el):
             if self.isElement(node):
-                die("Somehow a CDATA element got an element child:\n{0}", outerHTML(el))
+                die("Somehow a CDATA element got an element child:\n{0}", dom.outerHTML(el))
                 return
             else:
                 write(node)
@@ -115,20 +115,20 @@ class Serializer(object):
 
     def _writeOpaqueElement(self, tag, el, write, indent):
         self.startTag(tag, el, write)
-        for node in childNodes(el):
+        for node in dom.childNodes(el):
             if self.isElement(node):
                 self._serializeEl(node, write, indent=indent, pre=True)
             else:
-                write(escapeHTML(node))
+                write(dom.escapeHTML(node))
         self.endTag(tag, write)
 
     def _writeInlineElement(self, tag, el, write, inline):
         self.startTag(tag, el, write)
-        for node in childNodes(el):
+        for node in dom.childNodes(el):
             if self.isElement(node):
                 self._serializeEl(node, write, inline=inline)
             else:
-                write(escapeHTML(self.fixWS(node)))
+                write(dom.escapeHTML(self.fixWS(node)))
         self.endTag(tag, write)
 
     def _blocksFromChildren(self, children):
@@ -139,9 +139,9 @@ class Serializer(object):
         Figure out what sort of contents the block has,
         so we know what serialization strategy to use.
         '''
-        if len(el) == 0 and (el.text is None or el.text.strip() == ""):
+        if len(el) == 0 and dom.emptyText(el.text):
             return "empty", None
-        children = childNodes(el)
+        children = dom.childNodes(el)
         for child in children:
             if self.isElement(child) and self.isBlockElement(child.tag):
                 return "blocks", self._blocksFromChildren(children)

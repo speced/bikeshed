@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from ..htmlhelpers import *
+from ..html import *
 from ..messages import *
 
 def exampleIDs(doc):

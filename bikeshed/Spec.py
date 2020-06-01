@@ -29,7 +29,7 @@ from . import metadata
 from . import shorthands
 from . import wpt
 
-from .htmlhelpers import *
+from .html import *
 from .InputSource import InputSource, FileInputSource, StdinInputSource
 from .Line import Line
 from .messages import *

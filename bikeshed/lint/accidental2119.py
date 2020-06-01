@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import re
-from ..htmlhelpers import *
+from ..html import *
 from ..messages import *
 
 def accidental2119(doc):

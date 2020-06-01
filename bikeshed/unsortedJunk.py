@@ -17,7 +17,7 @@ from . import datablocks
 from . import dfnpanels
 from . import func
 from . import markdown
-from .htmlhelpers import *
+from .html import *
 from .messages import *
 
 class MarkdownCodeSpans(func.Functor):

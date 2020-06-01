@@ -5,7 +5,7 @@ import io
 
 from subprocess import Popen, PIPE
 
-from ..htmlhelpers import *
+from ..html import *
 from ..messages import *
 
 def processTags(doc):

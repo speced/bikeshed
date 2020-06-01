@@ -19,7 +19,7 @@ from . import constants
 from . import datablocks
 from . import markdown
 from .DefaultOrderedDict import DefaultOrderedDict
-from .htmlhelpers import *
+from .html import *
 from .messages import *
 from .repository import *
 

@@ -8,9 +8,9 @@ from lxml import etree
 from lxml.html import tostring
 from lxml.cssselect import CSSSelector
 
-from . import config
-from .DefaultOrderedDict import DefaultOrderedDict
-from .messages import *
+from .. import config
+from ..DefaultOrderedDict import DefaultOrderedDict
+from ..messages import *
 
 def unescape(string):
     import html

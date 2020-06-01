@@ -2,7 +2,7 @@
 
 
 from .DefaultOrderedDict import DefaultOrderedDict
-from .htmlhelpers import *
+from .html import *
 
 def addDfnPanels(doc, dfns):
     # Constructs "dfn panels" which show all the local references to a term

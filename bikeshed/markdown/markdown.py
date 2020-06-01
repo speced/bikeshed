@@ -4,7 +4,7 @@ import re
 from itertools import *
 
 from .. import Line
-from ..htmlhelpers import escapeAttr
+from ..html import escapeAttr
 from ..messages import *
 
 

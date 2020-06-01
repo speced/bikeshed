@@ -2,7 +2,7 @@
 
 
 from ..messages import printColor
-from ..htmlhelpers import outerHTML, isElement
+from ..html import outerHTML, isElement
 
 def printjson(x, indent=2, level=0):
     if isinstance(indent, int):

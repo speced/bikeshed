@@ -15,7 +15,8 @@ from .. import biblio
 from .. import config
 from .. import constants
 from .. import datablocks
-from ..htmlhelpers import *
+from ..html import *
+from ..messages import *
 
 class ReferenceManager(object):
 

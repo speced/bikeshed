@@ -4,7 +4,7 @@
 import io
 
 from .. import config
-from ..htmlhelpers import findAll, textContent, removeNode, E, addClass, appendChild, clearContents
+from ..html import findAll, textContent, removeNode, E, addClass, appendChild, clearContents
 from ..messages import *
 
 def processWptElements(doc):

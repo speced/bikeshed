@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 
+from . import config
 from .config import simplifyText
-from .htmlhelpers import *
+from .html import *
 from .messages import *
 
 

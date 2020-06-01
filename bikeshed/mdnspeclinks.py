@@ -4,7 +4,7 @@ import json
 import os
 from collections import OrderedDict
 from . import config
-from .htmlhelpers import *  # noqa
+from .html import *  # noqa
 
 
 def addMdnPanels(doc):
