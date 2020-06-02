@@ -97,6 +97,10 @@ def retrieveBoilerplateFile(doc, name, group=None, status=None, error=True):
     sources.append(InputSource(boilerplatePath(statusFile)))
     sources.append(InputSource(boilerplatePath(genericFile)))
 
+    # Watch all the possible sources, not just the one that got used, because if
+    # an earlier one appears, we want to rebuild.
+    doc.recordDependencies(*sources)
+
     for source in sources:
         if source is not None:
             try:
