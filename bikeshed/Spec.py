@@ -50,6 +50,7 @@ class Spec(object):
             die("No input file specified, and no *.bs or *.src.html files found in current directory.\nPlease specify an input file, or use - to pipe from STDIN.")
             return
         self.inputSource = InputSource(inputFilename)
+        self.transitiveDependencies = set()
         self.debug = debug
         self.token = token
         self.testing = testing
@@ -100,10 +101,13 @@ class Spec(object):
 
         return True
 
+    def recordDependencies(self, *inputSources):
+        self.transitiveDependencies.update(inputSources)
+
     def preprocess(self):
+        self.transitiveDependencies.clear()
         self.assembleDocument()
         self.processDocument()
-        return self
 
     def assembleDocument(self):
         # Textual hacks
@@ -154,7 +158,6 @@ class Spec(object):
         correctH1(self)
         includes.processInclusions(self)
         metadata.parseDoc(self)
-        return self
 
     def processDocument(self):
         # Fill in and clean up a bunch of data
@@ -335,22 +338,25 @@ class Spec(object):
         mdCommandLine = self.mdCommandLine
 
         try:
-            lastInputModified = self.inputSource.mtime()
             self.preprocess()
             self.finish(outputFilename)
+            lastInputModified = {dep: dep.mtime()
+                                 for dep in self.transitiveDependencies}
             p("==============DONE==============")
             try:
                 while True:
-                    inputModified = self.inputSource.mtime()
-                    if inputModified > lastInputModified:
+                    # Comparing mtimes with "!=" handles when a file starts or
+                    # stops existing, and it's fine to rebuild if an mtime
+                    # somehow gets older.
+                    if any(input.mtime() != lastModified for input, lastModified in lastInputModified.items()):
                         resetSeenMessages()
-                        lastInputModified = inputModified
-                        formattedTime = datetime.fromtimestamp(inputModified).strftime("%H:%M:%S")
-                        p("Source file modified at {0}. Rebuilding...".format(formattedTime))
+                        p("Source file modified. Rebuilding...")
                         self.initializeState()
                         self.mdCommandLine = mdCommandLine
                         self.preprocess()
                         self.finish(outputFilename)
+                        lastInputModified = {dep: dep.mtime()
+                                             for dep in self.transitiveDependencies}
                         p("==============DONE==============")
                     time.sleep(1)
             except KeyboardInterrupt:

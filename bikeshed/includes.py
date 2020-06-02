@@ -40,8 +40,10 @@ def handleBikeshedInclude(el, doc):
         macros[k.lower()] = v
     if el.get("path"):
         path = el.get("path")
+        includedInputSource = doc.inputSource.relative(path)
+        doc.recordDependencies(includedInputSource)
         try:
-            lines = doc.inputSource.relative(path).read().rawLines
+            lines = includedInputSource.read().rawLines
         except Exception as err:
             die("Couldn't find include file '{0}'. Error was:\n{1}", path, err, el=el)
             removeNode(el)
@@ -85,8 +87,10 @@ def handleCodeInclude(el, doc):
         removeNode(el)
         return
     path = el.get("path")
+    includedInputSource = doc.inputSource.relative(path)
+    doc.recordDependencies(includedInputSource)
     try:
-        lines = doc.inputSource.relative(path).read().rawLines
+        lines = includedInputSource.read().rawLines
     except Exception as err:
         die("Couldn't find include-code file '{0}'. Error was:\n{1}", path, err, el=el)
         removeNode(el)
@@ -117,8 +121,10 @@ def handleRawInclude(el, doc):
         removeNode(el)
         return
     path = el.get("path")
+    includedInputSource = doc.inputSource.relative(path)
+    doc.recordDependencies(includedInputSource)
     try:
-        content = doc.inputSource.relative(path).read().content
+        content = includedInputSource.read().content
     except Exception as err:
         die("Couldn't find include-raw file '{0}'. Error was:\n{1}", path, err, el=el)
         removeNode(el)

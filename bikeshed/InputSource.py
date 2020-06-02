@@ -57,6 +57,15 @@ class InputSource:
     def __str__(self) -> str:
         pass
 
+    def __repr__(self) -> str:
+        return "{}({!r})".format(self.__class__.__name__, str(self))
+
+    def __hash__(self):
+        return hash(str(self))
+
+    def __eq__(self, other):
+        return str(self) == str(other)
+
     @abstractmethod
     def read(self) -> InputContent:
         """Fully reads the source.
@@ -176,7 +185,10 @@ class FileInputSource(InputSource):
     def cheaplyExists(self, relativePath) -> bool:
         return os.access(self.relative(relativePath).sourceName, os.R_OK)
 
-    def mtime(self) -> float:
-        """Returns the last modification time of this source, if that's known.
+    def mtime(self) -> Optional[float]:
+        """Returns the last modification time of this file, or None if it doesn't exist.
         """
-        return os.stat(self.sourceName).st_mtime
+        try:
+            return os.stat(self.sourceName).st_mtime
+        except FileNotFoundError:
+            return None
