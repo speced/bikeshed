@@ -115,6 +115,7 @@ class Spec(object):
         if self.lineNumbers:
             self.lines = hackyLineNumbers(self.lines)
         self.lines = markdown.stripComments(self.lines)
+        self.recordDependencies(self.inputSource)
         # Extract and process metadata
         self.lines, self.mdDocument = metadata.parse(lines=self.lines)
         # First load the metadata sources from 'local' data
