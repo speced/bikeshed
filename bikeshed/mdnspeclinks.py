@@ -5,6 +5,7 @@ import os
 from collections import OrderedDict
 from . import config
 from .html import *  # noqa
+from .messages import *
 
 
 def addMdnPanels(doc):
