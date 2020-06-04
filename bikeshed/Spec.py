@@ -284,7 +284,7 @@ class Spec(object):
         if not constants.dryRun:
             try:
                 if outputFilename == "-":
-                    sys.stdout.write(rendered.encode("utf-8"))
+                    sys.stdout.write(rendered)
                 else:
                     with io.open(outputFilename, "w", encoding="utf-8") as f:
                         f.write(rendered)
