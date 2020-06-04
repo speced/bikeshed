@@ -923,6 +923,7 @@ def getSpecRepository(doc):
         except subprocess.CalledProcessError:
             # check_output will throw CalledProcessError when not in a git repo
             return config.Nil()
+    return config.Nil()
 
 
 def parseDoc(doc):
