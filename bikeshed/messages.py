@@ -188,4 +188,4 @@ def formatMessage(type, text, lineNum=None):
 
 def errorAndExit():
     failure("Did not generate, due to fatal errors")
-    sys.exit(1)
+    sys.exit(2)
