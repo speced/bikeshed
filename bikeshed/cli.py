@@ -198,6 +198,32 @@ def main():
                            action="store_true",
                            help="Outputs a skeleton WPT file for you to start with.")
 
+    mailParser = subparsers.add_parser('mail', help="Generate an email publication announcement based on spec metadata.")
+    mailParser.add_argument("infile", nargs="?",
+                            default=None,
+                            help="Path to the source file.")
+    mailParser.add_argument("outfile", nargs="?",
+                            default="-",
+                            help="Path to the output file.")
+    mailParser.add_argument("--mailto",
+                             dest="mailto",
+                             default=False,
+                             action="store_true",
+                             help="Encode as a mailto: URL.")
+
+    blogParser = subparsers.add_parser('blog', help="Generate an blog post announcement based on spec metadata.")
+    blogParser.add_argument("infile", nargs="?",
+                            default=None,
+                            help="Path to the source file.")
+    blogParser.add_argument("outfile", nargs="?",
+                            default="-",
+                            help="Path to the output file.")
+    blogParser.add_argument("--curl",
+                             dest="curl",
+                             default=False,
+                             action="store_true",
+                             help="Encode as a WordPress curl command.")
+
     options, extras = argparser.parse_known_args()
 
     constants.quiet = options.quiet
@@ -240,6 +266,10 @@ def main():
         handleTemplate(options, extras)
     elif options.subparserName == "wpt":
         handleWpt(options, extras)
+    elif options.subparserName == "mail":
+        handleMail(options, extras)
+    elif options.subparserName == "blog":
+        handleBlog(options, extras)
 
 
 def handleUpdate(options, extras):
@@ -462,3 +492,74 @@ assert_equals(ACTUAL VALUE HERE, EXPECTED VALUE HERE, "TEST DESCRIPTION");
 // lots more at http://web-platform-tests.org/writing-tests/testharness-api.html#list-of-assertions
 </script>
 ''')
+
+def handleMail(options, extras):
+    from . import metadata
+    from .html import replaceMacros
+    from .Spec import Spec
+    import io
+    doc = Spec(inputFilename=options.infile)
+    doc.mdCommandLine = metadata.fromCommandLine(extras)
+    doc.transitiveDependencies.clear()
+    doc.assembleDocument()
+    mail = config.retrieveBoilerplateFile(doc, 'mail')
+    mail = replaceMacros(mail, macros=doc.macros)
+
+    if options.mailto:
+        from email.parser import Parser
+        import urllib
+
+        parser = Parser()
+        parsed_mail = parser.parsestr(mail)
+        if "To" not in parsed_mail:
+            parsed_mail["To"] = doc.macros["grouplists"]
+        if "Reply-To" not in parsed_mail:
+            parsed_mail["Reply-To"] = doc.macros["groupreplyto"]
+
+        output = "mailto:?To={}".format(urllib.parse.quote(parsed_mail["To"]))
+        del parsed_mail["To"]
+        for key,value in parsed_mail.items():
+            output += "&{}={}".format(key, urllib.parse.quote(value))
+        if parsed_mail.is_multipart():
+            die("Cannot handle multipart emails")
+        output += "&body={}".format(urllib.parse.quote(parsed_mail.get_payload()));
+    else:
+        output = mail
+
+    outputFilename = options.outfile
+    try:
+        if outputFilename == "-":
+            sys.stdout.write(output)
+        else:
+            with io.open(outputFilename, "w", encoding="utf-8") as f:
+                f.write(output)
+    except Exception as e:
+        die("Something prevented me from saving the output document to {0}:\n{1}", outputFilename, e)
+
+def handleBlog(options, extras):
+    from . import metadata
+    from .html import replaceMacros
+    from .Spec import Spec
+    import io
+    doc = Spec(inputFilename=options.infile)
+    doc.mdCommandLine = metadata.fromCommandLine(extras)
+    doc.transitiveDependencies.clear()
+    doc.assembleDocument()
+    blog = config.retrieveBoilerplateFile(doc, 'blog')
+    blog = replaceMacros(blog, macros=doc.macros)
+
+    if options.curl:
+        # craft a curl command line to create a WordPress Post
+        die("not implemented yet")
+    else:
+        output = blog
+
+    outputFilename = options.outfile
+    try:
+        if outputFilename == "-":
+            sys.stdout.write(output)
+        else:
+            with io.open(outputFilename, "w", encoding="utf-8") as f:
+                f.write(output)
+    except Exception as e:
+        die("Something prevented me from saving the output document to {0}:\n{1}", outputFilename, e)

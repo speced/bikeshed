@@ -8,3 +8,4 @@ from .Nil import Nil
 from .printjson import printjson
 from .retrieve import DataFileRequester, defaultRequester, retrieveBoilerplateFile
 from .status import *
+from .group import *

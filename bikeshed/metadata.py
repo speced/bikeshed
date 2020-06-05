@@ -269,6 +269,16 @@ class MetadataManager:
             macros["status"] = "NOTE"
         else:
             macros["status"] = self.rawStatus
+        if self.group in config.shortToLongGroup:
+            macros["longgroup"] = config.shortToLongGroup[self.group]
+        else:
+            macros["longgroup"] = self.group
+        if self.group in config.groupAnnounceLists:
+            macros["grouplists"] = ", ".join(config.groupAnnounceLists[self.group])
+        if self.group in config.groupAnnounceLists:
+            macros["groupreplyto"] = config.groupAnnounceLists[self.group][0]
+        if self.group in config.groupMLArchive:
+            macros["groupmlarchive"] = config.groupMLArchive[self.group]
         if self.workStatus:
             macros["workstatus"] = self.workStatus
         if self.TR:
