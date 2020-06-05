@@ -129,6 +129,10 @@ def innerHTML(el):
 def outerHTML(el, literal=False):
     if el is None:
         return ''
+    if isinstance(el, str):
+        return el
+    if isinstance(el, list):
+        return "".join(map(outerHTML, el))
     if el.get("bs-autolink-syntax") is not None and not literal:
         return el.get("bs-autolink-syntax")
     return tostring(el, with_tail=False, encoding="unicode")
