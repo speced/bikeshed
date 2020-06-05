@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
 import re
-from . import config
-from .html import *
-from .messages import *
+from .. import config
+from ..html import *
+from ..messages import *
 
 def transformProductionPlaceholders(doc):
     propdescRe = re.compile(r"^'(?:(\S*)/)?([\w*-]+)(?:!!([\w-]+))?'$")
