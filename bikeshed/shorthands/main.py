@@ -3,9 +3,10 @@ from .. import html
 from ..config import flatten
 from . import steps
 from .biblio import BiblioShorthand
+from .section import SectionShorthand
 
 def walk(doc):
-	shorthands = [BiblioShorthand]
+	shorthands = [BiblioShorthand, SectionShorthand]
 	processEl(doc.body, shorthands)
 
 
