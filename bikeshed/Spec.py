@@ -267,7 +267,7 @@ class Spec(object):
                 outputFilename = "-"
             elif self.inputSource.sourceName.endswith(".bs"):
                 outputFilename = self.inputSource.sourceName[0:-3] + ".html"
-            elif self.inputSource.endswith(".src.html"):
+            elif self.inputSource.sourceName.endswith(".src.html"):
                 outputFilename = self.inputSource.sourceName[0:-9] + ".html"
             else:
                 outputFilename = "-"
