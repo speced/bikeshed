@@ -119,6 +119,7 @@ def addMdnPanels(doc):
             .mdn-anno > .feature > .support > .samsunginternet_android::before { background-image: url(https://resources.whatwg.org/browser-logos/samsung.svg); }
             .mdn-anno > .feature > .support > .webview_android::before { background-image: url(https://resources.whatwg.org/browser-logos/android-webview.png); }
             .name-slug-mismatch { color: red }
+            .caniuse-status:hover { z-index: 9; }
             '''  # noqa
 
 def panelsFromData(doc, data):
