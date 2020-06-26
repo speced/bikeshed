@@ -1,10 +1,12 @@
-<<<<<<< HEAD
 import re
+
+from .. import config
 from ..html import E, outerHTML
-from . import steps
 from ..messages import die
 
-class PropdescShorthand:
+from . import steps
+
+class IdlShorthand:
     def __init__(self):
         self.stage = "start"
         self.escapedText = None
@@ -25,15 +27,11 @@ class PropdescShorthand:
         if escape:
             self.escapedText = match.group(0)[1:]
 
-        if match.groups(0) == "'-":
-            # Not a valid property actually.
-            return steps.Failure()
-
         if self.linkFor == "":
             self.linkFor = "/"
 
         if self.linkType is None:
-            self.linkType = "propdesc"
+            self.linkType = "idl"
 
         if hasLinkText:
             self.stage = "link text"
@@ -49,34 +47,37 @@ class PropdescShorthand:
 
     def respondEnd(self):
         if self.escapedText:
-            return steps.Success(skips=["'"], nodes=[self.escapedText[1:], *self.linkText, "'"])
+            return steps.Success(skips=["{"], nodes=[self.escapedText[1:], *self.linkText, "}}"])
 
-        self.bsAutolink += "'"
+        self.bsAutolink += "}}"
 
-        if self.linkType not in ["property", "descriptor", "propdesc"]:
-            die("Shorthand {0} gives type as '{1}', but only 'property' and 'descriptor' are allowed.", self.bsAutolink, linkType)
-            return steps.Success(E.span(self.bsAutolink))
+        if self.linkType not in config.idlTypes:
+            die("Shorthand {0} gives type as '{1}', but only IDL types are allowed.", self.bsAutolink, self.linkType)
+            return steps.Success(E.span({}, self.bsAutolink))
 
-        if self.linkText is None:
-            self.linkText = lt
+        if not self.linkText:
+            if self.lt.startswith("constructor(") and self.linkFor and self.linkFor != "/":
+                # make {{Foo/constructor()}} output as "Foo()" so you know what it's linking to.
+                self.linkText = self.linkFor + self.lt[11:]
+            else:
+                self.linkText = self.lt
 
         attrs = {
             "data-link-type":self.linkType,
-            "class":"property",
-            "for": self.linkFor,
-            "lt": self.lt,
-            "bs-autolink-syntax":self.bsAutolink
-            }
-        return steps.Success(E.a(attrs, linkText))
+            "for":self.linkFor,
+            "lt":self.lt,
+            "bs-autolink-syntax":self.bsAutolink}
+        return steps.Success(
+            E.code({"class":"idl", "nohighlight":""},
+                E.a(attrs, linkText)))
 
 
-PropdescShorthand.startRe = re.compile(r"""
-                        (\\)?
-                        '
-                        (?:([^\s'|]*)/)?
-                        ([\w*-]+)
-                        (?:!!([\w-]+))?
-                        (\|)?
-                        """, re.X)
+IdlShorthand.startRe = re.compile(r"""
+(\\)?
+{{
+(?:([^}|]*)/)?
+([^}/|]+?)
+(?:!!([\w-]+))?
+(\|)?""", re.X)
 
-endRe = re.compile("'")
+endRe = re.compile("}}")
