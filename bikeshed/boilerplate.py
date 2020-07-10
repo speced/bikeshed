@@ -842,6 +842,9 @@ def addSpecMetadataSection(doc):
         """
 
     def createMdEntry(key, vals):
+        vals = list(filter(lambda x:x is not None, vals))
+        if not vals:
+            return []
         # Pluralize appropriate words
         pluralization = {
             "Previous Version": "Previous Versions",
