@@ -98,11 +98,11 @@ def testNamesFromEl(el, pathPrefix=None):
 
 def prefixPlusPath(prefix, path):
 	# Join prefix to path, normalizing slashes
+	if path.startswith("/"):
+		return path[1:]
 	prefix = normalizePathSegment(prefix)
 	if prefix is None:
 		return path
-	if path.startswith("/"):
-		path = path[1:]
 	return prefix + path
 
 def prefixInPath(prefix, path):
