@@ -34,47 +34,13 @@ def addMdnPanels(doc):
 
     panels = panelsFromData(doc, data)
     if panels:
-        appendChild(doc.body, panels)
         doc.extraScripts["script-mdn-anno"] = '''
-            function positionAnnos() {
-                var annos = [].slice.call(document.querySelectorAll(".mdn-anno"));
-                for(var i = 0; i < annos.length; i++) {
-                    var anno = annos[i];
-                    id = anno.getAttribute("data-mdn-for");
-                    var dfn = document.querySelector("[id='" + id +"']");
-                    if (dfn !== null) {
-                        var rect = dfn.getBoundingClientRect(id);
-                        anno.style.top = (window.scrollY + rect.top) + "px";
-                        /* See https://domspec.herokuapp.com/#dom-event-cancelable
-                         * for an example of a spec that defines multiple terms in
-                         * the same sentence on the same line. In such cases, we
-                         * need to offset the vertical positioning of each Nth anno
-                         * for that term, to prevent the annos from being placed
-                         * exactly on top of the previous ones at that position. */
-                        var top = anno.style.top;
-                        var offset = 10 * (document.querySelectorAll("[style='top: " + top + ";']").length - 1)
-                        anno.style.top = (Number(top.slice(0, -2)) + offset) + "px";
-                    } else {
-                        console.error('MDN anno references non-existent element ID "%s".%o', id, anno);
-                    }
-                }
-            }
-            window.addEventListener("load", positionAnnos())
             document.body.addEventListener("click", (e) => {
                 if(e.target.closest(".mdn-anno-btn")) {
                     e.target.closest(".mdn-anno").classList.toggle("wrapped");
                 }
             });
-            /* If this is a document styled for W3C publication with a ToC
-             * sidebar, and the ToC "Collapse Sidebar" button is pushed, some
-             * MDN annos seem to end up getting wildly out of place unless we
-             * reposition them where they belong. */
-            const tocToggle = document.querySelector("#toc-toggle");
-            if (tocToggle) {
-                tocToggle.addEventListener("click", () => positionAnnos());
-            }
             '''  # noqa
-
         doc.extraStyles["style-mdn-anno"] = '''
             @media (max-width: 767px) { .mdn-anno { opacity: .1 } }
             .mdn-anno { font: 1em sans-serif; padding: 0.3em; position: absolute; z-index: 8; right: 0.3em; background: #EEE; color: black; box-shadow: 0 0 3px #999; overflow: hidden; border-collapse: initial; border-spacing: initial; min-width: 9em; max-width: min-content; white-space: nowrap; word-wrap: normal; hyphens: none}
@@ -120,7 +86,19 @@ def addMdnPanels(doc):
             .mdn-anno > .feature > .support > .webview_android::before { background-image: url(https://resources.whatwg.org/browser-logos/android-webview.png); }
             .name-slug-mismatch { color: red }
             .caniuse-status:hover { z-index: 9; }
+            
+            /* dt, li, .issue, .note, and .example are "position: relative", so to put annotation at right margin, must move to right of containing block */
+            .h-entry:not(.status-LS) dt > .mdn-anno, .h-entry:not(.status-LS) li > .mdn-anno, .h-entry:not(.status-LS) .issue > .mdn-anno, .h-entry:not(.status-LS) .note > .mdn-anno, .h-entry:not(.status-LS) .example > .mdn-anno { right: -6.7em; }
+            .h-entry p + .mdn-anno { margin-top: 0; }
+            h2 + .mdn-anno.after { margin: -48px 0 0 0; }
+            h3 + .mdn-anno.after { margin: -46px 0 0 0; }
+            h4 + .mdn-anno.after { margin: -42px 0 0 0; }
+            h5 + .mdn-anno.after { margin: -40px 0 0 0; }
+            h6 + .mdn-anno.after { margin: -40px 0 0 0; }
             '''  # noqa
+
+def createAnno(className, mdnButton, featureDivs):
+    return E.aside({"class": className}, mdnButton, featureDivs)
 
 def panelsFromData(doc, data):
     mdnBaseUrl = "https://developer.mozilla.org/en-US/docs/Web/"
@@ -151,24 +129,40 @@ def panelsFromData(doc, data):
         "webview_android": "Android WebView"
     }
 
-    panels = []
+    panels = False
     for elementId, features in data.items():
         lessThanTwoEngines = 0
         onlyTwoEngines = 0
         allEngines = 0
         featureDivs = []
+        targetElement = find(f"[id='{elementId}']", doc)
+        if targetElement is None:
+            msg = f"No '{elementId}' ID found."
+            if "slug" in feature:
+                msg += f" Update {mdnBaseUrl}{feature['slug']} Specifications Table?"
+            warn(msg)
+            continue
+        else:
+            panels = True
+            if targetElement.tag in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+                isAnnoForHeadingContent = True
+            else:
+                for ancestor in targetElement.iterancestors():
+                    if ancestor.tag in ['body', 'main', 'article', 'aside',
+                                        'nav', 'section', 'header', 'footer']:
+                        break
+                    targetElement = ancestor
+                    if ancestor.tag in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+                        isAnnoForHeadingContent = True
+                        break
+                    if ancestor.tag in ['td', 'dt', 'dd', 'li']:
+                        isAnnoForListItemOrTableContent = True
+                        break
+                    if ancestor.tag in ['pre', 'xmp', 'p']:
+                        break
         for feature in features:
-            # TODO: This find() is expensive, but if we add an anno to
-            # the document with a reference to an ID that doesn't
-            # actually exist in the document, the anno won't actually
-            # get displayed next to whatever feature in the spec it's
-            # intended to annotate...
-            if find(f"[id='{elementId}']", doc) is None:
-                msg = f"No '{elementId}' ID found."
-                if "slug" in feature:
-                    msg += f" Update {mdnBaseUrl}{feature['slug']} Specifications Table?"
-                warn(msg)
-                continue
+            isAnnoForHeadingContent = False
+            isAnnoForListItemOrTableContent = False
             if "engines" in feature:
                 engines = len(feature["engines"])
                 if engines < 2:
@@ -201,12 +195,43 @@ def panelsFromData(doc, data):
                     "\u2714"))
         appendChild(mdnButton, E.span("MDN"))
 
-        panels.append(
-            E.aside({"class": "mdn-anno wrapped",
-                     "data-deco": "",
-                     "data-mdn-for": elementId},
-                mdnButton,
-                featureDivs))
+        className = "mdn-anno wrapped"
+        if isAnnoForListItemOrTableContent:
+            if targetElement.getchildren() \
+                    and hasClass(targetElement.getchildren()[0], 'mdn-anno'):
+                # If there's already an annotation at the point where we want
+                # this, just re-use it (instead of creating another one).
+                appendChild(targetElement.getchildren()[0], featureDivs)
+            else:
+                # For elements we're annotating inside a dt, dd, li, or td, we
+                # prepend the annotation to the dt, dd, li, or td — because in
+                # cases where we have a long table or list, all the annotations
+                # for everything in it otherwise ends up being merged into a
+                # single annotation way up at the top of the table or list.
+                prependChild(targetElement, createAnno(className, mdnButton, featureDivs))
+        elif isAnnoForHeadingContent:
+            className = "mdn-anno wrapped after"
+            if targetElement.getnext() is not None \
+                    and targetElement.getnext().get('class') == className:
+                # If there's already an annotation at the point where we want
+                # this, just re-use it (instead of creating another one).
+                appendChild(targetElement.getnext(), featureDivs)
+            else:
+                # For elements we're annotating inside an h1-h6 heading, we
+                # insert the annotation as the next sibling of the heading.
+                insertAfter(targetElement, createAnno(className, mdnButton, featureDivs))
+        else:
+            if targetElement.getprevious() is not None \
+                    and targetElement.getprevious().get('class') == className:
+                # If there's already an annotation at the point where we want
+                # this, just re-use it (instead of creating another one) —
+                # unless it's a class=after annotation (following a heading).
+                appendChild(targetElement.getprevious(), featureDivs)
+            else:
+                # For elements we're annotating that aren't inside a table or
+                # list or heading, we insert the annotation as the previous
+                # sibling of whatever block-level element holds the element.
+                insertBefore(targetElement, createAnno(className, mdnButton, featureDivs))
     return panels
 
 def addSupportRow(browserCodeName, nameFromCodeName, support, supportData):

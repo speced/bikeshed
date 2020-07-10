@@ -2,9 +2,8 @@ from .main import walk
 from . import oldShorthands
 
 def run(doc):
-	#walk(doc)
-    oldShorthands.transformShorthandElements(doc)
-    oldShorthands.transformProductionPlaceholders(doc)
-    oldShorthands.transformMaybePlaceholders(doc)
-    oldShorthands.transformAutolinkShortcuts(doc)
-    oldShorthands.transformProductionGrammars(doc)
+	oldShorthands.transformShorthandElements(doc)
+	oldShorthands.transformProductionPlaceholders(doc)
+	oldShorthands.transformMaybePlaceholders(doc)
+	oldShorthands.transformAutolinkShortcuts(doc)
+	oldShorthands.transformProductionGrammars(doc)
