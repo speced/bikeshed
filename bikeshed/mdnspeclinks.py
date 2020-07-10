@@ -132,34 +132,34 @@ def panelsFromData(doc, data):
         onlyTwoEngines = 0
         allEngines = 0
         featureDivs = []
+        targetElement = find(f"[id='{elementId}']", doc)
+        if targetElement is None:
+            msg = f"No '{elementId}' ID found."
+            if "slug" in feature:
+                msg += f" Update {mdnBaseUrl}{feature['slug']} Specifications Table?"
+            warn(msg)
+            continue
+        else:
+            panels = True
+            if targetElement.tag in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+                isAnnoForHeadingContent = True
+            else:
+                for ancestor in targetElement.iterancestors():
+                    if ancestor.tag in ['body', 'main', 'article', 'aside',
+                                        'nav', 'section', 'header', 'footer']:
+                        break
+                    targetElement = ancestor
+                    if ancestor.tag in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+                        isAnnoForHeadingContent = True
+                        break
+                    if ancestor.tag in ['td', 'dt', 'dd', 'li']:
+                        isAnnoForListItemOrTableContent = True
+                        break
+                    if ancestor.tag in ['pre', 'xmp', 'p']:
+                        break
         for feature in features:
             isAnnoForHeadingContent = False
             isAnnoForListItemOrTableContent = False
-            targetElement = find(f"[id='{elementId}']", doc)
-            if targetElement is None:
-                msg = f"No '{elementId}' ID found."
-                if "slug" in feature:
-                    msg += f" Update {mdnBaseUrl}{feature['slug']} Specifications Table?"
-                warn(msg)
-                continue
-            else:
-                panels = True
-                if targetElement.tag in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
-                    isAnnoForHeadingContent = True
-                else:
-                    for ancestor in targetElement.iterancestors():
-                        if ancestor.tag in ['body', 'main', 'article', 'aside',
-                                            'nav', 'section', 'header', 'footer']:
-                            break
-                        targetElement = ancestor
-                        if ancestor.tag in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
-                            isAnnoForHeadingContent = True
-                            break
-                        if ancestor.tag in ['td', 'dt', 'dd', 'li']:
-                            isAnnoForListItemOrTableContent = True
-                            break
-                        if ancestor.tag in ['pre', 'xmp', 'p']:
-                            break
             if "engines" in feature:
                 engines = len(feature["engines"])
                 if engines < 2:
