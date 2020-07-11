@@ -807,6 +807,17 @@ def parseWptDisplay(key, val, lineNum):
     return "none"
 
 
+def parsePreviousVersion(key, val, lineNum):
+    biblioMatch = re.match(r"from biblio(\s+\S+)?", val.lower())
+    if biblioMatch:
+        if biblioMatch.group(1):
+            return [{"type":"from-biblio", "value":biblioMatch.group(1).strip()}]
+        else:
+            return [{"type":"from-biblio-implicit"}]
+    else:
+        return [{"type":"url", "value":val}]
+
+
 def parseInlineTagCommand(key, val, lineNum):
     tag,_,command = val.strip().partition(" ")
     command = command.strip()
@@ -1073,7 +1084,7 @@ knownKeys = {
     "Note Class": Metadata("Note Class", "noteClass", joinValue, parseLiteral),
     "Opaque Elements": Metadata("Opaque Elements", "opaqueElements", joinList, parseCommaSeparated),
     "Prepare For Tr": Metadata("Prepare For Tr", "prepTR", joinValue, parseBoolean),
-    "Previous Version": Metadata("Previous Version", "previousVersions", joinList, parseLiteralList),
+    "Previous Version": Metadata("Previous Version", "previousVersions", joinList, parsePreviousVersion),
     "Remove Multiple Links": Metadata("Remove Multiple Links", "removeMultipleLinks", joinValue, parseBoolean),
     "Repository": Metadata("Repository", "repository", joinValue, parseRepository),
     "Required Ids": Metadata("Required Ids", "requiredIDs", joinList, parseIdList),

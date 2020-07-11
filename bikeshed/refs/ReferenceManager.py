@@ -482,16 +482,8 @@ class ReferenceManager(object):
             return
         key = text.lower()
         while True:
-            if key not in self.biblios:
-                # Try to load the group up, if necessary
-                group = key[0:2]
-                if group not in self.loadedBiblioGroups:
-                    with self.dataFile.fetch("biblio", "biblio-{0}.data".format(group), okayToFail=True) as lines:
-                        biblio.loadBiblioDataFile(lines, self.biblios)
-                self.loadedBiblioGroups.add(group)
-            # Check if it's there
-            if key in self.biblios:
-                candidates = self.biblios[key]
+            candidates = self.bibliosFromKey(key)
+            if candidates:
                 break
 
             # Did it fail because SpecRef *only* has the *un*versioned name?
@@ -523,7 +515,7 @@ class ReferenceManager(object):
                 die("A biblio link references {0}, but only {1} exists in SpecRef.", text, config.englishFromList(numericSuffixes))
             return None
 
-        candidate = stripLineBreaks(sorted(candidates, key=itemgetter('order'))[0])
+        candidate = self._bestCandidateBiblio(candidates)
         # TODO: When SpecRef definitely has all the CSS specs, turn on this code.
         # if candidates[0]['order'] > 3: # 3 is SpecRef level
         #    warn("Bibliography term '{0}' wasn't found in SpecRef.\n         Please find the equivalent key in SpecRef, or submit a PR to SpecRef.", text)
@@ -548,6 +540,50 @@ class ReferenceManager(object):
             bib.originalLinkText, bib.linkText = bib.linkText, self.preferredBiblioNames[bib.linkText]
 
         return bib
+
+
+    def bibliosFromKey(self, key):
+        # Load up the biblio data necessary to fetch the given key
+        # and then actually fetch it.
+        # If you don't call this,
+        # the current data might not be reliable.
+        if key not in self.biblios:
+            # Try to load the group up, if necessary
+            group = key[0:2]
+            if group not in self.loadedBiblioGroups:
+                with self.dataFile.fetch("biblio", "biblio-{0}.data".format(group), okayToFail=True) as lines:
+                    biblio.loadBiblioDataFile(lines, self.biblios)
+            self.loadedBiblioGroups.add(group)
+        return self.biblios.get(key, [])
+
+
+    def _bestCandidateBiblio(self, candidates):
+        return stripLineBreaks(sorted(candidates, key=itemgetter('order'))[0])
+
+
+    def getLatestBiblioRef(self, key, el=None, quiet=False):
+        # Takes a biblio reference name,
+        # returns the latest dated variant of that name
+        # (names in the form FOO-19700101)
+        candidates = self.bibliosFromKey(key)
+        if not candidates:
+            return None
+        latestDate = None
+        latestRefs = None
+        for k,biblios in self.biblios.items():
+            if not k.startswith(key):
+                continue
+            match = re.search(r"(\d{8})$", k)
+            if not match:
+                continue
+            date = match.group(1)
+            if latestDate is None or date > latestDate:
+                latestDate = date
+                latestRefs = biblios
+        if latestRefs is None:
+            return None
+        return biblio.BiblioEntry(**self._bestCandidateBiblio(latestRefs))
+
 
     def vNamesFromSpecNames(self, specName):
         # Takes an unversioned specName,

@@ -784,6 +784,21 @@ def addSpecMetadataSection(doc):
             return E.a({"href": url, "hreflang": lang, "rel": "alternate"},
                        lang)
 
+    def printPreviousVersion(v):
+        if v['type'] == "url":
+            return E.a({"href":v['value'], "rel":"prev"}, v['value'])
+        else:
+            if v['type'] == "from-biblio":
+                key = v['value']
+            else: # "from-biblio-implicit"
+                key = doc.md.vshortname
+            dated = doc.refs.getLatestBiblioRef(key)
+            if not dated:
+                die(f"While trying to generate a Previous Version line, couldn't find a dated biblio reference for {key}.")
+                return
+            return E.a({"href":dated.url, "rel":"prev"}, dated.url)
+
+
     md = DefaultOrderedDict(list)
     mac = doc.macros
     if 'version' in mac:
@@ -793,7 +808,7 @@ def addSpecMetadataSection(doc):
     if doc.md.ED and doc.md.status in config.snapshotStatuses:
         md["Editor's Draft"].append(E.a({"href": doc.md.ED}, doc.md.ED))
     if doc.md.previousVersions:
-        md["Previous Versions"] = [E.a({"href":ver, "rel":"prev"}, ver) for ver in doc.md.previousVersions]
+        md["Previous Versions"] = [printPreviousVersion(ver) for ver in doc.md.previousVersions]
     if doc.md.versionHistory:
         md["Version History"] = [E.a({"href":vh}, vh) for vh in doc.md.versionHistory]
     if doc.md.mailingList:
