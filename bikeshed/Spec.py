@@ -201,7 +201,6 @@ class Spec(object):
         biblio.dedupBiblioReferences(self)
         verifyUsageOfAllLocalBiblios(self)
         caniuse.addCanIUsePanels(self)
-        mdnspeclinks.addMdnPanels(self)
         boilerplate.addIndexSection(self)
         boilerplate.addExplicitIndexes(self)
         boilerplate.addStyles(self)
@@ -217,6 +216,8 @@ class Spec(object):
         processAutolinks(self)
         boilerplate.addAnnotations(self)
         boilerplate.removeUnwantedBoilerplate(self)
+        # Add MDN panels after all IDs/anchors have been added
+        mdnspeclinks.addMdnPanels(self)
         highlight.addSyntaxHighlighting(self)
         boilerplate.addBikeshedBoilerplate(self)
         fingerprinting.addTrackingVector(self)
