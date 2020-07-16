@@ -86,7 +86,7 @@ def addMdnPanels(doc):
             .mdn-anno > .feature > .support > .webview_android::before { background-image: url(https://resources.whatwg.org/browser-logos/android-webview.png); }
             .name-slug-mismatch { color: red }
             .caniuse-status:hover { z-index: 9; }
-            
+
             /* dt, li, .issue, .note, and .example are "position: relative", so to put annotation at right margin, must move to right of containing block */
             .h-entry:not(.status-LS) dt > .mdn-anno, .h-entry:not(.status-LS) li > .mdn-anno, .h-entry:not(.status-LS) .issue > .mdn-anno, .h-entry:not(.status-LS) .note > .mdn-anno, .h-entry:not(.status-LS) .example > .mdn-anno { right: -6.7em; }
             .h-entry p + .mdn-anno { margin-top: 0; }
@@ -137,10 +137,7 @@ def panelsFromData(doc, data):
         featureDivs = []
         targetElement = find(f"[id='{elementId}']", doc)
         if targetElement is None:
-            msg = f"No '{elementId}' ID found."
-            if "slug" in feature:
-                msg += f" Update {mdnBaseUrl}{feature['slug']} Specifications Table?"
-            warn(msg)
+            warn(f"No '{elementId}' ID found, skipping MDN features that would target it.")
             continue
         else:
             panels = True
