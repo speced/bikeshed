@@ -233,6 +233,12 @@ def transformShorthandElements(doc):
             return True
         return False
     for el in findAll("l", doc):
+        # Autolinks that aren't HTML-parsing-compatible
+        # are already specially handled by fixAwkwardCSSShorthands().
+        child = hasOnlyChild(el)
+        if child is not None and child.get("bs-autolink-syntax") is not None:
+            continue
+
         text = textContent(el)
         if replacer(propdescRe, propdescReplacer, el, text):
             continue
@@ -248,7 +254,6 @@ def transformShorthandElements(doc):
             continue
         if replacer(varRe, varReplacer, el, text):
             continue
-        # TODO: handle "maybe" autolinks
         die("<l> element doesn't contain a recognized autolinking syntax:\n{0}", outerHTML(el), el=el)
         el.tag = "span"
 
