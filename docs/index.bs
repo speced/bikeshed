@@ -1769,57 +1769,6 @@ is highlighted,
 the entire "line" element gets highlighted.
 
 
-Property/descriptor/element definition table expansion {#table-expansion}
-------------------------------------------------------
-
-Propdef tables are rather large, even when correctly formatted.
-Instead, you can write the table in a simple text format similar to the spec's metadata block,
-and let the processor automatically generate a <{table}> from it:
-
-<xmp highlight=html>
-	<pre class='propdef'>
-	Name: flex-basis
-	Value: content | <<'width'>>
-	Initial: auto
-	Applies to: <a>flex items</a>
-	Inherited: no
-	Computed value: as specified, with lengths made absolute
-	Percentages: relative to the <a>flex container's</a> inner <a>main size</a>
-	Animation type: length
-	</pre>
-</xmp>
-
-The data block is parsed as a series of lines,
-with each line composed of one of the propdef headings, a colon, then the value.
-
-The property name will automatically be wrapped in a <{dfn}> element.
-Within the `Value` line, things that look like grammar nonterminals (anything like `<foo>`) will be automatically escaped and wrapped in <{var}> elements.
-
-This also works for descdef tables, describing the syntax of descriptors.
-When writing a descdef table, you should additionally add a `For` line containing the name of the at-rule the descriptor is for.
-
-If you're defining a *partial* propdef or descdef
-(for example, just defining a few new values for an existing property),
-you can indicate this by adding a "partial" class to the <{pre}>.
-(This will prevent Bikeshed from complaining about lots of missing propdef/descdef lines.)
-
-The format of an elementdef table is a little different.  It can contain the following lines:
-
-* **Name** - the element name(s)
-* **Categories** - what "categories" the element is classified in, such as "flow content" or "graphics element".
-	These must be defined terms, as Bikeshed will attempt to link them.
-* **Contexts** - what contexts the element can be used in
-* **Content Model** - what kind of elements and other nodes can validly appear inside the element
-* **Attributes** - what attributes are defined for the element.
-	These must be defined (as `element-attr` definitions), as Bikeshed will attempt to link to them.
-* **Attribute Groups** - optional. If some attributes commonly appear on lots of elements, you can classify them into groups and list them here.
-	The group name must be defined as a `dfn` type definition,
-	with the attributes in the group defined as `element-attr` definitions with a `for` value of the group name.
-	Bikeshed will expand the group into a `<details>` element for you and automatically link the attributes.
-* **DOM Interfaces** - list the IDL interfaces that correspond to the elements defined in the block.
-	These must be defined (as `interface` definitions), as Bikeshed will attempt to link to them.
-
-
 Automatic ID Generation {#id-gen}
 -----------------------
 
@@ -2933,6 +2882,242 @@ This includes any notes (`class=note`), examples (`class=example`),
 or sections manually marked with `class=non-normative`.
 (You can override this and get a normative reference
 by adding a `class=normative` to the link or an ancestor.)
+
+
+<!--
+████████  ████████ ████████ ████████  ██        ███████   ██████  ██    ██  ██████
+██     ██ ██       ██       ██     ██ ██       ██     ██ ██    ██ ██   ██  ██    ██
+██     ██ ██       ██       ██     ██ ██       ██     ██ ██       ██  ██   ██
+██     ██ ██████   ██████   ████████  ██       ██     ██ ██       █████     ██████
+██     ██ ██       ██       ██     ██ ██       ██     ██ ██       ██  ██         ██
+██     ██ ██       ██       ██     ██ ██       ██     ██ ██    ██ ██   ██  ██    ██
+████████  ████████ ██       ████████  ████████  ███████   ██████  ██    ██  ██████
+-->
+
+Definition Tables {#def-blocks}
+=================
+
+Several types of definitions have well-established presentations,
+as a simple "key/value" table providing all of the details
+in a standardized format.
+
+Bikeshed handles these specially,
+with a dedicated set of `<pre class=xxxdef>` blocks.
+The information in the block is presented in a simple line-based `Key: value` format,
+similar to `<pre class=metadata>`,
+and this is transformed into a standardized <{table}>.
+
+All of the def tables look like this:
+
+<xmp highlight=html>
+	<pre class='propdef'>
+	Name: flex-basis
+	Value: content | <<'width'>>
+	Initial: auto
+	Inherited: no
+	Applies to: <a>flex items</a>
+	Computed value: as specified, with lengths made absolute
+	Percentages: relative to the <a>flex container's</a> inner <a>main size</a>
+	Animation type: length
+	Canonical Order: per grammar
+	</pre>
+</xmp>
+
+CSS Property Tables {#propdef-block}
+-------------------
+
+CSS properties are defined with a `<pre class="propdef">` block.
+
+`Name`, `Value`, `Initial`, and `Inherited` are all required.
+
+* `Name` gives the property name.
+	It will be automatically wrapped in a <{dfn}> by Bikeshed,
+	so there's no need to do anything manually.
+	Multiple comma-separated property names can be given,
+	if several properties share identical propdef blocks.
+* `Value` gives the grammar for the property,
+	written in CSS's [[css-values-4#value-defs|Value Definition Syntax]].
+	Anything that looks like a grammar non-terminal (like `<foo>`)
+	will automatically be escaped and linked appropriately,
+	so you don't need to manually autolink it.
+* `Initial` gives the initial value of the property.
+* `Inherited` must be "yes" or "no".
+
+All the other keys listed in the block above are optional.
+If left unspecified,
+they'll be given a usually-reasonable default value:
+
+* `Applies to` defaults to "all elements".
+	It specifies what subset of elements the property has meaning for.
+* `Percentages` defaults to "n/a".
+	It specifies what value percentages are resolved against,
+	if the property takes percentage values at all.
+* `Computed Value` defaults to "as specified".
+	It specifies what, if any, canonicalization occurs
+	when transforming specified values to computed values.
+	(Complex values should use "see prose" and define it in prose instead.)
+* `Canonical Order` defaults to "per grammar".
+	It specifies what order values are serialized in,
+	if values are rearrangle when parsing.
+	(The default is almost always correct;
+	usually only properties with unusual legacy constraints on their serialization
+	will need to specify anything for this.)
+* `Animation Type` defaults to "discrete".
+	It specifies the [=Animation Type=] of the values.
+
+All values are placed directly into the output HTML as written,
+so HTML tags, Bikeshed autolinks, etc can all be used as normal.
+
+If defining a shorthand property,
+put a `"shorthand"` class on the block.
+This will change the block to only require `Name` and `Value`;
+`Canonical Order` is still allowed,
+but continues to default to "per grammar" as usual.
+All other keys will default to "see individual properties",
+which is usually all you need.
+
+If adding some values to a property,
+rather than defining the property itself,
+put a `"partial"` class on the block.
+It will now require a `New Values` key,
+rather than `Value`,
+but is otherwise normal.
+
+Additional keys beyond what is described here can be provided;
+they're placed after all the built-in keys.
+
+The end result looks like:
+
+<pre class='propdef'>
+Name: flex-basis
+Value: content | <<'width'>>
+Initial: auto
+Inherited: no
+Applies to: <a>flex items</a>
+Computed value: as specified, with lengths made absolute
+Percentages: relative to the <a>flex container's</a> inner <a>main size</a>
+Animation type: length
+Canonical Order: per grammar
+</pre>
+
+
+CSS Descriptor Tables {#descdef-block}
+---------------------
+
+CSS descriptors
+(like properties, but for at-rules)
+have def blocks similar to,
+but simpler than,
+propdef blocks.
+
+`Name`, `Value`, and `Initial` are required keys,
+just like propdef blocks.
+Additionally, `For` is required,
+giving the name of the at-rule the descriptor is for,
+like `For: @counter-style`.
+The rest of the propdef keys are not meaningful for descriptors.
+
+Like propdef blocks,
+a `"partial"` class can be put on the block
+to indicate that you're adding values to an existing definition;
+`Name`, `For`, and `New Values` must be provided.
+
+While not technically descriptors,
+media features can be defined with this block as well,
+if an `"mq"` class is put on the block.
+It then only requires `Name`, `For`, and `Value`.
+
+Additional keys beyond what is described here can be provided;
+they're placed after all the built-in keys.
+
+
+HTML Element Tables {#elementdef-block}
+-------------------
+
+HTML/SVG/etc elements can use a `<pre class="elementdef">` block.
+(The content and presentation of this block is similar to that in the HTML standard,
+but is closer to that in the SVG standard.)
+
+* **Name** - required.
+	Gives the element name.
+	Can provide multiple element names, comma-separated.
+	The names will automatically be wrapped in a <{dfn}> for you.
+* **Categories** - required.
+	What [[html#kinds-of-content|element categories]] the element is part of.
+	Can provide multiple values, comma-separated.
+	The names will automatically be wrapped in links for you,
+	of `dfn` type.
+* **Contexts** - required.
+	The [[html#element-definitions|contexts in which the element can be used]].
+	This is freeform HTML.
+* **Content model** - required.
+	The [[html#element-definitions|types of contents the element can contain]].
+	This is freeform HTML.
+* **Attributes** and/or **Attribute Groups** - at least one is required.
+	A comma-separated list of attribute names
+	and/or attribute groups
+	that this element can have.
+	These will be automatically be wrapped in links for you--
+	`element-attr` type for attributes,
+	and `dfn` type for attribute groups
+	(like "core attributes" in SVG).
+* **DOM interfaces** - required.
+	A comma-separated list of WebIDL interface names
+	corresponding to the elements being defined.
+	The names will automatically be wrapped in links for you,
+	of `interface` type.
+
+Additional keys beyond what is described here can be provided;
+they're placed after all the built-in keys.
+
+
+IDL Method Argument Tables {#argumentdef-block}
+--------------------------
+
+IDL methods can have their arguments defined & documented in a `<pre class="argumentdef">` block:
+
+<xmp highlight=html>
+	<pre class=idl>
+		interface Foo {
+			void bar(long arg1, DOMString? arg2);
+		};
+	</pre>
+
+	<pre class=argumentdef for="Foo/bar()">
+	arg1: here's the first arg
+	arg2: the second arg is different!
+	</pre>
+</xmp>
+
+The `argumentdef` block must specify what method the arguments are for
+in a `for` attribute on the `<pre>`.
+The contents of the element must then,
+on each line,
+list the argument name,
+a colon,
+then a description of that argument.
+
+It will produce a table listing each argument,
+its description,
+and automatically contain its type, nullability, and optionality
+(determined from the IDL block),
+like:
+
+<pre class=idl style="display:none">
+	interface Foo {
+		void bar(long arg1, DOMString? arg2);
+	};
+</pre>
+
+<pre class=argumentdef for="Foo/bar()">
+arg1: here's the first arg
+arg2: the second arg is different!
+</pre>
+
+Note: This automatically wraps the argument names in a `<dfn>`;
+this is meant to be the canonical location of the argument's definition.
+
+
 
 <!--
 ████ ████████  ██
