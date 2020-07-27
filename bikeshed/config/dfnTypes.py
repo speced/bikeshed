@@ -103,7 +103,7 @@ def linkTypeIn(linkTypes, targetTypes="all"):
 # Elements that are allowed to provide definitions to Shepherd
 dfnElements = frozenset(["dfn", "h2", "h3", "h4", "h5", "h6"])
 anchorishElements = dfnElements.union(["a"])
-dfnElementsSelector = "dfn:not([ignore]), h2[data-dfn-type], h3[data-dfn-type], h4[data-dfn-type], h5[data-dfn-type], h6[data-dfn-type]"
+dfnElementsSelector = "dfn:not([data-var-ignore]), h2[data-dfn-type], h3[data-dfn-type], h4[data-dfn-type], h5[data-dfn-type], h6[data-dfn-type]"
 
 
 # Some of the more significant types and their patterns

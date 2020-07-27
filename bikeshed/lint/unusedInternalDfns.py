@@ -3,6 +3,7 @@
 import re
 from ..html import *
 from ..messages import *
+from ..config import dfnElementsSelector
 
 def unusedInternalDfns(doc):
 	'''
@@ -10,7 +11,7 @@ def unusedInternalDfns(doc):
 	If you don't actually *use* a noexport dfn, that's probably an error.
 	In particular, this'll probably help find *untagged* dfns that are defaulting to noexport.
 	'''
-	noexportDfns = [el for el in findAll("dfn", doc) if el.get("data-noexport") == "by-default"]
+	noexportDfns = [el for el in findAll(dfnElementsSelector, doc) if el.get("data-noexport") == "by-default"]
 
 	def local(el):
 		return (el.get("href") is not None
