@@ -534,22 +534,23 @@ def fillAttributeInfoSpans(doc):
             if default is not None:
                 decorations.append(", defaulting to ")
                 decorations.append(E.code(default))
-            if datatype[0] == "(":
-                # Union type
-                # TODO(Nov 2015): actually handle this properly, don't have time to think through it right now.
-                appendChild(el,
-                            " of type ",
-                            E.code({"class":"idl-code"}, datatype),
-                            *decorations)
-            elif re.match(r"(\w+)<(\w+)>", datatype):
-                # Sequence type
-                match = re.match(r"(\w+)<(\w+)>", datatype)
+            if re.match(r"\w+<\w+(\s*,\s*\w+)*>", datatype):
+                # Simple higher-kinded types
+                match = re.match(r"(\w+)<(\w+(?:\s*,\s*\w+)*)>", datatype)
+                types = [E.a({"data-link-type":"idl-name"}, x.strip()) for x in match.group(2).split(",")]
                 appendChild(el,
                             " of type ",
                             match.group(1),
                             "<",
-                            E.a({"data-link-type":"idl-name"}, match.group(2)),
+                            config.intersperse(types, ", "),
                             ">",
+                            *decorations)
+            elif "<" in datatype or "(" in datatype:
+                # Unions or more-complex higher-kinded types
+                # Currently just bail, but I need to address this at some point.
+                appendChild(el,
+                            " of type ",
+                            E.code({"class":"idl-code"}, datatype),
                             *decorations)
             else:
                 # Everything else
