@@ -925,9 +925,6 @@ def addSelfLinks(doc):
     foundFirstNumberedSection = False
     for el in findAll("h2, h3, h4, h5, h6", doc):
         foundFirstNumberedSection = foundFirstNumberedSection or (el.get('data-level') is not None)
-        if el in dfnElements:
-            # It'll get a self-link or dfn-panel later.
-            continue
         if foundFirstNumberedSection:
             appendChild(el, makeSelfLink(el))
     for el in findAll(".issue[id], .example[id], .note[id], li[id], dt[id]", doc):
