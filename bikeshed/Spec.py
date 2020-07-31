@@ -11,6 +11,7 @@ from datetime import datetime
 from . import biblio
 from . import boilerplate
 from . import caniuse
+from . import dfns
 from . import mdnspeclinks
 from . import config
 from . import constants
@@ -194,7 +195,7 @@ class Spec(object):
         processBiblioLinks(self)
         processDfns(self)
         idl.processIDL(self)
-        fillAttributeInfoSpans(self)
+        dfns.annotateDfns(self)
         formatArgumentdefTables(self)
         formatElementdefTables(self)
         processAutolinks(self)
