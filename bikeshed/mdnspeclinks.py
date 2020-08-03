@@ -98,7 +98,7 @@ def addMdnPanels(doc):
             '''  # noqa
 
 def createAnno(className, mdnButton, featureDivs):
-    return E.aside({"class": className}, mdnButton, featureDivs)
+    return E.div({"class": className}, mdnButton, featureDivs)
 
 def panelsFromData(doc, data):
     mdnBaseUrl = "https://developer.mozilla.org/en-US/docs/Web/"
