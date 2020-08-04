@@ -131,6 +131,8 @@ def panelsFromData(doc, data):
 
     panels = False
     for elementId, features in data.items():
+        isAnnoForHeadingContent = False
+        isAnnoForListItemOrTableContent = False
         lessThanTwoEngines = 0
         onlyTwoEngines = 0
         allEngines = 0
@@ -158,8 +160,6 @@ def panelsFromData(doc, data):
                     if ancestor.tag in ['pre', 'xmp', 'p']:
                         break
         for feature in features:
-            isAnnoForHeadingContent = False
-            isAnnoForListItemOrTableContent = False
             if "engines" in feature:
                 engines = len(feature["engines"])
                 if engines < 2:
