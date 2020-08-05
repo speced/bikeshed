@@ -4,7 +4,9 @@
 import hashlib
 import io
 import os
+import queue
 import requests
+import threading
 from datetime import datetime
 
 from ..messages import *
@@ -143,28 +145,54 @@ def updateByManifest(path, dryRun=False):
         lastMsgTime = time.time()
         if newPaths:
             say("Updating {0} file{1}...", len(newPaths), "s" if len(newPaths) > 1 else "")
-        for i,filePath in enumerate(newPaths):
-            remotePath = ghPrefix + filePath
-            localPath = localizePath(path, filePath)
-            try:
-                newFile = requests.get(remotePath).text
-            except Exception as e:
-                warn("Couldn't download file '{0}'.\n{1}", remotePath, e)
-                return False
-            try:
-                dirPath = os.path.dirname(localPath)
-                if not os.path.exists(dirPath):
-                    os.makedirs(dirPath)
-                with io.open(localPath, 'w', encoding="utf-8") as fh:
-                    fh.write(newFile)
-            except Exception as e:
-                warn("Couldn't save file '{0}'.\n{1}", localPath, e)
-                return False
 
-            currFileTime = time.time()
-            if (currFileTime - lastMsgTime) >= messageDelta:
-                say("Updated {0}/{1}...", i+1, len(newPaths))
-                lastMsgTime = currFileTime
+        updateQueue = queue.Queue()
+        success = True
+        # This worker will download from remote, and update success if it fails.
+        def worker():
+            # Needed to update status and progress.
+            nonlocal success
+            nonlocal lastMsgTime
+            while True:
+                (i, filePath) = updateQueue.get()
+                remotePath = ghPrefix + filePath
+                localPath = localizePath(path, filePath)
+                try:
+                    newFile = requests.get(remotePath).text
+                except Exception as e:
+                    warn("Couldn't download file '{0}'.\n{1}", remotePath, e)
+                    success = False
+                try:
+                    dirPath = os.path.dirname(localPath)
+                    if not os.path.exists(dirPath):
+                        os.makedirs(dirPath)
+                    with io.open(localPath, 'w', encoding="utf-8") as fh:
+                        fh.write(newFile)
+                except Exception as e:
+                    warn("Couldn't save file '{0}'.\n{1}", localPath, e)
+                    success = False
+
+                currFileTime = time.time()
+                if (currFileTime - lastMsgTime) >= messageDelta:
+                    say("Updated {0}/{1}...", i+1, len(newPaths))
+                    lastMsgTime = currFileTime
+                updateQueue.task_done()
+
+        # Enqueue all the files to update. i is used for printing progress.
+        for i,filePath in enumerate(newPaths):
+            updateQueue.put((i, filePath))
+
+        # Create as many threads as we can.
+        for i in range(len(os.sched_getaffinity(0))):
+            t = threading.Thread(target=worker, daemon=True).start()
+
+        # Wait for all the requests to be done.
+        updateQueue.join()
+
+        # If any of the request fail, update has failed.
+        if not success:
+            return False
+
         try:
             with io.open(os.path.join(path, "manifest.txt"), 'w', encoding="utf-8") as fh:
                 fh.write("\n".join(remoteManifest))
