@@ -1158,7 +1158,14 @@ def formatArgumentdefTables(doc):
             argName = textContent(tds[0]).strip()
             arg = method.find_argument(argName)
             if arg:
-                appendChild(tds[1], str(arg.type))
+                argType = str(arg.type).strip()
+                # If the argument is a sequence, link to the element type
+                if (arg.type.type.type.sequence):
+                    baseType = str(arg.type.type.type.type).strip()
+                    appendChild(tds[1], E.a({"data-link-type":"idl-name", "data-lt":baseType}, argType))
+                else:
+                    appendChild(tds[1], E.a({"data-link-type":"idl-name"}, argType))
+
                 if str(arg.type).strip().endswith("?"):
                     appendChild(tds[2],
                                 E.span({"class":"yes"}, "✔"))
