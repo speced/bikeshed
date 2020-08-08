@@ -5,6 +5,7 @@ import hashlib
 import io
 import os
 import requests
+import time
 from datetime import datetime
 
 from ..messages import *
@@ -32,6 +33,8 @@ knownFolders = [
     "headings",
     "mdn",
 ]
+
+ghPrefix = "https://raw.githubusercontent.com/tabatkins/bikeshed-data/master/data/"
 
 def createManifest(path, dryRun=False):
     '''Generates a manifest file for all the data files.'''
@@ -85,7 +88,6 @@ def updateByManifest(path, dryRun=False):
     Returns False if updating failed and a full update should be performed;
     returns True if updating was a success.
     '''
-    ghPrefix = "https://raw.githubusercontent.com/tabatkins/bikeshed-data/master/data/"
     say("Updating via manifest...")
     try:
         with io.open(os.path.join(path, "manifest.txt"), 'r', encoding="utf-8") as fh:
@@ -138,34 +140,20 @@ def updateByManifest(path, dryRun=False):
             print("Deleted {0} old data file{1}.".format(len(deletedPaths), "s" if len(deletedPaths) > 1 else ""))
 
     if not dryRun:
-        import time
+        if newPaths:
+            say("Updating {0} file{1}...", len(newPaths), "s" if len(newPaths) > 1 else "")
+
         messageDelta = 2.5 # wall time
         lastMsgTime = time.time()
         session = requests.Session()
-        if newPaths:
-            say("Updating {0} file{1}...", len(newPaths), "s" if len(newPaths) > 1 else "")
-        for i,filePath in enumerate(newPaths):
-            remotePath = ghPrefix + filePath
-            localPath = localizePath(path, filePath)
-            try:
-                newFile = session.get(remotePath).text
-            except Exception as e:
-                warn("Couldn't download file '{0}'.\n{1}", remotePath, e)
-                return False
-            try:
-                dirPath = os.path.dirname(localPath)
-                if not os.path.exists(dirPath):
-                    os.makedirs(dirPath)
-                with io.open(localPath, 'w', encoding="utf-8") as fh:
-                    fh.write(newFile)
-            except Exception as e:
-                warn("Couldn't save file '{0}'.\n{1}", localPath, e)
-                return False
 
+        for i,filePath in enumerate(newPaths):
+            updateFile(path, i, filePath, session)
             currFileTime = time.time()
             if (currFileTime - lastMsgTime) >= messageDelta:
                 say("Updated {0}/{1}...", i+1, len(newPaths))
                 lastMsgTime = currFileTime
+
         try:
             with io.open(os.path.join(path, "manifest.txt"), 'w', encoding="utf-8") as fh:
                 fh.write("\n".join(remoteManifest))
@@ -174,6 +162,25 @@ def updateByManifest(path, dryRun=False):
             return False
     say("Done!")
     return True
+
+def updateFile(localPrefix, i, filePath, session):
+    remotePath = ghPrefix + filePath
+    localPath = localizePath(localPrefix, filePath)
+    try:
+        newFile = session.get(remotePath).text
+    except Exception as e:
+        warn("Couldn't download file '{0}'.\n{1}", remotePath, e)
+        return False
+    try:
+        dirPath = os.path.dirname(localPath)
+        if not os.path.exists(dirPath):
+            os.makedirs(dirPath)
+        with io.open(localPath, 'w', encoding="utf-8") as fh:
+            fh.write(newFile)
+    except Exception as e:
+        warn("Couldn't save file '{0}'.\n{1}", localPath, e)
+        return False
+
 
 
 def localizePath(root, relPath):
