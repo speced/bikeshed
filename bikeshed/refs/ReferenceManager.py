@@ -331,8 +331,11 @@ class ReferenceManager(object):
                 for dfnSpec, dfnType, dfnStatus, dfnFor in reversed(self.defaultSpecs[variedTexts[0]]):
                     if not config.linkTypeIn(dfnType, linkType):
                         continue
-                    if linkFor and dfnFor and linkFor != dfnFor:
-                        continue
+                    if linkFor and dfnFor:
+                        if isinstance(linkFor, str) and linkFor != dfnFor:
+                            continue
+                        if dfnFor not in linkFor:
+                            continue
                     spec = spec or dfnSpec
                     status = status or dfnStatus
                     linkFor = linkFor or dfnFor
@@ -361,14 +364,16 @@ class ReferenceManager(object):
             export = None
         refs, failure = self.foreignRefs.queryRefs(text=text, linkType=linkType, spec=spec, status=status, statusHint=statusHint, linkFor=linkFor, linkForHint=linkForHint, explicitFor=explicitFor, export=export, ignoreObsoletes=True)
 
-        if failure and linkType in ("argument", "idl") and linkFor is not None and linkFor.endswith("()"):
+        if failure and linkType in ("argument", "idl") and linkFor is not None and any(x.endswith("()") for x in linkFor):
             # foo()/bar failed, because foo() is technically the wrong signature
             # let's see if we can find the right signature, and it's unambiguous
-            while True:  # Hack for early exits
-                if "/" in linkFor:
-                    interfaceName, _, methodName = linkFor.partition("/")
+            for lf in linkFor:
+                if not lf.endswith("()"):
+                    continue
+                if "/" in lf:
+                    interfaceName, _, methodName = lf.partition("/")
                 else:
-                    methodName = linkFor
+                    methodName = lf
                     interfaceName = None
                 methodSignatures = self.foreignRefs.methods.get(methodName, None)
                 if methodSignatures is None:

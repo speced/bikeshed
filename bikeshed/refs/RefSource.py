@@ -105,6 +105,8 @@ class RefSource(object):
 
         def forRefsIterator(targetFors):
             # Same as above, but only grabs those for certain values
+            if isinstance(targetFors, str):
+                targetFors = [targetFors]
             for for_ in targetFors:
                 for text in self.fors[for_]:
                     for ref in self.fetchRefs(text):
@@ -122,7 +124,7 @@ class RefSource(object):
                     textsToSearch += [t.lower() for t in textsToSearch]
                 refs = list(textRefsIterator(textsToSearch))
         elif linkFor:
-            refs = list(forRefsIterator([linkFor]))
+            refs = list(forRefsIterator(linkFor))
         else:
             refs = list(allRefsIterator())
         if not refs:
@@ -163,10 +165,15 @@ class RefSource(object):
         ✔ | ✔ | ✔ = A/
         '''
         def filterByFor(refs, linkFor):
-            if linkFor == "/":
-                return [x for x in refs if not x.for_]
-            elif linkFor:
-                return [x for x in refs if linkFor in x.for_]
+            return [x for x in refs if matchFor(x.for_, linkFor)]
+        def matchFor(forVals, forTest):
+            # forTest can be a string, either / for no for or the for value to match,
+            # or an array of strings, of which any can match
+            if forTest == "/":
+                return not bool(forVals)
+            if isinstance(forTest, str):
+                return forTest in forVals
+            return any(matchFor(forVals, ft) for ft in forTest)
 
         if linkFor:
             refs = filterByFor(refs, linkFor)
