@@ -141,13 +141,14 @@ def updateByManifest(path, dryRun=False):
         import time
         messageDelta = 2.5 # wall time
         lastMsgTime = time.time()
+        session = requests.Session()
         if newPaths:
             say("Updating {0} file{1}...", len(newPaths), "s" if len(newPaths) > 1 else "")
         for i,filePath in enumerate(newPaths):
             remotePath = ghPrefix + filePath
             localPath = localizePath(path, filePath)
             try:
-                newFile = requests.get(remotePath).text
+                newFile = session.get(remotePath).text
             except Exception as e:
                 warn("Couldn't download file '{0}'.\n{1}", remotePath, e)
                 return False
