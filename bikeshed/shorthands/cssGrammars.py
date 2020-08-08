@@ -1,5 +1,5 @@
 import re
-from ..html import E
+from ..h import E
 from . import steps
 
 class HashMultShorthand:

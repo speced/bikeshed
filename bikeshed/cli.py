@@ -391,9 +391,9 @@ def handleProfile(options, extras):
     root = "--root=\"{0}\"".format(options.root) if options.root else ""
     leaf = "--leaf=\"{0}\"".format(options.leaf) if options.leaf else ""
     if options.svgFile:
-        os.system("time python -m cProfile -o stat.prof ~/bikeshed/bikeshed.py -f spec && gprof2dot -f pstats --skew=.0001 {root} {leaf} stat.prof | dot -Tsvg -o {svg} && rm stat.prof".format(root=root, leaf=leaf, svg=options.svgFile))
+        os.system("time python -m cProfile -o stat.prof -m bikeshed -f spec && gprof2dot -f pstats --skew=.0001 {root} {leaf} stat.prof | dot -Tsvg -o {svg} && rm stat.prof".format(root=root, leaf=leaf, svg=options.svgFile))
     else:
-        os.system("time python -m cProfile -o /tmp/stat.prof ~/bikeshed/bikeshed.py -f spec && gprof2dot -f pstats --skew=.0001 {root} {leaf} /tmp/stat.prof | xdot &".format(root=root, leaf=leaf))
+        os.system("time python -m cProfile -o /tmp/stat.prof -m bikeshed -f spec && gprof2dot -f pstats --skew=.0001 {root} {leaf} /tmp/stat.prof | xdot &".format(root=root, leaf=leaf))
 
 
 def handleTemplate(options, extras):

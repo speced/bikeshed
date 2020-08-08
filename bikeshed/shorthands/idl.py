@@ -1,7 +1,7 @@
 import re
 
 from .. import config
-from ..html import E, outerHTML
+from ..h import E, outerHTML
 from ..messages import die
 
 from . import steps

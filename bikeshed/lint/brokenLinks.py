@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import logging
-from ..html import *
+from ..h import *
 from ..messages import *
 
 def brokenLinks(doc):

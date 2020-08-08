@@ -1,6 +1,6 @@
 <<<<<<< HEAD
 import re
-from ..html import E, outerHTML
+from ..h import E, outerHTML
 from . import steps
 from ..messages import die
 

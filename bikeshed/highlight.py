@@ -4,7 +4,7 @@ import collections
 import itertools
 import re
 from . import config
-from .html import *
+from .h import *
 from .messages import *
 
 

@@ -8,7 +8,7 @@ import attr
 from . import biblio
 from . import config
 from . import Line
-from .html import *
+from .h import *
 from .messages import *
 from functools import reduce
 

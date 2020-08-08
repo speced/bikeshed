@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 
-from .html import *
+from .h import *
 
 trackingVectorId = "b732b3fe" # hashlib.md5("tracking-vector").hexdigest()[0:8], to minimize chance of collision
 

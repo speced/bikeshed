@@ -2,7 +2,7 @@
 
 from . import config
 from .config import simplifyText
-from .html import *
+from .h import *
 from .messages import *
 
 

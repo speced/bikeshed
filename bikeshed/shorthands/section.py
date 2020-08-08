@@ -1,5 +1,5 @@
 import re
-from ..html import E, outerHTML
+from ..h import E, outerHTML
 from . import steps
 
 class SectionShorthand:

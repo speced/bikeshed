@@ -20,7 +20,7 @@ from . import extensions
 from . import fingerprinting
 from . import headings
 from . import highlight
-from . import html
+from . import h
 from . import idl
 from . import includes
 from . import inlineTags
@@ -30,7 +30,7 @@ from . import metadata
 from . import shorthands
 from . import wpt
 
-from .html import *
+from .h import *
 from .InputSource import InputSource, FileInputSource, StdinInputSource
 from .Line import Line
 from .messages import *
@@ -256,7 +256,7 @@ class Spec(object):
 
     def serialize(self):
         try:
-            rendered = html.Serializer(self.md.opaqueElements, self.md.blockElements).serialize(self.document)
+            rendered = h.Serializer(self.md.opaqueElements, self.md.blockElements).serialize(self.document)
         except Exception as e:
             die("{0}", e)
         rendered = finalHackyCleanup(rendered)
@@ -371,7 +371,7 @@ class Spec(object):
             die("Something went wrong while watching the file:\n{0}", e)
 
     def fixText(self, text, moreMacros={}):
-        # Do several textual replacements that need to happen *before* the document is parsed as HTML.
+        # Do several textual replacements that need to happen *before* the document is parsed as h.
 
         # If markdown shorthands are on, remove all `foo`s while processing,
         # so their contents don't accidentally trigger other stuff.

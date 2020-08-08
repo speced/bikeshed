@@ -5,7 +5,7 @@ import re
 
 from widlparser import parser
 from . import config
-from .html import *
+from .h import *
 from .messages import *
 from .unsortedJunk import classifyDfns
 

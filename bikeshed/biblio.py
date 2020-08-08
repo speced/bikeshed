@@ -7,7 +7,7 @@ from collections import defaultdict
 import attr
 
 from . import constants
-from .html import *
+from .h import *
 from .messages import *
 
 @attr.s(slots=True)

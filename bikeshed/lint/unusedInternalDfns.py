@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import re
-from ..html import *
+from ..h import *
 from ..messages import *
 from ..config import dfnElementsSelector
 

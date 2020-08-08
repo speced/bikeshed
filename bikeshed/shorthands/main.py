@@ -1,5 +1,5 @@
 import re
-from .. import html
+from .. import h
 from ..config import flatten
 from . import steps
 from .biblio import BiblioShorthand
@@ -11,15 +11,15 @@ def walk(doc):
 
 
 def processEl(el, shorthands):
-	nodes = html.childNodes(el, clear=True, skipOddNodes=False)
+	nodes = h.childNodes(el, clear=True, skipOddNodes=False)
 	doneChildren = []
 	while nodes:
 		node = nodes.pop(0)
-		if html.isOddNode(node):
+		if h.isOddNode(node):
 			# Skip non-text, non-element nodes
 			doneChildren.append(node)
 			continue
-		elif html.isElement(node):
+		elif h.isElement(node):
 			processEl(node, shorthands)
 			doneChildren.append(node)
 			continue
@@ -55,7 +55,7 @@ def processEl(el, shorthands):
 				# so the whole text node is unchanged
 				doneChildren.append(node)
 				continue
-	html.appendChild(el, *doneChildren)
+	h.appendChild(el, *doneChildren)
 
 
 def runShorthands(shorthands, text):

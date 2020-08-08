@@ -4,7 +4,7 @@ import json
 from collections import OrderedDict
 from datetime import datetime
 from . import config
-from .html import *
+from .h import *
 from .messages import *
 
 def addCanIUsePanels(doc):

@@ -9,7 +9,7 @@ import re
 from . import config
 from . import datablocks
 from . import markdown
-from .html import *
+from .h import *
 from .messages import *
 
 def processInclusions(doc):

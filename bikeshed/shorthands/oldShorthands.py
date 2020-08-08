@@ -2,7 +2,7 @@
 
 import re
 from .. import config
-from ..html import *
+from ..h import *
 from ..messages import *
 
 def transformProductionPlaceholders(doc):
