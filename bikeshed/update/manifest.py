@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 
 
+import asyncio
+import aiofiles
+import aiohttp
 import hashlib
 import io
 import os
@@ -142,18 +145,7 @@ def updateByManifest(path, dryRun=False):
     if not dryRun:
         if newPaths:
             say("Updating {0} file{1}...", len(newPaths), "s" if len(newPaths) > 1 else "")
-
-        messageDelta = 2.5 # wall time
-        lastMsgTime = time.time()
-        session = requests.Session()
-
-        for i,filePath in enumerate(newPaths):
-            updateFile(path, i, filePath, session)
-            currFileTime = time.time()
-            if (currFileTime - lastMsgTime) >= messageDelta:
-                say("Updated {0}/{1}...", i+1, len(newPaths))
-                lastMsgTime = currFileTime
-
+        asyncio.run(updateFiles(path, newPaths))
         try:
             with io.open(os.path.join(path, "manifest.txt"), 'w', encoding="utf-8") as fh:
                 fh.write("\n".join(remoteManifest))
@@ -163,23 +155,52 @@ def updateByManifest(path, dryRun=False):
     say("Done!")
     return True
 
-def updateFile(localPrefix, i, filePath, session):
+async def updateFiles(localPrefix, newPaths):
+    tasks = set()
+    async with aiohttp.ClientSession() as session:
+        for filePath in newPaths:
+            coro = updateFile(localPrefix, filePath, session=session)
+            tasks.add(coro)
+
+        lastMsgTime = time.time()
+        messageDelta = 2
+        i = 0
+        for coro in asyncio.as_completed(tasks):
+            i += 1
+            await coro
+            currFileTime = time.time()
+            if (currFileTime - lastMsgTime) >= messageDelta:
+                say("Updated {0}/{1}...", i, len(newPaths))
+                lastMsgTime = currFileTime
+
+async def updateFile(localPrefix, filePath, session):
     remotePath = ghPrefix + filePath
     localPath = localizePath(localPrefix, filePath)
+    data = await downloadFile(remotePath, session)
+    if data is None:
+        return
+    await saveFile(localPath, data)
+
+async def downloadFile(path, session):
     try:
-        newFile = session.get(remotePath).text
+        resp = await session.request(method='GET', url=path)
+        resp.raise_for_status()
+        return await resp.text()
     except Exception as e:
-        warn("Couldn't download file '{0}'.\n{1}", remotePath, e)
-        return False
+        warn("Couldn't download file '{0}'.\n{1}", path, e)
+        return
+
+async def saveFile(path, data):
     try:
-        dirPath = os.path.dirname(localPath)
+        dirPath = os.path.dirname(path)
         if not os.path.exists(dirPath):
             os.makedirs(dirPath)
-        with io.open(localPath, 'w', encoding="utf-8") as fh:
-            fh.write(newFile)
+        async with aiofiles.open(path, 'w', encoding="utf-8") as fh:
+            await fh.write(data)
     except Exception as e:
-        warn("Couldn't save file '{0}'.\n{1}", localPath, e)
+        warn("Couldn't save file '{0}'.\n{1}", path, e)
         return False
+
 
 
 
