@@ -19,6 +19,9 @@ def main():
         with open(config.scriptPath('..', 'semver.txt'), 'r') as fh:
             semver = fh.read().strip()
             semverText = f"Bikeshed v{semver}: "
+            if len(sys.argv) == 2 and sys.argv[1] == "--version":
+                print(semver)
+                return
     except:
         semverText = ""
 
