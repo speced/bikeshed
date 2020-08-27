@@ -30,13 +30,13 @@ def verify_requirements():
                 try:
                     distribution = pkg_resources.get_distribution(requirement.project_name)
                     if (distribution not in requirement):
-                        print(f'Package {requirement.project_name} version {distribution.version} is not supported.')
+                        print('Package {} version {} is not supported.'.format(requirement.project_name, distribution.version))
                         requirements_met = False
                 except Exception:
-                    print(f'Package {requirement.project_name} is not installed.')
+                    print('Package {} is not installed.'.format(requirement.project_name))
                     requirements_met = False
         if (not requirements_met):
-            print(f'Run "pip3 install -r {requirements_file_path}" to complete installation')
+            print('Run "pip3 install -r {}" to complete installation'.format(requirements_file_path))
             sys.exit(1)
 verify_requirements()
 
