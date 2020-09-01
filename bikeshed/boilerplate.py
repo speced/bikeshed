@@ -127,6 +127,17 @@ def addLogo(doc):
     html = doc.fixText(html)
     fillWith('logo', parseHTML(html), doc=doc)
 
+def addSubstatus(doc):
+    container = getFillContainer("substatus", doc, default=False)
+    if not container:
+        return
+    if doc.md.status == "w3c/CR":
+        appendChild(container, E.span("Snapshot"))
+    elif doc.md.status == "w3c/CRD":
+        appendChild(container, E.span("Draft"))
+    else:
+        if container is not None:
+            removeNode(container)
 
 def addCopyright(doc):
     html = config.retrieveBoilerplateFile(doc, 'copyright')
