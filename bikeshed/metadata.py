@@ -213,6 +213,7 @@ class MetadataManager:
             recommendedSingularKeys['date'] = 'Date'
         if self.status in config.snapshotStatuses:
             requiredSingularKeys['TR'] = "TR"
+            requiredMultiKeys['issues'] = "Issue Tracking"
         if self.status not in config.unlevelledStatuses:
             requiredSingularKeys['level'] = 'Level'
         if self.status not in config.shortToLongStatus:
