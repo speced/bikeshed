@@ -78,6 +78,7 @@ class MetadataManager:
         self.ignoreCanIUseUrlFailure = []
         self.ignoredTerms = []
         self.ignoredVars = []
+        self.implementationReport = None
         self.includeCanIUsePanels = False
         self.includeMdnPanels = False
         self.indent = 4
@@ -214,6 +215,8 @@ class MetadataManager:
         if self.status in config.snapshotStatuses:
             requiredSingularKeys['TR'] = "TR"
             requiredMultiKeys['issues'] = "Issue Tracking"
+        if self.status in config.implementationStatuses:
+            requiredSingularKeys['implementationReport'] = "Implementation Report"
         if self.status not in config.unlevelledStatuses:
             requiredSingularKeys['level'] = 'Level'
         if self.status not in config.shortToLongStatus:
@@ -1059,6 +1062,7 @@ knownKeys = {
     "Ignore Can I Use Url Failure": Metadata("Ignore Can I Use Url Failure", "ignoreCanIUseUrlFailure", joinList, parseLiteralList),
     "Ignored Terms": Metadata("Ignored Terms", "ignoredTerms", joinList, parseCommaSeparated),
     "Ignored Vars": Metadata("Ignored Vars", "ignoredVars", joinList, parseCommaSeparated),
+    "Implementation Report": Metadata("Implementation Report", "implementationReport", joinValue, parseLiteral),
     "Include Can I Use Panels": Metadata("Include Can I Use Panels", "includeCanIUsePanels", joinValue, parseBoolean),
     "Include Mdn Panels": Metadata("Include Mdn Panels", "includeMdnPanels", joinValue, parseSoftBoolean),
     "Indent": Metadata("Indent", "indent", joinValue, parseInteger),

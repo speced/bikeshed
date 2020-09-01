@@ -838,6 +838,8 @@ def addSpecMetadataSection(doc):
                         E.a({"rel":"discussion", "href":doc.md.mailingListArchives}, "archives"),
                         ")")
         md["Feedback"].append(span)
+    if doc.md.implementationReport is not None:
+        md["Implementation Report"].append(E.a({"href":doc.md.implementationReport}, doc.md.implementationReport))
     if doc.md.testSuite is not None:
         md["Test Suite"].append(E.a({"href":doc.md.testSuite}, doc.md.testSuite))
     elif (doc.md.vshortname in doc.testSuites) and (doc.testSuites[doc.md.vshortname]['url'] is not None):
