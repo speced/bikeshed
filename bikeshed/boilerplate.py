@@ -129,7 +129,7 @@ def addLogo(doc):
 
 def addSubstatus(doc):
     container = getFillContainer("substatus", doc, default=False)
-    if not container:
+    if container is None:
         return
     if doc.md.status == "w3c/CR":
         appendChild(container, E.span("Snapshot"))
