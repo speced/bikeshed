@@ -267,7 +267,11 @@ def markupIDL(doc):
                 replaceNode(span, *contents)
         return
     if highlightingOccurred:
-        doc.extraStyles['style-syntax-highlighting'] += "pre.idl.highlight { color: #708090; }"
+        doc.extraStyles['style-syntax-highlighting'] += '''
+            pre.idl.highlight {
+                background: var(--def-bg);
+            }
+            '''
 
 
 def processIDL(doc):
