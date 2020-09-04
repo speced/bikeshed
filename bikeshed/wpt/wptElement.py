@@ -145,23 +145,9 @@ def xor(a, b):
 	return bool(a) != bool(b)
 
 wptStyle = '''
-:root {
-	--wpt-border: hsl(290, 70%, 60%);
-	--wpt-bg: hsl(290, 70%, 95%)
-	--wpt-text: var(--text);
-	--wptheading-text: hsl(290, 70%, 30%);
-}
-@media (prefers-color-scheme: dark) {
-	:root {
-		--wpt-border: hsl(290, 70%, 30%);
-		--wpt-bg: var(--borderedblock-bg);
-		--wpt-text: var(--text);
-		--wptheading-text: hsl(290, 70%, 60%);
-	}
-}
 .wpt-tests-block {
 	list-style: none;
-	border-left: .5em solid hsl(290, 70%, 30%);
+	border-left: .5em solid hsl(290, 70%, 60%);
 	background: hsl(290, 70%, 95%);
 	margin: 1em auto;
 	padding: .5em;

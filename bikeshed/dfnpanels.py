@@ -152,16 +152,6 @@ document.body.addEventListener("click", function(e) {
 '''
 
 dfnPanelStyle = '''
-:root {
-    --dfnpanel-bg: #ddd;
-    --dfnpanel-text: var(--text);
-}
-@media (prefers-color-scheme: dark) {
-    :root {
-        --dfnpanel-bg: #222;
-        --dfnpanel-text: var(--text);
-    }
-}
 .dfn-panel {
     position: absolute;
     z-index: 35;
@@ -173,8 +163,8 @@ dfnPanelStyle = '''
     overflow: auto;
     padding: 0.5em 0.75em;
     font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
-    background: var(--dfnpanel-bg);
-    color: var(--dfnpanel-text);
+    background: #DDDDDD;
+    color: black;
     border: outset 0.2em;
 }
 .dfn-panel:not(.on) { display: none; }

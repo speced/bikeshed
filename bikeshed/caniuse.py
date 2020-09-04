@@ -64,19 +64,7 @@ def addCanIUsePanels(doc):
                 }
             });'''
         doc.extraStyles['style-caniuse-panel'] = '''
-            :root {
-                --caniuse-shadow: #999;
-                --caniuse-nosupport-text: #ccc;
-                --caniuse-partialsupport-text: #666;
-            }
-            @media (prefers-color-scheme: dark) {
-                :root {
-                    --caniuse-shadow: #444;
-                    --caniuse-nosupport-text: #666;
-                    --caniuse-partialsupport-text: #bbb;
-                }
-            }
-            .caniuse-status { font: 1em sans-serif; width: 9em; padding: 0.3em; position: absolute; z-index: 8; top: auto; right: 0.3em; background: var(--borderedblock-bg, #EEE); color: var(--text, black); box-shadow: 0 0 3px var(--caniuse-shadow, #999); overflow: hidden; border-collapse: initial; border-spacing: initial; }
+            .caniuse-status { font: 1em sans-serif; width: 9em; padding: 0.3em; position: absolute; z-index: 8; top: auto; right: 0.3em; background: #EEE; color: black; box-shadow: 0 0 3px #999; overflow: hidden; border-collapse: initial; border-spacing: initial; }
             .caniuse-status.wrapped { width: 1em; height: 1em; }
             .caniuse-status.wrapped > :not(input) { display: none; }
             .caniuse-status > input { position: absolute; right: 0; top: 0; width: 1em; height: 1em; border: none; background: transparent; padding: 0; margin: 0; }
@@ -84,8 +72,8 @@ def addCanIUsePanels(doc):
             .caniuse-status > p + p { padding-top: 0.5em; }
             .caniuse-status > .support { display: block; }
             .caniuse-status > .support > span { padding: 0.2em 0; display: block; display: table; }
-            .caniuse-status > .support > span.partial { color: var(--caniuse-partialsupport-text, #666666); filter: grayscale(50%); }
-            .caniuse-status > .support > span.no { color: var(--caniuse-nosupport-text, #CCCCCC); filter: grayscale(100%); }
+            .caniuse-status > .support > span.partial { color: #666666; filter: grayscale(50%); }
+            .caniuse-status > .support > span.no { color: #CCCCCC; filter: grayscale(100%); }
             .caniuse-status > .support > span.no::before { opacity: 0.5; }
             .caniuse-status > .support > span:first-of-type { padding-top: 0.5em; }
             .caniuse-status > .support > span > span { padding: 0 0.5em; display: table-cell; vertical-align: top; }

@@ -447,7 +447,7 @@ styleMdLists = '''
 
 styleAutolinks = '''
 .css.css, .property.property, .descriptor.descriptor {
-    color: var(--a-normal-text);
+    color: #005a9c;
     font-size: inherit;
     font-family: inherit;
 }
@@ -508,18 +508,6 @@ pre .property::before, pre .property::after {
 }'''
 
 styleSelflinks = '''
-:root {
-    --selflink-text: white;
-    --selflink-bg: gray;
-    --selflink-hover-text: black;
-}
-@media (prefers-color-scheme: dark) {
-    :root {
-        --selflink-text: black;
-        --selflink-bg: silver;
-        --selflink-hover-text: white;
-    }
-}
 .heading, .issue, .note, .example, li, dt {
     position: relative;
 }
@@ -549,8 +537,8 @@ dfn > a.self-link {
     opacity: 0;
     width: 1.5em;
     height: 1.5em;
-    background: var(--selflink-bg);
-    color: var(--selflink-text);
+    background: gray;
+    color: white;
     font-style: normal;
     transition: opacity .2s, background-color .2s, color .2s;
 }
@@ -558,7 +546,7 @@ dfn:hover > a.self-link {
     opacity: 1;
 }
 dfn > a.self-link:hover {
-    color: var(--selflink-hover-text);
+    color: black;
 }
 
 a.self-link::before            { content: "¶"; }
