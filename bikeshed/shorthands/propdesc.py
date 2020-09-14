@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import re
 from ..h import E, outerHTML
 from . import steps
