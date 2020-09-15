@@ -127,6 +127,17 @@ def addLogo(doc):
     html = doc.fixText(html)
     fillWith('logo', parseHTML(html), doc=doc)
 
+def addSubstatus(doc):
+    container = getFillContainer("substatus", doc, default=False)
+    if container is None:
+        return
+    if doc.md.status == "w3c/CR":
+        appendChild(container, E.span("Snapshot"))
+    elif doc.md.status == "w3c/CRD":
+        appendChild(container, E.span("Draft"))
+    else:
+        if container is not None:
+            removeNode(container)
 
 def addCopyright(doc):
     html = config.retrieveBoilerplateFile(doc, 'copyright')
@@ -827,6 +838,8 @@ def addSpecMetadataSection(doc):
                         E.a({"rel":"discussion", "href":doc.md.mailingListArchives}, "archives"),
                         ")")
         md["Feedback"].append(span)
+    if doc.md.implementationReport is not None:
+        md["Implementation Report"].append(E.a({"href":doc.md.implementationReport}, doc.md.implementationReport))
     if doc.md.testSuite is not None:
         md["Test Suite"].append(E.a({"href":doc.md.testSuite}, doc.md.testSuite))
     elif (doc.md.vshortname in doc.testSuites) and (doc.testSuites[doc.md.vshortname]['url'] is not None):
