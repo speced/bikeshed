@@ -237,6 +237,21 @@ def addBikeshedBoilerplate(doc):
     for k,v in sorted(doc.extraStyles.items()):
         if k not in doc.md.boilerplate:
             continue
+        if k == "style-darkmode":
+            # Have to output these *last* so they'll override preceding colors.
+            continue
+        container = getFillContainer(k, doc)
+        if container is None:
+            container = getFillContainer("bs-styles", doc, default=True)
+        if container is not None:
+            appendChild(container,
+                        E.style("/* {0} */\n".format(k) + v))
+    # Output the darkmode styles after all other styles
+    # but don't put them in /TR space yet,
+    # until the W3C is ready for them.
+    if not doc.md.prepTR:
+        k = "style-darkmode"
+        v = doc.extraStyles[k]
         container = getFillContainer(k, doc)
         if container is None:
             container = getFillContainer("bs-styles", doc, default=True)
