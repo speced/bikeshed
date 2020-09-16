@@ -481,7 +481,43 @@ def transformRailroad(lines, doc, firstLine, **kwargs):
     import io
     from . import railroadparser
     ret = ["<div class='railroad'>"]
-    doc.extraStyles['style-railroad'] = "svg.railroad-diagram{background-color:hsl(30,20%,95%);}svg.railroad-diagram path{stroke-width:3px;stroke:black;fill:rgba(0,0,0,0);}svg.railroad-diagram text{font:bold 14px monospace;text-anchor:middle;}svg.railroad-diagram text.label{text-anchor:start;}svg.railroad-diagram text.comment{font:italic 12px monospace;}svg.railroad-diagram rect{stroke-width:3px;stroke:black;fill:hsl(120,100%,90%);}"
+    doc.extraStyles['style-railroad'] = '''
+    :root {
+        --railroad-bg: hsl(30, 20%, 95%);
+        --railroad-stroke: black;
+        --railroad-fill: hsl(120,100%,90%);
+    }
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --railroad-bg: rgba(255, 255, 255, .05);
+            --railroad-stroke: #ddd;
+            --railroad-fill: rgba(255, 255, 255, .05);
+        }
+    }
+    svg.railroad-diagram {
+        background-color: var(--railroad-bg);
+    }
+    svg.railroad-diagram path {
+        stroke-width:3px;
+        stroke: var(--railroad-stroke);
+        fill:transparent;
+    }
+    svg.railroad-diagram text {
+        font: bold 14px monospace;
+        color: var(--text, currentcolor);
+        text-anchor:middle;
+    }
+    svg.railroad-diagram text.label {
+        text-anchor:start;
+    }
+    svg.railroad-diagram text.comment {
+        font:italic 12px monospace;
+    }
+    svg.railroad-diagram rect {
+        stroke-width:3px;
+        stroke: var(--railroad-stroke);
+        fill:hsl(120,100%,90%);
+    }'''
     code = ''.join(lines)
     diagram = railroadparser.parse(code)
     if diagram:
