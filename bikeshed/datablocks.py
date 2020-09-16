@@ -487,13 +487,6 @@ def transformRailroad(lines, doc, firstLine, **kwargs):
         --railroad-stroke: black;
         --railroad-fill: hsl(120,100%,90%);
     }
-    @media (prefers-color-scheme: dark) {
-        :root {
-            --railroad-bg: rgba(255, 255, 255, .05);
-            --railroad-stroke: #ddd;
-            --railroad-fill: rgba(255, 255, 255, .05);
-        }
-    }
     svg.railroad-diagram {
         background-color: var(--railroad-bg);
     }
@@ -517,6 +510,14 @@ def transformRailroad(lines, doc, firstLine, **kwargs):
         stroke-width:3px;
         stroke: var(--railroad-stroke);
         fill:hsl(120,100%,90%);
+    }'''
+    doc.extraStyles['style-darkmode'] += '''
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --railroad-bg: rgba(255, 255, 255, .05);
+            --railroad-stroke: #ddd;
+            --railroad-fill: rgba(255, 255, 255, .05);
+        }
     }'''
     code = ''.join(lines)
     diagram = railroadparser.parse(code)

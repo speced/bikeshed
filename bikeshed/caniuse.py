@@ -69,13 +69,6 @@ def addCanIUsePanels(doc):
                 --caniuse-nosupport-text: #ccc;
                 --caniuse-partialsupport-text: #666;
             }
-            @media (prefers-color-scheme: dark) {
-                :root {
-                    --caniuse-shadow: #444;
-                    --caniuse-nosupport-text: #666;
-                    --caniuse-partialsupport-text: #bbb;
-                }
-            }
             .caniuse-status { font: 1em sans-serif; width: 9em; padding: 0.3em; position: absolute; z-index: 8; top: auto; right: 0.3em; background: var(--borderedblock-bg, #EEE); color: var(--text, black); box-shadow: 0 0 3px var(--caniuse-shadow, #999); overflow: hidden; border-collapse: initial; border-spacing: initial; }
             .caniuse-status.wrapped { width: 1em; height: 1em; }
             .caniuse-status.wrapped > :not(input) { display: none; }
@@ -114,6 +107,15 @@ def addCanIUsePanels(doc):
                 .caniuse-status:not(.wrapped) { width: 1em; height: 1em; }
                 .caniuse-status.wrapped > :not(input) { display: block; }
                 .caniuse-status:not(.wrapped) > :not(input) { display: none; }
+            }'''
+
+        doc.extraStyles['style-darkmode'] += '''
+            @media (prefers-color-scheme: dark) {
+                :root {
+                    --caniuse-shadow: #444;
+                    --caniuse-nosupport-text: #666;
+                    --caniuse-partialsupport-text: #bbb;
+                }
             }'''
 
 

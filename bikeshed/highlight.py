@@ -46,10 +46,13 @@ def addSyntaxHighlighting(doc):
 
     if highlightingOccurred:
         doc.extraStyles['style-syntax-highlighting'] += getHighlightStyles()
+        doc.extraStyles['style-darkmode'] += getHighlightDarkmodeStyles()
     if lineWrappingOccurred:
         doc.extraStyles['style-line-numbers'] += getLineNumberStyles()
+        doc.extraStyles['style-darkmode'] += getLineNumberDarkmodeStyles()
     if lineHighlightingOccurred:
         doc.extraStyles['style-line-highlighting'] += getLineHighlightingStyles()
+        doc.extraStyles['style-darkmode'] += getLineHighlightingDarkmodeStyles()
 
 
 def determineHighlightLang(doc, el):
@@ -462,7 +465,6 @@ def getHighlightStyles():
     #    }
     #print formatters.HtmlFormatter(style=PrismStyle).get_style_defs('.highlight')
     return '''
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -519,7 +521,9 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
+'''
+def getHighlightDarkmodeStyles():
+    return '''
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
 
@@ -589,11 +593,6 @@ def getLineNumberStyles():
 :root {
     --highlight-hover-bg: rgba(0, 0, 0, .05);
 }
-@media (prefers-color-scheme: dark) {
-    :root {
-        --highlight-hover-bg: rgba(255, 255, 255, .05);
-    }
-}
 .line-numbered {
     display: grid !important;
     grid-template-columns: min-content 1fr;
@@ -624,15 +623,19 @@ def getLineNumberStyles():
 }
 '''
 
-def getLineHighlightingStyles():
+def getLineNumberDarkmodeStyles():
     return '''
-:root {
-    --highlight-hover-bg: rgba(0, 0, 0, .05);
-}
 @media (prefers-color-scheme: dark) {
     :root {
         --highlight-hover-bg: rgba(255, 255, 255, .05);
     }
+}
+'''
+
+def getLineHighlightingStyles():
+    return '''
+:root {
+    --highlight-hover-bg: rgba(0, 0, 0, .05);
 }
 .line-numbered {
     display: grid !important;
@@ -666,6 +669,15 @@ def getLineHighlightingStyles():
 .line-no.highlight-line[data-line-end]::after {
     padding: 0 .5em 0 .1em;
     content: attr(data-line-end);
+}
+'''
+
+def getLineHighlightingDarkmodeStyles():
+    return '''
+@media (prefers-color-scheme: dark) {
+    :root {
+        --highlight-hover-bg: rgba(255, 255, 255, .05);
+    }
 }
 '''
 

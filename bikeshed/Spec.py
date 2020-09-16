@@ -83,6 +83,7 @@ class Spec(object):
         self.languages = json.loads(self.dataFile.fetch("languages.json", str=True))
         self.extraStyles = defaultdict(str)
         self.extraStyles['style-colors'] = styleColors
+        self.extraStyles['style-darkmode'] = styleDarkMode
         self.extraStyles['style-md-lists'] = styleMdLists
         self.extraStyles['style-autolinks'] = styleAutolinks
         self.extraStyles['style-selflinks'] = styleSelflinks
@@ -537,8 +538,9 @@ styleColors = '''
     --outdated-shadow: red;
 
     --editedrec-bg: darkorange;
-}
+}'''
 
+styleDarkMode = '''
 @media (prefers-color-scheme: dark) {
     :root {
         --text: #ddd;
@@ -719,13 +721,6 @@ styleSelflinks = '''
     --selflink-bg: gray;
     --selflink-hover-text: black;
 }
-@media (prefers-color-scheme: dark) {
-    :root {
-        --selflink-text: black;
-        --selflink-bg: silver;
-        --selflink-hover-text: white;
-    }
-}
 .heading, .issue, .note, .example, li, dt {
     position: relative;
 }
@@ -769,7 +764,18 @@ dfn > a.self-link:hover {
 
 a.self-link::before            { content: "¶"; }
 .heading > a.self-link::before { content: "§"; }
-dfn > a.self-link::before      { content: "#"; }'''
+dfn > a.self-link::before      { content: "#"; }
+'''
+styleDarkMode += '''
+@media (prefers-color-scheme: dark) {
+    :root {
+        --selflink-text: black;
+        --selflink-bg: silver;
+        --selflink-hover-text: white;
+    }
+}
+'''
+
 
 styleCounters = '''
 body {

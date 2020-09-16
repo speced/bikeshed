@@ -93,6 +93,7 @@ def addExternalDfnPanel(termEl, ref, elsFromHref, doc):
         appendChild(doc.body, panel)
         doc.extraScripts['script-dfn-panel'] = dfnPanelScript
         doc.extraStyles['style-dfn-panel'] = dfnPanelStyle
+        doc.extraStyles['style-darkmode'] += dfnPanelDarkmodeStyle
 
 
 dfnPanelScript = '''
@@ -156,12 +157,6 @@ dfnPanelStyle = '''
     --dfnpanel-bg: #ddd;
     --dfnpanel-text: var(--text);
 }
-@media (prefers-color-scheme: dark) {
-    :root {
-        --dfnpanel-bg: #222;
-        --dfnpanel-text: var(--text);
-    }
-}
 .dfn-panel {
     position: absolute;
     z-index: 35;
@@ -197,3 +192,11 @@ dfnPanelStyle = '''
 
 .dfn-paneled { cursor: pointer; }
 '''
+
+dfnPanelDarkmodeStyle = '''
+@media (prefers-color-scheme: dark) {
+    :root {
+        --dfnpanel-bg: #222;
+        --dfnpanel-text: var(--text);
+    }
+}'''
