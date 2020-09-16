@@ -269,7 +269,7 @@ def markupIDL(doc):
     if highlightingOccurred:
         doc.extraStyles['style-syntax-highlighting'] += '''
             pre.idl.highlight {
-                background: var(--def-bg);
+                background: var(--borderedblock-bg, var(--def-bg));
             }
             '''
 
