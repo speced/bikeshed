@@ -497,7 +497,7 @@ def transformRailroad(lines, doc, firstLine, **kwargs):
     }
     svg.railroad-diagram text {
         font: bold 14px monospace;
-        color: var(--text, currentcolor);
+        fill: var(--text, currentcolor);
         text-anchor:middle;
     }
     svg.railroad-diagram text.label {
@@ -509,14 +509,14 @@ def transformRailroad(lines, doc, firstLine, **kwargs):
     svg.railroad-diagram rect {
         stroke-width:3px;
         stroke: var(--railroad-stroke);
-        fill:hsl(120,100%,90%);
+        fill: var(--railroad-fill);
     }'''
     doc.extraStyles['style-darkmode'] += '''
     @media (prefers-color-scheme: dark) {
         :root {
             --railroad-bg: rgba(255, 255, 255, .05);
-            --railroad-stroke: #ddd;
-            --railroad-fill: rgba(255, 255, 255, .05);
+            --railroad-stroke: #bbb;
+            --railroad-fill: hsla(240deg, 20%, 15%);
         }
     }'''
     code = ''.join(lines)
