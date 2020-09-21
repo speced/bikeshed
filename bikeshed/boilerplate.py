@@ -249,7 +249,7 @@ def addBikeshedBoilerplate(doc):
     # Output the darkmode styles after all other styles
     # but don't put them in /TR space yet,
     # until the W3C is ready for them.
-    if not doc.md.prepTR:
+    if "style-darkmode" in doc.md.boilerplate and not doc.md.prepTR:
         k = "style-darkmode"
         v = doc.extraStyles[k]
         container = getFillContainer(k, doc)
