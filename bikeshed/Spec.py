@@ -440,6 +440,12 @@ constants.specClass = Spec
 
 styleColors = '''
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
+html {
+    color: black;
+    color: var(--text);
+    background-color: white;
+    background-color: var(--bg);
+}
 :root {
     color-scheme: light dark;
 
@@ -544,7 +550,7 @@ styleDarkMode = '''
 @media (prefers-color-scheme: dark) {
     :root {
         --text: #ddd;
-        --bg: #111;
+        --bg: black;
 
         --logo-bg: #1a5e9a;
         --logo-active-bg: #c00;
