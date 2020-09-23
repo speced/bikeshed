@@ -496,6 +496,7 @@ def addIndexOfExternallyDefinedTerms(doc, container):
         if href.startswith("#"):
             continue
         elsFromHref[href].append(a)
+    atLeastOnePanel = False
     for spec, refGroups in sorted(doc.externalRefsUsed.items(), key=lambda x:x[0].upper()):
         # ref.spec is always lowercase; if the same string shows up in biblio data,
         # use its casing instead.
@@ -520,7 +521,10 @@ def addIndexOfExternallyDefinedTerms(doc, container):
                     else:
                         link = makeLink(ref.text)
             appendChild(termsUl, E.li(link))
+            atLeastOnePanel = True
             dfnpanels.addExternalDfnPanel(link, ref, elsFromHref, doc)
+    if atLeastOnePanel:
+        dfnpanels.addExternalDfnPanelStyles(doc)
     appendChild(container,
                 E.h3({"class":"no-num no-ref", "id":safeID(doc, "index-defined-elsewhere")}, "Terms defined by reference"),
                 ul)

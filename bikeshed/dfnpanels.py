@@ -91,9 +91,11 @@ def addExternalDfnPanel(termEl, ref, elsFromHref, doc):
                                 " ",
                                 E.a({"href": "#" + escapeUrlFrag(linkID), "data-silently-dedup": ""}, "(" + str(i + 1) + ")"))
         appendChild(doc.body, panel)
-        doc.extraScripts['script-dfn-panel'] = dfnPanelScript
-        doc.extraStyles['style-dfn-panel'] = dfnPanelStyle
-        doc.extraStyles['style-darkmode'] += dfnPanelDarkmodeStyle
+
+def addExternalDfnPanelStyles(doc):
+    doc.extraScripts['script-dfn-panel'] = dfnPanelScript
+    doc.extraStyles['style-dfn-panel'] = dfnPanelStyle
+    doc.extraStyles['style-darkmode'] += dfnPanelDarkmodeStyle
 
 
 dfnPanelScript = '''
