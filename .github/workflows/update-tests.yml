@@ -1,0 +1,37 @@
+name: tests
+on:
+  schedule:
+  - cron: '20 20 * * *'
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      with:
+        python-version: 3.8
+    - name: install dependencies
+      run: |
+        pip install -r .github/workflows/update-tests/requirements.txt
+        pip install --editable .
+        bikeshed update
+    - name: update tests
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        rm -rf tests/github
+        python .github/workflows/update-tests/update.py
+        # paths need to be relative to tests/
+        (cd tests; find github -type f) | xargs bikeshed test --rebase
+    - name: push branch
+      run: |
+        git checkout -b auto-test-update
+        git add -A
+        git commit -m "Automatic test update"
+        #git push -f origin auto-test-update
+        git log -1
+      working-directory: ../bikeshed
+    - name: update PR
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: python .github/workflows/update-tests/update_pr.py

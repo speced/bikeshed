@@ -1,12 +1,12 @@
 # Bikeshed tests auto-updater
 
-This repo collects *.bs files from GitHub repos and creates PRs to update
-[bikeshed's tests](https://github.com/tabatkins/bikeshed/tree/master/tests/github).
+These scripts collect *.bs files from GitHub repos and creates PRs to update
+Bikeshed's tests in `tests/github/`.
 
 ## Adding Your Specs
 
 If you'd like to add your own specs to Bikeshed's regression test-suite,
-submit a PR for the [`specs.data`](https://github.com/foolip/bikeshed-tests/blob/master/specs.data) file.
+submit a PR for the `specs.data` file.
 
 This file format is line-based:
 to add your entire organization, add a `+org: orgname` line;
@@ -30,18 +30,13 @@ blank lines are also ignored.
 
 ## Running locally
 
-You need Python 2 and pip:
+You need Python 3. Then install the dependencies:
 ```bash
-sudo apt install python python-pip
+pip3 install --user -r requirements.txt
 ```
 
-Then install the dependencies:
-```bash
-pip install --user -r requirements.txt
-```
-
-The python scripts need `GH_TOKEN` environment variable set to a
+The python scripts need `GITHUB_TOKEN` environment variable set to a
 [personal access token](https://github.com/settings/tokens/new) with the
 "Access public repositories" (public_repo) scope enabled.
 
-To emulate what the Travis job does, execute each step in .travis.yml manually.
+To emulate what GitHub Actions does, execute each step in `update-tests.yml` manually.

@@ -1,21 +1,20 @@
-from __future__ import print_function
 import os
 
 from github import Github
 
 
 def create_pr():
-    token = os.environ['GH_TOKEN']
+    token = os.environ['GITHUB_TOKEN']
     g = Github(token)
     repo = g.get_repo('tabatkins/bikeshed')
     for pull in repo.get_pulls(state='open'):
-        if pull.head.label == 'autofoolip:auto-test-update':
+        if pull.head.label == 'auto-test-update':
             print("Existing PR found:", pull.html_url)
             return
     pull = repo.create_pull(title='Automatic test update',
-                            body='By https://github.com/foolip/bikeshed-tests',
+                            body='',
                             base='master',
-                            head='autofoolip:auto-test-update')
+                            head='auto-test-update')
     print('Created PR:', pull.html_url)
 
 
