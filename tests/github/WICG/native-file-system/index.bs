@@ -2,7 +2,7 @@
 Title: Native File System
 Shortname: native-file-system
 Abstract: This document defines a web platform API that lets websites gain write access to the
-  native file system. It builds on [[FILE-API]], but adds lots of new functionality on top.
+  native file system. It builds on [[FILE-API|File API]], but adds lots of new functionality on top.
 Status: CG-DRAFT
 ED: https://wicg.github.io/native-file-system/
 Level: 1
@@ -16,6 +16,7 @@ Markup Shorthands: css no, markdown yes
 
 <pre class=link-defaults>
 spec:fetch; type:interface; text:ReadableStream
+spec:webidl; type:dfn; text:resolve
 </pre>
 
 <pre class=anchors>
@@ -42,14 +43,15 @@ spec:fetch; type:interface; text:ReadableStream
 
 TODO
 
-This provides similar functionality as earlier drafts of the [[file-system-api]] as well as the
-[[entries-api]], but with a more modern API.
+This provides similar functionality as earlier drafts of the
+[[file-system-api|File API: Directories and System]] as well as the
+[[entries-api|File and Directory Entries API]], but with a more modern API.
 
 # Files and Directories # {#files-and-directories}
 
 ## Concepts ## {#concepts}
 
-A <dfn>entry</dfn> is either a [=file entry=] or a [=directory entry=].
+An <dfn>entry</dfn> is either a [=file entry=] or a [=directory entry=].
 
 Each [=/entry=] has an associated <dfn for=entry>name</dfn>.
 
@@ -57,10 +59,42 @@ A <dfn lt="file|file entry">file entry</dfn> additionally consists of <dfn for="
 data</dfn> and a <dfn for="file entry">modification timestamp</dfn>.
 
 A <dfn lt="directory|directory entry">directory entry</dfn> additionally consists of a [=/set=] of
-<dfn for="directory entry">entries</dfn>. Each member is either a [=file=] or a [=directory=].
+<dfn for="directory entry">children</dfn>, which are themselves [=/entries=]. Each member is either a [=file=] or a [=directory=].
 
-Issue: TODO: Explain how entries map to files on disk (multiple entries can map to the same file or
-directory on disk but doesn't have to map to any file on disk).
+[=/Entries=] can (but don't have to) be backed by files on the systems native file system,
+as such it is possible for the [=binary data=], [=modification timestamp=],
+and [=children=] of entries to be modified by applications outside of this specification.
+Exactly how external changes are reflected in the data structures defined by this specification,
+as well as how changes made to the data structures defined here are reflected externally
+is left up to individual user-agent implementations.
+
+An [=/entry=] |a| is <dfn for="entry">the same as</dfn> an [=/entry=] |b| if |a| is equal to |b|, or
+if |a| and |b| are backed by the same file or directory on the native file system.
+
+Issue: TODO: Explain better how entries map to files on disk (multiple entries can map to the same file or
+directory on disk but an entry doesn't have to map to any file on disk).
+
+<div algorithm>
+To <dfn for="entry">resolve</dfn> an [=/entry=] |child| relative to a [=directory entry=] |root|,
+run the following steps:
+
+1. Let |result| be [=a new promise=].
+1. Run the following steps [=in parallel=]:
+  1. If |child| is [=the same as=] |root|,
+     [=/resolve=] |result| with an empty list, and abort these substeps.
+  1. Let |childPromises| be << >>.
+  1. [=set/For each=] |entry| of |root|'s [=FileSystemHandle/entry=]'s [=children=]:
+    1. Let |p| be the result of [=entry/resolving=] |child| relative to |entry|.
+    1. [=list/Append=] |p| to |childPromises|.
+    1. [=Upon fulfillment=] of |p| with value |path|:
+      1. If |path| is not null:
+        1. [=list/Prepend=] |entry|'s [=entry/name=] to |path|.
+        1. [=/Resolve=] |result| with |path|.
+  1. [=Wait for all=] |childPromises|, with the following success steps:
+    1. If |result| hasn't been resolved yet, [=/resolve=] |result| with `null`.
+1. Return |result|.
+
+</div>
 
 ## The {{FileSystemHandle}} interface ## {#api-filesystemhandle}
 
@@ -75,24 +109,27 @@ interface FileSystemHandle {
   readonly attribute boolean isDirectory;
   readonly attribute USVString name;
 
+  Promise<boolean> isSameEntry(FileSystemHandle other);
+
   Promise<PermissionState> queryPermission(optional FileSystemHandlePermissionDescriptor descriptor = {});
   Promise<PermissionState> requestPermission(optional FileSystemHandlePermissionDescriptor descriptor = {});
 };
 </xmp>
 
 A {{FileSystemHandle}} object represents a [=/entry=]. Each {{FileSystemHandle}} object is assocaited
-with a <dfn for=FileSystemHandle>entry</dfn> (a [=/entry=]). Multiple separate objects implementing
+with a <dfn for=FileSystemHandle>entry</dfn> (an [=/entry=]). Multiple separate objects implementing
 the {{FileSystemHandle}} interface can all be associated with the same [=/entry=] simultaneously.
 
 <div algorithm="serialization steps">
 {{FileSystemHandle}} objects are [=serializable objects=].
 
-Advisement: In the Origin Trial as available in Chrome 78, these objects are not yet serializable.
+Advisement: In the Origin Trial as available in Chrome 78, these objects are not yet serializable. 
+In Chrome 82 they are.
 
 Their [=serialization steps=], given |value|, |serialized| and |forStorage| are:
 
 1. Set |serialized|.\[[Origin]] to |value|'s [=relevant settings object=]'s [=environment settings object/origin=].
-1. TODO
+1. Set |serialized|.\[[Entry]] to |value|'s [=FileSystemHandle/entry=].
 
 </div>
 
@@ -102,16 +139,16 @@ Their [=deserialization steps=], given |serialized| and |value| are:
 1. If |serialized|.\[[Origin]] is not [=same origin=] with
    |value|'s [=relevant settings object=]'s [=environment settings object/origin=],
    then throw a {{DataCloneError}}.
-1. TODO
+1. Set |value|'s [=FileSystemHandle/entry=] to |serialized|.\[[Entry]]
 
 </div>
 
 <div class="note domintro">
   : |handle| . {{FileSystemHandle/isFile}}
-  :: Returns true iff |handle| is a {{FileSystemFileHandle}}.
+  :: Returns true if |handle| is a {{FileSystemFileHandle}}.
 
   : |handle| . {{FileSystemHandle/isDirectory}}
-  :: Returns true iff |handle| is a {{FileSystemDirectoryHandle}}.
+  :: Returns true if |handle| is a {{FileSystemDirectoryHandle}}.
 
   : |handle| . {{FileSystemHandle/name}}
   :: Returns the [=entry/name=] of the entry represented by |handle|.
@@ -126,11 +163,33 @@ associated [=FileSystemHandle/entry=] is a [=directory entry=], and false otherw
 The <dfn attribute for=FileSystemHandle>name</dfn> attribute must return the [=entry/name=] of the
 associated [=FileSystemHandle/entry=].
 
+### The {{FileSystemHandle/isSameEntry()}} method ### {#api-filesystemhandle-issameentry}
+
+<div class="note domintro">
+  : |same| = await |handle1| . {{FileSystemHandle/isSameEntry()|isSameEntry}}( |handle2| )
+  :: Returns true if |handle1| and |handle2| represent the same file or directory.
+</div>
+
+Advisement: This method is first available in Chrome 82.
+
+<div algorithm>
+The <dfn method for=FileSystemHandle>isSameEntry(|other|)</dfn> method, when invoked, must run these steps:
+
+1. Let |realm| be [=this=]'s [=relevant Realm=].
+1. Let |p| be [=a new promise=] in |realm|.
+1. Run the following steps [=in parallel=]:
+  1. If [=this=]'s [=FileSystemHandle/entry=] is [=the same as=] |other|'s [=FileSystemHandle/entry=],
+     [=/resolve=] |p| with `true`.
+  1. Else [=/resolve=] |p| with `false`.
+1. Return |p|.
+
+</div>
+
 ### The {{FileSystemHandle/queryPermission()}} method ### {#api-filesystemhandle-querypermission}
 
-Issue: the currently described API here assumes a model where it is not possible to have a
+Issue(119): the currently described API here assumes a model where it is not possible to have a
     write-only handle. I.e. it is not possible to have or request write access without also having
-    read access. There definitely are use cases for write-only handles (i.e. directory downloads),
+    read access. There definitely are use cases for write-only handles (e.g. directory downloads),
     so we might have to reconsider this.
 
 <div class="note domintro">
@@ -190,21 +249,22 @@ The <dfn method for=FileSystemHandle>requestPermission(|descriptor|)</dfn> metho
 ## The {{FileSystemFileHandle}} interface ## {#api-filesystemfilehandle}
 
 <xmp class=idl>
-dictionary FileSystemCreateWriterOptions {
+dictionary FileSystemCreateWritableOptions {
   boolean keepExistingData = false;
 };
 
 [Exposed=(Window,Worker), SecureContext, Serializable]
 interface FileSystemFileHandle : FileSystemHandle {
   Promise<File> getFile();
-  Promise<FileSystemWriter> createWriter(optional FileSystemCreateWriterOptions options = {});
+  Promise<FileSystemWritableFileStream> createWritable(optional FileSystemCreateWritableOptions options);
 };
 </xmp>
 
 {{FileSystemFileHandle}} objects are [=serializable objects=]. Their [=serialization steps=] and
 [=deserialization steps=] are the same as those for {{FileSystemHandle}}.
 
-Advisement: In the Origin Trial as available in Chrome 78, these objects are not yet serializable.
+Advisement: In the Origin Trial as available in Chrome 78, these objects are not yet serializable. 
+In Chrome 82 they are.
 
 ### The {{FileSystemFileHandle/getFile()}} method ### {#api-filesystemfilehandle-getfile}
 
@@ -222,35 +282,37 @@ The <dfn method for=FileSystemFileHandle>getFile()</dfn> method, when invoked, m
 
 </div>
 
-### The {{FileSystemFileHandle/createWriter()}} method ### {#api-filesystemfilehandle-createwriter}
+### The {{FileSystemFileHandle/createWritable()}} method ### {#api-filesystemfilehandle-createwritable}
+
+Advisement: In the Origin Trial as available in Chrome 82, createWritable replaces the createWriter method.
 
 <div class="note domintro">
-  : |writer| = await |fileHandle| . {{FileSystemFileHandle/createWriter()}}
-  : |writer| = await |fileHandle| . {{FileSystemFileHandle/createWriter()|createWriter}}({ {{FileSystemCreateWriterOptions/keepExistingData}}: true/false })
-  :: Returns a {{FileSystemWriter}} that can be used to write to the file. Any changes made through
-     |writer| won't be reflected in the file represented by |fileHandle| until its
-     {{FileSystemWriter/close()}} method is called.
+  : |stream| = await |fileHandle| . {{FileSystemFileHandle/createWritable()}}
+  : |stream| = await |fileHandle| . {{FileSystemFileHandle/createWritable()|createWritable}}({ {{FileSystemCreateWritableOptions/keepExistingData}}: true/false })
+  :: Returns a {{FileSystemWritableFileStream}} that can be used to write to the file. Any changes made through
+     |stream| won't be reflected in the file represented by |fileHandle| until its
+     {{FileSystemWritableFileStream/close()}} method is called.
      User agents try to ensure that no partial writes happen, i.e. the file represented by
      |fileHandle| will either contains its old contents or it will contain whatever data was written
-     through |writer| up until {{FileSystemWriter/close()}} was called.
+     through |stream| up until {{FileSystemWritableFileStream/close()}} was called.
 
      This is typically implemented by writing data to a temporary file, and only replacing the file
-     represented by |fileHandle| with the temporary file when the writer is closed.
+     represented by |fileHandle| with the temporary file when the writable filestream is closed.
 
-     If {{FileSystemCreateWriterOptions/keepExistingData}} is `false` or not specified,
+     If {{FileSystemCreateWritableOptions/keepExistingData}} is `false` or not specified,
      the temporary file starts out empty,
      otherwise the existing file is first copied to this temporary file.
 </div>
 
-Issue: There has been some discussion around and desire for a "inPlace" mode for createWriter (where
-changes will be written to the actual underlying file as they are written to the writer, for example
-to support in-place modification of large files or things like databases). This is not currently
-implemented in Chrome. Implementing this is currently blocked on figuring out how to combine the
-desire to run malware checks with the desire to let websites make fast in-place modifications to
-existing large files.
+Issue(67): There has been some discussion around and desire for a "inPlace" mode for createWritable
+(where changes will be written to the actual underlying file as they are written to the writer, for
+example to support in-place modification of large files or things like databases). This is not
+currently implemented in Chrome. Implementing this is currently blocked on figuring out how to
+combine the desire to run malware checks with the desire to let websites make fast in-place
+modifications to existing large files.
 
 <div algorithm>
-The <dfn method for=FileSystemFileHandle>createWriter(|options|)</dfn> method, when invoked, must run these steps:
+The <dfn method for=FileSystemFileHandle>createWritable(|options|)</dfn> method, when invoked, must run these steps:
 
 1. TODO
 
@@ -280,29 +342,26 @@ interface FileSystemDirectoryHandle : FileSystemHandle {
   object getEntries();
 
   Promise<void> removeEntry(USVString name, optional FileSystemRemoveOptions options = {});
+
+  Promise<sequence<USVString>?> resolve(FileSystemHandle possibleDescendant);
 };
 </xmp>
 
 {{FileSystemDirectoryHandle}} objects are [=serializable objects=]. Their [=serialization steps=] and
 [=deserialization steps=] are the same as those for {{FileSystemHandle}}.
 
-Advisement: In the Origin Trial as available in Chrome 78, these objects are not yet serializable.
+Advisement: In the Origin Trial as available in Chrome 78, these objects are not yet serializable. 
+In Chrome 82 they are.
 
 Issue: Should we have separate getFile and getDirectory methods, or just a single getChild/getEntry
 method?
 
-Issue: Having getFile methods in both FileSystemDirectoryHandle and FileSystemFileHandle, but with
-very different behavior might be confusing? Perhaps rename at least one of them (but see also
+Issue(98): Having getFile methods in both FileSystemDirectoryHandle and FileSystemFileHandle, but
+with very different behavior might be confusing? Perhaps rename at least one of them (but see also
 previous issue).
 
-Issue: Should getEntries be its own method, or should FileSystemDirectoryHandle just be an async
+Issue(47): Should getEntries be its own method, or should FileSystemDirectoryHandle just be an async
 iterable itself?
-
-Issue: We will probably want some method to make it possible to compare two handles, and/or determine
-if one handle represents a descendant of another handle. Such a method will enable for example an IDE
-to detect that the user tries to open a file (through the file picker), where that file actually is
-part of the "project" the IDE has open, allowing the IDE to highlight the selected file in a directory
-tree.
 
 ### The {{FileSystemDirectoryHandle/getFile()}} method ### {#api-filesystemdirectoryhandle-getfile}
 
@@ -404,74 +463,170 @@ these steps:
 
 </div>
 
-## The {{FileSystemWriter}} interface ## {#api-filesystemwriter}
+### The {{FileSystemDirectoryHandle/resolve()}} method ### {#api-filesystemdirectoryhandle-resolve}
+
+<div class="note domintro">
+  : |path| = await |directory| . {{FileSystemDirectoryHandle/resolve()|resolve}}( |child| )
+  :: If |child| is equal to |directory|, |path| will be an empty array.
+  :: If |child| is a direct child of |directory|, |path| will be an array containing |child|'s name.
+  :: If |child| is a descendant of |directory|, |path| will be an array containing the names of
+     all the intermediate directories and |child|'s name as last element.
+  :: Otherwise (|directory| and |child| are not related), |path| will be null.
+</div>
+
+Advisement: This method is first available in Chrome 82.
+
+<div class=example id=filesystemdirectoryhandle-resolve-example>
+<xmp highlight=js>
+// Assume we at some point got a valid directory handle.
+const dir_ref = current_project_dir;
+if (!dir_ref) return;
+
+// Now get a file reference by showing a file picker:
+const file_ref = await self.chooseFileSystemEntries({type: 'openFile'});
+if (!file_ref) {
+    // User cancelled, or otherwise failed to open a file.
+    return;
+}
+
+// Check if file_ref exists inside dir_ref:
+const relative_path = await dir_ref.resolve(file_ref);
+if (relative_path === null) {
+    // Not inside dir_ref
+} else {
+    // relative_path is an array of names, giving the relative path
+    // from dir_ref to the file that is represented by file_ref:
+    assert relative_path.pop() == file_ref.name;
+
+    let entry = dir_ref;
+    for (const name of relative_path) {
+        entry = await entry.getDirectory(name);
+    }
+    entry = await entry.getFile(file_ref.name);
+
+    // Now |entry| will represent the same file on disk as |file_ref|.
+    assert await entry.isSameEntry(file_ref) == true;
+}
+</xmp>
+</div>
+
+<div algorithm>
+The <dfn method for=FileSystemDirectoryHandle>resolve(|possibleDescendant|)</dfn> method,
+when invoked, must return the result of [=entry/resolving=]
+|possibleDescendant|'s [=FileSystemHandle/entry=] relative to [=this=]'s [=FileSystemHandle/entry=].
+
+</div>
+
+
+
+## The {{FileSystemWritableFileStream}} interface ## {#api-filesystemwritablefilestream}
 
 <xmp class=idl>
+enum WriteCommandType {
+  "truncate",
+  "seek",
+  "write",
+};
+
+dictionary WriteParams {
+  required WriteCommandType type;
+  unsigned long long? size;
+  unsigned long long? position;
+  (BufferSource or Blob or USVString)? data;
+};
+
 [Exposed=(Window,Worker), SecureContext]
-interface FileSystemWriter {
-  Promise<void> write(unsigned long long position, (BufferSource or Blob or USVString) data);
+interface FileSystemWritableFileStream : WritableStream {
+  Promise<void> write((BufferSource or Blob or USVString or WriteParams) data);
+  Promise<void> seek(unsigned long long position);
   Promise<void> truncate(unsigned long long size);
-  Promise<void> close();
 };
 </xmp>
 
-Issue(19): We want some kind of integration with writable streams. One possible option is to make
-FileStreamWriter inherit from WritableStream, but other options should be considered as well.
+A {{FileSystemWritableFileStream}} object is a {{WritableStream}} object with additional methods to operate
+on a single file on disk.
 
-### The {{FileSystemWriter/write()}} method ### {#api-filesystemwriter-write}
+Upon creation, an underlying sink will have been created and the stream will be usable. All operations executed on the stream are queuable and producers will be able to respond to backpressure.
+
+The underlying sink's write method, and therefore {{WritableStreamDefaultWriter/write()|WritableStreamDefaultWriter's write()}} method, will accept byte-like data or {{WriteParams}} as input.
+
+The {{FileSystemWritableFileStream}} has a file position cursor initialized at byte offset 0 from the top of the file. When using {{FileSystemWritableFileStream/write()|write()}} or by using WritableStream capabilities through the {{WritableStreamDefaultWriter/write()|WritableStreamDefaultWriter's write()}} method, this position will be advanced based on the number of bytes written through the stream object.
+
+Similarly, when piping a {{ReadableStream}} into a {{FileSystemWritableFileStream}} object, this position is updated with the number of bytes that passed through the stream.
+
+{{WritableStream/getWriter()|getWriter()}} returns an instance of {{WritableStreamDefaultWriter}}.
+
+### The {{FileSystemWritableFileStream/write()}} method ### {#api-filesystemwritablefilestream-write}
 
 <div class="note domintro">
-  : await |writer| . {{FileSystemWriter/write()|write}}(|position|, |data|)
-  :: Writes the content of |data| into the file associated with |writer| at position |position|.
-     If |position| is past the end of the file writing will fail and this method rejects.
+  : await |stream| . {{FileSystemWritableFileStream/write()|write}}(|data|)
+  :: Writes the content of |data| into the file associated with |stream| at the current file
+     cursor offset in bytes from the top of the file by default.
 
-     No changes are written to the actual file until on disk until {{FileSystemWriter/close()}}
+     No changes are written to the actual file until on disk until {{FileSystemWritableFileStream/close()}}
+     is called. Changes are typically written to a temporary file instead.
+
+     If |data| is of type {{WriteParams}}, validates and executes the content of |data|, which might result in changes into the file associated with |stream|.
+
+     {{WriteParams}} requires the attribute {{WriteParams/type|type}} which determines what the operations to
+     execute are.
+
+     If {{WriteParams/type|type}} is {{truncate}}, {{WriteParams/size|size}} is a <span class=allow-2119>required</span> attribute.
+
+     If {{WriteParams/type|type}} is {{seek}}, {{WriteParams/position|position}} is a <span class=allow-2119>required</span> attribute.
+
+     If {{WriteParams/type|type}} is {{write}}, {{WriteParams/position|position}} is an <span class=allow-2119>optional</span> attribute, {{WriteParams/data|data}} is a <span class=allow-2119>required</span> attribute.
+
+     No changes are written to the actual file until on disk until {{FileSystemWritableFileStream/close()}}
      is called. Changes are typically written to a temporary file instead.
 </div>
 
 <div algorithm>
-The <dfn method for=FileSystemWriter>write(|position|, |data|)</dfn> method, when invoked, must run
+The <dfn method for=FileSystemWritableFileStream>write(|data|)</dfn> method, when invoked, must run
 these steps:
 
 1. TODO
 
 </div>
 
-### The {{FileSystemWriter/truncate()}} method ### {#api-filesystemwriter-truncate}
+### The {{FileSystemWritableFileStream/truncate()}} method ### {#api-filesystemwritablefilestream-truncate}
 
 <div class="note domintro">
-  : await |writer| . {{FileSystemWriter/truncate()|truncate}}(|size|)
-  :: Resizes the file associated with |writer| to be |size| bytes long. If |size| is larger than
-     the current file size this pads the file with zero bytes, otherwise it truncates the file.
+  : await |stream| . {{FileSystemWritableFileStream/truncate()|truncate}}(|size|)
+  :: Resizes the file associated with |stream| to be |size| bytes long. If |size| is larger than
+     the current file size this pads the file with null bytes, otherwise it truncates the file.
 
-     No changes are written to the actual file until on disk until {{FileSystemWriter/close()}}
+     The file cursor is updated when {{truncate}} is called. If the offset is smaller than offset,
+     it remains unchanged. If the offset is larger than |size|, the offset is set to |size| to
+     ensure that subsequent writes do not error.
+
+     No changes are written to the actual file until on disk until {{FileSystemWritableFileStream/close()}}
      is called. Changes are typically written to a temporary file instead.
 </div>
 
 <div algorithm>
-The <dfn method for=FileSystemWriter>truncate(|size|)</dfn> method, when invoked, must run these
+The <dfn method for=FileSystemWritableFileStream>truncate(|size|)</dfn> method, when invoked, must run these
 steps:
 
 1. TODO
 
 </div>
 
-### The {{FileSystemWriter/close()}} method ### {#api-filesystemwriter-close}
+### The {{FileSystemWritableFileStream/close()}} method ### {#api-filesystemwritablefilestream-close}
 
 <div class="note domintro">
-  : await |writer| . {{FileSystemWriter/close()}}
-  :: First flushes any data written so far to disk, and then closes the writer.
+  : await |stream| . {{FileSystemWritableFileStream/close()}}
+  :: First flushes any data written so far to disk, and then closes the writable stream.
      No changes will be visible in the destination file until this method is called.
-     Furthermore, if the file on disk changed between creating this |writer| and this invocation of
-     {{FileSystemWriter/close()}}, this will reject and all future operations on the writer will
-     fail.
+     Furthermore, if the file on disk changed between creating this |stream| and this invocation of
+     {{FileSystemWritableFileStream/close()}}, this will reject and all future operations on the stream will fail.
 
      This operation can take some time to complete, as user agents might use this moment to run
      malware scanners or perform other security checks if the website isn't sufficiently trusted.
 </div>
 
 <div algorithm>
-The <dfn method for=FileSystemWriter>close()</dfn> method, when invoked, must run these
+The <dfn method for=FileSystemWritableFileStream>close()</dfn> method, when invoked, must run these
 steps:
 
 1. TODO
@@ -542,7 +697,7 @@ partial interface Window {
      {{ChooseFileSystemEntriesOptionsAccepts/description}} is provided one will be generated.
 
      If |options|.{{ChooseFileSystemEntriesOptions/excludeAcceptAllOption}} is true, or if no valid
-     entries exist in |options|.{{ChooseFileSystemEntriesOptions/accepts}}, a option matching all
+     entries exist in |options|.{{ChooseFileSystemEntriesOptions/accepts}}, an option matching all
      files will be included in the file types the dialog lets the user select.
 </div>
 
@@ -657,7 +812,7 @@ Clearing browsing data is expected to revoke all permissions as well.
 
 ## First-party vs third-party contexts. ## {#privacy-third-party}
 
-In third-party contexts (i.e. an iframe whose origin does not match that of the top-level frame)
+In third-party contexts (e.g. an iframe whose origin does not match that of the top-level frame)
 websites can't gain access to data they don't already have access to. This includes both getting
 access to new files or directories via the {{chooseFileSystemEntries}} API, as well as requesting
 more permissions to existing handles via the {{requestPermission}} API.

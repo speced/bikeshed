@@ -25,6 +25,7 @@ spec: css-sizing-3; type: property;
 	text: min-width
 	text: box-sizing
 spec: selectors-4; type: type; text: <wq-name>
+spec: infra; type: dfn; text: string;
 </pre>
 <style>
 code, small { white-space: nowrap }
@@ -558,6 +559,42 @@ Author-defined Identifiers: the <<custom-ident>> type</h3>
 	the <<custom-ident>> should always be "positionally unambiguous",
 	so that it's impossible to conflict with any keyword values in the property.
 
+<h3 id='dashed-idents'>
+<em>Explicitly</em> Author-defined Identifiers: the <<dashed-ident>> type</h3>
+
+	Some contexts accept <em>both</em> author-defined identifiers
+	<em>and</em> CSS-defined identifiers.
+	If not handled carefully,
+	this can result in difficulties adding new CSS-defined values;
+	UAs have to study existing usage
+	and gamble that there are sufficiently few author-defined identifiers in use
+	matching the new CSS-defined one,
+	so giving the new value a special CSS-defined meaning
+	won't break existing pages.
+
+	While there are many legacy cases in CSS
+	that mix these two values spaces in exactly this fraught way,
+	the <<dashed-ident>> type is meant to be an easy way 
+	to distinguish author-defined identifiers
+	from CSS-defined identifiers.
+
+	The <dfn><<dashed-ident>></dfn> production
+	is a <<custom-ident>>,
+	with all the [=case-sensitivity=] that implies,
+	with the additional restriction that it must start with two dashes 
+	(U+002D HYPHEN-MINUS).
+
+	<<dashed-ident>>s are reserved solely for use as author-defined names.
+	CSS will never define a <<dashed-ident>> for its own use.
+
+	<div class=example>
+		For example, [=custom properties=] need to be distinguishable from CSS-defined properties,
+		as new properties are added to CSS regularly.
+		To allow this,
+		[=custom property=] names are required to be <<dashed-ident>>s.
+	</div>
+
+
 <!--
  ██████  ████████ ████████  ████ ██    ██  ██████
 ██    ██    ██    ██     ██  ██  ███   ██ ██    ██
@@ -571,7 +608,7 @@ Author-defined Identifiers: the <<custom-ident>> type</h3>
 <h3 id="strings">
 Quoted Strings: the <<string>> type</h3>
 
-	<dfn export lt="string">Strings</dfn> are denoted by <dfn id="string-value">&lt;string></dfn>
+	[=Strings=] are denoted by <dfn id="string-value">&lt;string></dfn>
 	and consist of a sequence of characters delimited by double quotes or
 	single quotes. They correspond to the <<string-token>> production
 	in the <a href="https://www.w3.org/TR/css-syntax/">CSS Syntax Module</a> [[!CSS3SYN]].
@@ -686,6 +723,9 @@ Relative URLs</h4>
 	not that of the styled source document.
 	Style sheets embedded within a document have
 	the base URL associated with their container.
+
+	Note: For HTML documents,
+	the <a href="https://html.spec.whatwg.org/multipage/urls-and-fetching.html#dynamic-changes-to-base-urls">base URL is mutable</a>.
 
 	When a <<url>> appears in the computed value of a property,
 	it is resolved to an absolute URL,
@@ -2573,6 +2613,232 @@ Comparison Functions: ''min()'', ''max()'', and ''clamp()''</h3>
 	</div>
 
 
+<h3 id=round-func>
+Stepped Value Functions: ''round()'', ''mod()'', and ''rem()''</h3>
+
+	The stepped-value functions,
+	''round()'', ''mod()'', and ''rem()'',
+	all transform a given value
+	according to another "step value",
+	in different ways.
+
+	The <dfn lt="round()">round(<<rounding-strategy>>?, A, B)</dfn> function
+	contains an optional rounding strategy,
+	and two [=calculations=] A and B,
+	and returns the value of A,
+	rounded according to the rounding strategy,
+	to the nearest integer multiple of B either above or below A.
+	The argument [=calculations=] can resolve to any <<number>>, <<dimension>>, or <<percentage>>,
+	but must have the <em>same</em> [=determine the type of a calculation|type=],
+	or else the function is invalid;
+	the result will have the same [=CSSNumericValue/type=] as the arguments.
+
+	If A is exactly equal to an integer multiple of B,
+	''round()'' resolves to A exactly
+	(preserving whether A is 0⁻	or 0⁺, if relevant).
+	Otherwise, there are two integer multiples of B that are potentially "closest" to A,
+	|lower B| which is closer to −∞
+	and |upper B| which is closer to +∞.
+	The following <dfn><<rounding-strategy>></dfn>s dictate how to choose between them:
+
+	<dl dfn-type=value dfn-for="<rounding-strategy>">
+		: <dfn>nearest</dfn>
+		:: Choose whichever of |lower B| and |upper B|
+			that has the smallest absolute difference from A.
+			If both have an equal difference
+			(A is exactly between the two values),
+			choose |upper B|.
+		: <dfn>up</dfn>
+		:: Choose |upper B|.
+		: <dfn>down</dfn>
+		:: Choose |lower B|.
+		: <dfn>to-zero</dfn>
+		:: Choose whichever of |lower B| and |upper B|
+			that has the smallest absolute difference from 0.
+	</dl>
+
+	If |lower B| would be zero,
+	it is specifically equal to 0⁺;
+	if |upper B| would be zero,
+	it is specifically equal to 0⁻.
+
+	If <<rounding-strategy>> is omitted,
+	it defaults to ''nearest''.
+
+	<div class=example>
+		Unlike languages like JavaScript
+		which have a natural "precision" to round to
+		(integers),
+		CSS values have no such precision
+		because values can be written in many different compatible units.
+		As such, the precision has to be given explicitly;
+		to round a width to the nearest ''50px'',
+		one can write ''round(var(--width), 50px)''.
+	</div>
+
+	Note: JavaScript and other programming languages
+	sometimes separate out the rounding strategies into separate rounding functions.
+	JS’s <code highlight=JS>Math.floor()</code>
+	is equivalent to CSS's ''round(down, ...)'';
+	JS’s <code highlight=JS>Math.ceil()</code>
+	is equivalent to CSS's ''round(up, ...)'';
+	JS’s <code highlight=JS>Math.trunc()</code>
+	is equivalent to CSS's ''round(to-zero, ...)'';
+	and JS’s <code highlight=JS>Math.round()</code>
+	is equivalent to CSS's ''round(nearest, ...)'',
+	or just ''round(...)''.
+
+	Note: The <<rounding-strategy>> keywords
+	are the same as the keywords in 'block-step-size'
+	and have the same behavior.
+	('block-step-size' just lacks ''to-zero'';
+	since block sizes are always non-negative,
+	''to-zero'' and ''down'' would be identical.)
+
+	The modulus functions <dfn lt="mod()">mod(A, B)</dfn>
+	and <dfn lt=rem()>rem(A, B)</dfn>
+	similarly contain two [=calculations=] A and B,
+	and return the difference between A
+	and the nearest integer multiple of B either above or below A.
+	The argument [=calculations=] can resolve to any <<number>>, <<dimension>>, or <<percentage>>,
+	but must have the <em>same</em> [=determine the type of a calculation|type=],
+	or else the function is invalid;
+	the result will have the same [=CSSNumericValue/type=] as the arguments.
+
+	The two functions are very similar,
+	and in fact return identical results
+	if both arguments are positive or both are negative:
+	the value of the function is equal to the value of A
+	shifted by the integer multiple of B
+	that brings the value <dfn noexport>between zero and B</dfn>.
+	(Specifically, the range includes zero
+	and excludes B.
+	More specifically, if B is positive the range starts at 0⁺,
+	and if B is negative it starts at 0⁻.)
+
+	<div class=example>
+		For example, ''mod(18px, 5px)'' resolves to the value ''3px'',
+		because subtracting ''5px * 3'' from ''18px'' yields ''3px'',
+		which is the only such value between ''0px'' and ''3px''.
+
+		Similarly, ''mod(-140deg, -90deg)'' resolves to the value ''-50deg'',
+		because adding ''-90deg * 1'' to ''-140deg'' yields ''-50deg'',
+		which is the only such value between ''0deg'' and ''-90deg''.
+
+		Evaluating either of these examples with ''rem()'' yields the exact same results.
+	</div>
+
+	Their behavior diverges if the A value and the B step
+	are on opposite sides of zero:
+	''mod()'' (short for “modulus”)
+	continues to choose the integer multiple of B
+	that puts the value [=between zero and B=], as above
+	(guaranteeing that the result will either be zero
+	or share the sign of B, not A),
+	while ''rem()'' (short for "remainder")
+	chooses the integer multiple of B
+	that puts the value [=between zero and B|between zero and -B=],
+	avoiding changing the sign of the value.
+
+	<div class=example>
+		For example, ''mod(-18px, 5px)'' resolves to the value ''2px'':
+		adding ''5px * 4'' to ''-18px'' yields ''2px'',
+		which is between ''0px'' and ''5px''.
+
+		On the other hand, ''rem(-18px, 5px)'' resolves to the value ''-3px'':
+		adding ''5px * 3'' to ''-18px'' yields ''-3px'',
+		which has the same sign as ''-18px''
+		but is between ''0px'' and ''-5px''.
+
+		Similarly, ''mod(140deg, -90deg)'' resolves to the value ''-40deg''
+		(adding ''-90deg * 2'' to ''140deg'',
+		bringing it to between ''0deg'' and ''-90deg''),
+		but ''rem(140deg, -90deg)'' resolves to the value ''50deg''.
+	</div>
+
+	<details>
+		<summary>When should I choose ''mod()'' vs ''rem()''?</summary>
+
+		Typically, users of this operation
+		are in control of the step value (B),
+		and are modifying an unknown value A.
+		As a result, it's <em>usually</em> more expected
+		that the result is between 0 and B,
+		regardless of A's sign,
+		meaning ''mod()'' should be chosen.
+
+		For example,
+		if an author wants to know whether a length
+		is an even or odd number of pixels,
+		''mod(A, 2px)'' will return either ''0px'' or ''1px''
+		(assuming the value is a whole number of pixels to begin with),
+		regardless of the value of a.
+		''rem(A, 2px)'', on the other hand,
+		will return ''0px'' if A is an even number of pixels,
+		but will return <em>either</em> ''1px'' or ''-1px''
+		if it's odd,
+		depending on whether A is positive or negative.
+
+		The opposite situation does sometimes occur,
+		however,
+		and so ''rem()'' is provided to cater to that.
+		As well, ''rem()'' is the behavior of JavaScript's <code highlight=js>%</code> operator,
+		so if an exact match between CSS and JS code is desired,
+		''rem()'' can be useful.
+	</details>
+
+	Note: ''mod()'' and ''rem()''
+	can also be defined directly in terms of other functions:
+	''mod(A, B)'' is equivalent to ''calc(A - sign(B)*round(down, A*sign(B), B))''
+	(a hacky way to say "round(down) when B is positive, round(up) when B is negative),
+	while ''rem(A, B)'' is equivalent to ''calc(A - round(to-zero, A, B))''.
+	(These expressions don't always handle 0⁺ and 0⁻ correctly, though,
+	because 0⁻ semantics aren't commutative for addition.)
+
+<h4 id=round-infinities>
+Argument Ranges</h4>
+
+	In ''round(A, B)'',
+	if B is 0,
+	the result is NaN.
+	If A and B are both infinite,
+	the result is NaN.
+
+	If A is infinite but B is finite,
+	the result is the same infinity.
+
+	If A is finite but B is infinite,
+	the result depends on the <<rounding-strategy>>
+	and the sign of A:
+
+	: ''nearest''
+	: ''to-zero''
+	:: If A is positive or 0⁺, return 0⁺.
+		Otherwise, return 0⁻.
+	: ''up''
+	:: If A is positive (not zero), return +∞.
+		If A is 0⁺, return 0⁺.
+		Otherwise, return 0⁻.
+	: ''down''
+	:: If A is negative (not zero), return −∞.
+		If A is 0⁻, return 0⁻.
+		Otherwise, return 0⁺.
+
+	In ''mod(A, B)'' or ''rem(A, B)'',
+	if B is 0,
+	the result is NaN.
+	If A is infinite,
+	the result is NaN.
+
+	In ''mod(A, B)'' only,
+	if B is infinite
+	and A is non-zero and has opposite sign to B,
+	the result is NaN.
+
+	Note: All other "infinite B" cases are valid,
+	and just return A immediately.
+
+
 <h3 id=trig-funcs>
 Trigonometric Functions: ''sin()'', ''cos()'', ''tan()'', ''asin()'', ''acos()'', ''atan()'', and ''atan2()''</h3>
 
@@ -2738,17 +3004,17 @@ Argument Ranges</h4>
 	(because the JS function's input is in radians,
 	and one cannot perfectly express a value of π/2 in JS numbers),
 	is defined so that roundtripping of values works;
-	''tan(atan(1 / 0))'' yields +∞,
-	''tan(atan(-1 / 0))'' yields −∞,
+	''tan(atan(infinity))'' yields +∞,
+	''tan(atan(-infinity))'' yields −∞,
 	''atan(tan(90deg))'' yields ''90deg'',
 	and ''atan(tan(-90deg))'' yields ''-90deg''.
 
 
 <h3 id=exponent-funcs>
-Exponential  Functions: ''pow()'', ''sqrt()'', ''hypot()''</h3>
+Exponential  Functions: ''pow()'', ''sqrt()'', ''hypot()'', ''log()'', ''exp()''</h3>
 
 	The exponential functions--
-	''pow()'', ''sqrt()'', and ''hypot()''--
+	''pow()'', ''sqrt()'', ''hypot()'', ''log()'', and ''exp()''--
 	compute various exponential functions with their arguments.
 
 	The <dfn lt="pow()">pow(A, B)</dfn> function
@@ -2856,6 +3122,21 @@ Exponential  Functions: ''pow()'', ''sqrt()'', ''hypot()''</h3>
 		Thus it's fine to let author use dimensions directly in ''hypot()''.
 	</details>
 
+	The <dfn lt="log()">log(A, B?)</dfn> function
+	contains one or two [=calculations=]
+	(representing the value to be logarithmed,
+	and the base of the logarithm,
+	defaulting to e),
+	which must resolve to <<number>>s,
+	and returns the logarithm base B of the value A,
+	as a <<number>>.
+
+	The <dfn lt="exp()">exp(A)</dfn> function
+	contains one [=calculation=]
+	which must resolve to a <<number>>,
+	and returns the same value as ''pow(e, A)''
+	as a <<number>>.
+
 	<div class=example>
 		The ''pow()'' function can be useful for strategies like <a href="https://www.modularscale.com/">CSS Modular Scale</a>,
 		which relates all the font-sizes on a page to each other by a fixed ratio.
@@ -2896,6 +3177,19 @@ Exponential  Functions: ''pow()'', ''sqrt()'', ''hypot()''</h3>
 		If an author wanted elements to get smaller as they moved further away from their starting point
 		(drawing some sort of word cloud, for example),
 		they could then use this distance in their scaling factor calculations.
+	</div>
+
+	<div class=example>
+		With a single argument,
+		''log()'' provides the “natural log” of its argument,
+		or the log base e,
+		same as JavaScript.
+
+		If one instead wants log base 10
+		(to, for example, count the number of digits in a value)
+		or log base 2
+		(counting the number of bits in a value),
+		''log(X, 10)'' or ''log(X, 2)'' provide those values.
 	</div>
 
 <h4 id="exponent-infinities">
@@ -2972,6 +3266,29 @@ Argument Ranges</h4>
 	if any of the inputs are infinite,
 	the result is +∞.
 
+	In ''log(A, B)'',
+	if B is 1 or negative,
+	<span class='note'>
+	B values <em>between</em> 0 and 1,
+	or greater than 1,
+	are valid.
+	</span>
+	the result is NaN.
+	If A is negative,
+	the result is NaN.
+	If A is 0⁺ or 0⁻,
+	the result is −∞.
+	If A is 1,
+	the result is 0⁺.
+	If A is +∞,
+	the result is +∞.
+
+	In ''exp(A)'',
+	if A is +∞,
+	the result is +∞.
+	If A is −∞,
+	the result is 0⁺.
+
 	(See [[#calc-type-checking]] for details on how [=math functions=] handle NaN and infinities.)
 
 	<div class=note>
@@ -3005,10 +3322,110 @@ Argument Ranges</h4>
 			is likely done at a higher CSS level
 			rather than in the internal math functions anyway,
 			consistency in CSS was chosen to be more important,
-			so all functions were defined to have "infection" NaN.
+			so all functions were defined to have "infectious" NaN.
 		</details>
 	</div>
 
+
+<h3 id='sign-funcs'>
+Sign-Related Functions: ''abs()'', ''sign()''</h3>
+
+	The sign-related functions--
+	''abs()'' and ''sign()''--
+	compute various functions related to the sign of their argument.
+
+	The <dfn lt="abs()">abs(A)</dfn> function
+	contains one [=calculation=] A,
+	and returns the absolute value of A,
+	as the same [=CSSNumericValue/type=] as the input:
+	if A's numeric value is positive or 0⁺, just A again;
+	otherwise ''-1 * A''.
+
+	The <dfn lt="sign()">sign(A)</dfn> function
+	contains one [=calculation=] A,
+	and returns -1 if A's numeric value is negative,
+	+1 if A's numeric value is positive,
+	0⁺ if A's numeric value is 0⁺,
+	and 0⁻ if A's numeric value is 0⁻.
+
+	Note: Both of these functions operate on the fully simplified/resolved form of their arguments,
+	which may give unintuitive results at first glance.
+	In particular,
+	an expression like ''10%'' might be positive <em>or</em> negative once it's resolved,
+	depending on what value it's resolved against.
+	For example, in 'background-position' positive percentages
+	resolve to a negative length,
+	and vice versa,
+	if the background image is larger than the background area.
+	Thus ''sign(10%)'' might return ''1'' <em>or</em> ''-1'',
+	depending on how the percentage is resolved!
+	(Or even ''0'', if it's resolved against a zero length.)
+
+
+<h3 id='calc-constants'>
+Numeric Constants: ''e'', ''pi''</h3>
+
+	While the trigonometric and exponential functions
+	handle many complex numeric operations,
+	some reasonable calculations must be put together more manually,
+	and many times these include well-known constants,
+	such as <i>e</i> and <i>π</i>.
+
+	Rather than require authors to manually type out
+	several digits of these constants,
+	a few of them are provided directly:
+
+	<dfn value export for=calc()>e</dfn> is the base of the natural logarithm,
+	approximately equal to 2.7182818284590452354.
+
+	<dfn value for=calc()>pi</dfn> is the ratio of a circle's circumference to its diameter,
+	approximately equal to 3.1415926535897932.
+
+	Note: These keywords are only usable within a calculation,
+	such as ''calc(pow(e, pi) - pi)'', or ''min(pi, 5, e)''.
+	If used outside of a calculation,
+	they're treated like any other keyword:
+	''animation-name: pi;'' refers to an animation named "pi";
+	''line-height: e;'' is invalid
+	(<em>not</em> similar to ''line-height: 2.7'',
+	but ''line-height: calc(e);'' is).
+
+
+<h4 id='calc-error-constants'>
+Degenerate Numeric Constants: ''infinity'', <nobr>''-infinity''</nobr>, ''NaN''</h4>
+
+	When a [=calculation=] or a subtree of a [=calculation=]
+	becomes infinite or NaN,
+	representing it with a numeric value is no longer possible.
+	To aid in serialization of these degenerate values,
+	the additional math constants
+	<dfn value for=calc()>infinity</dfn> (with the value +∞),
+	<dfn value for=calc()>-infinity</dfn> (with the value −∞),
+	and <dfn value for=calc()>NaN</dfn> (with the value NaN)
+	are defined.
+
+	As usual for CSS keywords,
+	these are [=ASCII case-insensitive=].
+	<span class=note>
+	Thus, ''calc(InFiNiTy)'' is perfectly valid.
+	</span>
+	However, ''NaN'' must be serialized with this canonical casing.
+
+	Note: While not <em>technically</em> numbers,
+	these keywords act as numeric values,
+	similar to ''e'' and ''pi''.
+	Thus to get an infinite length,
+	for example,
+	requires an expression like ''calc(infinity * 1px)''.
+
+	Note: These constants are defined <em>mostly</em>
+	to make serialization of infinite/NaN values simpler and more obvious,
+	but <em>can</em> be used to indicate a "largest possible value",
+	since an infinite value gets clamped to the allowed range.
+	It's rare for this to be reasonable,
+	but when it is,
+	using ''infinity'' is clearer in its intent
+	than just putting an enormous number in one's stylesheet.
 
 <h3 id='calc-syntax'>
 Syntax</h3>
@@ -3020,6 +3437,9 @@ Syntax</h3>
 	<<min()>>   = min( <<calc-sum>># )
 	<<max()>>   = max( <<calc-sum>># )
 	<<clamp()>> = clamp( <<calc-sum>>#{3} )
+	<<round()>> = round( <<rounding-strategy>>?, <<calc-sum>>, <<calc-sum>> )
+	<<mod()>>   = mod( <<calc-sum>>, <<calc-sum>> )
+	<<rem()>>   = rem( <<calc-sum>>, <<calc-sum>> )
 	<<sin()>>   = sin( <<calc-sum>> )
 	<<cos()>>   = cos( <<calc-sum>> )
 	<<tan()>>   = tan( <<calc-sum>> )
@@ -3030,9 +3450,15 @@ Syntax</h3>
 	<<pow()>>   = pow( <<calc-sum>>, <<calc-sum>> )
 	<<sqrt()>>  = sqrt( <<calc-sum>> )
 	<<hypot()>> = hypot( <<calc-sum>># )
+	<<log()>>   = log( <<calc-sum>>, <<calc-sum>>? )
+	<<exp()>>   = exp( <<calc-sum>> )
+	<<abs()>>   = abs( <<calc-sum>> )
+	<<sign()>>  = sign( <<calc-sum>> )
 	<dfn>&lt;calc-sum></dfn> = <<calc-product>> [ [ '+' | '-' ] <<calc-product>> ]*
 	<dfn>&lt;calc-product></dfn> = <<calc-value>> [ [ '*' | '/' ] <<calc-value>> ]*
-	<dfn>&lt;calc-value></dfn> = <<number>> | <<dimension>> | <<percentage>> | ( <<calc-sum>> )
+	<dfn>&lt;calc-value></dfn> = <<number>> | <<dimension>> | <<percentage>> |
+	               <<calc-constant>> | ( <<calc-sum>> )
+	<dfn>&lt;calc-constant></dfn> = e | pi | infinity | -infinity | NaN
 	</pre>
 
 	In addition, [=whitespace=]
@@ -3118,6 +3544,8 @@ Type Checking</h3>
 				:: the [=CSSNumericValue/type=] is «[ "resolution" → 1 ]»
 				: <<flex>>
 				:: the [=CSSNumericValue/type=] is «[ "flex" → 1 ]»
+				: <<calc-constant>>
+				:: the [=CSSNumericValue/type=] is «[ ]» (empty map)
 				: <<percentage>>
 				::
 					If, in the context in which the [=math function=]
@@ -3139,18 +3567,20 @@ Type Checking</h3>
 	[=Math functions=] themselves have [=CSSNumericValue/types=],
 	according to their contained [=calculations=]:
 
-	* The [=CSSNumericValue/type=] of a ''calc()'' expression
+	* The [=CSSNumericValue/type=] of a ''calc()'' or ''abs()'' expression
 		is the [=CSSNumericValue/type=] of its contained [=calculation=].
 	* The [=CSSNumericValue/type=] of a ''min()'', ''max()'', or ''clamp()'' expression
 		is the result of [=add two types|adding the types=]
 		of its comma-separated [=calculations=].
+	* The [=CSSNumericValue/type=] of a ''sign()'' expression
+		is «[ "number" → 1 ]».
 	* The [=CSSNumericValue/type=] of a ''sin()'', ''cos()'', or ''tan()'' expression
 		is «[ "number" → 1 ]».
 	* The [=CSSNumericValue/type=] of an ''asin()'', ''acos()'', ''atan()'', or ''atan2()'' expression
 		is «[ "angle" → 1 ]».
-	* The [=CSSNumericValue/type=] of a ''pow()'' or ''sqrt()'' expression
+	* The [=CSSNumericValue/type=] of a ''pow()'', ''sqrt()'', ''log()'', or ''exp()'' expression
 		is «[ "number" → 1 ]».
-	* The [=CSSNumericValue/type=] of a ''hypot()'' expression
+	* The [=CSSNumericValue/type=] of a ''hypot()'', ''round()'', ''mod()'', or ''rem()'' expression
 		is the result of [=add two types|adding the types=]
 		of its comma-separated [=calculations=].
 
@@ -3191,22 +3621,16 @@ Type Checking</h3>
 
 	* Negative zero
 		(0⁻)
-		can be produced literally by negating a zero
-		(''-0''),
-		or by a multiplication or division that produces zero
+		can be produced by a multiplication or division that produces zero
 		with exactly one negative argument
-		(such as ''-5 * 0'' or ''1 / (-1 / 0)'').
+		(such as ''-5 * 0'' or ''1 / (-infinity)''),
+		or by certain argument combinations in the other [=math functions=].
 
-		Note: Note that,
-		outside of [=math functions=],
-		''-0'' just produces a "standard" zero,
-		identical to ''0''--
-		CSS as a whole doesn't recognize the concept of signed zeros.
-		Negative zeros also don't escape a [=math function=];
+		Note: Note that negative zeros don't escape a [=math function=];
 		as detailed below,
 		they're "censored" away into an "unsigned" zero.
-	* ''-0 + -0''
-		or ''-0 - 0''
+	* ''0⁻ + 0⁻''
+		or ''0⁻ - 0''
 		produces 0⁻.
 		All other additions or subtractions that would produce a zero
 		produce 0⁺.
@@ -3222,16 +3646,17 @@ Type Checking</h3>
 		follows standard sign rules.)
 	* When comparing 0⁺ and 0⁻,
 		0⁻ is less than 0⁺.
-		For example, ''min(0, -0)'' must produce 0⁻,
-		''max(0, -0)'' must produce 0⁺,
-		and ''clamp(0, -0, 1)'' must produce 0⁺.
+		For example, ''min(0⁺, 0⁻)'' must produce 0⁻,
+		''max(0⁺, 0⁻)'' must produce 0⁺,
+		and ''clamp(0⁺, 0⁻, 1)'' must produce 0⁺.
 
 	If a <dfn export>top-level calculation</dfn>
 	(a [=math function=] not nested inside of another [=math function=])
-	would produce a NaN,
-	it instead produces +∞.
-	If a [=top-level calculation=] would produce 0⁻,
-	it instead produces the standard "unsigned" zero.
+	would produce a value whose numeric part is NaN,
+	it instead act as though the numeric part is +∞.
+	If a [=top-level calculation=]
+	would produce a value whose numeric part is 0⁻,
+	it instead acts as though the numeric part is the standard "unsigned" zero.
 
 	<div class=example>
 		For example, ''calc(-5 * 0)'' produces an unsigned zero--
@@ -3394,7 +3819,10 @@ Simplification</h4>
 				do so,
 				and return the value.
 
-			3. Otherwise, return |root|.
+			3. If |root| is a <<calc-constant>>,
+				return its numeric value.
+
+			4. Otherwise, return |root|.
 
 		2. If |root| is any other leaf node
 			(not an operator node):
@@ -3599,16 +4027,19 @@ Serialization</h3>
 
 		2. If |fn| represents an infinite or NaN value:
 			1. Let |s| be the [=string=] "calc(".
-			2. Create a numeric value
+			2. Serialize the keyword ''infinity'', ''-infinity'', or ''NaN'',
+				as appropriate to represent the value,
+				and append it to |s|.
+			3. If |fn|’s [=CSSNumericValue/type=] is anything other than «[ ]»
+				(empty, representing a <<number>>),
+				append " * " to |s|.
+				Create a numeric value
 				in the [=canonical unit=] for |fn|'s [=CSSNumericValue/type=]
 				(such as ''px'' for <<length>>),
-				with a value of 1 if |fn| represents +∞,
-				a value of -1 if |fn| represents −∞,
-				or a value of 0 if |fn| represents NaN.
+				with a value of 1.
 				Serialize this numeric value
 				and append it to |s|.
-			3. Append " / 0)" to |s|,
-				and return |s|.
+			3. Return |s|.
 
 		3. If the [=calculation tree’s=] root node is a numeric value,
 			or a [=calc-operator node=],

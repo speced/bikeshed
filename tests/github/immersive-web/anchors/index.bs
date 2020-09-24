@@ -1,0 +1,311 @@
+<pre class="metadata">
+Shortname: webxr-anchors
+Title: WebXR Anchors Module
+Group: immersivewebcg
+Status: CG-DRAFT
+Level: 1
+ED: https://immersive-web.github.io/anchors/
+Repository: immersive-web/anchors
+Mailing List Archives: https://lists.w3.org/Archives/Public/public-immersive-web/
+
+!Participate: <a href="https://github.com/immersive-web/anchors/issues/new">File an issue</a> (<a href="https://github.com/immersive-web/anchors/issues">open issues</a>)
+!Participate: <a href="https://lists.w3.org/Archives/Public/public-immersive-web/">Mailing list archive</a>
+!Participate: <a href="irc://irc.w3.org:6665/">W3C's #immersive-web IRC</a>
+
+Editor: Piotr Bialecki 114482, Google http://google.com/, bialpio@google.com
+
+Abstract: Describes a method to create anchors tracked by underlying system.
+</pre>
+
+<pre class="link-defaults">
+spec:webxr device api - level 1; type:dfn; for:/; text:xr device
+spec:webxr-ar-module-1; type:enum-value; text:"immersive-ar"
+</pre>
+
+<pre class="anchors">
+spec: WebXR Device API - Level 1; urlPrefix: https://www.w3.org/TR/webxr/#
+    for: XRFrame;
+        type: dfn; text: active; url: xrframe-active
+        type: dfn; text: session; url: dom-xrframe-session
+        type: dfn; text: time; url: xrframe-time
+    for: XRSession;
+        type: dfn; text: mode; url: xrsession-mode
+        type: dfn; text: XR device; url: xrsession-xr-device
+    for: XRSpace;
+        type: dfn; text: effective origin; url: xrspace-effective-origin
+        type: dfn; text: native origin; url: xrspace-native-origin
+        type: dfn; text: origin offset; url: xrspace-origin-offset
+        type: dfn; text: session; url: xrspace-session
+    type: dfn; text: capable of supporting; url: capable-of-supporting
+    type: dfn; text: feature descriptor; url: feature-descriptor
+    type: dfn; text: identity transform; url: identity-transform
+    type: dfn; text: inline XR device; url: inline-xr-device
+    type: dfn; text: XR device; url: xr-device
+spec: WebXR Hit Test Module; urlPrefix: https://immersive-web.github.io/hit-test/#
+    type: interface; text: XRHitTestResult; url: xrhittestresult
+    for: XRHitTestResult;
+        type: dfn; text: frame; url: xrhittestresult-frame
+        type: dfn; text: native origin; url: xrhittestresult-native-origin
+    type: dfn; text: hit-test; url: hit-test
+</pre>
+
+<style>
+  .non-normative::before {
+    content: "This section is non-normative.";
+    font-style: italic;
+  }
+  .tg {
+    border-collapse: collapse;
+    border-spacing: 0;
+  }
+  .tg th {
+    border-style: solid;
+    border-width: 1px;
+    background: #90b8de;
+    color: #fff;
+    font-family: sans-serif;
+    font-weight: bold;
+    border-color: grey;
+  }
+  .tg td {
+    padding: 4px 5px;
+    background-color: rgb(221, 238, 255);
+    font-family: monospace;
+    border-style: solid;
+    border-width: 1px;
+    border-color: grey;
+    overflow: hidden;
+    word-break: normal;
+  }
+  .unstable::before {
+    content: "This section is not stable";
+    display: block;
+    font-weight: bold;
+    text-align: right;
+    color: red;
+  }
+  .unstable {
+    border: thin solid pink;
+    border-radius: .5em;
+    padding: .5em;
+    margin: .5em calc(-0.5em - 1px);
+    background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='290'><text transform='rotate(-45)' text-anchor='middle' font-family='sans-serif' font-weight='bold' font-size='70' y='210' opacity='.1'>Unstable</text></svg>");
+    background-repeat: repeat;
+    background-color: #FFF4F4;
+  }
+  .unstable h3:first-of-type {
+    margin-top: 0.5rem;
+  }
+  .unstable.example:not(.no-marker)::before {
+    content: "Example " counter(example) " (Unstable)";
+    float: none;
+  }
+</style>
+
+Introduction {#intro}
+============
+
+<section class="non-normative">
+
+WebXR Anchors module enables applications to ask the underlying XR system to track changes to a particular three-dimensional pose (position and orientation) as the system's understanding of the world changes. This allows the application to adjust the location of the virtual objects that it placed in the scene in a way that helps with maintaining the illusion that the placed objects are really present in the user's environment.
+
+</section>
+
+Terminology {#terminology}
+-----------
+
+Pose, as understood by this document, signifies a position and orientation in 3D space.
+
+Anchor, as understood by this document, is an entity that keeps track of the pose that is fixed relative to the real world, and is created by the application.
+
+Initialization {#anchor-feature-initialization}
+==================
+
+Feature descriptor {#anchor-feature-descriptor}
+------------------
+
+In order for the applications to signal their interest in using anchors during a session, the session must be requested with appropriate [=feature descriptor=]. The string <dfn>anchors</dfn> is introduced by this module as a new valid feature descriptor for anchors feature.
+
+A device is [=capable of supporting=] the anchors feature if the device's tracking system exposes a [[#native-anchor|native anchors]] capability. The [=inline XR device=] MUST NOT be treated as [=capable of supporting=] the anchors feature. The user agents SHOULD attempt to support anchors feature for sessions with [=XRSession/mode=] equal to {{XRSessionMode/"immersive-ar"}}.
+
+Note: Even though anchors feature support is not required, anchors are one of the basic features needed by the AR-enabled applications to provide good user experience. Therefore, it is *highly* recommended that the user agents support them for <code>"immersive-ar"</code> sessions.
+
+Anchors {#anchors-section}
+=======
+
+XRAnchor {#xr-anchor}
+--------
+
+<script type="idl">
+[SecureContext, Exposed=Window]
+interface XRAnchor {
+  readonly attribute XRSpace anchorSpace;
+
+  void detach();
+};
+</script>
+
+An {{XRAnchor}} contains {{XRAnchor/anchorSpace}} that can be used to locate the anchor relative to other {{XRSpace|XRSpaces}}. If this attribute is accessed when [=XRAnchor/detached=] is set to <code>true</code>, the user agent MUST throw an {{InvalidStateError}}.
+
+Each {{XRAnchor}} has an associated <dfn for=XRAnchor>detached</dfn> boolean value that is initially set to <code>false</code>.
+
+Each {{XRAnchor}} has an associated <dfn for=XRAnchor>native origin</dfn>.
+
+Each {{XRAnchor}} has an associated <dfn for=XRAnchor>session</dfn>.
+
+<div class="algorithm" data-algorithm="create-anchor-object">
+In order to <dfn>create new anchor object</dfn> from |native origin| and |session|, the user agent MUST run the following steps:
+    1. Let |anchor| be a new {{XRAnchor}}.
+    1. Set |anchor|'s [=XRAnchor/native origin=] to |native origin|.
+    1. Set |anchor|'s [=XRAnchor/session=] to |session|.
+    1. Set |anchor|'s [=XRAnchor/detached=] to <code>false</code>.
+    1. Set |anchor|'s {{XRAnchor/anchorSpace}} to a new {{XRSpace}} object created with [=XRSpace/session=] set to |anchor|'s [=XRAnchor/session=] and [=XRSpace/native origin=] set to [=XRAnchor/native origin=].
+    1. Return |anchor|.
+</div>
+
+Anchor creation {#anchor-creation}
+===============
+
+The {{XRSession}} is extended to contain an associated <dfn for=XRSession>set of tracked anchors</dfn>.
+
+The {{XRSession}} is extended to contain an associated <dfn for=XRSession>map of new anchors</dfn> that is keyed with {{XRAnchor}} object and maps to <code>{{Promise}}&lt;{{XRAnchor}}&gt;</code> object.
+
+<script type="idl">
+partial interface XRFrame {
+  Promise<XRAnchor> createAnchor(XRRigidTransform pose, XRSpace space);
+};
+
+partial interface XRHitTestResult {
+  Promise<XRAnchor> createAnchor(XRRigidTransform pose);
+};
+</script>
+
+The {{XRHitTestResult}} is extended to contain an associated <dfn for=XRHitTestResult>native entity</dfn>. If the underlying system does not provide information about native entity that resulted in computing the result, it will be assumed that [=XRHitTestResult/native entity=] is set to <code>null</code>.
+
+The application can create an anchor using one of the 2 ways:
+- By [=create an anchor from frame|creating an anchor from frame=] - created anchor will not be attached to any particular real world object.
+- By [=create an anchor from hit test result|creating an anchor from hit test result=] - created anchor will be attached to a real world object if the underlying [=/XR device=] supports it.
+
+In order to <dfn>create an anchor from frame</dfn>, the application can call {{XRFrame}}'s {{XRFrame/createAnchor(pose, space)}} method.
+
+<div class="algorithm" data-algorithm="create-anchor-from-frame">
+The {{XRFrame/createAnchor(pose, space)}} method, when invoked on an {{XRFrame}} |frame| with |pose| and |space|, MUST run the following steps:
+    1. Let |promise| be [=a new Promise=].
+    1. If |frame|'s [=XRFrame/active=] boolean is <code>false</code>, [=/reject=] |promise| with {{InvalidStateError}} and abort these steps.
+    1. Add [=update anchors=] algorithm to session’s list of frame updates if it is not already present there.
+    1. Let |session| be |frame|'s [=XRFrame/session=].
+    1. Let |device| be |session|'s [=XRSession/XR device=].
+    1. Let |native origin| be |space|'s [=XRSpace/native origin=].
+    1. Let |anchor native origin| be a new native origin returned from the |device|'s call to create a new anchor using |pose|, interpreted as if expressed relative to |native origin|.
+    1. [=Create new anchor object=] |anchor| using |anchor native origin| and |session|.
+    1. Add |anchor| to |session|'s [=XRSession/set of tracked anchors=].
+    1. Add a mapping from |anchor| to |promise| to |session|'s [=XRSession/map of new anchors=].
+</div>
+
+In order to <dfn>create an anchor from hit test result</dfn>, the application can call {{XRHitTestResult}}'s {{XRHitTestResult/createAnchor(pose)}} method.
+
+<div class="algorithm" data-algorithm="create-anchor-from-hit-test-result">
+The {{XRHitTestResult/createAnchor(pose)}} method, when invoked on an {{XRHitTestResult}} |hitTestResult| with |pose|, MUST run the following steps:
+    1. Let |promise| be [=a new Promise=].
+    1. Let |frame| be |hitTestResult|'s [=XRHitTestResult/frame=].
+    1. If |frame|'s [=XRFrame/active=] boolean is <code>false</code>, [=/reject=] |promise| with {{InvalidStateError}} and abort these steps.
+    1. Add [=update anchors=] algorithm to session’s list of frame updates if it is not already present there.
+    1. Let |session| be |frame|'s [=XRFrame/session=].
+    1. Let |device| be |session|'s [=XRSession/XR device=].
+    1. Let |nativeEntity| be the |hitTestResult|'s [=XRHitTestResult/native entity=].
+    1. Let |anchor native origin| be a new native origin returned from the |device|'s call to create a new anchor using |pose|, interpreted as if expressed relative to |hitTestResult|'s [=XRHitTestResult/native origin=] and [=attached=] to |nativeEntity|.
+    1. [=Create new anchor object=] |anchor| using |anchor native origin| and |session|.
+    1. Add |anchor| to |session|'s [=XRSession/set of tracked anchors=].
+    1. Add a mapping from |anchor| to |promise| to |session|'s [=XRSession/map of new anchors=].
+</div>
+
+Issue: Session's "list of frame updates" might need to have a way of specifying ordering - some algorithms may depend on others.
+
+Anchor updates {#anchor-updates}
+==============
+
+<script type="idl">
+interface XRAnchorSet {
+  readonly setlike<XRAnchor>;
+};
+
+partial interface XRFrame {
+  [SameObject] readonly attribute XRAnchorSet trackedAnchors;
+};
+</script>
+
+An {{XRAnchorSet}} interface is introduced as a way to expose a collection of anchors.
+
+An {{XRFrame}} is extended to contain a {{XRFrame/trackedAnchors}} attribute which contains all anchors still tracked in the frame. At {{XRFrame}} creation, the set is initially empty and will be populated by the [=update anchors=] algorithm.
+
+<div class="algorithm" data-algorithm="update-anchors">
+In order to <dfn>update anchors</dfn> for |frame|, the user agent MUST run the following steps:
+    1. Let |session| be a |frame|'s [=XRFrame/session=].
+    1. Let |device| be a |session|'s [=XRSession/XR device=].
+    1. For each |anchor| in |session|'s [=XRSession/set of tracked anchors=], run:
+        1. Query the |device|'s tracking system for the |anchor|'s [=XRAnchor/native origin=] information.
+        1. If the |device|'s tracking system no longer [=tracked|tracks=] the |anchor|, run the following steps:
+            1. Remove |anchor| from the |session|'s [=XRSession/set of tracked anchors=].
+            1. If |session|'s [=XRSession/map of new anchors=] contains a mapping from |anchor| to |promise|, [=/reject=] the |promise| and remove the mapping.
+            1. Continue to the next entry in |session|'s [=XRSession/set of tracked anchors=].
+        1. Add |anchor| to |frame|'s {{XRFrame/trackedAnchors}} set.
+        1. If |session|'s [=XRSession/map of new anchors=] contains a mapping from |anchor| to |promise|, [=/resolve=] the |promise| with |anchor| and remove the mapping.
+</div>
+
+Anchor removal {#anchor-removal}
+==============
+
+When an application is no longer interested in receiving updates to an anchor, it can [=detach an anchor=] by calling {{XRAnchor/detach()}}.
+
+<div class="algorithm" data-algorithm="detach-anchor">
+The {{XRAnchor/detach()}} method, when invoked on an {{XRAnchor}} |anchor|, MUST <dfn>detach an anchor</dfn> by running the following steps:
+    1. If |anchor|'s [=XRAnchor/detached=] is <code>true</code>, abort these steps.
+    1. Set |anchor|'s {{XRAnchor/anchorSpace}} to <code>null</code>.
+    1. Set |anchor|'s [=XRAnchor/detached=] to <code>true</code>.
+    1. Let |session| be an |anchor|'s [=XRFrame/session=].
+    1. Let |device| be a |session|'s [=XRSession/XR device=].
+    1. Let |native origin| be an |anchor|'s [=XRAnchor/native origin=].
+    1. Inform the |device|'s tracking system that the |native origin| is no longer to be tracked.
+    1. Remove |anchor| from |session|'s [=XRSession/set of tracked anchors=].
+</div>
+
+Native device concepts {#native-device-concepts}
+======================
+
+<section class="non-normative">
+
+In order for the user agents to be able to implement the anchors API, the underlying XR device should provide native support of this feature. This section describes requirements placed on the underlying XR system, and is by necessity under-specified to allow the implementation of anchors API on top of various frameworks / devices.
+
+</section>
+
+Native anchor {#native-anchor}
+-------------
+
+The underlying [=XR device=] is [=capable of supporting=] the [=anchors=] feature if it supports the following capabilities related to anchors:
+- Native anchor creation is possible, with the following requirements:
+    - The native anchors API attempts to maintain the pose of the anchor as if it were fixed relative to the real world.
+    - It accepts pose of the newly created anchor at some specific time <code>t</code>.
+    - It optionally accepts a native entity information in order to express the intent of [=attached|attaching=] newly created anchor to the given entity. If the underlying XR system does not support attaching anchors to a native entity (i.e. does not accept a native entity), the newly created anchor will be free-floating.
+    - It returns a result that can be treated as a [=native origin=] by the user agents.
+- Native anchors are continuously <dfn>tracked</dfn> by the underlying XR system and can be queried for their most up-to-date state. When the underlying system deems that the native anchor's location is never going to be known, it SHOULD report that the native anchor is no longer tracked.
+- Optionally, native anchors can be <dfn>attached</dfn> to native entities. A native anchor that is attached to a native entity attempts to maintain its position fixed relative to the entity to which it is attached (as opposed to the real world in case of free-floating anchors). When the device detects that the pose of the object to which the anchor is attached changes, the anchor will be updated accordingly. This does not imply that the object itself moved - it may be that the system's understanding of its location changed. If the underlying system is capable of tracking moving objects, the native anchors attached to moving objects should be updated as well.
+
+In case the underlying device does not support native anchors, the user agents MAY decide to implement the anchors API through <dfn>emulated native anchors</dfn>. This approach assumes that anchors, once created, never change their pose, and their pose is the pose passed in by the application to the anchor creation methods such as {{XRFrame}}'s {{XRFrame/createAnchor(pose, space)}} or {{XRHitTestResult}}'s {{XRHitTestResult/createAnchor(pose)}}.
+
+Note: The [=emulated native anchors=] approach is equivalent to the applications emulating the anchors feature themselves and can help reduce the number of different cases that the applications need to handle. It might also allow the applications to re-use the same code for {{XRSessionMode/"immersive-ar"}} and {{XRSessionMode/"immersive-vr"}} sessions.
+
+Privacy & Security Considerations {#privacy-security}
+=================================
+
+<section class="non-normative">
+
+The anchors API does not directly expose access to the information about the user environment. In case the session was created with [=hit-test=] support enabled and the device supports tracking moving objects, it may be possible for the application to infer the layout of the user's environment by observing changes to anchor poses of objects that are, for example, carried around. This offers similar level of information about user's environment as hit-testing API. Anchor feature has to be declared when creating an XR session, which will allow the user agents to notify the users about potential privacy implications of allowing the anchors API to be used by the website.
+
+</section>
+
+Issue: I'm not aware of devices that support tracking general objects that move - should they be considered by the spec at all? Are there any examples of such devices?
+
+Acknowledgements {#ack}
+================
+
+The following individuals have contributed to the design of the WebXR Anchors specification:

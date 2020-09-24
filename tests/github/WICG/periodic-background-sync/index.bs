@@ -1,0 +1,327 @@
+<pre class='metadata'>
+Title: Web Periodic Background Synchronization
+Status: CG-DRAFT
+ED: https://wicg.github.io/periodic-background-sync/index.html
+Shortname: periodic-background-sync
+Level: 1
+Editor: Mugdha Lakhani, Google, nator@chromium.org
+Editor: Jake Archibald, Google, jakearchibald@chromium.org
+Abstract: This specification describes a method that enables web applications to periodically synchronize data and content in the background.
+Group: wicg
+Repository: WICG/periodic-background-sync
+Markup Shorthands: css no, markdown yes
+Indent: 2
+</pre>
+
+<pre class="anchors">
+spec: background-fetch; urlPrefix: https://wicg.github.io/background-fetch/
+  type:interface; text: BackgroundFetchManager
+  type:dfn; text:background fetch
+</pre>
+
+<pre class=link-defaults>
+spec:html; type:dfn; for:/; text:browsing context
+spec:service-workers;
+  type:dfn; text:frame type
+  type:dfn; text:origin
+  type:dfn; text:terminate service worker
+  type:dfn; for:/; text:service worker
+spec:web-background-sync;
+  type:dfn; text:online
+spec:permissions-1; type:dict-member; text:name
+spec:webidl; type:dfn; text:resolve
+spec:infra; type:dfn; text:list
+</pre>
+
+Introduction {#intro}
+=====================
+
+  <em>This section is non-normative.</em>
+
+  Web Applications often run in environments with unreliable networks (e.g., mobile phones) and unknown lifetimes (the browser might be killed or the user might navigate away).
+  This makes it difficult for web apps to keep their content and state in sync with servers.
+
+  This API is intended to reduce the time between content creation and content synchronization between the servers and the web app. It does so by letting the web app register an intent to periodically synchronize state and data, with a minimum interval it wishes to do so at. Through a service worker event, the user agent then periodically lets the web app download network resources and update state.
+
+  As this API relies on service workers, functionality provided by this API is only available in a [=secure context=].
+
+  ## Example ## {#example}
+  Registering periodic background sync at a mininimum interval of one day from a [=browsing context=]:
+
+  <pre class="lang-js">
+    async function registerPeriodicNewsCheck() {
+      const registration = await navigator.serviceWorker.ready;
+      try {
+        await registration.periodicSync.register('fetch-news', {
+          minInterval: 24 * 60 * 60 * 1000,
+        });
+      } catch {
+        console.log('Periodic Sync could not be registered!');
+      }
+    }
+  </pre>
+
+  Reacting to a [=periodicsync event=] within a [=service worker=]:
+
+  <pre class="lang-js">
+    self.addEventListener('periodicsync', event => {
+      event.waitUntil(fetchAndCacheLatestNews());
+    });
+  </pre>
+
+  In the above example `fetchAndCacheLatestNews` is a developer-defined function is a developer-defined function that fetches the latest news articles from a server and stores them locally, for example using the {{Cache}} API, for offline consumption.
+
+Concepts {#concepts}
+========================
+
+When a [=periodicsync event=] is fired for a [=periodic sync registration=] |registration|, it is considered to run <dfn for="periodicsync event">in the background</dfn> if no [=service worker clients=] whose [=frame type=] is "`top-level`", "`auxiliary`" or "`nested`" exist for the [=origin=] of the [=periodic sync registration/service worker registration=] associated with |registration|.
+
+Extensions to service worker registration {#extensions-to-service-worker-registration}
+======================================================================================
+A [=/service worker registration=] additionally has:
+* <dfn>Active periodic sync registrations</dfn> (a [=map=]), where each key is a {{DOMString}}, and each item is a [=periodic sync registration=].
+* <dfn>Periodic sync processing queue</dfn>, initially the result of [=starting a new parallel queue=].
+
+Constructs {#constructs}
+=========================
+
+## Periodic sync registration ## {#periodic-sync-registration-construct}
+A <dfn>periodic sync registration</dfn> consists of:
+<div dfn-for="periodic sync registration">
+A <dfn>service worker registration</dfn>, which is a [=/service worker registration=].
+
+A <dfn>tag</dfn>, which is a {{DOMString}}.
+
+Note: Periodic Background Sync doesn't share namespace with Background Sync, so an [=origin=] can have registrations of both types with the same tag.
+
+<dfn>minimum interval</dfn> (a long long), which is used to specify the minimum interval, in milliseconds, at which the periodic synchronization should happen. [=minimum interval=] is a suggestion to the user agent.
+
+Note: The actual interval at which [=periodicsync event|periodicsync events=] are fired MUST be greater than or equal to this.
+
+An <dfn>anchor time</dfn> (a timestamp), the previous time a [=periodicsync event=] fired for this [=periodic sync registration=], or the time of initial registration.
+
+A <dfn>state</dfn>, which is one of "`pending`", "`firing`", "`suspended`" or "`reregistered-while-firing`". It is initially set to "`pending`".
+</div>
+
+## <dfn>Periodic Sync Scheduler</dfn> ## {#periodic-sync-scheduler-construct}
+The [=periodic sync scheduler=] is responsible for scheduling firing of [=periodicsync events=].
+In response to these triggers, the scheduler either schedules delayed processing to fire a [=periodicsync event=] at the appropriate time in the future, or cancels such scheduling.
+
+  <div dfn-for="periodic sync scheduler">
+    The scheduler maintains:
+    * The <dfn>time of last fire</dfn>, a [=map=], where each key is an [=origin=], and each item is a timestamp. The keys of this map are the [=origin|origins=] associated with the [=periodic sync registration/service worker registration|service worker registrations=] of [=active periodic sync registrations=]. This is initially an empty [=map=].
+  </div>
+
+The <dfn>effective minimum sync interval for origin</dfn> |origin| (an [=origin=]), is the [=minimum periodic sync interval for any origin=] + some user agent defined amount for the |origin|.
+
+Note: The user agent defined amount could be based off the amount of engagement the user has with the origin. This value can be different each time [=effective minimum sync interval for origin=] is called.
+
+  The scheduler [=process periodic sync registrations|processes periodic sync registrations=].
+
+  Note: Browsers may suspend this processing loop when there are no [=active periodic sync registrations=] to conserve resources.
+
+## Constants ## {#constants}
+As recommended in [[#privacy]] and [[#resources]], the user agent SHOULD also define:
+* <dfn>minimum periodic sync interval for any origin</dfn>, a long long, that represents the minimum gap between [=periodicsync event|periodicsync events=] for any given origin, and,
+* <dfn>minimum periodic sync interval across origins</dfn>, a long long, that represents the minimum gap between [=periodicsync event|periodicsync events=] across all origins.
+
+[=minimum periodic sync interval across origins=] MUST be greater than or equal to [=minimum periodic sync interval for any origin=].
+If undefined, these are set to 43200000, which is twelve hours in milliseconds.
+
+Note: Two caps on frequency are needed because conforming to the cap enforced by [=minimum periodic sync interval for any origin=] for each origin can still cause the browser to fire [=periodicsync events=] very frequently. This can happen, for instance, when there are many [=periodic sync registration|periodic sync registrations=] for different origins. [=minimum periodic sync interval across origins=] ensures there's a global cap on how often these events are fired.
+
+The user agent MAY define a <dfn>maximum number of retries</dfn>, a number, allowed for each [=periodicsync event=]. In choosing this, the user agent SHOULD ensure that the time needed to attempt the [=maximum number of retries=] is an order of magnitude smaller than the [=minimum periodic sync interval for any origin=]. If undefined, this number is zero.
+
+Privacy Considerations {#privacy}
+==================================
+
+## Permission ## {#permission}
+Periodic Background Sync is only available if the {{PermissionState}} for a {{PermissionDescriptor}} with {{PermissionDescriptor/name}} `"periodic-background-sync"` is {{PermissionState/granted}}. In addition, user agents SHOULD offer a way for the user to disable Periodic Background Sync.
+When Periodic Background Sync is disabled, [=periodicsync event|periodicsync events=] MUST NOT be dispatched for the [=periodic sync registration|periodic sync registrations=] affected by this permission. (See [[#responding-to-permission-revocation-algorithm]]).
+
+## Location Tracking ## {#location-tracking}
+Fetch requests within the [=periodicsync event=] while [=periodicsync event/in the background=] may reveal the client's IP address to the server after the user has left the page. The user agent SHOULD limit tracking by capping the number of retries and duration of [=periodicsync event=]s, to reduce the amount of time the user's location can be tracked by the website. Further, the user agent SHOULD limit persistent location tracking by capping the frequency of [=periodicsync event=]s, both for an [=origin=], and across [=origin|origins=].
+
+## History Leaking ## {#history-leaking}
+Fetch requests within the [=periodicsync event=] while [=periodicsync event/in the background=] may reveal something about the client's navigation history to middleboxes on networks different from the one used to create the [=periodic sync registration=]. For instance, the client might visit site https://example.com, which registers a [=periodicsync event=], but based on the implementation, might not fire until after the user has navigated away from the page and changed networks. Middleboxes on the new network may see the fetch requests that the [=periodicsync event=] makes. The fetch requests are HTTPS so the request contents will not be leaked but the destination of the fetch request and domain may be (via DNS lookups and IP address of the request). To prevent this leakage of browsing history, the user agent MAY choose to only fire [=periodicsync event|periodicsync events=] on the network the [=periodic sync registration=] was made on, with the understanding that it will reduce usability by not allowing synchronization opportunistically.
+
+Resource Usage {#resources}
+============================
+
+<em>This section is non-normative.</em>
+
+A website will most likely download resources from the network when processing a [=periodicsync event=]. The underlying operating system may launch the user agent to dispatch these events, and may keep it awake for a pre-defined duration to allow processing of the events. Both cause battery drain.
+The user agent should cap the duration and frequency of these events to limit resource usage by websites when the user has navigated away.
+
+Large resources should be downloaded by registering a [=background fetch=] via the {{BackgroundFetchManager}} interface.
+
+In addition, the user agent should consider other factors such as user engagement with the [=origin=], and any user indications to temporarily reduce data consumption, such as a Data Saving Mode, to adjust the frequency of [=periodicsync event|periodicsync events=].
+
+Algorithms {#algorithms}
+=========================
+
+  <div algorithm>
+    ## <dfn>Process periodic sync registrations</dfn> ## {#process-periodic-sync-registrations-algorithm}
+    When the user agent starts, run the following steps [=in parallel=]:
+    1. While true:
+      1. Wait for [=minimum periodic sync interval across origins=].
+      1. Let |firedPeriodicSync| be false.
+      1. While |firedPeriodicSync| is false:
+        1. Wait for some user agent defined amount of time.
+
+          Note: This can be used to group synchronization for different [=periodic sync registrations=] into a single device wake-up.
+
+        1. Wait until [=online=].
+        1. For each [=/service worker registration=] |registration| that is not [=service worker registration/unregistered=], [=enqueue the following steps=] to |registration|'s [=periodic sync processing queue=]:
+          1. Let |origin| be the [=origin=] associated with |periodicSyncRegistration|'s [=periodic sync registration/service worker registration=].
+          1. If [=periodic sync scheduler/time of last fire=][|origin|] + the [=effective minimum sync interval for origin=] |origin| is greater than now, [=continue=].
+          1. For each [=periodic sync registration=] |periodicSyncRegistration| in |registration|'s [=active periodic sync registrations=]:
+            1. If |periodicSyncRegistration|'s [=periodic sync registration/state=] is not "`pending`", [=continue=].
+            1. If |periodicSyncRegistration|'s [=periodic sync registration/anchor time=] + |periodicSyncRegistration|'s [=periodic sync registration/minimum interval=] is greater than now, [=continue=].
+            1. Set |firedPeriodicSync| to true.
+            1. [=Fire a periodicsync event=] for |periodicSyncRegistration|.
+  </div>
+
+  <div algorithm>
+    ## <dfn>Respond to permission revocation</dfn> ## {#responding-to-permission-revocation-algorithm}
+    To [=respond to permission revocation|respond to revocation=] of the permission with {{PermissionDescriptor/name}} `"periodic-background-sync"` for [=origin=] |origin|, the user agent MUST [=enqueue the following steps=] to the [=periodic sync processing queue=]:
+    1. For each [=periodic sync registration=] |registration| in [=active periodic sync registrations=] whose [=periodic sync registration/service worker registration=] is associated with the same [=origin=] as |origin|:
+      1. Remove |registration| from [=active periodic sync registrations=].
+  </div>
+
+API Description {#api-description}
+===================================
+## Extensions to the {{ServiceWorkerGlobalScope}} interface ## {#extensions-to-serviceworkerglobalscope}
+<script type="idl">
+partial interface ServiceWorkerGlobalScope {
+    attribute EventHandler onperiodicsync;
+};
+</script>
+
+## Extensions to the {{ServiceWorkerRegistration}} interface ## {#extensions-to-serviceworkerregistration}
+
+<script type="idl">
+[Exposed=(Window,Worker)]
+partial interface ServiceWorkerRegistration {
+  readonly attribute PeriodicSyncManager periodicSync;
+};
+</script>
+
+<div dfn-for="ServiceWorkerRegistration">
+A {{ServiceWorkerRegistration}} has a <dfn>periodic sync manager</dfn> (a {{PeriodicSyncManager}}).
+
+The <dfn attribute>periodicSync</dfn> attribute's getter must return the [=context object=]'s [=ServiceWorkerRegistration/periodic sync manager=], initially a new {{PeriodicSyncManager}} whose [=PeriodicSyncManager/service worker registration=] is the [=context object=]'s [=/service worker registration=].
+</div>
+
+## {{PeriodicSyncManager}} interface ## {#periodicsyncmanager-interface}
+<script type="idl">
+[Exposed=(Window,Worker)]
+interface PeriodicSyncManager {
+    Promise<void> register(DOMString tag, optional BackgroundSyncOptions options);
+    Promise<sequence<DOMString>> getTags();
+    Promise<void> unregister(DOMString tag);
+};
+
+dictionary BackgroundSyncOptions {
+    [EnforceRange] unsigned long long minInterval = 0;
+};
+</script>
+
+<div dfn-for="PeriodicSyncManager">
+A {{PeriodicSyncManager}} has a <dfn>service worker registration</dfn> (a [=/service worker registration=]).
+</div>
+
+  <div algorithm>
+    The <code><dfn method for=PeriodicSyncManager title="register(tag, options)">register(|tag|, |options|)</dfn></code> method, when invoked, MUST return [=a new promise=] |promise| and [=enqueue the following steps=] to the [=periodic sync processing queue=]:
+    1. Let |serviceWorkerRegistration| be the [=PeriodicSyncManager/service worker registration=] associated with the [=context object=]'s {{PeriodicSyncManager}}.
+    1. If |serviceWorkerRegistration|’s [=active worker=] is null, [=reject=] |promise| with an {{InvalidStateError}} and abort these steps.
+    1. If the {{PermissionState}} for a {{PermissionDescriptor}} with {{PermissionDescriptor/name}} `"periodic-background-sync"` is not {{PermissionState/granted}}, [=reject=] |promise| with a {{NotAllowedError}} and abort these steps.
+    1. Let |isBackground|, a boolean, be true.
+    1. For each |client| in the [=service worker clients=] for the |serviceWorkerRegistration|'s [=origin=]:
+      1. If |client|'s [=frame type=] is "`top-level`" or "`auxiliary`", set |isBackground| to false.
+    1. If |isBackground| is true, [=reject=] |promise| with an {{InvalidAccessError}} and abort these steps.
+    1. Let |currentRegistration| be the [=periodic sync registration=] in |serviceWorkerRegistration|'s [=active periodic sync registrations=] whose [=periodic sync registration/tag=] equals |tag| if it exists, else null.
+    1. If |currentRegistration| is null:
+        1. Let |newRegistration| be a new [=periodic sync registration=].
+        1. Set |newRegistration|'s [=periodic sync registration/tag=] to |tag|.
+        1. Set |newRegistration|'s [=periodic sync registration/minimum interval=] to |options|' {{BackgroundSyncOptions/minInterval}} member.
+        1. Set |newRegistration|'s [=periodic sync registration/state=] to "`pending`".
+        1. Set |newRegistration|'s [=periodic sync registration/service worker registration=] to |serviceWorkerRegistration|.
+        1. Set |newRegistration|'s [=periodic sync registration/anchor time=] to a timestamp representing now.
+        1. Add |newRegistration| to |serviceWorkerRegistration|'s [=active periodic sync registrations=].
+        1. [=Resolve=] |promise|.
+    1. Else:
+      1. If |currentRegistration|'s [=periodic sync registration/minimum interval=] is different to |options|' {{BackgroundSyncOptions/minInterval}} member:
+        1. Set |currentRegistration|'s [=periodic sync registration/minimum interval=] to |options|' {{BackgroundSyncOptions/minInterval}} member.
+      1. Else, if |currentRegistration|'s [=periodic sync registration/state=] is "`firing`", set |serviceWorkerRegistration|'s [=periodic sync registration/state=] to "`reregistered-while-firing`".
+      1. [=Resolve=] |promise|.
+  </div>
+
+  <div algorithm>
+    The <code><dfn method for=PeriodicSyncManager title="getTags()">getTags()</dfn></code> method when invoked, MUST return [=a new promise=] |promise| and  [=enqueue the following steps=] to the [=periodic sync processing queue=]:
+
+    1. Let |serviceWorkerRegistration| be the [=PeriodicSyncManager/service worker registration=] associated with the [=context object=]'s {{PeriodicSyncManager}}.
+    1. Let |currentTags| be a new [=/list=].
+    1. For each |registration| of |serviceWorkerRegistration|'s [=active periodic sync registrations=], [=list/append=] |registration|'s [=periodic sync registration/tag=] to |currentTags|.
+    1. [=Resolve=] |promise| with |currentTags|.
+  </div>
+
+  <div algorithm>
+    The <code><dfn method for=PeriodicSyncManager title="unregister(tag)">unregister(|tag|)</dfn></code> method when invoked, MUST return [=a new promise=] <var>promise</var> and [=enqueue the following steps=] to the [=periodic sync processing queue=]:
+    1. Let |serviceWorkerRegistration| be the [=PeriodicSyncManager/service worker registration=] associated with the [=context object=]'s {{PeriodicSyncManager}}.
+        1. Let <var>currentRegistration</var> be the [=periodic sync registration=] in |serviceWorkerRegistration|'s [=active periodic sync registrations=] whose [=periodic sync registration/tag=] equals |tag| if it exists, else null.
+        1. If |currentRegistration| is not null, remove |currentRegistration| from |serviceWorkerRegistration|'s [=active periodic sync registrations=].
+        1. Resolve |promise|.
+  </div>
+
+
+## The <dfn>periodicsync event</dfn> ## {#periodicsync-event-interface}
+<script type="idl">
+dictionary PeriodicSyncEventInit : ExtendableEventInit {
+    required DOMString tag;
+};
+
+[
+    Constructor(DOMString type, PeriodicSyncEventInit init),
+    Exposed=ServiceWorker
+] interface PeriodicSyncEvent : ExtendableEvent {
+    readonly attribute DOMString tag;
+  };
+</script>
+
+<div dfn-for="PeriodicSyncEvent">
+  A {{PeriodicSyncEvent}} has a <dfn>tag</dfn> (a [=periodic sync registration/tag=]).
+  The <dfn attribute>tag</dfn> attribute must return the value it was initialized to.
+</div>
+
+### [=Fire a periodicsync event=] ### {#firing-a-periodicsync-event}
+Note: A user agent MAY impose a time limit on the lifetime extension and execution time of a {{PeriodicSyncEvent}} which is stricter than the time limit imposed for {{ExtendableEvent}}s in general. In particular, any retries of the {{PeriodicSyncEvent}} MAY have a significantly shortened time limit.
+
+<div algorithm>
+  To <dfn>fire a periodicsync event</dfn> for a [=periodic sync registration=] |registration|, the user agent MUST run the following steps:
+  1. Let |serviceWorkerRegistration| be |registration|'s [=periodic sync registration/service worker registration=].
+  1. If |registration| is no longer part of |serviceWorkerRegistration|'s [=active periodic sync registrations=], abort these steps.
+  1. [=Assert=]: |registration|'s [=periodic sync registration/state=] is "`pending`".
+  1. Let retryCount be 0.
+  1. Set |registration|'s [=periodic sync registration/state=] to "`firing`".
+  1. While true:
+    1. Let |continue| be false.
+    1. Let |success| be false.
+    1. [=Fire functional event=] "`periodicsync`" using {{PeriodicSyncEvent}} on |serviceWorkerRegistration| with [=PeriodicSyncEvent/tag=] set to |registration|'s [=periodic sync registration/tag=]. Let |dispatchedEvent|, an {{ExtendableEvent}}, represent the dispatched [=periodicsync event=] and run the following steps with |dispatchedEvent|:
+    1. Let |waitUntilPromise| be the result of [=waiting for all=] of |dispatchedEvent|'s [=extend lifetime promises=].
+    1. React to the [=upon fulfillment|fulfillment=] of |waitUntilPromise| with the following steps:
+      1. Set |success| to true.
+      1. Set |continue| to true.
+    1. React to rejection [=upon rejection|rejection=] of |waitUntilPromise| with the following steps:
+      1. Set |continue| to true.
+    1. [=In parallel=]:
+      1. Wait for |continue| to be true.
+      1. Let |origin| be the [=origin=] associated with |registration|'s [=periodic sync registration/service worker registration=].
+      1. If |success| is true, set [=periodic sync scheduler/time of last fire=] for key |origin| to the current time.
+      1. If |success| is true or |retryCount| is greater than [=maximum number of retries=] or |registration|'s state is "`reregistered-while-firing`", then:
+        1. Set |registration|'s [=periodic sync registration/state=] to "`pending`".
+        1. Set |registration|'s [=periodic sync registration/anchor time=] to a timestamp representing now.
+        1. Abort these steps.
+    1. Increment |retryCount|.
+    1. Wait for a small back-off time based on |retryCount|.
+</div>

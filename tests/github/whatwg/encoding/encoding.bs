@@ -12,11 +12,7 @@ Translate IDs: dictdef-textdecoderoptions textdecoderoptions,dictdef-textdecodeo
 <link rel=stylesheet href=visualization-colors.css>
 
 <pre class=link-defaults>
-spec:infra; type:dfn;
-    text:code point
-    text:ascii case-insensitive
-spec:streams;
-    type:interface; text:ReadableStream
+spec:streams; type:interface; text:ReadableStream
 </pre>
 
 
@@ -98,8 +94,8 @@ bitwise AND by "&amp;", and bitwise OR by "|".
 
 <hr>
 
-<p>A <dfn id=concept-token>token</dfn> is a piece of data, such as a <a>byte</a>
-or <a>code point</a>.
+<p>A <dfn id=concept-token>token</dfn> is a piece of data, such as a <a>byte</a> or
+<a>scalar value</a>.
 
 <p>A <dfn id=concept-stream>stream</dfn> represents an ordered sequence of
 <a>tokens</a>. <dfn>End-of-stream</dfn> is a special
@@ -216,15 +212,24 @@ happening.
  <var>encoderDecoderInstance</var> is a <a for=/>decoder</a> instance, and "<code>fatal</code>"
  otherwise.
 
+ <li><p>Assert: if <var>encoderDecoderInstance</var> is an <a for=/>encoder</a> instance,
+ <var>token</var> is not a <a>surrogate</a>.
+
  <li><p>Let <var>result</var> be the result of running <var>encoderDecoderInstance</var>'s
  <a>handler</a> on <var>input</var> and <var>token</var>.
 
  <li><p>If <var>result</var> is <a>continue</a> or <a>finished</a>, return
  <var>result</var>.
 
- <li><p>Otherwise, if <var>result</var> is one or more
- <a>tokens</a>, <a>push</a>
- <var>result</var> to <var>output</var>.
+ <li>
+  <p>Otherwise, if <var>result</var> is one or more <a>tokens</a>:
+
+  <ol>
+   <li><p>Assert: if <var>encoderDecoderInstance</var> is a <a for=/>decoder</a> instance,
+   <var>result</var> does not contain any <a>surrogates</a>.
+
+   <li><p><a>Push</a> <var>result</var> to <var>output</var>.
+  </ol>
 
  <li>
   <p>Otherwise, if <var>result</var> is <a>error</a>, switch on <var>mode</var> and
@@ -858,6 +863,10 @@ different format here, to be able to represent ranges.)
 
  <p>The <a>get an encoding</a> algorithm is to be used to turn a <a>label</a> into an
  <a for=/>encoding</a>.
+
+ <p>Standards are to ensure that the streams they pass to the <a for=/>encode</a> and
+ <a>UTF-8 encode</a> algorithms are effectively scalar value streams, i.e., they contain no
+ <a>surrogates</a>.
 </div>
 
 <p>To <dfn export>decode</dfn> a byte stream <var>stream</var> using
@@ -866,7 +875,7 @@ fallback encoding <var>encoding</var>, run these steps:
 <ol>
  <li><p>Let <var>buffer</var> be an empty byte sequence.
 
- <li><p>Let <var>BOM seen flag</var> be unset.
+ <li><p>Let <var>BOMSeen</var> be false.
 
  <li><p><a>Read</a> bytes from <var>stream</var>
  into <var>buffer</var> until either <var>buffer</var> contains three bytes or
@@ -877,7 +886,7 @@ fallback encoding <var>encoding</var>, run these steps:
   one and going down, if the first bytes of <var>buffer</var> match
   all the bytes given in the first column, then set <var>encoding</var>
   to the <a for=/>encoding</a> given in the cell in the second column of
-  that row and set <var>BOM seen flag</var>.
+  that row and <var>BOMSeen</var> to true.
 
   <table>
    <tbody><tr><th>Byte order mark<th>Encoding
@@ -890,15 +899,15 @@ fallback encoding <var>encoding</var>, run these steps:
   than anything else. In a context where HTTP is used this is in violation of the semantics of the
   `<code>Content-Type</code>` header.
 
- <li><p>If <var>BOM seen flag</var> is unset,
+ <li><p>If <var>BOMSeen</var> is false,
  <a>prepend</a> <var>buffer</var> to <var>stream</var>.
 
- <li><p>Otherwise, if <var>BOM seen flag</var> is set, <var>encoding</var> is not
+ <li><p>Otherwise, if <var>BOMSeen</var> is true, <var>encoding</var> is not
  <a>UTF-8</a>, and <var>buffer</var> contains three bytes,
  <a>prepend</a> the last byte of <var>buffer</var> to
  <var>stream</var>.
 
- <li><p>Let <var>output</var> be a code point <a for=/>stream</a>.
+ <li><p>Let <var>output</var> be a scalar value <a for=/>stream</a>.
 
  <li><p><a>Run</a> <var>encoding</var>'s
  <a for=/>decoder</a> with <var>stream</var> and <var>output</var>.
@@ -918,7 +927,7 @@ these steps:
  <li><p>If <var>buffer</var> does not match 0xEF 0xBB 0xBF,
  <a>prepend</a> <var>buffer</var> to <var>stream</var>.
 
- <li><p>Let <var>output</var> be a code point <a for=/>stream</a>.
+ <li><p>Let <var>output</var> be a scalar value <a for=/>stream</a>.
 
  <li><p><a>Run</a> <a>UTF-8</a>'s
  <a for=/>decoder</a> with <var>stream</var> and <var>output</var>.
@@ -930,7 +939,7 @@ these steps:
 steps:
 
 <ol>
- <li><p>Let <var>output</var> be a code point <a for=/>stream</a>.
+ <li><p>Let <var>output</var> be a scalar value <a for=/>stream</a>.
 
  <li><p><a>Run</a> <a>UTF-8</a>'s
  <a for=/>decoder</a> with <var>stream</var> and <var>output</var>.
@@ -945,7 +954,7 @@ steps:
      -->
 
 <ol>
- <li><p>Let <var>output</var> be a code point stream.
+ <li><p>Let <var>output</var> be a scalar value stream.
 
  <li><p>Let <var>potentialError</var> be the result of <a>running</a>
  <a>UTF-8</a>'s <a for=/>decoder</a> with <var>stream</var>, <var>output</var>, and
@@ -958,8 +967,8 @@ steps:
 
 <hr>
 
-<p>To <dfn export>encode</dfn> a code point stream <var>stream</var> using
-encoding <var>encoding</var>, run these steps:
+<p>To <dfn export>encode</dfn> a scalar value stream <var>stream</var> using encoding
+<var>encoding</var>, run these steps:
 
 <ol>
  <li><p>Assert: <var>encoding</var> is not <a>replacement</a>, <a>UTF-16BE</a> or
@@ -979,9 +988,8 @@ encoding <var>encoding</var>, run these steps:
 [[URL]]
 [[HTML]]
 
-<p>To <dfn export>UTF-8 encode</dfn> a code point stream <var>stream</var>,
-return the result of <a lt=encode for=/>encoding</a>
-<var>stream</var> using encoding <a>UTF-8</a>.
+<p>To <dfn export>UTF-8 encode</dfn> a scalar value stream <var>stream</var>, return the result of
+<a lt=encode for=/>encoding</a> <var>stream</var> using encoding <a>UTF-8</a>.
 
 
 
@@ -1072,8 +1080,8 @@ interface mixin TextDecoderCommon {
 <p>The {{TextDecoderCommon}} interface mixin defines common attributes that are shared between
 {{TextDecoder}} and {{TextDecoderStream}} objects. These objects have an associated
 <dfn id=textdecoder-encoding for=TextDecoderCommon>encoding</dfn>,
-<dfn id=textdecoder-ignore-bom-flag for=TextDecoderCommon>ignore BOM flag</dfn> (initially unset),
-<dfn id=textdecoder-bom-seen-flag for=TextDecoderCommon>BOM seen flag</dfn> (initially unset), and
+<dfn id=textdecoder-ignore-bom-flag for=TextDecoderCommon>ignore BOM</dfn> (initially false),
+<dfn id=textdecoder-bom-seen-flag for=TextDecoderCommon>BOM seen</dfn> (initially false), and
 <dfn id=textdecoder-error-mode for=TextDecoderCommon>error mode</dfn> (initially
 "<code>replacement</code>").
 
@@ -1092,14 +1100,14 @@ interface mixin TextDecoderCommon {
 
    <li>
     <p>If <a for=TextDecoderCommon>encoding</a> is <a>UTF-8</a>, <a>UTF-16BE</a>, or
-    <a>UTF-16LE</a>, and <a for=TextDecoderCommon>ignore BOM flag</a> and
-    <a for=TextDecoderCommon>BOM seen flag</a> are unset, then:
+    <a>UTF-16LE</a>, and <a for=TextDecoderCommon>ignore BOM</a> and
+    <a for=TextDecoderCommon>BOM seen</a> are false, then:
 
     <ol>
-     <li><p>If <var>token</var> is U+FEFF, then set <a for=TextDecoderCommon>BOM seen flag</a>.
+     <li><p>If <var>token</var> is U+FEFF, then set <a for=TextDecoderCommon>BOM seen</a> to true.
 
      <li><p>Otherwise, if <var>token</var> is not <a>end-of-stream</a>, then set
-     <a for=TextDecoderCommon>BOM seen flag</a> and append <var>token</var> to <var>output</var>.
+     <a for=TextDecoderCommon>BOM seen</a> to true and append <var>token</var> to <var>output</var>.
 
      <li><p>Otherwise, return <var>output</var>.
     </ol>
@@ -1127,8 +1135,8 @@ attribute's getter, when invoked, must return true if this object's
 
 <p>The
 <dfn attribute id=dom-textdecoder-ignorebom for=TextDecoderCommon><code>ignoreBOM</code></dfn>
-attribute's getter, when invoked, must return true if this object's
-<a for=TextDecoderCommon>ignore BOM flag</a> is set, and false otherwise.
+attribute's getter, when invoked, must return the value of this object's
+<a for=TextDecoderCommon>ignore BOM</a>.
 
 
 <h3 id=interface-textdecoder>Interface {{TextDecoder}}</h3>
@@ -1153,8 +1161,8 @@ TextDecoder includes TextDecoderCommon;
 </pre>
 
 <p>A {{TextDecoder}} object has an associated <dfn for=TextDecoder>decoder</dfn>,
-<dfn for=TextDecoder>stream</dfn>, and <dfn for=TextDecoder>do not flush flag</dfn> (initially
-unset).
+<dfn for=TextDecoder>stream</dfn>, and
+<dfn id=textdecoder-do-not-flush-flag for=TextDecoder>do not flush</dfn> (initially false).
 
 <dl class=domintro>
  <dt><code><var>decoder</var> = new <a constructor for=TextDecoder lt=TextDecoder()>TextDecoder([<var>label</var> = "utf-8" [, <var>options</var>]])</a></code>
@@ -1173,8 +1181,7 @@ unset).
  false otherwise.
 
  <dt><code><var>decoder</var> . <a attribute for=TextDecoderCommon>ignoreBOM</a></code>
- <dd><p>Returns true if <a for=TextDecoderCommon>ignore BOM flag</a> is set, and false
- otherwise.
+ <dd><p>Returns the value of <a for=TextDecoderCommon>ignore BOM</a>.
 
  <dt><code><var>decoder</var> . <a method for=TextDecoder lt=decode()>decode([<var>input</var> [, <var>options</var>]])</a></code>
  <dd>
@@ -1212,8 +1219,8 @@ constructor, when invoked, must run these steps:
  <li><p>If <var>options</var>'s <code>fatal</code> member is true, then set <var>dec</var>'s
  <a for=TextDecoderCommon>error mode</a> to "<code>fatal</code>".
 
- <li><p>If <var>options</var>'s <code>ignoreBOM</code> member is true, then set <var>dec</var>'s
- <a for=TextDecoderCommon>ignore BOM flag</a>.
+ <li>If <var>options</var>'s <code>ignoreBOM</code> member is true, then set <var>dec</var>'s
+ <a for=TextDecoderCommon>ignore BOM</a> to true.
 
  <li><p>Return <var>dec</var>.
 </ol>
@@ -1222,14 +1229,13 @@ constructor, when invoked, must run these steps:
 method, when invoked, must run these steps:
 
 <ol>
- <li><p>If the <a for=TextDecoder>do not flush flag</a> is unset, set <a for=TextDecoder>decoder</a>
- to a new <a for=TextDecoderCommon>encoding</a>'s <a for=/>decoder</a>, set
- <a for=TextDecoder>stream</a> to a new <a for=/>stream</a>, and unset the
- <a for=TextDecoderCommon>BOM seen flag</a>.
+ <li><p>If <a for=TextDecoder>do not flush</a> is false, set <a for=TextDecoder>decoder</a>
+ to a new <a for=TextDecoderCommon>encoding</a>'s <a for=/>decoder</a>,
+ <a for=TextDecoder>stream</a> to a new <a for=/>stream</a>, and
+ <a for=TextDecoderCommon>BOM seen</a> to false.
 
- <li><p>If <var>options</var>'s <code>stream</code> is true, set the
- <a for=TextDecoder>do not flush flag</a>, and unset the <a for=TextDecoder>do not flush flag</a>
- otherwise.
+ <li><p>Set <a for=TextDecoder>do not flush</a> to true if <var>options</var>'s <code>stream</code>
+ is true, and false otherwise.
 
  <li>
   <p>If <var>input</var> is given, then <a>push</a> a
@@ -1254,14 +1260,14 @@ method, when invoked, must run these steps:
    <li><p>Let <var>token</var> be the result of <a>reading</a> from <a for=TextDecoder>stream</a>.
 
    <li>
-    <p>If <var>token</var> is <a>end-of-stream</a> and the <a for=TextDecoder>do not flush flag</a>
-    is set, then return <var>output</var>,
+    <p>If <var>token</var> is <a>end-of-stream</a> and <a for=TextDecoder>do not flush</a>
+    is true, then return <var>output</var>,
     <a lt="serialize stream" for=TextDecoderCommon>serialized</a>.
 
-    <p class=note>The way streaming works is to not handle <a>end-of-stream</a> here when the
-    <a for=TextDecoder>do not flush flag</a> is set and to not unset that flag. That way in a
-    subsequent invocation <a for=TextDecoder>decoder</a> is not set anew in the first step of the
-    algorithm and its state is preserved.
+    <p class=note>The way streaming works is to not handle <a>end-of-stream</a> here when
+    <a for=TextDecoder>do not flush</a> is true and to not set <a for=TextDecoder>do not flush</a>
+    to false. That way in a subsequent invocation <a for=TextDecoder>decoder</a> is not set anew in
+    the first step of the algorithm and its state is preserved.
 
    <li>
     <p>Otherwise:
@@ -1517,8 +1523,7 @@ TextDecoderStream includes GenericTransformStream;
  false otherwise.
 
  <dt><code><var>decoder</var> . <a attribute for=TextDecoderCommon>ignoreBOM</a></code>
- <dd><p>Returns true if <a for=TextDecoderCommon>ignore BOM flag</a> is set, and false
- otherwise.
+ <dd><p>Returns the value of <a for=TextDecoderCommon>ignore BOM</a>.
 
  <dt><code><var>decoder</var> . <a attribute for=GenericTransformStream>readable</a></code>
  <dd>
@@ -1565,7 +1570,7 @@ byteReadable
  <a for=TextDecoderCommon>error mode</a> to "<code>fatal</code>".
 
  <li><p>If <var>options</var>'s <code>ignoreBOM</code> member is true, then set <var>dec</var>'s
- <a for=TextDecoderCommon>ignore BOM flag</a>.
+ <a for=TextDecoderCommon>ignore BOM</a> to true.
 
  <li>
   <p>Set <var>dec</var>'s <a for=TextDecoderStream>decoder</a> to a new <a for=/>decoder</a>
@@ -1828,9 +1833,9 @@ constructor, when invoked, must run these steps:
  <li><p>Return <var>token</var>.
 </ol>
 
-<p class=note>This is equivalent to the "<a>convert</a> a <a>JavaScript string</a> into a <a>scalar
-value string</a>" algorithm from the Infra Standard, but allows for surrogate pairs that are split
-between strings. [[!INFRA]]
+<p class=note>This is equivalent to the "<a for=string>convert</a> a <a for=/>string</a> into a
+<a for=/>scalar value string</a>" algorithm from the Infra Standard, but allows for surrogate pairs
+that are split between strings. [[!INFRA]]
 
 <p>The <dfn>encode and flush</dfn> algorithm, given a {{TextEncoderStream}} object <var>enc</var>,
 runs these steps:
@@ -2146,7 +2151,7 @@ historically this might have been the case for <a>ISO-8859-6</a> and
 <h4 id=gbk-encoder dfn export>GBK encoder</h4>
 
 <p><a>GBK</a>'s <a for=/>encoder</a> is <a>gb18030</a>'s <a for=/>encoder</a>
-with its <a>GBK flag</a> set.
+with its <a>is GBK</a> set to true.
 
 <p class="note no-backref">Not fully aliasing <a>GBK</a> with <a>gb18030</a>
 is a conservative move to decrease the chances of breaking legacy servers and other
@@ -2258,8 +2263,8 @@ consumers of content generated with <a>GBK</a>'s <a for=/>encoder</a>.
 
 <h4 id=gb18030-encoder dfn export>gb18030 encoder</h4>
 
-<p><a>gb18030</a>'s <a for=/>encoder</a> has an associated <dfn>GBK flag</dfn>
-(initially unset).
+<p><a>gb18030</a>'s <a for=/>encoder</a> has an associated <dfn id=gbk-flag>is GBK</dfn>
+(initially false).
 
 <p><a>gb18030</a>'s <a for=/>encoder</a>'s <a>handler</a>, given a
 <var>stream</var> and <var>code point</var>, runs these steps:
@@ -2277,7 +2282,7 @@ consumers of content generated with <a>GBK</a>'s <a for=/>encoder</a>.
   <p class=note><a>Index gb18030</a> maps 0xA3 0xA0 to U+3000 rather than U+E5E5 for
   compatibility with deployed content. Therefore it cannot roundtrip.
 
- <li><p>If the <a>GBK flag</a> is set and <var>code point</var> is
+ <li><p>If <a>is GBK</a> is true and <var>code point</var> is
  U+20AC, return byte 0x80.
 
  <li><p>Let <var>pointer</var> be the <a>index pointer</a> for
@@ -2298,7 +2303,7 @@ consumers of content generated with <a>GBK</a>'s <a for=/>encoder</a>.
    <var>trail</var> + <var>offset</var>.
   </ol>
 
- <li><p>If <a>GBK flag</a> is set, return <a>error</a> with
+ <li><p>If <a>is GBK</a> is true, return <a>error</a> with
  <var>code point</var>.
 
  <li><p>Set <var>pointer</var> to the
@@ -2441,7 +2446,7 @@ consumers of content generated with <a>GBK</a>'s <a for=/>encoder</a>.
 <h4 id=euc-jp-decoder dfn export>EUC-JP decoder</h4>
 
 <p><a>EUC-JP</a>'s <a for=/>decoder</a> has an associated
-<dfn>EUC-JP jis0212 flag</dfn> (initially unset) and
+<dfn id=euc-jp-jis0212-flag>EUC-JP jis0212</dfn> (initially false) and
 <dfn>EUC-JP lead</dfn> (initially 0x00).
 
 <p><a>EUC-JP</a>'s <a for=/>decoder</a>'s <a>handler</a>, given a
@@ -2461,7 +2466,7 @@ consumers of content generated with <a>GBK</a>'s <a for=/>encoder</a>.
  <!-- Katakana; subtraction is done first to avoid upsetting compilers -->
 
  <li><p>If <a>EUC-JP lead</a> is 0x8F and <var>byte</var> is in the range
- 0xA1 to 0xFE, inclusive, set the <a>EUC-JP jis0212 flag</a>, set
+ 0xA1 to 0xFE, inclusive, set <a>EUC-JP jis0212</a> to true, set
  <a>EUC-JP lead</a> to <var>byte</var>, and return <a>continue</a>.
 
  <li>
@@ -2475,10 +2480,10 @@ consumers of content generated with <a>GBK</a>'s <a for=/>encoder</a>.
    range 0xA1 to 0xFE, inclusive, set <var>code point</var> to the
    <a>index code point</a> for
    (<var>lead</var> &minus; 0xA1) × 94 + <var>byte</var> &minus; 0xA1
-   in <a>index jis0208</a> if the <a>EUC-JP jis0212 flag</a> is unset and in
+   in <a>index jis0208</a> if <a>EUC-JP jis0212</a> is false and in
    <a>index jis0212</a> otherwise.
 
-   <li><p>Unset the <a>EUC-JP jis0212 flag</a>.
+   <li><p>Set <a>EUC-JP jis0212</a> to false.
 
    <li><p>If <var>code point</var> is non-null, return a code point whose value is
    <var>code point</var>.
@@ -2555,7 +2560,7 @@ consumers of content generated with <a>GBK</a>'s <a for=/>encoder</a>.
 <dfn>ISO-2022-JP decoder output state</dfn> (initially
 <a lt="ISO-2022-JP decoder ASCII">ASCII</a>),
 <dfn>ISO-2022-JP lead</dfn> (initially 0x00), and
-<dfn>ISO-2022-JP output flag</dfn> (initially unset).
+<dfn id=iso-2022-jp-output-flag>ISO-2022-JP output</dfn> (initially false).
 
 <p><a>ISO-2022-JP</a>'s <a for=/>decoder</a>'s <a>handler</a>, given a
 <var>stream</var> and <var>byte</var>, runs these steps, switching on
@@ -2573,14 +2578,14 @@ consumers of content generated with <a>GBK</a>'s <a for=/>encoder</a>.
    <a>continue</a>.
 
    <dt>0x00 to 0x7F, excluding 0x0E, 0x0F, and 0x1B
-   <dd><p>Unset the <a>ISO-2022-JP output flag</a> and return a code point whose
+   <dd><p>Set <a>ISO-2022-JP output</a> to false and return a code point whose
    value is <var>byte</var>.
 
    <dt><a>end-of-stream</a>
    <dd><p>Return <a>finished</a>.
 
    <dt>Otherwise
-   <dd><p>Unset the <a>ISO-2022-JP output flag</a> and return <a>error</a>.
+   <dd><p>Set <a>ISO-2022-JP output</a> to false and return <a>error</a>.
   </dl>
 
  <dt><dfn lt="ISO-2022-JP decoder Roman">Roman</dfn>
@@ -2594,20 +2599,20 @@ consumers of content generated with <a>GBK</a>'s <a for=/>encoder</a>.
    <a>continue</a>.
 
    <dt>0x5C
-   <dd><p>Unset the <a>ISO-2022-JP output flag</a> and return code point U+00A5.
+   <dd><p>Set <a>ISO-2022-JP output</a> to false and return code point U+00A5.
 
    <dt>0x7E
-   <dd><p>Unset the <a>ISO-2022-JP output flag</a> and return code point U+203E.
+   <dd><p>Set <a>ISO-2022-JP output</a> to false and return code point U+203E.
 
    <dt>0x00 to 0x7F, excluding 0x0E, 0x0F, 0x1B, 0x5C, and 0x7E
-   <dd><p>Unset the <a>ISO-2022-JP output flag</a> and return a code point whose
+   <dd><p>Set <a>ISO-2022-JP output</a> to false and return a code point whose
    value is <var>byte</var>.
 
    <dt><a>end-of-stream</a>
    <dd><p>Return <a>finished</a>.
 
    <dt>Otherwise
-   <dd><p>Unset the <a>ISO-2022-JP output flag</a> and return <a>error</a>.
+   <dd><p>Set <a>ISO-2022-JP output</a> to false and return <a>error</a>.
   </dl>
 
  <dt><dfn lt="ISO-2022-JP decoder katakana">katakana</dfn>
@@ -2620,7 +2625,7 @@ consumers of content generated with <a>GBK</a>'s <a for=/>encoder</a>.
    <a>continue</a>.
 
    <dt>0x21 to 0x5F
-   <dd><p>Unset the <a>ISO-2022-JP output flag</a> and return a code point whose
+   <dd><p>Set <a>ISO-2022-JP output</a> to false and return a code point whose
    value is 0xFF61 &minus; 0x21 + <var>byte</var>.
    <!-- Katakana; subtraction is done first to avoid upsetting compilers -->
 
@@ -2628,7 +2633,7 @@ consumers of content generated with <a>GBK</a>'s <a for=/>encoder</a>.
    <dd><p>Return <a>finished</a>.
 
    <dt>Otherwise
-   <dd><p>Unset the <a>ISO-2022-JP output flag</a> and return <a>error</a>.
+   <dd><p>Set <a>ISO-2022-JP output</a> to false and return <a>error</a>.
   </dl>
 
  <dt><dfn lt="ISO-2022-JP decoder lead byte">Lead byte</dfn>
@@ -2641,7 +2646,7 @@ consumers of content generated with <a>GBK</a>'s <a for=/>encoder</a>.
    <a>continue</a>.
 
    <dt>0x21 to 0x7E
-   <dd><p>Unset the <a>ISO-2022-JP output flag</a>, set
+   <dd><p>Set <a>ISO-2022-JP output</a> to false,
    <a>ISO-2022-JP lead</a> to <var>byte</var>,
    <a>ISO-2022-JP decoder state</a> to
    <a lt="ISO-2022-JP decoder trail byte">trail byte</a>, and return
@@ -2651,7 +2656,7 @@ consumers of content generated with <a>GBK</a>'s <a for=/>encoder</a>.
    <dd><p>Return <a>finished</a>.
 
    <dt>Otherwise
-   <dd><p>Unset the <a>ISO-2022-JP output flag</a> and return <a>error</a>.
+   <dd><p>Set <a>ISO-2022-JP output</a> to false and return <a>error</a>.
   </dl>
 
  <dt><dfn lt="ISO-2022-JP decoder trail byte">Trail byte</dfn>
@@ -2706,7 +2711,7 @@ consumers of content generated with <a>GBK</a>'s <a for=/>encoder</a>.
    <li><p><a>Prepend</a> <var>byte</var> to
    <var>stream</var>.
 
-   <li><p>Unset the <a>ISO-2022-JP output flag</a>, set
+   <li><p>Set <a>ISO-2022-JP output</a> to false,
    <a>ISO-2022-JP decoder state</a> to
    <a>ISO-2022-JP decoder output state</a>, and return <a>error</a>.
   </ol>
@@ -2739,18 +2744,18 @@ consumers of content generated with <a>GBK</a>'s <a for=/>encoder</a>.
      <li><p>Set <a>ISO-2022-JP decoder state</a> and
      <a>ISO-2022-JP decoder output state</a> to <var>state</var>.
 
-     <li><p>Let <var>output flag</var> be the <a>ISO-2022-JP output flag</a>.
+     <li><p>Let <var>output</var> be the value of <a>ISO-2022-JP output</a>.
 
-     <li><p>Set the <a>ISO-2022-JP output flag</a>.
+     <li><p>Set <a>ISO-2022-JP output</a> to true.
 
-     <li><p>Return <a>continue</a>, if <var>output flag</var> is unset, and
+     <li><p>Return <a>continue</a>, if <var>output</var> is false, and
      <a>error</a> otherwise.
     </ol>
 
    <li><p><a>Prepend</a>
    <var>lead</var> and <var>byte</var> to <var>stream</var>.
 
-   <li><p>Unset the <a>ISO-2022-JP output flag</a>, set
+   <li><p>Set <a>ISO-2022-JP output</a> to false,
    <a>ISO-2022-JP decoder state</a> to <a>ISO-2022-JP decoder output state</a>
    and return <a>error</a>.
   </ol>
@@ -3072,7 +3077,7 @@ the server and the client.
 <h4 id=replacement-decoder dfn export>replacement decoder</h4>
 
 <p><a>replacement</a>'s <a for=/>decoder</a> has an associated
-<dfn>replacement error returned flag</dfn> (initially unset).
+<dfn id=replacement-error-returned-flag>replacement error returned</dfn> (initially false).
 
 <p><a>replacement</a>'s <a for=/>decoder</a>'s <a>handler</a>, given a
 <var>stream</var> and <var>byte</var>, runs these steps:
@@ -3080,8 +3085,8 @@ the server and the client.
 <ol>
  <li><p>If <var>byte</var> is <a>end-of-stream</a>, return <a>finished</a>.
 
- <li><p>If <a>replacement error returned flag</a> is unset, set the
- <a>replacement error returned flag</a> and return <a>error</a>.
+ <li><p>If <a>replacement error returned</a> is false, set
+ <a>replacement error returned</a> to true and return <a>error</a>.
 
  <li><p>Return <a>finished</a>.
 </ol>
@@ -3097,7 +3102,7 @@ has been found to be more accurate in deployed content. Therefore it is not part
 
 <p><a>shared UTF-16 decoder</a> has an associated <dfn>UTF-16 lead byte</dfn> and
 <dfn>UTF-16 lead surrogate</dfn> (both initially null), and
-<dfn>UTF-16BE decoder flag</dfn> (initially unset).
+<dfn id=utf-16be-decoder-flag>is UTF-16BE decoder</dfn> (initially false).
 
 <p><a>shared UTF-16 decoder</a>'s <a>handler</a>, given a <var>stream</var>
 and <var>byte</var>, runs these steps:
@@ -3119,9 +3124,9 @@ and <var>byte</var>, runs these steps:
   <p>Let <var>code unit</var> be the result of:
 
   <dl class=switch>
-   <dt><a>UTF-16BE decoder flag</a> is set
+   <dt><a>is UTF-16BE decoder</a> is true
    <dd><p>(<a>UTF-16 lead byte</a> &lt;&lt; 8) + <var>byte</var>.
-   <dt><a>UTF-16BE decoder flag</a> is unset
+   <dt><a>is UTF-16BE decoder</a> is false
    <dd><p>(<var>byte</var> &lt;&lt; 8) + <a>UTF-16 lead byte</a>.
   </dl>
 
@@ -3141,7 +3146,7 @@ and <var>byte</var>, runs these steps:
    <li><p>Let <var>byte2</var> be <var>code unit</var> &amp; 0x00FF.
 
    <li><p>Let <var>bytes</var> be two bytes whose values are <var>byte1</var> and <var>byte2</var>,
-   if the <a>UTF-16BE decoder flag</a> is set, and <var>byte2</var> and <var>byte1</var> otherwise.
+   if <a>is UTF-16BE decoder</a> is true, and <var>byte2</var> and <var>byte1</var> otherwise.
 
    <li><p><a>Prepend</a> the <var>bytes</var> to
    <var>stream</var> and return <a>error</a>.
@@ -3165,7 +3170,7 @@ and <var>byte</var>, runs these steps:
 <h4 id=utf-16be-decoder dfn export>UTF-16BE decoder</h4>
 
 <p><a>UTF-16BE</a>'s <a for=/>decoder</a> is <a>shared UTF-16 decoder</a> with
-its <a>UTF-16BE decoder flag</a> set.
+its <a>is UTF-16BE decoder</a> set to true.
 
 
 <h3 id=utf-16le dfn export>UTF-16LE</h3>
@@ -3278,6 +3283,7 @@ Adam Rice,
 Alan Chaney,
 Alexander Shtuchkin,
 Allen Wirfs-Brock,
+Andreu Botella,
 Aneesh Agrawal,
 Arkadiusz Michalski,
 Asmus Freytag,

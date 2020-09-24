@@ -69,6 +69,7 @@ interface MediaRecorder : EventTarget {
   attribute EventHandler onerror;
   readonly attribute unsigned long videoBitsPerSecond;
   readonly attribute unsigned long audioBitsPerSecond;
+  readonly attribute BitrateMode audioBitrateMode;
 
   void start(optional unsigned long timeslice);
   void stop();
@@ -152,6 +153,12 @@ interface MediaRecorder : EventTarget {
     for the respective media types, such that the sum of {{videoBitsPerSecond}}
     and {{audioBitsPerSecond}} is close to the value of |recorder|'s
     [=[[ConstrainedBitsPerSecond]]=] slot.</li>
+    <li>If |recorder| supports the {{BitrateMode}} specified by the value of
+    |options|' {{MediaRecorderOptions/audioBitrateMode}} member,
+    then initialize |recorder|'s {{audioBitrateMode}} attribute to the value of
+    |options|' {{MediaRecorderOptions/audioBitrateMode}} member,
+    else initialize |recorder|'s {{audioBitrateMode}} attribute to the value
+    "vbr".</li>
     <li>Return |recorder|.</li>
   </ol></dd>
 </dl>
@@ -203,6 +210,9 @@ interface MediaRecorder : EventTarget {
 
   <dt><dfn attribute for="MediaRecorder"><code>audioBitsPerSecond</code></dfn></dt>
   <dd>The target bitrate used to encode audio tracks.</dd>
+
+  <dt><dfn attribute for="MediaRecorder"><code>audioBitrateMode</code></dfn></dt>
+  <dd>The {{BitrateMode}} used to encode audio tracks.</dd>
 </dl>
 
 ## Methods ## {#mediarecorder-methods}
@@ -239,16 +249,9 @@ interface MediaRecorder : EventTarget {
     {{DOMException}} and abort these steps.</li>
 
     <li>If the [=[[ConstrainedMimeType]]=] slot specifies a media type,
-    container, or codec, then run the following sub steps:
-    <ol>
-      <li>Constrain the configuration of |recorder| to the media type,
-      container, and codec specified in the [=[[ConstrainedMimeType]]=]
-      slot.</li>
-      <li>For each track in |tracks|, if the User Agent cannot record the track
-      using the current configuration, then throw a {{NotSupportedError}}
-      {{DOMException}} and abort all steps.</li>
-    </ol>
-    </li>
+    container, or codec, then constrain the configuration of |recorder| to the
+    media type, container, and codec specified in the [=[[ConstrainedMimeType]]=]
+    slot.</li>
 
     <li>If |recorder|'s [=[[ConstrainedBitsPerSecond]]=] slot is not
     <code>undefined</code>, set |recorder|'s {{videoBitsPerSecond}} and
@@ -270,6 +273,14 @@ interface MediaRecorder : EventTarget {
     |recorder| will be recording. |audioBitrate| is a hint for the encoder and
     the value might be surpassed, not achieved, or only be achieved over a long
     period of time.</li>
+
+    <li>Constrain the configuration of |recorder| to encode using the
+    {{BitrateMode}} specified by the value of |recorder|'s {{audioBitrateMode}}
+    attribute for all audio tracks |recorder| will be recording.</li>
+
+    <li>For each track in |tracks|, if the User Agent cannot record the track
+    using the current configuration, then throw a {{NotSupportedError}}
+    {{DOMException}} and abort these steps.</li>
 
     <li>Set |recorder|'s {{state}} to {{recording}}, and run the following steps
     in parallel:
@@ -594,6 +605,7 @@ dictionary MediaRecorderOptions {
   unsigned long audioBitsPerSecond;
   unsigned long videoBitsPerSecond;
   unsigned long bitsPerSecond;
+  BitrateMode audioBitrateMode = "vbr";
 };
 </pre>
 
@@ -624,8 +636,30 @@ dictionary MediaRecorderOptions {
   {{MediaRecorderOptions/audioBitsPerSecond}} or
   {{MediaRecorderOptions/videoBitsPerSecond}} if present, and might be
   distributed among the present track encoders as the UA sees fit.</dd>
+  
+  <dt><dfn dict-member for="MediaRecorderOptions"><code>audioBitrateMode</code></dfn></dt>
+  <dd>Specifes the {{BitrateMode}} that should be used to encode the Audio track(s).</dd>
 </dl>
 
+## BitrateMode ## {#bitratemode}
+
+<pre class="idl">
+enum BitrateMode {
+  "cbr",
+  "vbr"
+};
+</pre>
+
+### Values ### {#bitratemode-values}
+
+<dl class="domintro">
+  <dt><dfn enum-value for="BitrateMode"><code>cbr</code></dfn></dt>
+  <dd>Encode at a constant bitrate.</dd>
+
+  <dt><dfn enum-value for="BitrateMode"><code>vbr</code></dfn></dt>
+  <dd>Encode using a variable bitrate, allowing more space to be used for complex signals
+  and less space for less complex signals.</dd>
+</dl>
 
 ## RecordingState ## {#recordingstate}
 

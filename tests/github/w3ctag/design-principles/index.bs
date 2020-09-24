@@ -4,9 +4,9 @@ Group: W3C TAG
 Shortname: design-principles
 Repository: w3ctag/design-principles
 Status: DREAM
-Editor: Travis Leithead, Microsoft, travil@microsoft.com
 Editor: Sangwhan Moon, Invited Expert, https://sangwhan.com
 Former Editor: Domenic Denicola, Google https://www.google.com/, https://domenic.me/, d@domenic.me
+Former Editor: Travis Leithead, Microsoft, travil@microsoft.com
 Abstract: This document contains a small-but-growing set of design principles collected by the W3C TAG while <a href="https://github.com/w3ctag/spec-reviews/">reviewing</a> specifications.
 Default Biblio Status: current
 Markup Shorthands: markdown on
@@ -17,13 +17,16 @@ Boilerplate: feedback-header off
 Link Defaults: html (dfn) queue a task/in parallel/reflect
 </pre>
 <pre class="link-defaults">
-spec:html; type:dfn; for:/; text:browsing context
+spec:html; type:dfn; for:/; 
+    text:browsing context
+    text:focus update steps
+    text:task queue
 spec:webidl; type:dfn; text:namespace
-spec:webidl; type:extended-attribute; text:Constructor
 </pre>
 <pre class="anchors">
-url: https://tc39.github.io/ecma262/#sec-error-objects; type: dfn; text: ECMAScript error objects;
+url: https://tc39.github.io/ecma262/#sec-error-objects; type: interface; text: Error;
 url: https://www.w3.org/TR/WebCryptoAPI/#dfn-Crypto; type: interface; text: Crypto
+url: https://www.w3.org/TR/payment-request/#dfn-state; type: dfn; spec: payment-request; text: [[state]];
 url: https://w3c.github.io/touch-events/#idl-def-touchevent; type: interface; text: TouchEvent
 url: https://w3c.github.io/IntersectionObserver/;
     type: interface; text: IntersectionObserver; url: #intersectionobserver
@@ -40,6 +43,318 @@ url: https://dom.spec.whatwg.org/#ref-for-concept-getelementsbytagname; type: in
         font-size: small;
     }
 </style>
+
+<h2 id="basic-principles">Principles behind design of Web APIs</h2>
+
+<h3 id="safe-to-browse">It should be safe to visit a web page</h3>
+
+Hyperlinks, links from one page to another, are one of the foundations of the Web.
+
+Following a link, or visiting a web page, should be safe:
+users doing this
+should not have to fear for the security of their computer
+or for essential aspects of their privacy.
+(But it's not completely safe,
+in the sense that users may face consequences
+if their use of the Web is harming others.)
+Furthermore, users should understand that it is safe (and how it isn't)
+so they can make informed decisions between use of the Web versus other technologies.
+
+Saying “essential aspects” here skips over quite a bit of detail.
+The Web today is far from being perfectly private.
+One aspect of privacy problems is when reality doesn't meet expectations.
+For example,
+a person walking down the street generally expects to be recognized by their friends,
+but (depending on the country)
+may not expect that they walked down that street at that time
+to be recorded in a permanent government database.
+Online, people might have less understanding of what is or isn't possible,
+and their expectations might differ more widely.
+<!-- Can we cite research on this??? -->
+
+We can probably make privacy on the Web better than it is today:
+  * We can improve the user interfaces through which the Web is used
+    to make it clearer what users of the Web should expect.
+  * We can change the technical foundations of the Web
+    so that they match user expectations of privacy.
+  * We can consider the cases where users would be better off
+    if expectations were higher,
+    and in those cases
+    try to change both technical foundations and expectations
+
+When we add new features to the Web
+that might weaken the security or privacy characteristics that the Web currently has,
+we should consider the tradeoffs involved in that particular feature.
+A new feature with security risks might still make users safer, for example,
+because they would download and run native binary software less often,
+and downloading and running binaries is much riskier than visiting a Web page.
+However, we should also consider the tradeoff
+against the *idea* that it is safe to visit Web pages:
+adding a risky feature to the Web teaches the Web's users that the Web is less safe,
+and this erodes one of the core values of the Web:  that it is safe to visit websites.
+We should seek to give users a true picture of the safety of the Web
+so that they can act based on that understanding of safety
+(in comparison to the safety of alternatives),
+and at the same time we should seek to keep the Web safe for its users
+and work to make it safer.
+
+<h3 id="trusted-ui">Trusted user interface should be trustworthy</h3>
+
+Since users of the Web can follow links to sites they might not know already,
+software that lets them access the Web generally provides user interface
+to show the user who they're interacting with and how,
+such as by displaying part or all of the URL or other information about the site,
+or whether the connection is secure.
+Since users rely on this information to learn what site they're on
+and to make judgments about whether it is trustworthy,
+this software is designed so that
+sites are not able to override this user interface
+or spoof it in a way that would confuse users.
+Therefore, when we add new features to the web,
+we should consider whether they require new complexity in this user interface,
+and whether that complexity would reduce users' ability
+to make correct judgments about who they're interacting with
+or whether the user interface is trustworthy or spoofed.
+
+<h3 id="consent">Ask users for meaningful consent when appropriate</h3>
+
+In some cases,
+we might add features to the Web that are not appropriate to allow for any website a user visits,
+but that are reasonable to have if the user agrees to use the feature
+based on a reasonable understanding of what will happen as a result.
+One example of such a feature might be support for location:
+many users seem likely to understand what it means to share their current location with a website
+and be able to consent to doing so
+(even though they might not fully understand the privacy implications of doing so).
+Another example of such a feature would be camera access,
+where users understand that they're sharing the image
+in the rectangle visible to the camera
+(even if they might not understand everything someone might do with the data).
+
+We should not depend on asking the user for consent
+(via a permission prompt or other mechanism)
+if we don't have a way to express that request in a way
+that users will understand what is being requested
+and the main implications of giving their consent.
+Understanding whether this is the case may require
+studying users understanding of potential user interfaces,
+although in many cases experienced user experience designers
+may be able to extrapolate from previous experience.
+
+We should also not ask users to consent to something
+that can also happen if the user does not consent.
+The existence of prompts
+that request a user's consent for something
+(from trusted user interface in their browser or other user agent)
+imply that the thing for which consent is being requested
+will not happen if the user doesn't consent.
+Therefore we should not have user agents request consent
+for something that they can't effectively prevent.
+Doing so would send the wrong message about the safety characteristics of the Web
+and would lead users to be disappointed when the expectations of privacy,
+which they learned from trusted user interface,
+did not match reality.
+
+Asking users for consent via permission prompts
+can reinforce the idea that <a href="#safe-to-browse">the web is safe</a>
+by showing the user that certain things won't happen without their permission.
+But frequently asking users for consent can also show how scary a place the web is
+by showing how many sites are willing to ask for intrusive and unnecessary permissions.
+
+<h2 id="api-across-languages">API Design Across Languages</h2>
+
+<h3 id="naming-is-hard">Naming things</h3>
+
+Naming is hard! We would all like a silver-bullet for naming APIs...
+
+Names take meaning from:
+
+* signposting (the name itself)
+* use (how people come to understand the name over time)
+* context (the object on the left-hand side, for example)
+
+Consistency is a good principle that helps to create a platform that users can navigate intuitively
+and by name association.
+
+Please consult widely on names in your APIs.
+
+API naming *must* be done in easily readable US English. For example `horizontalAlignment` 
+is a more English-readable name than `alignmentHorizontal`. Whenever possible consider 
+readability over brevity.
+
+Names should adhere to the local language restrictions, for example CSS ident rules etc. 
+and *should* be in the [ASCII range](https://infra.spec.whatwg.org/#ascii-code-point).
+
+Boolean properties, options, or API parameters which are asking a question about
+their argument *should not* be prefixed with <code>is</code>, while methods
+that serve the same purpose, given that it has no side effects, *should* be
+prefixed with <code>is</code> to be consistent with the rest of the platform.
+
+The name should not be directly associated with a brand or specific revision of
+the underlying technology whenever possible; technology becomes obsolete, but
+since removing APIs from the web is difficult, naming should be generic and
+future-proof whenever possible.
+
+<h3 id="casing-rules">Use casing rules consistent with existing APIs</h3>
+
+Although they haven't always been uniformly followed, through the history of web platform API
+design, the following rules have emerged:
+
+<table class="data complex">
+    <thead>
+        <tr>
+            <th></th>
+            <th>Casing rule</th>
+            <th>Examples</th>
+        </tr>
+    </thead>
+    <tr>
+        <th>Methods and properties<br>(Web IDL attributes, operations, and dictionary keys)</th>
+        <td>Camel case</td>
+        <td><code highlight="js">document.createAttribute()</code><br>
+            <code highlight="js">document.compatMode</code></td>
+    </tr>
+    <tr>
+        <th>Classes and mixins<br>(Web IDL interfaces)</th>
+        <td>Pascal case</td>
+        <td><code highlight="js">NamedNodeMap</code><br>
+            <code highlight="js">NonElementParentNode</code></td>
+    </tr>
+    <tr>
+        <th>Initialisms in APIs</th>
+        <td>All caps, except when the first word in a method or property</td>
+        <td><code highlight="js">HTMLCollection</code><br>
+            <code highlight="js">element.innerHTML</code><br>
+            <code highlight="js">document.bgColor</code></td>
+    </tr>
+    <tr>
+        <th>Repeated initialisms in APIs</th>
+        <td>Follow the same rule</td>
+        <td><code highlight="js">HTMLHRElement</code><br>
+            <code highlight="js">RTCDTMFSender</code><br>
+    </tr>
+    <tr>
+        <th>The abbreviation of "identity"</th>
+        <td><code highlight="js">Id</code>, except when the first word in a method or property</td>
+        <td><code highlight="js">node.getElementById()</code><br>
+            <code highlight="js">event.pointerId</code><br>
+            <code highlight="js">credential.id</code></td>
+    </tr>
+    <tr>
+        <th>Enumeration values</th>
+        <td>Lowercase, dash-delimited</td>
+        <td><code highlight="js">"no-referrer-when-downgrade"</code></td>
+    </tr>
+    <tr>
+        <th>Events</th>
+        <td>Lowercase, concatenated</td>
+        <td><code>autocompleteerror</code><br>
+            <code>languagechange</code></td>
+    </tr>
+    <tr>
+        <th>HTML elements and attributes</th>
+        <td>Lowercase, concatenated</td>
+        <td><code highlight="html">&lt;figcaption&gt;</code><br>
+            <code highlight="html">&lt;textarea maxlength&gt;</code></td>
+    </tr>
+    <tr>
+        <th>JSON keys</th>
+        <td>Lowercase, underscore-delimited</td>
+        <td><code highlight="js">manifest.short_name</code></td>
+    </tr>
+</table>
+
+<div class="non-normative">
+Note that in particular, when a HTML attribute is <a>reflected</a> as a property, the attribute
+and property's casings will not necessarily match. For example, the HTML attribute
+<{img/ismap}> on <{img}> elements is <a>reflected</a> as the
+{{HTMLImageElement/isMap}} property on {{HTMLImageElement}}.
+
+The rules for JSON keys are meant to apply to specific JSON file formats sent over HTTP
+or stored on disk, and don't apply to the general notion of JavaScript object keys.
+
+Repeated initialisms are particularly non-uniform throughout the platform. Infamous historical
+examples that violate the above rules are {{XMLHttpRequest}} and
+{{HTMLHtmlElement}}. Do not follow their example; instead always capitalize your
+initialisms, even if they are repeated.
+</div>
+
+<h3 id="feature-detect">New features should be detectable</h3>
+
+The existence of new features should generally be detectable,
+so that web content can act appropriately whether the feature is present or not.
+This applies both to features that
+are not present because they are not implemented,
+and to features that may not be present in a particular configuration
+(ranging from features that are present only on particular platforms
+to features that are
+only available in secure contexts).
+
+It should generally be indistinguishable why a feature is unavailable,
+so that feature detection code written for one case of unavailability
+(e.g., the feature not being implemented yet in some browsers)
+also works in other cases
+(e.g., a library being used in a non-secure context when
+the feature is limited to secure contexts).
+
+Detection should always be possible from script,
+but in some cases the feature should also be detectable
+in the language where it is used
+(such as ''@supports'' in CSS).
+
+<h3 id="secure-context">Consider limiting new features to secure contexts</h3>
+
+It may save you significant time and effort
+to pre-emptively restrict your feature to Secure Contexts.
+
+The TAG is on the record in supporting
+an industry-wide move to [Secure the Web](https://www.w3.org/2001/tag/doc/web-https)
+and applaud [efforts](https://blog.mozilla.org/security/2017/01/20/communicating-the-dangers-of-non-secure-http/)
+to shift web traffic to secure connections.
+A great deal of effort has gone into debating
+which features should be restricted to [Secure Contexts](https://w3c.github.io/webappsec-secure-contexts/).
+Opinions vary amongst engine vendors, leading to difficult choices for feature designers.
+Some vendors require *all* new features be restricted this way,
+whereas others take a more selective approach.
+
+This backdrop makes it difficult to provide
+advice about the extent to which your feature should be restricted.
+What we *can* highlight is that Secure Context-restricted features
+face the least friction in gaining wide adoption amongst these varying regimes.
+
+Specification authors can limit most features defined in
+<a href="https://heycam.github.io/webidl/">WebIDL</a>,
+to secure contexts
+by using the
+<code>[<a href="https://w3c.github.io/webappsec-secure-contexts/#integration-idl">SecureContext</a>]</code> extended attribute
+on interfaces, namespaces, or their members (such as methods and attributes).
+Similar ways of marking features as limited to secure contexts should be added
+to other major points where the Web platform is extended over time
+(for example, the definition of a new CSS property).
+However, for some types of extension points (e.g., dispatching an event),
+limitation to secure contexts should just
+be defined in normative prose in the specification.
+
+As described in [[#feature-detect]],
+the existence of features should generally be detectable,
+so that web content can act appropriately if the feature is present or not.
+Since the detection should be the same no matter why the feature is unavailable,
+a feature that is limited to secure contexts should, in non-secure contexts,
+be indistinguishable from a feature that is not implemented.
+However, if, for some reason
+(a reason that itself requires serious justification),
+it is not possible for developers to detect whether a feature is present,
+limiting the feature to secure contexts
+might cause problems
+for libraries that may be used in either secure or non-secure contexts.
+
+If a feature would pose a risk to user privacy or security
+without the authentication, integrity, or confidentiality
+that is present only in secure contexts,
+then the feature must be limited to secure contexts.
+One example of a feature that should be limited to secure contexts
+is geolocation, since the authentication and confidentiality provided by
+secure contexts reduce the risks to user privacy.
 
 <h2 id="js">JavaScript Language</h2>
 
@@ -117,55 +432,7 @@ the API visibly relates to garbage collection details. By contrast, special APIs
 purpose such as `WeakRef` and `FinalizationGroup` have their GC interaction as a specific part of
 their contract with the developer.
 
-<h2 id="api-surface">API Surface Concerns</h2>
-
-<h3 id="naming-is-hard">Naming things</h3>
-
-Naming is hard! We would all like a silver-bullet for naming APIs...
-
-Names take meaning from:
-
-* signposting (the name itself)
-* use (how people come to understand the name over time)
-* context (the object on the left-hand side, for example)
-
-Consistency is a good principle that helps to create a platform that users can navigate intuitively
-and by name association.
-
-Please consult widely on names in your APIs.
-
-Boolean properties, options, or API parameters which are asking a question about
-their argument *should not* be prefixed with <code>is</code>, while methods
-that serve the same purpose, given that it has no side effects, *should* be
-prefixed with <code>is</code> to be consistent with the rest of the platform.
-
-The name should not be directly associated with a brand or specific revision of
-the underlying technology whenever possible; technology becomes obsolete, but
-since removing APIs from the web is difficult, naming should be generic and
-future-proof whenever possible.
-
-<h3 id="feature-detect">New features should be detectable</h3>
-
-The existence of new features should generally be detectable,
-so that web content can act appropriately whether the feature is present or not.
-This applies both to features that
-are not present because they are not implemented,
-and to features that may not be present in a particular configuration
-(ranging from features that are present only on particular platforms
-to features that are
-only available in secure contexts).
-
-It should generally be indistinguishable why a feature is unavailable,
-so that feature detection code written for one case of unavailability
-(e.g., the feature not being implemented yet in some browsers)
-also works in other cases
-(e.g., a library being used in a non-secure context when
-the feature is limited to secure contexts).
-
-Detection should always be possible from script,
-but in some cases the feature should also be detectable
-in the language where it is used
-(such as ''@supports'' in CSS).
+<h2 id="api-surface">JavaScript API Surface Concerns</h2>
 
 <h3 id="attributes-like-data">Attributes should behave like data properties</h3>
 
@@ -256,90 +523,6 @@ In particular,
 if a result that changes frequently is returned as a static object,
 it should probably be returned from a method rather than an attribute getter.
 
-<h3 id="casing-rules">Use casing rules consistent with existing APIs</h3>
-
-Although they haven't always been uniformly followed, through the history of web platform API
-design, the following rules have emerged:
-
-<table class="data complex">
-    <thead>
-        <tr>
-            <th></th>
-            <th>Casing rule</th>
-            <th>Examples</th>
-        </tr>
-    </thead>
-    <tr>
-        <th>Methods and properties<br>(Web IDL attributes, operations, and dictionary keys)</th>
-        <td>Camel case</td>
-        <td><code highlight="js">document.createAttribute()</code><br>
-            <code highlight="js">document.compatMode</code></td>
-    </tr>
-    <tr>
-        <th>Classes and mixins<br>(Web IDL interfaces)</th>
-        <td>Pascal case</td>
-        <td><code highlight="js">NamedNodeMap</code><br>
-            <code highlight="js">NonElementParentNode</code></td>
-    </tr>
-    <tr>
-        <th>Initialisms in APIs</th>
-        <td>All caps, except when the first word in a method or property</td>
-        <td><code highlight="js">HTMLCollection</code><br>
-            <code highlight="js">element.innerHTML</code><br>
-            <code highlight="js">document.bgColor</code></td>
-    </tr>
-    <tr>
-        <th>Repeated initialisms in APIs</th>
-        <td>Follow the same rule</td>
-        <td><code highlight="js">HTMLHRElement</code><br>
-            <code highlight="js">RTCDTMFSender</code><br>
-    </tr>
-    <tr>
-        <th>The abbreviation of "identity"</th>
-        <td><code highlight="js">Id</code>, except when the first word in a method or property</td>
-        <td><code highlight="js">node.getElementById()</code><br>
-            <code highlight="js">event.pointerId</code><br>
-            <code highlight="js">credential.id</code></td>
-    </tr>
-    <tr>
-        <th>Enumeration values</th>
-        <td>Lowercase, dash-delimited</td>
-        <td><code highlight="js">"no-referrer-when-downgrade"</code></td>
-    </tr>
-    <tr>
-        <th>Events</th>
-        <td>Lowercase, concatenated</td>
-        <td><code>autocompleteerror</code><br>
-            <code>languagechange</code></td>
-    </tr>
-    <tr>
-        <th>HTML elements and attributes</th>
-        <td>Lowercase, concatenated</td>
-        <td><code highlight="html">&lt;figcaption&gt;</code><br>
-            <code highlight="html">&lt;textarea maxlength&gt;</code></td>
-    </tr>
-    <tr>
-        <th>JSON keys</th>
-        <td>Lowercase, underscore-delimited</td>
-        <td><code highlight="js">manifest.short_name</code></td>
-    </tr>
-</table>
-
-<div class="non-normative">
-Note that in particular, when a HTML attribute is <a>reflected</a> as a property, the attribute
-and property's casings will not necessarily match. For example, the HTML attribute
-<{img/ismap}> on <{img}> elements is <a>reflected</a> as the
-{{HTMLImageElement/isMap}} property on {{HTMLImageElement}}.
-
-The rules for JSON keys are meant to apply to specific JSON file formats sent over HTTP
-or stored on disk, and don't apply to the general notion of JavaScript object keys.
-
-Repeated initialisms are particularly non-uniform throughout the platform. Infamous historical
-examples that violate the above rules are {{XMLHttpRequest}} and
-{{HTMLHtmlElement}}. Do not follow their example; instead always capitalize your
-initialisms, even if they are repeated.
-</div>
-
 <h3 id="prefer-dict-to-bool">Prefer dictionary parameters over boolean parameters or other unreadable parameters</h3>
 
 APIs should generally prefer dictionary parameters
@@ -387,7 +570,7 @@ of Web IDL-derived classes without ever actually calling their constructor.
 
 You should strive to reduce such magic in designing your own APIs, and give them constructors which
 allow JavaScript developers to create them, just like the platform does. This means adding an
-appropriate [{{Constructor}}] extended attribute to your interface, and defining the algorithm for
+appropriate [=constructor operation=] to your interface, and defining the algorithm for
 creating new instances of your class.
 
 Apart from reducing the magic in the platform, adding constructors allows JavaScript developers to
@@ -521,60 +704,6 @@ the `AbortController` can still be used because a call to `abort()` on
 Note, requestAbort() was considered in the AbortController design instead
 of abort(), but the latter was chosen for brevity.
 
-<h3 id="secure-context">Consider limiting new features to secure contexts</h3>
-
-It may save you significant time and effort
-to pre-emptively restrict your feature to Secure Contexts.
-
-The TAG is on the record in supporting
-an industry-wide move to [Secure the Web](https://www.w3.org/2001/tag/doc/web-https)
-and applaud [efforts](https://blog.mozilla.org/security/2017/01/20/communicating-the-dangers-of-non-secure-http/)
-to shift web traffic to secure connections.
-A great deal of effort has gone into debating
-which features should be restricted to [Secure Contexts](https://w3c.github.io/webappsec-secure-contexts/).
-Opinions vary amongst engine vendors, leading to difficult choices for feature designers.
-Some vendors require *all* new features be restricted this way,
-whereas others take a more selective approach.
-
-This backdrop makes it difficult to provide
-advice about the extent to which your feature should be restricted.
-What we *can* highlight is that Secure Context-restricted features
-face the least friction in gaining wide adoption amongst these varying regimes.
-
-Specification authors can limit most features defined in
-<a href="https://heycam.github.io/webidl/">WebIDL</a>,
-to secure contexts
-by using the
-<code>[<a href="https://w3c.github.io/webappsec-secure-contexts/#integration-idl">SecureContext</a>]</code> extended attribute
-on interfaces, namespaces, or their members (such as methods and attributes).
-Similar ways of marking features as limited to secure contexts should be added
-to other major points where the Web platform is extended over time
-(for example, the definition of a new CSS property).
-However, for some types of extension points (e.g., dispatching an event),
-limitation to secure contexts should just
-be defined in normative prose in the specification.
-
-As described in [[#feature-detect]],
-the existence of features should generally be detectable,
-so that web content can act appropriately if the feature is present or not.
-Since the detection should be the same no matter why the feature is unavailable,
-a feature that is limited to secure contexts should, in non-secure contexts,
-be indistinguishable from a feature that is not implemented.
-However, if, for some reason
-(a reason that itself requires serious justification),
-it is not possible for developers to detect whether a feature is present,
-limiting the feature to secure contexts
-might cause problems
-for libraries that may be used in either secure or non-secure contexts.
-
-If a feature would pose a risk to user privacy or security
-without the authentication, integrity, or confidentiality
-that is present only in secure contexts,
-then the feature must be limited to secure contexts.
-One example of a feature that should be limited to secure contexts
-is geolocation, since the authentication and confidentiality provided by
-secure contexts reduce the risks to user privacy.
-
 <h3 id="string-constants">Constants, enums, and bitmasks</h3>
 
 In many other platforms and programming languages, constants and enums are
@@ -620,7 +749,7 @@ callback and get invoked multiple times until paired cancel API is called.
 
 Instead, use the existing event registration pattern and separate API controls
 to start/stop the underlying process (since event listeners should not have
-<a href="#events-are-for-notification">side-effects</a>).
+[[#events-are-for-notification|side-effects]]).
 
 If the callback would have been provided specific data, then this data should
 be added to an `Event` object (but see <a href="#state-and-subclassing">State
@@ -679,11 +808,131 @@ are traditionally added to {{WindowEventHandlers}} rather than {{Window}}.</p>
 
 Try to design DOM events to deliver after-the-fact notifications of changes. It may be tempting to try to trigger side-effects from the action of {{EventTarget/dispatchEvent()}}, but in general this is <a href="https://lists.w3.org/Archives/Public/public-webapps/2014AprJun/0510.html">strongly discouraged</a> as it requires changes to the DOM specification when added. Your design will proceed more quickly if you avoid this pattern.
 
-<h3 id="favor-asynchronous-events">Favor asynchronous events</h3>
+<h3 id="guard-against-recursion">Guard against potential recursion</h3>
 
-A few events in the platform are specified to dispatch synchronously. These events cause problems for engines and performance issues in applications due to the possibility for re-entrant behavior they open up. The deprecated [Mutation Events](https://developer.mozilla.org/en-US/docs/Web/Guide/Events/Mutation_events), for instance, has caused many years of security issues. A more modern approach embodied in [Mutation Observers](ihttps://developer.mozilla.org/en-US/docs/Web/API/MutationObserver) addresses most of the same use-cases in a higher-performance way which is easier to develop with and implement.
+When designing a long-running or complicated algorithm that is initiated by an 
+API call, events are appropriate for [[#events-are-for-notification|notifying]]
+user code of the ongoing process. However, they also introduce the possibility of unexpected
+re-execution of the current algorithm before it has finished! Because user code gets
+to run in the middle of the algorithm, recursion can happen if that user code triggers
+the algorithm again (directly or indirectly).
 
-If you feel you need a synchronous event in your design, please reconsider and ask the TAG for help in redesigning the API.
+To address this, if the algorithmic complexity and call graph is reasonably understood, add appropriate
+state to track that the algorithm is in progress and terminate immediately if the algorithm
+is already concurrently running. This technique is "guarding" the algorithm:
+
+<div class="example">
+    The following is a technique (e.g., as used in the [=AbortSignal/add|AbortSignal's add algorithm=]
+    or as a stack-based variation in the [=focus update steps=])
+    for guarding against unplanned recursion. 
+    
+    In this example, an object of type <dfn noexport interface>MyObject</dfn> has
+    a method <dfn method for="MyObject">doComplexOpWithEvents()</dfn> and
+    an internal state attribute [[<dfn noexport attribute for="MyObject">started</dfn>]]
+    referenced below as
+    {{MyObject|this}}.[[{{started}}]] whose initial
+    value is `false`.
+
+    The {{doComplexOpWithEvents()}} method must act as follows:
+    
+    1. If {{MyObject|this}}.[[{{started}}]] is not `false` then throw an {{InvalidStateError}}
+        {{DOMException}} and terminate this algorithm.
+        
+        Note: {{doComplexOpWithEvents()}} is not allowed to be run again
+        (e.g., from within a `"currentlyinprogress"` event handler) before it finishes
+        its original execution.
+
+    2. Set {{MyObject|this}}.[[{{started}}]] to `true`.
+
+    3. ...Do complex stuff...
+
+    4. [=Fire an event=] named `"currentlyinprogress"` at {{MyObject|this}}.
+
+    5. ...Finish up complex stuff...
+
+    6. Set {{MyObject|this}}.[[{{started}}]] to `false`.
+</div>
+
+Note: A caution about early termination: if the algorithm being terminated would go 
+on to ensure some critical state consistency, be sure to also make the relevant adjustments 
+in state before early termination of the algorithm. Not doing so can lead to inconsistent
+state and end-user-visible bugs when implemented as-specified.
+
+Note: A caution about throwing exceptions in early termination: keep in mind the scenario
+in which developers will be invoking the algorithm, and whether they would reasonably
+expect to handle an exception in this [perhaps rare] case. For example, will this
+be the only exception in the algorithm?
+
+Sometimes "guarding" as illustrated above cannot be done because of the complexity
+of the algorithm, the number of potential algorithm entry-points, or the side-effects
+beyond the algorithm's control. In these cases another form of protecting the integrity
+of the algorithm's state is to "defer" the event to a subsequent task or microtask.
+Deferral ensures that any stack-based recursion is avoided (but does not eliminate
+potentially problematic loops, as they could now occur as unending follow-up tasks).
+
+Deferring an event is often specified as "[=queue a task=] to [=fire an event=]...".
+
+By way of illustration, the deprecated
+[Mutation Events](https://developer.mozilla.org/en-US/docs/Web/Guide/Events/Mutation_events)
+fired in the middle of node insertion and removal algorithms, and
+could be triggered by a variety of common API calls like {{Node/appendChild()}}. The side-effects
+from recursively running node mutation algorithms caused many years of security issues.
+A more robust approach embodied in
+{{MutationObserver}}
+applies the principle of deferral of notification — in this case to the microtask queue
+following the algorithm.
+
+Also note that deferral of events is always necessary if the algorithm that triggers
+the event could be running on a different thread or process. In this case deferral 
+ensures the events can be processed on the correct task in the [=task queue=].
+
+Both approaches to protecting against unwanted recursion have trade-offs. Some things
+to consider when choosing the guarding approach:
+
+* all state management can be rationalized within one "turn" of the algorithm (no
+    need to consider any state changes or API invocations between the time the algorithm
+    completes and when the event fires).
+* events can reveal internal state changes as early as possible when dispatched immediately
+    in the algorithm (resulting in minimal delay to user code that wants to act on
+    that state).
+* events do not need to carry snapshots (copies) of internal state because user code
+    running in the event handler can observe relevant state directly on the instance
+    object they were fired on (avoiding the need to derive a new type of {{Event}}
+    to hold such state snapshots).
+
+When deferring, event handlers will run after the algorithm ends (or starts 
+to run [=in parallel=]) and any number of other tasks or microtasks may run in between 
+that invalidate the object's state. Since the object's state will be unknown when
+the deferred event is dispatched, consider the following:
+
+* state relevant to the event should be packaged with the deferred event, usually 
+    involving a new {{Event}}-derived type with new attributes to hold the state.
+    For example, the {{ProgressEvent}} adds {{ProgressEvent/loaded}}, 
+    {{ProgressEvent/total}}, etc. attributes to hold the state.
+* any coordination needed among parts of an algorithm using deferred events often
+    requires defining an explicit state machine (well-defined state transitions) to
+    ensure that when a deferred event fires, the behavior of inspecting or changing
+    state is well-defined. For example, in [[payment-request]], the {{PaymentRequest}}'s
+    [=[[state]]=] internal slot explicitly tracks the object's state
+    through its well-defined transitions.
+    * in addition to defining state transitions, each coordinated algorithm usually 
+        applies the guarding technique (anyway) to ensure the algorithm can only proceed
+        under the appropriate set of states. For example, in [[payment-request]] note
+        the guards used often around the [=[[state]]=] internal
+        slot such as in the {{MerchantValidationEvent/complete()}} algorithm.
+    
+Finally, dispatching a deferred event that does not seem to require
+packaging extra state or defining a state machine for the algorithm as mentioned above,
+could mean that all of the state transitions have been completed and that the event 
+is meant to signal completion of the algorithm. In this case, it's likely that instead
+of using an event to signal completion, the API should be designed to return and complete
+a {{Promise}} instead. See [[#one-time-events]].
+
+Note: events that expose the possibility of recursion as described in this section
+were sometimes called "synchronous events". This terminology is discouraged as it
+implies that it is possible to dispatch an event asynchronously. All events are dispatched
+synchronously. What is more often implied by "asynchronous event" is to defer firing
+an event.
 
 <h3 id="state-and-subclassing">State and {{Event}} subclasses</h3>
 
@@ -863,7 +1112,7 @@ See [[!HIGHRES-TIME]] for more details.
 <h3 id="error-types">Use Error or DOMException for errors</h3>
 
 Errors in web APIs should be represented as
-<a>ECMAScript error objects</a> (perhaps via the WebIDL {{Error}} type)
+ECMAScript error objects (e.g., {{Error}})
 or as {{DOMException}}.
 There was at one point a trend to use {{DOMError}} when
 objects had a property representing an error.

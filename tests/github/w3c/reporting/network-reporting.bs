@@ -1,0 +1,932 @@
+<h1>Network Reporting API</h1>
+<pre class="metadata">
+Status: ED
+ED: https://w3c.github.io/reporting/network-reporting
+Shortname: network-reporting
+Group: webperf
+Editor: Douglas Creager 103120, GitHub, dcreager@dcreager.net
+Editor: Ian Clelland 76841, Google Inc., iclelland@google.com
+Editor: Mike West 56384, Google Inc., mkwst@google.com
+Former Editor: Ilya Grigorik 56102, Google Inc., igrigorik@google.com
+Former Editor: Paul Meyer 99916, Google Inc., paulmeyer@google.com
+Abstract:
+  This document extends the generic reporting framework from the Reporting API
+  with a mechanisms for web developers to associate groups of reporting
+  endpoints with origins they control, and defines how reports can reliably be
+  sent to those endpoints, in order to be able to report on network conditions,
+  or other concerns which exceed the scope of a single document, in a consistent
+  manner.
+Level: 1
+Indent: 2
+Version History: https://github.com/w3c/reporting/commits/master/index.src.html
+Boilerplate: omit conformance, omit feedback-header
+!Participate: <a href="https://github.com/w3c/reporting/issues/new">File an issue</a> (<a href="https://github.com/w3c/reporting/issues">open issues</a>)
+Markup Shorthands: css off, markdown on
+</pre>
+<pre class="anchors">
+spec: CSP; urlPrefix: https://w3c.github.io/webappsec-csp/
+  type: dfn
+    text: Content-Security-Policy
+    text: reports directive; url: directives-reporting
+spec: FETCH; urlPrefix: https://fetch.spec.whatwg.org/
+  type: dfn
+    text: navigation request
+    text: response; url: concept-response
+    text: request; url: concept-request
+    text: header; url: concept-header
+    text: header list; url: concept-header-list
+    text: main fetch
+    text: fetch; url: concept-fetch
+    text: wait for a response
+    text: ok status
+  type: attribute
+    for: response
+      text: url; url: concept-response-url
+      text: HTTPS state; url: concept-response-https-state
+      text: header list; url: concept-response-header-list
+    for: request
+      text: target browsing context; url: concept-request-target-browsing-context
+    for: header
+      text: name; url: concept-header-name
+      text: value; url: concept-header-value
+spec: SECURE-CONTEXTS; urlPrefix: https://w3c.github.io/webappsec-secure-contexts/
+  type: dfn
+    text: potentially trustworthy; url: is-origin-trustworthy
+spec: URL; urlPrefix: https://url.spec.whatwg.org/
+  type: dfn
+    text: origin of a url; url: concept-url-origin
+    text: URL serializer; url: concept-url-serializer
+    text: URL parser; url: concept-url-parser
+  type: interface
+    text: URL; url: concept-url
+  type: attribute
+    for: URL
+      text: username; url: concept-url-username
+      text: password; url: concept-url-password
+spec: HTML; urlPrefix: https://html.spec.whatwg.org/multipage/
+  urlPrefix: infrastructure.html
+    type: dfn
+      text: ASCII case-insensitive
+  urlPrefix: webappapis.html
+    type: dfn
+      text: global object
+      text: environment settings object
+      text: creation URL
+      text: queue a task
+  urlPrefix: browsers.html
+    type: dfn
+      text: origin
+      text: top-level browsing context
+  urlPrefix: system-state.html
+    type: dfn
+      text: navigator.userAgent; url: dom-navigator-useragent
+spec: RFC2782; for: SRV; urlPrefix: https://tools.ietf.org/html/rfc2782
+  type: dfn
+    text: SRV record; url:
+    text: target selection algorithm; url: page-4
+spec: RFC3986; urlPrefix: https://tools.ietf.org/html/rfc3986
+  type: grammar
+    text: absolute-uri; url: section-4.3
+spec: RFC6797; urlPrefix: https://tools.ietf.org/html/rfc6797
+  type: dfn
+    url: section-8.2
+      text: superdomain match
+      text: congruent match
+spec: RFC8259; urlPrefix: https://tools.ietf.org/html/rfc8259
+  type: dfn
+    text: JSON text; url: section-2
+spec: RFC7230; urlPrefix: https://tools.ietf.org/html/rfc7230
+  type: grammar
+    text: OWS; url: section-3.2.3
+    text: BWS; url: section-3.2.3
+    text: token; url: section-3.2.6
+    text: quoted-string; url: section-3.2.6
+    text: #rule; url: section-7
+spec: RFC7234; urlPrefix: https://tools.ietf.org/html/rfc7234
+  type: grammar
+    text: delta-seconds; url: section-1.2.1
+spec: RFC7469; urlPrefix: https://tools.ietf.org/html/rfc7469
+  type: dfn
+    text: Public-Key-Pins; url: section-2.1
+spec: HTTP-JFV; urlPrefix: https://tools.ietf.org/html/draft-reschke-http-jfv
+  type: grammar
+    text: json-field-value; url: section-2
+spec: ECMASCRIPT; urlPrefix: https://tc39.github.io/ecma262/
+  type: dfn
+    text: Realm
+    text: Date object; url: sec-date-objects
+  type: interface
+    text: Date; url: sec-date-objects
+spec: webdriver; urlPrefix: https://w3c.github.io/webdriver/webdriver-spec.html#
+  type: dfn
+    text: current browsing context; url: dfn-current-browsing-context
+    text: handle any user prompts; url: dfn-handle-any-user-prompts
+    text: WebDriver error; url: dfn-error
+    text: WebDriver error code; url: dfn-error-code
+    text: extension command; url: dfn-extension-command
+    text: extension command uri template; url: dfn-extension-command-uri-template
+    text: invalid argument; url: dfn-invalid-argument
+    text: no such window; url: dfn-no-such-window
+    text: local end; url: dfn-local-end
+    text: remote end steps; url: dfn-remote-end-steps
+    text: session; url: dfn-session
+    text: success; url: dfn-success
+    text: trying; url: dfn-try
+spec: origin-policy; urlPrefix: https://wicg.github.io/origin-policy/
+  type: dfn
+    text: origin policy manifest; url: origin-policy-manifest
+</pre>
+<pre class="biblio">
+{
+  "SECURE-CONTEXTS": {
+    "authors": [ "Mike West", "Yan Zhu" ],
+    "href": "https://w3c.github.io/webappsec-secure-contexts/",
+    "title": "Secure Contexts",
+    "publisher": "W3C"
+  }
+}
+
+</pre>
+<section>
+  <h2 id="intro">Introduction</h2>
+
+  This document extends the concepts defined in [[REPORTING]] to enable a class
+  of reports which are not tied to the lifetime of any particular document. This
+  enables network errors to be reported on, even (or especially) in cases where
+  a document could not be loaded.
+
+  Decoupling reports from documents implies two major differences from the
+  document-centred reporting defined in [[REPORTING]]: First, configuration of
+  reporting must be done at the origin level, rather than through document
+  response headers. Second, the reports are queued and delivered by the user
+  agent separately from document reports.
+
+  <h3 id="guarantees">Guarantees</h3>
+
+  This specification aims to provide a best-effort report delivery system that
+  executes out-of-band with website activity. The user agent will be able to do
+  a better job prioritizing and scheduling delivery of reports, as it has an
+  overview of cross-origin activity that individual websites do not, and can
+  deliver reports based on error conditions that would prevent a website from
+  loading in the first place.
+
+  The delivery is not, however, guaranteed in a strict sense. We spell out a
+  reasonable set of retry rules in the algorithms below, but it's quite possible
+  for a report to be dropped on the floor if things go badly.
+
+  Reporting can generate a good deal of traffic, so we allow developers to set
+  up groups of <a for="/" data-lt="endpoint">endpoints</a>, using a failover and
+  load-balancing mechanism inspired by the DNS <a>SRV record</a>.  The user
+  agent will do its best to deliver a particular report to <strong>at most
+  one</strong> endpoint in a group.  Endpoints can be assigned weights to
+  distribute load, with each endpoint receiving a specified fraction of
+  reporting traffic.  Endpoints can be assigned priorities, allowing developers
+  to set up fallback collectors that are only tried when uploads to primary
+  collectors fail.
+
+  <h3 id="examples">Examples</h3>
+
+  <div class="example">
+    MegaCorp Inc. wants to collect Network Error Log reports for its site.
+    It can do so by serving an origin policy manifest with the following key,
+    to define a set of reporting endpoints named "`endpoint-1`":
+
+    <pre>
+      {
+      "<a>network_reporting_endpoints</a>": {
+        "<a for="network_reporting_endpoints">group</a>": "endpoint-1",
+        "<a for="network_reporting_endpoints">max_age</a>": 10886400,
+        "<a for="network_reporting_endpoints">endpoints</a>": [
+          { "<a for="network_reporting_endpoints">url</a>": "https://example.com/reports", "<a for="network_reporting_endpoints">priority</a>": 1 },
+          { "<a for="network_reporting_endpoints">url</a>": "https://backup.com/reports", "<a for="network_reporting_endpoints">priority</a>": 2 }
+        ] }
+      }
+    </pre>
+
+    And the following headers, which direct NEL reports to that group:
+
+    <pre>
+      NEL: { ..., "<a lt="reports directive">report-to</a>": "endpoint-1" }
+    </pre>
+  </div>
+</section>
+
+<section>
+  <h2 id="concept">Concepts</h2>
+
+  <h3 id="concept-endpoint-groups">Endpoint groups</h3>
+
+  An <dfn export>endpoint group</dfn> is a set of <a
+  data-lt="network reporting endpoint">network reporting endpoints</a> that will
+  be used together for backup and failover purposes.
+
+  Each <a>endpoint group</a> has a
+  <dfn for="endpoint group" export attribute>name</dfn>, which is an ASCII
+  string.
+
+  Each <a>endpoint group</a> has an <dfn
+  for="endpoint group" export attribute>endpoints</dfn> list, which is a list of
+  <a data-lt="network reporting endpoint">network reporting endpoints</a>.
+
+  Each <a>endpoint group</a> has a <dfn for="endpoint group"
+  export attribute>subdomains</dfn> flag, which is either "`include`" or
+  "`exclude`".
+
+  Each <a>endpoint group</a> has a <dfn for="endpoint group"
+  export attribute>ttl</dfn> representing the number of seconds the group
+  remains valid for an <a spec="html">origin</a>.
+
+  Each <a>endpoint group</a> has a <dfn for="endpoint group"
+  export attribute>creation</dfn> which is the timestamp at which the group was
+  added to an <a spec="html">origin</a>.
+
+  A <a>endpoint group</a> is <dfn for="endpoint group"
+  id="endpoint-group-expired">expired</dfn> if its {{endpoint group/creation}}
+  plus its {{endpoint group/ttl}} represents a time in the past.
+
+  <h3 id="concept-network-endpoint">Network reporting endpoints</h3>
+
+  A <dfn>network reporting endpoint</dfn> is an <a>endpoint</a>, which is
+  extended with these additional attributes:
+
+  Each <a>network reporting endpoint</a> has a <dfn
+  for="network reporting endpoint" export attribute>priority</dfn>, which is a
+  non-negative integer.
+
+  Each <a>network reporting endpoint</a> has a <dfn
+  for="network reporting endpoint" export attribute>weight</dfn>, which is a
+  non-negative integer.
+
+  Each <a>network reporting endpoint</a> has a <dfn
+  for="network reporting endpoint" export attribute>retry_after</dfn>, which is
+  either `null`, or a timestamp after which delivery should be retried.
+
+  An <a>network reporting endpoint</a> is <dfn
+  for="network reporting endpoint">pending</dfn> if its
+  {{network reporting endpoint/retry_after}} is not `null`, and represents a
+  time in the future.
+
+  <h3 id="concept-client">Clients</h3>
+
+  A <dfn export>client</dfn> represents a particular origin's relationship to
+  a set of <a for="/" data-lt="endpoint">endpoints</a>.
+
+  Each <a>client</a> has an <dfn for="client" export attribute>origin</dfn>,
+  which is an <a spec="html">origin</a>.
+
+  Each <a>client</a> has an <dfn for="client" export
+  attribute>endpoint-groups</dfn> list, which is a list of <a>endpoint
+  groups</a>, each of which MUST have a distinct {{endpoint group/name}}.
+  (The algorithm in [[#process-configuration]] guarantees this by keeping only
+  the first entry in the configuration member with a particular name.)
+
+  <h3 id="concept-failover-load-balancing">Failover and load balancing</h3>
+
+  The <a>network reporting endpoints</a> in an <a>endpoint group</a> that all
+  have the same {{network reporting endpoint/priority}} form a <dfn
+  export>failover class</dfn>. <a>Failover classes</a> allow the developer to
+  provide backup collectors (those with higher
+  {{network reporting endpoint/priority}} values) that will only receive reports
+  if **all** of the primary collectors (those with lower
+  {{network reporting endpoint/priority}} values) fail.
+
+  Developers can assign each <a>network reporting endpoint</a> in a <a>failover
+  class</a> a {{network reporting endpoint/weight}}, which determines how report
+  traffic is balanced across the <a>failover class</a>.
+
+  The algorithm that implements these rules is described in
+  [[#choose-endpoint]].
+
+  Note: The {{network reporting endpoint/priority}} and
+  {{network reporting endpoint/weight}} fields have the same semantics as the
+  corresponding fields in a DNS <a>SRV record</a>.
+
+  Note: Failover and load balancing is a feature that would be generally useful
+  outside of Reporting.  Reporting delegates to the [[FETCH]] API to actually
+  upload reports once an endpoint has been selected.  If, in the future, the
+  Fetch API adds native support for failover and load balancing of requests, a
+  future version of this specification will be updated to use it instead of this
+  bespoke mechanism.
+
+  <h3 id="concept-storage">Storage</h3>
+
+  A conformant user agent MUST provide a <dfn>reporting cache</dfn>, which
+  is a storage mechanism that maintains a set of <a>endpoint groups</a>
+  that websites have instructed the user agent to associate with their
+  <a spec="html">origins</a>, and a set of <a>reports</a> which are queued for
+  delivery.
+
+  This storage mechanism is opaque, vendor-specific, and not exposed to the
+  web, but it MUST provide the following methods which will be used in the
+  algorithms this document defines:
+
+  1.  Insert, update, and remove <a>clients</a>.
+  2.  Enqueue and dequeue <a>reports</a> for delivery.
+  3.  Retrieve a list of <a>client</a> objects for an <a spec="html">origin</a>.
+  4.  Retrieve a list of queued <a>report</a> objects.
+  5.  Clear the cache.
+
+</section>
+
+<section>
+  <h2 id="endpoint-delivery">Endpoint Delivery</h2>
+
+  A server MAY define a set of <a>endpoint groups</a> for an origin it controls
+  through an <a>origin policy manifest</a> [[!ORIGIN-POLICY]].
+
+  <a>Endpoint groups</a> are specified with the `"network_reporting_endpoints"`
+  member, which defines the <a>endpoint groups</a> to be associated with that
+  origin.
+
+  This member is defined in [[#network_reporting_endpoints-policy-item]], and
+  its processing in [[#process-configuration]].
+
+  <h3 id="network_reporting_endpoints-policy-item">The
+  "network_reporting_endpoints" policy item</h3>
+
+  The <dfn>`network_reporting_endpoints`</dfn> member defines the <a>endpoint
+  groups</a> to be associated with the origin.
+
+  If present, the member must be an array of objects.
+
+  Each object in the array defines a <a>endpoint group</a> to which
+  reports may be delivered, and will be parsed as defined in
+  [[#process-configuration]].
+
+  The following subsections define the set of known members which may be
+  specified for each object in the array.  Future versions of this document may
+  define additional such members, and user agents MUST ignore unknown members
+  when parsing the configuration.
+
+  <h4 id="id-member">The `group` member</h4>
+
+  The OPTIONAL <dfn for="network_reporting_endpoints">`group`</dfn> member is a
+  string that associates a {{endpoint group/name}} with the <a>endpoint
+  group</a>.
+
+  If present, the member's value MUST be a string. If not present, the
+  <a>endpoint group</a> will be given the {{endpoint group/name}}
+  "`default`".
+
+  <h4 id="include-subdomains-member">The `include_subdomains` member</h4>
+
+  The OPTIONAL <dfn for="network_reporting_endpoints">`include_subdomains`</dfn>
+  member is a boolean that enables this <a>endpoint group</a> for all
+  subdomains of the current <a spec="html">origin</a>'s {{URL/host}}.
+
+  <h4 id="max-age-member">The `max_age` member</h4>
+
+  The REQUIRED <dfn for="network_reporting_endpoints" export>`max_age`</dfn>
+  member defines the <a>endpoint group</a>'s lifetime, as a non-negative
+  integer number of seconds.
+
+  The member's value MUST be a non-negative number.
+
+  A value of "`0`" will cause the <a>endpoint group</a> to be removed
+  from the user agent's <a>reporting cache</a>.
+
+  <h4 id="endpoints-member">The `endpoints` member</h4>
+
+  The REQUIRED <dfn for="network_reporting_endpoints" export>`endpoints`</dfn>
+  member defines the list of <a for="/" data-lt="endpoint">endpoints</a> that
+  belong to this <a>endpoint group</a>.
+
+  The member's value MUST be an array of JSON objects.
+
+  The following subsections define the initial set of known members in each
+  JSON object in the array. Future versions of this document may define
+  additional such members, and user agents MUST ignore unknown members when
+  parsing the elements of the array.
+
+  <!--
+  Note: If a group resolves to multiple <a>endpoints</a>, the user agent will
+  deliver a particular <a>report</a> to <strong>at most one</strong>
+  <a>endpoint</a> in that group on a best-effort basis.
+  -->
+
+  <h4 id="endpoints-url-member">The `endpoints.url` member</h4>
+
+  The REQUIRED <dfn for="network_reporting_endpoints">`url`</dfn> member is a
+  string that defines the location of the <a for="/">endpoint</a>.
+
+  The member's value MUST be a string. Moreover, the URL that the member's value
+  represents MUST be <a>potentially trustworthy</a> [[!SECURE-CONTEXTS]].
+  Non-secure endpoints will be ignored.
+
+  <h4 id="endpoints-priority-member">The `endpoints.priority` member</h4>
+
+  The OPTIONAL <dfn for="network_reporting_endpoints">`priority`</dfn> member is
+  a number that defines which failover class the <a for="/">endpoint</a> belongs
+  to.
+
+  The member's value, if present, MUST be a non-negative integer.
+
+  <h4 id="endpoints-weight-member">The `endpoints.weight` member</h4>
+
+  The OPTIONAL <dfn for="network_reporting_endpoints">`weight`</dfn> member is a
+  number that defines load balancing for the failover class that the <a
+  for="/">endpoint</a> belongs to.
+
+  The member's value, if present, MUST be a non-negative integer.
+
+  <h3 id="process-configuration" algorithm>
+    Process origin policy configuration
+  </h3>
+
+  Given a <a>map</a> (|parsed|), and an <a spec="html">origin</a> (|origin|),
+  this algorithm extracts a list of <a>network reporting endpoints</a>
+  and <a>endpoint groups</a> for |origin|, and updates the <a>reporting
+  cache</a> accordingly.
+
+  Note: This algorithm is called from around step 9 of
+  [[ORIGIN-POLICY#parse-a-string-into-an-origin-policy]], and only updates the
+  <a>reporting cache</a> if the |response| has been delivered securely.
+
+  ISSUE: Origin Policy monkey patching. Talk to Domenic.
+
+  1.  Let |groups| be an empty list.
+
+  2.  If |parsed|["network_reporting_endpoints"] exists and is a list, then for
+      each |item| in |parsed|["network_reporting_endpoints"]:
+
+      1.  If |item| has no member named "<a
+          for="network_reporting_endpoints">`max_age`</a>", or that member's
+          value is not a number, skip to the next |item|.
+
+      2.  If |item| has no member named "<a
+          for="network_reporting_endpoints">`endpoints`</a>", or that member's
+          value is not an array, skip to the next |item|.
+
+      3.  Let |name| be |item|'s "<a
+          for="network_reporting_endpoints">`group`</a>" member's value if
+          present, and "`default`" otherwise.
+
+      4.  If there is already a <a>endpoint group</a> in |groups| whose
+          {{endpoint group/name}} is |name|, skip to the next |item|.
+
+      5.  Let |endpoints| be an empty list.
+
+      6.  For each |endpoint item| in the value of |item|'s "<a
+          for="network_reporting_endpoints">`endpoints`</a>" member:
+
+          1.  If |endpoint item| has no member named "<a
+              for="network_reporting_endpoints">`url`</a>", or that member's
+              value is not a string, or if that value is not an
+              <a>absolute-URL string</a> or a <a>path-absolute-URL string</a>,
+              skip to the next |endpoint item|.
+
+          2.  Let |endpoint url| be the result of executing the <a>URL
+              parser</a> on |endpoint item|'s "<a
+              for="network_reporting_endpoints">`url`</a>" member's value, with
+              <a spec="url">base URL</a> set to |response|'s <a for="response"
+              attribute>url</a>. If |endpoint url| is failure, skip to the next
+              |endpoint item|.
+
+          3.  If |endpoint item| has a member named "<a
+              for="network_reporting_endpoints">`priority`</a>", whose value is
+              not a non-negative integer, skip to the next |endpoint item|.
+
+          4.  If |endpoint item| has a member named "<a
+              for="network_reporting_endpoints">`weight`</a>", whose value is
+              not a non-negative integer, skip to the next |endpoint item|.
+
+          5.  Let |endpoint| be a new <a>network reporting endpoint</a> whose
+              properties are set as follows:
+
+              :   {{endpoint/name}}
+              ::  `null`
+              :   {{endpoint/url}}
+              ::  |endpoint url|
+              :   {{network reporting endpoint/priority}}
+              ::  The value of the |endpoint item|'s "<a
+                  for="network_reporting_endpoints">`priority`</a>" member, if
+                  present; `1` otherwise.
+              :   {{network reporting endpoint/weight}}
+              ::  The value of the |endpoint item|'s "<a
+                  for="network_reporting_endpoints">`weight`</a>" member, if
+                  present; `1` otherwise.
+              :   {{endpoint/failures}}
+              ::  0
+              :   {{network reporting endpoint/retry_after}}
+              ::  `null`
+
+          5.  Add |endpoint| to |endpoints|.
+
+      7.  Let |group| be a new <a>endpoint group</a> whose properties
+          are set as follows:
+
+          :   {{endpoint group/name}}
+          ::  |name|
+          :   {{endpoint group/subdomains}}
+          ::  "`include`" if |item| has a member named "<a
+              for="network_reporting_endpoints">`include_subdomains`</a>" whose
+              value is `true`, "`exclude`" otherwise.
+          :   {{endpoint group/ttl}}
+          ::  |item|'s "<a for="network_reporting_endpoints">`max_age`</a>"
+              member's value.
+          :   {{endpoint group/creation}}
+          ::  The current timestamp
+          :   {{endpoint group/endpoints}}
+          ::  |endpoints|
+
+      8.  Add |group| to |groups|.
+
+  3.  Let |client| be a new <a>client</a> whose properties are set as follows:
+
+      :   {{client/origin}}
+      ::  |origin|
+      :   {{client/endpoint-groups}}
+      ::  |groups|
+
+  4.  If there is already an entry in the <a>reporting cache</a> for |origin|,
+      replace it with |client|.  Otherwise, insert |client| into the
+      <a>reporting cache</a> for |origin|.
+
+
+<!-- Big Text: Reporting -->
+<section>
+  <h2 id="report-generation">Report Generation</h2>
+
+  Network reports can be generated with or without an active document. If a
+  document is present, and can be considered the source of the report, then the
+  report generated may be visible to reporting observers in that document.
+
+  When a user agent is to <dfn export>generate a network report</dfn>, given a
+  string (|type|), another string (|endpoint group|), a serializable object
+  (|data|), and an optional <a>Document</a> (|document|), it must run the
+  following steps:
+
+  1.  If |document| is given, then
+
+      1.  Let |settings| be |document|'s [=environment settings object=].
+
+      2.  Let |report| be the result of running [[REPORTING#queue-report]] with
+          |data|, |type|, |endpoint group| and |settings|.
+
+  2.  Otherwise, let |report| be the result of running
+      [[REPORTING#queue-report]] with |data|, |type|, and |endpoint group|.
+
+  3. Append |report| to the <a>reporting cache</a>.
+
+  <h2 id="report-delivery">Report Delivery</h2>
+
+  Over time, various features will queue up a list of <a>reports</a> in the
+  user agent's <a>reporting cache</a>. The user agent will periodically grab
+  the list of currently pending reports, and deliver them to the associated
+  endpoints. This document does not define a schedule for the user agent to
+  follow, and assumes that the user agent will have enough contextual
+  information to deliver reports in a timely manner, balanced against impacting
+  a user's experience.
+
+  That said, a user agent SHOULD make an effort to deliver reports as soon as
+  possible after queuing, as a report's data might be significantly more useful
+  in the period directly after its generation than it would be a day or a week
+  later.
+
+  <h3 id="choose-endpoint">
+    Choose an |endpoint| from a |group|
+  </h3>
+
+  Note: This algorithm is the same as the <a for="SRV">target selection
+    algorithm</a> used for DNS <a>SRV records</a>.
+
+  Given an <a>endpoint group</a> (|group|), this algorithm chooses an arbitrary
+  eligible <a>endpoint</a> from the group, if there is one, taking into account
+  the {{endpoint/priority}} and {{endpoint/weight}} of the <a
+  data-lt="endpoint">endpoints</a>.
+
+  1.  Let |endpoints| be a copy of |group|'s {{endpoint group/endpoints}} list.
+
+  2.  Remove every |endpoint| from |endpoints| that is
+      <a for="endpoint">pending</a>.
+
+  3.  If |endpoints| is empty, return `null`.
+
+  4.  Let |priority| be the minimum {{endpoint/priority}} value of each
+      |endpoint| in |endpoints|.
+
+  5.  Remove every |endpoint| from |endpoints| whose {{endpoint/priority}} value
+      is not equal to |priority|.
+
+  6.  If |endpoints| is empty, return `null`.
+
+  7.  Let |total weight| be the sum of the {{endpoint/weight}} value of each
+      |endpoint| in |endpoints|.
+
+  8.  Let |weight| be a random number &ge; 0 and &le; |total weight|.
+
+  9.  For each |endpoint| in |endpoints|:
+
+      1.  If |weight| is less than or equal to |endpoint|'s {{endpoint/weight}},
+          return |endpoint|.
+
+      2.  Subtract |endpoint|'s {{endpoint/weight}} from |weight|.
+
+  10. It should not be possible to fall through to here, since the random number
+      chosen earlier will be less than or equal to |total weight|.
+
+  <h3 id="send-reports" algorithm>
+    Send reports
+  </h3>
+
+  A user agent sends reports by executing the following steps:
+
+  1.  Let |reports| be a copy of the list of queued <a>report</a> objects in
+      <a>reporting cache</a>.
+
+  2.  Let |endpoint map| be an empty map of <a>network reporting endpoint</a>
+      objects to lists of <a>report</a> objects.
+
+  3.  For each |report| in |reports|:
+
+      1.  Let |origin| be the <a>origin</a> of |report|'s [=report/url=].
+
+      2.  Let |client| be the entry in the <a>reporting cache</a> for
+          |origin|.
+
+      3.  If there exists a <a>endpoint group</a> (|group|) in
+          |client|'s {{client/endpoint-groups}} list whose
+          {{endpoint group/name}} is |report|'s [=report/group=]:
+
+          1.  Let |endpoint| be the result of executing [[#choose-endpoint]] on
+              |group|.
+
+          2.  If |endpoint| is not `null`:
+
+              1.  Append |report| to |endpoint map|'s list of reports for
+                  |endpoint|.
+
+              2.  Skip to the next |report|.
+
+      4.  For each |parent origin| that is a <a>superdomain match</a>
+          for |origin| [[!RFC6797]]:
+
+          1.  Let |client| be the entry in the <a>reporting cache</a> for
+              |parent origin|.
+
+          2.  If there exists a <a>endpoint group</a> (|group|) in
+              |client|'s {{client/endpoint-groups}} list whose
+              {{endpoint group/name}} is |report|'s [=report/group=] <b>and</b>
+              whose {{endpoint group/subdomains}} flag is "`include`":
+
+              1.  Let |endpoint| be the result of executing [[#choose-endpoint]]
+                  on |group|.
+
+              2.  If |endpoint| is not `null`:
+
+                  1.  Append |report| to |endpoint map|'s list of reports for
+                      |endpoint|.
+
+                  2.  Skip to the next |report|.
+
+      5.  If we reach this step, the |report| did not match any <a>network
+          reporting endpoint</a> and the user agent MAY remove |report| from the
+          <a>reporting cache</a> directly. Depending on load, the user agent MAY
+          instead wait for [[#gc]] at some point in the future.
+
+  4.  For each (|endpoint|, |reports|) pair in |endpoint map|:
+
+      1.  Let |origin map| be an empty map of <a spec="html">origins</a> to
+          lists of <a>report</a> objects.
+
+      2.  For each |report| in |reports|:
+
+          1.  Let |origin| be the <a>origin</a> of |report|'s [=report/url=].
+
+          2.  Append |report| to |origin map|'s list of reports for |origin|.
+
+      3.  For each (|origin|, |per-origin reports|) pair in |origin map|,
+          execute the following steps asynchronously:
+
+          1.  Let |result| be the result of executing [[REPORTING#try-delivery]]
+              on |endpoint|, |origin|, and |per-origin reports|.
+
+          2.  If |result| is "`Success`":
+
+              1.  Set |endpoint|'s {{endpoint/failures}} to 0, and its
+                  {{network reporting endpoint/retry_after}} to `null`.
+
+              2.  Remove each <a>report</a> in |reports| from the <a>reporting
+                  cache</a>.
+
+              Otherwise, if |result| is "`Remove Endpoint`":
+
+              1.  Remove |endpoint| from the reporting cache.
+
+                  Note: |reports| remain in the reporting cache for potential
+                  delivery to other endpoints.
+
+              Otherwise (if |result| is "`Failure`"):
+
+              1.  Increment |endpoint|'s {{endpoint/failures}}.
+
+              2.  Set |endpoint|'s {{network reporting endpoint/retry_after}} to
+                  a point in the future which the user agent chooses.
+
+                  Note: We don't specify a particular algorithm here, but user
+                  agents are encouraged to employ some sort of exponential
+                  backoff algorithm which increases the retry period with the
+                  number of failures, with the addition of some random jitter to
+                  ensure that temporary failures don't lead to a crush of
+                  reports all being retried on the same schedule.
+
+                  ISSUE: Add in a reasonable reference describing a good
+                  algorithm.  Wikipedia, if nothing else.
+
+  Note: User agents MAY decide to attempt delivery for only a subset of the
+  collected reports or endpoints (because, for example, sending all the reports
+  at once would consume an unreasonable amount of bandwidth, etc). As reports
+  are only removed from the cache when they're successfully delivered, skipped
+  reports will simply be delivered later.
+
+</section>
+
+<section>
+  <h2 id="implementation">Implementation Considerations</h2>
+
+  <h3 id="delivery">Delivery</h3>
+
+  The user agent SHOULD attempt to deliver reports as soon as possible to
+  provide feedback to developers as quickly as possible. However, when this
+  desire is balanced against the impact on the user, the user wins. With that
+  in mind, the user agent MAY delay delivery of reports based on its knowledge
+  of the user's activities and context.
+
+  For instance, the user agent SHOULD prioritize the transmission of reporting
+  data lower than other network traffic. The user's explicit activities on a
+  website should preempt reporting traffic.
+
+  The user agent MAY choose to withhold report delivery entirely until the user
+  is on a fast, cheap network in order to prevent unnecessary data cost.
+
+  The user agent MAY choose to prioritize reports from particular origins over
+  others (perhaps those that the user visits most often?)
+
+  <h3 id="gc">Garbage Collection</h3>
+
+  Periodically, the user agent SHOULD walk through the cached <a>reports</a>
+  and <a for="/" data-lt="endpoint">endpoints</a>, and discard those that are no
+  longer relevant. These include:
+
+  *   <a>endpoint groups</a> which are <a for="endpoint group">expired</a>.
+  *   <a>endpoint groups</a> which have not been used in some arbitrary
+      period of time (perhaps a ~week?)
+  *   <a for="/" data-lt="endpoint">endpoints</a> whose {{endpoint/failures}}
+      exceed some user-agent-defined threshold (~5 seems reasonable.)
+  *   <a>reports</a> whose [=report/attempts=] exceed
+      some user-agent-defined threshold (~5 seems reasonable.)
+  *   <a>reports</a> which have not been delivered in some arbitrary period of
+      time (perhaps ~2 days?)
+</section>
+
+<section>
+  <h2 id="sample-reports">Sample Reports</h2>
+
+  <div class="example">
+    <pre>
+      POST / HTTP/1.1
+      Host: example.com
+      ...
+      Content-Type: application/reports+json
+
+      [{
+        "type": "csp",
+        "age": 10,
+        "url": "https://example.com/vulnerable-page/",
+        "user_agent": "Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101 Firefox/60.0",
+        "body": {
+          "blocked": "https://evil.com/evil.js",
+          "directive": "script-src",
+          "policy": "script-src 'self'; object-src 'none'",
+          "status": 200,
+          "referrer": "https://evil.com/"
+        }
+      }, {
+        "type": "hpkp",
+        "age": 32,
+        "url": "https://www.example.com/",
+        "user_agent": "Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101 Firefox/60.0",
+        "body": {
+          "date-time": "2014-04-06T13:00:50Z",
+          "hostname": "www.example.com",
+          "port": 443,
+          "effective-expiration-date": "2014-05-01T12:40:50Z"
+          "include-subdomains": false,
+          "served-certificate-chain": [
+            "-----BEGIN CERTIFICATE-----\n
+            MIIEBDCCAuygAwIBAgIDAjppMA0GCSqGSIb3DQEBBQUAMEIxCzAJBgNVBAYTAlVT\n
+            ...
+            HFa9llF7b1cq26KqltyMdMKVvvBulRP/F/A8rLIQjcxz++iPAsbw+zOzlTvjwsto\n
+            WHPbqCRiOwY1nQ2pM714A5AuTHhdUDqB1O6gyHA43LL5Z/qHQF1hwFGPa4NrzQU6\n
+            yuGnBXj8ytqU0CwIPX4WecigUCAkVDNx\n
+            -----END CERTIFICATE-----",
+            ...
+          ]
+        }
+      }, {
+        "type": "nel",
+        "age": 29,
+        "url": "https://example.com/thing.js",
+        "user_agent": "Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101 Firefox/60.0",
+        "body": {
+          "referrer": "https://www.example.com/",
+          "server-ip": "234.233.232.231",
+          "protocol": "",
+          "status-code": 0,
+          "elapsed-time": 143,
+          "age": 0,
+          "type": "http.dns.name_not_resolved"
+        }
+      }]
+    </pre>
+  </div>
+</section>
+
+<section>
+  <h2 id="security">Security Considerations</h2>
+
+  <h3 id="capability-urls">Capability URLs</h3>
+
+  Some URLs are valuable in and of themselves. To mitigate the possibility
+  that such URLs will be leaked via this reporting mechanism, we strip out
+  credential information and fragment data from the URL we store as a
+  <a>report</a>'s originator. It is still possible, however, for a feature
+  to unintentionally leak such data via a report's [=report/body=]. Implementers
+  SHOULD ensure that URLs contained in a report's body are similarly stripped.
+</section>
+
+<section>
+  <h2 id="privacy">Privacy Considerations</h2>
+
+  <h3 id="network-leakage">Network Leakage</h3>
+
+  Because this reporting mechanism is out-of-band, and doesn't rely on a page
+  being open, it's entirely possible for a report generated while a user is on
+  one network to be sent while the user is on another network, even if they
+  don't explicitly open the page from which the report was sent.
+
+  ISSUE(w3c/BackgroundSync#107): Consider mitigations. For example, we could
+  drop reports if we change from one network to another.
+
+  <h3 id="fingerprinting-clock-skew">Clock Skew</h3>
+
+  Each report is delivered along with an `age` property, rather than the
+  timestamp at which it was generated. We do this because each user's local
+  clock will be skewed from the clock on the server by an arbitrary amount.
+  The difference between the time the report was generated and the time it
+  was sent will be stable, regardless of clock skew, and we can avoid the
+  fingerprinting risk of exposing the clock skew via this API.
+
+  <h3 id="correlation">Cross-origin correlation</h3>
+
+  If multiple origins all use the same reporting endpoint, that endpoint may
+  learn that a particular user has interacted with a certain set of websites,
+  as it will receive origin-tagged reports from each. This doesn't seem worse
+  than the status quo ability to track the same information from cooperative
+  origins, and doesn't grant any new tracking ability above and beyond what's
+  possible with `<img>` today.
+
+  <h3 id="subdomains">Subdomains</h3>
+
+  This specification allows any resource on a host to declare a set of reporting
+  endpoints for that host and each of its subdomains. This doesn't have privacy
+  implications in and of itself (beyond those noted in [[#clear-cache]]), as the
+  reporting endpoints themselves don't take any real action, as features will
+  need to opt-into using these reporting endpoints explicitly. Those features
+  certainly will have privacy implications, and should carefully consider
+  whether they should be enabled across origin boundaries.
+
+  <h3 id="clear-cache">Clearing the reporting cache</h3>
+
+  A user agent's <a>reporting cache</a> contains data about a user's activity
+  on the web, and user agents ought to handle this data carefully. In
+  particular, if a user agent gives users the ability to clear their site data,
+  browsing history, browsing cache, or similar, the user agent MUST also clear
+  the <a>reporting cache</a>. Note that this includes both the pending reports
+  themselves, as well as the endpoints to which they would be sent. Both MUST
+  be cleared.
+
+  <h3 id="disable">Disabling Reporting</h3>
+
+  Reporting is, to some extent, a question of commons. In the aggregate, it
+  seems useful for everyone for reports to be delivered. There is direct benefit
+  to developers, as they can fix bugs, which means there's indirect benefit to
+  users, as the sites they enjoy will be more stable and enjoyable. As a
+  concrete example, Content Security Policy grants something like herd immunity
+  to cross-site scripting attacks by alerting developers about potential holes
+  in their sites' defenses. Fixing those bugs helps every user, even those whose
+  user agents don't support Content Security Policy.
+
+  The calculus, of course, depends on the nature of data that's being delivered,
+  and the relative maliciousness of the reporting endpoints, but that's the
+  value proposition in broad strokes.
+
+  That said, it can't be the case that this general benefit be allowed to take
+  priority over the ability of a user to individually opt-out of such a system.
+  Sending reports costs bandwidth, and potentially could reveal some small
+  amount of additional information above and beyond what a website can obtain
+  in-band ([[NETWORK-ERROR-LOGGING]], for instance). User agents MUST allow
+  users to disable reporting with some reasonable amount of granularity in order
+  to maintain the priority of constituencies espoused in
+  [[HTML-DESIGN-PRINCIPLES]].
+</section>

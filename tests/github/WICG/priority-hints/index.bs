@@ -1,0 +1,466 @@
+<pre class='metadata'>
+Title: Priority Hints
+Shortname: PriorityHints
+Level: 1
+Status: CG-Draft
+Group: WICG
+URL: https://wicg.github.io/priority-hints
+Editor: Addy Osmani, Google Inc., addyosmani@gmail.com, https://blog.yoav.ws
+Editor: Yoav Weiss 58673, Google Inc., yoav@yoav.ws, https://blog.yoav.ws
+Abstract: Specification of the Priority Hints feature.
+Markup Shorthands: markdown yes
+</pre>
+
+<pre class="link-defaults">
+spec:html; type:dfn; for:/; text:enumerated attribute
+spec:html; type:dfn; for:/; text:invalid value default
+spec:html; type:dfn; for:/; text:missing value default
+</pre>
+
+<pre class=biblio>
+{
+    "PRELOAD": {
+        "authors": [
+            "Ilya Grigorik", "Yoav Weiss"
+        ],
+        "href": "https://w3c.github.io/preload/",
+        "publisher": "W3C",
+        "title": "Preload"
+    },
+    "RFC5988": {
+        "authors": [
+            "Mark Nottingham"
+        ],
+        "href": "https://tools.ietf.org/html/rfc5988",
+        "publisher": "IETF",
+        "title": "Web Linking"
+    }
+}
+</pre>
+
+<body>
+  <section>
+    <p>
+      This specification describes a browser API enabling developers to signal the priority of each resource they need to download.
+      It introduces the
+      <a href="#solution">importance</a> <a data-lt="enumerated attribute">attribute</a> that may be used with elements such as
+      <code>img</code>, <code>link</code>, <code>script</code> and <code>iframe</code>.
+    </p>
+  </section>
+  <section id="sotd">
+    <p>
+      This is an unofficial proposal.
+    </p>
+  </section>
+
+  <section>
+    <h2 id="introduction">Introduction</h2>
+    <p>
+      <em>This section is non-normative.</em>
+    </p>
+    <p>The browser's resource loading process is a complex one. Browsers discover needed resources and download them according
+      to their heuristic priority. Browsers might also use this heuristic resource priority to delay sending certain requests
+      in order to avoid bandwidth contention of these resources with more critical ones.</p>
+
+    <p>Currently web developers have very little control over the heuristic importance of loaded resources, other than speeding
+      up their discovery using <code>&lt;link rel=preload&gt;</code>([[PRELOAD]]). Browsers mostly determine a request's priority based on the
+      request's <a>destination</a>, and location in the containing document if applicable.</p>
+
+    <p>This document details use cases and a markup that will provide developers control to indicate a resource's
+      relative importance to the browser, enabling the browser to act on those indications to influence the request's overall priority
+      in ways described in the <a href="#effects-of-priority-hints">Effects of Priority Hints</a> section.
+    </p>
+
+  </section>
+
+  <section>
+    <h2 id="solution">Solution</h2>
+
+    <p>The
+      <code>importance</code> <a>enumerated attribute</a> may be used with resource-requesting elements including <code>link</code>,
+      <code>img</code>, <code>script</code> and <code>iframe</code>. This keyword hints to the browser the relative fetch priority
+      a developer intends for a resource to have.</p>
+
+    <ul>
+      <li>The <code>importance</code> attribute will have three states:
+        <ul>
+          <li>
+            <code>high</code> - The developer considers the resource as being high priority.</li>
+          <li>
+            <code>low</code> - The developer considers the resource as being low priority.
+          </li>
+          <li>
+            <code>auto</code> - The developer does not indicate a preference. This also serves as the attribute's
+            <a>invalid value default</a> and <a>missing value default</a>.
+          </li>
+        </ul>
+      </li>
+    </ul>
+
+    <p>With this attribute, the browser should make an effort to respect the developer's preference for the importance of a
+      resource when fetching it. Note that this is intentionally weak language, allowing for a browser to apply its own preferences
+      for resource priority or heuristics if deemed important. See the below section for more information.
+    </p>
+
+    <p>
+      <div class="note">
+        <p>Priority Hints complement existing browser loading primitives such as preload. Preload is a mandatory fetch for a resource
+          that is necessary for the current navigation. Priority Hints can hint that a resource's priority should be lower or higher than
+          its default, and can also be used to provide more granular prioritization to preloads.</p>
+      </div>
+    </p>
+
+    <p>This is how we conceptually think about different resource types under the hood in browsers today. It may translate well
+      to user-space where different types of content share similar properties.</p>
+
+    <h2 id="effects-of-priority-hints">Effects of Priority Hints</h2>
+
+    <p>Since the user agents' resource loading pipeline is largely unspecified, this document doesn't describe a specific mapping
+      between Priority Hints and request prioritization. However, it does describe ways in which implementations are encouraged to
+      influence a request's overall fetch priority given a Priority Hint.</p>
+
+    <strong>HTTP/2 Relative Stream Priority</strong>
+    <p>Implementations are encouraged to use Priority Hints to influence the HTTP/2 stream priority assigned to a given request.
+      It is not the intention of the different <code>importance</code> states to directly map to existing browser priority values,
+      but instead act as a relative influencer among requests of a similar type.</p>
+    <div class="example">
+      <p>
+        If requests for <code>image</code>
+        <a data-lt="destination">destinations</a> in a particular implementation are typically assigned a stream weight of
+        <code>60</code>, a request for an image with <code>importance="low"</code> might be assigned a stream weight less than
+        <code>60</code>. In other words, <code>importance="low"</code> on an image might lead to an entirely different resolved
+        HTTP/2 stream priority than <code>importance="low"</code> on something like a script, or an iframe.
+      </p>
+    </div>
+
+    <strong>Queueing</strong>
+    <p>A user agent might choose to queue up certain low priority requests until higher priority requests are sent out or finished
+      in order to reduce bandwidth contention. Implementations are encouraged to use Priority Hints to determine whether a given
+      request is a candidate for such queueing so that more important resources are fetched and used earlier, in order to improve
+      the user's experience.</p>
+
+    <h2 id="examples">Examples</h2>
+
+    <strong>Lower fetch priority when browser defaults are insufficient</strong>
+    <p>Browsers make a best-effort to assign a reasonable fetch priority to images so those in-viewport appear as soon as possible.
+      In many cases, this will not cause issues, however, what if some above-the-fold imagery is not as critical as others?
+      Priority Hints can assist here. </p>
+
+    <div class="example" title="Example 1">
+      <p>FastCorp Inc. have a carousel of images at the top of a page with the first image visible and the remaining images
+        images off screen. The markup of this carousel may look as follows:</p>
+      <pre highlight="html">
+&lt;ul class=&quot;carousel&quot;&gt;
+<br/> &lt;!-- The first image is visible --&gt;
+<br/> &lt;img src=&quot;img/carousel-1.jpg&quot;&gt;
+<br/> &lt;!-- The other carousel images are not --&gt;
+<br/> &lt;img src=&quot;img/carousel-2.jpg&quot;&gt;
+<br/> &lt;img src=&quot;img/carousel-3.jpg&quot;&gt;
+<br/> &lt;img src=&quot;img/carousel-4.jpg&quot;&gt;
+<br/>&lt;/ul&gt;
+</div>
+
+<p>Browser heuristics may cause all four images to be fetched with a high priprity, despite three of them not initially being visible. This may cause these fetches to delay the first image from completing fetching or contend with fetches for other in-viewport resources.</p>
+<p>A developer could use rel=preload to preload the first image in the carousel, however doing so may not provide the outcome one expects: rel=preload will effectively prioritize that image above everything else, and if that image is large, it may block rendering as even stylesheets may end up waiting for that image to complete downloading. Priority Hints may help here.</p>
+
+<div class="example" title="Example 1">
+<pre highlight="html">
+&lt;ul class=&quot;carousel&quot;&gt;
+<br/> &lt;!-- The first image is visible --&gt;
+<br/> &lt;img src=&quot;img/carousel-1.jpg&quot; importance=&quot;high&quot;&gt;
+<br/> &lt;!-- The other carousel images are not --&gt;
+<br/> &lt;img src=&quot;img/carousel-2.jpg&quot; importance=&quot;low&quot;&gt;
+<br/> &lt;img src=&quot;img/carousel-3.jpg&quot; importance=&quot;low&quot;&gt;
+<br/> &lt;img src=&quot;img/carousel-4.jpg&quot; importance=&quot;low&quot;&gt;
+<br/>&lt;/ul&gt;
+</pre>
+    </div>
+
+    <p>When we assign the off-screen images low importance, this will create less contention between the remaining high priority
+      images and other high priority resources.</p>
+
+    <strong>Speed up resource loads without incurring the cost of rel=preload</strong>
+    <p>Some UAs fetch scripts with medium priority. Using `importance=high` on them has the benefit of speeding this up without
+    incurring the cost of `rel=preload` contending with higher-up-the-page render blocking resources:</p>
+    <div class="example" title="Example 1">
+      <p>FastCorp Inc. have a web app with a mix of resources that are critical and non-critical to the initial experience.
+        They want to signify the importance of their primary script without using rel=preload, which would contend with their render blocking stylesheet:
+      </p>
+      <pre highlight="html">
+&lt;link rel=&quot;stylesheet&quot; href=&quot;https://foo.com/main.css&quot;&gt;
+&lt;script src=&quot;main.js&quot; importance=&quot;high&quot;&gt;&lt;/script&gt;
+  </pre>
+    </div>
+
+<p>In the below example, using rel=preload, async styles may normally be loaded at the highest priority. Priority Hints can
+  help us here to ensure the loading of the stylesheet doesn't contend with any render-blocking or more critical resources.</p>
+<div class="example" title="Preload">
+  <pre highlight="html">
+&lt;link rel=&quot;preload&quot; as=&quot;script&quot; href=&quot;critical-script.js&quot;&gt;
+<br/>&lt;link rel=&quot;preload&quot; as=&quot;style&quot; href=&quot;theme.css&quot; importance=&quot;low&quot; 
+onload=&quot;this.rel=stylesheet&quot;&gt;
+</pre>
+</div>
+
+    <strong>Reduce network contention from third-party resources</strong>
+
+    <p>Third party resources (e.g scripts from ads) are often loaded with medium/high priority, but developers may wish to load
+      them all at low priority. Similarly, developers may wish to load all first-party resources that are critical with a
+      high priority.
+    </p>
+    <div class="example" title="Example 2">
+      <p>FastCorp Inc. have a page that includes a number of
+        <b>third party</b> resources which are not-critical to first paint. They would like to signify to the browser that the
+        importance of these resources is low so that requests for them don't contend with network requests for more important
+        resources. They can accomplish this by annotating these requests with an `importance` of `low`:
+      </p>
+      <pre highlight="html">
+&lt;script src=&quot;https://foo.com/non-critical.js&quot; importance=&quot;low&quot;&gt;&lt;/script&gt;
+
+&lt;script src=&quot;https://foo.com/ads.js&quot; importance=&quot;low&quot;&gt;&lt;/script&gt;
+
+&lt;link rel=&quot;stylesheet&quot; href=&quot;https://foo.com/footer.css&quot; importance=&quot;low&quot;&gt;
+      </pre>
+    </div>
+
+    <p>Markup images are typically loaded with low priority, but may be critical to the user experience, so for certain images,
+      the developer may want to indicate that their importance only falls short of the page's render blocking resources.
+      A prominent example of that is the page's image in an image sharing site, where the image is the main content users
+      are looking for. Another example is a single-page-app where route fetches must run at highest priority.</p>
+    <div class="example" title="Example 3">
+      <p>FastCorp Inc. have an image sharing section of their site where individual images have their own dedicated pages. Although
+        there are several resources loaded for each of these pages, the image is the main content users are interested in.
+        Related images are the next most important. They want to indicate this importance to the browser:
+      </p>
+      <pre highlight="html">
+&lt;main&gt;
+  &lt;img src=&quot;family.jpg&quot; importance=&quot;high&quot;&gt;
+&lt;/main&gt;
+
+&lt;section id=&quot;related&quot;&gt;
+  &lt;img src=&quot;graduation.jpg&quot; importance=&quot;high&quot;&gt;
+  &lt;img src=&quot;wedding.jpg&quot; importance=&quot;high&quot;&gt;
+&lt;/section&gt;
+&lt;script src=&quot;social-buttons.js&quot; importance=&quot;low&quot;&gt;&lt;/script&gt;
+
+&lt;script src=&quot;analytics.js&quot; importance=&quot;low&quot;&gt;&lt;/script&gt;
+      </pre>
+    </div>
+
+    <ul>
+
+
+      <li>Blocking scripts are often of high priority (depends on their location in the page and other heuristics), yet sometimes
+        developers want to avoid them interfering with e.g., loading of viewport images.</li>
+
+      <li>When developers download a group of resources as a result of user interaction, those resources' download priorities
+        don't take into account the eventual usage and importance of those resources. Developers may wish to load these resources
+        with priorities and dependencies which better represent their usage and the user's needs.</li>
+
+      <li>Single-page applications can kick off multiple API requests to bootstrap the user experience. Developers may wish to
+        load critical API requests at a high priority and have better control over scheduling priority for the rest.</li>
+    </ul>
+
+    <strong>Reduce network contention from non-critical Fetch API requests</strong>
+    <p>Priority Hints can be used to lower the priority of non-critical Fetch API requests to avoid them contending with more
+      important ones.
+    </p>
+
+    <p>A news site making a critical Fetch API request for article content might end up contending with requests for less important
+      resources like related content.</p>
+
+    <div class="example" title="Example 4">
+      <pre highlight="html">
+&lt;script&gt;
+<br/> // Critical Fetch request for article content
+<br/> fetch('/api/articles.json').then(/*...*/)
+<br/>
+<br/> // Request for related content contending with the above request
+<br/> fetch('/api/related.json').then(/*...*/)
+<br/>&lt;/script&gt;
+</pre>
+    </div>
+
+    <p>By using the
+      <code>importance</code> attribute on the second Fetch request, we can hint that the priority of that request is
+      <code>low</code>, reducing the chances of it contending with the Fetch request for article content. We can also explicitly state the
+      priority of the first request is
+      <code>high</code> so that browsers where Fetch requests do not already have a high priority know that it is important to the page.</p>
+
+    <div class="example" title="Example 5">
+      <pre highlight="html">
+&lt;script&gt;
+<br/> // Critical Fetch request for article content
+<br/> fetch('/api/articles.json', { importance: 'high' }).then(/*...*/)
+<br/>
+<br/> // Request for related content now reduced in priority
+<br/> // reducing the opportunity for contention
+<br/> fetch('/api/related.json', { importance: 'low' }).then(/*...*/)
+<br/>&lt;/script&gt;
+</pre>
+    </div>
+
+    <p>This might be more pronounced on HTTP 1.1 with the impact being more visible with HTTP/2 multiplexing if a large number
+      of Fetch requests are being made and are contending with one another. </p>
+    <p>The importance hint may be specified in the document markup, MAY be provided via JavaScript, MAY be provided via the
+      HTTP header, and MAY be dynamically added to the document.</p>
+    <div class="example" title="Example 5">
+      <pre highlight="html">Link: &lt;/app/style.css&gt;; importance=high<br/>
+Link: &lt;/app/script.js&gt;; importance=low</pre>
+    </div>
+
+    <p>As above examples illustrate, importance can be specified via declarative markup, Link HTTP header ([[RFC5988]]), 
+      or scheduled via JavaScript.</p>
+
+    <h2 id="adoptionpath">Adoption path</h2>
+
+    <p>Markup-based signals should be added in a way such that non-supporting browsers will simply ignore them and load all
+      resources, potentially not with the intended priority and dependency. Script-based signaling APIs should be created
+      in a way that non-supporting browsers simply ignore the signals.</p>
+
+    <h2 id="outofscope">Out of scope</h2>
+
+    <ul>
+      <li>Signal that certain images should not block the load event.</li>
+
+      <li>Signals relating the script execution order, script execution grouping, execution dependency, etc.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2 id="use-cases">Use Cases</h2>
+
+    <p>This section outlines the different use-cases Priority Hints sets out to address. It is worth noting that priority in
+      these examples should not limit itself to network priority (i.e. request time and HTTP/2 dependencies and weights),
+      but also to processing priority, as the browser can use the same signals in order to avoid processing of low priority
+      resource in favor of higher priority ones.</p>
+
+    <h3 id="communicateresourceimportancetothebrowser">Communicate resource importance to the browser</h3>
+
+    <p>The browser assigns priorities and certain dependencies to downloaded resources and uses them to determine:</p>
+
+    <ul>
+      <li>When the resource's request is sent to the server.</li>
+
+      <li>What HTTP/2 dependencies and weights are assigned to the resource's request.</li>
+    </ul>
+
+    <p>The browser uses various heuristics in order to do the above, which are based on the type of resource, its location in
+      the document, and more.</p>
+
+    <p>Occasionally, web developers are in a better position to know which resources are more impactful than others on their
+      users' loading experience, and need a way to communicate that to the browser.</p>
+
+
+    <h3 id="signalaresourceasnoncritical">Signal a resource as non-critical</h3>
+
+    <p>Using
+      <code>&lt;link rel=preload&gt;</code> in order to get the browser to early-discover certain resources, especially in its header form, means that the browser
+      may discover these resources before other, more critical resources and send their request to the server first. That
+      can result in loading regressions as the server may start sending those non-critical resources before other, more critical
+      ones, which may fill up the TCP socket sending queues.</p>
+    <p>While better transport protocols (e.g. QUIC) may address that at a lower layer for the single origin case, developers
+      should be able to signal to the browser that a certain resource is not critical, and therefore should be queued until
+      such resources are discovered. Such marking as "non-critical" should be orthogonal to the signaling of the resource's
+      "importance" (e.g. this could be applied to high priority resources that shouldn't contend with rendering-critical
+      resources as well as low priority ones).</p>
+
+    <h3 id="avoidbandwidthcontentioninmultipleoriginscenarios">Avoid bandwidth contention in multiple origin scenarios</h3>
+
+    <p>When loading resources from multiple origins, setting HTTP/2 dependencies and weights do very little to avoid bandwidth
+      contention between the origins, as each origin tries to send down its most critical resource without knowing of more
+      critical resources in other origins. Signaling resource importance to the browser can enable it to defer sending of
+      non-critical third party requests while critical resources are still being downloaded.</p>
+
+    <h3 id="provideprioritysignalsformarkupbasedresources">Provide priority signals for markup-based resources</h3>
+
+    <p>Developers need a way to provide the above signals for resources that are loaded through markup (or through markup-equivalent
+      HTTP headers, e.g.
+      <code>Link:</code>)</p>
+
+    <h3 id="provideprioritysignalsfordynamicallyloadedresources">Provide priority signals for dynamically loaded resources</h3>
+
+    <p>Developers need a way to provide the above signals for resources that are fetched through JavaScript, e.g., using the
+      <code>fetch()</code> API. That would enable them both to upgrade and downgrade those resource's "importance".
+    </p>
+
+    <h3 id="providetheabilitytoreprioritizearesourceinflight">Provide the ability to re-prioritize a resource in-flight</h3>
+
+    <ul>
+      <li>"Resource priority" is not always the right way of looking at it. For resources that are parsed on-the-fly (most notably
+        HTML and progressive images), their first buffer is often more important than their last. Developers can use the
+        ability to reprioritize resources to reflect this notion when downloading such resources.</li>
+
+      <li>There are also cases where the priority of a resource changes due to user action or condition changes. One example
+        is the loading of images, where in-viewport images (or soon-to-be in-viewport images) are of higher priority than
+        images that are further away from the viewport and therefore less likely to be seen by the user.</li>
+    </ul>
+
+    <h3 id="downgradepriorityofaniframeanditssubresources">Downgrade priority of an iframe and its subresources</h3>
+
+    <p>When developers load a third party iframe, they may wish to make sure that it does not contend on bandwidth and/or CPU
+      with the more important first party content of the page. Alternatively, they may wish to signal to the browser that a
+      certain third party iframe is as important as the main page content and should be given CPU and bandwidth resources
+      accordingly.
+    </p>
+
+    <p>When such a signal is applied to an iframe, it should be equally applied to all the subresources that the iframe loads.</p>
+  </section>
+
+  <section data-dfn-for="safety">
+    <h2 id="safe-usage">Safe usage</h2>
+    <div class="note">
+      <p>If the
+        <code>importance</code> keyword is used as an optimization to initiate earlier fetch then no additional feature detection checks are necessary:
+        browsers that support
+        <code>importance</code> may initiate earlier fetch, and those that do not will ignore it and fetch the resource as previously. Otherwise,
+        if the application intends to rely on
+        <code>importance</code> to fetch the resource, then it can execute a feature detection check to verify that it is supported.
+      </p>
+    </div>
+
+    <p>Applying
+      <code>importance</code> to the resources in a page should never degrade performance. This should hold true for both browsers that support
+      Priority Hints as well as browsers that do not. UAs are free to apply other heuristics in addition to Priority Hints
+      to decide on how they load content.</p>
+    <p>With in-viewport images, a browser may automatically detect if the image is important and boost priority if it gets to
+      layout early enough. However, all browsers would benefit from knowing which images an author wants to load "earlier"
+      and which are safe to load "later", regardless of how they use this information.</p>
+    <p>This same logic applies for scripts. Browsers may have different heuristics that work differently across browsers for
+      scripts (e.g with
+      <code>async</code>,
+      <code>defer</code>) but a site could fix any misguesses across the board by being explicit using Priority Hints.</p>
+  </section>
+  <section>
+    <h2 id="security_privacy">Security and Privacy Considerations</h2>
+    <h3 id="fingerprintability">Fingerprintability</h3>
+    <p>This specification does not expose any new information about the user and their preferences, so does not increase the risk of user fingerprinting.
+    At the same time, it does expose priority information to web servers that enables them to distinguish between browsers that support the feature and ones that do not support it.
+    This is not dissimilar to other web platform features, but with one important distinction:
+    this information is exposed at the HTTP layer, allowing the server implementation to discover discrepancies between the User-Agent string the request is sent with and the browser that sent the request.
+    It is not clear that this is a significant issue, but it is something for implementing user agents (and user agents which try to spoof others) to be aware of.
+    It is also possible that the network patterns that result from the use of the feature would be observable to passive network-based observers and will enable them to distinguish supporting and non-supporting browsers.
+    </p>
+    <h3 id="ecosystem">Negative ecosystem side-effects</h3>
+    <p>
+    There's a risk that monetizing third-party components, and ad networks in particular, will require publishers to use the feature in order to upgrade the priority of their resource requests.
+    While they certainly can do that, and enforce such a requirement by inspecting the HTTP/2 priorities of the resource requests they receive, the risk for that is rather small.
+    <ul>
+        <li><p>Such "priority upgrade" is already available in the platform today, e.g., when switching scripts from blocking to deferred or async ones.
+            There's no existing evidence that advertisers have required such hacks in order to make sure their resources load first.</p></li>
+        <li><p>Furthermore, monitoring that publishers complied with that requirement can be difficult for advertisers that run outside of the main frame, as it will require coordination between the their HTTP/2 termination point and the application layer.
+            Depending on their architecture, such coordination may not be trivial.</p></li>
+    </ul>
+
+    </p>
+
+    <p>If such a problem arise in the future, browsers will be able to find creative ways to fight against it.
+    For example, since Priority Hints are hints by their nature, browsers will be able to ignore those hints for third-party hosts that are known to abuse the feature.
+    In such a case, advertisers will not be able to distinguish such user agent intervention from lack of compliance with their Priority Hints requirements.
+    </p>
+  </section>
+
+
+</body>
+
+</html>

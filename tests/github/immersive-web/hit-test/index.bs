@@ -17,6 +17,7 @@ Editor: Piotr Bialecki 114482, Google http://google.com/, bialpio@google.com
 Abstract: Describes a method for performing hit tests against real world geometry to be used with the WebXR Device API.
 </pre>
 
+
 <pre class="link-defaults">
 spec:webxr device api - level 1; type:dfn; for:/; text:xr device
 </pre>
@@ -24,12 +25,14 @@ spec:webxr device api - level 1; type:dfn; for:/; text:xr device
 <pre class="anchors">
 spec: WebXR Device API - Level 1; urlPrefix: https://www.w3.org/TR/webxr/#
     for: XRSpace;
-        type: dfn; text: session; url: xrspace-session
+        type: dfn; text: effective origin; url: xrspace-effective-origin
         type: dfn; text: native origin; url: xrspace-native-origin
         type: dfn; text: origin offset; url: xrspace-origin-offset
-        type: dfn; text: effective origin; url: xrspace-effective-origin
+        type: dfn; text: session; url: xrspace-session
     type: interface; text: XRSession; url: xrsession-interface
     for: XRSession;
+        type: dfn; text: ended; url: ended
+        type: dfn; text: list of enabled features; url: xrsession-list-of-enabled-features
         type: dfn; text: list of frame updates; url: xrsession-list-of-frame-updates
         type: dfn; text: XR device; url: xrsession-xr-device
     type: interface; text: XRFrame; url: xrframe-interface
@@ -41,12 +44,19 @@ spec: WebXR Device API - Level 1; urlPrefix: https://www.w3.org/TR/webxr/#
         type: attribute; text: matrix; url: dom-xrrigidtransform-matrix
     for: XRInputSource;
         type: dfn; text: input profile name; url: xrinputsource-input-profile-name
+    type: callback; text: XRFrameRequestCallback; url: callbackdef-xrframerequestcallback
+    type: dfn; text: capable of supporting; url: capable-of-supporting
+    type: dfn; text: feature descriptor; url: feature-descriptor
+    type: dfn; text: feature policy; url: feature-policy
+    type: dfn; text: identity transform; url: identity-transform
+    type: dfn; text: inline XR device; url: inline-xr-device
     type: dfn; text: list of active XR input sources; url: list-of-active-xr-input-sources
-    type: dfn; text: XR device; url: xr-device
+    type: dfn; text: list of animation frame callbacks; url: list-of-animation-frame-callbacks
     type: dfn; text: matrix; url: matrix
     type: dfn; text: normalize; url: normalize
     type: dfn; text: populate the pose; url: populate-the-pose
-    type: dfn; text: identity transform; url: identity-transform
+    type: dfn; text: XR animation frame; url: xr-animation-frame
+    type: dfn; text: XR device; url: xr-device
 spec: ECMAScript; urlPrefix: https://tc39.github.io/ecma262/#
     type: method; text: IsDetachedBuffer; url: sec-isdetachedbuffer
 </pre>
@@ -82,6 +92,29 @@ spec: ECMAScript; urlPrefix: https://tc39.github.io/ecma262/#
     overflow: hidden;
     word-break: normal;
   }
+  .unstable::before {
+    content: "This section is not stable";
+    display: block;
+    font-weight: bold;
+    text-align: right;
+    color: red;
+  }
+  .unstable {
+    border: thin solid pink;
+    border-radius: .5em;
+    padding: .5em;
+    margin: .5em calc(-0.5em - 1px);
+    background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='290'><text transform='rotate(-45)' text-anchor='middle' font-family='sans-serif' font-weight='bold' font-size='70' y='210' opacity='.1'>Unstable</text></svg>");
+    background-repeat: repeat;
+    background-color: #FFF4F4;
+  }
+  .unstable h3:first-of-type {
+    margin-top: 0.5rem;
+  }
+  .unstable.example:not(.no-marker)::before {
+    content: "Example " counter(example) " (Unstable)";
+    float: none;
+  }
 </style>
 
 Introduction {#intro}
@@ -98,11 +131,25 @@ Terminology {#terminology}
 
 Hit testing, as understood by this document, is an act of checking if an idealised mathematical ray (half-line) intersects with real world as understood by the underlying Augmented Reality hardware & software. Ray intersections against virtual objects created by the application consuming the API are explicitly out of scope of the hit test API.
 
+Initialization {#hit-test-initialization}
+==============
+
+Feature descriptor {#hit-test-feature-descriptor}
+------------------
+
+In order for the applications to signal their interest in performing hit testing during a session, the session must be requested with appropriate [=feature descriptor=]. The string <dfn>hit-test</dfn> is introduced by this module as a new valid feature descriptor for hit test feature.
+
+A device is [=capable of supporting=] the hit test feature if the device exposes a [=native hit test=] capability. The [=inline XR device=] MUST NOT be treated as [=capable of supporting=] the hit test feature.
+
+The hit test feature is subject to [=feature policy=] and requires <code>"xr-spatial-tracking"</code> policy to be allowed on the requesting document's origin.
+
 Hit test options {#hit-test-options}
 ================
 
 XRHitTestTrackableType {#hit-test-trackable-type-enum}
 ----------------------
+
+<section class="unstable">
 
 An {{XRHitTestTrackableType}} enum specifies the type of entity that can be used for the purposes of hit test source creation.
 
@@ -117,6 +164,8 @@ enum XRHitTestTrackableType {
 - A hit test trackable of type <dfn enum-value for="XRHitTestTrackableType">"point"</dfn> indicates that the hit test results will be computed based on the feature points detected by the underlying Augmented Reality system.
 - A hit test trackable of type <dfn enum-value for="XRHitTestTrackableType">"plane"</dfn> indicates that the hit test results will be computed based on the planes detected by the underlying Augmented Reality system.
 - A hit test trackable of type <dfn enum-value for="XRHitTestTrackableType">"mesh"</dfn> indicates that the hit test results will be computed based on the meshes detected by the underlying Augmented Reality system.
+
+</section>
 
 XRHitTestOptionsInit {#hit-test-options-dictionary}
 --------------------
@@ -133,11 +182,15 @@ dictionary XRHitTestOptionsInit {
 
 The <dfn dict-member for="XRHitTestOptionsInit">space</dfn> dictionary member specifies {{XRSpace}} relative to which the {{XRHitTestOptionsInit/offsetRay}} is specified.
 
+<section class="unstable">
 The <dfn dict-member for="XRHitTestOptionsInit">entityTypes</dfn> dictionary member specifies array of <a enum lt="XRHitTestTrackableType">XRHitTestTrackableTypes</a> that will be used to compute results of the hit test.
+</section>
 
 The <dfn dict-member for="XRHitTestOptionsInit">offsetRay</dfn> dictionary member specifies {{XRRay}} that will be used to perform hit test. The {{XRHitTestOptionsInit/offsetRay}} will be interpreted as if expressed in a coordinate system defined by {{XRHitTestOptionsInit/space}}.
 
+<section class="unstable">
 The {{XRHitTestOptionsInit}} dictionary has an associated <dfn for="XRHitTestOptionsInit">effective entityTypes</dfn> which is set to {{XRHitTestOptionsInit/entityTypes}} if it was provided at dictionary construction time. If the {{XRHitTestOptionsInit/entityTypes}} was not provided at construction time, the [=XRHitTestOptionsInit/effective entityTypes=] is set to an array containing single element, {{XRHitTestTrackableType/"plane"}}.
+</section>
 
 The {{XRHitTestOptionsInit}} dictionary has an associated <dfn for="XRHitTestOptionsInit">effective offsetRay</dfn> which is set to {{XRHitTestOptionsInit/offsetRay}} if it was provided at dictionary construction time. If the {{XRHitTestOptionsInit/offsetRay}} was not provided at construction time, the [=XRHitTestOptionsInit/effective offsetRay=] is set to an {{XRRay}} constructed by invoking {{XRRay/XRRay()}} without any parameters.
 
@@ -156,11 +209,15 @@ dictionary XRTransientInputHitTestOptionsInit {
 
 The <dfn dict-member for="XRTransientInputHitTestOptionsInit">profile</dfn> dictionary member specifies an [=XRInputSource/input profile name=] of the transient input source that will be used to compute hit test results.
 
+<section class="unstable">
 The <dfn dict-member for="XRTransientInputHitTestOptionsInit">entityTypes</dfn> dictionary member specifies array of <a enum lt="XRHitTestTrackableType">XRHitTestTrackableTypes</a> that will be used to compute results of the hit test.
+</section>
 
 The <dfn dict-member for="XRTransientInputHitTestOptionsInit">offsetRay</dfn> dictionary member specifies {{XRRay}} that will be used to perform hit test. The {{XRTransientInputHitTestOptionsInit/offsetRay}} will be interpreted as if expressed in a coordinate system defined by {{XRInputSource}} whose profile matches the passed in {{XRTransientInputHitTestOptionsInit/profile}} when computing hit test results for transient input sources.
 
+<section class="unstable">
 The {{XRTransientInputHitTestOptionsInit}} dictionary has an associated <dfn for="XRTransientInputHitTestOptionsInit">effective entityTypes</dfn> which is set to {{XRTransientInputHitTestOptionsInit/entityTypes}} if it was provided at dictionary construction time. If the {{XRTransientInputHitTestOptionsInit/entityTypes}} was not provided at construction time, the [=XRTransientInputHitTestOptionsInit/effective entityTypes=] is set to an array containing single element, {{XRHitTestTrackableType/"plane"}}.
+</section>
 
 The {{XRTransientInputHitTestOptionsInit}} dictionary has an associated <dfn for="XRTransientInputHitTestOptionsInit">effective offsetRay</dfn> which is set to {{XRTransientInputHitTestOptionsInit/offsetRay}} if it was provided at dictionary construction time. If the {{XRTransientInputHitTestOptionsInit/offsetRay}} was not provided at construction time, the [=XRTransientInputHitTestOptionsInit/effective offsetRay=] is set to an {{XRRay}} constructed by invoking {{XRRay/XRRay()}} without any parameters.
 
@@ -183,7 +240,9 @@ Each {{XRHitTestSource}} has an associated <dfn for="XRHitTestSource">session</d
 
 Each {{XRHitTestSource}} has an associated <dfn for="XRHitTestSource">native origin</dfn> which stores information sufficient to identify the [=XRSpace/native origin=] of an {{XRSpace}} that was used to [=request hit test=]. This information will be subsequently used when computing hit test results.
 
+<section class="unstable">
 Each {{XRHitTestSource}} has an associated <dfn for="XRHitTestSource">entity types</dfn>, which is an array of <a enum lt="XRHitTestTrackableType">XRHitTestTrackableTypes</a> describing which entity types will be considered when computing hit test results.
+</section>
 
 Each {{XRHitTestSource}} has an associated <dfn for="XRHitTestSource">offset ray</dfn>, which is an {{XRRay}} that will be used when computing hit test results.
 
@@ -231,7 +290,9 @@ Each {{XRTransientInputHitTestSource}} has an associated <dfn for="XRTransientIn
 
 Each {{XRTransientInputHitTestSource}} has an associated <dfn for="XRTransientInputHitTestSource">profile</dfn> which stores [=XRInputSource/input profile name=] of an input source. This information will be subsequently used when computing hit test results for transient input sources.
 
+<section class="unstable">
 Each {{XRTransientInputHitTestSource}} has an associated <dfn for="XRTransientInputHitTestSource">entity types</dfn>, which is an array of <a enum lt="XRHitTestTrackableType">XRHitTestTrackableTypes</a> describing which entity types will be considered when computing hit test results.
+</section>
 
 Each {{XRTransientInputHitTestSource}} has an associated <dfn for="XRTransientInputHitTestSource">offset ray</dfn>, which is an {{XRRay}} that will be used when computing hit test results.
 
@@ -358,14 +419,19 @@ The {{XRSession}} is extended to contain an associated <dfn for="XRSession">set 
 
 The {{XRSession}} is extended to contain an associated <dfn for="XRSession">set of active hit test sources for transient input</dfn> that will be used when computing hit test results for transient input.
 
+The application is considered to make an <dfn>unreasonable number of requests</dfn> when the total number of active hit test sources or recently made requests is considered too high for a legitimate use of the API. This is an OPTIONAL privacy measure that the user agent MAY take to avoid abuse.
+
 The application can <dfn>request hit test</dfn> using {{XRSession}}'s {{XRSession/requestHitTestSource()}} method.
 
 <div class="algorithm" data-algorithm="request-hit-test-source">
 
 The <dfn method for="XRSession">requestHitTestSource(|options|)</dfn> method, when invoked on an {{XRSession}} |session|, MUST run the following steps:
 
-  1. Add [=compute all hit test results=] algorithm to |session|'s [=XRSession/list of frame updates=] if it is not already present there.
   1. Let |promise| be [=a new Promise=].
+  1. If [=hit-test=] feature descriptor is not [=list/contain|contained=] in the |session|'s [=XRSession/list of enabled features=], [=/reject=] |promise| with {{NotSupportedError}} and abort these steps.
+  1. If |session|’s [=XRSession/ended=] value is <code>true</code>, throw an {{InvalidStateError}} and abort these steps.
+  1. The user agent MAY [=/reject=] |promise| with {{NotAllowedError}} and abort these steps if there is a [=unreasonable number of requests=].
+  1. Add [=compute all hit test results=] algorithm to |session|'s [=XRSession/list of frame updates=] if it is not already present there.
   1. [=Create a hit test source=], |hitTestSource|, with |session|, |options|' {{XRHitTestOptionsInit/space}}, |options|' [=XRHitTestOptionsInit/effective entityTypes=] and |options|' [=XRHitTestOptionsInit/effective offsetRay=].
   1. If |hitTestSource| is <code>null</code>, [=/reject=] |promise| with an {{OperationError}} and abort these steps.
   1. Store created |hitTestSource| in |session|'s [=set of active hit test sources=].
@@ -377,8 +443,11 @@ The <dfn method for="XRSession">requestHitTestSource(|options|)</dfn> method, wh
 
 The <dfn method for="XRSession">requestHitTestSourceForTransientInput(|options|)</dfn> method, when invoked on an {{XRSession}} |session|, MUST run the following steps:
 
-  1. Add [=compute all hit test results=] algorithm to |session|'s [=XRSession/list of frame updates=] if it is not already present there.
   1. Let |promise| be [=a new Promise=].
+  1. If [=hit-test=] feature descriptor is not [=list/contain|contained=] in the |session|'s [=XRSession/list of enabled features=], [=/reject=] |promise| with {{NotSupportedError}} and abort these steps.
+  1. If |session|’s [=XRSession/ended=] value is <code>true</code>, throw an {{InvalidStateError}} and abort these steps.
+  1. The user agent MAY [=/reject=] |promise| with {{NotAllowedError}} and abort these steps if there is a [=unreasonable number of requests=].
+  1. Add [=compute all hit test results=] algorithm to |session|'s [=XRSession/list of frame updates=] if it is not already present there.
   1. [=Create a hit test source for transient input=], |hitTestSource|, with |session|, |options|' {{XRTransientInputHitTestOptionsInit/profile}}, |options|' [=XRHitTestOptionsInit/effective entityTypes=] and |options|' [=XRHitTestOptionsInit/effective offsetRay=].
   1. If |hitTestSource| is <code>null</code>, [=/reject=] |promise| with an {{OperationError}} and abort these steps.
   1. Store created |hitTestSource| in |session|'s [=set of active hit test sources for transient input=].
@@ -516,6 +585,7 @@ The <dfn constructor for="XRRay">XRRay(|transform|)</dfn> constructor MUST perfo
   1. Transform |ray|'s {{XRRay/origin}} by premultiplying the |transform|'s {{XRRigidTransform/matrix}} and set |ray| to the result.
   1. Transform |ray|'s {{XRRay/direction}} by premultiplying the |transform|'s {{XRRigidTransform/matrix}} and set |ray| to the result.
   1. [=Normalize=] the {{DOMPointReadOnly/x}}, {{DOMPointReadOnly/y}}, and {{DOMPointReadOnly/z}} components of |ray|'s {{XRRay/direction}}.
+  1. Initialize |ray|'s [=XRRay/matrix=] to <code>null</code>.
   1. Return |ray|.
 
 </div>
@@ -579,7 +649,7 @@ Note: For devices that do not expose the hit test functionality natively, it mig
 
 Native entity type {#native-entity-type-section}
 ------------------
-
+<section class="unstable">
 [=Native hit test results=] returned by [=XR device=] should contain information about the <dfn lt="native entity type">type of the entity</dfn> used to compute the result. Such native types might consist of, but not be limited to:
 - Point - signifies that hit test result was computed based on characteristic points found in user's environment.
 - Plane - signifies that hit test result was computed based on planes detected in user's environment.
@@ -604,6 +674,7 @@ To <dfn>convert from native entity type</dfn> into {{XRHitTestTrackableType}}, t
   1. Return |entityType|.
 
 </div>
+</section>
 
 Native hit test result {#native-hit-test-result-section}
 ----------------------
@@ -613,6 +684,21 @@ Native hit test result {#native-hit-test-result-section}
 The information about position and orientation of the intersection point should be contained in [=native hit test result=]'s native origin. Native origin defines a new coordinate system in such a way that its Y axis represents the surface's normal vector at the intersection point. If the orientation is not returned from the XR device, the user agent SHOULD set the native origin in such a way that Y axis of the coordinate system it defines is pointing up (towards negative gravity vector).
 
 Issue: Decide if we need to specify other axes of the coordinate system defined by hit test result's native origin to maintain compatibility between different implementations & differrent AR frameworks.
+
+Privacy & Security Considerations {#privacy-security}
+=================================
+
+<section class="non-normative">
+
+The hit test API can be used to map the user environment with more or less
+precision by sending hit test rays in multiple directions. Hit test has to be
+declared when creating an XR session as a [=feature descriptor=] which will
+allow the user agent to notify the user of the potential privacy implications of
+allowing the hit test API to be used by the website. Furthermore, the user agent
+is allowed to deny hit test requests when it considers that an [=unreasonable
+number of requests=] have been made for a genuine non-privacy invasive usage.
+
+</section>
 
 Acknowledgements {#ack}
 ================
