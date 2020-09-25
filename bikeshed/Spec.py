@@ -649,6 +649,9 @@ styleDarkMode = '''
 
         --editedrec-bg: darkorange;
     }
+    /* In case a transparent-bg image doesn't expect to be on a dark bg,
+       which is quite common in practice... */
+    img { background: white; }
 }'''
 
 styleMdLists = '''
