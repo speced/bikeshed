@@ -111,7 +111,7 @@ class IDLMarker(object):
             # The "NamedConstructor" Name already got markup up, so ignore this one.
             return (None, None)
 
-        return ('<a class=n data-link-type="idl-name">', '</a>')
+        return ('<a data-link-type="idl-name">', '</a>')
 
     def markup_keyword(self, text, construct):
         # Fires on the various "keywords" of WebIDL -
