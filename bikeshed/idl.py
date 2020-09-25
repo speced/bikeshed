@@ -125,6 +125,17 @@ class IDLMarker(object):
             else:
                 # Otherwise, you *can* point to/dfn stringification behavior if you want.
                 return ("<idl data-export data-idl-type=dfn data-idl-for='{0}' data-lt='stringification behavior' id='{0}-stringification-behavior'>".format(construct.parent.full_name), "</idl>")
+        # The remaining built-in types that aren't covered by a more specific function.
+        builtinTypes = {
+            "any":"interface",
+            "sequence":"dfn",
+            "record":"dfn",
+            "Promise":"interface",
+            "FrozenArray":"interface",
+            "ObservableArray":"interface",
+        }
+        if text in builtinTypes:
+            return (f'<a data-link-spec=webidl data-link-type="{builtinTypes[text]}">', '</a>')
         return (None, None)
 
     def markup_name(self, text, construct):
