@@ -29,6 +29,7 @@ from .dom import fixTypography
 from .dom import fixupIDs
 from .dom import foldWhitespace
 from .dom import hasAncestor
+from .dom import hasAttr
 from .dom import hasAttrs
 from .dom import hasChildElements
 from .dom import hasClass

@@ -497,6 +497,14 @@ def removeAttr(el, *attrNames):
     return el
 
 
+def hasAttr(el, *attrNames):
+    # Returns True if the element has at least one of the named attributes
+    for attrName in attrNames:
+        if attrName in el.attrib:
+            return True
+    return False
+
+
 def hasAttrs(el):
     return bool(el.attrib)
 

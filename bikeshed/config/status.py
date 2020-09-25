@@ -266,3 +266,21 @@ def canonicalizeStatus(rawStatus, group):
         msg = "Unknown Status metadata '{0}'. Check the docs for valid Status values.".format(canonStatus)
     die("{0}", msg)
     return canonStatus
+
+def splitStatus(st):
+    parts = st.partition("/")
+    if parts[2] == "":
+        return None, parts[0]
+    return parts[0], parts[2]
+
+def looselyMatch(s1, s2):
+    # Loosely matches two statuses:
+    # they must have the same status name,
+    # and either the same or missing group name
+    group1, status1 = splitStatus(s1)
+    group2, status2 = splitStatus(s2)
+    if status1 != status2:
+        return False
+    if group1 == group2 or group1 is None or group2 is None:
+        return True
+    return False

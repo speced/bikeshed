@@ -13,6 +13,7 @@ from . import boilerplate
 from . import caniuse
 from . import dfns
 from . import mdnspeclinks
+from . import conditional
 from . import config
 from . import constants
 from . import datablocks
@@ -165,6 +166,7 @@ class Spec(object):
 
     def processDocument(self):
         # Fill in and clean up a bunch of data
+        conditional.processConditionals(self)
         self.fillContainers = locateFillContainers(self)
         lint.exampleIDs(self)
         boilerplate.addBikeshedVersion(self)
