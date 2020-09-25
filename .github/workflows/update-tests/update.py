@@ -1,8 +1,10 @@
 import base64
 import fnmatch
 import io
+import math
 import os
 import re
+import time
 
 from github import Github
 from github.GithubException import GithubException
@@ -115,16 +117,31 @@ def processFile(file):
 def main():
     token = os.environ['GITHUB_TOKEN']
     g = Github(token)
+    start_secs = time.monotonic()
+    initial_rate_limit = g.rate_limiting
+    print('Initial rate limit is {0[1]} requests per hour ({0[0]} remaining)'.format(initial_rate_limit))
+    def throttle():
+        elapsed_secs = time.monotonic() - start_secs
+        current_rate_limit = g.rate_limiting
+        requests_used = initial_rate_limit[0] - current_rate_limit[0]
+        ideal_elapsed_secs = 3600 * (requests_used / current_rate_limit[1])
+        sleep_secs = math.ceil(ideal_elapsed_secs - elapsed_secs)
+        if (sleep_secs > 0):
+            print('Sleeping {}s to stay under rate limit ({} requests so far)'.format(sleep_secs, requests_used))
+            time.sleep(sleep_secs)
     data = getData()
     repos = []
     for orgName in sorted(data['orgs']):
         org = g.get_organization(orgName)
         repos.extend(reposFromOrg(org, data['skipRepos']))
+        throttle()
     for repoName in data['moreRepos']:
         repos.append(g.get_repo(repoName))
+        throttle()
     files = []
     for repo in sorted(repos, key=lambda x: x.full_name):
         files.extend(filesFromRepo(repo, data['skipFiles']))
+        throttle()
     for file in sorted(files, key=lambda x: x['path']):
         processFile(file)
 
