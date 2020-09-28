@@ -58,10 +58,16 @@ def processConditionals(doc):
 def evalConditions(doc, el, conditionString):
 	for cond in parseConditions(conditionString, el):
 		if cond['type'] == "status":
-			if not config.looselyMatch(cond['value'], doc.md.status):
-				yield False
+			yield config.looselyMatch(cond['value'], doc.md.status)
+		elif cond['type'] == "text macro":
+			for k,v in doc.md.customTextMacros:
+				if k == cond['value']:
+					yield True
+					break
 			else:
-				yield True
+				yield False
+		elif cond['type'] == "boilerplate":
+			yield (find(f'[boilerplate="{escapeCSSIdent(cond["value"])}"]', doc) is not None)
 		else:
 			die(f"Program error, some type of include/exclude-if condition wasn't handled: '{repr(cond)}'. Please report!", el)
 			yield False
@@ -75,5 +81,11 @@ def parseConditions(s, el=None):
 		if re.match(r"([\w-]+/)?[\w-]+$", sub):
 			yield {"type":"status", "value": sub}
 			continue
+		match = re.match(r"text macro:\s*(.+)$", sub, re.I)
+		if match:
+			yield {"type":"text macro", "value":match.group(1).strip()}
+		match = re.match(r"boilerplate:\s*(.+)$", sub, re.I)
+		if match:
+			yield {"type":"boilerplate", "value":match.group(1).strip()}
 		die(f"Unknown include/exclude-if condition '{sub}'", el=el)
 		continue
