@@ -84,8 +84,10 @@ def parseConditions(s, el=None):
 		match = re.match(r"text macro:\s*(.+)$", sub, re.I)
 		if match:
 			yield {"type":"text macro", "value":match.group(1).strip()}
+			continue
 		match = re.match(r"boilerplate:\s*(.+)$", sub, re.I)
 		if match:
 			yield {"type":"boilerplate", "value":match.group(1).strip()}
+			continue
 		die(f"Unknown include/exclude-if condition '{sub}'", el=el)
 		continue
