@@ -177,7 +177,10 @@ dfnPanelStyle = '''
 .dfn-panel:not(.on) { display: none; }
 .dfn-panel * { margin: 0; padding: 0; text-indent: 0; }
 .dfn-panel > b { display: block; }
-.dfn-panel a { color: black; }
+.dfn-panel a {
+    color: black;
+    color: var(--dfnpanel-link)
+}
 .dfn-panel a:not(:hover) { text-decoration: none !important; border-bottom: none !important; }
 .dfn-panel > b + b { margin-top: 0.25em; }
 .dfn-panel ul { padding: 0; }
@@ -200,5 +203,6 @@ dfnPanelDarkmodeStyle = '''
     :root {
         --dfnpanel-bg: #222;
         --dfnpanel-text: var(--text);
+        --dfnpanel-link: var(--text);
     }
 }'''
