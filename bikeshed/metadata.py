@@ -769,7 +769,7 @@ def parseAudience(key, val, lineNum):
     elif len(values) >= 1:
         ret = []
         namedAudiences = {"CWG", "LWG", "EWG", "LEWG", "DIRECTION"}
-        pseudonymAudiences = {"Concurrency":"SG1", "TM":"SG5", "Numerics":"SG6", "Reflection":"SG7", "UB":"SG12", "HMI":"SG13", "Tooling":"SG15", "Unicode":"SG16", "EWGI":"SG17", "LEWG":"SG18"}
+        pseudonymAudiences = {"Concurrency":"SG1", "TM":"SG5", "Numerics":"SG6", "Reflection":"SG7", "UB":"SG12", "HMI":"SG13", "Tooling":"SG15", "Unicode":"SG16", "EWGI":"SG17", "LEWGI":"SG18"}
         for v in values:
             if v in namedAudiences:
                 ret.append(v)
