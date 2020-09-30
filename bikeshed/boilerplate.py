@@ -484,7 +484,7 @@ def addIndexOfExternallyDefinedTerms(doc, container):
         return
 
     def makeLink(*contents):
-        return E.span({"style":"color:initial"}, *contents)
+        return E.span({}, *contents)
 
     ul = E.ul({"class": "index"})
     # Gather all the <a href> in the document, for use in the dfn-panels
