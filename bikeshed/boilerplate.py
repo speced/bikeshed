@@ -867,11 +867,9 @@ def addSpecMetadataSection(doc):
     if doc.md.issues:
         md["Issue Tracking"] = [E.a({"href":href}, text) for text,href in doc.md.issues]
     if doc.md.editors:
-        editorTerm = doc.md.editorTerm['singular']
-        md[editorTerm] = list(map(printEditor, doc.md.editors))
+        md["Editor"] = list(map(printEditor, doc.md.editors))
     if doc.md.previousEditors:
-        editorTerm = doc.md.editorTerm['singular']
-        md["Former " + editorTerm] = list(map(printEditor, doc.md.previousEditors))
+        md["Former Editor"] = list(map(printEditor, doc.md.previousEditors))
     if doc.md.translations:
         md["Translations"] = list(map(printTranslation, doc.md.translations))
     if doc.md.audience:
@@ -892,6 +890,13 @@ def addSpecMetadataSection(doc):
         vals = list(filter(lambda x:x is not None, vals))
         if not vals:
             return []
+        # Convert the canonical key to a display version
+        if key == "Editor":
+            displayKey = doc.md.editorTerm['singular']
+        elif key == "Former Editor":
+            displayKey = "Former " + doc.md.editorTerm['singular']
+        else:
+            displayKey = key
         # Pluralize appropriate words
         pluralization = {
             "Previous Version": "Previous Versions",
@@ -899,20 +904,22 @@ def addSpecMetadataSection(doc):
             doc.md.editorTerm['singular']: doc.md.editorTerm['plural'],
             "Former " + doc.md.editorTerm['singular']: "Former " + doc.md.editorTerm['plural']
         }
-        if len(vals) > 1 and key in pluralization:
-            displayKey = pluralization[key]
-        else:
-            displayKey = key
+        if len(vals) > 1 and displayKey in pluralization:
+            displayKey = pluralization[displayKey]
+        # Handle some custom <dt> structures
         if key in ("Editor", "Former Editor"):
-            # A bunch of Microformats stuff is preloaded on the <dd>s,
-            # so this prevents code from genning an extra wrapper <dd>.
-            return [E.dt({"class": "editor"}, displayKey, ":")] + vals
+            ret = [E.dt({"class": "editor"}, displayKey, ":")]
         elif key == "Translations":
             ret = [E.dt(displayKey, " ", E.small("(non-normative)"), ":")]
-            ret += [E.dd({}, val) for val in vals]
-            return ret
         else:
-            return [E.dt(displayKey, ":")] + [E.dd({}, val) for val in vals]
+            ret = [E.dt(displayKey, ":")]
+        # Add all the values, wrapping in a <dd> if necessary.
+        for val in vals:
+            if isElement(val) and val.tag == "dd":
+                ret.append(val)
+            else:
+                ret.append(E.dd({}, val))
+        return ret
 
     # Merge "custom" metadata into non-custom, when they match up
     otherMd = OrderedDict()
