@@ -141,6 +141,13 @@ def linkTextVariations(str, linkType):
         if str == "thrown":
             yield "throw"
 
+    if " " in str and (config.linkTypeIn(linkType, "dfn") or config.linkTypeIn(linkType, "abstract-op")):
+        # Multi-word phrase, which often contains the conjugated word as the *first*,
+        # rather than at the end.
+        first,_,rest = str.partition(" ")
+        for variation in linkTextVariations(first, linkType):
+            yield variation + " " + rest
+
     if config.linkTypeIn(linkType, "idl"):
         # _or <-> or
         if str[:1] == "_":
