@@ -65,6 +65,7 @@ class MetadataManager:
         self.date = datetime.utcnow().date()
         self.deadline = None
         self.defaultHighlight = None
+        self.defaultBiblioDisplay = "index"
         self.defaultRefStatus = None
         self.displayShortname = None
         self.editors = []
@@ -574,6 +575,15 @@ def parseBoilerplate(key, val, lineNum):
     return boilerplate
 
 
+def parseBiblioDisplay(key, val, lineNum):
+    val = val.strip().lower()
+    if val in constants.biblioDisplay:
+        return val
+    else:
+        die("'{0}' must be either 'inline' or 'index'. Got '{1}'", key, val, lineNum=lineNum)
+        return constants.biblioDisplay.index
+
+
 def parseRefStatus(key, val, lineNum):
     val = val.strip().lower()
     if val == "dated":
@@ -1054,6 +1064,7 @@ knownKeys = {
     "Custom Warning Title": Metadata("Custom Warning Title", "customWarningTitle", joinValue, parseLiteral),
     "Date": Metadata("Date", "date", joinValue, parseDate),
     "Deadline": Metadata("Deadline", "deadline", joinValue, parseDate),
+    "Default Biblio Display": Metadata("Default Biblio Display", "defaultBiblioDisplay", joinValue, parseBiblioDisplay),
     "Default Biblio Status": Metadata("Default Biblio Status", "defaultRefStatus", joinValue, parseRefStatus), #synonym of "Default Ref Status"
     "Default Highlight": Metadata("Default Highlight", "defaultHighlight", joinValue, parseLiteral),
     "Default Ref Status": Metadata("Default Ref Status", "defaultRefStatus", joinValue, parseRefStatus),

@@ -7,6 +7,7 @@ errorLevel = ["fatal"]
 printMode = "console"
 quiet = True
 refStatus = StringEnum("current", "snapshot")
+biblioDisplay = StringEnum("index", "inline")
 specClass = None
 testAnnotationURL = "https://test.csswg.org/harness/annotate.js"
 

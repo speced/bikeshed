@@ -325,12 +325,12 @@ biblioRe = re.compile(r"""
                         \[\[
                         (!)?
                         ([\w.+-]+)
-                        (?:\s+(current|snapshot))?
+                        (\s+(?:current|snapshot|inline|index)\s*)*
                         (?:\|([^\]]+))?
                         \]\]""", re.X)
 def biblioReplacer(match):
     # Allow escaping things that aren't actually biblio links, by preceding with a \
-    escape, bang, term, status, linkText = match.groups()
+    escape, bang, term, modifiers, linkText = match.groups()
     if escape:
         return match.group(0)[1:]
     if bang == "!":
@@ -340,8 +340,22 @@ def biblioReplacer(match):
     if linkText is None:
         linkText = "[{0}]".format(term)
     attrs = {"data-lt":term, "data-link-type":"biblio", "data-biblio-type":type, "bs-autolink-syntax":match.group(0)}
-    if status is not None:
-        attrs['data-biblio-status'] = status.strip()
+
+    modifiers = re.split(r"\s+", modifiers.strip()) if modifiers is not None else []
+    statusCurrent = "current" in modifiers
+    statusSnapshot = "snapshot" in modifiers
+    if statusCurrent and statusSnapshot:
+        die(f"Biblio shorthand {match.group(0)} contains *both* 'current' and 'snapshot', please pick one.")
+    elif statusCurrent or statusSnapshot:
+        attrs['data-biblio-status'] = "current" if statusCurrent else "snapshot"
+
+    displayInline = "inline" in modifiers
+    displayIndex = "index" in modifiers
+    if displayInline and displayIndex:
+        die(f"Biblio shorthand {match.group(0)} contains *both* 'inline' and 'index', please pick one.")
+    elif displayInline or displayIndex:
+        attrs['data-biblio-display'] = "inline" if displayInline else "index"
+
     return E.a(attrs, linkText)
 
 sectionRe = re.compile(r"""

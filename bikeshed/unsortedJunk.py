@@ -733,10 +733,15 @@ def processBiblioLinks(doc):
             doc.refs.preferredBiblioNames[ref.linkText] = linkText
             # Use it on the current ref. Future ones will use the preferred name automatically.
             ref.linkText = linkText
+        storage[ref.linkText] = ref
 
         id = config.simplifyText(ref.linkText)
         el.set('href', '#biblio-' + id)
-        storage[ref.linkText] = ref
+
+        biblioDisplay = el.get("data-biblio-display", doc.md.defaultBiblioDisplay)
+        if biblioDisplay == "inline":
+            replaceContents(el, ref.title)
+
 
 
 def verifyUsageOfAllLocalBiblios(doc):
