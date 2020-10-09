@@ -16,6 +16,7 @@ and elsewhere!
 [![Build Status](https://travis-ci.org/tabatkins/bikeshed.svg?branch=master)](https://travis-ci.org/tabatkins/bikeshed)
 [![Gitter](https://img.shields.io/badge/Gitter-Join%20Chat%20↣-blue.svg)](https://gitter.im/tabatkins/bikeshed?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 [![Docs](https://img.shields.io/badge/docs-available-orange.svg)](https://tabatkins.github.io/bikeshed)
+[![Release Notes](https://img.shields.io/badge/release-notes-purple.svg)](https://github.com/tabatkins/bikeshed/issues/1773)
 
 The processor can be easily [installed](https://tabatkins.github.io/bikeshed/#installing) and run locally (requiring no
 network access unless you're updating), or accessed as a CGI without any installation at all: <https://api.csswg.org/bikeshed/>
