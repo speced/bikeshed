@@ -280,7 +280,7 @@ class Spec(object):
                 outputFilename = "-"
         return outputFilename
 
-    def finish(self, outputFilename=None):
+    def finish(self, outputFilename=None, newline=None):
         self.printResultMessage()
         outputFilename = self.fixMissingOutputFilename(outputFilename)
         rendered = self.serialize()
@@ -289,7 +289,7 @@ class Spec(object):
                 if outputFilename == "-":
                     sys.stdout.write(rendered)
                 else:
-                    with io.open(outputFilename, "w", encoding="utf-8") as f:
+                    with io.open(outputFilename, "w", encoding="utf-8", newline=newline) as f:
                         f.write(rendered)
             except Exception as e:
                 die("Something prevented me from saving the output document to {0}:\n{1}", outputFilename, e)

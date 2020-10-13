@@ -102,7 +102,7 @@ def rebase(patterns=None, md=None):
         resetSeenMessages()
         p(f"{ratio(i,len(paths))}: Rebasing {name}")
         doc = processTest(path, md)
-        doc.finish()
+        doc.finish(newline="\n")
 
 def ratio(i, total):
     justifiedI = str(i).rjust(len(str(total)))
