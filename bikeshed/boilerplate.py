@@ -6,12 +6,28 @@ import re
 import subprocess
 from collections import defaultdict, OrderedDict
 from datetime import datetime
+from . import conditional
 from . import config
 from . import dfnpanels
 from .refs import utils as refUtils
 from .DefaultOrderedDict import DefaultOrderedDict
 from .h import *
 from .messages import *
+
+
+def boilerplateFromHtml(doc, htmlString):
+    htmlString = doc.fixText(htmlString)
+    bp = E.div({}, parseHTML(htmlString))
+    conditional.processConditionals(bp, doc)
+    return childNodes(bp, clear=True)
+
+
+def loadBoilerplate(doc, filename, bpname=None):
+    if bpname is None:
+        bpname = filename
+    html = config.retrieveBoilerplateFile(doc, filename)
+    el = boilerplateFromHtml(doc, html)
+    fillWith(bpname, el, doc=doc)
 
 
 def addBikeshedVersion(doc):
@@ -123,9 +139,8 @@ def getFillContainer(tag, doc, default=False):
 
 
 def addLogo(doc):
-    html = config.retrieveBoilerplateFile(doc, 'logo')
-    html = doc.fixText(html)
-    fillWith('logo', parseHTML(html), doc=doc)
+    loadBoilerplate(doc, 'logo')
+
 
 def addSubstatus(doc):
     container = getFillContainer("substatus", doc, default=False)
@@ -139,17 +154,14 @@ def addSubstatus(doc):
         if container is not None:
             removeNode(container)
 
+
 def addCopyright(doc):
-    html = config.retrieveBoilerplateFile(doc, 'copyright')
-    html = doc.fixText(html)
-    fillWith('copyright', parseHTML(html), doc=doc)
+    loadBoilerplate(doc, 'copyright')
 
 
 def addAbstract(doc):
     if not doc.md.noAbstract:
-        html = config.retrieveBoilerplateFile(doc, 'abstract')
-        html = doc.fixText(html)
-        fillWith('abstract', parseHTML(html), doc=doc)
+        loadBoilerplate(doc, 'abstract')
     else:
         container = getFillContainer("abstract", doc, default=False)
         if container is not None:
@@ -157,9 +169,7 @@ def addAbstract(doc):
 
 
 def addStatusSection(doc):
-    html = config.retrieveBoilerplateFile(doc, 'status')
-    html = doc.fixText(html)
-    fillWith('status', parseHTML(html), doc=doc)
+    loadBoilerplate(doc, 'status')
 
 
 def addExpiryNotice(doc):
@@ -170,9 +180,7 @@ def addExpiryNotice(doc):
     else:
         boilerplate = "warning-expires"
         doc.extraScripts['script-expires'] = expiryScript
-    html = config.retrieveBoilerplateFile(doc, boilerplate)
-    html = doc.fixText(html)
-    fillWith('warning', parseHTML(html), doc=doc)
+    loadBoilerplate(doc, boilerplate, 'warning')
     addClass(doc.body, boilerplate)
 
 expiryScript = '''
@@ -190,9 +198,7 @@ if(expires < today) {
 
 def addObsoletionNotice(doc):
     if doc.md.warning:
-        html = config.retrieveBoilerplateFile(doc, doc.md.warning[0])
-        html = doc.fixText(html)
-        fillWith('warning', parseHTML(html), doc=doc)
+        loadBoilerplate(doc, doc.md.warning[0], 'warning')
 
 
 def addAtRisk(doc):
@@ -229,8 +235,8 @@ def removeUnwantedBoilerplate(doc):
 def addAnnotations(doc):
     if doc.md.vshortname in doc.testSuites:
         html = config.retrieveBoilerplateFile(doc, 'annotations')
-        html = doc.fixText(html)
-        appendContents(find("head", doc), parseHTML(html))
+        el = boilerplateFromHtml(doc, html)
+        appendContents(find("head", doc), el)
 
 
 def addBikeshedBoilerplate(doc):
@@ -245,7 +251,7 @@ def addBikeshedBoilerplate(doc):
             container = getFillContainer("bs-styles", doc, default=True)
         if container is not None:
             appendChild(container,
-                        E.style("/* {0} */\n".format(k) + v))
+                        E.style(f"/* {k} */\n{v}"))
     # Output the darkmode styles after all other styles
     # but don't put them in /TR space yet,
     # until the W3C is ready for them.
@@ -257,7 +263,7 @@ def addBikeshedBoilerplate(doc):
             container = getFillContainer("bs-styles", doc, default=True)
         if container is not None:
             appendChild(container,
-                        E.style("/* {0} */\n".format(k) + v))
+                        E.style(f"/* {k} */\n{v}"))
     for k,v in sorted(doc.extraScripts.items()):
         if k not in doc.md.boilerplate:
             continue
@@ -266,7 +272,7 @@ def addBikeshedBoilerplate(doc):
             container = getFillContainer("bs-scripts", doc, default=True)
         if container is not None:
             appendChild(container,
-                        E.script("/* {0} */\n".format(k) + v))
+                        E.script(f"/* {k} */\n{v}"))
 
 
 def addIndexSection(doc):

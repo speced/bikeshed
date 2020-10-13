@@ -26,8 +26,10 @@ from .messages import *
 # but its children are left in its place.
 
 
-def processConditionals(doc):
-	for el in findAll("[include-if], [exclude-if], if-wrapper", doc):
+def processConditionals(container, doc=None):
+	if doc is None:
+		doc = container
+	for el in findAll("[include-if], [exclude-if], if-wrapper", container):
 		if el.tag == "if-wrapper" and not hasAttr(el, "include-if", "exclude-if"):
 			die("<if-wrapper> elements must have an include-if and/or exclude-if attribute.", el=el)
 			removeNode(el)
