@@ -7,6 +7,7 @@ import os
 from ..InputSource import InputSource
 from ..messages import *
 from .main import scriptPath
+from .status import splitStatus
 
 
 class DataFileRequester(object):
@@ -62,16 +63,15 @@ defaultRequester = DataFileRequester(type="latest", fallback=DataFileRequester(t
 
 
 def retrieveBoilerplateFile(doc, name, group=None, status=None, error=True):
-    # Looks in three locations, in order:
-    # the folder the spec source is in, the group's boilerplate folder, and the generic boilerplate folder.
+    # Looks in three or four locations, in order:
+    # the folder the spec source is in, the group's boilerplate folder, the megagroup's boilerplate folder, and the generic boilerplate folder.
     # In each location, it first looks for the file specialized on status, and then for the generic file.
     # Filenames must be of the format NAME.include or NAME-STATUS.include
     if group is None and doc.md.group is not None:
         group = doc.md.group.lower()
-    if status is None and doc.md.rawStatus is not None:
-        megaGroup,_,status = doc.md.rawStatus.partition("/")
-        if status == "":
-            status = megaGroup
+    if status is None and doc.md.status is not None:
+        status = doc.md.status
+    megaGroup, status = splitStatus(status)
 
     searchLocally = doc.md.localBoilerplate[name]
 
@@ -94,6 +94,9 @@ def retrieveBoilerplateFile(doc, name, group=None, status=None, error=True):
     if group:
         sources.append(InputSource(boilerplatePath(group, statusFile)))
         sources.append(InputSource(boilerplatePath(group, genericFile)))
+    if megaGroup:
+        sources.append(InputSource(boilerplatePath(megaGroup, statusFile)))
+        sources.append(InputSource(boilerplatePath(megaGroup, genericFile)))
     sources.append(InputSource(boilerplatePath(statusFile)))
     sources.append(InputSource(boilerplatePath(genericFile)))
 

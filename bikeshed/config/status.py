@@ -268,9 +268,13 @@ def canonicalizeStatus(rawStatus, group):
     return canonStatus
 
 def splitStatus(st):
+    if st is None:
+        return None, None
+
     parts = st.partition("/")
     if parts[2] == "":
         return None, parts[0]
+
     return parts[0], parts[2]
 
 def looselyMatch(s1, s2):

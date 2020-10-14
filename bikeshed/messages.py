@@ -11,7 +11,7 @@ messages = set()
 messageCounts = Counter()
 
 
-def p(msg):
+def p(msg, sep=None, end=None):
     if isinstance(msg, tuple):
         msg, ascii = msg
     else:
@@ -19,7 +19,7 @@ def p(msg):
     if constants.quiet == float("infinity"):
         return
     try:
-        print(msg)
+        print(msg, sep=sep, end=end)
     except UnicodeEncodeError:
         if ascii is not None:
             print(ascii.encode("ascii", "replace"))
@@ -28,7 +28,7 @@ def p(msg):
             if warning not in messages:
                 print(warning)
                 messages.add(warning)
-            print(msg.encode("ascii", "xmlcharrefreplace"))
+            print(msg.encode("ascii", "xmlcharrefreplace"), sep=sep, end=end)
 
 
 def die(msg, *formatArgs, **namedArgs):
