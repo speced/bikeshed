@@ -147,7 +147,7 @@ def xor(a, b):
 wptStyle = '''
 :root {
 	--wpt-border: hsl(290, 70%, 60%);
-	--wpt-bg: hsl(290, 70%, 95%)
+	--wpt-bg: hsl(290, 70%, 95%);
 	--wpt-text: var(--text);
 	--wptheading-text: hsl(290, 70%, 30%);
 }
