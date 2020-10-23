@@ -10,6 +10,7 @@ import os
 import requests
 import time
 from datetime import datetime
+from result import Ok, Err
 
 from ..messages import *
 
@@ -38,6 +39,7 @@ knownFolders = [
 ]
 
 ghPrefix = "https://raw.githubusercontent.com/tabatkins/bikeshed-data/master/data/"
+
 
 def createManifest(path, dryRun=False):
     '''Generates a manifest file for all the data files.'''
@@ -110,7 +112,11 @@ def updateByManifest(path, dryRun=False):
         die("Something's gone wrong with the remote data; I can't read its timestamp. Please report this!")
         return
 
-    if localDt is not None:
+    if localDt == "error":
+        # A previous update run didn't complete successfully,
+        # so I definitely need to try again.
+        warn("Previous update had some download errors, so re-running...")
+    elif localDt is not None:
         if (remoteDt - datetime.utcnow()).days >= 2:
             warn("Remote data is more than two days old; the update process has probably fallen over. Please report this!")
         if localDt == remoteDt and localDt != 0:
@@ -145,15 +151,20 @@ def updateByManifest(path, dryRun=False):
     if not dryRun:
         if newPaths:
             say("Updating {0} file{1}...", len(newPaths), "s" if len(newPaths) > 1 else "")
-        asyncio.run(updateFiles(path, newPaths))
+        goodPaths, badPaths = asyncio.run(updateFiles(path, newPaths))
         try:
             with io.open(os.path.join(path, "manifest.txt"), 'w', encoding="utf-8") as fh:
-                fh.write("\n".join(remoteManifest))
+                fh.write(createFinishedManifest(remoteManifest, goodPaths, badPaths))
         except Exception as e:
             warn("Couldn't save new manifest file.\n{0}", e)
             return False
-    say("Done!")
-    return True
+    if not badPaths:
+        say("Done!")
+        return True
+    else:
+        phrase = f"were {len(badPaths)} errors" if len(badPaths) > 1 else "was 1 error"
+        die(f"Done, but there {phrase} in downloading or saving. Run `bikeshed update` again to retry.")
+        return False
 
 async def updateFiles(localPrefix, newPaths):
     tasks = set()
@@ -164,31 +175,41 @@ async def updateFiles(localPrefix, newPaths):
 
         lastMsgTime = time.time()
         messageDelta = 2
-        i = 0
+        goodPaths = []
+        badPaths = []
         for coro in asyncio.as_completed(tasks):
-            i += 1
-            await coro
+            result = await coro
+            if result.is_ok():
+                goodPaths.append(result.value)
+            else:
+                badPaths.append(result.value)
             currFileTime = time.time()
             if (currFileTime - lastMsgTime) >= messageDelta:
-                say("Updated {0}/{1}...", i, len(newPaths))
+                if not badPaths:
+                    say("Updated {0}/{1}...", len(goodPaths), len(newPaths))
+                else:
+                    say("Updated {0}/{1}, {2} errors...", len(goodPaths), len(newPaths), len(badPaths))
                 lastMsgTime = currFileTime
+    return goodPaths, badPaths
 
 async def updateFile(localPrefix, filePath, session):
     remotePath = ghPrefix + filePath
     localPath = localizePath(localPrefix, filePath)
-    data = await downloadFile(remotePath, session)
-    if data is None:
-        return
-    await saveFile(localPath, data)
+    res = await downloadFile(remotePath, session)
+    if res.is_ok():
+        res = await saveFile(localPath, res.value)
+    if res.is_err():
+        res = Err(filePath)
+    return res
 
 async def downloadFile(path, session):
     try:
         resp = await session.request(method='GET', url=path)
         resp.raise_for_status()
-        return await resp.text()
+        return Ok(await resp.text())
     except Exception as e:
         warn("Couldn't download file '{0}'.\n{1}", path, e)
-        return
+        return Err(path)
 
 async def saveFile(path, data):
     try:
@@ -197,9 +218,10 @@ async def saveFile(path, data):
             os.makedirs(dirPath)
         async with aiofiles.open(path, 'w', encoding="utf-8") as fh:
             await fh.write(data)
+            return Ok(path)
     except Exception as e:
         warn("Couldn't save file '{0}'.\n{1}", path, e)
-        return False
+        return Err(path)
 
 
 
@@ -227,8 +249,31 @@ def dictFromManifest(lines):
     return ret
 
 def dtFromManifest(lines):
+    if lines[0].strip() == "error":
+        return "error"
     try:
         return datetime.strptime(lines[0].strip(), "%Y-%m-%d %H:%M:%S.%f")
     except:
         # Sigh, something borked
         return
+
+def createFinishedManifest(manifestLines, goodPaths, badPaths):
+    if not badPaths:
+        return "\n".join(manifestLines)
+
+    # Ah, some errors.
+    # First, indicate that errors happened in the timestamp,
+    # so I won't spuriously refuse to re-update.
+
+    manifestLines[0] = "error"
+
+    # Now go thru and blank out the hashes for the bad paths,
+    # so I'll definitely try to regenerate them later.
+
+    badPaths = set(badPaths)
+    for i,line in enumerate(manifestLines[1:], 1):
+        prefix,_,path = line.strip().rpartition(" ")
+        if path in badPaths:
+            manifestLines[i] = "error" + ("-" * (len(prefix) - len("error"))) + " " + path
+
+    return "\n".join(manifestLines)
