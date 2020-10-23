@@ -164,8 +164,8 @@ def updateByManifest(path, dryRun=False):
         return True
     else:
         phrase = f"were {len(badPaths)} errors" if len(badPaths) > 1 else "was 1 error"
-        die(f"Done, but there {phrase} in downloading or saving. Run `bikeshed update` again to retry.")
-        return False
+        die(f"Done, but there {phrase} (of {len(newPaths)} total) in downloading or saving. Run `bikeshed update` again to retry.")
+        return True
 
 async def updateFiles(localPrefix, newPaths):
     tasks = set()
