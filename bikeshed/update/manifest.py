@@ -8,6 +8,7 @@ import hashlib
 import io
 import os
 import requests
+import tenacity
 import time
 from datetime import datetime
 from result import Ok, Err
@@ -202,33 +203,34 @@ async def updateFile(localPrefix, filePath, session):
         res = Err(filePath)
     return res
 
+@tenacity.retry(
+    reraise=True,
+    stop=tenacity.stop_after_attempt(3),
+    wait=tenacity.wait_random(1,2),
+    retry_error_callback=lambda retry_state: Err(retry_state),
+    )
 async def downloadFile(path, session):
-    try:
-        resp = await session.request(method='GET', url=path)
-        resp.raise_for_status()
-        return Ok(await resp.text())
-    except Exception as e:
-        warn("Couldn't download file '{0}'.\n{1}", path, e)
-        return Err(path)
+    resp = await session.request(method='GET', url=path)
+    resp.raise_for_status()
+    return Ok(await resp.text())
 
+@tenacity.retry(
+    reraise=True,
+    stop=tenacity.stop_after_attempt(3),
+    wait=tenacity.wait_random(1,2),
+    retry_error_callback=lambda retry_state: Err(retry_state),
+    )
 async def saveFile(path, data):
-    try:
-        dirPath = os.path.dirname(path)
-        if not os.path.exists(dirPath):
-            os.makedirs(dirPath)
-        async with aiofiles.open(path, 'w', encoding="utf-8") as fh:
-            await fh.write(data)
-            return Ok(path)
-    except Exception as e:
-        warn("Couldn't save file '{0}'.\n{1}", path, e)
-        return Err(path)
-
-
+    dirPath = os.path.dirname(path)
+    if not os.path.exists(dirPath):
+        os.makedirs(dirPath)
+    async with aiofiles.open(path, 'w', encoding="utf-8") as fh:
+        await fh.write(data)
+        return Ok(path)
 
 
 def localizePath(root, relPath):
     return os.path.join(root, *relPath.split("/"))
-
 
 
 def dictFromManifest(lines):

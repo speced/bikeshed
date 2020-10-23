@@ -4,7 +4,7 @@ import certifi
 import io
 import json
 import re
-import retrying
+import tenacity
 import os
 from collections import defaultdict
 from contextlib import closing
@@ -103,11 +103,10 @@ def update(path, dryRun=False):
     return writtenPaths
 
 
-@retrying.retry(
-    stop_max_attempt_number=3,
-    wait_fixed=1000,
-    # don't catch Ctrl-D, etc
-    retry_on_exception=lambda x:isinstance(x, Exception))
+@tenacity.retry(
+    reraise=True,
+    stop=tenacity.stop_after_attempt(3),
+    wait=tenacity.wait_random(1,2))
 def dataFromApi(api, *args, **kwargs):
     anchorDataContentTypes = [
         "application/json",
