@@ -1,19 +1,18 @@
 from __future__ import annotations
 
+import attr
 import email.utils
 import errno
 import io
 import os
+import requests
 import sys
+import tenacity
 import urllib.parse
 from abc import abstractmethod
 from datetime import date, datetime
 from typing import List, Optional
 
-import attr
-
-import requests
-import retrying
 
 from .Line import Line
 
@@ -126,13 +125,10 @@ class UrlInputSource(InputSource):
     def __str__(self) -> str:
         return self.sourceName
 
-    @retrying.retry(
-        stop_max_attempt_number=3,
-        wait_fixed=1000,
-        # Only catch exceptions from the requests library.
-        retry_on_exception=lambda e: isinstance(
-            e, requests.exceptions.RequestException
-        ),
+    @tenacity.retry(
+        reraise=True,
+        stop=tenacity.stop_after_attempt(3),
+        wait=tenacity.wait_random(1,2),
     )
     def _fetch(self, *args, **kwargs):
         response = requests.get(self.sourceName, timeout=10)
