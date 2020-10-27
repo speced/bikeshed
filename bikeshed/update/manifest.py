@@ -198,16 +198,29 @@ async def updateFile(localPrefix, filePath, session):
     localPath = localizePath(localPrefix, filePath)
     res = await downloadFile(remotePath, session)
     if res.is_ok():
-        res = await saveFile(localPath, res.value)
+        res = await saveFile(localPath, res.ok())
+    else:
+        warn(f"Error downloading {filePath}, full error was:\n{await errorFromAsyncErr(res)}")
     if res.is_err():
         res = Err(filePath)
     return res
+
+async def errorFromAsyncErr(res):
+    if res.is_ok():
+        return res.ok()
+    try:
+        await res.err()
+    except Exception as e:
+        return e
+
+def wrapError(retry_state):
+    return Err(asyncio.wrap_future(retry_state.outcome))
 
 @tenacity.retry(
     reraise=True,
     stop=tenacity.stop_after_attempt(3),
     wait=tenacity.wait_random(1,2),
-    retry_error_callback=lambda retry_state: Err(retry_state),
+    retry_error_callback=wrapError,
     )
 async def downloadFile(path, session):
     resp = await session.request(method='GET', url=path)
@@ -218,7 +231,7 @@ async def downloadFile(path, session):
     reraise=True,
     stop=tenacity.stop_after_attempt(3),
     wait=tenacity.wait_random(1,2),
-    retry_error_callback=lambda retry_state: Err(retry_state),
+    retry_error_callback=wrapError,
     )
 async def saveFile(path, data):
     dirPath = os.path.dirname(path)
