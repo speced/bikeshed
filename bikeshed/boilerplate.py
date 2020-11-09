@@ -243,10 +243,9 @@ def addBikeshedBoilerplate(doc):
     for k,v in sorted(doc.extraStyles.items()):
         if k not in doc.md.boilerplate:
             continue
-        if doc.md.prepTR:
-            if k in ["style-darkmode", "style-colors"]:
-                # These are handled by the /TR stylesheet, so don't output them
-                continue
+        if k == "style-colors" and doc.md.prepTR:
+            # These are handled by the /TR stylesheet, so don't output them
+            continue
         if k == "style-darkmode":
             # Have to output these *last* so they'll override preceding colors.
             continue
@@ -257,7 +256,7 @@ def addBikeshedBoilerplate(doc):
             appendChild(container,
                         E.style(f"/* {k} */\n{v}"))
     # Output the darkmode styles after all other styles
-    if "style-darkmode" in doc.md.boilerplate:
+    if not doc.md.prepTR and "style-darkmode" in doc.md.boilerplate:
         k = "style-darkmode"
         v = doc.extraStyles[k]
         container = getFillContainer(k, doc)
