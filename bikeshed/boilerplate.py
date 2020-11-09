@@ -239,26 +239,29 @@ def addAnnotations(doc):
         appendContents(find("head", doc), el)
 
 
+def w3cStylesheetInUse(doc):
+    for el in findAll("link[rel=stylesheet]", doc):
+        if "https://www.w3.org/StyleSheets/TR" in el.get("href"):
+            return True
+    return False
+
+def keyFromStyles(kv):
+    k = kv[0]
+    if k == "style-darkmode":
+        prio = 2
+    else:
+        prio = 1
+
+    return (prio, k)
+
 def addBikeshedBoilerplate(doc):
-    for k,v in sorted(doc.extraStyles.items()):
+    w3cStylesheet = w3cStylesheetInUse(doc)
+    for k,v in sorted(doc.extraStyles.items(), key=keyFromStyles):
         if k not in doc.md.boilerplate:
             continue
-        if k == "style-colors" and doc.md.prepTR:
+        if w3cStylesheet and k in ["style-colors", "style-darkmode"]:
             # These are handled by the /TR stylesheet, so don't output them
             continue
-        if k == "style-darkmode":
-            # Have to output these *last* so they'll override preceding colors.
-            continue
-        container = getFillContainer(k, doc)
-        if container is None:
-            container = getFillContainer("bs-styles", doc, default=True)
-        if container is not None:
-            appendChild(container,
-                        E.style(f"/* {k} */\n{v}"))
-    # Output the darkmode styles after all other styles
-    if not doc.md.prepTR and "style-darkmode" in doc.md.boilerplate:
-        k = "style-darkmode"
-        v = doc.extraStyles[k]
         container = getFillContainer(k, doc)
         if container is None:
             container = getFillContainer("bs-styles", doc, default=True)
