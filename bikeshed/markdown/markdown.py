@@ -33,8 +33,13 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
     # Inline elements that are allowed to start a "normal" line of text.
     # Any other element will instead be an HTML line and will close paragraphs, etc.
     inlineElements = {"a", "em", "strong", "small", "s", "cite", "q", "dfn", "abbr", "data", "time", "code", "var", "samp", "kbd", "sub", "sup", "i", "b", "u", "mark", "ruby", "bdi", "bdo", "span", "br", "wbr", "img", "meter", "progress", "css", "l"}
+
     if blockElements is None:
         blockElements = []
+    # Custom elements are assumed to be inline in general,
+    # (you have to pass the block-level custom elements as metadata),
+    # but Bikeshed has some custom elements that it uses as block-level
+    blockElements.append("if-wrapper")
 
     def inlineElementStart(line):
         # Whether or not the line starts with an inline element
@@ -175,7 +180,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
         tokens.append(token)
 
     #for token in tokens:
-    #    print (" " * (11 - len(token['type']))) + token['type'] + ": " + token['line'].text.rstrip()
+    #    print(f"{' ' * (11 - len(token['type']))}{token['type']}: {token['line'].text.rstrip()}")
 
     return tokens
 
