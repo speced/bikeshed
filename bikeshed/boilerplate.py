@@ -142,19 +142,6 @@ def addLogo(doc):
     loadBoilerplate(doc, 'logo')
 
 
-def addSubstatus(doc):
-    container = getFillContainer("substatus", doc, default=False)
-    if container is None:
-        return
-    if doc.md.status == "w3c/CR":
-        appendChild(container, E.span("Snapshot"))
-    elif doc.md.status == "w3c/CRD":
-        appendChild(container, E.span("Draft"))
-    else:
-        if container is not None:
-            removeNode(container)
-
-
 def addCopyright(doc):
     loadBoilerplate(doc, 'copyright')
 
