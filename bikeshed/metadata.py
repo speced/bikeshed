@@ -190,14 +190,6 @@ class MetadataManager:
         if self.displayShortname:
             self.shortname = self.displayShortname.lower()
 
-        # Temporary fix until W3C publishes a better version of the image
-        if self.status in ["w3c/CG-DRAFT", "w3c/UD"] and not self.prepTR:
-            doc.extraStyles['darkmode'] += '''
-            @media (prefers-color-scheme: dark) {
-                html { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cg fill='%23100808' transform='translate(200 200) rotate(-45) translate(-200 -200)' stroke='%23100808' stroke-width='3'%3E%3Ctext x='50%25' y='220' style='font: bold 70px sans-serif; text-anchor: middle; letter-spacing: 6px;'%3EUNOFFICIAL%3C/text%3E%3Ctext x='50%25' y='305' style='font: bold 70px sans-serif; text-anchor: middle; letter-spacing: 6px;'%3EDRAFT%3C/text%3E%3C/g%3E%3C/svg%3E") !important; }
-            }
-            '''
-
     def validate(self):
         if self.group == "byos":
             return True

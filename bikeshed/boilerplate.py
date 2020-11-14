@@ -227,10 +227,8 @@ def addAnnotations(doc):
 
 
 def w3cStylesheetInUse(doc):
-    for el in findAll("link[rel=stylesheet]", doc):
-        if "https://www.w3.org/StyleSheets/TR" in el.get("href"):
-            return True
-    return False
+    return doc.md.prepTR or doc.md.status in config.snapshotStatuses
+
 
 def keyFromStyles(kv):
     k = kv[0]
