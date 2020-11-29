@@ -33,6 +33,8 @@ def main():
                            help="Force the preprocessor to run to completion; fatal errors don't stop processing.")
     argparser.add_argument("-d", "--dry-run", dest="dryRun", action="store_true",
                            help="Prevents the processor from actually saving anything to disk, but otherwise fully runs.")
+    argparser.add_argument("-a", "--ascii-only", dest="asciiOnly", action="store_true",
+                           help="Force all Bikeshed messages to be ASCII-only.")
     argparser.add_argument("--print", dest="printMode", action="store", default=None,
                            help="Print mode. Options are 'plain' (just text), 'console' (colored with console color codes), 'markup', and 'json'. Defaults to 'console'.")
     argparser.add_argument("--die-on", dest="errorLevel", choices=["nothing", "fatal", "link-error", "warning", "everything"],
@@ -207,6 +209,7 @@ def main():
         constants.quiet = float("infinity")
     constants.setErrorLevel(options.errorLevel)
     constants.dryRun = options.dryRun
+    constants.asciiOnly = options.asciiOnly
     if options.printMode is None:
         if "NO_COLOR" in os.environ or os.environ.get("TERM") == "dumb":
             constants.printMode = "plain"

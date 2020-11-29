@@ -12,17 +12,19 @@ messageCounts = Counter()
 
 
 def p(msg, sep=None, end=None):
+    if constants.quiet == float("infinity"):
+        return
     if isinstance(msg, tuple):
         msg, ascii = msg
     else:
-        ascii = None
-    if constants.quiet == float("infinity"):
-        return
+        ascii = msg.encode("ascii", "replace").decode()
+    if constants.asciiOnly:
+        msg = ascii
     try:
         print(msg, sep=sep, end=end)
     except UnicodeEncodeError:
         if ascii is not None:
-            print(ascii.encode("ascii", "replace"))
+            print(ascii, sep=sep, end=end)
         else:
             warning = formatMessage("warning", "Your console does not understand Unicode.\n  Messages may be slightly corrupted.")
             if warning not in messages:

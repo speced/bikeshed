@@ -6,6 +6,7 @@ dryRun = False
 errorLevel = ["fatal"]
 printMode = "console"
 quiet = True
+asciiOnly = False
 refStatus = StringEnum("current", "snapshot")
 biblioDisplay = StringEnum("index", "inline")
 specClass = None
