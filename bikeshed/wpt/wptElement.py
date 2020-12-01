@@ -46,7 +46,7 @@ def processWptElements(doc):
 		if len(prefixedNames) == 0:
 			die("Couldn't find any tests with the path prefix '{0}'.", pathPrefix)
 			return
-		createHTML(doc, wptRestElements[0], prefixedNames)
+		createHTML(doc, wptRestElements[0], prefixedNames, testData)
 		warn("<wpt-rest> is intended for debugging only. Move the tests to <wpt> elements next to what they're testing.")
 	else:
 		if pathPrefix:
