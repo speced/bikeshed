@@ -26,11 +26,8 @@ def update(path, dryRun=False):
 
     paths = []
     for testType, typePaths in jsonData["items"].items():
-        if testType not in ("manual", "reftest", "testharness", "wdspec"):
-            # Not tests
-            continue
-        collectPaths(paths, typePaths, testType + " ")
-
+        if testType in ("crashtest", "manual", "print-reftest", "reftest", "testharness", "visual", "wdspec"):
+            collectPaths(paths, typePaths, testType + " ")
     if not dryRun:
         try:
             with io.open(os.path.join(path, "wpt-tests.txt"), 'w', encoding="utf-8") as f:

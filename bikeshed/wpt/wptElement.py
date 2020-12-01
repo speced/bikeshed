@@ -25,7 +25,7 @@ def processWptElements(doc):
 				die("Couldn't find WPT test '{0}' - did you misspell something?", testName, el=el)
 				continue
 			seenTestNames.add(testName)
-		createHTML(doc, el, testNames)
+		createHTML(doc, el, testNames, testData)
 
 	# <wpt-rest> elements
 	wptRestElements = findAll("wpt-rest", doc)
@@ -59,7 +59,7 @@ def processWptElements(doc):
 
 
 
-def createHTML(doc, blockEl, testNames):
+def createHTML(doc, blockEl, testNames, testData):
 	if doc.md.wptDisplay == "none":
 		removeNode(blockEl)
 	elif doc.md.wptDisplay == "inline":
@@ -72,12 +72,31 @@ def createHTML(doc, blockEl, testNames):
 			else:
 				liveTestScheme = "http"
 			_,_,lastNameFragment = testName.rpartition("/")
-			singleTestEl = E.li({"class": "wpt-test"},
-				E.a({"href": "https://wpt.fyi/results/"+testName}, lastNameFragment),
-				" ",
-				E.a({"title": testName, "href": "{0}://web-platform-tests.live/{1}".format(liveTestScheme, testName)}, E.small("(live test)")),
-				" ",
-				E.a({"href": "https://github.com/web-platform-tests/wpt/blob/master/"+testName}, E.small("(source)")))
+			testType = testData[testName]
+			if testType in ["crashtest", "print-reftest", "reftest", "testharness"]:
+				singleTestEl = E.li({"class": "wpt-test"},
+					E.a({"href": "https://wpt.fyi/results/"+testName, "class":"wpt-name"}, lastNameFragment),
+					" ",
+					E.a({"title": testName, "href": "{0}://web-platform-tests.live/{1}".format(liveTestScheme, testName), "class":"wpt-live"},
+						E.small("(live test)")),
+					" ",
+					E.a({"href": "https://github.com/web-platform-tests/wpt/blob/master/"+testName, "class":"wpt-source"}, E.small("(source)")))
+			elif testType in ["manual", "visual"]:
+				singleTestEl = E.li({"class": "wpt-test"},
+					E.span({"class":"wpt-name"},
+						lastNameFragment,
+						f" ({testType} test) "),
+					E.a({"href": "https://github.com/web-platform-tests/wpt/blob/master/"+testName, "class":"wpt-source"}, E.small("(source)")))
+			elif testType in ["wdspec"]:
+				singleTestEl = E.li({"class": "wpt-test"},
+					E.a({"href": "https://wpt.fyi/results/"+testName, "class":"wpt-name"}, lastNameFragment),
+					" ",
+					E.a({"href": "https://github.com/web-platform-tests/wpt/blob/master/"+testName, "class":"wpt-source"}, E.small("(source)")))
+			else:
+				warn(f"Programming error, the test {testName} is of type {testType}, which I don't know how to render. Please report this!")
+				continue
+
+
 			appendChild(blockEl, singleTestEl)
 	else:
 		die("Programming error, uncaught WPT Display value in createHTML.")
@@ -183,4 +202,7 @@ wptStyle = '''
 	text-decoration: underline;
 	border: none;
 }
+.wpt-test > .wpt-name { grid-column: 1; }
+.wpt-test > .wpt-live { grid-column: 2; }
+.wpt-test > .wpt-source { grid-column: 3; }
 '''
