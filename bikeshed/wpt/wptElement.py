@@ -161,8 +161,9 @@ wptStyle = '''
 }
 .wpt-tests-block {
 	list-style: none;
-	border-left: .5em solid hsl(290, 70%, 30%);
-	background: hsl(290, 70%, 95%);
+	border-left: .5em solid var(--wpt-border);
+	background: var(--wpt-bg);
+	color: var(--wpt-text);
 	margin: 1em auto;
 	padding: .5em;
 	display: grid;
@@ -172,7 +173,7 @@ wptStyle = '''
 .wpt-tests-block::before {
 	content: "Tests";
 	grid-column: 1/-1;
-	color: hsl(290, 70%, 30%);
+	color: var(--wptheading-text);
 	text-transform: uppercase;
 }
 .wpt-test {
