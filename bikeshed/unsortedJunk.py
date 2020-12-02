@@ -708,7 +708,9 @@ def processBiblioLinks(doc):
 
         okayToFail = el.get('data-okay-to-fail') is not None
 
-        ref = doc.refs.getBiblioRef(linkText, status=refStatus, generateFakeRef=okayToFail, quiet=okayToFail, el=el)
+        allowObsolete = el.get('data-biblio-obsolete') is not None
+
+        ref = doc.refs.getBiblioRef(linkText, status=refStatus, allowObsolete=allowObsolete, generateFakeRef=okayToFail, quiet=okayToFail, el=el)
         if not ref:
             if not okayToFail:
                 closeBiblios = biblio.findCloseBiblios(doc.refs.biblioKeys, linkText)

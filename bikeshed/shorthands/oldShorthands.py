@@ -325,7 +325,7 @@ biblioRe = re.compile(r"""
                         \[\[
                         (!)?
                         ([\w.+-]+)
-                        (\s+(?:current|snapshot|inline|index)\s*)*
+                        (\s+(?:current|snapshot|inline|index|obsolete)\s*)*
                         (?:\|([^\]]+))?
                         \]\]""", re.X)
 def biblioReplacer(match):
@@ -355,6 +355,9 @@ def biblioReplacer(match):
         die(f"Biblio shorthand {match.group(0)} contains *both* 'inline' and 'index', please pick one.")
     elif displayInline or displayIndex:
         attrs['data-biblio-display'] = "inline" if displayInline else "index"
+
+    if "obsolete" in modifiers:
+        attrs['data-biblio-obsolete'] = ""
 
     return E.a(attrs, linkText)
 

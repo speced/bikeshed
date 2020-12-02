@@ -2827,32 +2827,6 @@ An "informative" reference is anything else.
 Informative references might be to normative documents,
 if your feature doesn't actually *depend* on the referenced document.)
 
-Some biblio entries come with multiple sets of urls;
-at present, Bikeshed tracks a single "current" url and a single "snapshot" url.
-In the W3C, for example, this maps to Editors Drafts and things in /TR space, respectively.
-You can specify which url to use by specifying "current" or "snapshot" within the biblio shorthand,
-like `[[FOO current]]`,
-or specify the default url to choose for all your biblio refs with the <a>Default Ref Status</a>.
-
-By default, biblio autolinks are formatted like you typed, just with a single set of square brackets:
-`[[FOO]]` will produce a link with the text "\[FOO]",
-which links to the bibliography.
-Alternately, you can force them to display "inline",
-where the link text is the actual title of the referenced document,
-and the link goes straight to that document,
-rather than going to the bibliography first.
-(It still adds an entry to the bibliography index.)
-You can control this by setting `inline` or `index` in the shorthand,
-like `[[FOO inline]]`,
-or change the default for all biblio links in the document
-by setting the [=metadata/Default Biblio Display=] metadata.
-
-(`inline`/`index` can be combined with `current`/`snapshot`,
-and specified in either order.)
-
-If, for whatever reason, you need to craft a bibliography link manually,
-add `data-link-type=biblio`, `data-biblio-type=[normative | informative]`, and `data-biblio-status=[current | snapshot]` attributes to the link.
-
 Unlike regular autolinks,
 which link to <{dfn}> elements,
 biblio autolinks cause the spec to generate entries in its "References" section,
@@ -2864,17 +2838,95 @@ The default data comes from the [SpecRef project](https://github.com/tobie/specr
 and [the CSSWG's own biblio file](http://dev.w3.org/csswg/biblio.ref)
 (preferring SpecRef's information when the same name appears in both).
 
+Biblio Link Modifiers {#biblio-mods}
+---------------------
+
+Several aspects of how bibliography autolinks work can be controlled by adding keywords to the autolink,
+after the biblio name.
+
+* Some biblio entries come with multiple sets of urls;
+	at present, Bikeshed tracks a single "current" url and a single "snapshot" url.
+	In the W3C, for example, this maps to Editors Drafts and things in /TR space, respectively.
+
+	You can specify which url to use by specifying `current` or `snapshot` within the biblio shorthand,
+	like `[[FOO current]]`,
+	or specify the default url to choose for all your biblio refs with the <a>Default Ref Status</a>.
+
+* By default, biblio autolinks are formatted like you typed, just with a single set of square brackets:
+	`[[FOO]]` will produce a link with the text "\[FOO]",
+	which links to the bibliography.
+	Alternately, you can force them to display "inline",
+	where the link text is the actual title of the referenced document,
+	and the link goes straight to that document,
+	rather than going to the bibliography first.
+	(It still adds an entry to the bibliography index.)
+
+	You can control this by setting `inline` or `index` in the shorthand,
+	like `[[FOO inline]]`,
+	or change the default for all biblio links in the document
+	by setting the [=metadata/Default Biblio Display=] metadata.
+
+* The bibliography database tracks whether certain documents have been obsoleted by newer documents,
+	and if you attempt to link to the the now-obsolete document,
+	Bikeshed defaults to linking to the newer document instead
+	and asking you to update the reference.
+
+	If you do intentionally need to link to a now-obsolete document
+	(for example, if you're talking about a feature in the old document
+	that's since been replaced),
+	you can tell Bikeshed you do intend to link to that by setting `obsolete` in the shorthand,
+	like `[[FOO obsolete]]`.
+
+All of these keywords can be combined, in any order,
+such as `[[FOO inline obsolete]]` or `[[FOO index current]]`.
+
+
+Autolinking and Automatic Bibliography Entries {#biblio-auto}
+---------------------------------------------------
+
+Whenever you autolink to a term from another spec
+using a standard dfn autolink,
+Bikeshed automatically adds a bibliography entry for that document
+if one doesn't already exist.
+
+By default, it assumes these are normative references.
+However, if the link is in a "non-normative" element,
+Bikeshed doesn't put it in the bibliography.
+This includes any notes (`class=note`), examples (`class=example`),
+or sections manually marked with `class=non-normative`.
+(You can override this and get a normative reference
+by adding a `class=normative` to the link or an ancestor.)
+
+
+Manual Biblio Links {#biblio-manual}
+-------------------
+
+If, for whatever reason, you need to craft a bibliography link manually,
+just create an <{a}> element with `data-link-type=biblio`
+and the biblio tag either in the text content of the link or in a `data-lt` attribute,
+similar to a manually-crafted autolink.
+
+If you need one of the biblio link modifiers,
+add `data-biblio-type=[normative | informative]`,
+`data-biblio-status=[current | snapshot]`,
+`data-biblio-display=[index | inline]`,
+and/or `data-biblio-obsolete=""` to the link as well.
+
+
+Custom Biblio Entries {#biblio-custom}
+---------------------
+
 You can also add your own bibliography data,
-following the SpecRef JSON format:
+following the [SpecRef JSON format](https://github.com/tobie/specref):
 
 ```json
 {
 	"foo-bar": {
 		"authors": [
 			"Tab Atkins",
-			"Dirk Schultze"
+			"Bat Snikta"
 		],
-		"href": "http://www.w3.org/TR/foo-bar/",
+		"href": "http://www.example.com/foo-bar/",
 		"title": "Foo Bar Level 1",
 		"status": "CR",
 		"publisher": "W3C",
@@ -2885,28 +2937,22 @@ following the SpecRef JSON format:
 }
 ```
 
-Only the "title" field is strictly necessary;
+This would allow you to write `[[FOO-BAR]]` into your document,
+and have it be recognized as a valid autolink,
+with a bibliography entry generated in the index
+just like any of the predefined biblio references.
+
+Note: Only the "title" field is strictly necessary;
 the rest can be omitted if desired.
 
-This JSON should be inline, in a `<pre class=biblio>` block.  It can
-also be in a `biblio.json` file in the same folder as the spec file,
-but this is incompatible with
-[the web service](https://api.csswg.org/bikeshed/).
+This JSON should be inline, in a `<pre class=biblio>` block.
+It can also be in a `biblio.json` file in the same folder as the Bikeshed file,
+but this is incompatible with [[#install-no|the web service]].
 
-
-Linking and Automatic Biblio Entries {#auto-biblio}
----------------------------------------------------
-
-Whenever you autolink to another spec,
-Bikeshed automatically assumes this is a significant, normative reference,
-and adds a bibliography entry for the spec automatically.
-
-However, if the link is in a "non-normative" element,
-Bikeshed doesn't put it in the bibliography.
-This includes any notes (`class=note`), examples (`class=example`),
-or sections manually marked with `class=non-normative`.
-(You can override this and get a normative reference
-by adding a `class=normative` to the link or an ancestor.)
+If you find yourself adding this to more than one document,
+it might be worth adding to SpecRef itself
+so others can benefit from it as well;
+file an issue on that project if you're interested.
 
 
 <!--
