@@ -8,14 +8,14 @@ from ..h import escapeAttr
 from ..messages import *
 
 
-def parse(lines, numSpacesForIndentation, features=None, opaqueElements=None, blockElements=None):
+def parse(lines, numSpacesForIndentation, features=None, opaqueElements=None, blockElements=None, itemNumContext=None):
     fromStrings = False
     if any(isinstance(l, str) for l in lines):
         fromStrings = True
         lines = [Line.Line(-1, l) for l in lines]
     lines = Line.rectify(lines)
     tokens = tokenizeLines(lines, numSpacesForIndentation, features, opaqueElements=opaqueElements, blockElements=blockElements)
-    html = parseTokens(tokens, numSpacesForIndentation)
+    html = parseTokens(tokens, numSpacesForIndentation, itemNumContext)
     if fromStrings:
         return [l.text for l in html]
     else:
@@ -144,10 +144,10 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
         elif re.match(r"((\*\s*){3,})$|((-\s*){3,})$|((_\s*){3,})$", line):
             token = {'type':'rule'}
         elif re.match(r"-?\d+\.\s", line):
-            match = re.match(r"(-?\d+)\.\s+(.*)", line)
-            token = {'type':'numbered', 'text': match.group(2), 'num': int(match.group(1))}
+            match = re.match(r"(-?\d+)\.\s+(\{#([^ }]+)\})?(\s+)?(.*)", line)
+            token = {'type':'numbered', 'text': match.group(5), 'num': int(match.group(1)), 'id': match.group(3)}
         elif re.match(r"-?\d+\.$", line):
-            token = {'type':'numbered', 'text': "", 'num': int(line[:-1])}
+            token = {'type':'numbered', 'text': "", 'num': int(line[:-1]), 'id': None}
         elif re.match(r"[*+-]\s", line):
             match = re.match(r"[*+-]\s+(.*)", line)
             token = {'type':'bulleted', 'text': match.group(1)}
@@ -275,7 +275,7 @@ def stripPrefix(token, numSpacesForIndentation, len):
     return text[offset:]
 
 
-def parseTokens(tokens, numSpacesForIndentation):
+def parseTokens(tokens, numSpacesForIndentation, itemNumContext):
     '''
     Token types:
     eof
@@ -313,7 +313,7 @@ def parseTokens(tokens, numSpacesForIndentation):
         elif stream.currtype() == 'bulleted':
             lines += parseBulleted(stream)
         elif stream.currtype() == 'numbered':
-            lines += parseNumbered(stream, start=stream.currnum())
+            lines += parseNumbered(stream, start=stream.currnum(), itemNumContext=itemNumContext)
         elif stream.currtype() in ("dt", "dd"):
             lines += parseDl(stream)
         elif stream.currtype() == "blockquote":
@@ -456,7 +456,7 @@ def parseBulleted(stream):
     return lines
 
 
-def parseNumbered(stream, start=1):
+def parseNumbered(stream, itemNumContext, start=1):
     prefixLen = stream.currprefixlen()
     ol_i = stream.currline().i
     numSpacesForIndentation = stream.numSpacesForIndentation
@@ -466,18 +466,19 @@ def parseNumbered(stream, start=1):
         # Remove the numbered part from the line
         firstLine = stream.currtext() + "\n"
         i = stream.currline().i
+        id = stream.currid()
         lines = [lineFromStream(stream, firstLine)]
         while True:
             stream.advance()
             # All the conditions that indicate we're *past* the end of the item.
             if stream.currtype() == 'numbered' and stream.currprefixlen() == prefixLen:
-                return lines,i
+                return lines,i,id
             if stream.currprefixlen() < prefixLen:
-                return lines,i
+                return lines,i,id
             if stream.currtype() == 'blank' and stream.nexttype() != 'numbered' and stream.nextprefixlen() <= prefixLen:
-                return lines,i
+                return lines,i,id
             if stream.currtype() == 'eof':
-                return lines,i
+                return lines,i,id
             # Remove the prefix from each line before adding it.
             lines.append(lineFromStream(stream, stripPrefix(stream.curr(), numSpacesForIndentation, prefixLen + 1)))
 
@@ -498,10 +499,18 @@ def parseNumbered(stream, start=1):
         lines = [Line.Line(-1, "<ol data-md line-number={0}>".format(ol_i))]
     else:
         lines = [Line.Line(-1, "<ol data-md start='{0}' line-number={1}>".format(start, ol_i))]
-    for li_lines,i in getItems(stream):
-        lines.append(Line.Line(-1, "<li data-md line-number={0}>".format(i)))
-        lines.extend(parse(li_lines, numSpacesForIndentation))
+    for li_lines,i,id in getItems(stream):
+        itemNumInContext = None
+        if id is not None:
+            itemNumInContext = str(start)
+            if itemNumContext is not None:
+                itemNumInContext = itemNumContext + '.' + itemNumInContext
+            lines.append(Line.Line(-1, "<li data-md line-number={0} data-no-self-link=true id='{1}' item='{2}'>".format(i, escapeAttr(id), escapeAttr(itemNumInContext))))
+        else:
+            lines.append(Line.Line(-1, "<li data-md line-number={0}>".format(i)))
+        lines.extend(parse(li_lines, numSpacesForIndentation, itemNumContext=itemNumInContext))
         lines.append(Line.Line(-1, "</li>"))
+        start += 1
     lines.append(Line.Line(-1, "</ol>"))
     return lines
 
