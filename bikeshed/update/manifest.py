@@ -57,14 +57,19 @@ def createManifest(path, dryRun=False):
                 manifests.append((relPath, hashFile(fh)))
     except Exception as err:
         raise
+
+    manifest = str(datetime.utcnow()) + "\n"
+    for path,hash in sorted(manifests, key=keyManifest):
+        manifest += f"{hash} {path}\n"
+
     if not dryRun:
         try:
             with io.open(os.path.join(path, "manifest.txt"), 'w', encoding="utf-8") as fh:
-                fh.write(str(datetime.utcnow()) + "\n")
-                for p,h in sorted(manifests, key=keyManifest):
-                    fh.write("{0} {1}\n".format(h, p))
+                fh.write(manifest)
         except Exception as err:
             raise
+
+    return manifest
 
 def keyManifest(manifest):
     name = manifest[0]
@@ -82,8 +87,10 @@ def hashFile(fh):
 def getDatafilePaths(basePath):
     for root, dirs, files in os.walk(basePath):
         if "readonly" in dirs:
-            dirs.remove("readonly")
+            continue
         for filename in files:
+            if filename == "":
+                continue
             filePath = os.path.join(root, filename)
             yield filePath, os.path.relpath(filePath, basePath)
 
@@ -95,20 +102,32 @@ def updateByManifest(path, dryRun=False):
     returns True if updating was a success.
     '''
     say("Updating via manifest...")
+
+    say("Gathering local manifest data...")
+    # Get the last-update time from the local manifest
     try:
         with io.open(os.path.join(path, "manifest.txt"), 'r', encoding="utf-8") as fh:
-            localManifest = fh.readlines()
+            localDt = dtFromManifest(fh.readlines())
     except Exception as e:
+        localDt = "error"
         warn("Couldn't find local manifest file.\n{0}", e)
-        return False
+
+    # Get the actual file data by regenerating the local manifest,
+    # to guard against mistakes or shenanigans
+    localManifest = createManifest(path, dryRun=True).split("\n")
+    localFiles = dictFromManifest(localManifest)
+
+
+    say("Fetching remote manifest data...")
     try:
         remoteManifest = requests.get(ghPrefix + "manifest.txt").text.splitlines()
+        remoteDt = dtFromManifest(remoteManifest)
+        remoteFiles = dictFromManifest(remoteManifest)
     except Exception as e:
-        warn("Couldn't download remote manifest file.\n{0}", e)
+        warn("Couldn't download remote manifest file, so can't update. Please report this!\n{0}", e)
+        warn("Update manually with `bikeshed update --skip-manifest`.")
         return False
 
-    localDt = dtFromManifest(localManifest)
-    remoteDt = dtFromManifest(remoteManifest)
     if remoteDt is None:
         die("Something's gone wrong with the remote data; I can't read its timestamp. Please report this!")
         return
@@ -128,10 +147,8 @@ def updateByManifest(path, dryRun=False):
             say("Local data is fresher ({0}) than remote ({1}), so nothing to update.", localDt.strftime("%Y-%m-%d %H:%M:%S"), remoteDt.strftime("%Y-%m-%d %H:%M:%S"))
             return True
 
-    localFiles = dictFromManifest(localManifest)
     if len(localFiles) == 0:
-        say("The local manifest seems borked; re-downloading everything...")
-    remoteFiles = dictFromManifest(remoteManifest)
+        say("The local manifest is borked or missing; re-downloading everything...")
     if len(remoteFiles) == 0:
         die("The remote data doesn't have any data in it. Please report this!")
         return
@@ -259,6 +276,8 @@ def dictFromManifest(lines):
         return {}
     ret = {}
     for line in lines[1:]:
+        if line == "":
+            continue
         hash,_,path = line.strip().partition(" ")
         ret[path] = hash
     return ret
