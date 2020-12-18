@@ -37,7 +37,7 @@ def update(anchors=False, backrefs=False, biblio=False, caniuse=False, linkDefau
             "backrefs": updateBackRefs.update(path=path, dryRun=dryRun) if backrefs else None,
             "biblio": updateBiblio.update(path=path, dryRun=dryRun) if biblio else None,
             "caniuse": updateCanIUse.update(path=path, dryRun=dryRun) if caniuse else None,
-            "mdnspeclinks": updateMdn.update(path=path, dryRun=dryRun) if mdn else None,
+            "mdn": updateMdn.update(path=path, dryRun=dryRun) if mdn else None,
             "linkDefaults": updateLinkDefaults.update(path=path, dryRun=dryRun) if linkDefaults else None,
             "testSuites": updateTestSuites.update(path=path, dryRun=dryRun) if testSuites else None,
             "languages": updateLanguages.update(path=path, dryRun=dryRun) if languages else None,
@@ -115,9 +115,9 @@ def cleanupFiles(root, touchedPaths, dryRun=False):
         deletableFiles.extend(["caniuse.json"])
         deletableFolders.extend(["caniuse"])
         paths.update(touchedPaths["caniuse"])
-    if touchedPaths["mdnspeclinks"] is not None:
-        deletableFolders.extend(["mdnspeclinks"])
-        paths.update(touchedPaths["mdnspeclinks"])
+    if touchedPaths["mdn"] is not None:
+        deletableFolders.extend(["mdn"])
+        paths.update(touchedPaths["mdn"])
 
     say("Cleaning up old data files...")
     oldPaths = []
