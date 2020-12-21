@@ -6,7 +6,6 @@ import lxml.html
 from . import constants
 
 
-
 messages = set()
 messageCounts = Counter()
 
@@ -26,7 +25,10 @@ def p(msg, sep=None, end=None):
         if ascii is not None:
             print(ascii, sep=sep, end=end)
         else:
-            warning = formatMessage("warning", "Your console does not understand Unicode.\n  Messages may be slightly corrupted.")
+            warning = formatMessage(
+                "warning",
+                "Your console does not understand Unicode.\n  Messages may be slightly corrupted.",
+            )
             if warning not in messages:
                 print(warning)
                 messages.add(warning)
@@ -35,10 +37,10 @@ def p(msg, sep=None, end=None):
 
 def die(msg, *formatArgs, **namedArgs):
     lineNum = None
-    if 'el' in namedArgs and namedArgs['el'].get("line-number"):
-        lineNum = namedArgs['el'].get("line-number")
+    if "el" in namedArgs and namedArgs["el"].get("line-number"):
+        lineNum = namedArgs["el"].get("line-number")
     elif namedArgs.get("lineNum", None):
-        lineNum = namedArgs['lineNum']
+        lineNum = namedArgs["lineNum"]
     msg = formatMessage("fatal", msg.format(*formatArgs, **namedArgs), lineNum=lineNum)
     if msg not in messages:
         messageCounts["fatal"] += 1
@@ -52,39 +54,47 @@ def die(msg, *formatArgs, **namedArgs):
 def linkerror(msg, *formatArgs, **namedArgs):
     lineNum = None
     suffix = ""
-    if 'el' in namedArgs:
-        el = namedArgs['el']
+    if "el" in namedArgs:
+        el = namedArgs["el"]
         if el.get("line-number"):
             lineNum = el.get("line-number")
         else:
             if el.get("bs-autolink-syntax"):
                 suffix = "\n{0}".format(el.get("bs-autolink-syntax"))
             else:
-                suffix = "\n{0}".format(lxml.html.tostring(namedArgs['el'], with_tail=False, encoding="unicode"))
+                suffix = "\n{0}".format(
+                    lxml.html.tostring(
+                        namedArgs["el"], with_tail=False, encoding="unicode"
+                    )
+                )
     elif namedArgs.get("lineNum", None):
-        lineNum = namedArgs['lineNum']
-    msg = formatMessage("link", msg.format(*formatArgs, **namedArgs)+suffix, lineNum=lineNum)
+        lineNum = namedArgs["lineNum"]
+    msg = formatMessage(
+        "link", msg.format(*formatArgs, **namedArgs) + suffix, lineNum=lineNum
+    )
     if msg not in messages:
         messageCounts["linkerror"] += 1
         messages.add(msg)
         if constants.quiet < 2:
-                p(msg)
+            p(msg)
     if constants.errorLevelAt("link-error"):
         errorAndExit()
 
 
 def warn(msg, *formatArgs, **namedArgs):
     lineNum = None
-    if 'el' in namedArgs and namedArgs['el'].get("line-number"):
-        lineNum = namedArgs['el'].get("line-number")
+    if "el" in namedArgs and namedArgs["el"].get("line-number"):
+        lineNum = namedArgs["el"].get("line-number")
     elif namedArgs.get("lineNum", None):
-        lineNum = namedArgs['lineNum']
-    msg = formatMessage("warning", msg.format(*formatArgs, **namedArgs), lineNum=lineNum)
+        lineNum = namedArgs["lineNum"]
+    msg = formatMessage(
+        "warning", msg.format(*formatArgs, **namedArgs), lineNum=lineNum
+    )
     if msg not in messages:
         messageCounts["warning"] += 1
         messages.add(msg)
         if constants.quiet < 1:
-                p(msg)
+            p(msg)
     if constants.errorLevelAt("warning"):
         errorAndExit()
 
@@ -131,7 +141,7 @@ def printColor(text, color="white", *styles):
             "light blue": 94,
             "light magenta": 95,
             "light cyan": 96,
-            "white": 97
+            "white": 97,
         }
         stylesConverter = {
             "normal": 0,
@@ -143,7 +153,7 @@ def printColor(text, color="white", *styles):
             "blink": 5,
             "reverse": 7,
             "invert": 7,
-            "hidden": 8
+            "hidden": 8,
         }
 
         colorNum = colorsConverter[color.lower()]
@@ -172,9 +182,15 @@ def formatMessage(type, text, lineNum=None):
         if type == "message":
             return text
         if type == "success":
-            return (printColor(" ✔ ", "green", "invert") + " " + text, printColor("YAY", "green", "invert") + " " + text)
+            return (
+                printColor(" ✔ ", "green", "invert") + " " + text,
+                printColor("YAY", "green", "invert") + " " + text,
+            )
         if type == "failure":
-            return (printColor(" ✘ ", "red", "invert") + " " + text, printColor("ERR", "red", "invert") + " " + text)
+            return (
+                printColor(" ✘ ", "red", "invert") + " " + text,
+                printColor("ERR", "red", "invert") + " " + text,
+            )
         if type == "fatal":
             headingText = "FATAL ERROR"
             color = "red"
@@ -187,6 +203,7 @@ def formatMessage(type, text, lineNum=None):
         if lineNum is not None:
             headingText = "LINE {0}".format(lineNum)
         return printColor(headingText + ":", color, "bold") + " " + text
+
 
 def errorAndExit():
     failure("Did not generate, due to fatal errors")

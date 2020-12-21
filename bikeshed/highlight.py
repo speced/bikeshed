@@ -10,12 +10,14 @@ from .messages import *
 
 def loadCSSLexer():
     from .lexers import CSSLexer
-    return CSSLexer()
-customLexers = {
-    "css": loadCSSLexer
-}
 
-ColoredText = collections.namedtuple('ColoredText', ['text', 'color'])
+    return CSSLexer()
+
+
+customLexers = {"css": loadCSSLexer}
+
+ColoredText = collections.namedtuple("ColoredText", ["text", "color"])
+
 
 def addSyntaxHighlighting(doc):
     if doc.md.slimBuildArtifact:
@@ -38,21 +40,23 @@ def addSyntaxHighlighting(doc):
         # Find whether to add line numbers
         addLineNumbers, lineStart, lineHighlights = determineLineNumbers(doc, el)
         if addLineNumbers or lineHighlights:
-            addLineWrappers(el, numbers=addLineNumbers, start=lineStart, highlights=lineHighlights)
+            addLineWrappers(
+                el, numbers=addLineNumbers, start=lineStart, highlights=lineHighlights
+            )
             if addLineNumbers:
                 lineWrappingOccurred = True
             if lineHighlights:
                 lineHighlightingOccurred = True
 
     if highlightingOccurred:
-        doc.extraStyles['style-syntax-highlighting'] += getHighlightStyles()
-        doc.extraStyles['style-darkmode'] += getHighlightDarkmodeStyles()
+        doc.extraStyles["style-syntax-highlighting"] += getHighlightStyles()
+        doc.extraStyles["style-darkmode"] += getHighlightDarkmodeStyles()
     if lineWrappingOccurred:
-        doc.extraStyles['style-line-numbers'] += getLineNumberStyles()
-        doc.extraStyles['style-darkmode'] += getLineNumberDarkmodeStyles()
+        doc.extraStyles["style-line-numbers"] += getLineNumberStyles()
+        doc.extraStyles["style-darkmode"] += getLineNumberDarkmodeStyles()
     if lineHighlightingOccurred:
-        doc.extraStyles['style-line-highlighting'] += getLineHighlightingStyles()
-        doc.extraStyles['style-darkmode'] += getLineHighlightingDarkmodeStyles()
+        doc.extraStyles["style-line-highlighting"] += getLineHighlightingStyles()
+        doc.extraStyles["style-darkmode"] += getLineHighlightingDarkmodeStyles()
 
 
 def determineHighlightLang(doc, el):
@@ -93,7 +97,11 @@ def determineLineNumbers(doc, el):
         try:
             lineStart = int(lineStart)
         except ValueError:
-            die("line-start attribute must have an integer value. Got '{0}'.", lineStart, el=el)
+            die(
+                "line-start attribute must have an integer value. Got '{0}'.",
+                lineStart,
+                el=el,
+            )
             lineStart = 1
 
     lh = el.get("line-highlight")
@@ -105,22 +113,34 @@ def determineLineNumbers(doc, el):
         for item in lh.split(","):
             if "-" in item:
                 # Range, format of DDD-DDD
-                low,_,high = item.partition("-")
+                low, _, high = item.partition("-")
                 try:
                     low = int(low)
                     high = int(high)
                 except ValueError:
-                    die("Error parsing line-highlight range '{0}' - must be `int-int`.", item, el=el)
+                    die(
+                        "Error parsing line-highlight range '{0}' - must be `int-int`.",
+                        item,
+                        el=el,
+                    )
                     continue
                 if low >= high:
-                    die("line-highlight ranges must be well-formed lo-hi - got '{0}'.", item, el=el)
+                    die(
+                        "line-highlight ranges must be well-formed lo-hi - got '{0}'.",
+                        item,
+                        el=el,
+                    )
                     continue
-                lineHighlights.update(list(range(low, high+1)))
+                lineHighlights.update(list(range(low, high + 1)))
             else:
                 try:
                     item = int(item)
                 except ValueError:
-                    die("Error parsing line-highlight value '{0}' - must be integers.", item, el=el)
+                    die(
+                        "Error parsing line-highlight value '{0}' - must be integers.",
+                        item,
+                        el=el,
+                    )
                     continue
                 lineHighlights.add(item)
 
@@ -139,7 +159,8 @@ def highlightEl(el, lang):
 
 def highlightWithWebIDL(text, el):
     from widlparser import parser
-    '''
+
+    """
     Trick the widlparser emitter,
     which wants to output HTML via wrapping with start/end tags,
     into instead outputting a stack-based text format.
@@ -147,27 +168,36 @@ def highlightWithWebIDL(text, el):
     the text between the \1 and the \2 is the attr to be pushed.
     A \3 indicates a stack pop.
     All other text is colored with the attr currently on top of the stack.
-    '''
+    """
+
     class IDLUI(object):
         def warn(self, msg):
             die("{0}", msg.rstrip())
+
     class HighlightMarker(object):
         # Just applies highlighting classes to IDL stuff.
         def markup_type_name(self, text, construct):
-            return ('\1n\2', '\3')
+            return ("\1n\2", "\3")
+
         def markup_name(self, text, construct):
-            return ('\1g\2', '\3')
+            return ("\1g\2", "\3")
+
         def markup_keyword(self, text, construct):
-            return ('\1b\2', '\3')
+            return ("\1b\2", "\3")
+
         def markup_enum_value(self, text, construct):
-            return ('\1s\2', '\3')
+            return ("\1s\2", "\3")
 
     if "\1" in text or "\2" in text or "\3" in text:
-        die("WebIDL text contains some U+0001-0003 characters, which are used by the highlighter. This block can't be highlighted. :(", el=el)
+        die(
+            "WebIDL text contains some U+0001-0003 characters, which are used by the highlighter. This block can't be highlighted. :(",
+            el=el,
+        )
         return
 
     widl = parser.Parser(text, IDLUI())
     return coloredTextFromWidlStack(str(widl.markup(HighlightMarker())))
+
 
 def coloredTextFromWidlStack(widlText):
     coloredTexts = collections.deque()
@@ -209,19 +239,31 @@ def coloredTextFromWidlStack(widlText):
             else:
                 currentText += char
                 continue
-    assert len(colors) == 0, r"Colors stack wasn't empty at end, \1 and \3s aren't balanced?"
+    assert (
+        len(colors) == 0
+    ), r"Colors stack wasn't empty at end, \1 and \3s aren't balanced?"
     if currentText:
         coloredTexts.append(ColoredText(currentText, None))
     return coloredTexts
 
+
 def highlightWithPygments(text, lang, el):
     import pygments
     from pygments import formatters
+
     lexer = lexerFromLang(lang)
     if lexer is None:
-        die("'{0}' isn't a known syntax-highlighting language. See http://pygments.org/docs/lexers/. Seen on:\n{1}", lang, outerHTML(el), el=el)
+        die(
+            "'{0}' isn't a known syntax-highlighting language. See http://pygments.org/docs/lexers/. Seen on:\n{1}",
+            lang,
+            outerHTML(el),
+            el=el,
+        )
         return
-    rawTokens = str(pygments.highlight(text, lexer, formatters.RawTokenFormatter()), encoding="utf-8")
+    rawTokens = str(
+        pygments.highlight(text, lexer, formatters.RawTokenFormatter()),
+        encoding="utf-8",
+    )
     coloredText = coloredTextFromRawTokens(rawTokens)
     return coloredText
 
@@ -234,7 +276,7 @@ def mergeHighlighting(el, coloredText):
     # the markup structure is a flat list of sibling elements containing raw text
     # (and maybe some un-highlighted raw text between them).
     def createEl(color, text):
-        return createElement("c-", {color:""}, text)
+        return createElement("c-", {color: ""}, text)
 
     def colorizeEl(el, coloredText):
         for node in childNodes(el, clear=True):
@@ -253,7 +295,7 @@ def mergeHighlighting(el, coloredText):
                     nodes.append(nextColor.text)
                 else:
                     nodes.append(createEl(nextColor.color, nextColor.text))
-                text = text[len(nextColor.text):]
+                text = text[len(nextColor.text) :]
             else:  # Need to use only part of the nextColor node
                 if nextColor.color is None:
                     nodes.append(text)
@@ -261,13 +303,15 @@ def mergeHighlighting(el, coloredText):
                     nodes.append(createEl(nextColor.color, text))
                 # Truncate the nextColor text to what's unconsumed,
                 # and put it back into the deque
-                nextColor = ColoredText(nextColor.text[len(text):], nextColor.color)
+                nextColor = ColoredText(nextColor.text[len(text) :], nextColor.color)
                 coloredText.appendleft(nextColor)
-                text = ''
+                text = ""
         return nodes
+
     # Remove empty colored texts
     coloredText = collections.deque(x for x in coloredText if x.text)
     colorizeEl(el, coloredText)
+
 
 def coloredTextFromRawTokens(text):
     colorFromName = {
@@ -322,8 +366,9 @@ def coloredTextFromRawTokens(text):
         "Token.Name.Variable.Class": "vc",
         "Token.Name.Variable.Global": "vg",
         "Token.Name.Variable.Instance": "vi",
-        "Token.Literal.Number.Integer.Long": "il"
+        "Token.Literal.Number.Integer.Long": "il",
     }
+
     def addCtToList(list, ct):
         if "\n" in ct.text:
             # Break apart the formatting so that the \n is plain text,
@@ -335,12 +380,13 @@ def coloredTextFromRawTokens(text):
                 list.append(ColoredText(bit, ct.color))
         else:
             list.append(ct)
+
     textList = collections.deque()
     currentCT = None
     for line in text.split("\n"):
         if not line:
             continue
-        tokenName,_,tokenTextRepr = line.partition("\t")
+        tokenName, _, tokenTextRepr = line.partition("\t")
         color = colorFromName.get(tokenName, None)
         text = eval(tokenTextRepr)
         if not text:
@@ -382,6 +428,7 @@ def lexerFromLang(lang):
         return customLexers[lang]()
     try:
         from pygments.lexers import get_lexer_by_name
+
         return get_lexer_by_name(lang, encoding="utf-8", stripAll=True)
     except:
         return None
@@ -421,7 +468,7 @@ def addLineWrappers(el, numbers=True, start=1, highlights=None):
             addClass(lineNo, "highlight-line")
         internalNewlines = countInternalNewlines(node)
         if internalNewlines:
-            for i in range(1, internalNewlines+1):
+            for i in range(1, internalNewlines + 1):
                 if (lineNumber + i) in highlights:
                     addClass(lineNo, "highlight-line")
                     addClass(node, "highlight-line")
@@ -432,6 +479,7 @@ def addLineWrappers(el, numbers=True, start=1, highlights=None):
         lineNumber += 1
     addClass(el, "line-numbered")
     return el
+
 
 def countInternalNewlines(el):
     count = 0
@@ -445,9 +493,9 @@ def countInternalNewlines(el):
 
 def getHighlightStyles():
     # To regen the styles, edit and run the below
-    #from pygments import token
-    #from pygments import style
-    #class PrismStyle(style.Style):
+    # from pygments import token
+    # from pygments import style
+    # class PrismStyle(style.Style):
     #    default_style = "#000000"
     #    styles = {
     #        token.Name: "#0077aa",
@@ -463,8 +511,8 @@ def getHighlightStyles():
     #        token.Literal.String: "#a67f59",
     #        token.Comment: "#708090"
     #    }
-    #print formatters.HtmlFormatter(style=PrismStyle).get_style_defs('.highlight')
-    return '''
+    # print formatters.HtmlFormatter(style=PrismStyle).get_style_defs('.highlight')
+    return """
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -521,9 +569,11 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-'''
+"""
+
+
 def getHighlightDarkmodeStyles():
-    return '''
+    return """
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
 
@@ -586,10 +636,11 @@ def getHighlightDarkmodeStyles():
     c-[vm] { color: #cb4b16 } /* Name.Variable.Magic */
     c-[il] { color: #657b83 } /* Literal.Number.Integer.Long */
 }
-'''
+"""
+
 
 def getLineNumberStyles():
-    return '''
+    return """
 :root {
     --highlight-hover-bg: rgba(0, 0, 0, .05);
 }
@@ -621,19 +672,21 @@ def getLineNumberStyles():
     padding: 0 .5em 0 .1em;
     content: attr(data-line-end);
 }
-'''
+"""
+
 
 def getLineNumberDarkmodeStyles():
-    return '''
+    return """
 @media (prefers-color-scheme: dark) {
     :root {
         --highlight-hover-bg: rgba(255, 255, 255, .05);
     }
 }
-'''
+"""
+
 
 def getLineHighlightingStyles():
-    return '''
+    return """
 :root {
     --highlight-hover-bg: rgba(0, 0, 0, .05);
 }
@@ -670,16 +723,17 @@ def getLineHighlightingStyles():
     padding: 0 .5em 0 .1em;
     content: attr(data-line-end);
 }
-'''
+"""
+
 
 def getLineHighlightingDarkmodeStyles():
-    return '''
+    return """
 @media (prefers-color-scheme: dark) {
     :root {
         --highlight-hover-bg: rgba(255, 255, 255, .05);
     }
 }
-'''
+"""
 
 
 def grouper(iterable, n, fillvalue=None):

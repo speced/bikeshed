@@ -5,11 +5,13 @@ from .. import config
 from ..h import *
 from ..messages import *
 
+
 def transformProductionPlaceholders(doc):
     propdescRe = re.compile(r"^'(?:(\S*)/)?([\w*-]+)(?:!!([\w-]+))?'$")
     funcRe = re.compile(r"^(?:(\S*)/)?([\w*-]+\(\))$")
     atruleRe = re.compile(r"^(?:(\S*)/)?(@[\w*-]+)$")
-    typeRe = re.compile(r"""
+    typeRe = re.compile(
+        r"""
         ^(?:(\S*)/)?
         (\S+)
         (?:\s+
@@ -19,7 +21,9 @@ def transformProductionPlaceholders(doc):
             (-?(?:\d+[\w-]*|∞|Infinity))\s*
             \]\s*
         )?$
-        """, re.X)
+        """,
+        re.X,
+    )
     for el in findAll("fake-production-placeholder", doc):
         addLineNumber(el)
         text = textContent(el)
@@ -31,7 +35,12 @@ def transformProductionPlaceholders(doc):
             elif match.group(3) in ("property", "descriptor"):
                 linkType = match.group(2)
             else:
-                die("Shorthand <<{0}>> gives type as '{1}', but only 'property' and 'descriptor' are allowed.", match.group(0), match.group(3), el=el)
+                die(
+                    "Shorthand <<{0}>> gives type as '{1}', but only 'property' and 'descriptor' are allowed.",
+                    match.group(0),
+                    match.group(3),
+                    el=el,
+                )
                 el.tag = "span"
                 el.text = "<‘" + text[1:-1] + "’>"
                 continue
@@ -75,7 +84,11 @@ def transformProductionPlaceholders(doc):
                     die("Shorthand <<{0}>> has an invalid range.", text, el=el)
                 try:
                     if not correctlyOrderedRange(rangeStart, rangeEnd):
-                        die("Shorthand <<{0}>> has a range whose start is not less than its end.", text, el=el)
+                        die(
+                            "Shorthand <<{0}>> has a range whose start is not less than its end.",
+                            text,
+                            el=el,
+                        )
                 except:
                     print(text)
                     raise
@@ -83,10 +96,15 @@ def transformProductionPlaceholders(doc):
                 el.set("data-lt", "<{0}>".format(term))
             el.text = "<{0}>".format(interior)
             continue
-        die("Shorthand <<{0}>> does not match any recognized shorthand grammar.", text, el=el)
+        die(
+            "Shorthand <<{0}>> does not match any recognized shorthand grammar.",
+            text,
+            el=el,
+        )
         el.tag = "span"
         el.text = el.get("bs-autolink-syntax")
         continue
+
 
 def formatValue(val):
     negative = False
@@ -107,10 +125,12 @@ def formatValue(val):
 
     return ("−" if negative else "") + str(val) + unit
 
+
 def correctlyOrderedRange(start, end):
     start = numFromRangeVal(start)
     end = numFromRangeVal(end)
     return start < end
+
 
 def numFromRangeVal(val):
     sign = 1
@@ -121,6 +141,7 @@ def numFromRangeVal(val):
         return sign * float("inf")
     val = re.match(r"(\d+)", val).group(1)
     return sign * int(val)
+
 
 def transformMaybePlaceholders(doc):
     propRe = re.compile(r"^([\w-]+): .+")
@@ -144,7 +165,12 @@ def transformMaybePlaceholders(doc):
             elif match.group(3) in config.maybeTypes:
                 linkType = match.group(3)
             else:
-                die("Shorthand ''{0}'' gives type as '{1}', but only “maybe” types are allowed.", match.group(0), match.group(3), el=el)
+                die(
+                    "Shorthand ''{0}'' gives type as '{1}', but only “maybe” types are allowed.",
+                    match.group(0),
+                    match.group(3),
+                    el=el,
+                )
                 el.tag = "css"
                 continue
             el.tag = "a"
@@ -214,11 +240,12 @@ def transformAutolinkShortcuts(doc):
 
 
 def transformShorthandElements(doc):
-    '''
+    """
     The <l> element can contain any shorthand,
     and works inside of "opaque" elements too,
     unlike ordinary autolinking shorthands.
-    '''
+    """
+
     def replacer(reg, rep, el, text):
         match = reg.match(text)
         if match:
@@ -228,10 +255,11 @@ def transformShorthandElements(doc):
                 attrTarget = result
             else:
                 attrTarget = find("a", result)
-            for k,v in el.attrib.items():
-                attrTarget.set(k,v)
+            for k, v in el.attrib.items():
+                attrTarget.set(k, v)
             return True
         return False
+
     for el in findAll("l", doc):
         # Autolinks that aren't HTML-parsing-compatible
         # are already specially handled by fixAwkwardCSSShorthands().
@@ -254,9 +282,12 @@ def transformShorthandElements(doc):
             continue
         if replacer(varRe, varReplacer, el, text):
             continue
-        die("<l> element doesn't contain a recognized autolinking syntax:\n{0}", outerHTML(el), el=el)
+        die(
+            "<l> element doesn't contain a recognized autolinking syntax:\n{0}",
+            outerHTML(el),
+            el=el,
+        )
         el.tag = "span"
-
 
 
 def transformProductionGrammars(doc):
@@ -267,23 +298,32 @@ def transformProductionGrammars(doc):
     hashMultRe = re.compile(r"#{\s*\d+(\s*,(\s*\d+)?)?\s*}")
 
     def hashMultReplacer(match):
-        return E.a({"data-link-type":"grammar", "data-lt": "#", "for":""}, match.group(0))
+        return E.a(
+            {"data-link-type": "grammar", "data-lt": "#", "for": ""}, match.group(0)
+        )
 
     multRe = re.compile(r"{\s*\d+\s*}")
 
     def multReplacer(match):
-        return E.a({"data-link-type":"grammar", "data-lt": "{A}", "for":""}, match.group(0))
+        return E.a(
+            {"data-link-type": "grammar", "data-lt": "{A}", "for": ""}, match.group(0)
+        )
 
     multRangeRe = re.compile(r"{\s*\d+\s*,(\s*\d+)?\s*}")
 
     def multRangeReplacer(match):
-        return E.a({"data-link-type":"grammar", "data-lt": "{A,B}", "for":""}, match.group(0))
+        return E.a(
+            {"data-link-type": "grammar", "data-lt": "{A,B}", "for": ""}, match.group(0)
+        )
 
     simpleRe = re.compile(r"(\?|!|#|\*|\+|\|\||\||&amp;&amp;|&&|,)(?!')")
     # Note the negative-lookahead, to avoid matching delim tokens.
 
     def simpleReplacer(match):
-        return E.a({"data-link-type":"grammar", "data-lt": match.group(0), "for":""}, match.group(0))
+        return E.a(
+            {"data-link-type": "grammar", "data-lt": match.group(0), "for": ""},
+            match.group(0),
+        )
 
     addedNodes = []
 
@@ -319,15 +359,19 @@ def transformProductionGrammars(doc):
             addLineNumber(node)
 
 
-
-biblioRe = re.compile(r"""
+biblioRe = re.compile(
+    r"""
                         (\\)?
                         \[\[
                         (!)?
                         ([\w.+-]+)
                         (\s+(?:current|snapshot|inline|index|obsolete)\s*)*
                         (?:\|([^\]]+))?
-                        \]\]""", re.X)
+                        \]\]""",
+    re.X,
+)
+
+
 def biblioReplacer(match):
     # Allow escaping things that aren't actually biblio links, by preceding with a \
     escape, bang, term, modifiers, linkText = match.groups()
@@ -339,29 +383,40 @@ def biblioReplacer(match):
         type = "informative"
     if linkText is None:
         linkText = "[{0}]".format(term)
-    attrs = {"data-lt":term, "data-link-type":"biblio", "data-biblio-type":type, "bs-autolink-syntax":match.group(0)}
+    attrs = {
+        "data-lt": term,
+        "data-link-type": "biblio",
+        "data-biblio-type": type,
+        "bs-autolink-syntax": match.group(0),
+    }
 
     modifiers = re.split(r"\s+", modifiers.strip()) if modifiers is not None else []
     statusCurrent = "current" in modifiers
     statusSnapshot = "snapshot" in modifiers
     if statusCurrent and statusSnapshot:
-        die(f"Biblio shorthand {match.group(0)} contains *both* 'current' and 'snapshot', please pick one.")
+        die(
+            f"Biblio shorthand {match.group(0)} contains *both* 'current' and 'snapshot', please pick one."
+        )
     elif statusCurrent or statusSnapshot:
-        attrs['data-biblio-status'] = "current" if statusCurrent else "snapshot"
+        attrs["data-biblio-status"] = "current" if statusCurrent else "snapshot"
 
     displayInline = "inline" in modifiers
     displayIndex = "index" in modifiers
     if displayInline and displayIndex:
-        die(f"Biblio shorthand {match.group(0)} contains *both* 'inline' and 'index', please pick one.")
+        die(
+            f"Biblio shorthand {match.group(0)} contains *both* 'inline' and 'index', please pick one."
+        )
     elif displayInline or displayIndex:
-        attrs['data-biblio-display'] = "inline" if displayInline else "index"
+        attrs["data-biblio-display"] = "inline" if displayInline else "index"
 
     if "obsolete" in modifiers:
-        attrs['data-biblio-obsolete'] = ""
+        attrs["data-biblio-obsolete"] = ""
 
     return E.a(attrs, linkText)
 
-sectionRe = re.compile(r"""
+
+sectionRe = re.compile(
+    r"""
                         (\\)?
                         \[\[
                         ([\w.+-]+)?
@@ -370,7 +425,11 @@ sectionRe = re.compile(r"""
                             (\/[\w.+-]+)
                         )
                         (?:\|([^\]]+))?
-                        \]\]""", re.X)
+                        \]\]""",
+    re.X,
+)
+
+
 def sectionReplacer(match):
     escape, spec, section, justPage, linkText = match.groups()
     if escape:
@@ -381,22 +440,45 @@ def sectionReplacer(match):
         linkText = linkText
     if spec is None:
         # local section link
-        return E.a({"section":"", "href":section, "bs-autolink-syntax":match.group(0)}, linkText)
+        return E.a(
+            {"section": "", "href": section, "bs-autolink-syntax": match.group(0)},
+            linkText,
+        )
     elif justPage is not None:
         # foreign link, to an actual page from a multipage spec
-        return E.span({"spec-section":justPage + "#", "spec":spec, "bs-autolink-syntax":match.group(0)}, linkText)
+        return E.span(
+            {
+                "spec-section": justPage + "#",
+                "spec": spec,
+                "bs-autolink-syntax": match.group(0),
+            },
+            linkText,
+        )
     else:
         # foreign link
-        return E.span({"spec-section":section, "spec":spec, "bs-autolink-syntax":match.group(0)}, linkText)
+        return E.span(
+            {
+                "spec-section": section,
+                "spec": spec,
+                "bs-autolink-syntax": match.group(0),
+            },
+            linkText,
+        )
 
-propdescRe = re.compile(r"""
+
+propdescRe = re.compile(
+    r"""
                         (\\)?
                         '
                         (?:([^\s'|]*)/)?
                         ([\w*-]+)
                         (?:!!([\w-]+))?
                         (?:\|([^']+))?
-                        '""", re.X)
+                        '""",
+    re.X,
+)
+
+
 def propdescReplacer(match):
     escape, linkFor, lt, linkType, linkText = match.groups()
     if escape:
@@ -411,20 +493,39 @@ def propdescReplacer(match):
     elif linkType in ("property", "descriptor"):
         pass
     else:
-        die("Shorthand {0} gives type as '{1}', but only 'property' and 'descriptor' are allowed.", match.group(0), linkType)
+        die(
+            "Shorthand {0} gives type as '{1}', but only 'property' and 'descriptor' are allowed.",
+            match.group(0),
+            linkType,
+        )
         return E.span(match.group(0))
     if linkText is None:
         linkText = lt
-    return E.a({"data-link-type":linkType, "class":"property", "for": linkFor, "lt": lt, "bs-autolink-syntax":match.group(0)}, linkText)
+    return E.a(
+        {
+            "data-link-type": linkType,
+            "class": "property",
+            "for": linkFor,
+            "lt": lt,
+            "bs-autolink-syntax": match.group(0),
+        },
+        linkText,
+    )
 
-idlRe = re.compile(r"""
+
+idlRe = re.compile(
+    r"""
                     (\\)?
                     {{
                     (?:([^}|]*)/)?
                     ([^}/|]+?)
                     (?:!!([\w-]+))?
                     (?:\|([^}]+))?
-                    }}""", re.X)
+                    }}""",
+    re.X,
+)
+
+
 def idlReplacer(match):
     escape, linkFor, lt, linkType, linkText = match.groups()
     if escape:
@@ -436,7 +537,11 @@ def idlReplacer(match):
     elif linkType in config.idlTypes:
         pass
     else:
-        die("Shorthand {0} gives type as '{1}', but only IDL types are allowed.", match.group(0), linkType)
+        die(
+            "Shorthand {0} gives type as '{1}', but only IDL types are allowed.",
+            match.group(0),
+            linkType,
+        )
         return E.span(match.group(0))
     if linkText is None:
         if lt.startswith("constructor(") and linkFor and linkFor != "/":
@@ -444,16 +549,32 @@ def idlReplacer(match):
             linkText = linkFor + lt[11:]
         else:
             linkText = lt
-    return E.code({"class":"idl", "nohighlight":""},
-                  E.a({"data-link-type":linkType, "for": linkFor, "lt":lt, "bs-autolink-syntax":match.group(0)}, linkText))
+    return E.code(
+        {"class": "idl", "nohighlight": ""},
+        E.a(
+            {
+                "data-link-type": linkType,
+                "for": linkFor,
+                "lt": lt,
+                "bs-autolink-syntax": match.group(0),
+            },
+            linkText,
+        ),
+    )
 
-dfnRe = re.compile(r"""
+
+dfnRe = re.compile(
+    r"""
                     (\\)?
                     \[=
                     (?!\s)(?:([^=|]*)/)?
                     ([^\"=]+?)
                     (?:\|([^\"=]+))?
-                    =\]""", re.X)
+                    =\]""",
+    re.X,
+)
+
+
 def dfnReplacer(match):
     escape, linkFor, lt, linkText = match.groups()
     if escape:
@@ -462,15 +583,29 @@ def dfnReplacer(match):
         linkFor = "/"
     if linkText is None:
         linkText = lt
-    return E.a({"data-link-type":"dfn", "for": linkFor, "lt":lt, "bs-autolink-syntax":match.group(0)}, linkText)
+    return E.a(
+        {
+            "data-link-type": "dfn",
+            "for": linkFor,
+            "lt": lt,
+            "bs-autolink-syntax": match.group(0),
+        },
+        linkText,
+    )
 
-abstractRe = re.compile(r"""
+
+abstractRe = re.compile(
+    r"""
                         (\\)?
                         \[\$
                         (?!\s)(?:([^$|]*)/)?
                         ([^\"$]+?)
                         (?:\|([^\"$]+))?
-                        \$\]""", re.X)
+                        \$\]""",
+    re.X,
+)
+
+
 def abstractReplacer(match):
     escape, linkFor, lt, linkText = match.groups()
     if escape:
@@ -479,9 +614,19 @@ def abstractReplacer(match):
         linkFor = "/"
     if linkText is None:
         linkText = lt
-    return E.a({"data-link-type":"abstract-op", "for": linkFor, "lt":lt, "bs-autolink-syntax":match.group(0)}, linkText)
+    return E.a(
+        {
+            "data-link-type": "abstract-op",
+            "for": linkFor,
+            "lt": lt,
+            "bs-autolink-syntax": match.group(0),
+        },
+        linkText,
+    )
 
-elementRe = re.compile(r"""
+
+elementRe = re.compile(
+    r"""
                         (?P<escape>\\)?
                         <{
                         (?P<element>[\w*-]+)
@@ -490,7 +635,11 @@ elementRe = re.compile(r"""
                             (?:/(?P<value>[^}!|]+))?
                         )?
                         (?:!!(?P<linkType>[\w-]+))?
-                        (?:\|(?P<linkText>[^}]+))?}>""", re.X)
+                        (?:\|(?P<linkText>[^}]+))?}>""",
+    re.X,
+)
+
+
 def elementReplacer(match):
     groupdict = match.groupdict()
     if groupdict["escape"]:
@@ -513,59 +662,97 @@ def elementReplacer(match):
         linkText = groupdict["linkText"]
     else:
         linkText = lt
-    return E.code({},
-                  E.a({"data-link-type":linkType, "for": linkFor, "lt": lt, "bs-autolink-syntax":match.group(0)}, linkText))
+    return E.code(
+        {},
+        E.a(
+            {
+                "data-link-type": linkType,
+                "for": linkFor,
+                "lt": lt,
+                "bs-autolink-syntax": match.group(0),
+            },
+            linkText,
+        ),
+    )
 
-varRe = re.compile(r"""
+
+varRe = re.compile(
+    r"""
                     (\\)?
                     \|
                     (\w(?:[\w\s-]*\w)?)
-                    \|""", re.X)
+                    \|""",
+    re.X,
+)
+
+
 def varReplacer(match):
     escape, varText = match.groups()
     if escape:
         return match.group(0)[1:]
-    return E.var({"bs-autolink-syntax":match.group(0)}, varText)
+    return E.var({"bs-autolink-syntax": match.group(0)}, varText)
 
-inlineLinkRe = re.compile(r"""
+
+inlineLinkRe = re.compile(
+    r"""
                             (\\)?
                             \[([^\]]*)\]
                             \(\s*
                             ([^\s)]+)
                             \s*(?:"([^"]*)")?\s*
-                            \)""", re.X)
+                            \)""",
+    re.X,
+)
+
+
 def inlineLinkReplacer(match):
     escape, text, href, title = match.groups()
     if title:
-        attrs = {"href": href, "title":title}
+        attrs = {"href": href, "title": title}
     else:
         attrs = {"href": href}
     attrs["bs-autolink-syntax"] = match.group(0)
     return E.a(attrs, text)
 
-strongRe = re.compile(r"""
+
+strongRe = re.compile(
+    r"""
                         (?<!\\)
                         \*\*
                         (?!\s)([^*]+)(?!\s)
-                        (?<!\\)\*\*""", re.X)
-def strongReplacer(match):
-    return E.strong({"bs-autolink-syntax":match.group(0)}, match.group(1))
+                        (?<!\\)\*\*""",
+    re.X,
+)
 
-emRe = re.compile(r"""
+
+def strongReplacer(match):
+    return E.strong({"bs-autolink-syntax": match.group(0)}, match.group(1))
+
+
+emRe = re.compile(
+    r"""
                     (?<!\\)
                     \*
                     (?!\s)([^*]+)(?!\s)
-                    (?<!\\)\*""", re.X)
+                    (?<!\\)\*""",
+    re.X,
+)
+
+
 def emReplacer(match):
-    return E.em({"bs-autolink-syntax":match.group(0)}, match.group(1))
+    return E.em({"bs-autolink-syntax": match.group(0)}, match.group(1))
+
 
 escapedRe = re.compile(r"\\\*")
+
+
 def escapedReplacer(match):
     return "*"
 
+
 def addLineNumber(el):
-    if el.get('line-number'):
+    if el.get("line-number"):
         return
     line = approximateLineNumber(el)
     if line is not None:
-        el.set('line-number', line)
+        el.set("line-number", line)

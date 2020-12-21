@@ -96,8 +96,10 @@ class MetadataManager:
         self.logo = ""
         self.mailingList = None
         self.mailingListArchives = None
-        self.markupShorthands = config.BoolSet(["css", "dfn", "biblio", "markup", "idl", "algorithm"])
-        self.maxToCDepth = float('inf')
+        self.markupShorthands = config.BoolSet(
+            ["css", "dfn", "biblio", "markup", "idl", "algorithm"]
+        )
+        self.maxToCDepth = float("inf")
         self.metadataInclude = config.BoolSet(default=True)
         self.metadataOrder = ["*", "!*"]
         self.noAbstract = False
@@ -153,7 +155,11 @@ class MetadataManager:
             key = key.title()
 
         if key not in knownKeys:
-            die('Unknown metadata key "{0}". Prefix custom keys with "!".', key, lineNum=lineNum)
+            die(
+                'Unknown metadata key "{0}". Prefix custom keys with "!".',
+                key,
+                lineNum=lineNum,
+            )
             return
         md = knownKeys[key]
 
@@ -174,7 +180,11 @@ class MetadataManager:
             self.boilerplate.default = False
         if not self.repository and doc:
             self.repository = getSpecRepository(doc)
-        if self.repository.type == "github" and "feedback-header" in self.boilerplate and "repository-issue-tracking" in self.boilerplate:
+        if (
+            self.repository.type == "github"
+            and "feedback-header" in self.boilerplate
+            and "repository-issue-tracking" in self.boilerplate
+        ):
             self.issues.append(("GitHub", self.repository.formatIssueUrl()))
         self.status = config.canonicalizeStatus(self.rawStatus, self.group)
 
@@ -200,36 +210,36 @@ class MetadataManager:
 
         # { MetadataManager attr : metadata name (for printing) }
         requiredSingularKeys = {
-            'status': 'Status',
-            'shortname': 'Shortname',
-            'title': 'Title'
+            "status": "Status",
+            "shortname": "Shortname",
+            "title": "Title",
         }
         recommendedSingularKeys = {}
         requiredMultiKeys = {}
 
         if self.status not in config.noEDStatuses:
-            requiredSingularKeys['ED'] = 'ED'
+            requiredSingularKeys["ED"] = "ED"
         if self.status in config.deadlineStatuses:
-            requiredSingularKeys['deadline'] = 'Deadline'
+            requiredSingularKeys["deadline"] = "Deadline"
         if self.status in config.datedStatuses:
-            recommendedSingularKeys['date'] = 'Date'
+            recommendedSingularKeys["date"] = "Date"
         if self.status in config.snapshotStatuses:
-            requiredSingularKeys['TR'] = "TR"
-            requiredMultiKeys['issues'] = "Issue Tracking"
+            requiredSingularKeys["TR"] = "TR"
+            requiredMultiKeys["issues"] = "Issue Tracking"
         if self.status in config.implementationStatuses:
-            requiredSingularKeys['implementationReport'] = "Implementation Report"
+            requiredSingularKeys["implementationReport"] = "Implementation Report"
         if self.status not in config.unlevelledStatuses:
-            requiredSingularKeys['level'] = 'Level'
+            requiredSingularKeys["level"] = "Level"
         if self.status not in config.shortToLongStatus:
             die("Unknown Status '{0}' used.", self.status)
         if not self.noEditor:
-            requiredMultiKeys['editors'] = "Editor"
+            requiredMultiKeys["editors"] = "Editor"
         if not self.noAbstract:
-            requiredMultiKeys['abstract'] = "Abstract"
+            requiredMultiKeys["abstract"] = "Abstract"
         if self.group and self.group.lower() == "csswg":
-            requiredSingularKeys['workStatus'] = "Work Status"
+            requiredSingularKeys["workStatus"] = "Work Status"
         if self.group and self.group.lower() == "wg21":
-            requiredSingularKeys['audience'] = "Audience"
+            requiredSingularKeys["audience"] = "Audience"
 
         errors = []
         warnings = []
@@ -238,7 +248,9 @@ class MetadataManager:
                 errors.append("    Missing a '{0}' entry.".format(name))
         for attr, name in recommendedSingularKeys.items():
             if getattr(self, attr) is None:
-                warnings.append("    You probably want to provide a '{0}' entry.".format(name))
+                warnings.append(
+                    "    You probably want to provide a '{0}' entry.".format(name)
+                )
         for attr, name in requiredMultiKeys.items():
             if len(getattr(self, attr)) == 0:
                 errors.append("    Must provide at least one '{0}' entry.".format(name))
@@ -257,7 +269,9 @@ class MetadataManager:
             macros["spectitle"] = self.h1
         macros["shortname"] = self.displayShortname
         if self.statusText:
-            macros["statustext"] = "\n".join(markdown.parse(self.statusText, self.indent))
+            macros["statustext"] = "\n".join(
+                markdown.parse(self.statusText, self.indent)
+            )
         else:
             macros["statustext"] = ""
         macros["level"] = str(self.level)
@@ -281,34 +295,48 @@ class MetadataManager:
         if self.abstract:
             abstractLines = datablocks.transformDataBlocks(doc, self.abstract)
             macros["abstract"] = "\n".join(markdown.parse(abstractLines, self.indent))
-            macros["abstractattr"] = escapeAttr("  ".join(abstractLines).replace("<<","<").replace(">>",">"))
+            macros["abstractattr"] = escapeAttr(
+                "  ".join(abstractLines).replace("<<", "<").replace(">>", ">")
+            )
         elif self.noAbstract:
             macros["abstract"] = ""
             macros["abstractattr"] = ""
         macros["year"] = self.date.year
         macros["date"] = self.date.strftime("{0} %B %Y".format(self.date.day))
-        macros["date-dmmy"] = self.date.strftime("{0} %B %Y".format(self.date.day)) #same as plain 'date'
+        macros["date-dmmy"] = self.date.strftime(
+            "{0} %B %Y".format(self.date.day)
+        )  # same as plain 'date'
         macros["cdate"] = self.date.strftime("%Y%m%d")
         macros["isodate"] = self.date.strftime("%Y-%m-%d")
         macros["date-my"] = self.date.strftime("%b %Y")
         macros["date-mmy"] = self.date.strftime("%B %Y")
         if isinstance(self.expires, date):
-            macros["expires"] = self.expires.strftime("{0} %B %Y".format(self.expires.day))
-            macros["expires-dmmy"] = self.expires.strftime("{0} %B %Y".format(self.expires.day)) #same as plain 'expires'
+            macros["expires"] = self.expires.strftime(
+                "{0} %B %Y".format(self.expires.day)
+            )
+            macros["expires-dmmy"] = self.expires.strftime(
+                "{0} %B %Y".format(self.expires.day)
+            )  # same as plain 'expires'
             macros["cexpires"] = self.expires.strftime("%Y%m%d")
             macros["isoexpires"] = self.expires.strftime("%Y-%m-%d")
             macros["expires-my"] = self.expires.strftime("%b %Y")
             macros["expires-mmy"] = self.expires.strftime("%B %Y")
         if self.deadline:
-            macros["deadline"] = self.deadline.strftime("{0} %B %Y".format(self.deadline.day))
+            macros["deadline"] = self.deadline.strftime(
+                "{0} %B %Y".format(self.deadline.day)
+            )
             macros["isodeadline"] = self.deadline.strftime("%Y-%m-%d")
         if self.status in config.snapshotStatuses:
-            macros["version"] = "https://www.w3.org/TR/{year}/{status}-{vshortname}-{cdate}/".format(**macros)
+            macros[
+                "version"
+            ] = "https://www.w3.org/TR/{year}/{status}-{vshortname}-{cdate}/".format(
+                **macros
+            )
         elif self.ED:
             macros["version"] = self.ED
         macros["annotations"] = constants.testAnnotationURL
         if doc and self.vshortname in doc.testSuites:
-            macros["testsuite"] = doc.testSuites[self.vshortname]['vshortname']
+            macros["testsuite"] = doc.testSuites[self.vshortname]["vshortname"]
         if self.warning and len(self.warning) >= 2:
             macros["replacedby"] = self.warning[1]
         if self.warning and len(self.warning) >= 3:
@@ -324,18 +352,34 @@ class MetadataManager:
         if self.mailingListArchives:
             macros["mailinglistarchives"] = self.mailingListArchives
         if self.status == "w3c/FPWD":
-            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/W3C-WD"
+            macros[
+                "w3c-stylesheet-url"
+            ] = "https://www.w3.org/StyleSheets/TR/2016/W3C-WD"
         elif self.status == "FINDING":
-            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/W3C-NOTE"
+            macros[
+                "w3c-stylesheet-url"
+            ] = "https://www.w3.org/StyleSheets/TR/2016/W3C-NOTE"
         elif self.status == "w3c/CG-DRAFT":
-            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/cg-draft"
+            macros[
+                "w3c-stylesheet-url"
+            ] = "https://www.w3.org/StyleSheets/TR/2016/cg-draft"
         elif self.status == "w3c/CG-FINAL":
-            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/cg-final"
+            macros[
+                "w3c-stylesheet-url"
+            ] = "https://www.w3.org/StyleSheets/TR/2016/cg-final"
         else:
-            shortStatus = self.rawStatus.partition("/")[2] if (self.rawStatus and "/" in self.rawStatus) else self.rawStatus
-            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/W3C-{0}".format(shortStatus)
+            shortStatus = (
+                self.rawStatus.partition("/")[2]
+                if (self.rawStatus and "/" in self.rawStatus)
+                else self.rawStatus
+            )
+            macros[
+                "w3c-stylesheet-url"
+            ] = "https://www.w3.org/StyleSheets/TR/2016/W3C-{0}".format(shortStatus)
         if self.customWarningText is not None:
-            macros["customwarningtext"] = "\n".join(markdown.parse(self.customWarningText, self.indent))
+            macros["customwarningtext"] = "\n".join(
+                markdown.parse(self.customWarningText, self.indent)
+            )
         if self.customWarningTitle is not None:
             macros["customwarningtitle"] = self.customWarningTitle
         # Custom macros
@@ -349,7 +393,12 @@ def parseDate(key, val, lineNum):
     try:
         return datetime.strptime(val, "%Y-%m-%d").date()
     except:
-        die("The {0} field must be in the format YYYY-MM-DD - got \"{1}\" instead.", key, val, lineNum=lineNum)
+        die(
+            'The {0} field must be in the format YYYY-MM-DD - got "{1}" instead.',
+            key,
+            val,
+            lineNum=lineNum,
+        )
         return None
 
 
@@ -363,8 +412,14 @@ def parseDateOrDuration(key, val, lineNum):
             return parse_duration(val)
         return datetime.strptime(val, "%Y-%m-%d").date()
     except:
-        die("The {0} field must be an ISO 8601 duration, a date in the format YYYY-MM-DD, now, never, false, no, n, or off. Got '{1}' instead.", key, val, lineNum=lineNum)
+        die(
+            "The {0} field must be an ISO 8601 duration, a date in the format YYYY-MM-DD, now, never, false, no, n, or off. Got '{1}' instead.",
+            key,
+            val,
+            lineNum=lineNum,
+        )
         return None
+
 
 def canonicalizeExpiryDate(base, expires):
     if expires is None:
@@ -395,7 +450,12 @@ def parseInteger(key, val, lineNum):
 def parseBoolean(key, val, lineNum):
     b = boolish(val)
     if b is None:
-        die("The {0} field must be true/false, yes/no, y/n, or on/off. Got '{1}' instead.", key, val, lineNum=lineNum)
+        die(
+            "The {0} field must be true/false, yes/no, y/n, or on/off. Got '{1}' instead.",
+            key,
+            val,
+            lineNum=lineNum,
+        )
     return b
 
 
@@ -405,7 +465,10 @@ def parseSoftBoolean(key, val, lineNum):
         return b
     if val.lower() in ["maybe", "if possible", "if needed"]:
         return "maybe"
-    die(f"The {key} field must be boolish, or 'maybe'. Got '{val}' instead.", lineNum=lineNum)
+    die(
+        f"The {key} field must be boolish, or 'maybe'. Got '{val}' instead.",
+        lineNum=lineNum,
+    )
 
 
 def boolish(val):
@@ -418,11 +481,11 @@ def boolish(val):
 
 def parseWarning(key, val, lineNum):
     if val.lower() == "obsolete":
-        return "warning-obsolete",
+        return ("warning-obsolete",)
     if val.lower() == "not ready":
-        return "warning-not-ready",
+        return ("warning-not-ready",)
     if val.lower() == "custom":
-        return "warning-custom",
+        return ("warning-custom",)
     match = re.match(r"Commit +([^ ]+) +(.+) +replaced by +(.+)", val, re.I)
     if match:
         return "warning-commit", match.group(3), match.group(1), match.group(2)
@@ -435,115 +498,149 @@ def parseWarning(key, val, lineNum):
     match = re.match(r"New Version +(.+)", val, re.I)
     if match:
         return "warning-new-version", match.group(1)
-    die('''Unknown value "{1}" for "{0}" metadata. Expected one of:
+    die(
+        """Unknown value "{1}" for "{0}" metadata. Expected one of:
   obsolete
   not ready
   replaced by [new url]
   new version [new url]
   commit [snapshot id] [snapshot url] replaced by [master url]
   branch [branch name] [branch url] replaced by [master url]
-  custom''', key, val, lineNum=lineNum)
+  custom""",
+        key,
+        val,
+        lineNum=lineNum,
+    )
     return None
 
 
 def parseEditor(key, val, lineNum):
-    pieces = [unescape(piece.strip()) for piece in val.split(',')]
+    pieces = [unescape(piece.strip()) for piece in val.split(",")]
 
     def looksLinkish(string):
         return re.match(r"\w+:", string) or looksEmailish(string)
 
     def looksEmailish(string):
         return re.match(r".+@.+\..+", string)
+
     data = {
-        'name'   : pieces[0],
-        'w3cid'  : None,
-        'org'    : None,
-        'orglink': None,
-        'link'   : None,
-        'email'  : None,
-        'w3cid'  : None
+        "name": pieces[0],
+        "w3cid": None,
+        "org": None,
+        "orglink": None,
+        "link": None,
+        "email": None,
+        "w3cid": None,
     }
     # Handle well-known pieces, split off the ambiguous ones
     ambiguousPieces = []
     for piece in pieces[1:]:
-        if re.match(r"w3cid \d+$", piece) and data['w3cid'] is None:
-            data['w3cid'] = piece[6:]
+        if re.match(r"w3cid \d+$", piece) and data["w3cid"] is None:
+            data["w3cid"] = piece[6:]
         else:
             ambiguousPieces.append(piece)
-    if len(ambiguousPieces) == 3 and looksLinkish(ambiguousPieces[1]) and looksLinkish(ambiguousPieces[2]):
+    if (
+        len(ambiguousPieces) == 3
+        and looksLinkish(ambiguousPieces[1])
+        and looksLinkish(ambiguousPieces[2])
+    ):
         # [org, email, url] or [org, url, email]
-        data['org'] = ambiguousPieces[0]
+        data["org"] = ambiguousPieces[0]
         if looksEmailish(ambiguousPieces[1]):
-            data['email'] = ambiguousPieces[1]
-            data['link'] = ambiguousPieces[2]
+            data["email"] = ambiguousPieces[1]
+            data["link"] = ambiguousPieces[2]
         else:
-            data['link'] = ambiguousPieces[1]
-            data['email'] = ambiguousPieces[2]
-    elif len(ambiguousPieces) == 2 and looksLinkish(ambiguousPieces[0]) and looksLinkish(ambiguousPieces[1]):
+            data["link"] = ambiguousPieces[1]
+            data["email"] = ambiguousPieces[2]
+    elif (
+        len(ambiguousPieces) == 2
+        and looksLinkish(ambiguousPieces[0])
+        and looksLinkish(ambiguousPieces[1])
+    ):
         # [email, url] or [url, email]
         if looksEmailish(ambiguousPieces[0]):
-            data['email'] = ambiguousPieces[0]
-            data['link'] = ambiguousPieces[1]
+            data["email"] = ambiguousPieces[0]
+            data["link"] = ambiguousPieces[1]
         else:
-            data['link'] = ambiguousPieces[0]
-            data['email'] = ambiguousPieces[1]
+            data["link"] = ambiguousPieces[0]
+            data["email"] = ambiguousPieces[1]
     elif len(ambiguousPieces) == 2 and looksLinkish(ambiguousPieces[1]):
         # [org, email] or [org, url]
-        data['org'] = ambiguousPieces[0]
+        data["org"] = ambiguousPieces[0]
         if looksEmailish(ambiguousPieces[1]):
-            data['email'] = ambiguousPieces[1]
+            data["email"] = ambiguousPieces[1]
         else:
-            data['link'] = ambiguousPieces[1]
+            data["link"] = ambiguousPieces[1]
     elif len(ambiguousPieces) == 1:
         # [org], [email], or [url]
         if looksLinkish(ambiguousPieces[0]):
             if looksEmailish(ambiguousPieces[0]):
-                data['email'] = ambiguousPieces[0]
+                data["email"] = ambiguousPieces[0]
             else:
-                data['link'] = ambiguousPieces[0]
+                data["link"] = ambiguousPieces[0]
         else:
-            data['org'] = ambiguousPieces[0]
+            data["org"] = ambiguousPieces[0]
     elif len(ambiguousPieces) == 0:
         pass
     else:
-        die("'{0}' format is '<name>, <company>?, <email-or-contact-page>?'. Got:\n{1}", key, val, lineNum=lineNum)
+        die(
+            "'{0}' format is '<name>, <company>?, <email-or-contact-page>?'. Got:\n{1}",
+            key,
+            val,
+            lineNum=lineNum,
+        )
         return []
     # Check if the org ends with a link
-    if data['org'] is not None and " " in data['org'] and looksLinkish(data['org'].split()[-1]):
-        pieces = data['org'].split()
-        data['orglink'] = pieces[-1]
-        data['org'] = ' '.join(pieces[:-1])
+    if (
+        data["org"] is not None
+        and " " in data["org"]
+        and looksLinkish(data["org"].split()[-1])
+    ):
+        pieces = data["org"].split()
+        data["orglink"] = pieces[-1]
+        data["org"] = " ".join(pieces[:-1])
     # Check if the name ends with an ID.
     # TODO: remove this, it's redundant with the "w3cid ####" piece
-    if data['name'] and re.search(r"\s\d+$", data['name']):
-        pieces = data['name'].split()
-        data['w3cid'] = pieces[-1]
-        data['name'] = ' '.join(pieces[:-1])
+    if data["name"] and re.search(r"\s\d+$", data["name"]):
+        pieces = data["name"].split()
+        data["w3cid"] = pieces[-1]
+        data["name"] = " ".join(pieces[:-1])
     return [data]
 
 
 def parseCommaSeparated(key, val, lineNum):
-    return [term.strip().lower() for term in val.split(',')]
+    return [term.strip().lower() for term in val.split(",")]
 
 
 def parseIdList(key, val, lineNum):
-    return [term.strip() for term in val.split(',')]
+    return [term.strip() for term in val.split(",")]
 
 
 def parseLinkDefaults(key, val, lineNum):
     defaultSpecs = defaultdict(list)
     for default in val.split(","):
-        match = re.match(r"^([\w\d-]+)  (?:\s+\( ({0}) (?:\s+(snapshot|current))? \) )  \s+(.*)$".format("|".join(config.dfnTypes.union(["dfn"]))), default.strip(), re.X)
+        match = re.match(
+            r"^([\w\d-]+)  (?:\s+\( ({0}) (?:\s+(snapshot|current))? \) )  \s+(.*)$".format(
+                "|".join(config.dfnTypes.union(["dfn"]))
+            ),
+            default.strip(),
+            re.X,
+        )
         if match:
             spec = match.group(1)
             type = match.group(2)
             status = match.group(3)
-            terms = match.group(4).split('/')
+            terms = match.group(4).split("/")
             dfnFor = None
             for term in terms:
                 defaultSpecs[term.strip()].append((spec, type, status, dfnFor))
         else:
-            die("'{0}' is a comma-separated list of '<spec> (<dfn-type>) <terms>'. Got:\n{1}", key, default, lineNum=lineNum)
+            die(
+                "'{0}' is a comma-separated list of '<spec> (<dfn-type>) <terms>'. Got:\n{1}",
+                key,
+                default,
+                lineNum=lineNum,
+            )
             continue
     return defaultSpecs
 
@@ -553,7 +650,11 @@ def parseBoilerplate(key, val, lineNum):
     for command in val.split(","):
         pieces = command.lower().strip().split()
         if len(pieces) != 2:
-            die("Boilerplate metadata pieces are a boilerplate label and a boolean. Got:\n{0}", command, lineNum=lineNum)
+            die(
+                "Boilerplate metadata pieces are a boilerplate label and a boolean. Got:\n{0}",
+                command,
+                lineNum=lineNum,
+            )
             continue
         if pieces[0] == "omit":
             # legacy syntax; allows "omit foo" in addition to the normal "foo off"/etc
@@ -561,7 +662,11 @@ def parseBoilerplate(key, val, lineNum):
         else:
             onoff = boolish(pieces[1])
             if onoff is None:
-                die("Boilerplate metadata pieces are a boilerplate label and a boolean. Got:\n{0}", command, lineNum=lineNum)
+                die(
+                    "Boilerplate metadata pieces are a boilerplate label and a boolean. Got:\n{0}",
+                    command,
+                    lineNum=lineNum,
+                )
                 continue
             boilerplate[pieces[0]] = onoff
     return boilerplate
@@ -572,7 +677,12 @@ def parseBiblioDisplay(key, val, lineNum):
     if val in constants.biblioDisplay:
         return val
     else:
-        die("'{0}' must be either 'inline' or 'index'. Got '{1}'", key, val, lineNum=lineNum)
+        die(
+            "'{0}' must be either 'inline' or 'index'. Got '{1}'",
+            key,
+            val,
+            lineNum=lineNum,
+        )
         return constants.biblioDisplay.index
 
 
@@ -584,23 +694,38 @@ def parseRefStatus(key, val, lineNum):
     if val in constants.refStatus:
         return val
     else:
-        die("'{0}' must be either 'current' or 'snapshot'. Got '{1}'", key, val, lineNum=lineNum)
+        die(
+            "'{0}' must be either 'current' or 'snapshot'. Got '{1}'",
+            key,
+            val,
+            lineNum=lineNum,
+        )
         return constants.refStatus.current
 
 
 def parseComplainAbout(key, val, lineNum):
-    validLabels = frozenset(["missing-example-ids", "broken-links", "accidental-2119", "missing-exposed"])
-    ret = parseBoolishList(key, val.lower(), default=False, validLabels=validLabels, lineNum=lineNum)
+    validLabels = frozenset(
+        ["missing-example-ids", "broken-links", "accidental-2119", "missing-exposed"]
+    )
+    ret = parseBoolishList(
+        key, val.lower(), default=False, validLabels=validLabels, lineNum=lineNum
+    )
     return ret
 
 
 def parseExternalInfotrees(key, val, lineNum):
-    return parseBoolishList(key, val.lower(), default=False,
-                            validLabels=frozenset(["anchors.bsdata", "link-defaults.infotree"]),
-                            lineNum=lineNum)
+    return parseBoolishList(
+        key,
+        val.lower(),
+        default=False,
+        validLabels=frozenset(["anchors.bsdata", "link-defaults.infotree"]),
+        lineNum=lineNum,
+    )
 
 
-def parseBoolishList(key, val, default=None, validLabels=None, extraValues=None, lineNum=None):
+def parseBoolishList(
+    key, val, default=None, validLabels=None, extraValues=None, lineNum=None
+):
     # Parses anything defined as "label <boolish>, label <boolish>" into a passed BoolSet
     # Supply a list of valid labels if you want to have them checked,
     # and a dict of {value=>bool} pairs you want in addition to the standard boolish values
@@ -609,14 +734,22 @@ def parseBoolishList(key, val, default=None, validLabels=None, extraValues=None,
     elif default in (True, False):
         boolset = config.BoolSet(default=default)
     else:
-        die("Programming error - parseBoolishList() got a non-bool default value: '{0}'", default)
+        die(
+            "Programming error - parseBoolishList() got a non-bool default value: '{0}'",
+            default,
+        )
     if extraValues is None:
         extraValues = {}
     vals = [v.strip() for v in val.split(",")]
     for v in vals:
-        name,_, boolstring = v.strip().rpartition(" ")
+        name, _, boolstring = v.strip().rpartition(" ")
         if not name or not boolstring:
-            die("{0} metadata pieces are a label and a boolean. Got:\n{1}", key, v, lineNum=lineNum)
+            die(
+                "{0} metadata pieces are a label and a boolean. Got:\n{1}",
+                key,
+                v,
+                lineNum=lineNum,
+            )
             continue
         if validLabels and name not in validLabels:
             die("Unknown {0} label '{1}'.", key, name, lineNum=lineNum)
@@ -628,7 +761,12 @@ def parseBoolishList(key, val, default=None, validLabels=None, extraValues=None,
             if isinstance(onoff, bool):
                 boolset[name] = onoff
             else:
-                die("{0} metadata pieces are a shorthand category and a boolean. Got:\n{1}", key, v, lineNum=lineNum)
+                die(
+                    "{0} metadata pieces are a shorthand category and a boolean. Got:\n{1}",
+                    key,
+                    v,
+                    lineNum=lineNum,
+                )
                 continue
     return boolset
 
@@ -647,11 +785,17 @@ def parseMarkupShorthands(key, val, lineNum):
     # Output is a dict of the shorthand categories with boolean values.
     vals = [v.strip() for v in val.lower().split(",")]
     ret = config.BoolSet(default=False)
-    validCategories = frozenset(["css", "markup", "dfn", "biblio", "idl", "markdown", "algorithm"])
+    validCategories = frozenset(
+        ["css", "markup", "dfn", "biblio", "idl", "markdown", "algorithm"]
+    )
     for v in vals:
         pieces = v.split()
         if len(pieces) != 2:
-            die("Markup Shorthand metadata pieces are a shorthand category and a boolean. Got:\n{0}", v, lineNum=lineNum)
+            die(
+                "Markup Shorthand metadata pieces are a shorthand category and a boolean. Got:\n{0}",
+                v,
+                lineNum=lineNum,
+            )
             continue
         name, boolstring = pieces
         if name not in validCategories:
@@ -659,10 +803,15 @@ def parseMarkupShorthands(key, val, lineNum):
             continue
         onoff = boolish(boolstring)
         if onoff is None:
-            die("Markup Shorthand metadata pieces are a shorthand category and a boolean. Got:\n{0}", v, lineNum=lineNum)
+            die(
+                "Markup Shorthand metadata pieces are a shorthand category and a boolean. Got:\n{0}",
+                v,
+                lineNum=lineNum,
+            )
             continue
         ret[name] = onoff
     return ret
+
 
 def parseInlineGithubIssues(key, val, lineNum):
     val = val.lower()
@@ -670,12 +819,17 @@ def parseInlineGithubIssues(key, val, lineNum):
         return val
     b = boolish(val)
     if b is None:
-        die("Inline Github Issues must be 'title', 'full' or a boolish value. Got: '{0}'", val, lineNum=lineNum)
+        die(
+            "Inline Github Issues must be 'title', 'full' or a boolish value. Got: '{0}'",
+            val,
+            lineNum=lineNum,
+        )
         return False
     elif b is True:
         return "full"
     else:
         return False
+
 
 def parseTextMacro(key, val, lineNum):
     # Each Text Macro line is just a macro name (must be uppercase)
@@ -683,10 +837,18 @@ def parseTextMacro(key, val, lineNum):
     try:
         name, text = val.lstrip().split(None, 1)
     except:
-        die("Text Macro lines must contain a macro name followed by the macro text. Got:\n{0}", val, lineNum=lineNum)
+        die(
+            "Text Macro lines must contain a macro name followed by the macro text. Got:\n{0}",
+            val,
+            lineNum=lineNum,
+        )
         return []
     if not re.match(r"[A-Z0-9-]+$", name):
-        die("Text Macro names must be all-caps and alphanumeric. Got '{0}'", name, lineNum=lineNum)
+        die(
+            "Text Macro names must be all-caps and alphanumeric. Got '{0}'",
+            name,
+            lineNum=lineNum,
+        )
         return []
     return [(name, text)]
 
@@ -694,8 +856,21 @@ def parseTextMacro(key, val, lineNum):
 def parseWorkStatus(key, val, lineNum):
     # The Work Status is one of (completed, stable, testing, refining, revising, exploring, rewriting, abandoned).
     val = val.strip().lower()
-    if val not in ('completed', 'stable', 'testing', 'refining', 'revising', 'exploring', 'rewriting', 'abandoned'):
-        die("Work Status must be one of (completed, stable, testing, refining, revising, exploring, rewriting, abandoned). Got '{0}'. See http://fantasai.inkedblade.net/weblog/2011/inside-csswg/process for details.", val, lineNum=lineNum)
+    if val not in (
+        "completed",
+        "stable",
+        "testing",
+        "refining",
+        "revising",
+        "exploring",
+        "rewriting",
+        "abandoned",
+    ):
+        die(
+            "Work Status must be one of (completed, stable, testing, refining, revising, exploring, rewriting, abandoned). Got '{0}'. See http://fantasai.inkedblade.net/weblog/2011/inside-csswg/process for details.",
+            val,
+            lineNum=lineNum,
+        )
         return None
     return val
 
@@ -720,7 +895,11 @@ def parseRepository(key, val, lineNum):
         # Otherwise just use the url as the shortname
         return Repository(url=val)
     else:
-        die("Repository must be a url, optionally followed by a shortname. Got '{0}'", val, lineNum=lineNum)
+        die(
+            "Repository must be a url, optionally followed by a shortname. Got '{0}'",
+            val,
+            lineNum=lineNum,
+        )
         return config.Nil()
 
 
@@ -729,9 +908,13 @@ def parseTranslateIDs(key, val, lineNum):
     for v in val.split(","):
         pieces = v.strip().split()
         if len(pieces) != 2:
-            die("‘Translate IDs’ values must be an old ID followed by a new ID. Got '{0}'", v, lineNum=lineNum)
+            die(
+                "‘Translate IDs’ values must be an old ID followed by a new ID. Got '{0}'",
+                v,
+                lineNum=lineNum,
+            )
             continue
-        old,new = pieces
+        old, new = pieces
         translations[old] = new
     return translations
 
@@ -739,25 +922,39 @@ def parseTranslateIDs(key, val, lineNum):
 def parseTranslation(key, val, lineNum):
     # Format is <lang-code> <url> [ [ , name <name-in-spec-lang> ] || [ , native-name <name-in-the-lang> ] ]?
     pieces = val.split(",")
-    if not(1 <= len(pieces) <= 3):
-        die("Format of a Translation line is <lang-code> <url> [ [ , name <name-in-spec-lang> ] || [ , native-name <name-in-the-lang> ] ]?. Got:\n{0}", val, lineNum=lineNum)
+    if not (1 <= len(pieces) <= 3):
+        die(
+            "Format of a Translation line is <lang-code> <url> [ [ , name <name-in-spec-lang> ] || [ , native-name <name-in-the-lang> ] ]?. Got:\n{0}",
+            val,
+            lineNum=lineNum,
+        )
         return
     firstParts = pieces[0].split()
     if len(firstParts) != 2:
-        die("First part of a Translation line must be a lang-code followed by a url. Got:\n{0}", pieces[0], lineNum=lineNum)
+        die(
+            "First part of a Translation line must be a lang-code followed by a url. Got:\n{0}",
+            pieces[0],
+            lineNum=lineNum,
+        )
         return
     langCode, url = firstParts
     name = None
     nativeName = None
     for piece in pieces[1:]:
-        k,v = piece.split(None, 1)
+        k, v = piece.split(None, 1)
         if k.lower() == "name":
             name = v
         elif k.lower() == "native-name":
             nativeName = v
         else:
-            die("Later parts of a Translation line must start with 'name' or 'native-name'. Got:\n{0}", piece, lineNum=lineNum)
-    return [{"lang-code": langCode, "url": url, "name": name, "native-name": nativeName}]
+            die(
+                "Later parts of a Translation line must start with 'name' or 'native-name'. Got:\n{0}",
+                piece,
+                lineNum=lineNum,
+            )
+    return [
+        {"lang-code": langCode, "url": url, "name": name, "native-name": nativeName}
+    ]
 
 
 def parseAudience(key, val, lineNum):
@@ -771,7 +968,25 @@ def parseAudience(key, val, lineNum):
     elif len(values) >= 1:
         ret = []
         namedAudiences = {"CWG", "LWG", "EWG", "LEWG", "DIRECTION"}
-        pseudonymAudiences = {"Concurrency":"SG1", "Modules":"SG2", "Networking":"SG4", "TM":"SG5", "Numerics":"SG6", "Reflection":"SG7", "FeatureTesting":"SG10", "UB":"SG12", "HMI":"SG13", "LowLatency":"SG14", "Tooling":"SG15", "Unicode":"SG16", "EWGI":"SG17", "LEWGI":"SG18", "MachineLearning":"SG19", "Education":"SG20", "Contracts":"SG21"}
+        pseudonymAudiences = {
+            "Concurrency": "SG1",
+            "Modules": "SG2",
+            "Networking": "SG4",
+            "TM": "SG5",
+            "Numerics": "SG6",
+            "Reflection": "SG7",
+            "FeatureTesting": "SG10",
+            "UB": "SG12",
+            "HMI": "SG13",
+            "LowLatency": "SG14",
+            "Tooling": "SG15",
+            "Unicode": "SG16",
+            "EWGI": "SG17",
+            "LEWGI": "SG18",
+            "MachineLearning": "SG19",
+            "Education": "SG20",
+            "Contracts": "SG21",
+        }
         for v in values:
             if v in namedAudiences:
                 ret.append(v)
@@ -790,21 +1005,32 @@ def parseEditorTerm(key, val, lineNum):
     if len(values) == 2:
         return {"singular": values[0], "plural": values[1]}
     else:
-        die("Editor Term metadata must be two comma-separated terms, giving the singular and plural term for editors. Got '{0}'.", val)
+        die(
+            "Editor Term metadata must be two comma-separated terms, giving the singular and plural term for editors. Got '{0}'.",
+            val,
+        )
         return {"singular": "Editor", "plural": "Editors"}
 
 
 def parseMaxToCDepth(key, val, lineNum):
     if val.lower() == "none":
-        return float('inf')
+        return float("inf")
     try:
         v = int(val)
     except ValueError as e:
-        die("Max ToC Depth metadata must be 'none' or an integer 1-5. Got '{0}'.", val, lineNum=lineNum)
-        return float('inf')
+        die(
+            "Max ToC Depth metadata must be 'none' or an integer 1-5. Got '{0}'.",
+            val,
+            lineNum=lineNum,
+        )
+        return float("inf")
     if not (1 <= v <= 5):
-        die("Max ToC Depth metadata must be 'none' or an integer 1-5. Got '{0}'.", val, lineNum=lineNum)
-        return float('inf')
+        die(
+            "Max ToC Depth metadata must be 'none' or an integer 1-5. Got '{0}'.",
+            val,
+            lineNum=lineNum,
+        )
+        return float("inf")
     return v
 
 
@@ -817,7 +1043,11 @@ def parseWptDisplay(key, val, lineNum):
     val = val.lower()
     if val in ("none", "inline"):
         return val
-    die("WPT Display metadata only accepts the values 'none' or 'inline'. Got '{0}'.", val, lineNum=lineNum)
+    die(
+        "WPT Display metadata only accepts the values 'none' or 'inline'. Got '{0}'.",
+        val,
+        lineNum=lineNum,
+    )
     return "none"
 
 
@@ -825,15 +1055,15 @@ def parsePreviousVersion(key, val, lineNum):
     biblioMatch = re.match(r"from biblio(\s+\S+)?", val.lower())
     if biblioMatch:
         if biblioMatch.group(1):
-            return [{"type":"from-biblio", "value":biblioMatch.group(1).strip()}]
+            return [{"type": "from-biblio", "value": biblioMatch.group(1).strip()}]
         else:
-            return [{"type":"from-biblio-implicit"}]
+            return [{"type": "from-biblio-implicit"}]
     else:
-        return [{"type":"url", "value":val}]
+        return [{"type": "url", "value": val}]
 
 
 def parseInlineTagCommand(key, val, lineNum):
-    tag,_,command = val.strip().partition(" ")
+    tag, _, command = val.strip().partition(" ")
     command = command.strip()
     return {tag: command}
 
@@ -850,7 +1080,9 @@ def parse(lines):
     endTag = None
     md = MetadataManager()
     for line in lines:
-        if not inMetadata and re.match(r"<(pre|xmp) [^>]*class=[^>]*metadata[^>]*>", line.text):
+        if not inMetadata and re.match(
+            r"<(pre|xmp) [^>]*class=[^>]*metadata[^>]*>", line.text
+        ):
             inMetadata = True
             md.hasMetadata = True
             if line.text.startswith("<pre"):
@@ -870,7 +1102,11 @@ def parse(lines):
                 md.addData(match.group(1), match.group(2), lineNum=line.i)
                 lastKey = match.group(1)
             else:
-                die("Incorrectly formatted metadata line:\n{0}", line.text, lineNum=line.i)
+                die(
+                    "Incorrectly formatted metadata line:\n{0}",
+                    line.text,
+                    lineNum=line.i,
+                )
                 continue
         elif re.match(r"\s*<h1[^>]*>.*?</h1>", line.text):
             if md.title is None:
@@ -908,37 +1144,48 @@ def fromJson(data, source=""):
     except Exception as e:
         if data != "":
             if source == "computed-metadata":
-                die("Error loading computed-metadata JSON.\nCheck if you need to JSON-escape some characters in a text macro?\n{0}", str(e))
+                die(
+                    "Error loading computed-metadata JSON.\nCheck if you need to JSON-escape some characters in a text macro?\n{0}",
+                    str(e),
+                )
             else:
                 die("Error loading {1} JSON:\n{0}", str(e), source)
         return md
-    for key,val in defaults.items():
+    for key, val in defaults.items():
         if isinstance(val, str):
             md.addData(key, val)
         elif isinstance(val, list):
             for indivVal in val:
                 md.addData(key, indivVal)
         else:
-            die("JSON metadata values must be strings or arrays of strings. '{0}' is something else.", key)
+            die(
+                "JSON metadata values must be strings or arrays of strings. '{0}' is something else.",
+                key,
+            )
             return md
     return md
 
 
 def getSpecRepository(doc):
-    '''
+    """
     Attempts to find the name of the repository the spec is a part of.
     Currently only searches for GitHub repos.
     Returns a "shortname" of the repo, and the full url.
-    '''
+    """
     if doc and doc.inputSource and doc.inputSource.hasDirectory():
         source_dir = doc.inputSource.directory()
         try:
             with open(os.devnull, "wb") as fnull:
-                remotes = str(subprocess.check_output(["git", "remote", "-v"], stderr=fnull, cwd=source_dir), encoding="utf-8")
+                remotes = str(
+                    subprocess.check_output(
+                        ["git", "remote", "-v"], stderr=fnull, cwd=source_dir
+                    ),
+                    encoding="utf-8",
+                )
             searches = [
-              r"origin\tgit@github\.([\w.-]+):([\w-]+)/([\w-]+)\.git \(\w+\)",
-              r"origin\thttps://github\.([\w.-]+)/([\w-]+)/([\w-]+)\.git \(\w+\)",
-              r"origin\thttps://github\.([\w.-]+)/([\w-]+)/([\w-]+)/? \(\w+\)",
+                r"origin\tgit@github\.([\w.-]+):([\w-]+)/([\w-]+)\.git \(\w+\)",
+                r"origin\thttps://github\.([\w.-]+)/([\w-]+)/([\w-]+)\.git \(\w+\)",
+                r"origin\thttps://github\.([\w.-]+)/([\w-]+)/([\w-]+)/? \(\w+\)",
             ]
             for search_re in searches:
                 search = re.search(search_re, remotes)
@@ -967,24 +1214,29 @@ def parseDoc(doc):
         removeClass(el, "replace-with-advisement-class")
         addClass(el, doc.md.advisementClass)
 
-    if "feedback-header" in doc.md.boilerplate and "issues-index" in doc.md.boilerplate and find("." + doc.md.issueClass, doc) is not None:
-            # There's at least one inline issue.
-            doc.md.issues.append(("Inline In Spec", "#issues-index"))
+    if (
+        "feedback-header" in doc.md.boilerplate
+        and "issues-index" in doc.md.boilerplate
+        and find("." + doc.md.issueClass, doc) is not None
+    ):
+        # There's at least one inline issue.
+        doc.md.issues.append(("Inline In Spec", "#issues-index"))
 
 
 def join(*sources):
-    '''
+    """
     MetadataManager is a monoid
-    '''
+    """
     md = MetadataManager()
     md.hasMetadata = any(x.hasMetadata for x in sources)
     for mdsource in sources:
         for k in mdsource.manuallySetKeys:
             mdentry = knownKeys[k]
             md.addParsedData(k, getattr(mdsource, mdentry.attrName))
-        for k,v in mdsource.otherMetadata.items():
+        for k, v in mdsource.otherMetadata.items():
             md.otherMetadata[k].extend(v)
     return md
+
 
 @attr.s(slots=True, frozen=True)
 class Metadata(object):
@@ -1002,20 +1254,20 @@ def joinList(a, b):
     return a + b
 
 
-def joinDict(a,b):
+def joinDict(a, b):
     x = {}
     x.update(a)
     x.update(b)
     return x
 
 
-def joinBoolSet(a,b):
+def joinBoolSet(a, b):
     x = copy.deepcopy(a)
     x.update(b)
     return x
 
 
-def joinDdList(a,b):
+def joinDdList(a, b):
     x = defaultdict(list)
     x.update(a)
     x.update(b)
@@ -1042,71 +1294,156 @@ def parseLiteralList(key, val, lineNum):
 
 knownKeys = {
     "Abstract": Metadata("Abstract", "abstract", joinList, parseLiteralList),
-    "Advisement Class": Metadata("Advisement Class", "advisementClass", joinValue, parseLiteral),
-    "Assertion Class": Metadata("Assertion Class", "assertionClass", joinValue, parseLiteral),
-    "Assume Explicit For": Metadata("Assume Explicit For", "assumeExplicitFor", joinValue, parseBoolean),
+    "Advisement Class": Metadata(
+        "Advisement Class", "advisementClass", joinValue, parseLiteral
+    ),
+    "Assertion Class": Metadata(
+        "Assertion Class", "assertionClass", joinValue, parseLiteral
+    ),
+    "Assume Explicit For": Metadata(
+        "Assume Explicit For", "assumeExplicitFor", joinValue, parseBoolean
+    ),
     "At Risk": Metadata("At Risk", "atRisk", joinList, parseLiteralList),
     "Audience": Metadata("Audience", "audience", joinList, parseAudience),
-    "Block Elements": Metadata("Block Elements", "blockElements", joinList, parseCommaSeparated),
-    "Boilerplate": Metadata("Boilerplate", "boilerplate", joinBoolSet, parseBoilerplate),
-    "Can I Use Url": Metadata("Can I Use URL", "canIUseURLs", joinList, parseLiteralList),
+    "Block Elements": Metadata(
+        "Block Elements", "blockElements", joinList, parseCommaSeparated
+    ),
+    "Boilerplate": Metadata(
+        "Boilerplate", "boilerplate", joinBoolSet, parseBoilerplate
+    ),
+    "Can I Use Url": Metadata(
+        "Can I Use URL", "canIUseURLs", joinList, parseLiteralList
+    ),
     "Canonical Url": Metadata("Canonical URL", "canonicalURL", joinValue, parseLiteral),
-    "Complain About": Metadata("Complain About", "complainAbout", joinBoolSet, parseComplainAbout),
-    "Custom Warning Text": Metadata("Custom Warning Text", "customWarningText", joinList, parseLiteralList),
-    "Custom Warning Title": Metadata("Custom Warning Title", "customWarningTitle", joinValue, parseLiteral),
+    "Complain About": Metadata(
+        "Complain About", "complainAbout", joinBoolSet, parseComplainAbout
+    ),
+    "Custom Warning Text": Metadata(
+        "Custom Warning Text", "customWarningText", joinList, parseLiteralList
+    ),
+    "Custom Warning Title": Metadata(
+        "Custom Warning Title", "customWarningTitle", joinValue, parseLiteral
+    ),
     "Date": Metadata("Date", "date", joinValue, parseDate),
     "Deadline": Metadata("Deadline", "deadline", joinValue, parseDate),
-    "Default Biblio Display": Metadata("Default Biblio Display", "defaultBiblioDisplay", joinValue, parseBiblioDisplay),
-    "Default Biblio Status": Metadata("Default Biblio Status", "defaultRefStatus", joinValue, parseRefStatus), #synonym of "Default Ref Status"
-    "Default Highlight": Metadata("Default Highlight", "defaultHighlight", joinValue, parseLiteral),
-    "Default Ref Status": Metadata("Default Ref Status", "defaultRefStatus", joinValue, parseRefStatus),
+    "Default Biblio Display": Metadata(
+        "Default Biblio Display", "defaultBiblioDisplay", joinValue, parseBiblioDisplay
+    ),
+    "Default Biblio Status": Metadata(
+        "Default Biblio Status", "defaultRefStatus", joinValue, parseRefStatus
+    ),  # synonym of "Default Ref Status"
+    "Default Highlight": Metadata(
+        "Default Highlight", "defaultHighlight", joinValue, parseLiteral
+    ),
+    "Default Ref Status": Metadata(
+        "Default Ref Status", "defaultRefStatus", joinValue, parseRefStatus
+    ),
     "ED": Metadata("ED", "ED", joinValue, parseLiteral),
     "Editor": Metadata("Editor", "editors", joinList, parseEditor),
     "Editor Term": Metadata("Editor Term", "editorTerm", joinValue, parseEditorTerm),
     "Expires": Metadata("Expires", "expires", joinValue, parseDateOrDuration),
-    "External Infotrees": Metadata("External Infotrees", "externalInfotrees", joinBoolSet, parseExternalInfotrees),
+    "External Infotrees": Metadata(
+        "External Infotrees", "externalInfotrees", joinBoolSet, parseExternalInfotrees
+    ),
     "Favicon": Metadata("Favicon", "favicon", joinValue, parseLiteral),
-    "Force Crossorigin": Metadata("Force Crossorigin", "forceCrossorigin", joinValue, parseBoolean),
-    "Former Editor": Metadata("Former Editor", "previousEditors", joinList, parseEditor),
+    "Force Crossorigin": Metadata(
+        "Force Crossorigin", "forceCrossorigin", joinValue, parseBoolean
+    ),
+    "Former Editor": Metadata(
+        "Former Editor", "previousEditors", joinList, parseEditor
+    ),
     "Group": Metadata("Group", "group", joinValue, parseLiteral),
     "H1": Metadata("H1", "h1", joinValue, parseLiteral),
-    "Ignore Can I Use Url Failure": Metadata("Ignore Can I Use Url Failure", "ignoreCanIUseUrlFailure", joinList, parseLiteralList),
-    "Ignored Terms": Metadata("Ignored Terms", "ignoredTerms", joinList, parseCommaSeparated),
-    "Ignored Vars": Metadata("Ignored Vars", "ignoredVars", joinList, parseCommaSeparated),
-    "Implementation Report": Metadata("Implementation Report", "implementationReport", joinValue, parseLiteral),
-    "Include Can I Use Panels": Metadata("Include Can I Use Panels", "includeCanIUsePanels", joinValue, parseBoolean),
-    "Include Mdn Panels": Metadata("Include Mdn Panels", "includeMdnPanels", joinValue, parseSoftBoolean),
+    "Ignore Can I Use Url Failure": Metadata(
+        "Ignore Can I Use Url Failure",
+        "ignoreCanIUseUrlFailure",
+        joinList,
+        parseLiteralList,
+    ),
+    "Ignored Terms": Metadata(
+        "Ignored Terms", "ignoredTerms", joinList, parseCommaSeparated
+    ),
+    "Ignored Vars": Metadata(
+        "Ignored Vars", "ignoredVars", joinList, parseCommaSeparated
+    ),
+    "Implementation Report": Metadata(
+        "Implementation Report", "implementationReport", joinValue, parseLiteral
+    ),
+    "Include Can I Use Panels": Metadata(
+        "Include Can I Use Panels", "includeCanIUsePanels", joinValue, parseBoolean
+    ),
+    "Include Mdn Panels": Metadata(
+        "Include Mdn Panels", "includeMdnPanels", joinValue, parseSoftBoolean
+    ),
     "Indent": Metadata("Indent", "indent", joinValue, parseInteger),
-    "Infer Css Dfns": Metadata("Infer Css Dfns", "inferCSSDfns", joinValue, parseBoolean),
-    "Informative Classes": Metadata("Informative Classes", "informativeClasses", joinList, parseCommaSeparated),
-    "Inline Github Issues": Metadata("Inline Github Issues", "inlineGithubIssues", joinValue, parseInlineGithubIssues),
-    "Inline Tag Command": Metadata("Inline Tag Command", "inlineTagCommands", joinDict, parseInlineTagCommand),
+    "Infer Css Dfns": Metadata(
+        "Infer Css Dfns", "inferCSSDfns", joinValue, parseBoolean
+    ),
+    "Informative Classes": Metadata(
+        "Informative Classes", "informativeClasses", joinList, parseCommaSeparated
+    ),
+    "Inline Github Issues": Metadata(
+        "Inline Github Issues", "inlineGithubIssues", joinValue, parseInlineGithubIssues
+    ),
+    "Inline Tag Command": Metadata(
+        "Inline Tag Command", "inlineTagCommands", joinDict, parseInlineTagCommand
+    ),
     "Issue Class": Metadata("Issue Class", "issueClass", joinValue, parseLiteral),
-    "Issue Tracker Template": Metadata("Issue Tracker Template", "issueTrackerTemplate", joinValue, parseLiteral),
+    "Issue Tracker Template": Metadata(
+        "Issue Tracker Template", "issueTrackerTemplate", joinValue, parseLiteral
+    ),
     "Issue Tracking": Metadata("Issue Tracking", "issues", joinList, parseLinkedText),
     "Level": Metadata("Level", "level", joinValue, parseLevel),
     "Line Numbers": Metadata("Line Numbers", "lineNumbers", joinValue, parseBoolean),
-    "Link Defaults": Metadata("Link Defaults", "linkDefaults", joinDdList, parseLinkDefaults),
-    "Local Boilerplate": Metadata("Local Boilerplate", "localBoilerplate", joinBoolSet, partial(parseBoolishList, default=False)),
+    "Link Defaults": Metadata(
+        "Link Defaults", "linkDefaults", joinDdList, parseLinkDefaults
+    ),
+    "Local Boilerplate": Metadata(
+        "Local Boilerplate",
+        "localBoilerplate",
+        joinBoolSet,
+        partial(parseBoolishList, default=False),
+    ),
     "Logo": Metadata("Logo", "logo", joinValue, parseLiteral),
-    "Mailing List Archives": Metadata("Mailing List Archives", "mailingListArchives", joinValue, parseLiteral),
+    "Mailing List Archives": Metadata(
+        "Mailing List Archives", "mailingListArchives", joinValue, parseLiteral
+    ),
     "Mailing List": Metadata("Mailing List", "mailingList", joinValue, parseLiteral),
-    "Markup Shorthands": Metadata("Markup Shorthands", "markupShorthands", joinBoolSet, parseMarkupShorthands),
-    "Max Toc Depth": Metadata("Max ToC Depth", "maxToCDepth", joinValue, parseMaxToCDepth),
-    "Metadata Include": Metadata("Metadata Include", "metadataInclude", joinBoolSet, partial(parseBoolishList, default=True)),
-    "Metadata Order": Metadata("Metadata Order", "metadataOrder", joinValue, parseMetadataOrder),
+    "Markup Shorthands": Metadata(
+        "Markup Shorthands", "markupShorthands", joinBoolSet, parseMarkupShorthands
+    ),
+    "Max Toc Depth": Metadata(
+        "Max ToC Depth", "maxToCDepth", joinValue, parseMaxToCDepth
+    ),
+    "Metadata Include": Metadata(
+        "Metadata Include",
+        "metadataInclude",
+        joinBoolSet,
+        partial(parseBoolishList, default=True),
+    ),
+    "Metadata Order": Metadata(
+        "Metadata Order", "metadataOrder", joinValue, parseMetadataOrder
+    ),
     "No Abstract": Metadata("No Abstract", "noAbstract", joinValue, parseBoolean),
     "No Editor": Metadata("No Editor", "noEditor", joinValue, parseBoolean),
     "Note Class": Metadata("Note Class", "noteClass", joinValue, parseLiteral),
-    "Opaque Elements": Metadata("Opaque Elements", "opaqueElements", joinList, parseCommaSeparated),
+    "Opaque Elements": Metadata(
+        "Opaque Elements", "opaqueElements", joinList, parseCommaSeparated
+    ),
     "Prepare For Tr": Metadata("Prepare For Tr", "prepTR", joinValue, parseBoolean),
-    "Previous Version": Metadata("Previous Version", "previousVersions", joinList, parsePreviousVersion),
-    "Remove Multiple Links": Metadata("Remove Multiple Links", "removeMultipleLinks", joinValue, parseBoolean),
+    "Previous Version": Metadata(
+        "Previous Version", "previousVersions", joinList, parsePreviousVersion
+    ),
+    "Remove Multiple Links": Metadata(
+        "Remove Multiple Links", "removeMultipleLinks", joinValue, parseBoolean
+    ),
     "Repository": Metadata("Repository", "repository", joinValue, parseRepository),
     "Required Ids": Metadata("Required Ids", "requiredIDs", joinList, parseIdList),
     "Revision": Metadata("Revision", "level", joinValue, parseLevel),
     "Shortname": Metadata("Shortname", "displayShortname", joinValue, parseLiteral),
-    "Slim Build Artifact": Metadata("Slim Build Artifact", "slimBuildArtifact", joinValue, parseBoolean),
+    "Slim Build Artifact": Metadata(
+        "Slim Build Artifact", "slimBuildArtifact", joinValue, parseBoolean
+    ),
     "Status Text": Metadata("Status Text", "statusText", joinList, parseLiteralList),
     "Status": Metadata("Status", "rawStatus", joinValue, parseLiteral),
     "Test Suite": Metadata("Test Suite", "testSuite", joinValue, parseLiteral),
@@ -1114,20 +1451,48 @@ knownKeys = {
     "Title": Metadata("Title", "title", joinValue, parseLiteral),
     "Toggle Diffs": Metadata("Toggle Diffs", "toggleDiffs", joinValue, parseBoolean),
     "TR": Metadata("TR", "TR", joinValue, parseLiteral),
-    "Tracking Vector Class": Metadata("Tracking Vector Class", "trackingVectorClass", joinValue, parseLiteralOrNone),
-    "Tracking Vector Image": Metadata("Tracking Vector Image", "trackingVectorImage", joinValue, parseLiteralOrNone),
-    "Tracking Vector Image Width": Metadata("Tracking Vector Image Width", "trackingVectorImageWidth", joinValue, parseLiteral),
-    "Tracking Vector Image Height": Metadata("Tracking Vector Image Height", "trackingVectorImageHeight", joinValue, parseLiteral),
-    "Tracking Vector Alt Text": Metadata("Tracking Vector Alt Text", "trackingVectorAltText", joinValue, parseLiteral),
-    "Tracking Vector Title": Metadata("Tracking Vector Title", "trackingVectorTitle", joinValue, parseLiteral),
-    "Translate Ids": Metadata("Translate Ids", "translateIDs", joinDdList, parseTranslateIDs),
+    "Tracking Vector Class": Metadata(
+        "Tracking Vector Class", "trackingVectorClass", joinValue, parseLiteralOrNone
+    ),
+    "Tracking Vector Image": Metadata(
+        "Tracking Vector Image", "trackingVectorImage", joinValue, parseLiteralOrNone
+    ),
+    "Tracking Vector Image Width": Metadata(
+        "Tracking Vector Image Width",
+        "trackingVectorImageWidth",
+        joinValue,
+        parseLiteral,
+    ),
+    "Tracking Vector Image Height": Metadata(
+        "Tracking Vector Image Height",
+        "trackingVectorImageHeight",
+        joinValue,
+        parseLiteral,
+    ),
+    "Tracking Vector Alt Text": Metadata(
+        "Tracking Vector Alt Text", "trackingVectorAltText", joinValue, parseLiteral
+    ),
+    "Tracking Vector Title": Metadata(
+        "Tracking Vector Title", "trackingVectorTitle", joinValue, parseLiteral
+    ),
+    "Translate Ids": Metadata(
+        "Translate Ids", "translateIDs", joinDdList, parseTranslateIDs
+    ),
     "Translation": Metadata("Translation", "translations", joinList, parseTranslation),
     "URL": Metadata("URL", "ED", joinValue, parseLiteral),  # URL is a synonym for ED
-    "Use <I> Autolinks": Metadata("Use <I> Autolinks", "useIAutolinks", joinValue, parseBoolean),
-    "Use Dfn Panels": Metadata("Use Dfn Panels", "useDfnPanels", joinValue, parseBoolean),
-    "Version History": Metadata("Version History", "versionHistory", joinList, parseLiteralList),
+    "Use <I> Autolinks": Metadata(
+        "Use <I> Autolinks", "useIAutolinks", joinValue, parseBoolean
+    ),
+    "Use Dfn Panels": Metadata(
+        "Use Dfn Panels", "useDfnPanels", joinValue, parseBoolean
+    ),
+    "Version History": Metadata(
+        "Version History", "versionHistory", joinList, parseLiteralList
+    ),
     "Warning": Metadata("Warning", "warning", joinValue, parseWarning),
     "Work Status": Metadata("Work Status", "workStatus", joinValue, parseWorkStatus),
     "Wpt Display": Metadata("Wpt Display", "wptDisplay", joinValue, parseWptDisplay),
-    "Wpt Path Prefix": Metadata("Wpt Path Prefix", "wptPathPrefix", joinValue, parseLiteral)
+    "Wpt Path Prefix": Metadata(
+        "Wpt Path Prefix", "wptPathPrefix", joinValue, parseLiteral
+    ),
 }

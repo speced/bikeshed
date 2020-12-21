@@ -24,34 +24,52 @@ class DebugMarker(object):
     # Debugging tool for IDL markup
 
     def markup_construct(self, text, construct):
-        return ('<construct-' + construct.idl_type + '>', '</construct-' + construct.idl_type + '>')
+        return (
+            "<construct-" + construct.idl_type + ">",
+            "</construct-" + construct.idl_type + ">",
+        )
 
     def markup_type(self, text, construct):
-        return ('<TYPE for="' + construct.idl_type + '" idlType="' + text + '">', '</TYPE>')
+        return (
+            '<TYPE for="' + construct.idl_type + '" idlType="' + text + '">',
+            "</TYPE>",
+        )
 
     def markup_primitive_type(self, text, construct):
-        return ('<PRIMITIVE for="' + construct.idl_type + '" idlType="' + text + '">', '</PRIMITIVE>')
+        return (
+            '<PRIMITIVE for="' + construct.idl_type + '" idlType="' + text + '">',
+            "</PRIMITIVE>",
+        )
 
     def markup_buffer_type(self, text, construct):
-        return ('<BUFFER for="' + construct.idl_type + '" idlType="' + text + '">', '</BUFFER>')
+        return (
+            '<BUFFER for="' + construct.idl_type + '" idlType="' + text + '">',
+            "</BUFFER>",
+        )
 
     def markup_string_type(self, text, construct):
-        return ('<STRING for="' + construct.idl_type + '" idlType="' + text + '">', '</STRING>')
+        return (
+            '<STRING for="' + construct.idl_type + '" idlType="' + text + '">',
+            "</STRING>",
+        )
 
     def markup_object_type(self, text, construct):
-        return ('<OBJECT for="' + construct.idl_type + '" idlType="' + text + '">', '</OBJECT>')
+        return (
+            '<OBJECT for="' + construct.idl_type + '" idlType="' + text + '">',
+            "</OBJECT>",
+        )
 
     def markup_type_name(self, text, construct):
-        return ('<TYPE-NAME idlType="' + construct.idl_type + '">', '</TYPE-NAME>')
+        return ('<TYPE-NAME idlType="' + construct.idl_type + '">', "</TYPE-NAME>")
 
     def markup_name(self, text, construct):
-        return ('<NAME idlType="' + construct.idl_type + '">', '</NAME>')
+        return ('<NAME idlType="' + construct.idl_type + '">', "</NAME>")
 
     def markup_keyword(self, text, construct):
-        return ('<KEYWORD idlType="' + construct.idl_type + '">', '</KEYWORD>')
+        return ('<KEYWORD idlType="' + construct.idl_type + '">', "</KEYWORD>")
 
     def markup_enum_value(self, text, construct):
-        return ('<ENUM-VALUE for="' + construct.name + '">', '</ENUM-VALUE>')
+        return ('<ENUM-VALUE for="' + construct.name + '">', "</ENUM-VALUE>")
 
 
 class IDLMarker(object):
@@ -88,7 +106,10 @@ class IDLMarker(object):
             return (None, None)
 
         # The name in [PutForwards=foo] is an attribute of the same interface.
-        if construct.idl_type == "extended-attribute" and construct.name == "PutForwards":
+        if (
+            construct.idl_type == "extended-attribute"
+            and construct.name == "PutForwards"
+        ):
             # In [PutForwards=value] attribute DOMString foo
             # the "value" is a DOMString attr
             attr = construct.parent
@@ -99,19 +120,28 @@ class IDLMarker(object):
             typeName = str(type).strip()
             if typeName.endswith("?"):
                 typeName = typeName[:-1]
-            return ('<a data-link-type=attribute data-link-for="{0}">'.format(typeName), '</a>')
+            return (
+                '<a data-link-type=attribute data-link-for="{0}">'.format(typeName),
+                "</a>",
+            )
 
         # LegacyWindowAlias defines additional names for the construct,
         # so all the names should be forced <dfn>s, just like the interface name itself.
-        if construct.idl_type == "extended-attribute" and construct.name == "LegacyWindowAlias":
-            return ('<idl data-idl-type=interface data-lt="{0}">'.format(text), '</idl>')
+        if (
+            construct.idl_type == "extended-attribute"
+            and construct.name == "LegacyWindowAlias"
+        ):
+            return (
+                '<idl data-idl-type=interface data-lt="{0}">'.format(text),
+                "</idl>",
+            )
 
         if construct.idl_type == "constructor":
             # This shows up for the method name in a [NamedConstructor] extended attribute.
             # The "NamedConstructor" Name already got markup up, so ignore this one.
             return (None, None)
 
-        return ('<a data-link-type="idl-name">', '</a>')
+        return ('<a data-link-type="idl-name">', "</a>")
 
     def markup_keyword(self, text, construct):
         # Fires on the various "keywords" of WebIDL -
@@ -121,21 +151,34 @@ class IDLMarker(object):
         if text == "stringifier":
             if construct.name is None:
                 # If no name was defined, you're required to define stringification behavior.
-                return ("<a dfn for='{0}' data-lt='stringification behavior'>".format(construct.parent.full_name), "</a>")
+                return (
+                    "<a dfn for='{0}' data-lt='stringification behavior'>".format(
+                        construct.parent.full_name
+                    ),
+                    "</a>",
+                )
             else:
                 # Otherwise, you *can* point to/dfn stringification behavior if you want.
-                return ("<idl data-export data-idl-type=dfn data-idl-for='{0}' data-lt='stringification behavior' id='{0}-stringification-behavior'>".format(construct.parent.full_name), "</idl>")
+                return (
+                    "<idl data-export data-idl-type=dfn data-idl-for='{0}' data-lt='stringification behavior' id='{0}-stringification-behavior'>".format(
+                        construct.parent.full_name
+                    ),
+                    "</idl>",
+                )
         # The remaining built-in types that aren't covered by a more specific function.
         builtinTypes = {
-            "any":"interface",
-            "sequence":"dfn",
-            "record":"dfn",
-            "Promise":"interface",
-            "FrozenArray":"interface",
-            "ObservableArray":"interface",
+            "any": "interface",
+            "sequence": "dfn",
+            "record": "dfn",
+            "Promise": "interface",
+            "FrozenArray": "interface",
+            "ObservableArray": "interface",
         }
         if text in builtinTypes:
-            return (f'<a data-link-spec=webidl data-link-type="{builtinTypes[text]}">', '</a>')
+            return (
+                f'<a data-link-spec=webidl data-link-type="{builtinTypes[text]}">',
+                "</a>",
+            )
         return (None, None)
 
     def markup_name(self, text, construct):
@@ -146,7 +189,9 @@ class IDLMarker(object):
 
         if idlType == "constructor":
             # the [Constructor] extended attr, now deprecated
-            die(f"The [Constructor] extended attribute (on {construct.parent.name}) is deprecated, please switch to a constructor() method.")
+            die(
+                f"The [Constructor] extended attribute (on {construct.parent.name}) is deprecated, please switch to a constructor() method."
+            )
             return (None, None)
 
         if idlType == "argument" and construct.parent.idl_type == "constructor":
@@ -157,10 +202,10 @@ class IDLMarker(object):
         if idlType == "method" and idlTitle.startswith("constructor("):
             idlType = "constructor"
 
-        extraParameters = ''
+        extraParameters = ""
         refType = "idl"
         if idlType in config.functionishTypes:
-            idlTitle = '|'.join(self.methodLinkingTexts(construct))
+            idlTitle = "|".join(self.methodLinkingTexts(construct))
         elif idlType == "extended-attribute":
             refType = "link"
         elif idlType == "attribute":
@@ -169,20 +214,25 @@ class IDLMarker(object):
             elif hasattr(construct.member, "attribute"):
                 rest = construct.member.attribute
             else:
-                die("Can't figure out how to construct attribute-info from:\n  {0}", construct)
+                die(
+                    "Can't figure out how to construct attribute-info from:\n  {0}",
+                    construct,
+                )
             if rest.readonly is not None:
-                readonly = 'data-readonly'
+                readonly = "data-readonly"
             else:
-                readonly = ''
-            extraParameters = '{0} data-type="{1}"'.format(readonly, str(rest.type).strip())
+                readonly = ""
+            extraParameters = '{0} data-type="{1}"'.format(
+                readonly, str(rest.type).strip()
+            )
         elif idlType == "dict-member":
             extraParameters = 'data-type="{0}"'.format(construct.type)
             if construct.default is not None:
-                value = str(construct.default).split('=', 1)[1].strip()
-                if value.startswith('['):
-                    value = '[]'
-                elif value.startswith('}'):
-                    value = '{}'
+                value = str(construct.default).split("=", 1)[1].strip()
+                if value.startswith("["):
+                    value = "[]"
+                elif value.startswith("}"):
+                    value = "{}"
                 extraParameters += ' data-default="{0}"'.format(escapeAttr(value))
         elif idlType in ["interface", "namespace", "dictionary"]:
             if construct.partial:
@@ -196,30 +246,48 @@ class IDLMarker(object):
         if idlType in config.typesUsingFor:
             if idlType == "argument" and construct.parent.idl_type == "method":
                 interfaceName = construct.parent.parent.name
-                methodNames = ["{0}/{1}".format(interfaceName, m) for m in self.methodLinkingTexts(construct.parent)]
+                methodNames = [
+                    "{0}/{1}".format(interfaceName, m)
+                    for m in self.methodLinkingTexts(construct.parent)
+                ]
                 idlFor = "data-idl-for='{0}'".format(", ".join(methodNames))
             else:
                 idlFor = "data-idl-for='{0}'".format(construct.parent.full_name)
         else:
             idlFor = ""
-        return ('<{name} data-lt="{0}" data-{refType}-type="{1}" {2} {3}>'.format(idlTitle, idlType, idlFor, extraParameters, name=elementName, refType=refType), '</{0}>'.format(elementName))
+        return (
+            '<{name} data-lt="{0}" data-{refType}-type="{1}" {2} {3}>'.format(
+                idlTitle,
+                idlType,
+                idlFor,
+                extraParameters,
+                name=elementName,
+                refType=refType,
+            ),
+            "</{0}>".format(elementName),
+        )
 
     def markup_enum_value(self, text, construct):
-        return ("<idl data-idl-type=enum-value data-idl-for='{0}' data-lt='{1}'>".format(escapeAttr(construct.name), escapeAttr(text)), "</idl>")
+        return (
+            "<idl data-idl-type=enum-value data-idl-for='{0}' data-lt='{1}'>".format(
+                escapeAttr(construct.name), escapeAttr(text)
+            ),
+            "</idl>",
+        )
 
     def encode(self, text):
         return escapeHTML(text)
 
     def methodLinkingTexts(self, method):
-        '''
+        """
         Given a method-ish widlparser Construct,
         finds all possible linking texts.
         The full linking text is "foo(bar, baz)";
         beyond that, any optional or variadic arguments can be omitted.
         So, if both were optional,
         "foo(bar)" and "foo()" would both also be valid linking texts.
-        '''
-        for i,arg in enumerate(method.arguments or []):
+        """
+        for i, arg in enumerate(method.arguments or []):
             if arg.optional or arg.variadic:
                 optStart = i
                 break
@@ -233,7 +301,7 @@ class IDLMarker(object):
             if method.name == "constructor":
                 prefixes.append(method.parent.name)
             for i in range(optStart, len(method.arguments)):
-                argText = ', '.join(arg.name for arg in method.arguments[:i])
+                argText = ", ".join(arg.name for arg in method.arguments[:i])
                 for prefix in prefixes:
                     texts.append(prefix + "(" + argText + ")")
 
@@ -278,11 +346,13 @@ def markupIDL(doc):
                 replaceNode(span, *contents)
         return
     if highlightingOccurred:
-        doc.extraStyles['style-syntax-highlighting'] += '''
+        doc.extraStyles[
+            "style-syntax-highlighting"
+        ] += """
             pre.idl.highlight {
                 background: var(--borderedblock-bg, var(--def-bg));
             }
-            '''
+            """
 
 
 def processIDL(doc):
@@ -299,19 +369,24 @@ def processIDL(doc):
                 x = x[:-11]
             forcedInterfaces.append(x)
         for el in findAll("idl", pre):
-            idlType = el.get('data-idl-type')
+            idlType = el.get("data-idl-type")
             url = None
             forceDfn = False
             ref = None
-            for idlText in el.get('data-lt').split('|'):
+            for idlText in el.get("data-lt").split("|"):
                 if idlType == "interface" and idlText in forcedInterfaces:
                     forceDfn = True
-                for linkFor in config.splitForValues(el.get('data-idl-for', '')) or [None]:
-                    ref = doc.refs.getRef(idlType, idlText,
-                                          linkFor=linkFor,
-                                          status="local",
-                                          el=el,
-                                          error=False)
+                for linkFor in config.splitForValues(el.get("data-idl-for", "")) or [
+                    None
+                ]:
+                    ref = doc.refs.getRef(
+                        idlType,
+                        idlText,
+                        linkFor=linkFor,
+                        status="local",
+                        el=el,
+                        error=False,
+                    )
                     if ref:
                         url = ref.url
                         break
@@ -319,11 +394,11 @@ def processIDL(doc):
                     break
             if url is None or forceDfn:
                 el.tag = "dfn"
-                el.set('data-dfn-type', idlType)
-                del el.attrib['data-idl-type']
-                if el.get('data-idl-for'):
-                    el.set('data-dfn-for', el.get('data-idl-for'))
-                    del el.attrib['data-idl-for']
+                el.set("data-dfn-type", idlType)
+                del el.attrib["data-idl-type"]
+                if el.get("data-idl-for"):
+                    el.set("data-dfn-for", el.get("data-idl-for"))
+                    del el.attrib["data-idl-for"]
             else:
                 # Copy over the auto-generated linking text to the manual dfn.
                 dfn = find(url, doc)
@@ -333,20 +408,23 @@ def processIDL(doc):
 
                 # Reset the <idl> element to be a link to the manual dfn.
                 el.tag = "a"
-                el.set('data-link-type', idlType)
-                el.set('data-lt', idlText)
-                del el.attrib['data-idl-type']
-                if el.get('data-idl-for'):
-                    el.set('data-link-for', el.get('data-idl-for'))
-                    del el.attrib['data-idl-for']
-                if el.get('id'):
+                el.set("data-link-type", idlType)
+                el.set("data-lt", idlText)
+                del el.attrib["data-idl-type"]
+                if el.get("data-idl-for"):
+                    el.set("data-link-for", el.get("data-idl-for"))
+                    del el.attrib["data-idl-for"]
+                if el.get("id"):
                     # ID was defensively added by the Marker.
-                    del el.attrib['id']
+                    del el.attrib["id"]
 
-    dfns = findAll("pre.idl:not([data-no-idl]) dfn, xmp.idl:not([data-no-idl]) dfn", doc) + list(localDfns)
+    dfns = findAll(
+        "pre.idl:not([data-no-idl]) dfn, xmp.idl:not([data-no-idl]) dfn", doc
+    ) + list(localDfns)
     classifyDfns(doc, dfns)
     fixupIDs(doc, dfns)
-    doc.refs.addLocalDfns(dfn for dfn in dfns if dfn.get('id') is not None)
+    doc.refs.addLocalDfns(dfn for dfn in dfns if dfn.get("id") is not None)
+
 
 def combineIdlLinkingTexts(t1, t2):
     t1s = [normalizeIdlWhitespace(x) for x in (t1 or "").split("|")]
@@ -356,14 +434,13 @@ def combineIdlLinkingTexts(t1, t2):
             t1s.append(lt)
     return "|".join(t1s)
 
+
 def normalizeIdlWhitespace(text):
     # Remove all whitespace...
     text = re.sub(r"\s+", "", text)
     # Then add whitespace after commas
     text = re.sub(r",", ", ", text)
     return text
-
-
 
 
 def getParser():

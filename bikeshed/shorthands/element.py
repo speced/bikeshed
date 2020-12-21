@@ -6,6 +6,7 @@ from ..messages import die
 
 from . import steps
 
+
 class ElementShorthand:
     def __init__(self):
         self.stage = "start"
@@ -55,30 +56,35 @@ class ElementShorthand:
 
     def respondEnd(self):
         if self.escapedText:
-            return steps.Success(skips=["<"], nodes=[self.escapedText[1:], *self.linkText, "}>"])
+            return steps.Success(
+                skips=["<"], nodes=[self.escapedText[1:], *self.linkText, "}>"]
+            )
 
         self.bsAutolink += "}>"
 
         if self.linkType not in config.markupTypes and self.linkType != "element-sub":
-            die("Shorthand {0} gives type as '{1}', but only markup types ({2}) are allowed.",
+            die(
+                "Shorthand {0} gives type as '{1}', but only markup types ({2}) are allowed.",
                 self.bsAutolink,
                 self.linkType,
-                config.englishFromList(config.idlTypes))
+                config.englishFromList(config.idlTypes),
+            )
             return steps.Success(E.span({}, self.bsAutolink))
 
         if not self.linkText:
             self.linkText = self.lt
 
         attrs = {
-            "data-link-type":self.linkType,
-            "for":self.linkFor,
-            "lt":self.lt,
-            "bs-autolink-syntax":self.bsAutolink}
-        return steps.Success(
-            E.a(attrs, linkText))
+            "data-link-type": self.linkType,
+            "for": self.linkFor,
+            "lt": self.lt,
+            "bs-autolink-syntax": self.bsAutolink,
+        }
+        return steps.Success(E.a(attrs, linkText))
 
 
-ElementShorthand.startRe = re.compile(r"""
+ElementShorthand.startRe = re.compile(
+    r"""
                         (?P<escape>\\)?
                         <{
                         (?P<element>[\w*-]+)
@@ -87,6 +93,8 @@ ElementShorthand.startRe = re.compile(r"""
                             (?:/(?P<value>[^}!|]+))?
                         )?
                         (?:!!(?P<linkType>[\w-]+))?
-                        (?P<linkText>\|)?""", re.X)
+                        (?P<linkText>\|)?""",
+    re.X,
+)
 
 endRe = re.compile("}>")

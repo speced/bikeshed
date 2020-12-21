@@ -20,8 +20,11 @@ def update(path, dryRun=False):
     try:
         data = response.json(encoding="utf-8", object_pairs_hook=OrderedDict)
     except Exception as e:
-        die("The MDN Spec Links data wasn't valid JSON for some reason." +
-            " Try downloading again?\n{0}", e)
+        die(
+            "The MDN Spec Links data wasn't valid JSON for some reason."
+            + " Try downloading again?\n{0}",
+            e,
+        )
         return
     writtenPaths = set()
     if not dryRun:
@@ -31,9 +34,10 @@ def update(path, dryRun=False):
                 os.makedirs(mdnSpecLinksDir)
             p = os.path.join(path, "mdn.json")
             writtenPaths.add(p)
-            with io.open(p, 'w', encoding="utf-8") as fh:
-                fh.write(json.dumps(data, indent=1, ensure_ascii=False,
-                                    sort_keys=False))
+            with io.open(p, "w", encoding="utf-8") as fh:
+                fh.write(
+                    json.dumps(data, indent=1, ensure_ascii=False, sort_keys=False)
+                )
             # SPECMAP.json format:
             # {
             #     "https://compat.spec.whatwg.org/": "compat.json",
@@ -48,10 +52,14 @@ def update(path, dryRun=False):
                 try:
                     fileContents = requests.get(mdnSpecLinksBaseURL + specFilename).text
                 except Exception as e:
-                    die("Couldn't download the MDN Spec Links " + specFilename +
-                        " file.\n{0}", e)
+                    die(
+                        "Couldn't download the MDN Spec Links "
+                        + specFilename
+                        + " file.\n{0}",
+                        e,
+                    )
                     return
-                with io.open(p, 'w', encoding='utf-8') as fh:
+                with io.open(p, "w", encoding="utf-8") as fh:
                     fh.write(fileContents)
         except Exception as e:
             die("Couldn't save MDN Spec Links data to disk.\n{0}", e)

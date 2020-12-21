@@ -59,7 +59,10 @@ class DataFileRequester(object):
                 return io.StringIO("")
         raise IOError("Couldn't find file '{0}'".format(location))
 
-defaultRequester = DataFileRequester(type="latest", fallback=DataFileRequester(type="readonly"))
+
+defaultRequester = DataFileRequester(
+    type="latest", fallback=DataFileRequester(type="readonly")
+)
 
 
 def retrieveBoilerplateFile(doc, name, group=None, status=None, error=True):
@@ -77,6 +80,7 @@ def retrieveBoilerplateFile(doc, name, group=None, status=None, error=True):
 
     def boilerplatePath(*segs):
         return scriptPath("boilerplate", *segs)
+
     statusFile = "{0}-{1}.include".format(name, status)
     genericFile = "{0}.include".format(name)
     sources = []
@@ -86,9 +90,13 @@ def retrieveBoilerplateFile(doc, name, group=None, status=None, error=True):
     else:
         for f in (statusFile, genericFile):
             if doc.inputSource.cheaplyExists(f):
-                warn(("Found {0} next to the specification without a matching\n"+
-                    "Local Boilerplate: {1} yes\n"+
-                    "in the metadata. This include won't be found when building via a URL.").format(f, name))
+                warn(
+                    (
+                        "Found {0} next to the specification without a matching\n"
+                        + "Local Boilerplate: {1} yes\n"
+                        + "in the metadata. This include won't be found when building via a URL."
+                    ).format(f, name)
+                )
                 # We should remove this after giving specs time to react to the warning:
                 sources.append(doc.inputSource.relative(f))
     if group:
@@ -113,5 +121,10 @@ def retrieveBoilerplateFile(doc, name, group=None, status=None, error=True):
                 pass
     else:
         if error:
-            die("Couldn't find an appropriate include file for the {0} inclusion, given group='{1}' and status='{2}'.", name, group, status)
+            die(
+                "Couldn't find an appropriate include file for the {0} inclusion, given group='{1}' and status='{2}'.",
+                name,
+                group,
+                status,
+            )
         return ""

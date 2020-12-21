@@ -79,31 +79,9 @@ shortToLongStatus = {
     "fido/ID": "Implementation Draft",
     "fido/PS": "Proposed Standard",
     "fido/FD": "Final Document",
-    "khronos/ED": "Editor's Draft"
+    "khronos/ED": "Editor's Draft",
 }
-snapshotStatuses = ["w3c/WD", "w3c/FPWD", "w3c/LCWD", "w3c/CR", "w3c/CRD", "w3c/PR", "w3c/REC", "w3c/PER", "w3c/WG-NOTE", "w3c/IG-NOTE", "w3c/NOTE", "w3c/MO"]
-datedStatuses = ["w3c/WD", "w3c/FPWD", "w3c/LCWD", "w3c/CR", "w3c/CRD", "w3c/PR", "w3c/REC", "w3c/PER", "w3c/WG-NOTE", "w3c/IG-NOTE", "w3c/NOTE", "w3c/MO", "whatwg/RD"]
-implementationStatuses = ["w3c/CR", "w3c/CRD", "w3c/PR", "w3c/REC"]
-unlevelledStatuses = ["LS", "LD", "DREAM", "w3c/UD", "LS-COMMIT", "LS-BRANCH", "LS-PR", "FINDING", "DRAFT-FINDING", "whatwg/RD"]
-deadlineStatuses = ["w3c/LCWD", "w3c/PR"]
-noEDStatuses = ["LS", "LS-COMMIT", "LS-BRANCH", "LS-PR", "LD", "FINDING", "DRAFT-FINDING", "DREAM", "iso/NP", "whatwg/RD"]
-
-# W3C statuses are restricted in various confusing ways.
-
-# These statuses are usable by any group operating under the W3C Process
-# Document. (So, not by Community and Business Groups.)
-w3cProcessDocumentStatuses = frozenset([
-    "w3c/ED",
-    "w3c/NOTE",
-    "w3c/UD"
-])
-
-# Interest Groups are limited to these statuses
-w3cIGStatuses = frozenset([
-    "w3c/IG-NOTE"
-]).union(w3cProcessDocumentStatuses)
-# Working Groups are limited to these statuses
-w3cWGStatuses = frozenset([
+snapshotStatuses = [
     "w3c/WD",
     "w3c/FPWD",
     "w3c/LCWD",
@@ -112,35 +90,177 @@ w3cWGStatuses = frozenset([
     "w3c/PR",
     "w3c/REC",
     "w3c/PER",
-    "w3c/WG-NOTE"
-]).union(w3cProcessDocumentStatuses)
-# The TAG is limited to these statuses
-w3cTAGStatuses = frozenset([
-    "DRAFT-FINDING",
+    "w3c/WG-NOTE",
+    "w3c/IG-NOTE",
+    "w3c/NOTE",
+    "w3c/MO",
+]
+datedStatuses = [
+    "w3c/WD",
+    "w3c/FPWD",
+    "w3c/LCWD",
+    "w3c/CR",
+    "w3c/CRD",
+    "w3c/PR",
+    "w3c/REC",
+    "w3c/PER",
+    "w3c/WG-NOTE",
+    "w3c/IG-NOTE",
+    "w3c/NOTE",
+    "w3c/MO",
+    "whatwg/RD",
+]
+implementationStatuses = ["w3c/CR", "w3c/CRD", "w3c/PR", "w3c/REC"]
+unlevelledStatuses = [
+    "LS",
+    "LD",
+    "DREAM",
+    "w3c/UD",
+    "LS-COMMIT",
+    "LS-BRANCH",
+    "LS-PR",
     "FINDING",
-    "w3c/WG-NOTE" # despite the TAG not being a WG. I know, it's weird.
-]).union(w3cProcessDocumentStatuses)
+    "DRAFT-FINDING",
+    "whatwg/RD",
+]
+deadlineStatuses = ["w3c/LCWD", "w3c/PR"]
+noEDStatuses = [
+    "LS",
+    "LS-COMMIT",
+    "LS-BRANCH",
+    "LS-PR",
+    "LD",
+    "FINDING",
+    "DRAFT-FINDING",
+    "DREAM",
+    "iso/NP",
+    "whatwg/RD",
+]
+
+# W3C statuses are restricted in various confusing ways.
+
+# These statuses are usable by any group operating under the W3C Process
+# Document. (So, not by Community and Business Groups.)
+w3cProcessDocumentStatuses = frozenset(["w3c/ED", "w3c/NOTE", "w3c/UD"])
+
+# Interest Groups are limited to these statuses
+w3cIGStatuses = frozenset(["w3c/IG-NOTE"]).union(w3cProcessDocumentStatuses)
+# Working Groups are limited to these statuses
+w3cWGStatuses = frozenset(
+    [
+        "w3c/WD",
+        "w3c/FPWD",
+        "w3c/LCWD",
+        "w3c/CR",
+        "w3c/CRD",
+        "w3c/PR",
+        "w3c/REC",
+        "w3c/PER",
+        "w3c/WG-NOTE",
+    ]
+).union(w3cProcessDocumentStatuses)
+# The TAG is limited to these statuses
+w3cTAGStatuses = frozenset(
+    [
+        "DRAFT-FINDING",
+        "FINDING",
+        "w3c/WG-NOTE",  # despite the TAG not being a WG. I know, it's weird.
+    ]
+).union(w3cProcessDocumentStatuses)
 # Community and Business Groups are limited to these statuses
-w3cCommunityStatuses = frozenset([
-    "w3c/CG-DRAFT",
-    "w3c/CG-FINAL"
-])
+w3cCommunityStatuses = frozenset(["w3c/CG-DRAFT", "w3c/CG-FINAL"])
 
 megaGroups = {
-    "w3c": frozenset(["act-framework", "audiowg", "browser-testing-tools", "csswg", "dap", "fxtf", "fxtf-csswg", "geolocation", "houdini", "html", "i18n", "immersivewebcg", "immersivewebwg", "mediacapture", "mediawg", "ping", "privacycg", "processcg", "ricg", "sacg", "secondscreencg", "secondscreenwg", "serviceworkers", "svg", "tag", "texttracks", "uievents", "wasm", "web-bluetooth-cg", "webapps", "webappsec", "webauthn", "webml", "web-payments", "webperf", "webplatform", "webrtc", "webspecs", "webvr", "wicg"]),
+    "w3c": frozenset(
+        [
+            "act-framework",
+            "audiowg",
+            "browser-testing-tools",
+            "csswg",
+            "dap",
+            "fxtf",
+            "fxtf-csswg",
+            "geolocation",
+            "houdini",
+            "html",
+            "i18n",
+            "immersivewebcg",
+            "immersivewebwg",
+            "mediacapture",
+            "mediawg",
+            "ping",
+            "privacycg",
+            "processcg",
+            "ricg",
+            "sacg",
+            "secondscreencg",
+            "secondscreenwg",
+            "serviceworkers",
+            "svg",
+            "tag",
+            "texttracks",
+            "uievents",
+            "wasm",
+            "web-bluetooth-cg",
+            "webapps",
+            "webappsec",
+            "webauthn",
+            "webml",
+            "web-payments",
+            "webperf",
+            "webplatform",
+            "webrtc",
+            "webspecs",
+            "webvr",
+            "wicg",
+        ]
+    ),
     "whatwg": frozenset(["whatwg"]),
     "tc39": frozenset(["tc39"]),
     "iso": frozenset(["wg14", "wg21"]),
     "fido": frozenset(["fido"]),
-    "priv-sec": frozenset(["audiowg", "csswg", "dap", "fxtf", "fxtf-csswg", "geolocation", "houdini", "html", "mediacapture", "mediawg", "ricg", "svg", "texttracks", "uievents", "web-bluetooth-cg", "webappsec", "webplatform", "webspecs", "whatwg"]),
-    "khronos": frozenset(["webgl"])
+    "priv-sec": frozenset(
+        [
+            "audiowg",
+            "csswg",
+            "dap",
+            "fxtf",
+            "fxtf-csswg",
+            "geolocation",
+            "houdini",
+            "html",
+            "mediacapture",
+            "mediawg",
+            "ricg",
+            "svg",
+            "texttracks",
+            "uievents",
+            "web-bluetooth-cg",
+            "webappsec",
+            "webplatform",
+            "webspecs",
+            "whatwg",
+        ]
+    ),
+    "khronos": frozenset(["webgl"]),
 }
 # Community and business groups within the W3C:
-w3cCgs = frozenset(["immersivewebcg", "privacycg", "processcg", "ricg", "sacg", "web-bluetooth-cg", "wicg"])
+w3cCgs = frozenset(
+    [
+        "immersivewebcg",
+        "privacycg",
+        "processcg",
+        "ricg",
+        "sacg",
+        "web-bluetooth-cg",
+        "wicg",
+    ]
+)
 assert w3cCgs.issubset(megaGroups["w3c"])
 # Interest Groups within the W3C:
 w3cIgs = frozenset(["ping"])
 assert w3cIgs.issubset(megaGroups["w3c"])
+
 
 def canonicalizeStatus(rawStatus, group):
     if rawStatus is None:
@@ -148,42 +268,50 @@ def canonicalizeStatus(rawStatus, group):
 
     def validateW3Cstatus(group, status, rawStatus):
         if status == "DREAM":
-            warn("You used Status: DREAM for a W3C document."
-                 + " Consider UD instead.")
+            warn("You used Status: DREAM for a W3C document." + " Consider UD instead.")
             return
 
-        if "w3c/"+status in shortToLongStatus:
-            status = "w3c/"+status
+        if "w3c/" + status in shortToLongStatus:
+            status = "w3c/" + status
 
         def formatStatusSet(statuses):
-            return ", ".join(sorted(set([status.split("/")[-1] for status in statuses])))
+            return ", ".join(
+                sorted(set([status.split("/")[-1] for status in statuses]))
+            )
 
         msg = "You used Status: {0}, but {1} limited to these statuses: {2}."
 
         if group in w3cIgs and status not in w3cIGStatuses:
-            warn(msg, rawStatus, "W3C Interest Groups are",
-                 formatStatusSet(w3cIGStatuses))
+            warn(
+                msg,
+                rawStatus,
+                "W3C Interest Groups are",
+                formatStatusSet(w3cIGStatuses),
+            )
 
         if group == "tag" and status not in w3cTAGStatuses:
-            warn(msg, rawStatus, "the TAG is",
-                 formatStatusSet(w3cTAGStatuses))
+            warn(msg, rawStatus, "the TAG is", formatStatusSet(w3cTAGStatuses))
 
         if group in w3cCgs and status not in w3cCommunityStatuses:
-            warn(msg, rawStatus, "W3C Community and Business Groups are",
-                 formatStatusSet(w3cCommunityStatuses))
+            warn(
+                msg,
+                rawStatus,
+                "W3C Community and Business Groups are",
+                formatStatusSet(w3cCommunityStatuses),
+            )
 
     def megaGroupsForStatus(status):
         # Returns a list of megagroups that recognize the given status
         megaGroups = []
         for key in shortToLongStatus.keys():
-            mg,_,s = key.partition("/")
+            mg, _, s = key.partition("/")
             if s == status:
                 megaGroups.append(mg)
         return megaGroups
 
     # Canonicalize the rawStatus that was passed in, into a known form.
     # Might be foo/BAR, or just BAR.
-    megaGroup,_,status = rawStatus.partition("/")
+    megaGroup, _, status = rawStatus.partition("/")
     if status == "":
         status = megaGroup
         megaGroup = ""
@@ -214,33 +342,52 @@ def canonicalizeStatus(rawStatus, group):
         # Was the error because the megagroup doesn't exist?
         if possibleMgs:
             if megaGroup not in megaGroups:
-                msg = "Status metadata specified an unrecognized '{0}' organization.".format(megaGroup)
+                msg = "Status metadata specified an unrecognized '{0}' organization.".format(
+                    megaGroup
+                )
             else:
-                msg = "Status '{0}' can't be used with the org '{1}'.".format(status, megaGroup)
+                msg = "Status '{0}' can't be used with the org '{1}'.".format(
+                    status, megaGroup
+                )
             if "" in possibleMgs:
                 if len(possibleMgs) == 1:
-                    msg += " That status must be used without an org at all, like `Status: {0}`".format(status)
+                    msg += " That status must be used without an org at all, like `Status: {0}`".format(
+                        status
+                    )
                 else:
                     msg += " That status can only be used with the org{0} {1}, or without an org at all.".format(
-                        "s" if len(possibleMgs)>1 else "",
-                        englishFromList("'{0}'".format(x) for x in possibleMgs if x != ""))
+                        "s" if len(possibleMgs) > 1 else "",
+                        englishFromList(
+                            "'{0}'".format(x) for x in possibleMgs if x != ""
+                        ),
+                    )
             else:
                 if len(possibleMgs) == 1:
-                    msg += " That status can only be used with the org '{0}', like `Status: {0}/{1}`".format(possibleMgs[0], status)
+                    msg += " That status can only be used with the org '{0}', like `Status: {0}/{1}`".format(
+                        possibleMgs[0], status
+                    )
                 else:
-                    msg += " That status can only be used with the orgs {0}.".format(englishFromList("'{0}'".format(x) for x in possibleMgs))
+                    msg += " That status can only be used with the orgs {0}.".format(
+                        englishFromList("'{0}'".format(x) for x in possibleMgs)
+                    )
 
         else:
             if megaGroup not in megaGroups:
-                msg = "Unknown Status metadata '{0}'. Check the docs for valid Status values.".format(canonStatus)
+                msg = "Unknown Status metadata '{0}'. Check the docs for valid Status values.".format(
+                    canonStatus
+                )
             else:
-                msg = "Status '{0}' can't be used with the org '{1}'. Check the docs for valid Status values.".format(status, megaGroup)
+                msg = "Status '{0}' can't be used with the org '{1}'. Check the docs for valid Status values.".format(
+                    status, megaGroup
+                )
         die("{0}", msg)
         return canonStatus
 
     # Otherwise, they provided a bare status.
     # See if their group is compatible with any of the prefixed statuses matching the bare status.
-    assert "" not in possibleMgs # if it was here, the literal "in" test would have caught this bare status
+    assert (
+        "" not in possibleMgs
+    )  # if it was here, the literal "in" test would have caught this bare status
     for mg in possibleMgs:
         if group in megaGroups[mg]:
             canonStatus = mg + "/" + status
@@ -255,17 +402,23 @@ def canonicalizeStatus(rawStatus, group):
         msg = "You used Status: {0}, but that's limited to the {1} org{2}".format(
             rawStatus,
             englishFromList("'{0}'".format(mg) for mg in possibleMgs),
-            "s" if len(possibleMgs)>1 else "")
+            "s" if len(possibleMgs) > 1 else "",
+        )
         if group:
-            msg += ", and your group '{0}' isn't recognized as being in {1}.".format(group, "any of those orgs" if len(possibleMgs)>1 else "that org")
+            msg += ", and your group '{0}' isn't recognized as being in {1}.".format(
+                group, "any of those orgs" if len(possibleMgs) > 1 else "that org"
+            )
             msg += " If this is wrong, please file a Bikeshed issue to categorize your group properly, and/or try:\n"
             msg += "\n".join("Status: {0}/{1}".format(mg, status) for mg in possibleMgs)
         else:
             msg += ", and you don't have a Group metadata. Please declare your Group, or check the docs for statuses that can be used by anyone."
     else:
-        msg = "Unknown Status metadata '{0}'. Check the docs for valid Status values.".format(canonStatus)
+        msg = "Unknown Status metadata '{0}'. Check the docs for valid Status values.".format(
+            canonStatus
+        )
     die("{0}", msg)
     return canonStatus
+
 
 def splitStatus(st):
     if st is None:
@@ -276,6 +429,7 @@ def splitStatus(st):
         return None, parts[0]
 
     return parts[0], parts[2]
+
 
 def looselyMatch(s1, s2):
     # Loosely matches two statuses:

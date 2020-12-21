@@ -12,8 +12,10 @@ from .. import config
 from ..DefaultOrderedDict import DefaultOrderedDict
 from ..messages import *
 
+
 def unescape(string):
     import html
+
     return html.unescape(string)
 
 
@@ -21,7 +23,9 @@ def findAll(sel, context):
     if isinstance(context, constants.specClass):
         context = context.document
     try:
-        return CSSSelector(sel, namespaces={"svg":"http://www.w3.org/2000/svg"})(context)
+        return CSSSelector(sel, namespaces={"svg": "http://www.w3.org/2000/svg"})(
+            context
+        )
     except Exception as e:
         die("The selector '{0}' returned an error:\n{1}", sel, e)
         return []
@@ -41,21 +45,25 @@ def escapeCSSIdent(val):
         return ""
     ident = ""
     firstCode = val[0]
-    for i,code in enumerate(ord(x) for x in val):
+    for i, code in enumerate(ord(x) for x in val):
         if code == 0:
             die("Invalid character: the string '{0}' somehow has a NUL in it.", val)
             return ""
-        if (0x1 <= code <= 0x1f or
-            code == 0x7f or
-            (i == 0 and 0x30 <= code <= 0x39) or
-                (i == 1 and 0x30 <= code <= 0x39 and firstCode == 0x2d)):
+        if (
+            0x1 <= code <= 0x1F
+            or code == 0x7F
+            or (i == 0 and 0x30 <= code <= 0x39)
+            or (i == 1 and 0x30 <= code <= 0x39 and firstCode == 0x2D)
+        ):
             ident += r"\{0:x} ".format(code)
-        elif (code >= 0x80 or
-              code == 0x2d or
-              code == 0x5f or
-              0x30 <= code <= 0x39 or
-              0x41 <= code <= 0x5a or
-              0x61 <= code <= 0x7a):
+        elif (
+            code >= 0x80
+            or code == 0x2D
+            or code == 0x5F
+            or 0x30 <= code <= 0x39
+            or 0x41 <= code <= 0x5A
+            or 0x61 <= code <= 0x7A
+        ):
             ident += chr(code)
         else:
             ident += r"\{0}".format(chr(code))
@@ -75,25 +83,25 @@ def escapeUrlFrag(val):
 
 def validUrlUnit(char):
     c = ord(char)
-    if c < 0xa0:
+    if c < 0xA0:
         # ASCII range
         if (
-            c == 0x21 or
-            c == 0x24 or
-            0x26 <= c <= 0x29 or
-            0x2a <= c <= 0x3b or
-            c == 0x3d or
-            0x3f <= c <= 0x5a or
-            c == 0x5f or
-            0x61 <= c <= 0x7a or
-            c == 0x7e):
+            c == 0x21
+            or c == 0x24
+            or 0x26 <= c <= 0x29
+            or 0x2A <= c <= 0x3B
+            or c == 0x3D
+            or 0x3F <= c <= 0x5A
+            or c == 0x5F
+            or 0x61 <= c <= 0x7A
+            or c == 0x7E
+        ):
             return True
         return False
     else:
-        if (0xd800 <= c <= 0xdfff or
-            0xfdd0 <= c <= 0xfdef):
+        if 0xD800 <= c <= 0xDFFF or 0xFDD0 <= c <= 0xFDEF:
             return False
-        if (c % 0xffff) in [0xfffe, 0xffff]:
+        if (c % 0xFFFF) in [0xFFFE, 0xFFFF]:
             # Last two bytes are FFFE or FFFF
             return False
         return True
@@ -104,31 +112,31 @@ def textContent(el, exact=False):
     # get ignored in the textContent.
     # This allows me to ignore things added by Bikeshed by default.
     if len(el) == 0:
-        return el.text or ''
+        return el.text or ""
     if exact:
-        return tostring(el, method='text', with_tail=False, encoding="unicode")
+        return tostring(el, method="text", with_tail=False, encoding="unicode")
     else:
         return textContentIgnoringDecorative(el)
 
 
 def textContentIgnoringDecorative(el):
-    str = el.text or ''
+    str = el.text or ""
     for child in childElements(el):
         if child.get("data-deco") is None:
             str += textContentIgnoringDecorative(child)
-        str += child.tail or ''
+        str += child.tail or ""
     return str
 
 
 def innerHTML(el):
     if el is None:
-        return ''
-    return (el.text or '') + ''.join(tostring(x, encoding="unicode") for x in el)
+        return ""
+    return (el.text or "") + "".join(tostring(x, encoding="unicode") for x in el)
 
 
 def outerHTML(el, literal=False):
     if el is None:
-        return ''
+        return ""
     if isinstance(el, str):
         return el
     if isinstance(el, list):
@@ -137,12 +145,13 @@ def outerHTML(el, literal=False):
         return el.get("bs-autolink-syntax")
     return tostring(el, with_tail=False, encoding="unicode")
 
+
 def serializeTag(el):
     # Serialize *just* the opening tag for the element.
     # Use when you want to output the HTML,
     # but it might be a container with a lot of content.
     tag = "<" + el.tag
-    for n,v in el.attrib.items():
+    for n, v in el.attrib.items():
         tag += ' {n}="{v}"'.format(n=n, v=escapeAttr(v))
     tag += ">"
     return tag
@@ -153,7 +162,7 @@ def foldWhitespace(text):
 
 
 def parseHTML(text):
-    doc = html5lib.parse(text, treebuilder='lxml', namespaceHTMLElements=False)
+    doc = html5lib.parse(text, treebuilder="lxml", namespaceHTMLElements=False)
     head = doc.getroot()[0]
     body = doc.getroot()[1]
     if len(body) or body.text is not None:
@@ -171,22 +180,22 @@ def parseHTML(text):
 
 
 def parseDocument(text):
-    doc = html5lib.parse(text, treebuilder='lxml', namespaceHTMLElements=False)
+    doc = html5lib.parse(text, treebuilder="lxml", namespaceHTMLElements=False)
     return doc
 
 
 def escapeHTML(text):
     # Escape HTML
-    return text.replace('&', '&amp;').replace('<', '&lt;')
+    return text.replace("&", "&amp;").replace("<", "&lt;")
 
 
 def escapeAttr(text):
-    return text.replace('&', '&amp;').replace("'", '&apos;').replace('"', '&quot;')
+    return text.replace("&", "&amp;").replace("'", "&apos;").replace('"', "&quot;")
 
 
 def clearContents(el):
     del el[:]
-    el.text = ''
+    el.text = ""
     return el
 
 
@@ -200,9 +209,9 @@ def appendChild(parent, *children):
     for child in children:
         if isinstance(child, str):
             if len(parent) > 0:
-                parent[-1].tail = (parent[-1].tail or '') + child
+                parent[-1].tail = (parent[-1].tail or "") + child
             else:
-                parent.text = (parent.text or '') + child
+                parent.text = (parent.text or "") + child
         else:
             if len(parent) == 0 and parent.text is not None:
                 # LXML "helpfully" assumes you meant to insert it before the text,
@@ -229,7 +238,7 @@ def prependChild(parent, child):
         removeNode(child)
         parent.insert(0, child)
         if parent.text is not None:
-            child.tail = (child.tail or '') + parent.text
+            child.tail = (child.tail or "") + parent.text
             parent.text = None
 
 
@@ -240,9 +249,9 @@ def insertBefore(target, *els):
     for el in els:
         if isinstance(el, str):
             if prevSibling is not None:
-                prevSibling.tail = (prevSibling.tail or '') + el
+                prevSibling.tail = (prevSibling.tail or "") + el
             else:
-                parent.text = (parent.text or '') + el
+                parent.text = (parent.text or "") + el
         else:
             parent.insert(index, el)
             index += 1
@@ -254,7 +263,7 @@ def insertAfter(target, *els):
     parent = target.getparent()
     for el in els:
         if isinstance(el, str):
-            target.tail = (target.tail or '') + el
+            target.tail = (target.tail or "") + el
         else:
             parent.insert(parent.index(target) + 1, el)
             target = el
@@ -266,13 +275,13 @@ def removeNode(node):
     if parent is None:
         return node
     index = parent.index(node)
-    text = node.tail or ''
+    text = node.tail or ""
     node.tail = None
     if index == 0:
-        parent.text = (parent.text or '') + text
+        parent.text = (parent.text or "") + text
     else:
         prevsibling = parent[index - 1]
-        prevsibling.tail = (prevsibling.tail or '') + text
+        prevsibling.tail = (prevsibling.tail or "") + text
     parent.remove(node)
     return node
 
@@ -299,7 +308,8 @@ def replaceContents(el, newElements):
 
 def moveContents(toEl, fromEl):
     replaceContents(toEl, fromEl)
-    fromEl.text = ''
+    fromEl.text = ""
+
 
 def wrapContents(parentEl, wrapperEl):
     appendContents(wrapperEl, parentEl)
@@ -308,17 +318,17 @@ def wrapContents(parentEl, wrapperEl):
 
 
 def headingLevelOfElement(el):
-    for el in relevantHeadings(el, levels=[2,3,4,5,6]):
-        if el.get('data-level') is not None:
-            return el.get('data-level')
+    for el in relevantHeadings(el, levels=[2, 3, 4, 5, 6]):
+        if el.get("data-level") is not None:
+            return el.get("data-level")
     return None
 
 
 def relevantHeadings(startEl, levels=None):
     if levels is None:
-        levels = [1,2,3,4,5,6]
+        levels = [1, 2, 3, 4, 5, 6]
     levels = ["h" + str(level) for level in levels]
-    currentHeadingLevel = float('inf')
+    currentHeadingLevel = float("inf")
     for el in scopingElements(startEl, *levels):
         tagLevel = int(el.tag[1])
         if tagLevel < currentHeadingLevel:
@@ -329,10 +339,10 @@ def relevantHeadings(startEl, levels=None):
 
 
 def sectionName(el):
-    '''
+    """
     Return the name of the nearest section to el,
     or None if that section isn't meant to be referenced.
-    '''
+    """
     h = nextIter(relevantHeadings(el))
     if h is None:
         return "Unnamed section"
@@ -374,7 +384,7 @@ def childElements(parentEl, tag="*", *tags, **stuff):
 
 
 def childNodes(parentEl, clear=False, skipOddNodes=True):
-    '''
+    """
     This function returns all the nodes in a parent element in the DOM sense,
     mixing text nodes (strings) and other nodes together
     (rather than LXML's default stupid handling of text).
@@ -397,7 +407,7 @@ def childNodes(parentEl, clear=False, skipOddNodes=True):
 
     skipOddNodes ensures that the return value will only be text and Element nodes;
     if it's false, there might be comments, PIs, etc.
-    '''
+    """
     if isinstance(parentEl, list):
         return parentEl
     ret = []
@@ -453,6 +463,7 @@ def treeAttr(el, attrName):
     # Useful for when you can put an attr on an ancestor and apply it to all contents.
     # Returns attrValue or None if nothing is found.
     import itertools as it
+
     for target in it.chain([el], el.iterancestors()):
         if target.get(attrName) is not None:
             return target.get(attrName)
@@ -464,6 +475,7 @@ def closestAttr(el, *attrs):
     # If multiple target attrs show up on same element, priority is calling order.
     # Returns a tuple of (attrName, attrValue) or (None, None) if nothing is found.
     import itertools as it
+
     for target in it.chain([el], el.iterancestors()):
         for attrName in attrs:
             if target.get(attrName) is not None:
@@ -510,15 +522,17 @@ def hasAttrs(el):
 
 
 def addClass(el, cls):
-    if el.get('class') is None:
-        el.set('class', cls)
+    if el.get("class") is None:
+        el.set("class", cls)
     elif hasClass(el, cls):
         pass
     else:
-        el.set('class', "{0} {1}".format(el.get('class'), cls))
+        el.set("class", "{0} {1}".format(el.get("class"), cls))
 
 
 _classMap = {}
+
+
 def hasClass(el, cls, classMap=_classMap):
     elClass = el.get("class")
     if elClass is None:
@@ -528,20 +542,20 @@ def hasClass(el, cls, classMap=_classMap):
     key = cls, elClass
     if key in classMap:
         return classMap[key]
-    ret = re.search(r"(^|\s)"+cls+r"($|\s)", elClass)
+    ret = re.search(r"(^|\s)" + cls + r"($|\s)", elClass)
     classMap[key] = ret
     return ret
 
 
 def removeClass(el, cls):
-    oldClass = el.get('class')
+    oldClass = el.get("class")
     if oldClass is None:
         return
-    newClass = ' '.join(c for c in oldClass.split() if c != cls)
+    newClass = " ".join(c for c in oldClass.split() if c != cls)
     if newClass == "":
-        del el.attrib['class']
+        del el.attrib["class"]
     else:
-        el.set('class', newClass)
+        el.set("class", newClass)
 
 
 def isElement(node):
@@ -563,7 +577,12 @@ def isNormative(el, doc):
     # Currently just tests whether the element is in a class=example or class=note block, or not.
     if el in _normativeElCache:
         return _normativeElCache[el]
-    informativeClasses = ["note", "example", "non-normative", "informative"] + doc.md.informativeClasses
+    informativeClasses = [
+        "note",
+        "example",
+        "non-normative",
+        "informative",
+    ] + doc.md.informativeClasses
     for cls in informativeClasses:
         if hasClass(el, cls):
             _normativeElCache[el] = False
@@ -581,6 +600,8 @@ def isNormative(el, doc):
     norm = isNormative(parent, doc)
     _normativeElCache[el] = norm
     return norm
+
+
 _normativeElCache = {}
 
 
@@ -657,7 +678,9 @@ def hashContents(el):
     # Hash the contents of an element into an 8-character alphanum string.
     # Generally used for generating probably-unique IDs.
     # Normalize whitespace away to avoid git-related newline normalization issues.
-    text = re.sub(r"\s+", " ", textContent(el).strip()).encode("ascii", "xmlcharrefreplace")
+    text = re.sub(r"\s+", " ", textContent(el).strip()).encode(
+        "ascii", "xmlcharrefreplace"
+    )
     return hashlib.md5(text).hexdigest()[0:8]
 
 
@@ -686,8 +709,12 @@ def replaceMacros(text, macros):
         # Nothing has matched, so start failing the macros.
         if optional:
             return ""
-        die("Found unmatched text macro {0}. Correct the macro, or escape it with a leading backslash.", fullText)
+        die(
+            "Found unmatched text macro {0}. Correct the macro, or escape it with a leading backslash.",
+            fullText,
+        )
         return fullText
+
     return re.sub(r"(\\|\[)?\[([A-Z0-9-]+)(\??)\]", macroReplacer, text)
 
 
@@ -698,7 +725,10 @@ def replaceAwkwardCSSShorthands(text):
         escape, text = match.groups()
         if escape:
             return escapeHTML(match.group(0)[1:])
-        return "<fake-production-placeholder class=production bs-autolink-syntax='{0}'>{1}</fake-production-placeholder>".format(syntaxAttr, text)
+        return "<fake-production-placeholder class=production bs-autolink-syntax='{0}'>{1}</fake-production-placeholder>".format(
+            syntaxAttr, text
+        )
+
     text = re.sub(r"(\\)?<<([^>\n]+)>>", replaceProduction, text)
 
     # Replace the ''maybe link'' shortcuts.
@@ -710,7 +740,10 @@ def replaceAwkwardCSSShorthands(text):
         escape, text = match.groups()
         if escape:
             return escapeHTML(match.group(0)[1:])
-        return "<fake-maybe-placeholder bs-autolink-syntax='{0}'>{1}</fake-maybe-placeholder>".format(syntaxAttr, text)
+        return "<fake-maybe-placeholder bs-autolink-syntax='{0}'>{1}</fake-maybe-placeholder>".format(
+            syntaxAttr, text
+        )
+
     text = re.sub(r"(\\)?''([^=\n]+?)''", replaceMaybe, text)
     return text
 
@@ -736,7 +769,7 @@ def addOldIDs(els):
             continue
         oldIDs = [id.strip() for id in el.get("oldids").strip().split(",")]
         for oldID in oldIDs:
-            appendChild(el, E.span({"id":oldID}))
+            appendChild(el, E.span({"id": oldID}))
         removeAttr(el, "oldids")
 
 
@@ -745,10 +778,11 @@ def dedupIDs(doc):
 
     def findId(id):
         return find("#" + id, doc) is not None
+
     ids = DefaultOrderedDict(list)
     for el in findAll("[id]", doc):
-        ids[el.get('id')].append(el)
-    for dupeId,els in list(ids.items()):
+        ids[el.get("id")].append(el)
+    for dupeId, els in list(ids.items()):
         if len(els) < 2:
             # Only one instance, so nothing to do.
             continue
@@ -759,8 +793,8 @@ def dedupIDs(doc):
         ints = iter.count(1)
         for el in els[1:]:
             # If I registered an alternate ID, try to use that.
-            if el.get('data-alternate-id'):
-                altId = el.get('data-alternate-id')
+            if el.get("data-alternate-id"):
+                altId = el.get("data-alternate-id")
                 if altId not in ids:
                     el.set("id", safeID(doc, el.get("data-alternate-id")))
                     ids[altId].append(el)
@@ -771,7 +805,11 @@ def dedupIDs(doc):
                 warnAboutDupes = False
             # Try to de-dup the id by appending an integer after it.
             if warnAboutDupes:
-                warn("Multiple elements have the same ID '{0}'.\nDeduping, but this ID may not be stable across revisions.", dupeId, el=el)
+                warn(
+                    "Multiple elements have the same ID '{0}'.\nDeduping, but this ID may not be stable across revisions.",
+                    dupeId,
+                    el=el,
+                )
             for x in ints:
                 altId = "{0}{1}".format(dupeId, circledDigits(x))
                 if altId not in ids:
@@ -781,8 +819,8 @@ def dedupIDs(doc):
 
 
 def approximateLineNumber(el, setIntermediate=True):
-    if el.get('line-number'):
-        return el.get('line-number')
+    if el.get("line-number"):
+        return el.get("line-number")
     parent = parentElement(el)
     if not isElement(parent):
         if el.tag == "html":
@@ -794,28 +832,28 @@ def approximateLineNumber(el, setIntermediate=True):
     if approx[0].isdigit():
         approx = "~" + approx
     if setIntermediate:
-        el.set('line-number', approx)
+        el.set("line-number", approx)
     return approx
 
 
 def circledDigits(num):
-    '''
+    """
     Converts a base-10 number into a string using unicode circled digits.
     That is, 123 becomes "①②③"
-    '''
+    """
     num = int(num)
-    assert(num >= 0)
-    digits = ["⓪","①","②","③","④","⑤","⑥","⑦","⑧","⑨"]
+    assert num >= 0
+    digits = ["⓪", "①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨"]
     result = "".join(digits[int(d)] for d in str(num))
     return result
 
 
 def nextIter(it, default=None):
-    '''
+    """
     Returns the next element of the iterator,
     returning the default value if it's empty,
     rather than throwing an error.
-    '''
+    """
     try:
         return next(iter(it))
     except StopIteration:
@@ -823,7 +861,7 @@ def nextIter(it, default=None):
 
 
 def createElement(tag, attrs={}, *children):
-    el = etree.Element(tag, {n:v for n,v in attrs.items() if v is not None})
+    el = etree.Element(tag, {n: v for n, v in attrs.items() if v is not None})
     for child in children:
         appendChild(el, child)
     return el
@@ -832,11 +870,16 @@ def createElement(tag, attrs={}, *children):
 class ElementCreationHelper:
     def __getattr__(self, name):
         def _creater(*children):
-            if children and not (isinstance(children[0], str) or isElement(children[0])):
+            if children and not (
+                isinstance(children[0], str) or isElement(children[0])
+            ):
                 attrs = children[0]
                 children = children[1:]
             else:
                 attrs = {}
             return createElement(name, attrs, *children)
+
         return _creater
+
+
 E = ElementCreationHelper()

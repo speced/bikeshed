@@ -27,69 +27,78 @@ from .messages import *
 
 
 def processConditionals(container, doc=None):
-	if doc is None:
-		doc = container
-	for el in findAll("[include-if], [exclude-if], if-wrapper", container):
-		if el.tag == "if-wrapper" and not hasAttr(el, "include-if", "exclude-if"):
-			die("<if-wrapper> elements must have an include-if and/or exclude-if attribute.", el=el)
-			removeNode(el)
-			continue
+    if doc is None:
+        doc = container
+    for el in findAll("[include-if], [exclude-if], if-wrapper", container):
+        if el.tag == "if-wrapper" and not hasAttr(el, "include-if", "exclude-if"):
+            die(
+                "<if-wrapper> elements must have an include-if and/or exclude-if attribute.",
+                el=el,
+            )
+            removeNode(el)
+            continue
 
-		removeEl = False
-		if hasAttr(el, "include-if"):
-			if not any(evalConditions(doc, el, el.get("include-if"))):
-				removeEl = True
-		if not removeEl and hasAttr(el, "exclude-if"):
-			if any(evalConditions(doc, el, el.get("exclude-if"))):
-				removeEl = True
+        removeEl = False
+        if hasAttr(el, "include-if"):
+            if not any(evalConditions(doc, el, el.get("include-if"))):
+                removeEl = True
+        if not removeEl and hasAttr(el, "exclude-if"):
+            if any(evalConditions(doc, el, el.get("exclude-if"))):
+                removeEl = True
 
-		if removeEl:
-			removeNode(el)
-			continue
+        if removeEl:
+            removeNode(el)
+            continue
 
-		if el.tag == "if-wrapper":
-			# Passed the tests, so just remove the wrapper
-			replaceNode(el, *childNodes(el, clear=True))
-			continue
+        if el.tag == "if-wrapper":
+            # Passed the tests, so just remove the wrapper
+            replaceNode(el, *childNodes(el, clear=True))
+            continue
 
-		# Otherwise, go ahead and just remove the include/exclude-if attributes,
-		# since they're non-standard
-		removeAttr(el, "include-if", "exclude-if")
+        # Otherwise, go ahead and just remove the include/exclude-if attributes,
+        # since they're non-standard
+        removeAttr(el, "include-if", "exclude-if")
 
 
 def evalConditions(doc, el, conditionString):
-	for cond in parseConditions(conditionString, el):
-		if cond['type'] == "status":
-			yield config.looselyMatch(cond['value'], doc.md.status)
-		elif cond['type'] == "text macro":
-			for k,v in doc.md.customTextMacros:
-				if k == cond['value']:
-					yield True
-					break
-			else:
-				yield False
-		elif cond['type'] == "boilerplate":
-			yield (find(f'[boilerplate="{escapeCSSIdent(cond["value"])}"]', doc) is not None)
-		else:
-			die(f"Program error, some type of include/exclude-if condition wasn't handled: '{repr(cond)}'. Please report!", el)
-			yield False
+    for cond in parseConditions(conditionString, el):
+        if cond["type"] == "status":
+            yield config.looselyMatch(cond["value"], doc.md.status)
+        elif cond["type"] == "text macro":
+            for k, v in doc.md.customTextMacros:
+                if k == cond["value"]:
+                    yield True
+                    break
+            else:
+                yield False
+        elif cond["type"] == "boilerplate":
+            yield (
+                find(f'[boilerplate="{escapeCSSIdent(cond["value"])}"]', doc)
+                is not None
+            )
+        else:
+            die(
+                f"Program error, some type of include/exclude-if condition wasn't handled: '{repr(cond)}'. Please report!",
+                el,
+            )
+            yield False
 
 
 def parseConditions(s, el=None):
-	for sub in s.split(","):
-		sub = sub.strip()
-		if sub == "":
-			continue
-		if re.match(r"([\w-]+/)?[\w-]+$", sub):
-			yield {"type":"status", "value": sub}
-			continue
-		match = re.match(r"text macro:\s*(.+)$", sub, re.I)
-		if match:
-			yield {"type":"text macro", "value":match.group(1).strip()}
-			continue
-		match = re.match(r"boilerplate:\s*(.+)$", sub, re.I)
-		if match:
-			yield {"type":"boilerplate", "value":match.group(1).strip()}
-			continue
-		die(f"Unknown include/exclude-if condition '{sub}'", el=el)
-		continue
+    for sub in s.split(","):
+        sub = sub.strip()
+        if sub == "":
+            continue
+        if re.match(r"([\w-]+/)?[\w-]+$", sub):
+            yield {"type": "status", "value": sub}
+            continue
+        match = re.match(r"text macro:\s*(.+)$", sub, re.I)
+        if match:
+            yield {"type": "text macro", "value": match.group(1).strip()}
+            continue
+        match = re.match(r"boilerplate:\s*(.+)$", sub, re.I)
+        if match:
+            yield {"type": "boilerplate", "value": match.group(1).strip()}
+            continue
+        die(f"Unknown include/exclude-if condition '{sub}'", el=el)
+        continue

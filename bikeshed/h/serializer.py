@@ -4,11 +4,83 @@
 import io
 from . import dom
 
+
 class Serializer(object):
-    inlineEls = frozenset(["a", "em", "strong", "small", "s", "cite", "q", "dfn", "abbr", "data", "time", "code", "var", "samp", "kbd", "sub", "sup", "i", "b", "u", "mark", "ruby", "bdi", "bdo", "span", "br", "wbr", "img", "meter", "progress", "math", "[]"])
+    inlineEls = frozenset(
+        [
+            "a",
+            "em",
+            "strong",
+            "small",
+            "s",
+            "cite",
+            "q",
+            "dfn",
+            "abbr",
+            "data",
+            "time",
+            "code",
+            "var",
+            "samp",
+            "kbd",
+            "sub",
+            "sup",
+            "i",
+            "b",
+            "u",
+            "mark",
+            "ruby",
+            "bdi",
+            "bdo",
+            "span",
+            "br",
+            "wbr",
+            "img",
+            "meter",
+            "progress",
+            "math",
+            "[]",
+        ]
+    )
     rawEls = frozenset(["xmp", "script", "style"])
-    voidEls = frozenset(["area", "base", "br", "col", "command", "embed", "hr", "img", "input", "keygen", "link", "meta", "param", "source", "track", "wbr"])
-    omitEndTagEls = frozenset(["td", "th", "tr", "thead", "tbody", "tfoot", "colgroup", "col", "li", "dt", "dd", "html", "head", "body"])
+    voidEls = frozenset(
+        [
+            "area",
+            "base",
+            "br",
+            "col",
+            "command",
+            "embed",
+            "hr",
+            "img",
+            "input",
+            "keygen",
+            "link",
+            "meta",
+            "param",
+            "source",
+            "track",
+            "wbr",
+        ]
+    )
+    omitEndTagEls = frozenset(
+        [
+            "td",
+            "th",
+            "tr",
+            "thead",
+            "tbody",
+            "tfoot",
+            "colgroup",
+            "col",
+            "li",
+            "dt",
+            "dd",
+            "html",
+            "head",
+            "body",
+        ]
+    )
 
     def __init__(self, opaqueElements, blockElements):
         self.opaqueEls = frozenset(opaqueElements)
@@ -43,6 +115,7 @@ class Serializer(object):
 
     def fixWS(self, text):
         import string
+
         t1 = text.lstrip(string.whitespace)
         if text != t1:
             t1 = " " + t1
@@ -55,7 +128,7 @@ class Serializer(object):
         if tag == "[]":
             return
         if not dom.hasAttrs(el):
-            write("<"+tag+">")
+            write("<" + tag + ">")
             return
 
         strs = []
@@ -64,7 +137,13 @@ class Serializer(object):
             if attrVal == "":
                 strs.append(" " + self.unfuckName(attrName))
             else:
-                strs.append(" " + self.unfuckName(attrName) + '="' + dom.escapeAttr(attrVal) + '"')
+                strs.append(
+                    " "
+                    + self.unfuckName(attrName)
+                    + '="'
+                    + dom.escapeAttr(attrVal)
+                    + '"'
+                )
         strs.append(">")
         write("".join(strs))
 
@@ -96,7 +175,9 @@ class Serializer(object):
     def justWS(self, block):
         if self.isElement(block):
             return False
-        return len(block) == 1 and not self.isElement(block[0]) and block[0].strip() == ""
+        return (
+            len(block) == 1 and not self.isElement(block[0]) and block[0].strip() == ""
+        )
 
     def _writeVoidElement(self, tag, el, write, indent):
         write(" " * indent)
@@ -106,7 +187,9 @@ class Serializer(object):
         self.startTag(tag, el, write)
         for node in dom.childNodes(el):
             if self.isElement(node):
-                raise Exception(f"Somehow a CDATA element got an element child:\n{dom.outerHTML(el)}")
+                raise Exception(
+                    f"Somehow a CDATA element got an element child:\n{dom.outerHTML(el)}"
+                )
             else:
                 write(node)
         self.endTag(tag, write)
@@ -130,13 +213,15 @@ class Serializer(object):
         self.endTag(tag, write)
 
     def _blocksFromChildren(self, children):
-        return [block for block in self.groupIntoBlocks(children) if not self.justWS(block)]
+        return [
+            block for block in self.groupIntoBlocks(children) if not self.justWS(block)
+        ]
 
     def _categorizeBlockChildren(self, el):
-        '''
+        """
         Figure out what sort of contents the block has,
         so we know what serialization strategy to use.
-        '''
+        """
         if len(el) == 0 and dom.emptyText(el.text):
             return "empty", None
         children = dom.childNodes(el)

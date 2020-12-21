@@ -6,6 +6,7 @@ from ..messages import die
 
 from . import steps
 
+
 class IdlShorthand:
     def __init__(self):
         self.stage = "start"
@@ -47,37 +48,51 @@ class IdlShorthand:
 
     def respondEnd(self):
         if self.escapedText:
-            return steps.Success(skips=["{"], nodes=[self.escapedText[1:], *self.linkText, "}}"])
+            return steps.Success(
+                skips=["{"], nodes=[self.escapedText[1:], *self.linkText, "}}"]
+            )
 
         self.bsAutolink += "}}"
 
         if self.linkType not in config.idlTypes:
-            die("Shorthand {0} gives type as '{1}', but only IDL types are allowed.", self.bsAutolink, self.linkType)
+            die(
+                "Shorthand {0} gives type as '{1}', but only IDL types are allowed.",
+                self.bsAutolink,
+                self.linkType,
+            )
             return steps.Success(E.span({}, self.bsAutolink))
 
         if not self.linkText:
-            if self.lt.startswith("constructor(") and self.linkFor and self.linkFor != "/":
+            if (
+                self.lt.startswith("constructor(")
+                and self.linkFor
+                and self.linkFor != "/"
+            ):
                 # make {{Foo/constructor()}} output as "Foo()" so you know what it's linking to.
                 self.linkText = self.linkFor + self.lt[11:]
             else:
                 self.linkText = self.lt
 
         attrs = {
-            "data-link-type":self.linkType,
-            "for":self.linkFor,
-            "lt":self.lt,
-            "bs-autolink-syntax":self.bsAutolink}
+            "data-link-type": self.linkType,
+            "for": self.linkFor,
+            "lt": self.lt,
+            "bs-autolink-syntax": self.bsAutolink,
+        }
         return steps.Success(
-            E.code({"class":"idl", "nohighlight":""},
-                E.a(attrs, linkText)))
+            E.code({"class": "idl", "nohighlight": ""}, E.a(attrs, linkText))
+        )
 
 
-IdlShorthand.startRe = re.compile(r"""
+IdlShorthand.startRe = re.compile(
+    r"""
 (\\)?
 {{
 (?:([^}|]*)/)?
 ([^}/|]+?)
 (?:!!([\w-]+))?
-(\|)?""", re.X)
+(\|)?""",
+    re.X,
+)
 
 endRe = re.compile("}}")

@@ -2,6 +2,7 @@ import re
 from ..h import E, outerHTML
 from . import steps
 
+
 class AbstractOpShorthand:
     def __init__(self):
         self.stage = "start"
@@ -40,7 +41,9 @@ class AbstractOpShorthand:
 
     def respondEnd(self):
         if self.escapedText:
-            return steps.Success(skips=["["], nodes=[self.escapedText[1:], *self.linkText, "$]"])
+            return steps.Success(
+                skips=["["], nodes=[self.escapedText[1:], *self.linkText, "$]"]
+            )
 
         self.bsAutolink += "$]"
 
@@ -48,19 +51,22 @@ class AbstractOpShorthand:
             self.linkText = self.lt
 
         attrs = {
-            "data-link-type":"abstract-op",
-            "for":self.linkFor,
-            "lt":self.lt,
-            "bs-autolink-syntax":self.bsAutolink}
-        return steps.Success(
-            E.a(attrs, linkText))
+            "data-link-type": "abstract-op",
+            "for": self.linkFor,
+            "lt": self.lt,
+            "bs-autolink-syntax": self.bsAutolink,
+        }
+        return steps.Success(E.a(attrs, linkText))
 
 
-AbstractOpShorthand.startRe = re.compile(r"""
+AbstractOpShorthand.startRe = re.compile(
+    r"""
     (\\)?
     \[\$
     (?!\s)(?:([^$|]*)/)?
     ([^\"$]+?)
-    (?:\|)?""", re.X)
+    (?:\|)?""",
+    re.X,
+)
 
 endRe = re.compile("$]")

@@ -3,6 +3,7 @@ from ..h import E, outerHTML
 from . import steps
 from ..messages import die
 
+
 class PropdescShorthand:
     def __init__(self):
         self.stage = "start"
@@ -48,34 +49,43 @@ class PropdescShorthand:
 
     def respondEnd(self):
         if self.escapedText:
-            return steps.Success(skips=["'"], nodes=[self.escapedText[1:], *self.linkText, "'"])
+            return steps.Success(
+                skips=["'"], nodes=[self.escapedText[1:], *self.linkText, "'"]
+            )
 
         self.bsAutolink += "'"
 
         if self.linkType not in ["property", "descriptor", "propdesc"]:
-            die("Shorthand {0} gives type as '{1}', but only 'property' and 'descriptor' are allowed.", self.bsAutolink, linkType)
+            die(
+                "Shorthand {0} gives type as '{1}', but only 'property' and 'descriptor' are allowed.",
+                self.bsAutolink,
+                linkType,
+            )
             return steps.Success(E.span(self.bsAutolink))
 
         if self.linkText is None:
             self.linkText = lt
 
         attrs = {
-            "data-link-type":self.linkType,
-            "class":"property",
+            "data-link-type": self.linkType,
+            "class": "property",
             "for": self.linkFor,
             "lt": self.lt,
-            "bs-autolink-syntax":self.bsAutolink
-            }
+            "bs-autolink-syntax": self.bsAutolink,
+        }
         return steps.Success(E.a(attrs, linkText))
 
 
-PropdescShorthand.startRe = re.compile(r"""
+PropdescShorthand.startRe = re.compile(
+    r"""
                         (\\)?
                         '
                         (?:([^\s'|]*)/)?
                         ([\w*-]+)
                         (?:!!([\w-]+))?
                         (\|)?
-                        """, re.X)
+                        """,
+    re.X,
+)
 
 endRe = re.compile("'")

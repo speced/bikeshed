@@ -2,6 +2,7 @@ import re
 from ..h import E, outerHTML
 from . import steps
 
+
 class SectionShorthand:
     def __init__(self):
         self.stage = "start"
@@ -36,39 +37,43 @@ class SectionShorthand:
 
     def respondEnd(self):
         if self.escapedText:
-            return steps.Success(skips=["["], nodes=[self.escapedText[1:], *self.linkText, "]]"])
+            return steps.Success(
+                skips=["["], nodes=[self.escapedText[1:], *self.linkText, "]]"]
+            )
 
         self.bsAutolink += "]]"
 
         if not self.linkText:
-            self.linkText = "" # will get filled in by a later step
+            self.linkText = ""  # will get filled in by a later step
 
         if self.spec is None:
             # local section link
             attrs = {
-                "section":"",
-                "href":self.section,
-                "bs-autolink-syntax":self.bsAutolink,
-                }
+                "section": "",
+                "href": self.section,
+                "bs-autolink-syntax": self.bsAutolink,
+            }
             return steps.Success(E.a(attrs, self.linkText))
         elif self.justPage is not None:
             # foreign link, to an actual page from a multipage spec
             attrs = {
-                "spec-section":self.justPage + "#",
-                "spec":self.spec,
-                "bs-autolink-syntax":self.bsAutolink,
-                }
+                "spec-section": self.justPage + "#",
+                "spec": self.spec,
+                "bs-autolink-syntax": self.bsAutolink,
+            }
             return steps.Success(E.span(attrs, self.linkText))
         else:
             # foreign link
             attrs = {
-                "spec-section":self.section,
-                "spec":self.spec,
-                "bs-autolink-syntax":self.bsAutolink,
-                }
+                "spec-section": self.section,
+                "spec": self.spec,
+                "bs-autolink-syntax": self.bsAutolink,
+            }
             return steps.Success(E.span(attrs, self.linkText))
 
-SectionShorthand.startRe = re.compile(r"""
+
+SectionShorthand.startRe = re.compile(
+    r"""
     (\\)?
     \[\[
     ([\w.+-]+)?
@@ -77,6 +82,8 @@ SectionShorthand.startRe = re.compile(r"""
         (\/[\w.+-]+)
     )
     (\|)?
-    """, re.X)
+    """,
+    re.X,
+)
 
 endRe = re.compile(r"]]")

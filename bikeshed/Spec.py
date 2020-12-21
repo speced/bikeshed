@@ -38,9 +38,17 @@ from .messages import *
 from .refs import ReferenceManager
 from .unsortedJunk import *
 
-class Spec(object):
 
-    def __init__(self, inputFilename, debug=False, token=None, lineNumbers=False, fileRequester=None, testing=False):
+class Spec(object):
+    def __init__(
+        self,
+        inputFilename,
+        debug=False,
+        token=None,
+        lineNumbers=False,
+        fileRequester=None,
+        testing=False,
+    ):
         self.valid = False
         self.lineNumbers = lineNumbers
         if lineNumbers:
@@ -48,8 +56,10 @@ class Spec(object):
             constants.dryRun = True
         if inputFilename is None:
             inputFilename = findImplicitInputFile()
-        if inputFilename is None: # still
-            die("No input file specified, and no *.bs or *.src.html files found in current directory.\nPlease specify an input file, or use - to pipe from STDIN.")
+        if inputFilename is None:  # still
+            die(
+                "No input file specified, and no *.bs or *.src.html files found in current directory.\nPlease specify an input file, or use - to pipe from STDIN."
+            )
             return
         self.inputSource = InputSource(inputFilename)
         self.transitiveDependencies = set()
@@ -67,7 +77,7 @@ class Spec(object):
         self.normativeRefs = {}
         self.informativeRefs = {}
         self.refs = ReferenceManager(fileRequester=self.dataFile, testing=self.testing)
-        self.externalRefsUsed = defaultdict(lambda:defaultdict(dict))
+        self.externalRefsUsed = defaultdict(lambda: defaultdict(dict))
         self.md = None
         self.mdBaseline = metadata.MetadataManager()
         self.mdDocument = None
@@ -83,12 +93,12 @@ class Spec(object):
         self.testSuites = json.loads(self.dataFile.fetch("test-suites.json", str=True))
         self.languages = json.loads(self.dataFile.fetch("languages.json", str=True))
         self.extraStyles = defaultdict(str)
-        self.extraStyles['style-colors'] = styleColors
-        self.extraStyles['style-darkmode'] = styleDarkMode
-        self.extraStyles['style-md-lists'] = styleMdLists
-        self.extraStyles['style-autolinks'] = styleAutolinks
-        self.extraStyles['style-selflinks'] = styleSelflinks
-        self.extraStyles['style-counters'] = styleCounters
+        self.extraStyles["style-colors"] = styleColors
+        self.extraStyles["style-darkmode"] = styleDarkMode
+        self.extraStyles["style-md-lists"] = styleMdLists
+        self.extraStyles["style-autolinks"] = styleAutolinks
+        self.extraStyles["style-selflinks"] = styleSelflinks
+        self.extraStyles["style-counters"] = styleCounters
         self.extraScripts = defaultdict(str)
 
         try:
@@ -97,7 +107,10 @@ class Spec(object):
             if inputContent.date is not None:
                 self.mdBaseline.addParsedData("Date", inputContent.date)
         except OSError:
-            die("Couldn't find the input file at the specified location '{0}'.", self.inputSource)
+            die(
+                "Couldn't find the input file at the specified location '{0}'.",
+                self.inputSource,
+            )
             return False
         except IOError:
             die("Couldn't open the input file '{0}'.", self.inputSource)
@@ -125,14 +138,30 @@ class Spec(object):
         # First load the metadata sources from 'local' data
         self.md = metadata.join(self.mdBaseline, self.mdDocument, self.mdCommandLine)
         # Using that to determine the Group and Status, load the correct defaults.include boilerplate
-        self.mdDefaults = metadata.fromJson(data=config.retrieveBoilerplateFile(self, 'defaults', error=True), source="defaults")
-        self.md = metadata.join(self.mdBaseline, self.mdDefaults, self.mdDocument, self.mdCommandLine)
+        self.mdDefaults = metadata.fromJson(
+            data=config.retrieveBoilerplateFile(self, "defaults", error=True),
+            source="defaults",
+        )
+        self.md = metadata.join(
+            self.mdBaseline, self.mdDefaults, self.mdDocument, self.mdCommandLine
+        )
         # Using all of that, load up the text macros so I can sub them into the computed-metadata file.
         self.md.fillTextMacros(self.macros, doc=self)
-        jsonEscapedMacros = {k: json.dumps(v)[1:-1] for k,v in self.macros.items()}
-        computedMdText = replaceMacros(config.retrieveBoilerplateFile(self, 'computed-metadata', error=True), macros=jsonEscapedMacros)
-        self.mdOverridingDefaults = metadata.fromJson(data=computedMdText, source="computed-metadata")
-        self.md = metadata.join(self.mdBaseline, self.mdDefaults, self.mdOverridingDefaults, self.mdDocument, self.mdCommandLine)
+        jsonEscapedMacros = {k: json.dumps(v)[1:-1] for k, v in self.macros.items()}
+        computedMdText = replaceMacros(
+            config.retrieveBoilerplateFile(self, "computed-metadata", error=True),
+            macros=jsonEscapedMacros,
+        )
+        self.mdOverridingDefaults = metadata.fromJson(
+            data=computedMdText, source="computed-metadata"
+        )
+        self.md = metadata.join(
+            self.mdBaseline,
+            self.mdDefaults,
+            self.mdOverridingDefaults,
+            self.mdDocument,
+            self.mdCommandLine,
+        )
         # Finally, compute the "implicit" things.
         self.md.computeImplicitMetadata(doc=self)
         # And compute macros again, in case the preceding steps changed them.
@@ -146,13 +175,18 @@ class Spec(object):
 
         # Deal with further <pre> blocks, and markdown
         self.lines = datablocks.transformDataBlocks(self, self.lines)
-        self.lines = markdown.parse(self.lines, self.md.indent, opaqueElements=self.md.opaqueElements, blockElements=self.md.blockElements)
+        self.lines = markdown.parse(
+            self.lines,
+            self.md.indent,
+            opaqueElements=self.md.opaqueElements,
+            blockElements=self.md.blockElements,
+        )
         # Note that, currently, markdown.parse returns an array of strings, not of Line objects.
 
         self.refs.setSpecData(self.md)
 
         # Convert to a single string of html now, for convenience.
-        self.html = ''.join(l.text for l in self.lines)
+        self.html = "".join(l.text for l in self.lines)
         boilerplate.addHeaderFooter(self)
         self.html = self.fixText(self.html)
 
@@ -249,10 +283,14 @@ class Spec(object):
             # Ensure that all W3C links are https.
             for el in findAll("a", self):
                 href = el.get("href", "")
-                if href.startswith("http://www.w3.org") or href.startswith("http://lists.w3.org"):
+                if href.startswith("http://www.w3.org") or href.startswith(
+                    "http://lists.w3.org"
+                ):
                     el.set("href", "https" + href[4:])
                 text = el.text or ""
-                if text.startswith("http://www.w3.org") or text.startswith("http://lists.w3.org"):
+                if text.startswith("http://www.w3.org") or text.startswith(
+                    "http://lists.w3.org"
+                ):
                     el.text = "https" + text[4:]
             extensions.BSPrepTR(self)
 
@@ -260,7 +298,9 @@ class Spec(object):
 
     def serialize(self):
         try:
-            rendered = h.Serializer(self.md.opaqueElements, self.md.blockElements).serialize(self.document)
+            rendered = h.Serializer(
+                self.md.opaqueElements, self.md.blockElements
+            ).serialize(self.document)
         except Exception as e:
             die("{0}", e)
         rendered = finalHackyCleanup(rendered)
@@ -288,16 +328,22 @@ class Spec(object):
                 if outputFilename == "-":
                     sys.stdout.write(rendered)
                 else:
-                    with io.open(outputFilename, "w", encoding="utf-8", newline=newline) as f:
+                    with io.open(
+                        outputFilename, "w", encoding="utf-8", newline=newline
+                    ) as f:
                         f.write(rendered)
             except Exception as e:
-                die("Something prevented me from saving the output document to {0}:\n{1}", outputFilename, e)
+                die(
+                    "Something prevented me from saving the output document to {0}:\n{1}",
+                    outputFilename,
+                    e,
+                )
 
     def printResultMessage(self):
         # If I reach this point, I've succeeded, but maybe with reservations.
-        fatals = messageCounts['fatal']
-        links = messageCounts['linkerror']
-        warnings = messageCounts['warning']
+        fatals = messageCounts["fatal"]
+        links = messageCounts["linkerror"]
+        warnings = messageCounts["warning"]
         if self.lineNumbers:
             warn("Because --line-numbers was used, no output was saved.")
         if fatals:
@@ -332,10 +378,11 @@ class Spec(object):
 
             socketserver.TCPServer.allow_reuse_address = True
             server = socketserver.TCPServer(
-              ("localhost" if localhost else "", port), SilentServer)
+                ("localhost" if localhost else "", port), SilentServer
+            )
 
             print("Serving at port {0}".format(port))
-            thread = threading.Thread(target = server.serve_forever)
+            thread = threading.Thread(target=server.serve_forever)
             thread.daemon = True
             thread.start()
         else:
@@ -346,23 +393,28 @@ class Spec(object):
         try:
             self.preprocess()
             self.finish(outputFilename)
-            lastInputModified = {dep: dep.mtime()
-                                 for dep in self.transitiveDependencies}
+            lastInputModified = {
+                dep: dep.mtime() for dep in self.transitiveDependencies
+            }
             p("==============DONE==============")
             try:
                 while True:
                     # Comparing mtimes with "!=" handles when a file starts or
                     # stops existing, and it's fine to rebuild if an mtime
                     # somehow gets older.
-                    if any(input.mtime() != lastModified for input, lastModified in lastInputModified.items()):
+                    if any(
+                        input.mtime() != lastModified
+                        for input, lastModified in lastInputModified.items()
+                    ):
                         resetSeenMessages()
                         p("Source file modified. Rebuilding...")
                         self.initializeState()
                         self.mdCommandLine = mdCommandLine
                         self.preprocess()
                         self.finish(outputFilename)
-                        lastInputModified = {dep: dep.mtime()
-                                             for dep in self.transitiveDependencies}
+                        lastInputModified = {
+                            dep: dep.mtime() for dep in self.transitiveDependencies
+                        }
                         p("==============DONE==============")
                     time.sleep(1)
             except KeyboardInterrupt:
@@ -410,8 +462,9 @@ class Spec(object):
             return True
         return False
 
+
 def findImplicitInputFile():
-    '''
+    """
     Find what input file the user *probably* wants to use,
     by scanning the current folder.
     In preference order:
@@ -419,9 +472,10 @@ def findImplicitInputFile():
     2. Overview.bs
     3. the first file with a .bs extension
     4. the first file with a .src.html extension
-    '''
+    """
     import glob
     import os
+
     if os.path.isfile("index.bs"):
         return "index.bs"
     if os.path.isfile("Overview.bs"):
@@ -437,9 +491,10 @@ def findImplicitInputFile():
 
     return None
 
+
 constants.specClass = Spec
 
-styleColors = '''
+styleColors = """
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -546,9 +601,9 @@ styleColors = '''
     --outdated-shadow: red;
 
     --editedrec-bg: darkorange;
-}'''
+}"""
 
-styleDarkMode = '''
+styleDarkMode = """
 @media (prefers-color-scheme: dark) {
     :root {
         --text: #ddd;
@@ -659,9 +714,9 @@ styleDarkMode = '''
     /* In case a transparent-bg image doesn't expect to be on a dark bg,
        which is quite common in practice... */
     img { background: white; }
-}'''
+}"""
 
-styleMdLists = '''
+styleMdLists = """
 /* This is a weird hack for me not yet following the commonmark spec
    regarding paragraph and lists. */
 [data-md] > :first-child {
@@ -669,9 +724,9 @@ styleMdLists = '''
 }
 [data-md] > :last-child {
     margin-bottom: 0;
-}'''
+}"""
 
-styleAutolinks = '''
+styleAutolinks = """
 .css.css, .property.property, .descriptor.descriptor {
     color: var(--a-normal-text);
     font-size: inherit;
@@ -731,9 +786,9 @@ pre .property::before, pre .property::after {
 
 [data-link-type=biblio] {
     white-space: pre;
-}'''
+}"""
 
-styleSelflinks = '''
+styleSelflinks = """
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -783,8 +838,8 @@ dfn > a.self-link:hover {
 a.self-link::before            { content: "¶"; }
 .heading > a.self-link::before { content: "§"; }
 dfn > a.self-link::before      { content: "#"; }
-'''
-styleDarkMode += '''
+"""
+styleDarkMode += """
 @media (prefers-color-scheme: dark) {
     :root {
         --selflink-text: black;
@@ -792,10 +847,10 @@ styleDarkMode += '''
         --selflink-hover-text: white;
     }
 }
-'''
+"""
 
 
-styleCounters = '''
+styleCounters = """
 body {
     counter-reset: example figure issue;
 }
@@ -822,4 +877,4 @@ figcaption {
 }
 figcaption:not(.no-marker)::before {
     content: "Figure " counter(figure) " ";
-}'''
+}"""

@@ -5,7 +5,9 @@ from collections import defaultdict
 from .. import config
 
 
-def filterObsoletes(refs, replacedSpecs, ignoredSpecs, localShortname=None, localSpec=None):
+def filterObsoletes(
+    refs, replacedSpecs, ignoredSpecs, localShortname=None, localSpec=None
+):
     # Remove any ignored or obsoleted specs
     possibleSpecs = set(ref.spec for ref in refs)
     if localSpec:
@@ -25,13 +27,14 @@ def filterObsoletes(refs, replacedSpecs, ignoredSpecs, localShortname=None, loca
         ret.append(ref)
     return ret
 
+
 def filterOldVersions(refs, status=None):
     # If multiple levels of the same shortname exist,
     # only use the latest level.
     # If generating for a snapshot, prefer the latest snapshot level,
     # unless that doesn't exist, in which case just prefer the latest level.
-    shortnameLevels = defaultdict(lambda:defaultdict(list))
-    snapshotShortnameLevels = defaultdict(lambda:defaultdict(list))
+    shortnameLevels = defaultdict(lambda: defaultdict(list))
+    snapshotShortnameLevels = defaultdict(lambda: defaultdict(list))
     for ref in refs:
         shortnameLevels[ref.shortname][ref.level].append(ref)
         if status == ref.status == "snapshot":
@@ -141,10 +144,12 @@ def linkTextVariations(str, linkType):
         if str == "thrown":
             yield "throw"
 
-    if " " in str and (config.linkTypeIn(linkType, "dfn") or config.linkTypeIn(linkType, "abstract-op")):
+    if " " in str and (
+        config.linkTypeIn(linkType, "dfn") or config.linkTypeIn(linkType, "abstract-op")
+    ):
         # Multi-word phrase, which often contains the conjugated word as the *first*,
         # rather than at the end.
-        first,_,rest = str.partition(" ")
+        first, _, rest = str.partition(" ")
         for variation in linkTextVariations(first, linkType):
             yield variation + " " + rest
 
@@ -154,7 +159,6 @@ def linkTextVariations(str, linkType):
             yield str[1:]
         else:
             yield "_" + str
-
 
         # Let people refer to methods without the parens.
         # Since attrs and methods live in the same namespace, this is safe.
