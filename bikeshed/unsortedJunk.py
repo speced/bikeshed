@@ -369,9 +369,15 @@ def addVarClickHighlighting(doc):
 def fixIntraDocumentReferences(doc):
     ids = {el.get('id'):el for el in findAll("[id]", doc)}
     headingIDs = {el.get('id'):el for el in findAll("[id].heading", doc)}
+    stepIDs = {el.get('id'):el for el in findAll("li[id]", doc)}
     for el in findAll("a[href^='#']:not([href='#']):not(.self-link):not([data-link-type])", doc):
         targetID = urllib.parse.unquote(el.get("href")[1:])
-        if el.get('data-section') is not None and targetID not in headingIDs:
+        if targetID in stepIDs and stepIDs[targetID].get('item') is not None:
+            li = stepIDs[targetID]
+            text = "step " + li.get('item')
+            appendChild(el, text)
+            continue
+        elif el.get('data-section') is not None and targetID not in headingIDs:
             die("Couldn't find target document section {0}:\n{1}", targetID, outerHTML(el), el=el)
             continue
         elif targetID not in ids:
