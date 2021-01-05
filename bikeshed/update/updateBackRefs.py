@@ -29,21 +29,21 @@ def findTestFiles():
 
 def testNameForPath(path):
     if path.startswith(TEST_DIR):
-        return path[len(TEST_DIR)+1:]
+        return path[len(TEST_DIR) + 1 :]
     return path
 
 
 def update(path, dryRun=False):
-    return # early exit while working on this...
+    return  # early exit while working on this...
     say("Downloading backref data...")
     constants.quiet = float("inf")
     if not dryRun:
         specs = defaultdict(dict)
         backrefs = defaultdict(lambda: defaultdict(list))
-        for i,testPath in enumerate(findTestFiles()):
+        for i, testPath in enumerate(findTestFiles()):
             if i > 1:
                 break
-            print(i,testNameForPath(testPath))
+            print(i, testNameForPath(testPath))
             doc = Spec(inputFilename=testPath)
             doc.preprocess()
             if doc.md.ED:
@@ -54,16 +54,17 @@ def update(path, dryRun=False):
                 continue
             referencingShortname = doc.md.vshortname
             for ref in processRefs(doc.externalRefsUsed):
-                _,_,referencedID = ref.url.partition("#")
+                _, _, referencedID = ref.url.partition("#")
                 referencedID = urllib.parse.unquote(referencedID)
                 referencedShortname = ref.spec
                 referencingLinks = findAll("[href='{0}']".format(ref.url), doc)
-                referencingIDs = [link.get("id") for link in referencingLinks if link.get("id")]
+                referencingIDs = [
+                    link.get("id") for link in referencingLinks if link.get("id")
+                ]
                 referencingURLs = ["{0}#{1}".format(url, id) for id in referencingIDs]
-                backrefs[referencedShortname][referencedID].append({
-                    "shortname": referencingShortname,
-                    "urls": referencingURLs
-                })
+                backrefs[referencedShortname][referencedID].append(
+                    {"shortname": referencingShortname, "urls": referencingURLs}
+                )
 
     print(config.printjson(backrefs))
 
@@ -86,5 +87,5 @@ ignoredSpecs = {
     "css-2015-0",
     "d0???-1",
     "svg-color-1",
-    "{{repo}}-1"
+    "{{repo}}-1",
 }

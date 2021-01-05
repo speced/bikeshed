@@ -7,6 +7,7 @@ from . import config
 from .h import *
 from .messages import *
 
+
 def addCanIUsePanels(doc):
     # Constructs "Can I Use panels" which show a compatibility data summary
     # for a term's feature.
@@ -38,17 +39,28 @@ def addCanIUsePanels(doc):
         feature = doc.canIUse.getFeature(featId)
 
         addClass(dfn, "caniuse-paneled")
-        panel = canIUsePanelFor(id=featId, data=feature, update=lastUpdated, classFromBrowser=classFromBrowser)
+        panel = canIUsePanelFor(
+            id=featId,
+            data=feature,
+            update=lastUpdated,
+            classFromBrowser=classFromBrowser,
+        )
         dfnId = dfn.get("id")
         if not dfnId:
-            die("Elements with `caniuse` attribute need to have an ID as well. Got:\n{0}", serializeTag(dfn), el=dfn)
+            die(
+                "Elements with `caniuse` attribute need to have an ID as well. Got:\n{0}",
+                serializeTag(dfn),
+                el=dfn,
+            )
             continue
         panel.set("data-dfn-id", dfnId)
         appendChild(doc.body, panel)
         atLeastOnePanel = True
 
     if atLeastOnePanel:
-        doc.extraScripts['script-caniuse-panel'] = '''
+        doc.extraScripts[
+            "script-caniuse-panel"
+        ] = """
             window.addEventListener("load", function(){
                 var panels = [].slice.call(document.querySelectorAll(".caniuse-status"));
                 for(var i = 0; i < panels.length; i++) {
@@ -62,8 +74,10 @@ def addCanIUsePanels(doc):
                 if(e.target.classList.contains("caniuse-panel-btn")) {
                     e.target.parentNode.classList.toggle("wrapped");
                 }
-            });'''
-        doc.extraStyles['style-caniuse-panel'] = '''
+            });"""
+        doc.extraStyles[
+            "style-caniuse-panel"
+        ] = """
             :root {
                 --caniuse-shadow: #999;
                 --caniuse-nosupport-text: #ccc;
@@ -107,35 +121,47 @@ def addCanIUsePanels(doc):
                 .caniuse-status:not(.wrapped) { width: 1em; height: 1em; }
                 .caniuse-status.wrapped > :not(input) { display: block; }
                 .caniuse-status:not(.wrapped) > :not(input) { display: none; }
-            }'''
+            }"""
 
-        doc.extraStyles['style-darkmode'] += '''
+        doc.extraStyles[
+            "style-darkmode"
+        ] += """
             @media (prefers-color-scheme: dark) {
                 :root {
                     --caniuse-shadow: #444;
                     --caniuse-nosupport-text: #666;
                     --caniuse-partialsupport-text: #bbb;
                 }
-            }'''
+            }"""
 
 
 def canIUsePanelFor(id, data, update, classFromBrowser):
-    panel = E.aside({"class": "caniuse-status", "data-deco": ""},
-        E.input({"value": "\u22F0", "type": "button", "class":"caniuse-panel-btn"}))
+    panel = E.aside(
+        {"class": "caniuse-status", "data-deco": ""},
+        E.input({"value": "\u22F0", "type": "button", "class": "caniuse-panel-btn"}),
+    )
     mainPara = E.p({"class": "support"}, E.b({}, "Support:"))
     appendChild(panel, mainPara)
-    for browser,support in data['support'].items():
+    for browser, support in data["support"].items():
         statusCode = support[0]
         if statusCode == "u":
             continue
         minVersion = support[2:]
-        appendChild(mainPara,
-            browserCompatSpan(classFromBrowser[browser], browser, statusCode, minVersion))
-    appendChild(panel,
-        E.p({"class": "caniuse"},
+        appendChild(
+            mainPara,
+            browserCompatSpan(
+                classFromBrowser[browser], browser, statusCode, minVersion
+            ),
+        )
+    appendChild(
+        panel,
+        E.p(
+            {"class": "caniuse"},
             "Source: ",
             E.a({"href": "https://caniuse.com/#feat=" + id}, "caniuse.com"),
-            " as of " + update))
+            " as of " + update,
+        ),
+    )
     return panel
 
 
@@ -151,17 +177,10 @@ def browserCompatSpan(browserCodeName, browserFullName, statusCode, minVersion=N
     statusClass = {"y": "yes", "n": "no", "a": "partial"}[statusCode]
     outer = E.span({"class": browserCodeName + " " + statusClass})
     if statusCode == "a":
-        appendChild(outer,
-            E.span({},
-                E.span({},
-                    browserFullName,
-                    " (limited)")))
+        appendChild(outer, E.span({}, E.span({}, browserFullName, " (limited)")))
     else:
-        appendChild(outer,
-            E.span({}, browserFullName))
-    appendChild(outer,
-        E.span({},
-            minVersion))
+        appendChild(outer, E.span({}, browserFullName))
+    appendChild(outer, E.span({}, minVersion))
     return outer
 
 
@@ -176,7 +195,10 @@ def validateCanIUseURLs(doc, elements):
                 sawTheURL = True
                 urlFeatures.add(featureID)
         if not sawTheURL and url not in doc.md.ignoreCanIUseUrlFailure:
-            warn("The Can I Use URL '{0}' isn't associated with any of the Can I Use features. Please check Can I Use for the correct spec url, and either correct your spec or correct Can I Use. If the URL is correct and you'd like to keep it in pre-emptively, add the URL to a 'Ignore Can I Use URL Failure' metadata.", url)
+            warn(
+                "The Can I Use URL '{0}' isn't associated with any of the Can I Use features. Please check Can I Use for the correct spec url, and either correct your spec or correct Can I Use. If the URL is correct and you'd like to keep it in pre-emptively, add the URL to a 'Ignore Can I Use URL Failure' metadata.",
+                url,
+            )
 
     # Second, ensure that every feature in the data corresponding to one of the listed URLs
     # has a corresponding Can I Use entry in the document;
@@ -188,14 +210,22 @@ def validateCanIUseURLs(doc, elements):
 
     unusedFeatures = urlFeatures - docFeatures
     if unusedFeatures:
-        warn("The following Can I Use features are associated with your URLs, but don't show up in your spec:\n{0}",
-             "\n".join(" * {0} - https://caniuse.com/#feat={0}".format(x) for x in sorted(unusedFeatures)))
+        warn(
+            "The following Can I Use features are associated with your URLs, but don't show up in your spec:\n{0}",
+            "\n".join(
+                " * {0} - https://caniuse.com/#feat={0}".format(x)
+                for x in sorted(unusedFeatures)
+            ),
+        )
+
 
 class CanIUseManager(object):
-
     def __init__(self, dataFile):
         self.dataFile = dataFile
-        data = json.loads(self.dataFile.fetch("caniuse", "data.json", str=True), object_pairs_hook=OrderedDict)
+        data = json.loads(
+            self.dataFile.fetch("caniuse", "data.json", str=True),
+            object_pairs_hook=OrderedDict,
+        )
         self.updated = data["updated"]
         self.agents = data["agents"]
         self.urlFromFeature = data["features"]
@@ -209,6 +239,11 @@ class CanIUseManager(object):
             return self.features[featureName]
         if not self.hasFeature(featureName):
             return
-        data = json.loads(self.dataFile.fetch("caniuse", "feature-{0}.json".format(featureName), str=True), object_pairs_hook=OrderedDict)
+        data = json.loads(
+            self.dataFile.fetch(
+                "caniuse", "feature-{0}.json".format(featureName), str=True
+            ),
+            object_pairs_hook=OrderedDict,
+        )
         self.features[featureName] = data
         return data

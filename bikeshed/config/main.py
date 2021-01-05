@@ -6,6 +6,7 @@ import lxml
 import os
 import re
 
+
 def englishFromList(items, conjunction="or"):
     # Format a list of strings into an English list.
     items = list(items)
@@ -25,30 +26,30 @@ def intersperse(iterable, delimiter):
 
 
 def processTextNodes(nodes, regex, replacer):
-    '''
+    """
     Takes an array of alternating text/objects,
     and runs reSubObject on the text parts,
     splicing them into the passed-in array.
     Mutates!
-    '''
+    """
     for i, node in enumerate(nodes):
         # Node list always alternates between text and elements
         if i % 2 == 0:
-            nodes[i:i + 1] = reSubObject(regex, node, replacer)
+            nodes[i : i + 1] = reSubObject(regex, node, replacer)
     return nodes
 
 
 def reSubObject(pattern, string, repl=None):
-    '''
+    """
     like re.sub, but replacements don't have to be text;
     returns an array of alternating unmatched text and match objects instead.
     If repl is specified, it's called with each match object,
     and the result then shows up in the array instead.
-    '''
+    """
     lastEnd = 0
     pieces = []
     for match in pattern.finditer(string):
-        pieces.append(string[lastEnd:match.start()])
+        pieces.append(string[lastEnd : match.start()])
         if repl:
             pieces.append(repl(match))
         else:
@@ -73,28 +74,29 @@ def simplifyText(text):
 
 def linkTextsFromElement(el, preserveCasing=False):
     from ..h import find, textContent
-    if el.get('data-lt') == '':
+
+    if el.get("data-lt") == "":
         return []
-    elif el.get('data-lt'):
-        rawText = el.get('data-lt')
+    elif el.get("data-lt"):
+        rawText = el.get("data-lt")
         if rawText in ["|", "||", "|||"]:
             texts = [rawText]
         else:
-            texts = [x.strip() for x in rawText.split('|')]
+            texts = [x.strip() for x in rawText.split("|")]
     else:
         if el.tag in ("dfn", "a"):
             texts = [textContent(el).strip()]
         elif el.tag in ("h2", "h3", "h4", "h5", "h6"):
             texts = [textContent(find(".content", el)).strip()]
-    if el.get('data-local-lt'):
-        localTexts = [x.strip() for x in el.get('data-local-lt').split('|')]
+    if el.get("data-local-lt"):
+        localTexts = [x.strip() for x in el.get("data-local-lt").split("|")]
         for text in localTexts:
             if text in texts:
                 # lt and local-lt both specify the same thing
                 raise DuplicatedLinkText(text, texts + localTexts, el)
         texts += localTexts
 
-    texts = [re.sub(r"\s+", " ", x) for x in texts if x != '']
+    texts = [re.sub(r"\s+", " ", x) for x in texts if x != ""]
     return texts
 
 
@@ -105,7 +107,9 @@ class DuplicatedLinkText(Exception):
         self.el = el
 
     def __unicode__(self):
-        return "<Text '{0}' shows up in both lt and local-lt>".format(self.offendingText)
+        return "<Text '{0}' shows up in both lt and local-lt>".format(
+            self.offendingText
+        )
 
 
 def firstLinkTextFromElement(el):
@@ -117,19 +121,23 @@ def firstLinkTextFromElement(el):
 
 
 def splitForValues(forValues):
-    '''
+    """
     Splits a string of 1+ "for" values into an array of individual value.
     Respects function args, etc.
     Currently, for values are separated by commas.
-    '''
+    """
     if forValues is None:
         return None
     forValues = re.sub("\s+", " ", forValues)
-    return [value.strip() for value in re.split(r',(?![^()]*\))', forValues) if value.strip()]
+    return [
+        value.strip()
+        for value in re.split(r",(?![^()]*\))", forValues)
+        if value.strip()
+    ]
 
 
 def groupFromKey(key, length=2):
-    '''Generates a filename-safe "group" from a key, of a specified length.'''
+    """Generates a filename-safe "group" from a key, of a specified length."""
     if key in _groupFromKeyCache:
         return _groupFromKeyCache[key]
     safeChars = frozenset("abcdefghijklmnopqrstuvwxyz0123456789")
@@ -144,12 +152,18 @@ def groupFromKey(key, length=2):
         group = group.ljust(length, "_")
         _groupFromKeyCache[key] = group
         return group
+
+
 _groupFromKeyCache = {}
 
 
 def flatten(l):
     for el in l:
-        if isinstance(el, collections.Iterable) and not isinstance(el, str) and not lxml.etree.iselement(el):
+        if (
+            isinstance(el, collections.Iterable)
+            and not isinstance(el, str)
+            and not lxml.etree.iselement(el)
+        ):
             for sub in flatten(el):
                 yield sub
         else:
@@ -170,6 +184,7 @@ def doEvery(s, action, lastTime=None):
     # pass 0 as lastTime;
     # otherwise it won't take action until N seconds.
     import time
+
     newTime = time.time()
     if lastTime is None:
         lastTime = newTime

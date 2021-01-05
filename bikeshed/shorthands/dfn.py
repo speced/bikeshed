@@ -2,6 +2,7 @@ import re
 from ..h import E, outerHTML
 from . import steps
 
+
 class DfnShorthand:
     def __init__(self):
         self.stage = "start"
@@ -40,7 +41,9 @@ class DfnShorthand:
 
     def respondEnd(self):
         if self.escapedText:
-            return steps.Success(skips=["["], nodes=[self.escapedText[1:], *self.linkText, "=]"])
+            return steps.Success(
+                skips=["["], nodes=[self.escapedText[1:], *self.linkText, "=]"]
+            )
 
         self.bsAutolink += "=]"
 
@@ -48,19 +51,22 @@ class DfnShorthand:
             self.linkText = self.lt
 
         attrs = {
-            "data-link-type":"dfn",
-            "for":self.linkFor,
-            "lt":self.lt,
-            "bs-autolink-syntax":self.bsAutolink}
-        return steps.Success(
-            E.a(attrs, linkText))
+            "data-link-type": "dfn",
+            "for": self.linkFor,
+            "lt": self.lt,
+            "bs-autolink-syntax": self.bsAutolink,
+        }
+        return steps.Success(E.a(attrs, linkText))
 
 
-DfnShorthand.startRe = re.compile(r"""
+DfnShorthand.startRe = re.compile(
+    r"""
     (\\)?
     \[=
     (?!\s)(?:([^=|]*)/)?
     ([^\"=]+?)
-    (?:\|)?""", re.X)
+    (?:\|)?""",
+    re.X,
+)
 
 endRe = re.compile("=]")

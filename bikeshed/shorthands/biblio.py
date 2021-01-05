@@ -2,6 +2,7 @@ import re
 from ..h import E, outerHTML
 from . import steps
 
+
 class BiblioShorthand:
     def __init__(self):
         self.stage = "start"
@@ -40,7 +41,9 @@ class BiblioShorthand:
 
     def respondEnd(self):
         if self.escapedText:
-            return steps.Success(skips=["["], nodes=[self.escapedText[1:], *self.linkText, "]]"])
+            return steps.Success(
+                skips=["["], nodes=[self.escapedText[1:], *self.linkText, "]]"]
+            )
 
         self.bsAutolink += "]]"
 
@@ -48,21 +51,26 @@ class BiblioShorthand:
             self.linkText = "[{0}]".format(self.term)
 
         attrs = {
-            "data-lt":self.term,
-            "data-link-type":"biblio",
-            "data-biblio-type":self.type,
-            "bs-autolink-syntax":self.bsAutolink}
+            "data-lt": self.term,
+            "data-link-type": "biblio",
+            "data-biblio-type": self.type,
+            "bs-autolink-syntax": self.bsAutolink,
+        }
         if self.status is not None:
-            attrs['data-biblio-status'] = self.status.strip()
+            attrs["data-biblio-status"] = self.status.strip()
 
         return steps.Success(E.a(attrs, self.linkText))
 
-BiblioShorthand.startRe = re.compile(r"""
+
+BiblioShorthand.startRe = re.compile(
+    r"""
     (\\)?
     \[\[
     (!)?
     ([\w.+-]+)
     (?:\s+(current|snapshot))?
-    (\|)?""", re.X)
+    (\|)?""",
+    re.X,
+)
 
 biblioEndRe = re.compile(r"]]")

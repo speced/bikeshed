@@ -12,7 +12,6 @@ from ..DefaultOrderedDict import DefaultOrderedDict
 from ..messages import *
 
 
-
 def update(path, dryRun=False):
     say("Downloading biblio data...")
     biblios = defaultdict(list)
@@ -27,7 +26,7 @@ def update(path, dryRun=False):
             try:
                 p = os.path.join(path, "biblio", "biblio-{0}.data".format(group))
                 writtenPaths.add(p)
-                with io.open(p, 'w', encoding="utf-8") as fh:
+                with io.open(p, "w", encoding="utf-8") as fh:
                     writeBiblioFile(fh, biblios)
             except Exception as e:
                 die("Couldn't save biblio database to disk.\n{0}", e)
@@ -74,8 +73,14 @@ def update(path, dryRun=False):
         try:
             p = os.path.join(path, "biblio-keys.json")
             writtenPaths.add(p)
-            with io.open(p, 'w', encoding="utf-8") as fh:
-                fh.write(str(json.dumps(reducedNames, indent=0, ensure_ascii=False, sort_keys=True)))
+            with io.open(p, "w", encoding="utf-8") as fh:
+                fh.write(
+                    str(
+                        json.dumps(
+                            reducedNames, indent=0, ensure_ascii=False, sort_keys=True
+                        )
+                    )
+                )
         except Exception as e:
             die("Couldn't save biblio database to disk.\n{0}", e)
             return
@@ -85,8 +90,14 @@ def update(path, dryRun=False):
         try:
             p = os.path.join(path, "biblio-numeric-suffixes.json")
             writtenPaths.add(p)
-            with io.open(p, 'w', encoding="utf-8") as fh:
-                fh.write(str(json.dumps(numberedNames, indent=0, ensure_ascii=False, sort_keys=True)))
+            with io.open(p, "w", encoding="utf-8") as fh:
+                fh.write(
+                    str(
+                        json.dumps(
+                            numberedNames, indent=0, ensure_ascii=False, sort_keys=True
+                        )
+                    )
+                )
         except Exception as e:
             die("Couldn't save biblio numeric-suffix information to disk.\n{0}", e)
     say("Success!")
@@ -106,7 +117,9 @@ def getSpecrefData():
             try:
                 return requests.get("https://api.csswg.org/bibrefs").text
             except:
-                warn("Your Python is too old (pre-2.7.10) to talk to SpecRef over HTTPS, and something's wrong with the CSSWG proxy as well. Report this to the Bikeshed repo, please?")
+                warn(
+                    "Your Python is too old (pre-2.7.10) to talk to SpecRef over HTTPS, and something's wrong with the CSSWG proxy as well. Report this to the Bikeshed repo, please?"
+                )
                 raise
                 return "{}"
     except Exception as e:
@@ -124,7 +137,9 @@ def getWG21Data():
 
 def getCSSWGData():
     try:
-        return requests.get("https://raw.githubusercontent.com/w3c/csswg-drafts/master/biblio.ref").text.splitlines()
+        return requests.get(
+            "https://raw.githubusercontent.com/w3c/csswg-drafts/master/biblio.ref"
+        ).text.splitlines()
     except Exception as e:
         die("Couldn't download the CSSWG biblio data.\n{0}", e)
         return []
@@ -134,7 +149,7 @@ def groupBiblios(biblios):
     # Group the biblios by the first two letters of their keys
     groupedBiblios = DefaultOrderedDict(DefaultOrderedDict)
     allNames = []
-    for k,v in sorted(biblios.items(), key=lambda x:x[0].lower()):
+    for k, v in sorted(biblios.items(), key=lambda x: x[0].lower()):
         allNames.append(k)
         group = k[0:2]
         groupedBiblios[group][k] = v
@@ -142,7 +157,7 @@ def groupBiblios(biblios):
 
 
 def writeBiblioFile(fh, biblios):
-    '''
+    """
     Each line is a value for a specific key, in the order:
 
     key
@@ -158,18 +173,25 @@ def writeBiblioFile(fh, biblios):
     authors* (each on a separate line, an indeterminate number of lines)
 
     Each entry (including last) is ended by a line containing a single - character.
-    '''
-    typePrefixes = {
-        "dict": "d",
-        "string": "s",
-        "alias": "a"
-    }
+    """
+    typePrefixes = {"dict": "d", "string": "s", "alias": "a"}
     for key, entries in biblios.items():
-        b = sorted(entries, key=lambda x:x['order'])[0]
-        format = b['biblioFormat']
-        fh.write("{prefix}:{key}\n".format(prefix=typePrefixes[format], key=key.lower()))
+        b = sorted(entries, key=lambda x: x["order"])[0]
+        format = b["biblioFormat"]
+        fh.write(
+            "{prefix}:{key}\n".format(prefix=typePrefixes[format], key=key.lower())
+        )
         if format == "dict":
-            for field in ["linkText", "date", "status", "title", "snapshot_url", "current_url", "obsoletedBy", "other"]:
+            for field in [
+                "linkText",
+                "date",
+                "status",
+                "title",
+                "snapshot_url",
+                "current_url",
+                "obsoletedBy",
+                "other",
+            ]:
                 fh.write(b.get(field, "") + "\n")
             if b.get("etAl", False):
                 fh.write("1\n")
@@ -178,22 +200,23 @@ def writeBiblioFile(fh, biblios):
             for author in b.get("authors", []):
                 fh.write(author + "\n")
         elif format == "string":
-            fh.write(b['linkText'] + "\n")
-            fh.write(b['data'] + "\n")
+            fh.write(b["linkText"] + "\n")
+            fh.write(b["data"] + "\n")
         elif format == "alias":
-            fh.write(b['linkText'] + "\n")
-            fh.write(b['aliasOf'] + "\n")
+            fh.write(b["linkText"] + "\n")
+            fh.write(b["aliasOf"] + "\n")
         else:
             die("The biblio key '{0}' has an unknown biblio type '{1}'.", key, format)
             continue
         fh.write("-" + "\n")
 
+
 def collectNumberedNames(names):
-    '''
+    """
     Collects the set of names that have numeric suffixes
     (excluding ones that look like dates)
     for better error-correction.
-    '''
+    """
 
     names = set(names)
     prefixes = defaultdict(list)

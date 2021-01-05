@@ -3,19 +3,20 @@
 
 import collections
 
+
 class BoolSet(collections.MutableMapping):
-    '''
+    """
     Implements a "boolean set",
     where keys can be explicitly set to True or False,
     but interacted with like a normal set
     (similar to Counter, but with bools).
     Can also set whether the default should consider unset values to be True or False by default.
-    '''
+    """
 
     def __init__(self, values=None, default=False):
         self._internal = {}
         if isinstance(values, collections.Mapping):
-            for k,v in values.items():
+            for k, v in values.items():
                 self._internal[k] = bool(v)
         elif isinstance(values, collections.Iterable):
             for k in values:
@@ -48,9 +49,9 @@ class BoolSet(collections.MutableMapping):
 
     def __repr__(self):
         if self.default is False:
-            trueVals = [k for k,v in self._internal.items() if v is True]
+            trueVals = [k for k, v in self._internal.items() if v is True]
             vrepr = "[" + ", ".join(repr(x) for x in trueVals) + "]"
         else:
-            falseVals = [k for k,v in self._internal.items() if v is False]
+            falseVals = [k for k, v in self._internal.items() if v is False]
             vrepr = "{" + ", ".join(repr(x) + ":False" for x in falseVals) + "}"
         return "BoolSet({0}, default={1})".format(vrepr, self.default)

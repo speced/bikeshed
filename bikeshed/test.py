@@ -34,12 +34,12 @@ def findTestFiles(manualOnly=False):
 # given if the test is outside of that directory.
 def testNameForPath(path):
     if path.startswith(TEST_DIR):
-        return path[len(TEST_DIR)+1:]
+        return path[len(TEST_DIR) + 1 :]
     return path
 
 
 def sortTests(tests):
-    return sorted(tests, key=lambda x:("/" in testNameForPath(x), x))
+    return sorted(tests, key=lambda x: ("/" in testNameForPath(x), x))
 
 
 def runAllTests(patterns=None, manualOnly=False, md=None):
@@ -50,7 +50,7 @@ def runAllTests(patterns=None, manualOnly=False, md=None):
     numPassed = 0
     total = 0
     fails = []
-    for i,path in enumerate(paths, 1):
+    for i, path in enumerate(paths, 1):
         testName = testNameForPath(path)
         p(f"{ratio(i,len(paths))}: {testName}")
         total += 1
@@ -71,6 +71,7 @@ def runAllTests(patterns=None, manualOnly=False, md=None):
         for fail in fails:
             p("* " + fail)
 
+
 def processTest(path, md=None, fileRequester=config.DataFileRequester(type="readonly")):
     doc = Spec(inputFilename=path, fileRequester=fileRequester, testing=True)
     if md is not None:
@@ -79,10 +80,13 @@ def processTest(path, md=None, fileRequester=config.DataFileRequester(type="read
     doc.preprocess()
     return doc
 
+
 def compare(suspect, golden):
     if suspect == golden:
         return True
-    for line in difflib.unified_diff(golden.split("\n"), suspect.split("\n"), fromfile="golden", tofile="suspect"):
+    for line in difflib.unified_diff(
+        golden.split("\n"), suspect.split("\n"), fromfile="golden", tofile="suspect"
+    ):
         if line[0] == "-":
             p(printColor(line, color="red"))
         elif line[0] == "+":
@@ -92,21 +96,24 @@ def compare(suspect, golden):
     p("")
     return False
 
+
 def rebase(patterns=None, md=None):
     paths = testPaths(patterns)
     if len(paths) == 0:
         p("No tests were found.")
         return True
-    for i,path in enumerate(paths, 1):
+    for i, path in enumerate(paths, 1):
         name = testNameForPath(path)
         resetSeenMessages()
         p(f"{ratio(i,len(paths))}: Rebasing {name}")
         doc = processTest(path, md)
         doc.finish(newline="\n")
 
+
 def ratio(i, total):
     justifiedI = str(i).rjust(len(str(total)))
     return f"{justifiedI}/{total}"
+
 
 def testPaths(patterns=None):
     # if None, get all the test paths
@@ -114,15 +121,20 @@ def testPaths(patterns=None):
     if not patterns:
         return list(sortTests(findTestFiles()))
     else:
-        return [path
+        return [
+            path
             for pattern in patterns
             for path in glob.glob(os.path.join(TEST_DIR, pattern))
-            if path.endswith(".bs")]
+            if path.endswith(".bs")
+        ]
+
 
 def addTestMetadata(doc):
     from . import metadata
 
-    doc.mdBaseline.addData("Boilerplate", "omit feedback-header, omit generator, omit document-revision")
+    doc.mdBaseline.addData(
+        "Boilerplate", "omit feedback-header, omit generator, omit document-revision"
+    )
     doc.mdBaseline.addData("Repository", "test/test")
     _, md = metadata.parse(lines=doc.lines)
     if "Date" not in md.manuallySetKeys:
