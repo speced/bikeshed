@@ -72,8 +72,11 @@ def retrieveBoilerplateFile(doc, name, group=None, status=None, error=True):
     # Filenames must be of the format NAME.include or NAME-STATUS.include
     if group is None and doc.md.group is not None:
         group = doc.md.group.lower()
-    if status is None and doc.md.status is not None:
-        status = doc.md.status
+    if status is None:
+        if doc.md.status is not None:
+            status = doc.md.status
+        elif doc.md.rawStatus is not None:
+            status = doc.md.rawStatus
     megaGroup, status = splitStatus(status)
 
     searchLocally = doc.md.localBoilerplate[name]
