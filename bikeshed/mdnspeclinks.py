@@ -368,7 +368,6 @@ def mdnPanelFor(
     browsersForMobileDevices,
 ):
     featureDiv = E.div({"class": "feature"})
-    featureName = feature.get("name", None)
     if "slug" in feature:
         slug = feature["slug"]
         displaySlug = slug.split("/", 1)[1]

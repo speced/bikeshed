@@ -38,7 +38,6 @@ def update(path, dryRun=False):
     say("Downloading backref data...")
     constants.quiet = float("inf")
     if not dryRun:
-        specs = defaultdict(dict)
         backrefs = defaultdict(lambda: defaultdict(list))
         for i, testPath in enumerate(findTestFiles()):
             if i > 1:

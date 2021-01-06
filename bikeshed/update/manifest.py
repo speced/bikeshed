@@ -55,7 +55,7 @@ def createManifest(path, dryRun=False):
                 continue
             with io.open(absPath, "r", encoding="utf-8") as fh:
                 manifests.append((relPath, hashFile(fh)))
-    except Exception as err:
+    except Exception:
         raise
 
     manifest = str(datetime.utcnow()) + "\n"
@@ -68,7 +68,7 @@ def createManifest(path, dryRun=False):
                 os.path.join(path, "manifest.txt"), "w", encoding="utf-8"
             ) as fh:
                 fh.write(manifest)
-        except Exception as err:
+        except Exception:
             raise
 
     return manifest

@@ -242,7 +242,6 @@ def checkVarHygiene(doc):
         return f"'{algoName}'" + (f" for {algoFor}" if algoFor else "")
 
     # Look for vars that only show up once. These are probably typos.
-    singularVars = []
     varCounts = defaultdict(lambda: 0)
     for el in findAll("var:not([data-var-ignore])", doc):
         key = (foldWhitespace(textContent(el)).strip(), algoName(el))
