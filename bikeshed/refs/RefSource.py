@@ -10,6 +10,7 @@ from .. import config
 from .. import constants
 from .RefWrapper import RefWrapper
 from .utils import *
+from ..messages import linkerror
 
 
 class RefSource(object):
