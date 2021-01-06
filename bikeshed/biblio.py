@@ -464,8 +464,6 @@ def dedupBiblioReferences(doc):
     informShepherdUrls = set(informShepherdRefs.keys())
     specRefUrls = normSpecRefUrls | informSpecRefUrls
     shepherdUrls = normShepherdUrls | informShepherdUrls
-    normativeUrls = normShepherdUrls | normSpecRefUrls
-    informativeUrls = informShepherdUrls | informSpecRefUrls
     dupedUrls = shepherdUrls & specRefUrls
 
     if not dupedUrls:
@@ -493,8 +491,6 @@ def dedupBiblioReferences(doc):
         normSpecRefUrls.add(url)
     shepherdUrls = normShepherdUrls | informShepherdUrls
     specRefUrls = normSpecRefUrls | informSpecRefUrls
-    normativeUrls = normShepherdUrls | normSpecRefUrls
-    informativeUrls = informShepherdUrls | informSpecRefUrls
     dupedUrls = shepherdUrls & specRefUrls
 
     # Remove all the Shepherd refs that are left in duped

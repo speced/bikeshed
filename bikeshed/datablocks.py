@@ -1010,11 +1010,6 @@ def transformIncludeRaw(lines, doc, firstLine, lineNum=None, **kwargs):
         lineNumAttr = " line-number={0}".format(lineNum)
     infos = parseInfoTree(lines, doc.md.indent, lineNum)
     path = None
-    highlight = None
-    lineStart = None
-    show = []
-    lineHighlight = []
-    lineNumbers = False
     for info in infos:
         if "path" in info:
             if path is None:

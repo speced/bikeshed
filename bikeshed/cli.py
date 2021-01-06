@@ -418,7 +418,7 @@ def main():
         help="Save the graph to a specified SVG file, rather than outputting with xdot immediately.",
     )
 
-    templateParser = subparsers.add_parser(
+    subparsers.add_parser(
         "template", help="Outputs a skeleton .bs file for you to start with."
     )
 

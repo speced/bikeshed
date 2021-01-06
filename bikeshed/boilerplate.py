@@ -58,7 +58,7 @@ def addBikeshedVersion(doc):
             .decode(encoding="utf-8")
             .strip()
         )
-    except Exception as e:
+    except Exception:
         # Not in Bikeshed's repo, so instead grab from the datafile.
         bikeshedVersion = doc.dataFile.fetch(
             "bikeshed-version.txt", type="readonly", str=True

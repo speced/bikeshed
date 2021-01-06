@@ -10,6 +10,7 @@ from .. import config
 from .. import constants
 from .RefWrapper import RefWrapper
 from .utils import *
+from ..messages import linkerror
 
 
 class RefSource(object):
@@ -81,7 +82,6 @@ class RefSource(object):
         if self.source not in self.lazyLoadedSources:
             return list(self._refs.items())
 
-        path = config.scriptPath("spec-data", "anchors")
         for file in self.dataFile.walkFiles("anchors"):
             group = re.match("anchors-(.{2})", file).group(1)
             if group in self._loadedAnchorGroups:

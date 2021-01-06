@@ -271,7 +271,6 @@ def stripComments(lines):
     """
     output = []
     inComment = False
-    wholeCommentLines = 0
     for line in lines:
         text, inComment = stripCommentsFromLine(line.text, inComment)
         if (line.text != text and text.strip() == "") or (

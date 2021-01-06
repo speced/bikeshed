@@ -1017,7 +1017,7 @@ def parseMaxToCDepth(key, val, lineNum):
         return float("inf")
     try:
         v = int(val)
-    except ValueError as e:
+    except ValueError:
         die(
             "Max ToC Depth metadata must be 'none' or an integer 1-5. Got '{0}'.",
             val,
