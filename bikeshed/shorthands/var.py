@@ -8,7 +8,7 @@ class VarShorthand:
         escape, text = match.groups()
         if escape:
             return steps.Success(skips=["|"], nodes=[match.group(0)[1:]])
-        return steps.Success(E.var({"bs-autolink-syntax":match.group(0)}, text))
+        return steps.Success(E.var({"bs-autolink-syntax": match.group(0)}, text))
 
 
 VarShorthand.startRe = re.compile(
@@ -16,4 +16,6 @@ VarShorthand.startRe = re.compile(
                     (\\)?
                     \|
                     (\w(?:[\w\s-]*\w)?)
-                    \|""", re.X)
+                    \|""",
+    re.X,
+)
