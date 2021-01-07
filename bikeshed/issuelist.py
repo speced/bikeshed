@@ -32,10 +32,8 @@ def printIssueList(infilename=None, outfilename=None):
                 infilename += suffix
                 break
             except Exception as e:
-                pass
-        else:
-            die("Couldn't read from the infile:\n  {0}", str(e))
-            return
+                die("Couldn't read from the infile:\n  {0}", str(e))
+                return
 
     lines = infile.readlines()
     headerInfo = extractHeaderInfo(lines, infilename)
