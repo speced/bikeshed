@@ -1,15 +1,14 @@
 # -*- coding: utf-8 -*-
 
 import os
-import urllib.error, urllib.parse
+import re
+import urllib.parse
 from collections import defaultdict
 
-from .. import config
-from .. import constants
-from ..h import *
-from ..messages import *
+from .. import biblio, config, constants
+from ..h import findAll
+from ..messages import say
 from ..Spec import Spec
-
 
 TEST_DIR = os.path.abspath(os.path.join(config.scriptPath(), "..", "tests"))
 
