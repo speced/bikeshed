@@ -39,7 +39,7 @@ def createRelease():
     args.add_argument(
         "bump",
         choices=["break", "feature", "bugfix"],
-        help=f"Which type of release is this?",
+        help="Which type of release is this?",
     )
     args.add_argument(
         "--test",
