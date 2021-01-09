@@ -21,13 +21,25 @@ def findTestFiles(manualOnly=False):
     for root, dirnames, filenames in os.walk(TEST_DIR):
         for filename in filenames:
             filePath = testNameForPath(os.path.join(root, filename))
-            if manualOnly and re.match("github/", filePath):
+            pathSegs = splitPath(filePath)
+            if manualOnly and pathSegs[0] == "github":
                 continue
-            if re.match("[^/]*\d{3}-files/", filePath):
+            if re.search(r"\d{3}-files$", pathSegs[0]):
                 # support files for a manual test
                 continue
-            if filename.endswith(".bs"):
+            if os.path.splitext(filepath)[1] == ".bs":
                 yield os.path.join(root, filename)
+
+
+def splitPath(path, reverseSegs=None):
+    if reverseSegs is None:
+        reverseSegs = []
+    [head, tail] = os.path.split(path)
+    reverseSegs.append(tail)
+    if head in ["", "/"]:
+        return list(reversed(reverseSegs))
+    else:
+        return splitPath(head, reverseSegs)
 
 
 # The test name will be the path relative to the tests directory, or the path as
