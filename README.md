@@ -13,7 +13,7 @@ WHATWG,
 the C++ standards committee,
 and elsewhere!
 
-[![Build Status](https://travis-ci.org/tabatkins/bikeshed.svg?branch=master)](https://travis-ci.org/tabatkins/bikeshed)
+![CI](https://github.com/tabatkins/bikeshed/workflows/CI/badge.svg)
 [![Gitter](https://img.shields.io/badge/Gitter-Join%20Chat%20↣-blue.svg)](https://gitter.im/tabatkins/bikeshed?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 [![Docs](https://img.shields.io/badge/docs-available-orange.svg)](https://tabatkins.github.io/bikeshed)
 [![Release Notes](https://img.shields.io/badge/release-notes-purple.svg)](https://github.com/tabatkins/bikeshed/issues/1773)
