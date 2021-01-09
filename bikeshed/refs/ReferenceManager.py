@@ -278,7 +278,7 @@ class ReferenceManager(object):
                 linkTexts = e.allTexts
             for linkText in linkTexts:
                 linkText = unfixTypography(linkText)
-                linkText = re.sub("\s+", " ", linkText)
+                linkText = re.sub(r"\s+", " ", linkText)
                 linkType = treeAttr(el, "data-dfn-type")
                 if linkType not in config.dfnTypes:
                     die(
@@ -329,7 +329,7 @@ class ReferenceManager(object):
                 for term in dfnFor.copy():
                     # Saying a value is for a descriptor with @foo/bar
                     # should also make it for the bare descriptor bar.
-                    match = re.match("@[a-zA-Z0-9-_]+/(.*)", term)
+                    match = re.match(r"@[a-zA-Z0-9-_]+/(.*)", term)
                     if match:
                         dfnFor.add(match.group(1).strip())
                 # convert back into a list now, for easier JSONing

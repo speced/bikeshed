@@ -314,7 +314,7 @@ def addVarClickHighlighting(doc):
     # If you unclick then click again on same var, it should get same color if possible.
     doc.extraScripts[
         "script-var-click-highlighting"
-    ] = """
+    ] = r"""
     document.addEventListener("click", e=>{
         if(e.target.nodeName == "VAR") {
             highlightSameAlgoVars(e.target);
