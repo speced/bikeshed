@@ -27,7 +27,7 @@ def findTestFiles(manualOnly=False):
             if re.search(r"\d{3}-files$", pathSegs[0]):
                 # support files for a manual test
                 continue
-            if os.path.splitext(filepath)[1] == ".bs":
+            if os.path.splitext(filePath)[1] == ".bs":
                 yield os.path.join(root, filename)
 
 
