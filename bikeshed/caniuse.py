@@ -3,7 +3,6 @@
 import json
 from collections import OrderedDict
 from datetime import datetime
-from . import config
 from .h import *
 from .messages import *
 

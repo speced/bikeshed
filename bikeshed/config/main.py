@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import collections
-import io
 import lxml
 import os
 import re

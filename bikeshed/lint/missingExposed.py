@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-import re
 from ..h import *
 from ..messages import *
 

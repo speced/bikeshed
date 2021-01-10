@@ -4,7 +4,6 @@ import certifi
 import io
 import json
 import os
-from contextlib import closing
 from json_home_client import Client as APIClient
 
 from ..messages import *
