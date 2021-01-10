@@ -43,16 +43,15 @@ def update(
     if force:
         # If all are False, update everything
         if (
-            anchors
-            == backrefs
-            == biblio
-            == caniuse
-            == linkDefaults
-            == mdn
-            == testSuites
-            == languages
-            == wpt
-            == False
+            not anchors
+            and not backrefs
+            and not biblio
+            and not caniuse
+            and not linkDefaults
+            and not mdn
+            and not testSuites
+            and not languages
+            and not wpt
         ):
             anchors = (
                 backrefs

@@ -62,7 +62,7 @@ def update(path, dryRun=False):
             if len(linkingTexts) == 1 and linkingTexts[0].strip() == "":
                 # Happens if it was marked with an empty lt and Shepherd still picked it up
                 continue
-            if "section" in rawAnchor and rawAnchor["section"] == True:
+            if "section" in rawAnchor and rawAnchor["section"] is True:
                 addToHeadings(rawAnchor, specHeadings, spec=spec)
             if rawAnchor["type"] not in ["heading"]:
                 addToAnchors(rawAnchor, anchors, spec=spec)
