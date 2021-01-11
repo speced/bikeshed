@@ -115,7 +115,7 @@ class RefSource:
         dedupURLs=True,
         exact=False,
         error=False,
-        **kwargs
+        **kwargs,
     ):
         # Query the ref database.
         # If it fails to find a ref, also returns the stage at which it finally ran out of possibilities.

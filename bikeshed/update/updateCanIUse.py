@@ -49,7 +49,7 @@ def update(path, dryRun=False):
             die(
                 "Unknown CanIUse Status '{0}' for {1}/{2}/{3}. Please report this as a Bikeshed issue.",
                 s,
-                *rest
+                *rest,
             )
             return None
 
@@ -102,9 +102,7 @@ def update(path, dryRun=False):
                 )
 
             for featureName, feature in featureData.items():
-                p = os.path.join(
-                    path, "caniuse", f"feature-{featureName}.json"
-                )
+                p = os.path.join(path, "caniuse", f"feature-{featureName}.json")
                 writtenPaths.add(p)
                 with open(p, "w", encoding="utf-8") as fh:
                     fh.write(

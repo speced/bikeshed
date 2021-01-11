@@ -41,9 +41,7 @@ def update(path, dryRun=False):
             collectPaths(paths, typePaths, testType + " ")
     if not dryRun:
         try:
-            with open(
-                os.path.join(path, "wpt-tests.txt"), "w", encoding="utf-8"
-            ) as f:
+            with open(os.path.join(path, "wpt-tests.txt"), "w", encoding="utf-8") as f:
                 f.write(f"sha: {sha}\n")
                 for path in sorted(paths):
                     f.write(path + "\n")

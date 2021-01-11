@@ -136,9 +136,7 @@ def extractHeaderInfo(lines, infilename):
             ed = f"http://dev.w3.org/csswg/{shortname}/"
         if date is None:
             cdate = match.group(3)
-            date = "{}-{}-{}".format(
-                *re.match(r"(\d{4})(\d\d)(\d\d)", cdate).groups()
-            )
+            date = "{}-{}-{}".format(*re.match(r"(\d{4})(\d\d)(\d\d)", cdate).groups())
     else:
         warn(
             "Autodetection of Shortname, Date, and Status failed; draft url does not match the format /status-shortname-date/. Got:\n{0}",

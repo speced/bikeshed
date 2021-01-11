@@ -55,9 +55,7 @@ def verify_requirements():
                         )
                         requirements_met = False
                 except Exception:
-                    print(
-                        f"Package {requirement.project_name} is not installed."
-                    )
+                    print(f"Package {requirement.project_name} is not installed.")
                     requirements_met = False
         if not requirements_met:
             print(

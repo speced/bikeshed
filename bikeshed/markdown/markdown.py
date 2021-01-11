@@ -204,7 +204,9 @@ def tokenizeLines(
             # h2 underline
             match = re.match(r"-{3,}\s*$", lineText)
             token = {"type": "dash-line"}
-        elif "headings" in features and re.match(r"(#{1,5})\s+(.+?)(\1\s*\{#[^ }]+\})?\s*$", lineText):
+        elif "headings" in features and re.match(
+            r"(#{1,5})\s+(.+?)(\1\s*\{#[^ }]+\})?\s*$", lineText
+        ):
             # single-line heading
             match = re.match(r"(#{1,5})\s+(.+?)(\1\s*\{#[^ }]+\})?\s*$", lineText)
             level = len(match.group(1)) + 1
@@ -472,7 +474,7 @@ def parseMultiLineHeading(stream):
                 level=level,
                 htext=text,
                 i=stream.currline().i,
-                **stream.curr()
+                **stream.curr(),
             ),
         )
     ]
@@ -643,11 +645,7 @@ def parseNumbered(stream, start=1):
     if start == 1:
         lines = [Line.Line(-1, f"<ol data-md line-number={ol_i}>")]
     else:
-        lines = [
-            Line.Line(
-                -1, f"<ol data-md start='{start}' line-number={ol_i}>"
-            )
-        ]
+        lines = [Line.Line(-1, f"<ol data-md start='{start}' line-number={ol_i}>")]
     for li_lines, i in getItems(stream):
         lines.append(Line.Line(-1, f"<li data-md line-number={i}>"))
         lines.extend(parse(li_lines, numSpacesForIndentation))

@@ -244,9 +244,7 @@ class MetadataManager:
                 errors.append(f"    Missing a '{name}' entry.")
         for attrName, name in recommendedSingularKeys.items():
             if getattr(self, attrName) is None:
-                warnings.append(
-                    f"    You probably want to provide a '{name}' entry."
-                )
+                warnings.append(f"    You probably want to provide a '{name}' entry.")
         for attrName, name in requiredMultiKeys.items():
             if len(getattr(self, attrName)) == 0:
                 errors.append(f"    Must provide at least one '{name}' entry.")
@@ -307,9 +305,7 @@ class MetadataManager:
         macros["date-my"] = self.date.strftime("%b %Y")
         macros["date-mmy"] = self.date.strftime("%B %Y")
         if isinstance(self.expires, date):
-            macros["expires"] = self.expires.strftime(
-                f"{self.expires.day} %B %Y"
-            )
+            macros["expires"] = self.expires.strftime(f"{self.expires.day} %B %Y")
             macros["expires-dmmy"] = self.expires.strftime(
                 f"{self.expires.day} %B %Y"
             )  # same as plain 'expires'
@@ -318,9 +314,7 @@ class MetadataManager:
             macros["expires-my"] = self.expires.strftime("%b %Y")
             macros["expires-mmy"] = self.expires.strftime("%B %Y")
         if self.deadline:
-            macros["deadline"] = self.deadline.strftime(
-                f"{self.deadline.day} %B %Y"
-            )
+            macros["deadline"] = self.deadline.strftime(f"{self.deadline.day} %B %Y")
             macros["isodeadline"] = self.deadline.strftime("%Y-%m-%d")
         if self.status in config.snapshotStatuses:
             macros[

@@ -387,9 +387,7 @@ def addExplicitIndexes(doc):
             specs = {x.strip() for x in el.get("data-link-spec").split(",")}
             for s in list(specs):
                 if s not in doc.refs.specs:
-                    die(
-                        "Unknown spec name '{}' on {}".format(s, outerHTML(el)), el=el
-                    )
+                    die("Unknown spec name '{}' on {}".format(s, outerHTML(el)), el=el)
                     specs.remove(s)
         else:
             specs = None
@@ -587,9 +585,7 @@ def addIndexOfExternallyDefinedTerms(doc, container):
             else:
                 for key, ref in sorted(refs.items(), key=lambda x: x[0]):
                     if key:
-                        link = makeLink(
-                            ref.text, " ", E.small({}, f"(for {key})")
-                        )
+                        link = makeLink(ref.text, " ", E.small({}, f"(for {key})"))
                     else:
                         link = makeLink(ref.text)
             appendChild(termsUl, E.li(link))
