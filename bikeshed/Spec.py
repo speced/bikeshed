@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
 
 
-import glob
 import io
 import sys
-import os
-from collections import defaultdict, OrderedDict
-from datetime import datetime
+from collections import defaultdict
+from functools import partial as curry
 
 from . import biblio
 from . import boilerplate
@@ -32,8 +30,7 @@ from . import shorthands
 from . import wpt
 
 from .h import *
-from .InputSource import InputSource, FileInputSource, StdinInputSource
-from .Line import Line
+from .InputSource import InputSource, FileInputSource
 from .messages import *
 from .refs import ReferenceManager
 from .unsortedJunk import *
@@ -473,8 +470,6 @@ def findImplicitInputFile():
     3. the first file with a .bs extension
     4. the first file with a .src.html extension
     """
-    import glob
-    import os
 
     if os.path.isfile("index.bs"):
         return "index.bs"

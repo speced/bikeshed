@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
-import io
 import json
-import os
 from collections import OrderedDict
-from . import config
 from .h import *  # noqa
 from .messages import *
 

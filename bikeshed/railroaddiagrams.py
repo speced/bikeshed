@@ -1,6 +1,4 @@
 # coding=utf-8
-import math
-import re
 
 # Display constants
 VERTICAL_SEPARATION = 8

@@ -42,45 +42,18 @@ def update(
             force = True
     if force:
         # If all are False, update everything
-        if (
-            anchors
-            == backrefs
-            == biblio
-            == caniuse
-            == linkDefaults
-            == mdn
-            == testSuites
-            == languages
-            == wpt
-            == False
-        ):
-            anchors = (
-                backrefs
-            ) = (
-                biblio
-            ) = caniuse = linkDefaults = mdn = testSuites = languages = wpt = True
+        if anchors == backrefs == biblio == caniuse == linkDefaults == mdn == testSuites == languages == wpt == False:
+            anchors = backrefs =  biblio =  caniuse =  linkDefaults =  mdn =  testSuites =  languages =  wpt =  True  # noqa: E222
 
         touchedPaths = {
-            "anchors": updateCrossRefs.update(path=path, dryRun=dryRun)
-            if anchors
-            else None,
-            "backrefs": updateBackRefs.update(path=path, dryRun=dryRun)
-            if backrefs
-            else None,
+            "anchors": updateCrossRefs.update(path=path, dryRun=dryRun) if anchors else None,
+            "backrefs": updateBackRefs.update(path=path, dryRun=dryRun) if backrefs else None,
             "biblio": updateBiblio.update(path=path, dryRun=dryRun) if biblio else None,
-            "caniuse": updateCanIUse.update(path=path, dryRun=dryRun)
-            if caniuse
-            else None,
+            "caniuse": updateCanIUse.update(path=path, dryRun=dryRun) if caniuse else None,
             "mdn": updateMdn.update(path=path, dryRun=dryRun) if mdn else None,
-            "linkDefaults": updateLinkDefaults.update(path=path, dryRun=dryRun)
-            if linkDefaults
-            else None,
-            "testSuites": updateTestSuites.update(path=path, dryRun=dryRun)
-            if testSuites
-            else None,
-            "languages": updateLanguages.update(path=path, dryRun=dryRun)
-            if languages
-            else None,
+            "linkDefaults": updateLinkDefaults.update(path=path, dryRun=dryRun) if linkDefaults else None,
+            "testSuites": updateTestSuites.update(path=path, dryRun=dryRun) if testSuites else None,
+            "languages": updateLanguages.update(path=path, dryRun=dryRun) if languages else None,
             "wpt": updateWpt.update(path=path, dryRun=dryRun) if wpt else None,
         }
 

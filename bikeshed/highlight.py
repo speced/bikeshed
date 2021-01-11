@@ -3,7 +3,6 @@
 import collections
 import itertools
 import re
-from . import config
 from .h import *
 from .messages import *
 
@@ -418,7 +417,7 @@ def normalizeLanguageName(lang):
 def normalizeHighlightMarkers(doc):
     # Translate Prism-style highlighting into Pygment-style
     for el in findAll("[class*=language-], [class*=lang-]", doc):
-        match = re.search("(?:lang|language)-(\w+)", el.get("class"))
+        match = re.search(r"(?:lang|language)-(\w+)", el.get("class"))
         if match:
             el.set("highlight", match.group(1))
 

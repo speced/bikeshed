@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 
-import collections
 import copy
 import json
 import os
@@ -192,9 +191,9 @@ class MetadataManager:
 
         # for TR document, defaults to TR
         # fallbacks to ED
-        if (self.canonicalURL == None or self.canonicalURL == "TR") and self.TR:
+        if (self.canonicalURL is None or self.canonicalURL == "TR") and self.TR:
             self.canonicalURL = self.TR
-        elif (self.canonicalURL == None or self.canonicalURL == "ED") and self.ED:
+        elif (self.canonicalURL is None or self.canonicalURL == "ED") and self.ED:
             self.canonicalURL = self.ED
 
         if self.displayShortname:
@@ -884,12 +883,12 @@ def parseRepository(key, val, lineNum):
         return Repository(url=pieces[0], name=pieces[1])
     elif len(pieces) == 1:
         # Try to recognize a GitHub url
-        match = re.match("https://github\.([\w.-]+)/([\w-]+)/([\w-]+)/?$", val)
+        match = re.match(r"https://github\.([\w.-]+)/([\w-]+)/([\w-]+)/?$", val)
         if match:
             return GithubRepository(*match.groups())
         # If you just provide a user/repo pair, assume it's a github.com repo.
         # Will provide ways to opt into other repos when people care.
-        match = re.match("([\w-]+)/([\w-]+)$", val)
+        match = re.match(r"([\w-]+)/([\w-]+)$", val)
         if match:
             return GithubRepository("com", *match.groups())
         # Otherwise just use the url as the shortname
@@ -1124,7 +1123,7 @@ def fromCommandLine(overrides):
     # and fills a MetadataManager accordingly.
     md = MetadataManager()
     for o in overrides:
-        match = re.match("--md-([^ =]+)=(.+)", o)
+        match = re.match(r"--md-([^ =]+)=(.+)", o)
         if not match:
             # Not a metadata key
             continue

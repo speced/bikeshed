@@ -1,18 +1,12 @@
 # -*- coding: utf-8 -*-
 
-import io
-import json
-import re
 import os
 import urllib.error, urllib.parse
 from collections import defaultdict
-from contextlib import closing
 
-from .. import biblio
 from .. import config
 from .. import constants
 from ..h import *
-from ..DefaultOrderedDict import DefaultOrderedDict
 from ..messages import *
 from ..Spec import Spec
 

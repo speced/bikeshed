@@ -7,7 +7,6 @@ import tarfile
 import tempfile
 
 from . import extensions
-from .messages import *
 
 
 def publishEchidna(
