@@ -7,7 +7,6 @@ import re
 import tenacity
 import os
 from collections import defaultdict
-from contextlib import closing
 from json_home_client import Client as APIClient
 
 from .. import config
