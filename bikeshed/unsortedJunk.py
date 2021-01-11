@@ -5,15 +5,50 @@ import io
 import json
 import logging
 import re
-import urllib.parse, urllib.error
-from collections import defaultdict, namedtuple
+from collections import Counter, defaultdict, namedtuple
+from urllib import parse
 
-from . import biblio
-from . import config
-from . import dfnpanels
-from . import func
-from .h import *
-from .messages import *
+from . import biblio, config, datablocks, dfnpanels, func, markdown
+from .h import (
+    E,
+    addClass,
+    appendChild,
+    childNodes,
+    clearContents,
+    closestAncestor,
+    closestAttr,
+    createElement,
+    dedupIDs,
+    emptyText,
+    escapeAttr,
+    escapeHTML,
+    escapeUrlFrag,
+    find,
+    findAll,
+    fixupIDs,
+    foldWhitespace,
+    hasAncestor,
+    hasClass,
+    hashContents,
+    hasOnlyChild,
+    insertAfter,
+    isEmpty,
+    isNormative,
+    moveContents,
+    outerHTML,
+    parentElement,
+    parseHTML,
+    prependChild,
+    relevantHeadings,
+    removeAttr,
+    replaceContents,
+    replaceNode,
+    safeID,
+    textContent,
+    treeAttr,
+    wrapContents,
+)
+from .messages import die, say, warn
 
 
 class MarkdownCodeSpans(func.Functor):
@@ -400,7 +435,7 @@ def fixIntraDocumentReferences(doc):
     for el in findAll(
         "a[href^='#']:not([href='#']):not(.self-link):not([data-link-type])", doc
     ):
-        targetID = urllib.parse.unquote(el.get("href")[1:])
+        targetID = parse.unquote(el.get("href")[1:])
         if el.get("data-section") is not None and targetID not in headingIDs:
             die(
                 "Couldn't find target document section {0}:\n{1}",
