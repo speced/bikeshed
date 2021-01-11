@@ -732,18 +732,14 @@ def classifyDfns(doc, dfns):
                 pass
             elif dfnType == "event":
                 # Special case 'event' because it needs a different format from IDL types
-                id = config.simplifyText(
-                    "{type}-{id}".format(
-                        type=dfnTypeToPrefix[dfnType], _for=singleFor, id=id
-                    )
-                )
+                id = config.simplifyText(f"{dfnTypeToPrefix[dfnType]}-{id}")
             elif dfnType == "attribute" and primaryDfnText.startswith("[["):
                 # Slots get their identifying [] stripped from their ID, so gotta dedup them some other way.
-                id = config.simplifyText("dom-{id}-slot".format(_for=singleFor, id=id))
+                id = config.simplifyText(f"dom-{id}-slot")
             elif dfnType in config.idlTypes.intersection(config.typesUsingFor):
-                id = config.simplifyText("dom-{id}".format(id=id))
+                id = config.simplifyText(f"dom-{id}")
             else:
-                id = "{type}-{id}".format(type=dfnTypeToPrefix[dfnType], id=id)
+                id = f"{dfnTypeToPrefix[dfnType]}-{id}"
             el.set("id", safeID(doc, id))
         # Set lt if it's not set,
         # and doing so won't mess with anything else.
