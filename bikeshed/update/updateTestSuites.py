@@ -4,7 +4,6 @@ import certifi
 import io
 import json
 import os
-from contextlib import closing
 from json_home_client import Client as APIClient
 
 from ..messages import *
@@ -30,7 +29,7 @@ def update(path, dryRun=False):
             )
             return
         if res.content_type not in testSuiteDataContentTypes:
-            die("Unrecognized test suite content-type '{0}'.", res.contentType)
+            die("Unrecognized test suite content-type '{0}'.", res.content_type)
             return
         rawTestSuiteData = res.data
     except Exception as e:

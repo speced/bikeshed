@@ -3,7 +3,6 @@
 import hashlib
 import html5lib
 import re
-from collections import Counter, defaultdict
 from lxml import etree
 from lxml.html import tostring
 from lxml.cssselect import CSSSelector

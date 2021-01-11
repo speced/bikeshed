@@ -2,21 +2,16 @@
 
 
 import io
-import itertools
 import json
 import logging
-import os
 import re
 import urllib.parse, urllib.error
 from collections import defaultdict, namedtuple
-from functools import partial as curry
 
 from . import biblio
 from . import config
-from . import datablocks
 from . import dfnpanels
 from . import func
-from . import markdown
 from .h import *
 from .messages import *
 
