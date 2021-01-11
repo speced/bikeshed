@@ -526,7 +526,6 @@ def parseEditor(key, val, lineNum):
         "orglink": None,
         "link": None,
         "email": None,
-        "w3cid": None,
     }
     # Handle well-known pieces, split off the ambiguous ones
     ambiguousPieces = []
