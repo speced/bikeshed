@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-
 import copy
 import re
 from collections import defaultdict
@@ -12,7 +9,7 @@ from .utils import *
 from ..messages import linkerror
 
 
-class RefSource(object):
+class RefSource:
 
     __slots__ = [
         "dataFile",
@@ -69,7 +66,7 @@ class RefSource(object):
             return []
         # Otherwise, load the group file.
         with self.dataFile.fetch(
-            "anchors", "anchors-{0}.data".format(group), okayToFail=True
+            "anchors", f"anchors-{group}.data", okayToFail=True
         ) as fh:
             self._refs.update(decodeAnchors(fh))
             self._loadedAnchorGroups.add(group)

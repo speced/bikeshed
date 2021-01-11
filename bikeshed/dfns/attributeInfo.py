@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import re
 
 from .. import config
@@ -74,7 +72,7 @@ def getTargetInfo(doc, el):
         )
     else:
         targets = h.findAll(
-            'a[data-link-type={1}][data-lt="{0}"]'.format(referencedAttribute, refType),
+            f'a[data-link-type={refType}][data-lt="{referencedAttribute}"]',
             doc,
         )
 

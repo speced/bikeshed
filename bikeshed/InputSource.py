@@ -161,7 +161,7 @@ class FileInputSource(InputSource):
         return self.sourceName
 
     def read(self) -> InputContent:
-        with io.open(self.sourceName, "r", encoding="utf-8") as f:
+        with open(self.sourceName, encoding="utf-8") as f:
             return InputContent(
                 f.readlines(),
                 datetime.fromtimestamp(os.path.getmtime(self.sourceName)).date(),

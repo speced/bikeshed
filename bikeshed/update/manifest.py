@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-
 import asyncio
 import aiofiles
 import aiohttp
@@ -53,7 +50,7 @@ def createManifest(path, dryRun=False):
                 pass
             else:
                 continue
-            with io.open(absPath, "r", encoding="utf-8") as fh:
+            with open(absPath, encoding="utf-8") as fh:
                 manifests.append((relPath, hashFile(fh)))
     except Exception:
         raise
@@ -64,7 +61,7 @@ def createManifest(path, dryRun=False):
 
     if not dryRun:
         try:
-            with io.open(
+            with open(
                 os.path.join(path, "manifest.txt"), "w", encoding="utf-8"
             ) as fh:
                 fh.write(manifest)
@@ -109,7 +106,7 @@ def updateByManifest(path, dryRun=False):
     say("Gathering local manifest data...")
     # Get the last-update time from the local manifest
     try:
-        with io.open(os.path.join(path, "manifest.txt"), "r", encoding="utf-8") as fh:
+        with open(os.path.join(path, "manifest.txt"), encoding="utf-8") as fh:
             localDt = dtFromManifest(fh.readlines())
     except Exception as e:
         localDt = "error"
@@ -183,7 +180,7 @@ def updateByManifest(path, dryRun=False):
                 deletedPaths.append(filePath)
         if deletedPaths:
             print(
-                "Deleted {0} old data file{1}.".format(
+                "Deleted {} old data file{}.".format(
                     len(deletedPaths), "s" if len(deletedPaths) > 1 else ""
                 )
             )
@@ -197,7 +194,7 @@ def updateByManifest(path, dryRun=False):
             )
         goodPaths, badPaths = asyncio.run(updateFiles(path, newPaths))
         try:
-            with io.open(
+            with open(
                 os.path.join(path, "manifest.txt"), "w", encoding="utf-8"
             ) as fh:
                 fh.write(createFinishedManifest(remoteManifest, goodPaths, badPaths))

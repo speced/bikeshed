@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import re
 from collections import OrderedDict, defaultdict
 
@@ -75,7 +73,7 @@ def transformDataBlocks(doc, lines):
                 die(
                     "Found {0} classes on the <{1}>, so can't tell which to process the block as. Please use only one.",
                     config.englishFromList(
-                        ("'{0}'".format(x) for x in seenClasses), "and"
+                        (f"'{x}'" for x in seenClasses), "and"
                     ),
                     tagName,
                     lineNum=line.i,
@@ -197,13 +195,13 @@ def transformPre(lines, tagName, firstLine, **kwargs):
     # which'll mess up the indent finding.
     # Instead, specially handle this case.
     if len(lines) == 0:
-        return [firstLine, "</{0}>".format(tagName)]
+        return [firstLine, f"</{tagName}>"]
 
     if re.match(r"\s*</code>\s*$", lines[-1]):
-        lastLine = "</code></{0}>".format(tagName)
+        lastLine = f"</code></{tagName}>"
         lines = lines[:-1]
     else:
-        lastLine = "</{0}>".format(tagName)
+        lastLine = f"</{tagName}>"
 
     if len(lines) == 0:
         return [firstLine, lastLine]
@@ -245,12 +243,12 @@ def transformPropdef(lines, doc, firstLine, lineNum=None, **kwargs):
     # attrs with any other value are optional, and use the specified value if not present in parsedAttrs
     forHint = ""
     if "Name" in parsedAttrs:
-        forHint = " data-link-for-hint='{0}'".format(
+        forHint = " data-link-for-hint='{}'".format(
             parsedAttrs["Name"].split(",")[0].strip()
         )
     lineNumAttr = ""
     if lineNum is not None:
-        lineNumAttr = " line-number={0}".format(lineNum)
+        lineNumAttr = f" line-number={lineNum}"
     if "partial" in firstLine or "New values" in parsedAttrs:
         attrs["Name"] = None
         attrs["New values"] = None
@@ -323,34 +321,22 @@ def transformPropdef(lines, doc, firstLine, lineNum=None, **kwargs):
 
     for key, val in attrsToPrint:
         tr = "<tr>"
-        th = "<th>{0}:".format(key)
-        td = "<td>{0}".format(val)
+        th = f"<th>{key}:"
+        td = f"<td>{val}"
         if key in ("Value", "New values"):
             tr = "<tr class=value>"
-            th = "<th><a href='https://www.w3.org/TR/css-values/#value-defs'>{0}:</a>".format(
-                key
-            )
-            td = "<td class=prod>{0}".format(val)
+            th = f"<th><a href='https://www.w3.org/TR/css-values/#value-defs'>{key}:</a>"
+            td = f"<td class=prod>{val}"
         elif key == "Initial":
-            th = "<th><a href='https://www.w3.org/TR/css-cascade/#initial-values'>{0}:</a>".format(
-                key
-            )
+            th = f"<th><a href='https://www.w3.org/TR/css-cascade/#initial-values'>{key}:</a>"
         elif key == "Inherited":
-            th = "<th><a href='https://www.w3.org/TR/css-cascade/#inherited-property'>{0}:</a>".format(
-                key
-            )
+            th = f"<th><a href='https://www.w3.org/TR/css-cascade/#inherited-property'>{key}:</a>"
         elif key == "Percentages":
-            th = "<th><a href='https://www.w3.org/TR/css-values/#percentages'>{0}:</a>".format(
-                key
-            )
+            th = f"<th><a href='https://www.w3.org/TR/css-values/#percentages'>{key}:</a>"
         elif key == "Computed value":
-            th = "<th><a href='https://www.w3.org/TR/css-cascade/#computed'>{0}:</a>".format(
-                key
-            )
+            th = f"<th><a href='https://www.w3.org/TR/css-cascade/#computed'>{key}:</a>"
         elif key in ("Animatable", "Animation type"):
-            th = "<th><a href='https://www.w3.org/TR/web-animations/#animation-type'>{0}:</a>".format(
-                key
-            )
+            th = f"<th><a href='https://www.w3.org/TR/web-animations/#animation-type'>{key}:</a>"
         elif key == "Applies to" and val.lower() == "all elements":
             td = "<td><a href='https://www.w3.org/TR/css-pseudo/#generated-content' title='Includes ::before and ::after pseudo-elements.'>all elements</a>"
         ret.append(tr + th + td)
@@ -368,7 +354,7 @@ def transformPropdef(lines, doc, firstLine, lineNum=None, **kwargs):
 def transformDescdef(lines, doc, firstLine, lineNum=None, **kwargs):
     lineNumAttr = ""
     if lineNum is not None:
-        lineNumAttr = " line-number={0}".format(lineNum)
+        lineNumAttr = f" line-number={lineNum}"
     vals = parseDefBlock(lines, "descdef")
     if "partial" in firstLine or "New values" in vals:
         requiredKeys = ["Name", "For"]
@@ -394,14 +380,14 @@ def transformDescdef(lines, doc, firstLine, lineNum=None, **kwargs):
     for key in requiredKeys:
         if key == "For":
             ret.append(
-                "<tr><th>{0}:<td><a at-rule>{1}</a>".format(key, vals.get(key, ""))
+                "<tr><th>{}:<td><a at-rule>{}</a>".format(key, vals.get(key, ""))
             )
         elif key == "Value":
             ret.append(
-                "<tr><th>{0}:<td class='prod'>{1}".format(key, vals.get(key, ""))
+                "<tr><th>{}:<td class='prod'>{}".format(key, vals.get(key, ""))
             )
         elif key in vals:
-            ret.append("<tr><th>{0}:<td>{1}".format(key, vals.get(key, "")))
+            ret.append("<tr><th>{}:<td>{}".format(key, vals.get(key, "")))
         else:
             die(
                 "The descdef for '{0}' is missing a '{1}' line.",
@@ -413,7 +399,7 @@ def transformDescdef(lines, doc, firstLine, lineNum=None, **kwargs):
     for key, val in vals.items():
         if key in requiredKeys:
             continue
-        ret.append("<tr><th>{0}:<td>{1}".format(key, vals[key]))
+        ret.append("<tr><th>{}:<td>{}".format(key, vals[key]))
     ret.append("</table>")
 
     indent = getWsPrefix(firstLine)
@@ -425,7 +411,7 @@ def transformDescdef(lines, doc, firstLine, lineNum=None, **kwargs):
 def transformElementdef(lines, doc, firstLine, lineNum=None, **kwargs):
     lineNumAttr = ""
     if lineNum is not None:
-        lineNumAttr = " line-number={0}".format(lineNum)
+        lineNumAttr = f" line-number={lineNum}"
     attrs = OrderedDict()
     parsedAttrs = parseDefBlock(lines, "elementdef")
     if "Attribute groups" in parsedAttrs or "Attributes" in parsedAttrs:
@@ -460,7 +446,7 @@ def transformElementdef(lines, doc, firstLine, lineNum=None, **kwargs):
     attrs["Attributes"] = None
     attrs["Dom interfaces"] = None
     ret = [
-        "<table class='def elementdef'{lineNumAttr}>".format(lineNumAttr=lineNumAttr)
+        f"<table class='def elementdef'{lineNumAttr}>"
     ]
     for key, val in attrs.items():
         if key in parsedAttrs or val is not None:
@@ -477,7 +463,7 @@ def transformElementdef(lines, doc, firstLine, lineNum=None, **kwargs):
                     )
                 )
             elif key == "Content model":
-                ret.append("<tr><th>{0}:<td>".format(key))
+                ret.append(f"<tr><th>{key}:<td>")
                 ret.extend(val.split("\n"))
             elif key == "Categories":
                 ret.append("<tr><th>Categories:<td>")
@@ -500,7 +486,7 @@ def transformElementdef(lines, doc, firstLine, lineNum=None, **kwargs):
                     )
                 )
             else:
-                ret.append("<tr><th>{0}:<td>{1}".format(key, val))
+                ret.append(f"<tr><th>{key}:<td>{val}")
         else:
             die(
                 "The elementdef for '{0}' is missing a '{1}' line.",
@@ -512,7 +498,7 @@ def transformElementdef(lines, doc, firstLine, lineNum=None, **kwargs):
     for key, val in parsedAttrs.items():
         if key in attrs:
             continue
-        ret.append("<tr><th>{0}:<td>{1}".format(key, val))
+        ret.append(f"<tr><th>{key}:<td>{val}")
     ret.append("</table>")
 
     indent = getWsPrefix(firstLine)
@@ -524,7 +510,7 @@ def transformElementdef(lines, doc, firstLine, lineNum=None, **kwargs):
 def transformArgumentdef(lines, firstLine, lineNum=None, **kwargs):
     lineNumAttr = ""
     if lineNum is not None:
-        lineNumAttr = " line-number={0}".format(lineNum)
+        lineNumAttr = f" line-number={lineNum}"
     attrs = parseDefBlock(lines, "argumentdef", capitalizeKeys=False, lineNum=lineNum)
     el = parseHTML(firstLine + "</pre>")[0]
     if "for" in el.attrib:
@@ -548,7 +534,7 @@ def transformArgumentdef(lines, firstLine, lineNum=None, **kwargs):
         return []
     addClass(el, "data")
     rootAttrs = " ".join(
-        "{0}='{1}'".format(k, escapeAttr(v)) for k, v in el.attrib.items()
+        "{}='{}'".format(k, escapeAttr(v)) for k, v in el.attrib.items()
     )
     text = (
         """
@@ -743,7 +729,7 @@ def processAnchors(anchors, doc, lineNum=None):
         spec = anchor["spec"][0] if "spec" in anchor else None
         if shortname and not spec:
             if level:
-                spec = "{0}-{1}".format(shortname, level)
+                spec = f"{shortname}-{level}"
             else:
                 spec = shortname
         elif spec and not shortname:
@@ -903,7 +889,7 @@ def processInfo(infos, doc, lineNum=None):
 def transformInclude(lines, doc, firstLine, lineNum=None, **kwargs):
     lineNumAttr = ""
     if lineNum is not None:
-        lineNumAttr = " line-number={0}".format(lineNum)
+        lineNumAttr = f" line-number={lineNum}"
     infos = parseInfoTree(lines, doc.md.indent, lineNum)
     path = None
     macros = {}
@@ -928,10 +914,10 @@ def transformInclude(lines, doc, firstLine, lineNum=None, **kwargs):
                         lineNum=lineNum,
                     )
     if path:
-        el = "<pre class=include path='{0}'".format(escapeAttr(path))
+        el = "<pre class=include path='{}'".format(escapeAttr(path))
         for i, (k, v) in enumerate(macros.items()):
-            el += " macro-{0}='{1} {2}'".format(i, k, escapeAttr(v))
-        el += "{lineNumAttr}></pre>".format(lineNumAttr=lineNumAttr)
+            el += " macro-{}='{} {}'".format(i, k, escapeAttr(v))
+        el += f"{lineNumAttr}></pre>"
 
         indent = getWsPrefix(firstLine)
         return [indent + el]
@@ -942,7 +928,7 @@ def transformInclude(lines, doc, firstLine, lineNum=None, **kwargs):
 def transformIncludeCode(lines, doc, firstLine, lineNum=None, **kwargs):
     lineNumAttr = ""
     if lineNum is not None:
-        lineNumAttr = " line-number={0}".format(lineNum)
+        lineNumAttr = f" line-number={lineNum}"
     infos = parseInfoTree(lines, doc.md.indent, lineNum)
     path = None
     highlight = None
@@ -986,18 +972,18 @@ def transformIncludeCode(lines, doc, firstLine, lineNum=None, **kwargs):
 
     if path:
         attrs = lineNumAttr
-        attrs += " path='{0}'".format(escapeAttr(path))
+        attrs += " path='{}'".format(escapeAttr(path))
         if highlight:
-            attrs += " highlight='{0}'".format(escapeAttr(highlight))
+            attrs += " highlight='{}'".format(escapeAttr(highlight))
         if lineStart:
-            attrs += " line-start='{0}'".format(escapeAttr(lineStart))
+            attrs += " line-start='{}'".format(escapeAttr(lineStart))
         if show:
-            attrs += " data-code-show='{0}'".format(escapeAttr(",".join(show)))
+            attrs += " data-code-show='{}'".format(escapeAttr(",".join(show)))
         if lineHighlight:
-            attrs += " line-highlight='{0}'".format(escapeAttr(",".join(lineHighlight)))
+            attrs += " line-highlight='{}'".format(escapeAttr(",".join(lineHighlight)))
         if lineNumbers:
             attrs += " line-numbers"
-        el = "<pre class=include-code{0}></pre>".format(attrs)
+        el = f"<pre class=include-code{attrs}></pre>"
         indent = getWsPrefix(firstLine)
         return [indent + el]
     else:
@@ -1007,7 +993,7 @@ def transformIncludeCode(lines, doc, firstLine, lineNum=None, **kwargs):
 def transformIncludeRaw(lines, doc, firstLine, lineNum=None, **kwargs):
     lineNumAttr = ""
     if lineNum is not None:
-        lineNumAttr = " line-number={0}".format(lineNum)
+        lineNumAttr = f" line-number={lineNum}"
     infos = parseInfoTree(lines, doc.md.indent, lineNum)
     path = None
     for info in infos:
@@ -1022,8 +1008,8 @@ def transformIncludeRaw(lines, doc, firstLine, lineNum=None, **kwargs):
 
     if path:
         attrs = lineNumAttr
-        attrs += " path='{0}'".format(escapeAttr(path))
-        el = "<pre class=include-raw{0}></pre>".format(attrs)
+        attrs += " path='{}'".format(escapeAttr(path))
+        el = f"<pre class=include-raw{attrs}></pre>"
         indent = getWsPrefix(firstLine)
         return [indent + el]
     else:
@@ -1130,7 +1116,7 @@ def classesFromLine(line):
 
 
 @attr.s(slots=True)
-class StartTag(object):
+class StartTag:
     tag = attr.ib()
     attrs = attr.ib(default=attr.Factory(dict))
 

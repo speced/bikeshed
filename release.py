@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import argparse
 import json
 import os
@@ -22,14 +20,14 @@ def createRelease():
         )
         sys.exit(1)
 
-    with open("semver.txt", "r") as fh:
+    with open("semver.txt") as fh:
         currentVersion = fh.read().strip()
         semver = parseSemver(currentVersion)
 
     try:
-        with open("secrets.json", "r") as fh:
+        with open("secrets.json") as fh:
             secrets = json.load(fh)
-    except IOError:
+    except OSError:
         print("Error trying to load the secrets.json file.")
         raise
 

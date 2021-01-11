@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-
 import difflib
 import glob
 import io
@@ -66,7 +63,7 @@ def runAllTests(patterns=None, manualOnly=False, md=None):
         total += 1
         doc = processTest(path, md)
         outputText = doc.serialize()
-        with io.open(path[:-2] + "html", encoding="utf-8") as golden:
+        with open(path[:-2] + "html", encoding="utf-8") as golden:
             goldenText = golden.read()
         if compare(outputText, goldenText):
             numPassed += 1
@@ -76,7 +73,7 @@ def runAllTests(patterns=None, manualOnly=False, md=None):
         p(printColor("✔ All tests passed.", color="green"))
         return True
     else:
-        p(printColor("✘ {0}/{1} tests passed.".format(numPassed, total), color="red"))
+        p(printColor(f"✘ {numPassed}/{total} tests passed.", color="red"))
         p(printColor("Failed Tests:", color="red"))
         for fail in fails:
             p("* " + fail)

@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-
 import os
 
 from . import updateBackRefs
@@ -68,12 +65,12 @@ def fixupDataFiles():
     using the legacy files with the new code is quite bad!
     """
     try:
-        localVersion = int(open(localPath("version.txt"), "r").read())
-    except IOError:
+        localVersion = int(open(localPath("version.txt")).read())
+    except OSError:
         localVersion = None
     try:
-        remoteVersion = int(open(remotePath("version.txt"), "r").read())
-    except IOError as err:
+        remoteVersion = int(open(remotePath("version.txt")).read())
+    except OSError as err:
         warn("Couldn't check the datafile version. Bikeshed may be unstable.\n{0}", err)
         return
 
@@ -144,7 +141,7 @@ def cleanupFiles(root, touchedPaths, dryRun=False):
             os.remove(absPath)
             oldPaths.append(relPath)
     if oldPaths:
-        say("Success! Deleted {0} old files.".format(len(oldPaths)))
+        say("Success! Deleted {} old files.".format(len(oldPaths)))
     else:
         say("Success! Nothing to delete.")
 

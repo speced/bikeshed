@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-
 from collections import defaultdict
 from .. import config
 
@@ -9,7 +6,7 @@ def filterObsoletes(
     refs, replacedSpecs, ignoredSpecs, localShortname=None, localSpec=None
 ):
     # Remove any ignored or obsoleted specs
-    possibleSpecs = set(ref.spec for ref in refs)
+    possibleSpecs = {ref.spec for ref in refs}
     if localSpec:
         possibleSpecs.add(localSpec)
     moreIgnores = set()

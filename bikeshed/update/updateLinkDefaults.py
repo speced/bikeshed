@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import io
 import os
 import requests
@@ -19,7 +17,7 @@ def update(path, dryRun=False):
 
     if not dryRun:
         try:
-            with io.open(
+            with open(
                 os.path.join(path, "link-defaults.infotree"), "w", encoding="utf-8"
             ) as f:
                 f.write(data)

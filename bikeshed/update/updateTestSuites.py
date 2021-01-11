@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import certifi
 import io
 import json
@@ -54,7 +52,7 @@ def update(path, dryRun=False):
 
     if not dryRun:
         try:
-            with io.open(
+            with open(
                 os.path.join(path, "test-suites.json"), "w", encoding="utf-8"
             ) as f:
                 f.write(

@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import io
 import json
 import os
@@ -91,7 +89,7 @@ def update(path, dryRun=False):
                         version = simplifyVersion(v)
                     else:
                         break
-            browserData[codeNames[browser]] = "{0} {1}".format(status, version)
+            browserData[codeNames[browser]] = f"{status} {version}"
         featureData[featureName] = {"notes": notes, "url": url, "support": browserData}
 
     writtenPaths = set()
@@ -99,17 +97,17 @@ def update(path, dryRun=False):
         try:
             p = os.path.join(path, "caniuse", "data.json")
             writtenPaths.add(p)
-            with io.open(p, "w", encoding="utf-8") as fh:
+            with open(p, "w", encoding="utf-8") as fh:
                 fh.write(
                     json.dumps(basicData, indent=1, ensure_ascii=False, sort_keys=True)
                 )
 
             for featureName, feature in featureData.items():
                 p = os.path.join(
-                    path, "caniuse", "feature-{0}.json".format(featureName)
+                    path, "caniuse", f"feature-{featureName}.json"
                 )
                 writtenPaths.add(p)
-                with io.open(p, "w", encoding="utf-8") as fh:
+                with open(p, "w", encoding="utf-8") as fh:
                     fh.write(
                         json.dumps(
                             feature, indent=1, ensure_ascii=False, sort_keys=True

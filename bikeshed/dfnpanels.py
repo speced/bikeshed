@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-
 from .DefaultOrderedDict import DefaultOrderedDict
 from .h import *
 
@@ -48,7 +45,7 @@ def addDfnPanels(doc, dfns):
             for i, el in enumerate(els):
                 refID = el.get("id")
                 if refID is None:
-                    refID = "ref-for-{0}".format(id)
+                    refID = f"ref-for-{id}"
                     el.set("id", safeID(doc, refID))
                 if i == 0:
                     appendChild(
@@ -89,7 +86,7 @@ def addExternalDfnPanel(termEl, ref, elsFromHref, doc):
     if len(refs):
         addClass(termEl, "dfn-paneled")
         _, _, refID = ref.url.partition("#")
-        termID = "term-for-{0}".format(refID)
+        termID = f"term-for-{refID}"
         termEl.set("id", termID)
         termEl.set("data-silently-dedup", "")
         panel = E.aside(

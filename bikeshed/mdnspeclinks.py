@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import json
 from collections import OrderedDict
 from .h import *  # noqa
@@ -12,11 +11,11 @@ def addMdnPanels(doc):
     try:
         filename = doc.md.vshortname + ".json"
         datafile = doc.dataFile.fetch("mdn", filename, str=True)
-    except IOError:
+    except OSError:
         try:
             filename = doc.md.shortname + ".json"
             datafile = doc.dataFile.fetch("mdn", filename, str=True)
-        except IOError:
+        except OSError:
             if doc.md.includeMdnPanels == "maybe":
                 # if "maybe", failure is fine, don't complain
                 pass

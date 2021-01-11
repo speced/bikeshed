@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import io
 import os
 import requests
@@ -44,10 +42,10 @@ def update(path, dryRun=False):
             collectPaths(paths, typePaths, testType + " ")
     if not dryRun:
         try:
-            with io.open(
+            with open(
                 os.path.join(path, "wpt-tests.txt"), "w", encoding="utf-8"
             ) as f:
-                f.write("sha: {0}\n".format(sha))
+                f.write(f"sha: {sha}\n")
                 for path in sorted(paths):
                     f.write(path + "\n")
         except Exception as e:
@@ -59,7 +57,7 @@ def update(path, dryRun=False):
 def collectPaths(pathListSoFar, pathTrie, pathPrefix):
     for k, v in pathTrie.items():
         if isinstance(v, dict):
-            collectPaths(pathListSoFar, v, "{0}{1}/".format(pathPrefix, k))
+            collectPaths(pathListSoFar, v, f"{pathPrefix}{k}/")
         else:
             pathListSoFar.append(pathPrefix + k)
     return pathListSoFar

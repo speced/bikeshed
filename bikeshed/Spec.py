@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-
 import glob
 import io
 import os
@@ -38,7 +35,7 @@ from .refs import ReferenceManager
 from .unsortedJunk import *
 
 
-class Spec(object):
+class Spec:
     def __init__(
         self,
         inputFilename,
@@ -111,7 +108,7 @@ class Spec(object):
                 self.inputSource,
             )
             return False
-        except IOError:
+        except OSError:
             die("Couldn't open the input file '{0}'.", self.inputSource)
             return False
 
@@ -327,7 +324,7 @@ class Spec(object):
                 if outputFilename == "-":
                     sys.stdout.write(rendered)
                 else:
-                    with io.open(
+                    with open(
                         outputFilename, "w", encoding="utf-8", newline=newline
                     ) as f:
                         f.write(rendered)
@@ -360,7 +357,7 @@ class Spec(object):
 
         outputFilename = self.fixMissingOutputFilename(outputFilename)
         if self.inputSource.mtime() is None:
-            die("Watch mode doesn't support {}".format(self.inputSource))
+            die(f"Watch mode doesn't support {self.inputSource}")
         if outputFilename == "-":
             die("Watch mode doesn't support streaming to STDOUT.")
             return
@@ -380,7 +377,7 @@ class Spec(object):
                 ("localhost" if localhost else "", port), SilentServer
             )
 
-            print("Serving at port {0}".format(port))
+            print(f"Serving at port {port}")
             thread = threading.Thread(target=server.serve_forever)
             thread.daemon = True
             thread.start()

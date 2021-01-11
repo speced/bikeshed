@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-
 import argparse
 import os
 import sys
@@ -17,7 +14,7 @@ def main():
         sys.argv.append("spec")
 
     try:
-        with open(config.scriptPath("..", "semver.txt"), "r") as fh:
+        with open(config.scriptPath("..", "semver.txt")) as fh:
             semver = fh.read().strip()
             semverText = f"Bikeshed v{semver}: "
     except:
@@ -587,7 +584,7 @@ def handleDebug(options, extras):
         refs = doc.refs.refs[options.linkText] + doc.refs.refs[options.linkText + "\n"]
         constants.quiet = options.quiet
         if not constants.quiet:
-            p("Refs for '{0}':".format(options.linkText))
+            p(f"Refs for '{options.linkText}':")
         # Get ready for JSONing
         for ref in refs:
             ref["level"] = str(ref["level"])
@@ -670,8 +667,8 @@ def handleTest(options, extras):
 def handleProfile(options, extras):
     import os
 
-    root = '--root="{0}"'.format(options.root) if options.root else ""
-    leaf = '--leaf="{0}"'.format(options.leaf) if options.leaf else ""
+    root = f'--root="{options.root}"' if options.root else ""
+    leaf = f'--leaf="{options.leaf}"' if options.leaf else ""
     if options.svgFile:
         os.system(
             "time python -m cProfile -o stat.prof -m bikeshed -f spec && gprof2dot -f pstats --skew=.0001 {root} {leaf} stat.prof | dot -Tsvg -o {svg} && rm stat.prof".format(

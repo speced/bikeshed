@@ -1,11 +1,8 @@
-# -*- coding: utf-8 -*-
-
-
 import io
 from . import dom
 
 
-class Serializer(object):
+class Serializer:
     inlineEls = frozenset(
         [
             "a",

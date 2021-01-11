@@ -48,7 +48,7 @@ class BiblioShorthand:
         self.bsAutolink += "]]"
 
         if not self.linkText:
-            self.linkText = "[{0}]".format(self.term)
+            self.linkText = f"[{self.term}]"
 
         attrs = {
             "data-lt": self.term,

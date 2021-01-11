@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-
 import re
 
 from widlparser import parser
@@ -10,17 +7,17 @@ from .messages import *
 from .unsortedJunk import classifyDfns
 
 
-class IDLUI(object):
+class IDLUI:
     def warn(self, msg):
         die("{0}", msg.rstrip())
 
 
-class IDLSilent(object):
+class IDLSilent:
     def warn(self, msg):
         pass
 
 
-class DebugMarker(object):
+class DebugMarker:
     # Debugging tool for IDL markup
 
     def markup_construct(self, text, construct):
@@ -72,7 +69,7 @@ class DebugMarker(object):
         return ('<ENUM-VALUE for="' + construct.name + '">', "</ENUM-VALUE>")
 
 
-class IDLMarker(object):
+class IDLMarker:
     def markup_construct(self, text, construct):
         # Fires for every 'construct' in the WebIDL.
         # Some things are "productions", not "constructs".
@@ -121,7 +118,7 @@ class IDLMarker(object):
             if typeName.endswith("?"):
                 typeName = typeName[:-1]
             return (
-                '<a data-link-type=attribute data-link-for="{0}">'.format(typeName),
+                f'<a data-link-type=attribute data-link-for="{typeName}">',
                 "</a>",
             )
 
@@ -132,7 +129,7 @@ class IDLMarker(object):
             and construct.name == "LegacyWindowAlias"
         ):
             return (
-                '<idl data-idl-type=interface data-lt="{0}">'.format(text),
+                f'<idl data-idl-type=interface data-lt="{text}">',
                 "</idl>",
             )
 
@@ -152,7 +149,7 @@ class IDLMarker(object):
             if construct.name is None:
                 # If no name was defined, you're required to define stringification behavior.
                 return (
-                    "<a dfn for='{0}' data-lt='stringification behavior'>".format(
+                    "<a dfn for='{}' data-lt='stringification behavior'>".format(
                         construct.parent.full_name
                     ),
                     "</a>",
@@ -222,18 +219,18 @@ class IDLMarker(object):
                 readonly = "data-readonly"
             else:
                 readonly = ""
-            extraParameters = '{0} data-type="{1}"'.format(
+            extraParameters = '{} data-type="{}"'.format(
                 readonly, str(rest.type).strip()
             )
         elif idlType == "dict-member":
-            extraParameters = 'data-type="{0}"'.format(construct.type)
+            extraParameters = f'data-type="{construct.type}"'
             if construct.default is not None:
                 value = str(construct.default).split("=", 1)[1].strip()
                 if value.startswith("["):
                     value = "[]"
                 elif value.startswith("}"):
                     value = "{}"
-                extraParameters += ' data-default="{0}"'.format(escapeAttr(value))
+                extraParameters += ' data-default="{}"'.format(escapeAttr(value))
         elif idlType in ["interface", "namespace", "dictionary"]:
             if construct.partial:
                 refType = "link"
@@ -247,12 +244,12 @@ class IDLMarker(object):
             if idlType == "argument" and construct.parent.idl_type == "method":
                 interfaceName = construct.parent.parent.name
                 methodNames = [
-                    "{0}/{1}".format(interfaceName, m)
+                    f"{interfaceName}/{m}"
                     for m in self.methodLinkingTexts(construct.parent)
                 ]
-                idlFor = "data-idl-for='{0}'".format(", ".join(methodNames))
+                idlFor = "data-idl-for='{}'".format(", ".join(methodNames))
             else:
-                idlFor = "data-idl-for='{0}'".format(construct.parent.full_name)
+                idlFor = f"data-idl-for='{construct.parent.full_name}'"
         else:
             idlFor = ""
         return (
@@ -264,12 +261,12 @@ class IDLMarker(object):
                 name=elementName,
                 refType=refType,
             ),
-            "</{0}>".format(elementName),
+            f"</{elementName}>",
         )
 
     def markup_enum_value(self, text, construct):
         return (
-            "<idl data-idl-type=enum-value data-idl-for='{0}' data-lt='{1}'>".format(
+            "<idl data-idl-type=enum-value data-idl-for='{}' data-lt='{}'>".format(
                 escapeAttr(construct.name), escapeAttr(text)
             ),
             "</idl>",

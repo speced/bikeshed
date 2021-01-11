@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import collections
 import itertools
 import re
@@ -169,11 +167,11 @@ def highlightWithWebIDL(text, el):
     All other text is colored with the attr currently on top of the stack.
     """
 
-    class IDLUI(object):
+    class IDLUI:
         def warn(self, msg):
             die("{0}", msg.rstrip())
 
-    class HighlightMarker(object):
+    class HighlightMarker:
         # Just applies highlighting classes to IDL stuff.
         def markup_type_name(self, text, construct):
             return ("\1n\2", "\3")
