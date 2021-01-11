@@ -3,7 +3,6 @@
 import collections
 import itertools
 import re
-from . import config
 from .h import *
 from .messages import *
 

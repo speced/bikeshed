@@ -59,12 +59,12 @@ class PropdescShorthand:
             die(
                 "Shorthand {0} gives type as '{1}', but only 'property' and 'descriptor' are allowed.",
                 self.bsAutolink,
-                linkType,
+                self.linkType,
             )
             return steps.Success(E.span(self.bsAutolink))
 
         if self.linkText is None:
-            self.linkText = lt
+            self.linkText = self.lt
 
         attrs = {
             "data-link-type": self.linkType,
@@ -73,7 +73,7 @@ class PropdescShorthand:
             "lt": self.lt,
             "bs-autolink-syntax": self.bsAutolink,
         }
-        return steps.Success(E.a(attrs, linkText))
+        return steps.Success(E.a(attrs, self.linkText))
 
 
 PropdescShorthand.startRe = re.compile(

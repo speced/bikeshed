@@ -5,9 +5,7 @@ import difflib
 import glob
 import io
 import os
-import pipes
 import re
-import subprocess
 from itertools import *
 from . import config
 from .messages import *

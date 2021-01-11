@@ -3,10 +3,8 @@
 
 import hashlib
 import itertools
-import io
 import re
 
-from . import config
 from . import datablocks
 from . import markdown
 from .h import *

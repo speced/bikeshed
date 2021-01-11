@@ -80,7 +80,7 @@ class ElementShorthand:
             "lt": self.lt,
             "bs-autolink-syntax": self.bsAutolink,
         }
-        return steps.Success(E.a(attrs, linkText))
+        return steps.Success(E.a(attrs, self.linkText))
 
 
 ElementShorthand.startRe = re.compile(

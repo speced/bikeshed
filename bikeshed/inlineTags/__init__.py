@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 
 
-import io
-
 from subprocess import Popen, PIPE
 
 from ..h import *
