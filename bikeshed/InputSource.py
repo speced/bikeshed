@@ -67,7 +67,6 @@ class InputSource:
     @abstractmethod
     def read(self) -> InputContent:
         """Fully reads the source."""
-        pass
 
     def hasDirectory(self) -> bool:
         """Only some InputSources have a directory."""
