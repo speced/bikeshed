@@ -665,8 +665,6 @@ def handleTest(options, extras):
 
 
 def handleProfile(options, extras):
-    import os
-
     root = f'--root="{options.root}"' if options.root else ""
     leaf = f'--leaf="{options.leaf}"' if options.leaf else ""
     if options.svgFile:
