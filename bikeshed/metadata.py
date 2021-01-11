@@ -191,9 +191,9 @@ class MetadataManager:
 
         # for TR document, defaults to TR
         # fallbacks to ED
-        if (self.canonicalURL == None or self.canonicalURL == "TR") and self.TR:
+        if (self.canonicalURL is None or self.canonicalURL == "TR") and self.TR:
             self.canonicalURL = self.TR
-        elif (self.canonicalURL == None or self.canonicalURL == "ED") and self.ED:
+        elif (self.canonicalURL is None or self.canonicalURL == "ED") and self.ED:
             self.canonicalURL = self.ED
 
         if self.displayShortname:
