@@ -103,7 +103,7 @@ def addExternalDfnPanel(termEl, ref, elsFromHref, doc):
             for i, el in enumerate(els):
                 linkID = el.get("id")
                 if linkID is None:
-                    linkID = "termref-for-".format(refID)
+                    linkID = f"termref-for-{refID}"
                     el.set("id", safeID(doc, linkID))
                     el.set("data-silently-dedup", "")
                 if i == 0:
