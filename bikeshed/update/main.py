@@ -43,7 +43,7 @@ def update(
     if force:
         # If all are False, update everything
         if anchors == backrefs == biblio == caniuse == linkDefaults == mdn == testSuites == languages == wpt == False:
-            anchors = backrefs =  biblio =  caniuse =  linkDefaults =  mdn =  testSuites =  languages =  wpt =  True # noqa: E222
+            anchors = backrefs =  biblio =  caniuse =  linkDefaults =  mdn =  testSuites =  languages =  wpt =  True  # noqa: E222
 
         touchedPaths = {
             "anchors": updateCrossRefs.update(path=path, dryRun=dryRun) if anchors else None,
