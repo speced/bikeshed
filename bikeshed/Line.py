@@ -14,6 +14,6 @@ class Line(object):
 
 
 def rectify(lines):
-    if any(isinstance(l, str) for l in lines):
-        return [Line(-1, l) for l in lines]
+    if any(isinstance(x, str) for x in lines):
+        return [Line(-1, x) for x in lines]
     return lines

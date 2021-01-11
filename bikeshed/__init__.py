@@ -73,7 +73,7 @@ def verify_requirements():
 
 verify_requirements()
 
-from .cli import main
-from .Spec import Spec
-from . import update
-from . import config
+from .cli import main  # noqa: E402
+from .Spec import Spec  # noqa: E402
+from . import update  # noqa: E402
+from . import config  # noqa: E402

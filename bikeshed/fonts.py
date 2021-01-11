@@ -119,7 +119,7 @@ def parseCharacters(md, lines):
     for bigcharlines in grouper(lines, height + 1):
         littlechar = bigcharlines[0][0]
         bigchar = [line.strip("\n") for line in bigcharlines[1:]]
-        width = max(len(l) for l in bigchar)
+        width = max(len(line) for line in bigchar)
         for i, line in enumerate(bigchar):
             # Make sure the letter is a rectangle.
             if len(line) < width:

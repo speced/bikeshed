@@ -183,7 +183,7 @@ class Spec(object):
         self.refs.setSpecData(self.md)
 
         # Convert to a single string of html now, for convenience.
-        self.html = "".join(l.text for l in self.lines)
+        self.html = "".join(line.text for line in self.lines)
         boilerplate.addHeaderFooter(self)
         self.html = self.fixText(self.html)
 

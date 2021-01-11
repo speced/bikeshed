@@ -156,8 +156,8 @@ def groupFromKey(key, length=2):
 _groupFromKeyCache = {}
 
 
-def flatten(l):
-    for el in l:
+def flatten(arr):
+    for el in arr:
         if (
             isinstance(el, collections.Iterable)
             and not isinstance(el, str)

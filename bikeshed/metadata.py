@@ -242,16 +242,16 @@ class MetadataManager:
 
         errors = []
         warnings = []
-        for attr, name in requiredSingularKeys.items():
-            if getattr(self, attr) is None:
+        for attrName, name in requiredSingularKeys.items():
+            if getattr(self, attrName) is None:
                 errors.append("    Missing a '{0}' entry.".format(name))
-        for attr, name in recommendedSingularKeys.items():
-            if getattr(self, attr) is None:
+        for attrName, name in recommendedSingularKeys.items():
+            if getattr(self, attrName) is None:
                 warnings.append(
                     "    You probably want to provide a '{0}' entry.".format(name)
                 )
-        for attr, name in requiredMultiKeys.items():
-            if len(getattr(self, attr)) == 0:
+        for attrName, name in requiredMultiKeys.items():
+            if len(getattr(self, attrName)) == 0:
                 errors.append("    Must provide at least one '{0}' entry.".format(name))
         if warnings:
             warn("Some recommended metadata is missing:\n{0}", "\n".join(warnings))

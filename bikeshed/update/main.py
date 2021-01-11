@@ -42,7 +42,7 @@ def update(
             force = True
     if force:
         # If all are False, update everything
-        if anchors == backrefs == biblio == caniuse == linkDefaults == mdn == testSuites == languages == wpt == False:
+        if anchors == backrefs == biblio == caniuse == linkDefaults == mdn == testSuites == languages == wpt == False:  # noqa: E712
             anchors = backrefs =  biblio =  caniuse =  linkDefaults =  mdn =  testSuites =  languages =  wpt =  True  # noqa: E222
 
         touchedPaths = {

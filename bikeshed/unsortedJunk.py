@@ -8,7 +8,7 @@ import re
 from collections import Counter, defaultdict, namedtuple
 from urllib import parse
 
-from . import biblio, config, datablocks, dfnpanels, func, markdown
+from . import biblio, config, dfnpanels, func
 from .h import (
     E,
     addClass,

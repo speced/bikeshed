@@ -16,9 +16,9 @@ def parse(
     blockElements=None,
 ):
     fromStrings = False
-    if any(isinstance(l, str) for l in lines):
+    if any(isinstance(x, str) for x in lines):
         fromStrings = True
-        lines = [Line.Line(-1, l) for l in lines]
+        lines = [Line.Line(-1, x) for x in lines]
     lines = Line.rectify(lines)
     tokens = tokenizeLines(
         lines,
@@ -29,7 +29,7 @@ def parse(
     )
     html = parseTokens(tokens, numSpacesForIndentation)
     if fromStrings:
-        return [l.text for l in html]
+        return [x.text for x in html]
     else:
         return html
 
@@ -112,7 +112,7 @@ def tokenizeLines(
     opaqueElements += ["pre", "xmp", "script", "style"]
     rawElements = "|".join(re.escape(x) for x in opaqueElements)
 
-    for l in lines:
+    for line in lines:
 
         # Three kinds of "raw" elements, which prevent markdown processing inside of them.
         # 1. <pre> and manual opaque elements, which can contain markup and so can nest.
@@ -126,26 +126,26 @@ def tokenizeLines(
             # Inside at least one raw element that turns off markdown.
             # First see if this line will *end* the raw element.
             endTag = rawStack[-1]
-            if endTag["type"] == "element" and re.search(endTag["tag"], l.text):
+            if endTag["type"] == "element" and re.search(endTag["tag"], line.text):
                 rawStack.pop()
-                tokens.append({"type": "raw", "prefixlen": float("inf"), "line": l})
+                tokens.append({"type": "raw", "prefixlen": float("inf"), "line": line})
                 continue
             elif endTag["type"] == "fenced" and re.match(
-                r"\s*{0}{1}*\s*$".format(endTag["tag"], endTag["tag"][0]), l.text
+                r"\s*{0}{1}*\s*$".format(endTag["tag"], endTag["tag"][0]), line.text
             ):
                 rawStack.pop()
-                l.text = "</xmp>"
-                tokens.append({"type": "raw", "prefixlen": float("inf"), "line": l})
+                line.text = "</xmp>"
+                tokens.append({"type": "raw", "prefixlen": float("inf"), "line": line})
                 continue
             elif not endTag["nest"]:
                 # Just an internal line, but for the no-nesting elements,
                 # so guaranteed no more work needs to be done.
-                tokens.append({"type": "raw", "prefixlen": float("inf"), "line": l})
+                tokens.append({"type": "raw", "prefixlen": float("inf"), "line": line})
                 continue
 
         # We're either in a nesting raw element or not in a raw element at all,
         # so check if the line starts a new element.
-        match = re.match(r"(\s*)(`{3,}|~{3,})([^`]*)$", l.text)
+        match = re.match(r"(\s*)(`{3,}|~{3,})([^`]*)$", line.text)
         if match:
             ws, tag, infoString = match.groups()
             rawStack.append({"type": "fenced", "tag": tag, "nest": False})
@@ -156,25 +156,25 @@ def tokenizeLines(
                 classAttr = " class='language-{0}'".format(escapeAttr(lang))
             else:
                 classAttr = ""
-            l.text = "{0}<xmp{1}>".format(ws, classAttr)
+            line.text = "{0}<xmp{1}>".format(ws, classAttr)
             tokens.append(
                 {
                     "type": "raw",
                     "prefixlen": prefixLen(ws, numSpacesForIndentation),
-                    "line": l,
+                    "line": line,
                 }
             )
             continue
-        match = re.match(r"\s*<({0})[ >]".format(rawElements), l.text)
+        match = re.match(r"\s*<({0})[ >]".format(rawElements), line.text)
         if match:
             tokens.append(
                 {
                     "type": "raw",
-                    "prefixlen": prefixLen(l.text, numSpacesForIndentation),
-                    "line": l,
+                    "prefixlen": prefixLen(line.text, numSpacesForIndentation),
+                    "line": line,
                 }
             )
-            if re.search(r"</({0})>".format(match.group(1)), l.text):
+            if re.search(r"</({0})>".format(match.group(1)), line.text):
                 # Element started and ended on same line, cool, don't need to do anything.
                 pass
             else:
@@ -188,10 +188,10 @@ def tokenizeLines(
                 )
             continue
         if rawStack:
-            tokens.append({"type": "raw", "prefixlen": float("inf"), "line": l})
+            tokens.append({"type": "raw", "prefixlen": float("inf"), "line": line})
             continue
 
-        line = l.text.strip()
+        line = line.text.strip()
 
         if line == "":
             token = {
@@ -254,8 +254,8 @@ def tokenizeLines(
         if token["type"] == "blank":
             token["prefixlen"] = float("inf")
         else:
-            token["prefixlen"] = prefixLen(l.text, numSpacesForIndentation)
-        token["line"] = l
+            token["prefixlen"] = prefixLen(line.text, numSpacesForIndentation)
+        token["line"] = line
         tokens.append(token)
 
     # for token in tokens:

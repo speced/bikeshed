@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 
 import os
-import re
 import urllib.parse
 from collections import defaultdict
 
-from .. import biblio, config, constants
+from .. import config, constants
 from ..h import findAll
 from ..messages import say
 from ..Spec import Spec

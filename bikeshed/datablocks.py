@@ -30,9 +30,9 @@ from functools import reduce
 
 def transformDataBlocks(doc, lines):
     fromStrings = False
-    if any(isinstance(l, str) for l in lines):
+    if any(isinstance(x, str) for x in lines):
         fromStrings = True
-        lines = [Line.Line(-1, l) for l in lines]
+        lines = [Line.Line(-1, x) for x in lines]
     inBlock = False
     blockTypes = {
         "propdef": transformPropdef,
@@ -105,20 +105,20 @@ def transformDataBlocks(doc, lines):
                     lineNum=line.i,
                     doc=doc,
                 )
-                newLines.extend(Line.Line(line.i, l) for l in repl)
+                newLines.extend(Line.Line(line.i, x) for x in repl)
                 line.text = match.group(3)
                 newLines.append(line)
             elif re.match(r"^\s*$", match.group(1)):
                 # End tag was the first tag on the line.
                 # Remove the tag from the line.
                 repl = blockTypes[blockType](
-                    lines=cleanPrefix([l.text for l in blockLines[1:]], doc.md.indent),
+                    lines=cleanPrefix([x.text for x in blockLines[1:]], doc.md.indent),
                     tagName=tagName,
                     firstLine=blockLines[0].text,
                     lineNum=blockLines[0].i,
                     doc=doc,
                 )
-                newLines.extend(Line.Line(blockLines[0].i, l) for l in repl)
+                newLines.extend(Line.Line(blockLines[0].i, x) for x in repl)
                 line.text = match.group(2)
                 newLines.append(line)
             else:
@@ -126,7 +126,7 @@ def transformDataBlocks(doc, lines):
                 # Process the stuff before it, preserve the stuff after it.
                 repl = blockTypes[blockType](
                     lines=cleanPrefix(
-                        [l.text for l in blockLines[1:]] + [match.group(1)],
+                        [x.text for x in blockLines[1:]] + [match.group(1)],
                         doc.md.indent,
                     ),
                     tagName=tagName,
@@ -134,7 +134,7 @@ def transformDataBlocks(doc, lines):
                     lineNum=blockLines[0].i,
                     doc=doc,
                 )
-                newLines.extend(Line.Line(blockLines[0].i, l) for l in repl)
+                newLines.extend(Line.Line(blockLines[0].i, x) for x in repl)
                 line.text = match.group(2)
                 newLines.append(line)
             tagName = ""
@@ -150,7 +150,7 @@ def transformDataBlocks(doc, lines):
     #    print line
 
     if fromStrings:
-        return [l.text for l in newLines]
+        return [x.text for x in newLines]
     else:
         return newLines
 
@@ -357,7 +357,7 @@ def transformPropdef(lines, doc, firstLine, lineNum=None, **kwargs):
     ret.append("</table>")
 
     indent = getWsPrefix(firstLine)
-    ret = [indent + l for l in ret]
+    ret = [indent + x for x in ret]
 
     return ret
 
@@ -417,7 +417,7 @@ def transformDescdef(lines, doc, firstLine, lineNum=None, **kwargs):
     ret.append("</table>")
 
     indent = getWsPrefix(firstLine)
-    ret = [indent + l for l in ret]
+    ret = [indent + x for x in ret]
 
     return ret
 
@@ -516,7 +516,7 @@ def transformElementdef(lines, doc, firstLine, lineNum=None, **kwargs):
     ret.append("</table>")
 
     indent = getWsPrefix(firstLine)
-    ret = [indent + l for l in ret]
+    ret = [indent + x for x in ret]
 
     return ret
 
@@ -676,7 +676,7 @@ def transformRailroad(lines, doc, firstLine, **kwargs):
         ret.append("</div>")
 
         indent = getWsPrefix(firstLine)
-        ret = [indent + l for l in ret]
+        ret = [indent + x for x in ret]
 
         return ret
     else:

@@ -2,8 +2,8 @@
 
 
 from . import config
-from .h import *
-from .messages import *
+from .h import *  # noqa: F401
+from .messages import *  # noqa: F401
 
 
 def load(doc):
