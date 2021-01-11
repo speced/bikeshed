@@ -56,7 +56,7 @@ class DfnShorthand:
             "lt": self.lt,
             "bs-autolink-syntax": self.bsAutolink,
         }
-        return steps.Success(E.a(attrs, linkText))
+        return steps.Success(E.a(attrs, self.linkText))
 
 
 DfnShorthand.startRe = re.compile(
