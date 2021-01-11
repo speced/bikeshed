@@ -470,8 +470,6 @@ def findImplicitInputFile():
     3. the first file with a .bs extension
     4. the first file with a .src.html extension
     """
-    import glob
-    import os
 
     if os.path.isfile("index.bs"):
         return "index.bs"
