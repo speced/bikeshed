@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-
 import hashlib
 import itertools
 import re

@@ -1,7 +1,3 @@
-# -*- coding: utf-8 -*-
-
-
-import io
 import json
 import random
 import re
@@ -18,7 +14,7 @@ from ..h import *
 from ..messages import *
 
 
-class ReferenceManager(object):
+class ReferenceManager:
 
     __slots__ = [
         "dataFile",
@@ -144,7 +140,7 @@ class ReferenceManager(object):
                     datablocks.transformAnchors(
                         doc.inputSource.relative("anchors.bsdata").read().rawLines, doc
                     )
-                except IOError:
+                except OSError:
                     warn(
                         "anchors.bsdata not found despite being listed in the External Infotrees metadata."
                     )
@@ -171,7 +167,7 @@ class ReferenceManager(object):
                         .rawLines,
                         doc,
                     )
-                except IOError:
+                except OSError:
                     warn(
                         "link-defaults.infotree not found despite being listed in the External Infotrees metadata."
                     )
@@ -180,7 +176,7 @@ class ReferenceManager(object):
         if spec in self.headings:
             return self.headings[spec]
         with self.dataFile.fetch(
-            "headings", "headings-{0}.json".format(spec), okayToFail=True
+            "headings", f"headings-{spec}.json", okayToFail=True
         ) as fh:
             try:
                 data = json.load(fh)
@@ -201,9 +197,9 @@ class ReferenceManager(object):
         # Get local bibliography data
         try:
             storage = defaultdict(list)
-            with io.open("biblio.json", "r", encoding="utf-8") as fh:
+            with open("biblio.json", encoding="utf-8") as fh:
                 biblio.processSpecrefBiblioFile(fh.read(), storage, order=2)
-        except IOError:
+        except OSError:
             # Missing file is fine
             pass
         for k, vs in storage.items():
@@ -861,7 +857,7 @@ class ReferenceManager(object):
             group = key[0:2]
             if group not in self.loadedBiblioGroups:
                 with self.dataFile.fetch(
-                    "biblio", "biblio-{0}.data".format(group), okayToFail=True
+                    "biblio", f"biblio-{group}.data", okayToFail=True
                 ) as lines:
                     biblio.loadBiblioDataFile(lines, self.biblios)
             self.loadedBiblioGroups.add(group)
@@ -964,12 +960,12 @@ def reportMultiplePossibleRefs(
             mergedRefs.append(refs)
 
     if linkFor:
-        error = "Multiple possible '{0}' {1} refs for '{2}'.".format(
+        error = "Multiple possible '{}' {} refs for '{}'.".format(
             linkText, linkType, linkFor
         )
     else:
-        error = "Multiple possible '{0}' {1} refs.".format(linkText, linkType)
-    error += "\nArbitrarily chose {0}".format(defaultRef.url)
+        error = f"Multiple possible '{linkText}' {linkType} refs."
+    error += f"\nArbitrarily chose {defaultRef.url}"
     if uniqueRefs:
         error += "\nTo auto-select one of the following refs, insert one of these lines into a <pre class=link-defaults> block:\n"
         error += "\n".join(refToText(r) for r in uniqueRefs)

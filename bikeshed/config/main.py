@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import collections
 import lxml
 import os
@@ -106,9 +104,7 @@ class DuplicatedLinkText(Exception):
         self.el = el
 
     def __unicode__(self):
-        return "<Text '{0}' shows up in both lt and local-lt>".format(
-            self.offendingText
-        )
+        return f"<Text '{self.offendingText}' shows up in both lt and local-lt>"
 
 
 def firstLinkTextFromElement(el):
@@ -163,8 +159,7 @@ def flatten(arr):
             and not isinstance(el, str)
             and not lxml.etree.iselement(el)
         ):
-            for sub in flatten(el):
-                yield sub
+            yield from flatten(el)
         else:
             yield el
 

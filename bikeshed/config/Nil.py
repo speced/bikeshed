@@ -1,7 +1,4 @@
-# -*- coding: utf-8 -*-
-
-
-class Nil(object):
+class Nil:
     """Super-None, falsey and returns itself from every method/attribute/etc"""
 
     def __repr__(self):

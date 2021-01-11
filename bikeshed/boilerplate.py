@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import copy
 import os
 import re
@@ -334,14 +332,14 @@ def addIndexOfLocallyDefinedTerms(doc, container):
             # Don't generate index entries for arguments.
             continue
         if el.get("data-dfn-for") is not None:
-            disambiguator = "{0} for {1}".format(
+            disambiguator = "{} for {}".format(
                 el.get("data-dfn-type"),
                 ", ".join(config.splitForValues(el.get("data-dfn-for"))),
             )
         elif type == "dfn":
             disambiguator = "definition of"
         else:
-            disambiguator = "({0})".format(el.get("data-dfn-type"))
+            disambiguator = "({})".format(el.get("data-dfn-type"))
 
         id = el.get("id")
         for linkText in linkTexts:
@@ -373,11 +371,11 @@ def addExplicitIndexes(doc):
             continue
 
         if el.get("type"):
-            types = set(x.strip() for x in el.get("type").split(","))
+            types = {x.strip() for x in el.get("type").split(",")}
             for t in types:
                 if t not in config.dfnTypes:
                     die(
-                        "Unknown type value '{0}' on {1}".format(t, outerHTML(el)),
+                        "Unknown type value '{}' on {}".format(t, outerHTML(el)),
                         el=el,
                     )
                     types.remove(t)
@@ -386,18 +384,18 @@ def addExplicitIndexes(doc):
 
         if el.get("data-link-spec"):
             # Yes, this is dumb. Accidental over-firing of a shortcut attribute. >_<
-            specs = set(x.strip() for x in el.get("data-link-spec").split(","))
+            specs = {x.strip() for x in el.get("data-link-spec").split(",")}
             for s in list(specs):
                 if s not in doc.refs.specs:
                     die(
-                        "Unknown spec name '{0}' on {1}".format(s, outerHTML(el)), el=el
+                        "Unknown spec name '{}' on {}".format(s, outerHTML(el)), el=el
                     )
                     specs.remove(s)
         else:
             specs = None
 
         if el.get("for"):
-            fors = set(x.strip() for x in el.get("for").split(","))
+            fors = {x.strip() for x in el.get("for").split(",")}
         else:
             fors = None
 
@@ -409,7 +407,7 @@ def addExplicitIndexes(doc):
                 export = False
             else:
                 die(
-                    "Unknown export value '{0}' (should be boolish) on {1}".format(
+                    "Unknown export value '{}' (should be boolish) on {}".format(
                         exportVal, outerHTML(el)
                     ),
                     el=el,
@@ -427,7 +425,7 @@ def addExplicitIndexes(doc):
             if ref.for_:
                 try:
                     disambInfo.append(
-                        "for {0}".format(", ".join(x.strip() for x in ref.for_))
+                        "for {}".format(", ".join(x.strip() for x in ref.for_))
                     )
                 except:
                     # todo: The TR version of Position triggers this
@@ -590,7 +588,7 @@ def addIndexOfExternallyDefinedTerms(doc, container):
                 for key, ref in sorted(refs.items(), key=lambda x: x[0]):
                     if key:
                         link = makeLink(
-                            ref.text, " ", E.small({}, "(for {0})".format(key))
+                            ref.text, " ", E.small({}, f"(for {key})")
                         )
                     else:
                         link = makeLink(ref.text)

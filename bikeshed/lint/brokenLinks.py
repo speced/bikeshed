@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import logging
 from ..h import *
 from ..messages import *

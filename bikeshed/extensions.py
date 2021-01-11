@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-
 from . import config
 from .h import *  # noqa: F401
 from .messages import *  # noqa: F401

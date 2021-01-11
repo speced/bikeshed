@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 from . import config
 from .config import simplifyText
 from .h import *

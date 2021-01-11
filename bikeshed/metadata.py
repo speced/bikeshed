@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-
 import copy
 import json
 import os
@@ -27,13 +24,13 @@ class MetadataManager:
     @property
     def vshortname(self):
         if self.level:
-            return "{0}-{1}".format(self.shortname, self.level)
+            return f"{self.shortname}-{self.level}"
         return self.shortname
 
     @property
     def displayVshortname(self):
         if self.level:
-            return "{0}-{1}".format(self.displayShortname, self.level)
+            return f"{self.displayShortname}-{self.level}"
         return self.displayShortname
 
     def __init__(self):
@@ -244,15 +241,15 @@ class MetadataManager:
         warnings = []
         for attrName, name in requiredSingularKeys.items():
             if getattr(self, attrName) is None:
-                errors.append("    Missing a '{0}' entry.".format(name))
+                errors.append(f"    Missing a '{name}' entry.")
         for attrName, name in recommendedSingularKeys.items():
             if getattr(self, attrName) is None:
                 warnings.append(
-                    "    You probably want to provide a '{0}' entry.".format(name)
+                    f"    You probably want to provide a '{name}' entry."
                 )
         for attrName, name in requiredMultiKeys.items():
             if len(getattr(self, attrName)) == 0:
-                errors.append("    Must provide at least one '{0}' entry.".format(name))
+                errors.append(f"    Must provide at least one '{name}' entry.")
         if warnings:
             warn("Some recommended metadata is missing:\n{0}", "\n".join(warnings))
         if errors:
@@ -276,7 +273,7 @@ class MetadataManager:
         macros["level"] = str(self.level)
         macros["vshortname"] = self.displayVshortname
         if self.status == "FINDING" and self.group:
-            macros["longstatus"] = "Finding of the {0}".format(self.group)
+            macros["longstatus"] = f"Finding of the {self.group}"
         elif self.status in config.shortToLongStatus:
             macros["longstatus"] = config.shortToLongStatus[self.status]
         else:
@@ -301,9 +298,9 @@ class MetadataManager:
             macros["abstract"] = ""
             macros["abstractattr"] = ""
         macros["year"] = self.date.year
-        macros["date"] = self.date.strftime("{0} %B %Y".format(self.date.day))
+        macros["date"] = self.date.strftime(f"{self.date.day} %B %Y")
         macros["date-dmmy"] = self.date.strftime(
-            "{0} %B %Y".format(self.date.day)
+            f"{self.date.day} %B %Y"
         )  # same as plain 'date'
         macros["cdate"] = self.date.strftime("%Y%m%d")
         macros["isodate"] = self.date.strftime("%Y-%m-%d")
@@ -311,10 +308,10 @@ class MetadataManager:
         macros["date-mmy"] = self.date.strftime("%B %Y")
         if isinstance(self.expires, date):
             macros["expires"] = self.expires.strftime(
-                "{0} %B %Y".format(self.expires.day)
+                f"{self.expires.day} %B %Y"
             )
             macros["expires-dmmy"] = self.expires.strftime(
-                "{0} %B %Y".format(self.expires.day)
+                f"{self.expires.day} %B %Y"
             )  # same as plain 'expires'
             macros["cexpires"] = self.expires.strftime("%Y%m%d")
             macros["isoexpires"] = self.expires.strftime("%Y-%m-%d")
@@ -322,7 +319,7 @@ class MetadataManager:
             macros["expires-mmy"] = self.expires.strftime("%B %Y")
         if self.deadline:
             macros["deadline"] = self.deadline.strftime(
-                "{0} %B %Y".format(self.deadline.day)
+                f"{self.deadline.day} %B %Y"
             )
             macros["isodeadline"] = self.deadline.strftime("%Y-%m-%d")
         if self.status in config.snapshotStatuses:
@@ -374,7 +371,7 @@ class MetadataManager:
             )
             macros[
                 "w3c-stylesheet-url"
-            ] = "https://www.w3.org/StyleSheets/TR/2016/W3C-{0}".format(shortStatus)
+            ] = f"https://www.w3.org/StyleSheets/TR/2016/W3C-{shortStatus}"
         if self.customWarningText is not None:
             macros["customwarningtext"] = "\n".join(
                 markdown.parse(self.customWarningText, self.indent)
@@ -619,7 +616,7 @@ def parseLinkDefaults(key, val, lineNum):
     defaultSpecs = defaultdict(list)
     for default in val.split(","):
         match = re.match(
-            r"^([\w\d-]+)  (?:\s+\( ({0}) (?:\s+(snapshot|current))? \) )  \s+(.*)$".format(
+            r"^([\w\d-]+)  (?:\s+\( ({}) (?:\s+(snapshot|current))? \) )  \s+(.*)$".format(
                 "|".join(config.dfnTypes.union(["dfn"]))
             ),
             default.strip(),
@@ -1238,7 +1235,7 @@ def join(*sources):
 
 
 @attr.s(slots=True, frozen=True)
-class Metadata(object):
+class Metadata:
     humanName = attr.ib()
     attrName = attr.ib()
     join = attr.ib()

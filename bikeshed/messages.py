@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import sys
 from collections import Counter
 import lxml.html
@@ -60,9 +58,9 @@ def linkerror(msg, *formatArgs, **namedArgs):
             lineNum = el.get("line-number")
         else:
             if el.get("bs-autolink-syntax"):
-                suffix = "\n{0}".format(el.get("bs-autolink-syntax"))
+                suffix = "\n{}".format(el.get("bs-autolink-syntax"))
             else:
-                suffix = "\n{0}".format(
+                suffix = "\n{}".format(
                     lxml.html.tostring(
                         namedArgs["el"], with_tail=False, encoding="unicode"
                     )
@@ -158,7 +156,7 @@ def printColor(text, color="white", *styles):
 
         colorNum = colorsConverter[color.lower()]
         styleNum = ";".join(str(stylesConverter[style.lower()]) for style in styles)
-        return "\033[{0};{1}m{text}\033[0m".format(styleNum, colorNum, text=text)
+        return f"\033[{styleNum};{colorNum}m{text}\033[0m"
     else:
         return text
 
@@ -167,17 +165,17 @@ def formatMessage(type, text, lineNum=None):
     if constants.printMode == "markup":
         text = text.replace("<", "&lt;")
         if type == "fatal":
-            return "<fatal>{0}</fatal>".format(text)
+            return f"<fatal>{text}</fatal>"
         elif type == "link":
-            return "<linkerror>{0}</linkerror>".format(text)
+            return f"<linkerror>{text}</linkerror>"
         elif type == "warning":
-            return "<warning>{0}</warning>".format(text)
+            return f"<warning>{text}</warning>"
         elif type == "message":
-            return "<message>{0}</message>".format(text)
+            return f"<message>{text}</message>"
         elif type == "success":
-            return "<final-success>{0}</final-success>".format(text)
+            return f"<final-success>{text}</final-success>"
         elif type == "failure":
-            return "<final-failure>{0}</final-failure>".format(text)
+            return f"<final-failure>{text}</final-failure>"
     else:
         if type == "message":
             return text
@@ -201,7 +199,7 @@ def formatMessage(type, text, lineNum=None):
             headingText = "WARNING"
             color = "light cyan"
         if lineNum is not None:
-            headingText = "LINE {0}".format(lineNum)
+            headingText = f"LINE {lineNum}"
         return printColor(headingText + ":", color, "bold") + " " + text
 
 

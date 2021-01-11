@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import re
 from .. import config
 from ..h import *
@@ -92,9 +90,9 @@ def transformProductionPlaceholders(doc):
                 except:
                     print(text)
                     raise
-                interior += " [{0},{1}]".format(rangeStart, rangeEnd)
-                el.set("data-lt", "<{0}>".format(term))
-            el.text = "<{0}>".format(interior)
+                interior += f" [{rangeStart},{rangeEnd}]"
+                el.set("data-lt", f"<{term}>")
+            el.text = f"<{interior}>"
             continue
         die(
             "Shorthand <<{0}>> does not match any recognized shorthand grammar.",
@@ -382,7 +380,7 @@ def biblioReplacer(match):
     else:
         type = "informative"
     if linkText is None:
-        linkText = "[{0}]".format(term)
+        linkText = f"[{term}]"
     attrs = {
         "data-lt": term,
         "data-link-type": "biblio",

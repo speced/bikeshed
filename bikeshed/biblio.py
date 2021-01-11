@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-
 import re
 from collections import defaultdict
 
@@ -12,7 +9,7 @@ from .messages import *
 
 
 @attr.s(slots=True)
-class BiblioEntry(object):
+class BiblioEntry:
     linkText = attr.ib(default=None)
     originalLinkText = attr.ib(default=None)
     title = attr.ib(default=None)
@@ -60,9 +57,9 @@ class BiblioEntry(object):
             str += "; et al. " if etAl else ". "
 
         if self.url:
-            str += "<a href='{0}'>{1}</a>. ".format(self.url, self.title)
+            str += f"<a href='{self.url}'>{self.title}</a>. "
         else:
-            str += "{0}. ".format(self.title)
+            str += f"{self.title}. "
 
         if self.preferredURL == "current" and self.current_url:
             pass
@@ -134,7 +131,7 @@ class SpecBasedBiblioEntry(BiblioEntry):
     """
 
     def __init__(self, spec, preferredURL=None):
-        super(SpecBasedBiblioEntry, self).__init__()
+        super().__init__()
         if preferredURL is None:
             preferredURL = constants.refStatus.snapshot
         self.spec = spec

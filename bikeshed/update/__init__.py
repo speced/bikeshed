@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-
 from .main import fixupDataFiles, update, updateReadonlyDataFiles
 from .manifest import createManifest
 

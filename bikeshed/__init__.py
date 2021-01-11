@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-
 def verify_python_version():
     import sys
     import platform
@@ -39,7 +36,7 @@ def verify_requirements():
     )
     if os.path.exists(requirements_file_path):
         requirements_met = True
-        with open(requirements_file_path, "r") as requirements_file:
+        with open(requirements_file_path) as requirements_file:
             requirements = [
                 line
                 for line in requirements_file.read().split("\n")
@@ -59,7 +56,7 @@ def verify_requirements():
                         requirements_met = False
                 except Exception:
                     print(
-                        "Package {} is not installed.".format(requirement.project_name)
+                        f"Package {requirement.project_name} is not installed."
                     )
                     requirements_met = False
         if not requirements_met:

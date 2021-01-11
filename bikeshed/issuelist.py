@@ -1,7 +1,4 @@
-# -*- coding: utf-8 -*-
-
 import glob
-import io
 import re
 import sys
 from .messages import *
@@ -28,7 +25,7 @@ def printIssueList(infilename=None, outfilename=None):
     else:
         for suffix in [".txt", "txt", ""]:
             try:
-                infile = io.open(infilename + suffix, "r", encoding="utf-8")
+                infile = open(infilename + suffix, encoding="utf-8")
                 infilename += suffix
                 break
             except Exception:
@@ -51,7 +48,7 @@ def printIssueList(infilename=None, outfilename=None):
         outfile = sys.stdout
     else:
         try:
-            outfile = io.open(outfilename, "w", encoding="utf-8")
+            outfile = open(outfilename, "w", encoding="utf-8")
         except Exception as e:
             die("Couldn't write to outfile:\n{0}", str(e))
             return
@@ -136,10 +133,10 @@ def extractHeaderInfo(lines, infilename):
                 status = "LCWD"
         if ed is None:
             shortname = match.group(2)
-            ed = "http://dev.w3.org/csswg/{}/".format(shortname)
+            ed = f"http://dev.w3.org/csswg/{shortname}/"
         if date is None:
             cdate = match.group(3)
-            date = "{0}-{1}-{2}".format(
+            date = "{}-{}-{}".format(
                 *re.match(r"(\d{4})(\d\d)(\d\d)", cdate).groups()
             )
     else:
@@ -275,7 +272,7 @@ def printIssues(outfile, lines):
         issue = re.sub(r"((http|https):\S+)", r"<a href='\1'>\1</a>", issue)
 
         # And print it
-        outfile.write("<pre class='{0}' id='issue-{1}'>\n".format(code, index))
+        outfile.write(f"<pre class='{code}' id='issue-{index}'>\n")
         outfile.write(issue)
         outfile.write("</pre>\n")
 

@@ -1,5 +1,3 @@
-# coding=utf-8
-
 # Display constants
 VERTICAL_SEPARATION = 8
 ARC_RADIUS = 10
@@ -38,7 +36,7 @@ def doubleenumerate(seq):
         yield i, i - length, item
 
 
-class DiagramItem(object):
+class DiagramItem:
     def __init__(self, name, attrs=None, text=None):
         self.name = name
         # up = distance it projects above the entry line
@@ -296,7 +294,7 @@ class OptionalSequence(DiagramItem):
         if len(items) <= 1:
             return Sequence(*items)
         else:
-            return super(OptionalSequence, cls).__new__(cls, *items)
+            return super().__new__(cls, *items)
 
     def __init__(self, *items):
         DiagramItem.__init__(self, "g")

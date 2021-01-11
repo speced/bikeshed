@@ -39,7 +39,7 @@ class DefaultOrderedDict(OrderedDict):
         return type(self)(self.default_factory, copy.deepcopy(list(self.items())))
 
     def __repr__(self):
-        return "OrderedDefaultDict(%s, %s)" % (
+        return "OrderedDefaultDict({}, {})".format(
             self.default_factory,
             OrderedDict.__repr__(self),
         )

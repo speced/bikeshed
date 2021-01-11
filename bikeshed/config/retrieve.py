@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-
 import io
 import os
 
@@ -10,7 +7,7 @@ from .main import scriptPath
 from .status import splitStatus
 
 
-class DataFileRequester(object):
+class DataFileRequester:
     def __init__(self, type=None, fallback=None):
         self.type = type
         if self.type not in ("readonly", "latest"):
@@ -25,23 +22,22 @@ class DataFileRequester(object):
         location = self._buildPath(segs=segs, fileType=fileType)
         try:
             if str:
-                with io.open(location, "r", encoding="utf-8") as fh:
+                with open(location, encoding="utf-8") as fh:
                     return fh.read()
             else:
-                return io.open(location, "r", encoding="utf-8")
-        except IOError:
+                return open(location, encoding="utf-8")
+        except OSError:
             if self.fallback:
                 try:
                     return self.fallback.fetch(*segs, str=str, okayToFail=okayToFail)
-                except IOError:
+                except OSError:
                     return self._fail(location, str, okayToFail)
             return self._fail(location, str, okayToFail)
 
     def walkFiles(self, *segs, **kwargs):
         fileType = kwargs.get("type", self.type)
         for root, dirs, files in os.walk(self._buildPath(segs, fileType=fileType)):
-            for file in files:
-                yield file
+            yield from files
 
     def _buildPath(self, segs, fileType=None):
         if fileType is None:
@@ -57,7 +53,7 @@ class DataFileRequester(object):
                 return ""
             else:
                 return io.StringIO("")
-        raise IOError("Couldn't find file '{0}'".format(location))
+        raise OSError(f"Couldn't find file '{location}'")
 
 
 defaultRequester = DataFileRequester(
@@ -84,8 +80,8 @@ def retrieveBoilerplateFile(doc, name, group=None, status=None, error=True):
     def boilerplatePath(*segs):
         return scriptPath("boilerplate", *segs)
 
-    statusFile = "{0}-{1}.include".format(name, status)
-    genericFile = "{0}.include".format(name)
+    statusFile = f"{name}-{status}.include"
+    genericFile = f"{name}.include"
     sources = []
     if searchLocally:
         sources.append(doc.inputSource.relative(statusFile))  # Can be None.
@@ -119,7 +115,7 @@ def retrieveBoilerplateFile(doc, name, group=None, status=None, error=True):
         if source is not None:
             try:
                 return source.read().content
-            except IOError:
+            except OSError:
                 # That input doesn't exist.
                 pass
     else:

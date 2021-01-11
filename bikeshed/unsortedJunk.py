@@ -1,7 +1,3 @@
-# -*- coding: utf-8 -*-
-
-
-import io
 import json
 import logging
 import re
@@ -190,7 +186,7 @@ def canonicalizeShortcuts(doc):
         "algorithm": "data-algorithm",
         "ignore": "data-var-ignore",
     }
-    for el in findAll(",".join("[{0}]".format(attr) for attr in attrFixup.keys()), doc):
+    for el in findAll(",".join(f"[{attr}]" for attr in attrFixup.keys()), doc):
         for attr, fixedAttr in attrFixup.items():
             if el.get(attr) is not None:
                 el.set(fixedAttr, el.get(attr))
@@ -497,7 +493,7 @@ def fixInterDocumentReferences(doc):
                         + "but that spec is versioned as {1}. "
                         + "Please choose a versioned spec name.",
                         spec,
-                        config.englishFromList("'{0}'".format(x) for x in vNames),
+                        config.englishFromList(f"'{x}'" for x in vNames),
                         outerHTML(el),
                         el=el,
                     )
@@ -539,7 +535,7 @@ def fillInterDocumentReferenceFromShepherd(doc, el, spec, section):
                 "Multiple headings with id '{0}' for spec '{1}'. Please specify:\n{2}",
                 section,
                 spec,
-                "\n".join("  [[{0}]]".format(spec + x) for x in heading),
+                "\n".join("  [[{}]]".format(spec + x) for x in heading),
                 el=el,
             )
             return
@@ -743,7 +739,7 @@ def classifyDfns(doc, dfns):
                 el.set(
                     "data-alternate-id",
                     config.simplifyText(
-                        "dom-{_for}-{id}".format(_for=singleFor, id=primaryDfnText)
+                        f"dom-{singleFor}-{primaryDfnText}"
                     ),
                 )
                 if primaryDfnText.startswith("[["):
@@ -752,12 +748,12 @@ def classifyDfns(doc, dfns):
                     id += "-slot"
                     el.set(
                         "data-alternate-id",
-                        "{0}-slot".format(el.get("data-alternate-id")),
+                        "{}-slot".format(el.get("data-alternate-id")),
                     )
             else:
                 if dfnFor:
                     id = config.simplifyText(
-                        "{_for}-{id}".format(_for=singleFor, id=primaryDfnText)
+                        f"{singleFor}-{primaryDfnText}"
                     )
                 else:
                     id = config.simplifyText(primaryDfnText)
@@ -955,10 +951,10 @@ def verifyUsageOfAllLocalBiblios(doc):
     were used in the spec,
     so you can remove entries when they're no longer necessary.
     """
-    usedBiblioKeys = set(
+    usedBiblioKeys = {
         x.lower()
         for x in list(doc.normativeRefs.keys()) + list(doc.informativeRefs.keys())
-    )
+    }
     localBiblios = [
         b["linkText"].lower()
         for bs in doc.refs.biblios.values()
@@ -972,7 +968,7 @@ def verifyUsageOfAllLocalBiblios(doc):
     if unusedBiblioKeys:
         warn(
             "The following locally-defined biblio entries are unused and can be removed:\n{0}",
-            "\n".join("  * {0}".format(b) for b in unusedBiblioKeys),
+            "\n".join(f"  * {b}" for b in unusedBiblioKeys),
         )
 
 
@@ -1081,7 +1077,7 @@ def decorateAutolink(doc, el, linkType, linkText, ref):
     if el.get("id") is None:
         _, _, id = ref.url.partition("#")
         if id:
-            el.set("id", "ref-for-{0}".format(id))
+            el.set("id", f"ref-for-{id}")
             el.set("data-silently-dedup", "")
 
     # Get all the values that the type expands to, add it as a title.
@@ -1132,20 +1128,20 @@ def processIssuesAndExamples(doc):
             numberMatch = re.match(r"\s*(\d+)\s*$", remoteIssueID)
             remoteIssueURL = None
             if githubMatch:
-                remoteIssueURL = "https://github.com/{0}/{1}/issues/{2}".format(
+                remoteIssueURL = "https://github.com/{}/{}/issues/{}".format(
                     *githubMatch.groups()
                 )
                 if doc.md.inlineGithubIssues:
                     el.set(
                         "data-inline-github",
-                        "{0} {1} {2}".format(*githubMatch.groups()),
+                        "{} {} {}".format(*githubMatch.groups()),
                     )
             elif numberMatch and doc.md.repository.type == "github":
                 remoteIssueURL = doc.md.repository.formatIssueUrl(numberMatch.group(1))
                 if doc.md.inlineGithubIssues:
                     el.set(
                         "data-inline-github",
-                        "{0} {1} {2}".format(
+                        "{} {} {}".format(
                             doc.md.repository.user,
                             doc.md.repository.repo,
                             numberMatch.group(1),
@@ -1425,7 +1421,7 @@ def hackyLineNumbers(lines):
     for line in lines:
         line.text = re.sub(
             r"(^|[^<])(<[\w-]+)([ >])",
-            r"\1\2 line-number={0}\3".format(line.i),
+            fr"\1\2 line-number={line.i}\3",
             line.text,
         )
     return lines
@@ -1537,12 +1533,12 @@ def inlineRemoteIssues(doc):
 
     responses = json.loads(doc.dataFile.fetch("github-issues.json", str=True))
     for i, issue in enumerate(inlineIssues):
-        issueUserRepo = "{0}/{1}".format(*issue)
-        key = "{0}/{1}".format(issueUserRepo, issue.num)
-        href = "https://github.{0}/{1}/issues/{2}".format(
+        issueUserRepo = "{}/{}".format(*issue)
+        key = f"{issueUserRepo}/{issue.num}"
+        href = "https://github.{}/{}/issues/{}".format(
             doc.md.repository.ns, issueUserRepo, issue.num
         )
-        url = "{0}/repos/{1}/issues/{2}".format(
+        url = "{}/repos/{}/issues/{}".format(
             doc.md.repository.api, issueUserRepo, issue.num
         )
         say("Fetching issue {:-3d}/{:d}: {:s}".format(i + 1, len(inlineIssues), key))
@@ -1627,7 +1623,7 @@ def inlineRemoteIssues(doc):
                 el,
                 E.a(
                     {"href": href, "class": "marker"},
-                    "Issue #{0} on GitHub: “{1}”".format(data["number"], data["title"]),
+                    "Issue #{} on GitHub: “{}”".format(data["number"], data["title"]),
                 ),
                 *parseHTML(data["body_html"]),
             )
@@ -1636,7 +1632,7 @@ def inlineRemoteIssues(doc):
             el.tag = "div"
     # Save the cache for later
     try:
-        with io.open(
+        with open(
             config.scriptPath("spec-data", "github-issues.json"), "w", encoding="utf-8"
         ) as f:
             f.write(json.dumps(responses, ensure_ascii=False, indent=2, sort_keys=True))

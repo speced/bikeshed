@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import os
 import urllib.parse
 from collections import defaultdict
@@ -48,11 +46,11 @@ def update(path, dryRun=False):
                 _, _, referencedID = ref.url.partition("#")
                 referencedID = urllib.parse.unquote(referencedID)
                 referencedShortname = ref.spec
-                referencingLinks = findAll("[href='{0}']".format(ref.url), doc)
+                referencingLinks = findAll(f"[href='{ref.url}']", doc)
                 referencingIDs = [
                     link.get("id") for link in referencingLinks if link.get("id")
                 ]
-                referencingURLs = ["{0}#{1}".format(url, id) for id in referencingIDs]
+                referencingURLs = [f"{url}#{id}" for id in referencingIDs]
                 backrefs[referencedShortname][referencedID].append(
                     {"shortname": referencingShortname, "urls": referencingURLs}
                 )

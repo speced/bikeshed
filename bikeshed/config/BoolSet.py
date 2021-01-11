@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-
 import collections
 
 
@@ -54,4 +51,4 @@ class BoolSet(collections.MutableMapping):
         else:
             falseVals = [k for k, v in self._internal.items() if v is False]
             vrepr = "{" + ", ".join(repr(x) + ":False" for x in falseVals) + "}"
-        return "BoolSet({0}, default={1})".format(vrepr, self.default)
+        return f"BoolSet({vrepr}, default={self.default})"

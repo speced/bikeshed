@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-
 import copy
 
 import attr
@@ -9,7 +6,7 @@ from .utils import stripLineBreaks
 
 
 @attr.s(slots=True)
-class RefWrapper(object):
+class RefWrapper:
     # Refs don't contain their own name, so I don't have to copy as much when there are multiple linkTexts
     # This wraps that, producing an object that looks like it has a text property.
     # It also makes all the ref dict keys look like object attributes.

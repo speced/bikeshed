@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-
 from ..h import (
     findAll,
     textContent,
@@ -108,9 +105,7 @@ def createHTML(doc, blockEl, testNames, testData):
                     E.a(
                         {
                             "title": testName,
-                            "href": "{0}://web-platform-tests.live/{1}".format(
-                                liveTestScheme, testName
-                            ),
+                            "href": f"{liveTestScheme}://web-platform-tests.live/{testName}",
                             "class": "wpt-live",
                         },
                         E.small("(live test)"),

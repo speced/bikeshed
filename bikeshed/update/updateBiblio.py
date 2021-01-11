@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-import io
 import json
 import re
 import os
@@ -24,9 +21,9 @@ def update(path, dryRun=False):
         # Save each group to a file
         for group, biblios in groupedBiblios.items():
             try:
-                p = os.path.join(path, "biblio", "biblio-{0}.data".format(group))
+                p = os.path.join(path, "biblio", f"biblio-{group}.data")
                 writtenPaths.add(p)
-                with io.open(p, "w", encoding="utf-8") as fh:
+                with open(p, "w", encoding="utf-8") as fh:
                     writeBiblioFile(fh, biblios)
             except Exception as e:
                 die("Couldn't save biblio database to disk.\n{0}", e)
@@ -73,7 +70,7 @@ def update(path, dryRun=False):
         try:
             p = os.path.join(path, "biblio-keys.json")
             writtenPaths.add(p)
-            with io.open(p, "w", encoding="utf-8") as fh:
+            with open(p, "w", encoding="utf-8") as fh:
                 fh.write(
                     str(
                         json.dumps(
@@ -90,7 +87,7 @@ def update(path, dryRun=False):
         try:
             p = os.path.join(path, "biblio-numeric-suffixes.json")
             writtenPaths.add(p)
-            with io.open(p, "w", encoding="utf-8") as fh:
+            with open(p, "w", encoding="utf-8") as fh:
                 fh.write(
                     str(
                         json.dumps(

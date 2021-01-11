@@ -1,7 +1,4 @@
-# -*- coding: utf-8 -*-
-
-
-class Functor(object):
+class Functor:
     # Pointed and Co-Pointed by default;
     # override these yourself if you need to.
     def __init__(self, val):

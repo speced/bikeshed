@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import json
 from collections import OrderedDict
 from datetime import datetime
@@ -218,7 +216,7 @@ def validateCanIUseURLs(doc, elements):
         )
 
 
-class CanIUseManager(object):
+class CanIUseManager:
     def __init__(self, dataFile):
         self.dataFile = dataFile
         data = json.loads(
@@ -240,7 +238,7 @@ class CanIUseManager(object):
             return
         data = json.loads(
             self.dataFile.fetch(
-                "caniuse", "feature-{0}.json".format(featureName), str=True
+                "caniuse", f"feature-{featureName}.json", str=True
             ),
             object_pairs_hook=OrderedDict,
         )

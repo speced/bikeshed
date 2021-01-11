@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-import io
 import json
 import os
 import requests
@@ -34,7 +32,7 @@ def update(path, dryRun=False):
                 os.makedirs(mdnSpecLinksDir)
             p = os.path.join(path, "mdn.json")
             writtenPaths.add(p)
-            with io.open(p, "w", encoding="utf-8") as fh:
+            with open(p, "w", encoding="utf-8") as fh:
                 fh.write(
                     json.dumps(data, indent=1, ensure_ascii=False, sort_keys=False)
                 )
@@ -59,7 +57,7 @@ def update(path, dryRun=False):
                         e,
                     )
                     return
-                with io.open(p, "w", encoding="utf-8") as fh:
+                with open(p, "w", encoding="utf-8") as fh:
                     fh.write(fileContents)
         except Exception as e:
             die("Couldn't save MDN Spec Links data to disk.\n{0}", e)

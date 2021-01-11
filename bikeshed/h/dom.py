@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import hashlib
 import html5lib
 import re
@@ -54,7 +52,7 @@ def escapeCSSIdent(val):
             or (i == 0 and 0x30 <= code <= 0x39)
             or (i == 1 and 0x30 <= code <= 0x39 and firstCode == 0x2D)
         ):
-            ident += r"\{0:x} ".format(code)
+            ident += fr"\{code:x} "
         elif (
             code >= 0x80
             or code == 0x2D
@@ -65,7 +63,7 @@ def escapeCSSIdent(val):
         ):
             ident += chr(code)
         else:
-            ident += r"\{0}".format(chr(code))
+            ident += r"\{}".format(chr(code))
     return ident
 
 
@@ -76,7 +74,7 @@ def escapeUrlFrag(val):
             result += char
         else:
             for b in char.encode("utf-8"):
-                result += "%{:0>2x}".format(b)
+                result += f"%{b:0>2x}"
     return result
 
 
@@ -451,8 +449,7 @@ def nodeIter(el, clear=False, skipOddNodes=True):
         if skipOddNodes and isOddNode(c):
             continue
         # yield from nodeIter(c, clear=clear, skipOddNodes=skipOddNodes)
-        for grandChild in nodeIter(c, clear=clear, skipOddNodes=skipOddNodes):
-            yield grandChild
+        yield from nodeIter(c, clear=clear, skipOddNodes=skipOddNodes)
     if tail is not None:
         yield tail
 
@@ -526,7 +523,7 @@ def addClass(el, cls):
     elif hasClass(el, cls):
         pass
     else:
-        el.set("class", "{0} {1}".format(el.get("class"), cls))
+        el.set("class", "{} {}".format(el.get("class"), cls))
 
 
 _classMap = {}
@@ -724,9 +721,7 @@ def replaceAwkwardCSSShorthands(text):
         escape, text = match.groups()
         if escape:
             return escapeHTML(match.group(0)[1:])
-        return "<fake-production-placeholder class=production bs-autolink-syntax='{0}'>{1}</fake-production-placeholder>".format(
-            syntaxAttr, text
-        )
+        return f"<fake-production-placeholder class=production bs-autolink-syntax='{syntaxAttr}'>{text}</fake-production-placeholder>"
 
     text = re.sub(r"(\\)?<<([^>\n]+)>>", replaceProduction, text)
 
@@ -739,9 +734,7 @@ def replaceAwkwardCSSShorthands(text):
         escape, text = match.groups()
         if escape:
             return escapeHTML(match.group(0)[1:])
-        return "<fake-maybe-placeholder bs-autolink-syntax='{0}'>{1}</fake-maybe-placeholder>".format(
-            syntaxAttr, text
-        )
+        return f"<fake-maybe-placeholder bs-autolink-syntax='{syntaxAttr}'>{text}</fake-maybe-placeholder>"
 
     text = re.sub(r"(\\)?''([^=\n]+?)''", replaceMaybe, text)
     return text
@@ -810,7 +803,7 @@ def dedupIDs(doc):
                     el=el,
                 )
             for x in ints:
-                altId = "{0}{1}".format(dupeId, circledDigits(x))
+                altId = "{}{}".format(dupeId, circledDigits(x))
                 if altId not in ids:
                     el.set("id", safeID(doc, altId))
                     ids[altId].append(el)

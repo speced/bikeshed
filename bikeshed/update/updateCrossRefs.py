@@ -1,7 +1,4 @@
-# -*- coding: utf-8 -*-
-
 import certifi
-import io
 import json
 import re
 import tenacity
@@ -76,16 +73,16 @@ def update(path, dryRun=False):
         try:
             p = os.path.join(path, "specs.json")
             writtenPaths.add(p)
-            with io.open(p, "w", encoding="utf-8") as f:
+            with open(p, "w", encoding="utf-8") as f:
                 f.write(json.dumps(specs, ensure_ascii=False, indent=2, sort_keys=True))
         except Exception as e:
             die("Couldn't save spec database to disk.\n{0}", e)
             return
         try:
             for spec, specHeadings in headings.items():
-                p = os.path.join(path, "headings", "headings-{0}.json".format(spec))
+                p = os.path.join(path, "headings", f"headings-{spec}.json")
                 writtenPaths.add(p)
-                with io.open(p, "w", encoding="utf-8") as f:
+                with open(p, "w", encoding="utf-8") as f:
                     f.write(
                         json.dumps(
                             specHeadings, ensure_ascii=False, indent=2, sort_keys=True
@@ -102,7 +99,7 @@ def update(path, dryRun=False):
         try:
             p = os.path.join(path, "methods.json")
             writtenPaths.add(p)
-            with io.open(p, "w", encoding="utf-8") as f:
+            with open(p, "w", encoding="utf-8") as f:
                 f.write(
                     json.dumps(methods, ensure_ascii=False, indent=2, sort_keys=True)
                 )
@@ -112,7 +109,7 @@ def update(path, dryRun=False):
         try:
             p = os.path.join(path, "fors.json")
             writtenPaths.add(p)
-            with io.open(p, "w", encoding="utf-8") as f:
+            with open(p, "w", encoding="utf-8") as f:
                 f.write(json.dumps(fors, ensure_ascii=False, indent=2, sort_keys=True))
         except Exception as e:
             die("Couldn't save fors database to disk.\n{0}", e)
@@ -241,7 +238,7 @@ def addToHeadings(rawAnchor, specHeadings, spec):
     if uri[0] == "#":
         # Either single-page spec, or link on the top page of a multi-page spec
         heading = {
-            "url": spec["{0}_url".format(rawAnchor["status"])] + uri,
+            "url": spec["{}_url".format(rawAnchor["status"])] + uri,
             "number": rawAnchor["name"]
             if re.match(r"[\d.]+$", rawAnchor["name"])
             else "",
@@ -271,7 +268,7 @@ def addToHeadings(rawAnchor, specHeadings, spec):
             fragment = "#"
         shorthand = page + fragment
         heading = {
-            "url": spec["{0}_url".format(rawAnchor["status"])] + uri,
+            "url": spec["{}_url".format(rawAnchor["status"])] + uri,
             "number": rawAnchor["name"]
             if re.match(r"[\d.]+$", rawAnchor["name"])
             else "",
@@ -309,7 +306,7 @@ def addToAnchors(rawAnchor, anchors, spec):
         "level": int(spec["level"]),
         "export": rawAnchor.get("export", False),
         "normative": rawAnchor.get("normative", False),
-        "url": spec["{0}_url".format(rawAnchor["status"])] + rawAnchor["uri"],
+        "url": spec["{}_url".format(rawAnchor["status"])] + rawAnchor["uri"],
         "for": rawAnchor.get("for", []),
     }
     for text in rawAnchor["linking_text"]:
@@ -387,9 +384,9 @@ def writeAnchorsFile(anchors, path):
         group = config.groupFromKey(key)
         groupedEntries[group][key] = entries
     for group, anchors in groupedEntries.items():
-        p = os.path.join(path, "anchors", "anchors-{0}.data".format(group))
+        p = os.path.join(path, "anchors", f"anchors-{group}.data")
         writtenPaths.add(p)
-        with io.open(p, "w", encoding="utf-8") as fh:
+        with open(p, "w", encoding="utf-8") as fh:
             for key, entries in sorted(anchors.items(), key=lambda x: x[0]):
                 for e in entries:
                     fh.write(key + "\n")

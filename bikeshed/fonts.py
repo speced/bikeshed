@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-import io
 import re
 from itertools import *
 
@@ -63,10 +60,10 @@ This defines a font capable of rendering text composed of "A", "B", "a", "b", an
 """
 
 
-class Font(object):
+class Font:
     def __init__(self, fontfilename=config.scriptPath("bigblocks.bsfont")):
         try:
-            lines = io.open(fontfilename, "r", encoding="utf-8").readlines()
+            lines = open(fontfilename, encoding="utf-8").readlines()
         except Exception as e:
             die("Couldn't find font file “{0}”:\n{1}", fontfilename, e)
         self.metadata, lines = parseMetadata(lines)
@@ -174,14 +171,14 @@ def getInputLines(inputFilename):
         if inputFilename == "-":
             lines = list(sys.stdin.readlines())
         else:
-            lines = io.open(inputFilename, "r", encoding="utf-8").readlines()
+            lines = open(inputFilename, encoding="utf-8").readlines()
     except OSError:
         die(
             "Couldn't find the input file at the specified location '{0}'.",
             inputFilename,
         )
         return []
-    except IOError:
+    except OSError:
         die("Couldn't open the input file '{0}'.", inputFilename)
         return []
     return lines, inputFilename
@@ -194,7 +191,7 @@ def writeOutputLines(outputFilename, inputFilename, lines):
         if outputFilename == "-":
             sys.stdout.write("".join(lines))
         else:
-            with io.open(outputFilename, "w", encoding="utf-8") as f:
+            with open(outputFilename, "w", encoding="utf-8") as f:
                 f.write("".join(lines))
     except Exception as e:
         die(

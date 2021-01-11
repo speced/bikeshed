@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-
 from .main import englishFromList
 from ..messages import *
 
@@ -276,7 +273,7 @@ def canonicalizeStatus(rawStatus, group):
 
         def formatStatusSet(statuses):
             return ", ".join(
-                sorted(set([status.split("/")[-1] for status in statuses]))
+                sorted({status.split("/")[-1] for status in statuses})
             )
 
         msg = "You used Status: {0}, but {1} limited to these statuses: {2}."
@@ -342,23 +339,17 @@ def canonicalizeStatus(rawStatus, group):
         # Was the error because the megagroup doesn't exist?
         if possibleMgs:
             if megaGroup not in megaGroups:
-                msg = "Status metadata specified an unrecognized '{0}' organization.".format(
-                    megaGroup
-                )
+                msg = f"Status metadata specified an unrecognized '{megaGroup}' organization."
             else:
-                msg = "Status '{0}' can't be used with the org '{1}'.".format(
-                    status, megaGroup
-                )
+                msg = f"Status '{status}' can't be used with the org '{megaGroup}'."
             if "" in possibleMgs:
                 if len(possibleMgs) == 1:
-                    msg += " That status must be used without an org at all, like `Status: {0}`".format(
-                        status
-                    )
+                    msg += f" That status must be used without an org at all, like `Status: {status}`"
                 else:
-                    msg += " That status can only be used with the org{0} {1}, or without an org at all.".format(
+                    msg += " That status can only be used with the org{} {}, or without an org at all.".format(
                         "s" if len(possibleMgs) > 1 else "",
                         englishFromList(
-                            "'{0}'".format(x) for x in possibleMgs if x != ""
+                            f"'{x}'" for x in possibleMgs if x != ""
                         ),
                     )
             else:
@@ -367,19 +358,15 @@ def canonicalizeStatus(rawStatus, group):
                         possibleMgs[0], status
                     )
                 else:
-                    msg += " That status can only be used with the orgs {0}.".format(
-                        englishFromList("'{0}'".format(x) for x in possibleMgs)
+                    msg += " That status can only be used with the orgs {}.".format(
+                        englishFromList(f"'{x}'" for x in possibleMgs)
                     )
 
         else:
             if megaGroup not in megaGroups:
-                msg = "Unknown Status metadata '{0}'. Check the docs for valid Status values.".format(
-                    canonStatus
-                )
+                msg = f"Unknown Status metadata '{canonStatus}'. Check the docs for valid Status values."
             else:
-                msg = "Status '{0}' can't be used with the org '{1}'. Check the docs for valid Status values.".format(
-                    status, megaGroup
-                )
+                msg = f"Status '{status}' can't be used with the org '{megaGroup}'. Check the docs for valid Status values."
         die("{0}", msg)
         return canonStatus
 
@@ -399,23 +386,21 @@ def canonicalizeStatus(rawStatus, group):
 
     # Group isn't in any compatible org, so suggest prefixing.
     if possibleMgs:
-        msg = "You used Status: {0}, but that's limited to the {1} org{2}".format(
+        msg = "You used Status: {}, but that's limited to the {} org{}".format(
             rawStatus,
-            englishFromList("'{0}'".format(mg) for mg in possibleMgs),
+            englishFromList(f"'{mg}'" for mg in possibleMgs),
             "s" if len(possibleMgs) > 1 else "",
         )
         if group:
-            msg += ", and your group '{0}' isn't recognized as being in {1}.".format(
+            msg += ", and your group '{}' isn't recognized as being in {}.".format(
                 group, "any of those orgs" if len(possibleMgs) > 1 else "that org"
             )
             msg += " If this is wrong, please file a Bikeshed issue to categorize your group properly, and/or try:\n"
-            msg += "\n".join("Status: {0}/{1}".format(mg, status) for mg in possibleMgs)
+            msg += "\n".join(f"Status: {mg}/{status}" for mg in possibleMgs)
         else:
             msg += ", and you don't have a Group metadata. Please declare your Group, or check the docs for statuses that can be used by anyone."
     else:
-        msg = "Unknown Status metadata '{0}'. Check the docs for valid Status values.".format(
-            canonStatus
-        )
+        msg = f"Unknown Status metadata '{canonStatus}'. Check the docs for valid Status values."
     die("{0}", msg)
     return canonStatus
 

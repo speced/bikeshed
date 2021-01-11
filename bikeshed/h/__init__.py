@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 from .serializer import Serializer
 
 from .dom import addClass

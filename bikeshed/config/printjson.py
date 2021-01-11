@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-
 from ..messages import printColor
 from ..h import outerHTML, isElement
 
