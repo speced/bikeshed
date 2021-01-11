@@ -191,65 +191,63 @@ def tokenizeLines(
             tokens.append({"type": "raw", "prefixlen": float("inf"), "line": line})
             continue
 
-        line = line.text.strip()
+        lineText = line.text.strip()
 
-        if line == "":
+        if lineText == "":
             token = {
                 "type": "blank",
             }
         # FIXME: Detect the heading ID from heading lines
-        elif "headings" in features and re.match(r"={3,}\s*$", line):
+        elif "headings" in features and re.match(r"={3,}\s*$", lineText):
             # h1 underline
-            match = re.match(r"={3,}\s$", line)
+            match = re.match(r"={3,}\s$", lineText)
             token = {"type": "equals-line"}
-        elif "headings" in features and re.match(r"-{3,}\s*$", line):
+        elif "headings" in features and re.match(r"-{3,}\s*$", lineText):
             # h2 underline
-            match = re.match(r"-{3,}\s*$", line)
+            match = re.match(r"-{3,}\s*$", lineText)
             token = {"type": "dash-line"}
-        elif "headings" in features and re.match(
-            r"(#{1,5})\s+(.+?)(\1\s*\{#[^ }]+\})?\s*$", line
-        ):
+        elif "headings" in features and re.match(r"(#{1,5})\s+(.+?)(\1\s*\{#[^ }]+\})?\s*$", lineText):
             # single-line heading
-            match = re.match(r"(#{1,5})\s+(.+?)(\1\s*\{#[^ }]+\})?\s*$", line)
+            match = re.match(r"(#{1,5})\s+(.+?)(\1\s*\{#[^ }]+\})?\s*$", lineText)
             level = len(match.group(1)) + 1
             token = {"type": "heading", "text": match.group(2).strip(), "level": level}
-            match = re.search(r"\{#([^ }]+)\}\s*$", line)
+            match = re.search(r"\{#([^ }]+)\}\s*$", lineText)
             if match:
                 token["id"] = match.group(1)
-        elif re.match(r"((\*\s*){3,})$|((-\s*){3,})$|((_\s*){3,})$", line):
+        elif re.match(r"((\*\s*){3,})$|((-\s*){3,})$|((_\s*){3,})$", lineText):
             token = {"type": "rule"}
-        elif re.match(r"-?\d+\.\s", line):
-            match = re.match(r"(-?\d+)\.\s+(.*)", line)
+        elif re.match(r"-?\d+\.\s", lineText):
+            match = re.match(r"(-?\d+)\.\s+(.*)", lineText)
             token = {
                 "type": "numbered",
                 "text": match.group(2),
                 "num": int(match.group(1)),
             }
-        elif re.match(r"-?\d+\.$", line):
-            token = {"type": "numbered", "text": "", "num": int(line[:-1])}
-        elif re.match(r"[*+-]\s", line):
-            match = re.match(r"[*+-]\s+(.*)", line)
+        elif re.match(r"-?\d+\.$", lineText):
+            token = {"type": "numbered", "text": "", "num": int(lineText[:-1])}
+        elif re.match(r"[*+-]\s", lineText):
+            match = re.match(r"[*+-]\s+(.*)", lineText)
             token = {"type": "bulleted", "text": match.group(1)}
-        elif re.match(r"[*+-]$", line):
+        elif re.match(r"[*+-]$", lineText):
             token = {"type": "bulleted", "text": ""}
-        elif re.match(r":{1,2}\s+", line):
-            match = re.match(r"(:{1,2})\s+(.*)", line)
+        elif re.match(r":{1,2}\s+", lineText):
+            match = re.match(r"(:{1,2})\s+(.*)", lineText)
             type = "dt" if len(match.group(1)) == 1 else "dd"
             token = {"type": type, "text": match.group(2)}
-        elif re.match(r":{1,2}$", line):
-            match = re.match(r"(:{1,2})", line)
+        elif re.match(r":{1,2}$", lineText):
+            match = re.match(r"(:{1,2})", lineText)
             type = "dt" if len(match.group(1)) == 1 else "dd"
             token = {"type": type, "text": ""}
-        elif re.match(r">", line):
-            match = re.match(r">\s?(.*)", line)
+        elif re.match(r">", lineText):
+            match = re.match(r">\s?(.*)", lineText)
             token = {"type": "blockquote", "text": match.group(1)}
-        elif re.match(r"<", line):
-            if re.match(r"<<|<\{", line) or inlineElementStart(line):
-                token = {"type": "text", "text": line}
+        elif re.match(r"<", lineText):
+            if re.match(r"<<|<\{", lineText) or inlineElementStart(lineText):
+                token = {"type": "text", "text": lineText}
             else:
                 token = {"type": "htmlblock"}
         else:
-            token = {"type": "text", "text": line}
+            token = {"type": "text", "text": lineText}
 
         if token["type"] == "blank":
             token["prefixlen"] = float("inf")
