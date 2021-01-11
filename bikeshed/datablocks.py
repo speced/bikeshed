@@ -747,7 +747,7 @@ def processAnchors(anchors, doc, lineNum=None):
             else:
                 spec = shortname
         elif spec and not shortname:
-            match = re.match("(.*)-(\d+)$", spec)
+            match = re.match(r"(.*)-(\d+)$", spec)
             if match:
                 shortname = match.group(1)
                 level = match.group(2)
@@ -1069,7 +1069,7 @@ def parseInfoTree(lines, indent=4, lineNum=0):
             thisLine = None
         if line.strip() == "":
             continue
-        ws, text = re.match("(\s*)(.*)", line).groups()
+        ws, text = re.match(r"(\s*)(.*)", line).groups()
         if text.startswith("#"):  # comment
             continue
         wsLen = len(ws.replace("\t", indentSpace))
@@ -1099,7 +1099,7 @@ def parseInfoTree(lines, indent=4, lineNum=0):
         for piece in text.split(";"):
             if piece.strip() == "":
                 continue
-            match = re.match("([^:]+):\s*(.*)", piece)
+            match = re.match(r"([^:]+):\s*(.*)", piece)
             if not match:
                 die(
                     "Line doesn't match the grammar `k:v; k:v; k:v`:\n{0}",
@@ -1294,7 +1294,7 @@ def parseTag(text, lineNumber):
                 return
         elif state == "attribute-value-unquoted":
             attrValue = ""
-            while not eof(i, text) and re.match("[^\s<>'\"=`]", text[i]):
+            while not eof(i, text) and re.match(r"[^\s<>'\"=`]", text[i]):
                 attrValue += text[i]
                 i += 1
             tag.attrs[attrName] = attrValue

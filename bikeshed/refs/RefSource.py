@@ -82,7 +82,7 @@ class RefSource(object):
             return list(self._refs.items())
 
         for file in self.dataFile.walkFiles("anchors"):
-            group = re.match("anchors-(.{2})", file).group(1)
+            group = re.match(r"anchors-(.{2})", file).group(1)
             if group in self._loadedAnchorGroups:
                 # Already loaded
                 continue

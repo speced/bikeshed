@@ -127,7 +127,7 @@ def splitForValues(forValues):
     """
     if forValues is None:
         return None
-    forValues = re.sub("\s+", " ", forValues)
+    forValues = re.sub(r"\s+", " ", forValues)
     return [
         value.strip()
         for value in re.split(r",(?![^()]*\))", forValues)

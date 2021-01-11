@@ -100,7 +100,7 @@ def extractHeaderInfo(lines, infilename):
     date = None
     cdate = None
     for line in lines:
-        match = re.match("(Draft|Title|Status|Date|ED):\s*(.*)", line)
+        match = re.match(r"(Draft|Title|Status|Date|ED):\s*(.*)", line)
         if match:
             if match.group(1) == "Draft":
                 url = match.group(2)
@@ -111,7 +111,7 @@ def extractHeaderInfo(lines, infilename):
             elif match.group(1) == "Date":
                 date = match.group(2).rstrip()
                 cdate = date
-                if not re.match("(\d{4})-(\d\d)-(\d\d)$", date):
+                if not re.match(r"(\d{4})-(\d\d)-(\d\d)$", date):
                     die(
                         "Incorrect Date format. Expected YYYY-MM-DD, but got:\n{0}",
                         date,
@@ -125,7 +125,7 @@ def extractHeaderInfo(lines, infilename):
         die("Missing 'Title' metadata.")
         return
 
-    match = re.search("([A-Z]{2,})-([a-z0-9-]+)-(\d{8})", url)
+    match = re.search(r"([A-Z]{2,})-([a-z0-9-]+)-(\d{8})", url)
     if match:
         if status is None:
             # Auto-detect from the URL and filename.
@@ -138,7 +138,7 @@ def extractHeaderInfo(lines, infilename):
         if date is None:
             cdate = match.group(3)
             date = "{0}-{1}-{2}".format(
-                *re.match("(\d{4})(\d\d)(\d\d)", cdate).groups()
+                *re.match(r"(\d{4})(\d\d)(\d\d)", cdate).groups()
             )
     else:
         warn(

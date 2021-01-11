@@ -233,7 +233,7 @@ def processReferBiblioFile(lines, storage, order):
 
 
 def processSpecrefBiblioFile(text, storage, order):
-    """
+    r"""
     A SpecRef file is a JSON object, where keys are ids
     and values are either <alias>, <legacyRef>, or <ref>.
 
