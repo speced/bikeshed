@@ -3,7 +3,6 @@ from __future__ import annotations
 import attr
 import email.utils
 import errno
-import io
 import os
 import requests
 import sys

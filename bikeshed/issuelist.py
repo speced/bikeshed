@@ -1,5 +1,4 @@
 import glob
-import io
 import re
 import sys
 from .messages import *

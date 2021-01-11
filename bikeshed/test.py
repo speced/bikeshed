@@ -1,6 +1,5 @@
 import difflib
 import glob
-import io
 import os
 import re
 from itertools import *

@@ -2,7 +2,6 @@ import asyncio
 import aiofiles
 import aiohttp
 import hashlib
-import io
 import os
 import requests
 import tenacity

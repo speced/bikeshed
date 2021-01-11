@@ -1,5 +1,4 @@
 import certifi
-import io
 import json
 import os
 from json_home_client import Client as APIClient

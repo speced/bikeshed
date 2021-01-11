@@ -1,5 +1,4 @@
 import certifi
-import io
 import json
 import re
 import tenacity
