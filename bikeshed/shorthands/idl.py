@@ -80,7 +80,7 @@ class IdlShorthand:
             "bs-autolink-syntax": self.bsAutolink,
         }
         return steps.Success(
-            E.code({"class": "idl", "nohighlight": ""}, E.a(attrs, linkText))
+            E.code({"class": "idl", "nohighlight": ""}, E.a(attrs, self.linkText))
         )
 
 

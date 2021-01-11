@@ -56,7 +56,7 @@ class AbstractOpShorthand:
             "lt": self.lt,
             "bs-autolink-syntax": self.bsAutolink,
         }
-        return steps.Success(E.a(attrs, linkText))
+        return steps.Success(E.a(attrs, self.linkText))
 
 
 AbstractOpShorthand.startRe = re.compile(

@@ -3,7 +3,6 @@
 import hashlib
 import html5lib
 import re
-from collections import Counter, defaultdict
 from lxml import etree
 from lxml.html import tostring
 from lxml.cssselect import CSSSelector
@@ -699,7 +698,7 @@ def replaceMacros(text, macros):
         if fullText.startswith("[["):
             # Actually a biblio link
             return fullText
-        if re.match("[\d-]+$", innerText):
+        if re.match(r"[\d-]+$", innerText):
             # No refs are all-digits (this is probably JS code, or a regex/grammar).
             return fullText
         if innerText in macros:

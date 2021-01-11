@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
 
 
-import io
-
-from .. import config
 from ..h import (
     findAll,
     textContent,

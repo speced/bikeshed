@@ -1,4 +1,3 @@
-import re
 from .. import h
 from ..config import flatten
 from . import steps

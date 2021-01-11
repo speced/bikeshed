@@ -1,4 +1,3 @@
-#!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 
 import io
@@ -6,7 +5,7 @@ import re
 from itertools import *
 
 if __name__ == "__main__":
-    import bikeshed.config
+    from bikeshed import config
     from bikeshed.messages import *
 else:
     from . import config
