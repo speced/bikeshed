@@ -105,7 +105,7 @@ class Path(DiagramItem):
         if sweep[0] == "s" or sweep[1] == "n":
             y *= -1
         cw = (
-            1 if sweep == "ne" or sweep == "es" or sweep == "sw" or sweep == "wn" else 0
+            1 if sweep in ('ne', 'es', 'sw', 'wn') else 0
         )
         self.attrs["d"] += f"a{ARC_RADIUS:g} {ARC_RADIUS:g} 0 0 {cw:g} {x:g} {y:g}"
         return self
