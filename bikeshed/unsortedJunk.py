@@ -4,7 +4,8 @@ import re
 from collections import Counter, defaultdict, namedtuple
 from urllib import parse
 
-from . import biblio, config, dfnpanels, func
+from . import biblio, config, dfnpanels
+from .func import Functor
 from .h import (
     E,
     addClass,
@@ -47,7 +48,7 @@ from .h import (
 from .messages import die, say, warn
 
 
-class MarkdownCodeSpans(func.Functor):
+class MarkdownCodeSpans(Functor):
     # Wraps a string, such that the contained text is "safe"
     # and contains no markdown code spans.
     # Thus, functions mapping over the text can freely make substitutions,
@@ -90,7 +91,8 @@ class MarkdownCodeSpans(func.Functor):
             newText += text[indexSoFar:]
         elif mode == "code":
             newText += tag + "`" * backtickCount + text[indexSoFar:]
-        self.__val__ = newText
+
+        super().__init__(newText)
 
     def map(self, fn):
         x = MarkdownCodeSpans("")

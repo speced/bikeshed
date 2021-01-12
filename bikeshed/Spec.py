@@ -29,6 +29,7 @@ from . import wpt
 
 from .h import *
 from .InputSource import InputSource, FileInputSource
+from .func import Functor
 from .messages import *
 from .refs import ReferenceManager
 from .unsortedJunk import *
@@ -430,7 +431,7 @@ class Spec:
         if "markdown" in self.md.markupShorthands:
             textFunctor = MarkdownCodeSpans(text)
         else:
-            textFunctor = func.Functor(text)
+            textFunctor = Functor(text)
 
         macros = dict(self.macros, **moreMacros)
         textFunctor = textFunctor.map(curry(replaceMacros, macros=macros))
