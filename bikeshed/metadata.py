@@ -366,7 +366,7 @@ class MetadataManager:
         else:
             shortStatus = (
                 self.rawStatus.partition("/")[2]
-                if (self.rawStatus and "/" in self.rawStatus)
+                if (self.rawStatus and "/" in str(self.rawStatus))
                 else self.rawStatus
             )
             macros[
@@ -589,7 +589,7 @@ def parseEditor(key, val, lineNum):
     # Check if the org ends with a link
     if (
         data["org"] is not None
-        and " " in data["org"]
+        and " " in str(data["org"])
         and looksLinkish(data["org"].split()[-1])
     ):
         pieces = data["org"].split()
