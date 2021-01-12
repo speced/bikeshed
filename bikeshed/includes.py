@@ -166,7 +166,6 @@ def parseSingleRange(item):
                 die(
                     "Error parsing include-code 'show' range '{0}' - must be `int-int`.",
                     item,
-                    el=el,
                 )
                 return
         if high == "*":
@@ -178,14 +177,12 @@ def parseSingleRange(item):
                 die(
                     "Error parsing include-code 'show' range '{0}' - must be `int-int`.",
                     item,
-                    el=el,
                 )
                 return
         if low >= high:
             die(
                 "include-code 'show' ranges must be well-formed lo-hi - got '{0}'.",
                 item,
-                el=el,
             )
             return
         return [low, high]
@@ -200,5 +197,4 @@ def parseSingleRange(item):
                 die(
                     "Error parsing include-code 'show' value '{0}' - must be an int or *.",
                     item,
-                    el=el,
                 )
