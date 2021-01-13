@@ -10,23 +10,33 @@ from .h import *
 from .messages import *
 from functools import reduce
 
-# This function does a single pass through the doc,
-# finding all the "data blocks" and processing them.
-# A "data block" is any <pre> or <xmp> element.
-#
-# When a data block is found, the *contents* of the block
-# are passed to the appropriate processing function as an
-# array of lines.  The function should return a new array
-# of lines to replace the *entire* block.
-#
-# That is, we give you the insides, but replace the whole
-# thing.
-#
-# Additionally, we pass in the tag-name used (pre or xmp)
-# and the line with the content, in case it has useful data in it.
+
+# When writing a new transformFoo function,
+# PAY ATTENTION TO THE INDENT OF THE FIRST LINE
+# OR ELSE YOU'LL MESS UP THE MARKDOWN PARSER.
+# Generally, just spam the first-line's indent onto every line;
+# if you're outputting a raw element (<pre>/etc),
+# just spam it onto the first line.
 
 
 def transformDataBlocks(doc, lines):
+    """
+    This function does a single pass through the doc,
+    finding all the "data blocks" and processing them.
+    A "data block" is any <pre> or <xmp> element.
+    #
+    When a data block is found, the *contents* of the block
+    are passed to the appropriate processing function as an
+    array of lines.  The function should return a new array
+    of lines to replace the *entire* block.
+    #
+    That is, we give you the insides, but replace the whole
+    thing.
+    #
+    Additionally, we pass in the tag-name used (pre or xmp)
+    and the line with the content, in case it has useful data in it.
+    """
+
     fromStrings = False
     if any(isinstance(x, str) for x in lines):
         fromStrings = True
@@ -177,16 +187,6 @@ def commonPrefix(line1, line2):
 
 def getWsPrefix(line):
     return re.match(r"(\s*)", line).group(1)
-
-
-"""
-When writing a new transformFoo function,
-PAY ATTENTION TO THE INDENT OF THE FIRST LINE
-OR ELSE YOU'LL MESS UP THE MARKDOWN PARSER.
-Generally, just spam the first-line's indent onto every line;
-if you're outputting a raw element (<pre>/etc),
-just spam it onto the first line.
-"""
 
 
 def transformPre(lines, tagName, firstLine, **kwargs):

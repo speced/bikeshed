@@ -155,8 +155,6 @@ def highlightEl(el, lang):
 
 
 def highlightWithWebIDL(text, el):
-    from widlparser import parser
-
     """
     Trick the widlparser emitter,
     which wants to output HTML via wrapping with start/end tags,
@@ -166,6 +164,7 @@ def highlightWithWebIDL(text, el):
     A \3 indicates a stack pop.
     All other text is colored with the attr currently on top of the stack.
     """
+    from widlparser import parser
 
     class IDLUI:
         def warn(self, msg):
