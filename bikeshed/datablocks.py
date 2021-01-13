@@ -62,7 +62,7 @@ def transformDataBlocks(doc, lines):
             tagName = match.group(1)
             blockClasses = classesFromLine(line)
             seenClasses = []
-            for t in blockTypes.keys():
+            for t in blockTypes:
                 if t in blockClasses:
                     seenClasses.append(t)
             if not seenClasses:
