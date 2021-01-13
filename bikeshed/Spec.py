@@ -368,7 +368,7 @@ class Spec:
             import threading
 
             class SilentServer(http.server.SimpleHTTPRequestHandler):
-                def log_message(*args):
+                def log_message(self, format, *args):
                     pass
 
             socketserver.TCPServer.allow_reuse_address = True
