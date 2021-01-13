@@ -686,7 +686,7 @@ def parseRefStatus(key, val, lineNum):
     val = val.strip().lower()
     if val == "dated":
         # Legacy term that used to be allowed
-        val == "snapshot"
+        return "snapshot"
     if val in constants.refStatus:
         return val
     else:
