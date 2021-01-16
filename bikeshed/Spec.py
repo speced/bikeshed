@@ -103,7 +103,7 @@ class Spec:
             self.lines = inputContent.lines
             if inputContent.date is not None:
                 self.mdBaseline.addParsedData("Date", inputContent.date)
-        except OSError:
+        except FileNotFoundError:
             die(
                 "Couldn't find the input file at the specified location '{0}'.",
                 self.inputSource,
