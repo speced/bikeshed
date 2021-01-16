@@ -458,7 +458,7 @@ def addExplicitIndexes(doc):
                         if existingRef.status == status:
                             # Existing entry matches stated status, do nothing and don't add it.
                             break
-                        elif ref.status == status:
+                        if ref.status == status:
                             # New entry matches status, update and don't re-add it.
                             refsFromText[text][i] = ref
                             break
@@ -466,7 +466,7 @@ def addExplicitIndexes(doc):
                         # Default to preferring current specs
                         if existingRef.status == "current":
                             break
-                        elif ref.status == "current":
+                        if ref.status == "current":
                             refsFromText[ref.text][i] = ref
                             break
                 else:
