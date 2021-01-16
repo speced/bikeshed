@@ -60,9 +60,7 @@ def createManifest(path, dryRun=False):
 
     if not dryRun:
         try:
-            with open(
-                os.path.join(path, "manifest.txt"), "w", encoding="utf-8"
-            ) as fh:
+            with open(os.path.join(path, "manifest.txt"), "w", encoding="utf-8") as fh:
                 fh.write(manifest)
         except Exception:
             raise
@@ -193,9 +191,7 @@ def updateByManifest(path, dryRun=False):
             )
         goodPaths, badPaths = asyncio.run(updateFiles(path, newPaths))
         try:
-            with open(
-                os.path.join(path, "manifest.txt"), "w", encoding="utf-8"
-            ) as fh:
+            with open(os.path.join(path, "manifest.txt"), "w", encoding="utf-8") as fh:
                 fh.write(createFinishedManifest(remoteManifest, goodPaths, badPaths))
         except Exception as e:
             warn("Couldn't save new manifest file.\n{0}", e)

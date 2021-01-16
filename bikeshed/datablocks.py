@@ -72,9 +72,7 @@ def transformDataBlocks(doc, lines):
             else:
                 die(
                     "Found {0} classes on the <{1}>, so can't tell which to process the block as. Please use only one.",
-                    config.englishFromList(
-                        (f"'{x}'" for x in seenClasses), "and"
-                    ),
+                    config.englishFromList((f"'{x}'" for x in seenClasses), "and"),
                     tagName,
                     lineNum=line.i,
                 )
@@ -325,7 +323,9 @@ def transformPropdef(lines, doc, firstLine, lineNum=None, **kwargs):
         td = f"<td>{val}"
         if key in ("Value", "New values"):
             tr = "<tr class=value>"
-            th = f"<th><a href='https://www.w3.org/TR/css-values/#value-defs'>{key}:</a>"
+            th = (
+                f"<th><a href='https://www.w3.org/TR/css-values/#value-defs'>{key}:</a>"
+            )
             td = f"<td class=prod>{val}"
         elif key == "Initial":
             th = f"<th><a href='https://www.w3.org/TR/css-cascade/#initial-values'>{key}:</a>"
@@ -383,9 +383,7 @@ def transformDescdef(lines, doc, firstLine, lineNum=None, **kwargs):
                 "<tr><th>{}:<td><a at-rule>{}</a>".format(key, vals.get(key, ""))
             )
         elif key == "Value":
-            ret.append(
-                "<tr><th>{}:<td class='prod'>{}".format(key, vals.get(key, ""))
-            )
+            ret.append("<tr><th>{}:<td class='prod'>{}".format(key, vals.get(key, "")))
         elif key in vals:
             ret.append("<tr><th>{}:<td>{}".format(key, vals.get(key, "")))
         else:
@@ -445,9 +443,7 @@ def transformElementdef(lines, doc, firstLine, lineNum=None, **kwargs):
     attrs["Content model"] = None
     attrs["Attributes"] = None
     attrs["Dom interfaces"] = None
-    ret = [
-        f"<table class='def elementdef'{lineNumAttr}>"
-    ]
+    ret = [f"<table class='def elementdef'{lineNumAttr}>"]
     for key, val in attrs.items():
         if key in parsedAttrs or val is not None:
             if key in parsedAttrs:

@@ -738,9 +738,7 @@ def classifyDfns(doc, dfns):
                 )
                 el.set(
                     "data-alternate-id",
-                    config.simplifyText(
-                        f"dom-{singleFor}-{primaryDfnText}"
-                    ),
+                    config.simplifyText(f"dom-{singleFor}-{primaryDfnText}"),
                 )
                 if primaryDfnText.startswith("[["):
                     # Slots get their identifying [] stripped from their ID,
@@ -752,9 +750,7 @@ def classifyDfns(doc, dfns):
                     )
             else:
                 if dfnFor:
-                    id = config.simplifyText(
-                        f"{singleFor}-{primaryDfnText}"
-                    )
+                    id = config.simplifyText(f"{singleFor}-{primaryDfnText}")
                 else:
                     id = config.simplifyText(primaryDfnText)
             if dfnType == "dfn":

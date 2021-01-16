@@ -272,9 +272,7 @@ def canonicalizeStatus(rawStatus, group):
             status = "w3c/" + status
 
         def formatStatusSet(statuses):
-            return ", ".join(
-                sorted({status.split("/")[-1] for status in statuses})
-            )
+            return ", ".join(sorted({status.split("/")[-1] for status in statuses}))
 
         msg = "You used Status: {0}, but {1} limited to these statuses: {2}."
 
@@ -348,9 +346,7 @@ def canonicalizeStatus(rawStatus, group):
                 else:
                     msg += " That status can only be used with the org{} {}, or without an org at all.".format(
                         "s" if len(possibleMgs) > 1 else "",
-                        englishFromList(
-                            f"'{x}'" for x in possibleMgs if x != ""
-                        ),
+                        englishFromList(f"'{x}'" for x in possibleMgs if x != ""),
                     )
             else:
                 if len(possibleMgs) == 1:
