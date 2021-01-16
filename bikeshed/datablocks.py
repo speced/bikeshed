@@ -1133,7 +1133,6 @@ def parseTag(text, lineNumber):
             state,
             lineNum=lineNumber,
         )
-        return
 
     def eof(i, text):
         return i >= len(text)
