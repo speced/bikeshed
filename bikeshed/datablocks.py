@@ -144,7 +144,7 @@ def transformDataBlocks(doc, lines):
             blockType = ""
             blockLines = []
             continue
-        elif inBlock:
+        if inBlock:
             blockLines.append(line)
         else:
             newLines.append(line)
@@ -787,8 +787,9 @@ def processLinkDefaults(lds, doc, lineNum=None):
                 lineNum=lineNum,
             )
             continue
-        else:
-            type = ld["type"][0]
+
+        type = ld["type"][0]
+
         if len(ld.get("spec", [])) != 1:
             die(
                 "Every link default needs exactly one spec. Got:\n{0}",
@@ -796,8 +797,9 @@ def processLinkDefaults(lds, doc, lineNum=None):
                 lineNum=lineNum,
             )
             continue
-        else:
-            spec = ld["spec"][0]
+
+        spec = ld["spec"][0]
+
         if len(ld.get("text", [])) != 1:
             die(
                 "Every link default needs exactly one text. Got:\n{0}",
@@ -805,8 +807,9 @@ def processLinkDefaults(lds, doc, lineNum=None):
                 lineNum=lineNum,
             )
             continue
-        else:
-            text = ld["text"][0]
+
+        text = ld["text"][0]
+
         if "for" in ld:
             for _for in ld["for"]:
                 doc.md.linkDefaults[text].append(
@@ -1146,16 +1149,14 @@ def parseTag(text, lineNumber):
                 state = "tag-open"
                 i += 1
                 continue
-            else:
-                parseerror(i, state)
-                return
+            parseerror(i, state)
+            return
         elif state == "tag-open":
             if text[i].isalpha():
                 state = "tag-name"
                 continue
-            else:
-                parseerror(i, state)
-                return
+            parseerror(i, state)
+            return
         elif state == "tag-name":
             tagname = ""
             while not eof(i, text) and re.match(r"[^\s/>]", text[i]):
@@ -1185,15 +1186,14 @@ def parseTag(text, lineNumber):
             if text[i].isspace():
                 i += 1
                 continue
-            elif text[i] == "/" or text[i] == ">":
+            if text[i] == "/" or text[i] == ">":
                 state = "after-attribute-name"
                 continue
-            elif text[i] == "=":
+            if text[i] == "=":
                 parseerror(i, state)
                 return
-            else:
-                state = "attribute-name"
-                continue
+            state = "attribute-name"
+            continue
         elif state == "attribute-name":
             attrName = ""
             while not eof(i, text) and re.match(r"[^\s/>=\"'<]", text[i]):
@@ -1203,48 +1203,45 @@ def parseTag(text, lineNumber):
             if text[i].isspace() or text[i] == "/" or text[i] == ">":
                 state = "after-attribute-name"
                 continue
-            elif text[i] == "=":
+            if text[i] == "=":
                 state = "before-attribute-value"
                 i += 1
                 continue
-            else:
-                parseerror(i, state)
-                return
+            parseerror(i, state)
+            return
         elif state == "after-attribute-name":
             if text[i].isspace():
                 i += 1
                 continue
-            elif text[i] == "/":
+            if text[i] == "/":
                 state = "self-closing-start-tag"
                 i += 1
                 continue
-            elif text[i] == "=":
+            if text[i] == "=":
                 state = "before-attribute-value"
                 i += 1
                 continue
-            elif text[i] == ">":
+            if text[i] == ">":
                 return tag
-            else:
-                state = "attribute-name"
-                continue
+            state = "attribute-name"
+            continue
         elif state == "before-attribute-value":
             if text[i].isspace():
                 i += 1
                 continue
-            elif text[i] == '"':
+            if text[i] == '"':
                 state = "attribute-value-double-quoted"
                 i += 1
                 continue
-            elif text[i] == "'":
+            if text[i] == "'":
                 state = "attribute-value-single-quoted"
                 i += 1
                 continue
-            elif text[i] == "=":
+            if text[i] == "=":
                 parseerror(i, state)
                 return
-            else:
-                state = "attribute-value-unquoted"
-                continue
+            state = "attribute-value-unquoted"
+            continue
         elif state == "attribute-value-double-quoted":
             attrValue = ""
             while not eof(i, text) and not text[i] == '"':
@@ -1255,9 +1252,8 @@ def parseTag(text, lineNumber):
                 state = "after-attribute-value-quoted"
                 i += 1
                 continue
-            else:
-                parseerror(i, state)
-                return
+            parseerror(i, state)
+            return
         elif state == "attribute-value-single-quoted":
             attrValue = ""
             while not eof(i, text) and not text[i] == "'":
@@ -1268,9 +1264,8 @@ def parseTag(text, lineNumber):
                 state = "after-attribute-value-quoted"
                 i += 1
                 continue
-            else:
-                parseerror(i, state)
-                return
+            parseerror(i, state)
+            return
         elif state == "attribute-value-unquoted":
             attrValue = ""
             while not eof(i, text) and re.match(r"[^\s<>'\"=`]", text[i]):
@@ -1281,22 +1276,20 @@ def parseTag(text, lineNumber):
                 state = "before-attribute-name"
                 i += 1
                 continue
-            elif text[i] == ">":
+            if text[i] == ">":
                 return tag
-            else:
-                parseerror(i, state)
-                return
+            parseerror(i, state)
+            return
         elif state == "after-attribute-value-quoted":
             if text[i].isspace():
                 state = "before-attribute-name"
                 i += 1
                 continue
-            elif text[i] == "/":
+            if text[i] == "/":
                 state = "self-closing-start-tag"
                 i += 1
                 continue
-            elif text[i] == ">":
+            if text[i] == ">":
                 return tag
-            else:
-                parseerror(i, state)
-                return
+            parseerror(i, state)
+            return

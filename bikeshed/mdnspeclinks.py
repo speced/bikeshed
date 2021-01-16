@@ -153,32 +153,32 @@ def panelsFromData(doc, data):
                 f"No '{elementId}' ID found, skipping MDN features that would target it."
             )
             continue
+
+        panels = True
+        if targetElement.tag in ["h1", "h2", "h3", "h4", "h5", "h6"]:
+            isAnnoForHeadingContent = True
         else:
-            panels = True
-            if targetElement.tag in ["h1", "h2", "h3", "h4", "h5", "h6"]:
-                isAnnoForHeadingContent = True
-            else:
-                for ancestor in targetElement.iterancestors():
-                    if ancestor.tag in [
-                        "body",
-                        "main",
-                        "article",
-                        "aside",
-                        "nav",
-                        "section",
-                        "header",
-                        "footer",
-                    ]:
-                        break
-                    targetElement = ancestor
-                    if ancestor.tag in ["h1", "h2", "h3", "h4", "h5", "h6"]:
-                        isAnnoForHeadingContent = True
-                        break
-                    if ancestor.tag in ["td", "dt", "dd", "li"]:
-                        isAnnoForListItemOrTableContent = True
-                        break
-                    if ancestor.tag in ["pre", "xmp", "p"]:
-                        break
+            for ancestor in targetElement.iterancestors():
+                if ancestor.tag in [
+                    "body",
+                    "main",
+                    "article",
+                    "aside",
+                    "nav",
+                    "section",
+                    "header",
+                    "footer",
+                ]:
+                    break
+                targetElement = ancestor
+                if ancestor.tag in ["h1", "h2", "h3", "h4", "h5", "h6"]:
+                    isAnnoForHeadingContent = True
+                    break
+                if ancestor.tag in ["td", "dt", "dd", "li"]:
+                    isAnnoForListItemOrTableContent = True
+                    break
+                if ancestor.tag in ["pre", "xmp", "p"]:
+                    break
         for feature in features:
             if "engines" in feature:
                 engines = len(feature["engines"])

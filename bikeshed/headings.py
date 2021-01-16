@@ -117,8 +117,8 @@ def determineHeadingLevels(doc, headings):
             continue
         if skipLevel < level:
             continue
-        else:
-            skipLevel = float("inf")
+
+        skipLevel = float("inf")
 
         incrementLevel(level)
         header.set("data-level", printLevel())

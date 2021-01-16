@@ -200,14 +200,14 @@ def processReferBiblioFile(lines, storage, order):
                 storage[biblio["linkText"].lower()].append(biblio)
                 biblio = None
             continue
-        elif line.startswith("#") or line.startswith("%#"):
+        if line.startswith("#") or line.startswith("%#"):
             # Comment
             continue
-        else:
-            if biblio is None:
-                biblio = defaultdict(list)
-                biblio["order"] = order
-                biblio["biblioFormat"] = "dict"
+
+        if biblio is None:
+            biblio = defaultdict(list)
+            biblio["order"] = order
+            biblio["biblioFormat"] = "dict"
 
         match = re.match(r"%(\w)\s+(.*)", line)
         if match:

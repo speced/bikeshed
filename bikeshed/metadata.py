@@ -1076,10 +1076,10 @@ def parse(lines):
             else:
                 endTag = r"</xmp>\s*"
             continue
-        elif inMetadata and re.match(endTag, line.text):
+        if inMetadata and re.match(endTag, line.text):
             inMetadata = False
             continue
-        elif inMetadata:
+        if inMetadata:
             if lastKey and (line.text.strip() == "" or re.match(r"\s+", line.text)):
                 # empty lines, or lines that start with 1+ spaces, continue previous key
                 md.addData(lastKey, line.text, lineNum=line.i)

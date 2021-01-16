@@ -442,7 +442,7 @@ def fixIntraDocumentReferences(doc):
                 el=el,
             )
             continue
-        elif targetID not in ids:
+        if targetID not in ids:
             die("Couldn't find target anchor {0}:\n{1}", targetID, outerHTML(el), el=el)
             continue
         if isEmpty(el):
@@ -682,7 +682,7 @@ def classifyDfns(doc, dfns):
                     el=el,
                 )
                 continue
-            elif el.get("data-lt") is None:
+            if el.get("data-lt") is None:
                 if dfnType == "function":
                     # CSS function, define it with no args in the text
                     primaryDfnText = (
