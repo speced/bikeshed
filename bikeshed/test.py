@@ -12,7 +12,7 @@ TEST_DIR = os.path.abspath(os.path.join(config.scriptPath(), "..", "tests"))
 
 
 def findTestFiles(manualOnly=False):
-    for root, dirnames, filenames in os.walk(TEST_DIR):
+    for root, _, filenames in os.walk(TEST_DIR):
         for filename in filenames:
             filePath = testNameForPath(os.path.join(root, filename))
             pathSegs = splitPath(filePath)

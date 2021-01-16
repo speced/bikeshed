@@ -390,7 +390,7 @@ def transformDescdef(lines, doc, firstLine, lineNum=None, **kwargs):
                 lineNum=lineNum,
             )
             continue
-    for key, val in vals.items():
+    for key, _ in vals.items():
         if key in requiredKeys:
             continue
         ret.append("<tr><th>{}:<td>{}".format(key, vals[key]))

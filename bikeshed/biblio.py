@@ -192,7 +192,7 @@ def processReferBiblioFile(lines, storage, order):
     unusedReferCodes = set("BCIJNPRVX")
 
     biblio = None
-    for i, line in enumerate(lines):
+    for _, line in enumerate(lines):
         line = line.strip()
         if line == "":
             # Empty line

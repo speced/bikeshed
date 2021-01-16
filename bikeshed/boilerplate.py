@@ -577,7 +577,7 @@ def addIndexOfExternallyDefinedTerms(doc, container):
             E.li(E.a(attrs, "[", printableSpec, "]"), " defines the following terms:"),
         )
         termsUl = appendChild(specLi, E.ul())
-        for text, refs in sorted(refGroups.items(), key=lambda x: x[0]):
+        for _, refs in sorted(refGroups.items(), key=lambda x: x[0]):
             if len(refs) == 1:
                 ref = list(refs.values())[0]
                 link = makeLink(ref.text)
