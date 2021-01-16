@@ -188,7 +188,7 @@ def canonicalizeShortcuts(doc):
         "algorithm": "data-algorithm",
         "ignore": "data-var-ignore",
     }
-    for el in findAll(",".join(f"[{attr}]" for attr in attrFixup.keys()), doc):
+    for el in findAll(",".join(f"[{attr}]" for attr in attrFixup), doc):
         for attr, fixedAttr in attrFixup.items():
             if el.get(attr) is not None:
                 el.set(fixedAttr, el.get(attr))
