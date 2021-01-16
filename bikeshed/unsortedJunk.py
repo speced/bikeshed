@@ -117,14 +117,12 @@ class MarkdownCodeSpans(Functor):
                     return "{2}<code data-opaque bs-autolink-syntax='{1}'>{0}</code>".format(
                         t, escapeAttr(repl[2]), repl[0]
                     )
-                else:
-                    return "<code data-opaque data-span-tag={0} bs-autolink-syntax='{2}'>{1}</code>".format(
-                        repl[0], escapeHTML(repl[1]), escapeAttr(repl[2])
-                    )
+                return "<code data-opaque data-span-tag={0} bs-autolink-syntax='{2}'>{1}</code>".format(
+                    repl[0], escapeHTML(repl[1]), escapeAttr(repl[2])
+                )
 
             return re.sub("\ue0ff", codeSpanReviver, self.__val__)
-        else:
-            return self.__val__
+        return self.__val__
 
 
 def stripBOM(doc):
@@ -605,18 +603,18 @@ def determineDfnType(dfn, inferCSS=False):
         text = textContent(dfn)
         if text[0:1] == "@":
             return "at-rule"
-        elif (
+        if (
             len(dfn) == 1
             and dfn[0].get("data-link-type") == "maybe"
             and emptyText(dfn.text)
             and emptyText(dfn[0].tail)
         ):
             return "value"
-        elif text[0:1] == "<" and text[-1:] == ">":
+        if text[0:1] == "<" and text[-1:] == ">":
             return "type"
-        elif text[0:1] == ":":
+        if text[0:1] == ":":
             return "selector"
-        elif re.match(r"^[\w-]+\(.*\)$", text) and not (dfn.get("id") or "").startswith(
+        if re.match(r"^[\w-]+\(.*\)$", text) and not (dfn.get("id") or "").startswith(
             "dom-"
         ):
             return "function"
@@ -809,14 +807,13 @@ def determineLinkType(el):
     text = textContent(el)
     if config.typeRe["at-rule"].match(text):
         return "at-rule"
-    elif config.typeRe["type"].match(text):
+    if config.typeRe["type"].match(text):
         return "type"
-    elif config.typeRe["selector"].match(text):
+    if config.typeRe["selector"].match(text):
         return "selector"
-    elif config.typeRe["function"].match(text):
+    if config.typeRe["function"].match(text):
         return "functionish"
-    else:
-        return "dfn"
+    return "dfn"
 
 
 def determineLinkText(el):

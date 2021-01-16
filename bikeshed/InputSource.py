@@ -46,10 +46,9 @@ class InputSource:
 
         if sourceName == "-":
             return StdinInputSource(sourceName)
-        elif sourceName.startswith("https:"):
+        if sourceName.startswith("https:"):
             return UrlInputSource(sourceName)
-        else:
-            return FileInputSource(sourceName)
+        return FileInputSource(sourceName)
 
     @abstractmethod
     def __str__(self) -> str:

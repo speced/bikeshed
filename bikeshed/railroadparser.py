@@ -120,39 +120,39 @@ def _createDiagram(command, prelude, children, text=None, line=-1):
     if command == "Diagram":
         children = [_f for _f in [_createDiagram(**child) for child in children] if _f]
         return rr.Diagram(*children)
-    elif command in ("T", "Terminal"):
+    if command in ("T", "Terminal"):
         if children:
             return die("Line {0} - Terminal commands cannot have children.", line)
         return rr.Terminal(text, prelude)
-    elif command in ("N", "NonTerminal"):
+    if command in ("N", "NonTerminal"):
         if children:
             return die("Line {0} - NonTerminal commands cannot have children.", line)
         return rr.NonTerminal(text, prelude)
-    elif command in ("C", "Comment"):
+    if command in ("C", "Comment"):
         if children:
             return die("Line {0} - Comment commands cannot have children.", line)
         return rr.Comment(text, prelude)
-    elif command in ("S", "Skip"):
+    if command in ("S", "Skip"):
         if children:
             return die("Line {0} - Skip commands cannot have children.", line)
         if text:
             return die("Line {0} - Skip commands cannot have text.", line)
         return rr.Skip()
-    elif command in ("And", "Seq", "Sequence"):
+    if command in ("And", "Seq", "Sequence"):
         if prelude:
             return die("Line {0} - Sequence commands cannot have preludes.", line)
         if not children:
             return die("Line {0} - Sequence commands need at least one child.", line)
         children = [_f for _f in [_createDiagram(**child) for child in children] if _f]
         return rr.Sequence(*children)
-    elif command in ("Stack",):
+    if command in ("Stack",):
         if prelude:
             return die("Line {0} - Stack commands cannot have preludes.", line)
         if not children:
             return die("Line {0} - Stack commands need at least one child.", line)
         children = [_f for _f in [_createDiagram(**child) for child in children] if _f]
         return rr.Stack(*children)
-    elif command in ("Or", "Choice"):
+    if command in ("Or", "Choice"):
         if prelude == "":
             default = 0
         else:
@@ -169,7 +169,7 @@ def _createDiagram(command, prelude, children, text=None, line=-1):
             return die("Line {0} - Choice commands need at least one child.", line)
         children = [_f for _f in [_createDiagram(**child) for child in children] if _f]
         return rr.Choice(default, *children)
-    elif command in ("Opt", "Optional"):
+    if command in ("Opt", "Optional"):
         if prelude not in ("", "skip"):
             return die(
                 "Line {0} - Optional preludes must be nothing or 'skip'. Got:\n{1}",
@@ -180,7 +180,7 @@ def _createDiagram(command, prelude, children, text=None, line=-1):
             return die("Line {0} - Optional commands need exactly one child.", line)
         children = [_f for _f in [_createDiagram(**child) for child in children] if _f]
         return rr.Optional(*children, skip=(prelude == "skip"))
-    elif command in ("Plus", "OneOrMore"):
+    if command in ("Plus", "OneOrMore"):
         if prelude:
             return die("Line {0} - OneOrMore commands cannot have preludes.", line)
         if 0 == len(children) > 2:
@@ -189,7 +189,7 @@ def _createDiagram(command, prelude, children, text=None, line=-1):
             )
         children = [_f for _f in [_createDiagram(**child) for child in children] if _f]
         return rr.OneOrMore(*children)
-    elif command in ("Star", "ZeroOrMore"):
+    if command in ("Star", "ZeroOrMore"):
         if prelude:
             return die("Line {0} - ZeroOrMore commands cannot have preludes.", line)
         if 0 == len(children) > 2:
@@ -198,5 +198,4 @@ def _createDiagram(command, prelude, children, text=None, line=-1):
             )
         children = [_f for _f in [_createDiagram(**child) for child in children] if _f]
         return rr.ZeroOrMore(*children)
-    else:
-        return die("Line {0} - Unknown command '{1}'.", line, command)
+    return die("Line {0} - Unknown command '{1}'.", line, command)

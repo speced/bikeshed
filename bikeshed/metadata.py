@@ -662,14 +662,13 @@ def parseBiblioDisplay(key, val, lineNum):
     val = val.strip().lower()
     if val in constants.biblioDisplay:
         return val
-    else:
-        die(
-            "'{0}' must be either 'inline' or 'index'. Got '{1}'",
-            key,
-            val,
-            lineNum=lineNum,
-        )
-        return constants.biblioDisplay.index
+    die(
+        "'{0}' must be either 'inline' or 'index'. Got '{1}'",
+        key,
+        val,
+        lineNum=lineNum,
+    )
+    return constants.biblioDisplay.index
 
 
 def parseRefStatus(key, val, lineNum):
@@ -679,14 +678,13 @@ def parseRefStatus(key, val, lineNum):
         val = "snapshot"
     if val in constants.refStatus:
         return val
-    else:
-        die(
-            "'{0}' must be either 'current' or 'snapshot'. Got '{1}'",
-            key,
-            val,
-            lineNum=lineNum,
-        )
-        return constants.refStatus.current
+    die(
+        "'{0}' must be either 'current' or 'snapshot'. Got '{1}'",
+        key,
+        val,
+        lineNum=lineNum,
+    )
+    return constants.refStatus.current
 
 
 def parseComplainAbout(key, val, lineNum):
@@ -811,10 +809,9 @@ def parseInlineGithubIssues(key, val, lineNum):
             lineNum=lineNum,
         )
         return False
-    elif b is True:
+    if b is True:
         return "full"
-    else:
-        return False
+    return False
 
 
 def parseTextMacro(key, val, lineNum):
@@ -868,7 +865,7 @@ def parseRepository(key, val, lineNum):
     pieces = val.split(None, 1)
     if len(pieces) == 2:
         return Repository(url=pieces[0], name=pieces[1])
-    elif len(pieces) == 1:
+    if len(pieces) == 1:
         # Try to recognize a GitHub url
         match = re.match(r"https://github\.([\w.-]+)/([\w-]+)/([\w-]+)/?$", val)
         if match:
@@ -880,13 +877,12 @@ def parseRepository(key, val, lineNum):
             return GithubRepository("com", *match.groups())
         # Otherwise just use the url as the shortname
         return Repository(url=val)
-    else:
-        die(
-            "Repository must be a url, optionally followed by a shortname. Got '{0}'",
-            val,
-            lineNum=lineNum,
-        )
-        return config.Nil()
+    die(
+        "Repository must be a url, optionally followed by a shortname. Got '{0}'",
+        val,
+        lineNum=lineNum,
+    )
+    return config.Nil()
 
 
 def parseTranslateIDs(key, val, lineNum):
@@ -949,9 +945,9 @@ def parseAudience(key, val, lineNum):
     if not values:
         die("Audience metadata must have at least one value if specified.")
         return []
-    elif len(values) == 1 and values[0] == "ALL":
+    if len(values) == 1 and values[0] == "ALL":
         return ["all"]
-    elif len(values) >= 1:
+    if len(values) >= 1:
         ret = []
         namedAudiences = {"CWG", "LWG", "EWG", "LEWG", "DIRECTION"}
         pseudonymAudiences = {
@@ -990,12 +986,11 @@ def parseEditorTerm(key, val, lineNum):
     values = [x.strip() for x in val.strip().split(",")]
     if len(values) == 2:
         return {"singular": values[0], "plural": values[1]}
-    else:
-        die(
-            "Editor Term metadata must be two comma-separated terms, giving the singular and plural term for editors. Got '{0}'.",
-            val,
-        )
-        return {"singular": "Editor", "plural": "Editors"}
+    die(
+        "Editor Term metadata must be two comma-separated terms, giving the singular and plural term for editors. Got '{0}'.",
+        val,
+    )
+    return {"singular": "Editor", "plural": "Editors"}
 
 
 def parseMaxToCDepth(key, val, lineNum):
@@ -1042,10 +1037,8 @@ def parsePreviousVersion(key, val, lineNum):
     if biblioMatch:
         if biblioMatch.group(1):
             return [{"type": "from-biblio", "value": biblioMatch.group(1).strip()}]
-        else:
-            return [{"type": "from-biblio-implicit"}]
-    else:
-        return [{"type": "url", "value": val}]
+        return [{"type": "from-biblio-implicit"}]
+    return [{"type": "url", "value": val}]
 
 
 def parseInlineTagCommand(key, val, lineNum):

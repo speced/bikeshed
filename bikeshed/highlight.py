@@ -69,14 +69,12 @@ def determineHighlightLang(doc, el):
         return None
     if attr == "nohighlight":
         return None
-    elif attr == "highlight":
+    if attr == "highlight":
         return lang
-    else:
-        # Highlight-by-default, if applicable.
-        if el.tag in ["pre", "xmp"] and hasClass(el, "idl"):
-            return "webidl"
-        else:
-            return doc.md.defaultHighlight
+    # Highlight-by-default, if applicable.
+    if el.tag in ["pre", "xmp"] and hasClass(el, "idl"):
+        return "webidl"
+    return doc.md.defaultHighlight
 
 
 def determineLineNumbers(doc, el):

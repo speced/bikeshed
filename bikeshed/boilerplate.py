@@ -976,28 +976,26 @@ def addSpecMetadataSection(doc):
                     nativeName,
                 ),
             )
-        elif name:
+        if name:
             return E.a(
                 {"href": url, "hreflang": lang, "rel": "alternate", "title": lang}, name
             )
-        else:
-            return E.a({"href": url, "hreflang": lang, "rel": "alternate"}, lang)
+        return E.a({"href": url, "hreflang": lang, "rel": "alternate"}, lang)
 
     def printPreviousVersion(v):
         if v["type"] == "url":
             return E.a({"href": v["value"], "rel": "prev"}, v["value"])
-        else:
-            if v["type"] == "from-biblio":
-                key = v["value"]
-            else:  # "from-biblio-implicit"
-                key = doc.md.vshortname
-            dated = doc.refs.getLatestBiblioRef(key)
-            if not dated:
-                die(
-                    f"While trying to generate a Previous Version line, couldn't find a dated biblio reference for {key}."
-                )
-                return
-            return E.a({"href": dated.url, "rel": "prev"}, dated.url)
+        if v["type"] == "from-biblio":
+            key = v["value"]
+        else:  # "from-biblio-implicit"
+            key = doc.md.vshortname
+        dated = doc.refs.getLatestBiblioRef(key)
+        if not dated:
+            die(
+                f"While trying to generate a Previous Version line, couldn't find a dated biblio reference for {key}."
+            )
+            return
+        return E.a({"href": dated.url, "rel": "prev"}, dated.url)
 
     md = DefaultOrderedDict(list)
     mac = doc.macros
