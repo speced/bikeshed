@@ -1,6 +1,7 @@
 import glob
 import re
 import sys
+
 from .messages import *
 
 statusStyle = {

@@ -2,15 +2,14 @@ import copy
 import os
 import re
 import subprocess
-from collections import defaultdict, OrderedDict
+from collections import OrderedDict, defaultdict
 from datetime import datetime
-from . import conditional
-from . import config
-from . import dfnpanels
-from .refs import utils as refUtils
+
+from . import conditional, config, dfnpanels
 from .DefaultOrderedDict import DefaultOrderedDict
 from .h import *
 from .messages import *
+from .refs import utils as refUtils
 
 
 def boilerplateFromHtml(doc, htmlString):

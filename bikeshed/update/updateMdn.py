@@ -1,7 +1,8 @@
 import json
 import os
-import requests
 from collections import OrderedDict
+
+import requests
 
 from ..messages import *  # noqa
 

@@ -3,10 +3,10 @@ import glob
 import os
 import re
 from itertools import *
+
 from . import config
 from .messages import *
 from .Spec import Spec
-
 
 TEST_DIR = os.path.abspath(os.path.join(config.scriptPath(), "..", "tests"))
 

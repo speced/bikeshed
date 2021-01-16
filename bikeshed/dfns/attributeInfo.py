@@ -1,7 +1,6 @@
 import re
 
-from .. import config
-from .. import h
+from .. import config, h
 from ..messages import *
 
 

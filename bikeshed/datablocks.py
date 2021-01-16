@@ -1,15 +1,12 @@
 import re
 from collections import OrderedDict, defaultdict
+from functools import reduce
 
 import attr
 
-from . import biblio
-from . import config
-from . import Line
+from . import Line, biblio, config
 from .h import *
 from .messages import *
-from functools import reduce
-
 
 # When writing a new transformFoo function,
 # PAY ATTENTION TO THE INDENT OF THE FIRST LINE
@@ -603,6 +600,7 @@ def parseDefBlock(lines, type, capitalizeKeys=True, lineNum=None):
 
 def transformRailroad(lines, doc, firstLine, **kwargs):
     import io
+
     from . import railroadparser
 
     ret = ["<div class='railroad'>"]

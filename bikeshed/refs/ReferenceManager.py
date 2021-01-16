@@ -4,14 +4,11 @@ import re
 from collections import defaultdict
 from operator import itemgetter
 
-from .RefSource import RefSource
-from .utils import *
-from .. import biblio
-from .. import config
-from .. import constants
-from .. import datablocks
+from .. import biblio, config, constants, datablocks
 from ..h import *
 from ..messages import *
+from .RefSource import RefSource
+from .utils import *
 
 
 class ReferenceManager:

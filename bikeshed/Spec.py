@@ -4,32 +4,33 @@ import sys
 from collections import defaultdict
 from functools import partial as curry
 
-from . import biblio
-from . import boilerplate
-from . import caniuse
-from . import dfns
-from . import mdnspeclinks
-from . import conditional
-from . import config
-from . import constants
-from . import datablocks
-from . import extensions
-from . import fingerprinting
-from . import headings
-from . import highlight
-from . import h
-from . import idl
-from . import includes
-from . import inlineTags
-from . import lint
-from . import markdown
-from . import metadata
-from . import shorthands
-from . import wpt
-
-from .h import *
-from .InputSource import InputSource, FileInputSource
+from . import (
+    biblio,
+    boilerplate,
+    caniuse,
+    conditional,
+    config,
+    constants,
+    datablocks,
+    dfns,
+    extensions,
+    fingerprinting,
+    h,
+    headings,
+    highlight,
+    idl,
+    includes,
+    inlineTags,
+    lint,
+    markdown,
+    mdnspeclinks,
+    metadata,
+    shorthands,
+    wpt,
+)
 from .func import Functor
+from .h import *
+from .InputSource import FileInputSource, InputSource
 from .messages import *
 from .refs import ReferenceManager
 from .unsortedJunk import *

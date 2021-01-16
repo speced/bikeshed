@@ -1,8 +1,9 @@
 import sys
 from collections import Counter
-import lxml.html
-from . import constants
 
+import lxml.html
+
+from . import constants
 
 messages = set()
 messageCounts = Counter()

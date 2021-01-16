@@ -1,6 +1,7 @@
 import re
 
 from widlparser import parser
+
 from . import config
 from .h import *
 from .messages import *

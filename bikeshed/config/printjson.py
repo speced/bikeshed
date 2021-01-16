@@ -1,5 +1,5 @@
+from ..h import isElement, outerHTML
 from ..messages import printColor
-from ..h import outerHTML, isElement
 
 
 def printjson(x, indent=2, level=0):

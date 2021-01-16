@@ -1,5 +1,5 @@
-from .main import englishFromList
 from ..messages import *
+from .main import englishFromList
 
 shortToLongStatus = {
     "DREAM": "A Collection of Interesting Ideas",

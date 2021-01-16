@@ -1,6 +1,7 @@
-import certifi
 import json
 import os
+
+import certifi
 from json_home_client import Client as APIClient
 
 from ..messages import *

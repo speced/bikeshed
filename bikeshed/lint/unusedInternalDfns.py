@@ -1,6 +1,6 @@
+from ..config import dfnElementsSelector
 from ..h import *
 from ..messages import *
-from ..config import dfnElementsSelector
 
 
 def unusedInternalDfns(doc):

@@ -1,8 +1,9 @@
 import json
-import re
 import os
-import requests
+import re
 from collections import defaultdict
+
+import requests
 
 from .. import biblio
 from ..DefaultOrderedDict import DefaultOrderedDict

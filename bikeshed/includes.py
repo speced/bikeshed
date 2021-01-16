@@ -2,8 +2,7 @@ import hashlib
 import itertools
 import re
 
-from . import datablocks
-from . import markdown
+from . import datablocks, markdown
 from .h import *
 from .messages import *
 

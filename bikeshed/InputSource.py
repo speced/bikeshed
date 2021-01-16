@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-import attr
 import email.utils
 import errno
 import os
-import requests
 import sys
-import tenacity
 import urllib.parse
 from abc import abstractmethod
 from datetime import date, datetime
 from typing import List, Optional
 
+import attr
+import requests
+import tenacity
 
 from .Line import Line
 

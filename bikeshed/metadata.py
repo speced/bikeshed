@@ -3,17 +3,14 @@ import json
 import os
 import re
 import subprocess
-from collections import defaultdict, OrderedDict
-from datetime import datetime, timedelta, date
+from collections import OrderedDict, defaultdict
+from datetime import date, datetime, timedelta
 from functools import partial
 
 import attr
-from isodate import parse_duration, Duration
+from isodate import Duration, parse_duration
 
-from . import config
-from . import constants
-from . import datablocks
-from . import markdown
+from . import config, constants, datablocks, markdown
 from .DefaultOrderedDict import DefaultOrderedDict
 from .h import *
 from .messages import *
