@@ -878,8 +878,8 @@ def processInfo(infos, doc, lineNum=None):
             die("Unknown info-block type '{0}'", infoType, lineNum=lineNum)
             continue
         infoCollections[infoType].append(info)
-    for infoType, infos in infoCollections.items():
-        knownInfoTypes[infoType](infos, doc, lineNum=0)
+    for infoType, info in infoCollections.items():
+        knownInfoTypes[infoType](info, doc, lineNum=0)
 
 
 def transformInclude(lines, doc, firstLine, lineNum=None, **kwargs):
