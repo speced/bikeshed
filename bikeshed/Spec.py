@@ -289,7 +289,8 @@ class Spec:
                     "http://lists.w3.org"
                 ):
                     el.text = "https" + text[4:]
-            extensions.BSPrepTR(self)
+            # Loaded from .include files
+            extensions.BSPrepTR(self)  # pylint: disable=no-member
 
         return self
 
