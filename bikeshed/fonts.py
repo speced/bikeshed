@@ -1,4 +1,6 @@
+import glob
 import re
+import string
 from itertools import *
 
 if __name__ == "__main__":
@@ -107,8 +109,6 @@ def parseMetadata(lines):
 
 
 def parseCharacters(md, lines):
-    import string
-
     height = md["height"]
     characters = {}
     if "space-width" in md:
@@ -159,7 +159,6 @@ def getInputLines(inputFilename):
         # Default to looking for a *.bs file.
         # Otherwise, look for a *.src.html file.
         # Otherwise, use standard input.
-        import glob
 
         if glob.glob("*.bs"):
             inputFilename = glob.glob("*.bs")[0]

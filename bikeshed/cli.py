@@ -3,8 +3,10 @@ import json
 import os
 import sys
 
-from . import config, constants, update
+from . import config, constants, fonts, issuelist, metadata, publish, test, update
 from .messages import *
+from .refs.ReferenceManager import ReferenceManager
+from .Spec import Spec
 
 
 def main():
@@ -490,9 +492,6 @@ def handleUpdate(options, extras):
 
 
 def handleSpec(options, extras):
-    from . import metadata
-    from .Spec import Spec
-
     doc = Spec(
         inputFilename=options.infile,
         debug=options.debug,
@@ -507,9 +506,6 @@ def handleSpec(options, extras):
 
 
 def handleEchidna(options, extras):
-    from . import metadata, publish
-    from .Spec import Spec
-
     doc = Spec(inputFilename=options.infile, token=options.ghToken)
     doc.mdCommandLine = metadata.fromCommandLine(extras)
     doc.mdCommandLine.addData("Prepare For TR", "yes")
@@ -530,9 +526,6 @@ def handleEchidna(options, extras):
 
 
 def handleWatch(options, extras):
-    from . import metadata
-    from .Spec import Spec
-
     # Can't have an error killing the watcher
     constants.setErrorLevel("nothing")
     doc = Spec(inputFilename=options.infile, token=options.ghToken)
@@ -543,9 +536,6 @@ def handleWatch(options, extras):
 
 
 def handleServe(options, extras):
-    from . import metadata
-    from .Spec import Spec
-
     constants.setErrorLevel("nothing")
     doc = Spec(inputFilename=options.infile, token=options.ghToken)
     doc.mdCommandLine = metadata.fromCommandLine(extras)
@@ -555,9 +545,6 @@ def handleServe(options, extras):
 
 
 def handleDebug(options, extras):
-    from . import metadata
-    from .Spec import Spec
-
     constants.setErrorLevel("nothing")
     constants.quiet = 2
     if options.printExports:
@@ -594,10 +581,6 @@ def handleDebug(options, extras):
 
 
 def handleRefs(options, extras):
-    from . import metadata
-    from .refs.ReferenceManager import ReferenceManager
-    from .Spec import Spec
-
     constants.setErrorLevel("nothing")
     constants.quiet = 10
     doc = Spec(inputFilename=options.infile)
@@ -626,8 +609,6 @@ def handleRefs(options, extras):
 
 
 def handleIssuesList(options, extras):
-    from . import issuelist
-
     if options.printTemplate:
         issuelist.printHelpMessage()
     else:
@@ -638,8 +619,6 @@ def handleSource(options, extras):
     if not options.bigText:  # If no options are given, do all options.
         options.bigText = True
     if options.bigText:
-        from . import fonts
-
         font = fonts.Font()
         fonts.replaceComments(
             font=font, inputFilename=options.infile, outputFilename=options.outfile
@@ -647,8 +626,6 @@ def handleSource(options, extras):
 
 
 def handleTest(options, extras):
-    from . import metadata, test
-
     md = metadata.fromCommandLine(extras)
     constants.setErrorLevel("nothing")
     constants.quiet = 100

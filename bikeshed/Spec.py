@@ -1,6 +1,10 @@
 import glob
+import http.server
 import os
+import socketserver
 import sys
+import threading
+import time
 from collections import defaultdict
 from functools import partial as curry
 
@@ -354,8 +358,6 @@ class Spec:
             return
 
     def watch(self, outputFilename, port=None, localhost=False):
-        import time
-
         outputFilename = self.fixMissingOutputFilename(outputFilename)
         if self.inputSource.mtime() is None:
             die(f"Watch mode doesn't support {self.inputSource}")
@@ -365,10 +367,6 @@ class Spec:
 
         if port:
             # Serve the folder on an HTTP server
-            import http.server
-            import socketserver
-            import threading
-
             class SilentServer(http.server.SimpleHTTPRequestHandler):
                 def log_message(self, format, *args):
                     pass

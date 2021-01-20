@@ -1,3 +1,5 @@
+import re
+
 from . import railroaddiagrams as rr
 from .messages import *
 
@@ -17,7 +19,6 @@ def parse(string):
             Terminal: foo
             Terminal raw: bar
     """
-    import re
 
     lines = string.splitlines()
 

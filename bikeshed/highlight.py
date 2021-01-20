@@ -2,13 +2,17 @@ import collections
 import itertools
 import re
 
+import pygments
+from pygments.formatters.other import RawTokenFormatter
+from pygments.lexers import get_lexer_by_name
+from widlparser import parser
+
 from .h import *
+from .lexers import CSSLexer
 from .messages import *
 
 
 def loadCSSLexer():
-    from .lexers import CSSLexer
-
     return CSSLexer()
 
 
@@ -163,7 +167,6 @@ def highlightWithWebIDL(text, el):
     A \3 indicates a stack pop.
     All other text is colored with the attr currently on top of the stack.
     """
-    from widlparser import parser
 
     class IDLUI:
         def warn(self, msg):
@@ -242,9 +245,6 @@ def coloredTextFromWidlStack(widlText):
 
 
 def highlightWithPygments(text, lang, el):
-    import pygments
-    from pygments import formatters
-
     lexer = lexerFromLang(lang)
     if lexer is None:
         die(
@@ -255,7 +255,7 @@ def highlightWithPygments(text, lang, el):
         )
         return
     rawTokens = str(
-        pygments.highlight(text, lexer, formatters.RawTokenFormatter()),
+        pygments.highlight(text, lexer, RawTokenFormatter()),
         encoding="utf-8",
     )
     coloredText = coloredTextFromRawTokens(rawTokens)
@@ -421,8 +421,6 @@ def lexerFromLang(lang):
     if lang in customLexers:
         return customLexers[lang]()
     try:
-        from pygments.lexers import get_lexer_by_name
-
         return get_lexer_by_name(lang, encoding="utf-8", stripAll=True)
     except:
         return None

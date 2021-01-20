@@ -1,7 +1,11 @@
-def verify_python_version():
-    import platform
-    import sys
+import os
+import platform
+import sys
 
+import pkg_resources
+
+
+def verify_python_version():
     if sys.version_info < (3,):
         print(
             """Bikeshed has updated to Python 3, but you are trying to run it with
@@ -27,11 +31,6 @@ verify_python_version()
 
 
 def verify_requirements():
-    import os
-    import sys
-
-    import pkg_resources
-
     requirements_file_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "requirements.txt"
     )
@@ -69,6 +68,7 @@ def verify_requirements():
 
 verify_requirements()
 
+# pylint: disable=wrong-import-position
 from . import config  # noqa: E402
 from . import update  # noqa: E402
 from .cli import main  # noqa: E402

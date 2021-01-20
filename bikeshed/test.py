@@ -4,7 +4,7 @@ import os
 import re
 from itertools import *
 
-from . import config
+from . import config, metadata
 from .messages import *
 from .Spec import Spec
 
@@ -133,8 +133,6 @@ def testPaths(patterns=None):
 
 
 def addTestMetadata(doc):
-    from . import metadata
-
     doc.mdBaseline.addData(
         "Boilerplate", "omit feedback-header, omit generator, omit document-revision"
     )

@@ -1,10 +1,11 @@
+import io
 import re
 from collections import OrderedDict, defaultdict
 from functools import reduce
 
 import attr
 
-from . import Line, biblio, config
+from . import Line, biblio, config, railroadparser
 from .h import *
 from .messages import *
 
@@ -598,10 +599,6 @@ def parseDefBlock(lines, type, capitalizeKeys=True, lineNum=None):
 
 
 def transformRailroad(lines, doc, firstLine, **kwargs):
-    import io
-
-    from . import railroadparser
-
     ret = ["<div class='railroad'>"]
     doc.extraStyles[
         "style-railroad"

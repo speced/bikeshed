@@ -1,3 +1,4 @@
+import json
 import re
 from collections import defaultdict
 
@@ -262,7 +263,6 @@ def processSpecrefBiblioFile(text, storage, order):
 
     <wg>: {*url:<url>, *shortname:<string>}
     """
-    import json
 
     try:
         datas = json.loads(text)

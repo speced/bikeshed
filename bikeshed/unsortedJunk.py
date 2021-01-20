@@ -1,8 +1,11 @@
 import json
 import logging
 import re
+import string
 from collections import Counter, defaultdict, namedtuple
 from urllib import parse
+
+import requests
 
 from . import biblio, config, dfnpanels
 from .func import Functor
@@ -110,8 +113,6 @@ class MarkdownCodeSpans(Functor):
                 repl = repls.pop()
                 if repl[0] == "" or repl[0].endswith("-"):
                     # Markdown code span, so massage per CommonMark rules.
-                    import string
-
                     t = escapeHTML(repl[1]).strip(string.whitespace)
                     t = re.sub("[" + string.whitespace + "]{2,}", " ", t)
                     return "{2}<code data-opaque bs-autolink-syntax='{1}'>{0}</code>".format(
@@ -1521,8 +1522,6 @@ def inlineRemoteIssues(doc):
         removeAttr(el, "data-inline-github")
     if not inlineIssues:
         return
-
-    import requests
 
     logging.captureWarnings(True)
 

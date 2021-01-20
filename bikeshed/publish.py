@@ -3,6 +3,8 @@ import os
 import tarfile
 import tempfile
 
+import requests
+
 from . import extensions
 
 
@@ -15,7 +17,6 @@ def publishEchidna(
     cc=None,
     editorial=False,
 ):
-    import requests
 
     logging.captureWarnings(True)  # Silence SNIMissingWarning
     tar = prepareTar(doc, visibleTar=False, additionalDirectories=additionalDirectories)
