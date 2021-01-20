@@ -2,15 +2,14 @@ import copy
 import os
 import re
 import subprocess
-from collections import defaultdict, OrderedDict
+from collections import OrderedDict, defaultdict
 from datetime import datetime
-from . import conditional
-from . import config
-from . import dfnpanels
-from .refs import utils as refUtils
+
+from . import conditional, config, dfnpanels
 from .DefaultOrderedDict import DefaultOrderedDict
 from .h import *
 from .messages import *
+from .refs import utils as refUtils
 
 
 def boilerplateFromHtml(doc, htmlString):
@@ -459,7 +458,7 @@ def addExplicitIndexes(doc):
                         if existingRef.status == status:
                             # Existing entry matches stated status, do nothing and don't add it.
                             break
-                        elif ref.status == status:
+                        if ref.status == status:
                             # New entry matches status, update and don't re-add it.
                             refsFromText[text][i] = ref
                             break
@@ -467,7 +466,7 @@ def addExplicitIndexes(doc):
                         # Default to preferring current specs
                         if existingRef.status == "current":
                             break
-                        elif ref.status == "current":
+                        if ref.status == "current":
                             refsFromText[ref.text][i] = ref
                             break
                 else:
@@ -578,7 +577,7 @@ def addIndexOfExternallyDefinedTerms(doc, container):
             E.li(E.a(attrs, "[", printableSpec, "]"), " defines the following terms:"),
         )
         termsUl = appendChild(specLi, E.ul())
-        for text, refs in sorted(refGroups.items(), key=lambda x: x[0]):
+        for _, refs in sorted(refGroups.items(), key=lambda x: x[0]):
             if len(refs) == 1:
                 ref = list(refs.values())[0]
                 link = makeLink(ref.text)
@@ -977,28 +976,26 @@ def addSpecMetadataSection(doc):
                     nativeName,
                 ),
             )
-        elif name:
+        if name:
             return E.a(
                 {"href": url, "hreflang": lang, "rel": "alternate", "title": lang}, name
             )
-        else:
-            return E.a({"href": url, "hreflang": lang, "rel": "alternate"}, lang)
+        return E.a({"href": url, "hreflang": lang, "rel": "alternate"}, lang)
 
     def printPreviousVersion(v):
         if v["type"] == "url":
             return E.a({"href": v["value"], "rel": "prev"}, v["value"])
-        else:
-            if v["type"] == "from-biblio":
-                key = v["value"]
-            else:  # "from-biblio-implicit"
-                key = doc.md.vshortname
-            dated = doc.refs.getLatestBiblioRef(key)
-            if not dated:
-                die(
-                    f"While trying to generate a Previous Version line, couldn't find a dated biblio reference for {key}."
-                )
-                return
-            return E.a({"href": dated.url, "rel": "prev"}, dated.url)
+        if v["type"] == "from-biblio":
+            key = v["value"]
+        else:  # "from-biblio-implicit"
+            key = doc.md.vshortname
+        dated = doc.refs.getLatestBiblioRef(key)
+        if not dated:
+            die(
+                f"While trying to generate a Previous Version line, couldn't find a dated biblio reference for {key}."
+            )
+            return
+        return E.a({"href": dated.url, "rel": "prev"}, dated.url)
 
     md = DefaultOrderedDict(list)
     mac = doc.macros

@@ -63,7 +63,7 @@ def evalConditions(doc, el, conditionString):
         if cond["type"] == "status":
             yield config.looselyMatch(cond["value"], doc.md.status)
         elif cond["type"] == "text macro":
-            for k, v in doc.md.customTextMacros:
+            for k, _ in doc.md.customTextMacros:
                 if k == cond["value"]:
                     yield True
                     break

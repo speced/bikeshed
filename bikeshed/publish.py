@@ -76,6 +76,5 @@ def prepareTar(doc, visibleTar=False, additionalDirectories=None):
     os.remove(specOutput.name)
     if visibleTar:
         return open("test.tar", "rb")
-    else:
-        f.seek(0)
-        return f
+    f.seek(0)
+    return f

@@ -1,9 +1,10 @@
 import hashlib
-import html5lib
 import re
+
+import html5lib
 from lxml import etree
-from lxml.html import tostring
 from lxml.cssselect import CSSSelector
+from lxml.html import tostring
 
 from .. import config
 from ..DefaultOrderedDict import DefaultOrderedDict

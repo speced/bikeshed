@@ -24,10 +24,9 @@ def determineGaps(outer, inner):
     diff = outer - inner
     if INTERNAL_ALIGNMENT == "left":
         return 0, diff
-    elif INTERNAL_ALIGNMENT == "right":
+    if INTERNAL_ALIGNMENT == "right":
         return diff, 0
-    else:
-        return diff / 2, diff / 2
+    return diff / 2, diff / 2
 
 
 def doubleenumerate(seq):
@@ -291,8 +290,7 @@ class OptionalSequence(DiagramItem):
     def __new__(cls, *items):
         if len(items) <= 1:
             return Sequence(*items)
-        else:
-            return super().__new__(cls, *items)
+        return super().__new__(cls, *items)
 
     def __init__(self, *items):
         DiagramItem.__init__(self, "g")

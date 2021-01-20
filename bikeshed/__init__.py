@@ -1,6 +1,6 @@
 def verify_python_version():
-    import sys
     import platform
+    import sys
 
     if sys.version_info < (3,):
         print(
@@ -28,8 +28,9 @@ verify_python_version()
 
 def verify_requirements():
     import os
-    import pkg_resources
     import sys
+
+    import pkg_resources
 
     requirements_file_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "requirements.txt"
@@ -68,7 +69,7 @@ def verify_requirements():
 
 verify_requirements()
 
+from . import config  # noqa: E402
+from . import update  # noqa: E402
 from .cli import main  # noqa: E402
 from .Spec import Spec  # noqa: E402
-from . import update  # noqa: E402
-from . import config  # noqa: E402

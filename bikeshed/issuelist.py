@@ -1,6 +1,7 @@
 import glob
 import re
 import sys
+
 from .messages import *
 
 statusStyle = {
@@ -71,7 +72,7 @@ def findIssuesFile():
             "Can't find an 'issues*.txt' or '*.bsi' file in this folder. Explicitly pass a filename."
         )
         return
-    elif len(possibleFiles) == 1:
+    if len(possibleFiles) == 1:
         return possibleFiles[0]
 
     # If there are more than one, assume they contain either an index or a YYYYMMDD date,

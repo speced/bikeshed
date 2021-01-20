@@ -172,7 +172,7 @@ def getInputLines(inputFilename):
             lines = list(sys.stdin.readlines())
         else:
             lines = open(inputFilename, encoding="utf-8").readlines()
-    except OSError:
+    except FileNotFoundError:
         die(
             "Couldn't find the input file at the specified location '{0}'.",
             inputFilename,

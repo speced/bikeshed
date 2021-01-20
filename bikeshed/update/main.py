@@ -1,17 +1,19 @@
 import os
 
-from . import updateBackRefs
-from . import updateCrossRefs
-from . import updateBiblio
-from . import updateCanIUse
-from . import updateMdn
-from . import updateLinkDefaults
-from . import updateTestSuites
-from . import updateLanguages
-from . import updateWpt
-from . import manifest
 from .. import config
 from ..messages import *
+from . import (
+    manifest,
+    updateBackRefs,
+    updateBiblio,
+    updateCanIUse,
+    updateCrossRefs,
+    updateLanguages,
+    updateLinkDefaults,
+    updateMdn,
+    updateTestSuites,
+    updateWpt,
+)
 
 
 def update(
@@ -149,8 +151,8 @@ def cleanupFiles(root, touchedPaths, dryRun=False):
 
 
 def copyanything(src, dst):
-    import shutil
     import errno
+    import shutil
 
     try:
         shutil.rmtree(dst, ignore_errors=True)

@@ -2,8 +2,7 @@ import hashlib
 import itertools
 import re
 
-from . import datablocks
-from . import markdown
+from . import datablocks, markdown
 from .h import *
 from .messages import *
 
@@ -186,15 +185,13 @@ def parseSingleRange(item):
             )
             return
         return [low, high]
-    else:
-        if item == "*":
-            return None
-        else:
-            try:
-                val = int(item)
-                return [val, val]
-            except ValueError:
-                die(
-                    "Error parsing include-code 'show' value '{0}' - must be an int or *.",
-                    item,
-                )
+    if item == "*":
+        return None
+    try:
+        val = int(item)
+        return [val, val]
+    except ValueError:
+        die(
+            "Error parsing include-code 'show' value '{0}' - must be an int or *.",
+            item,
+        )

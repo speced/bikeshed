@@ -1,9 +1,10 @@
-import certifi
 import json
-import re
-import tenacity
 import os
+import re
 from collections import defaultdict
+
+import certifi
+import tenacity
 from json_home_client import Client as APIClient
 
 from .. import config

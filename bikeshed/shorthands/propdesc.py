@@ -1,7 +1,8 @@
 import re
+
 from ..h import E, outerHTML
-from . import steps
 from ..messages import die
+from . import steps
 
 
 class PropdescShorthand:

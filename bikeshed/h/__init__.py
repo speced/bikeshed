@@ -1,69 +1,70 @@
+from .dom import (
+    E,
+    addClass,
+    addOldIDs,
+    appendChild,
+    appendContents,
+    approximateLineNumber,
+    childElements,
+    childNodes,
+    circledDigits,
+    clearContents,
+    closestAncestor,
+    closestAttr,
+    createElement,
+    dedupIDs,
+    emptyText,
+    escapeAttr,
+    escapeCSSIdent,
+    escapeHTML,
+    escapeUrlFrag,
+    filterAncestors,
+    find,
+    findAll,
+    fixSurroundingTypography,
+    fixTypography,
+    fixupIDs,
+    foldWhitespace,
+    hasAncestor,
+    hasAttr,
+    hasAttrs,
+    hasChildElements,
+    hasClass,
+    hashContents,
+    hasOnlyChild,
+    headingLevelOfElement,
+    innerHTML,
+    insertAfter,
+    insertBefore,
+    isElement,
+    isEmpty,
+    isNormative,
+    isOddNode,
+    moveContents,
+    nodeIter,
+    outerHTML,
+    parentElement,
+    parseDocument,
+    parseHTML,
+    prependChild,
+    previousElements,
+    relevantHeadings,
+    removeAttr,
+    removeClass,
+    removeNode,
+    replaceAwkwardCSSShorthands,
+    replaceContents,
+    replaceMacros,
+    replaceNode,
+    safeID,
+    scopingElements,
+    sectionName,
+    serializeTag,
+    textContent,
+    textContentIgnoringDecorative,
+    treeAttr,
+    unescape,
+    unfixTypography,
+    wrapContents,
+)
 from .serializer import Serializer
-
-from .dom import addClass
-from .dom import addOldIDs
-from .dom import appendChild
-from .dom import appendContents
-from .dom import approximateLineNumber
-from .dom import childElements
-from .dom import childNodes
-from .dom import circledDigits
-from .dom import clearContents
-from .dom import closestAncestor
-from .dom import closestAttr
-from .dom import createElement
-from .dom import dedupIDs
-from .dom import E
-from .dom import emptyText
-from .dom import escapeAttr
-from .dom import escapeCSSIdent
-from .dom import escapeHTML
-from .dom import escapeUrlFrag
-from .dom import filterAncestors
-from .dom import find
-from .dom import findAll
-from .dom import fixSurroundingTypography
-from .dom import fixTypography
-from .dom import fixupIDs
-from .dom import foldWhitespace
-from .dom import hasAncestor
-from .dom import hasAttr
-from .dom import hasAttrs
-from .dom import hasChildElements
-from .dom import hasClass
-from .dom import hashContents
-from .dom import hasOnlyChild
-from .dom import headingLevelOfElement
-from .dom import innerHTML
-from .dom import insertAfter
-from .dom import insertBefore
-from .dom import isElement
-from .dom import isEmpty
-from .dom import isNormative
-from .dom import isOddNode
-from .dom import moveContents
-from .dom import nodeIter
-from .dom import outerHTML
-from .dom import parentElement
-from .dom import parseDocument
-from .dom import parseHTML
-from .dom import prependChild
-from .dom import previousElements
-from .dom import relevantHeadings
-from .dom import removeAttr
-from .dom import removeClass
-from .dom import removeNode
-from .dom import replaceAwkwardCSSShorthands
-from .dom import replaceContents
-from .dom import replaceMacros
-from .dom import replaceNode
-from .dom import safeID
-from .dom import scopingElements
-from .dom import sectionName
-from .dom import serializeTag
-from .dom import textContent
-from .dom import textContentIgnoringDecorative
-from .dom import treeAttr
-from .dom import unescape
-from .dom import unfixTypography
-from .dom import wrapContents

@@ -1,6 +1,7 @@
 import collections
 import itertools
 import re
+
 from .h import *
 from .messages import *
 
@@ -68,14 +69,12 @@ def determineHighlightLang(doc, el):
         return None
     if attr == "nohighlight":
         return None
-    elif attr == "highlight":
+    if attr == "highlight":
         return lang
-    else:
-        # Highlight-by-default, if applicable.
-        if el.tag in ["pre", "xmp"] and hasClass(el, "idl"):
-            return "webidl"
-        else:
-            return doc.md.defaultHighlight
+    # Highlight-by-default, if applicable.
+    if el.tag in ["pre", "xmp"] and hasClass(el, "idl"):
+        return "webidl"
+    return doc.md.defaultHighlight
 
 
 def determineLineNumbers(doc, el):
@@ -210,31 +209,30 @@ def coloredTextFromWidlStack(widlText):
                 currentText = ""
                 mode = "color"
                 continue
-            elif char == "\2":
+            if char == "\2":
                 assert False, r"Encountered a \2 while in text mode"
                 continue
-            elif char == "\3":
+            if char == "\3":
                 assert colors, r"Encountered a \3 without any colors on stack."
                 coloredTexts.append(ColoredText(currentText, colors.pop()))
                 currentText = ""
                 continue
-            else:
-                currentText += char
+
+            currentText += char
         elif mode == "color":
             if char == "\1":
                 assert False, r"Encountered a \1 while in color mode."
                 continue
-            elif char == "\2":
+            if char == "\2":
                 colors.append(currentText)
                 currentText = ""
                 mode = "text"
                 continue
-            elif char == "\3":
+            if char == "\3":
                 assert False, r"Encountered a \3 while in color mode."
                 continue
-            else:
-                currentText += char
-                continue
+            currentText += char
+            continue
     assert (
         len(colors) == 0
     ), r"Colors stack wasn't empty at end, \1 and \3s aren't balanced?"
