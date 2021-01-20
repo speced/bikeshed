@@ -2,11 +2,10 @@ import copy
 import re
 from collections import defaultdict
 
-from .. import config
-from .. import constants
+from .. import config, constants
+from ..messages import linkerror
 from .RefWrapper import RefWrapper
 from .utils import *
-from ..messages import linkerror
 
 
 class RefSource:
@@ -115,7 +114,7 @@ class RefSource:
         dedupURLs=True,
         exact=False,
         error=False,
-        **kwargs
+        **kwargs,
     ):
         # Query the ref database.
         # If it fails to find a ref, also returns the stage at which it finally ran out of possibilities.

@@ -3,16 +3,16 @@ import glob
 import os
 import re
 from itertools import *
+
 from . import config
 from .messages import *
 from .Spec import Spec
-
 
 TEST_DIR = os.path.abspath(os.path.join(config.scriptPath(), "..", "tests"))
 
 
 def findTestFiles(manualOnly=False):
-    for root, dirnames, filenames in os.walk(TEST_DIR):
+    for root, _, filenames in os.walk(TEST_DIR):
         for filename in filenames:
             filePath = testNameForPath(os.path.join(root, filename))
             pathSegs = splitPath(filePath)
@@ -32,8 +32,7 @@ def splitPath(path, reverseSegs=None):
     reverseSegs.append(tail)
     if head in ["", "/"]:
         return list(reversed(reverseSegs))
-    else:
-        return splitPath(head, reverseSegs)
+    return splitPath(head, reverseSegs)
 
 
 # The test name will be the path relative to the tests directory, or the path as
@@ -71,11 +70,10 @@ def runAllTests(patterns=None, manualOnly=False, md=None):
     if numPassed == total:
         p(printColor("✔ All tests passed.", color="green"))
         return True
-    else:
-        p(printColor(f"✘ {numPassed}/{total} tests passed.", color="red"))
-        p(printColor("Failed Tests:", color="red"))
-        for fail in fails:
-            p("* " + fail)
+    p(printColor(f"✘ {numPassed}/{total} tests passed.", color="red"))
+    p(printColor("Failed Tests:", color="red"))
+    for fail in fails:
+        p("* " + fail)
 
 
 def processTest(path, md=None, fileRequester=config.DataFileRequester(type="readonly")):
@@ -126,13 +124,12 @@ def testPaths(patterns=None):
     # otherwise, glob the provided paths, rooted at the test dir
     if not patterns:
         return list(sortTests(findTestFiles()))
-    else:
-        return [
-            path
-            for pattern in patterns
-            for path in glob.glob(os.path.join(TEST_DIR, pattern))
-            if path.endswith(".bs")
-        ]
+    return [
+        path
+        for pattern in patterns
+        for path in glob.glob(os.path.join(TEST_DIR, pattern))
+        if path.endswith(".bs")
+    ]
 
 
 def addTestMetadata(doc):

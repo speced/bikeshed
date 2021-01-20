@@ -1,10 +1,9 @@
 import argparse
+import json
 import os
 import sys
 
-from . import config
-from . import constants
-from . import update
+from . import config, constants, update
 from .messages import *
 
 
@@ -508,8 +507,7 @@ def handleSpec(options, extras):
 
 
 def handleEchidna(options, extras):
-    from . import metadata
-    from . import publish
+    from . import metadata, publish
     from .Spec import Spec
 
     doc = Spec(inputFilename=options.infile, token=options.ghToken)
@@ -649,8 +647,7 @@ def handleSource(options, extras):
 
 
 def handleTest(options, extras):
-    from . import metadata
-    from . import test
+    from . import metadata, test
 
     md = metadata.fromCommandLine(extras)
     constants.setErrorLevel("nothing")
@@ -665,8 +662,6 @@ def handleTest(options, extras):
 
 
 def handleProfile(options, extras):
-    import os
-
     root = f'--root="{options.root}"' if options.root else ""
     leaf = f'--leaf="{options.leaf}"' if options.leaf else ""
     if options.svgFile:

@@ -1,17 +1,19 @@
 import os
 
-from . import updateBackRefs
-from . import updateCrossRefs
-from . import updateBiblio
-from . import updateCanIUse
-from . import updateMdn
-from . import updateLinkDefaults
-from . import updateTestSuites
-from . import updateLanguages
-from . import updateWpt
-from . import manifest
 from .. import config
 from ..messages import *
+from . import (
+    manifest,
+    updateBackRefs,
+    updateBiblio,
+    updateCanIUse,
+    updateCrossRefs,
+    updateLanguages,
+    updateLinkDefaults,
+    updateMdn,
+    updateTestSuites,
+    updateWpt,
+)
 
 
 def update(
@@ -38,6 +40,7 @@ def update(
             say("Falling back to a manual update...")
             force = True
     if force:
+        # fmt: off
         # If all are False, update everything
         if anchors == backrefs == biblio == caniuse == linkDefaults == mdn == testSuites == languages == wpt == False:  # noqa: E712
             anchors = backrefs =  biblio =  caniuse =  linkDefaults =  mdn =  testSuites =  languages =  wpt =  True  # noqa: E222
@@ -53,6 +56,7 @@ def update(
             "languages": updateLanguages.update(path=path, dryRun=dryRun) if languages else None,
             "wpt": updateWpt.update(path=path, dryRun=dryRun) if wpt else None,
         }
+        # fmt: on
 
         cleanupFiles(path, touchedPaths=touchedPaths, dryRun=dryRun)
         manifest.createManifest(path=path, dryRun=dryRun)
@@ -147,8 +151,8 @@ def cleanupFiles(root, touchedPaths, dryRun=False):
 
 
 def copyanything(src, dst):
-    import shutil
     import errno
+    import shutil
 
     try:
         shutil.rmtree(dst, ignore_errors=True)

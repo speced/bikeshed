@@ -1,7 +1,8 @@
 import collections
-import lxml
 import os
 import re
+
+import lxml
 
 
 def englishFromList(items, conjunction="or"):

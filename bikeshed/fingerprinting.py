@@ -64,13 +64,12 @@ def trackingVectorImage(imageURL, imageWidth, imageHeight, altText, title):
             E.title({}, title),
             E.use({"href": "#" + trackingVectorId}),
         )
-    else:
-        return E.img(
-            {
-                "title": title,
-                "alt": altText,
-                "src": imageURL,
-                "width": imageWidth,
-                "height": imageHeight,
-            }
-        )
+    return E.img(
+        {
+            "title": title,
+            "alt": altText,
+            "src": imageURL,
+            "width": imageWidth,
+            "height": imageHeight,
+        }
+    )

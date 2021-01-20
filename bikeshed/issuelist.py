@@ -1,6 +1,7 @@
 import glob
 import re
 import sys
+
 from .messages import *
 
 statusStyle = {
@@ -71,7 +72,7 @@ def findIssuesFile():
             "Can't find an 'issues*.txt' or '*.bsi' file in this folder. Explicitly pass a filename."
         )
         return
-    elif len(possibleFiles) == 1:
+    if len(possibleFiles) == 1:
         return possibleFiles[0]
 
     # If there are more than one, assume they contain either an index or a YYYYMMDD date,
@@ -136,9 +137,7 @@ def extractHeaderInfo(lines, infilename):
             ed = f"http://dev.w3.org/csswg/{shortname}/"
         if date is None:
             cdate = match.group(3)
-            date = "{}-{}-{}".format(
-                *re.match(r"(\d{4})(\d\d)(\d\d)", cdate).groups()
-            )
+            date = "{}-{}-{}".format(*re.match(r"(\d{4})(\d\d)(\d\d)", cdate).groups())
     else:
         warn(
             "Autodetection of Shortname, Date, and Status failed; draft url does not match the format /status-shortname-date/. Got:\n{0}",

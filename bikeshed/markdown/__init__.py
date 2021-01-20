@@ -1,1 +1,1 @@
-from .markdown import stripComments, parse
+from .markdown import parse, stripComments

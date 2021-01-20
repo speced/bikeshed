@@ -1,11 +1,11 @@
 from ..h import (
-    findAll,
-    textContent,
-    removeNode,
     E,
     addClass,
     appendChild,
     clearContents,
+    findAll,
+    removeNode,
+    textContent,
 )
 from ..messages import *
 

@@ -1,13 +1,14 @@
 import asyncio
-import aiofiles
-import aiohttp
 import hashlib
 import os
-import requests
-import tenacity
 import time
 from datetime import datetime
-from result import Ok, Err
+
+import aiofiles
+import aiohttp
+import requests
+import tenacity
+from result import Err, Ok
 
 from ..messages import *
 
@@ -60,9 +61,7 @@ def createManifest(path, dryRun=False):
 
     if not dryRun:
         try:
-            with open(
-                os.path.join(path, "manifest.txt"), "w", encoding="utf-8"
-            ) as fh:
+            with open(os.path.join(path, "manifest.txt"), "w", encoding="utf-8") as fh:
                 fh.write(manifest)
         except Exception:
             raise
@@ -193,9 +192,7 @@ def updateByManifest(path, dryRun=False):
             )
         goodPaths, badPaths = asyncio.run(updateFiles(path, newPaths))
         try:
-            with open(
-                os.path.join(path, "manifest.txt"), "w", encoding="utf-8"
-            ) as fh:
+            with open(os.path.join(path, "manifest.txt"), "w", encoding="utf-8") as fh:
                 fh.write(createFinishedManifest(remoteManifest, goodPaths, badPaths))
         except Exception as e:
             warn("Couldn't save new manifest file.\n{0}", e)

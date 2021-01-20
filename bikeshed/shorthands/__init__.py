@@ -1,5 +1,5 @@
-from .main import walk
 from . import oldShorthands
+from .main import walk
 
 
 def run(doc):

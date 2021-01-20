@@ -1,8 +1,9 @@
 import sys
 from collections import Counter
-import lxml.html
-from . import constants
 
+import lxml.html
+
+from . import constants
 
 messages = set()
 messageCounts = Counter()
@@ -157,8 +158,7 @@ def printColor(text, color="white", *styles):
         colorNum = colorsConverter[color.lower()]
         styleNum = ";".join(str(stylesConverter[style.lower()]) for style in styles)
         return f"\033[{styleNum};{colorNum}m{text}\033[0m"
-    else:
-        return text
+    return text
 
 
 def formatMessage(type, text, lineNum=None):
@@ -166,15 +166,15 @@ def formatMessage(type, text, lineNum=None):
         text = text.replace("<", "&lt;")
         if type == "fatal":
             return f"<fatal>{text}</fatal>"
-        elif type == "link":
+        if type == "link":
             return f"<linkerror>{text}</linkerror>"
-        elif type == "warning":
+        if type == "warning":
             return f"<warning>{text}</warning>"
-        elif type == "message":
+        if type == "message":
             return f"<message>{text}</message>"
-        elif type == "success":
+        if type == "success":
             return f"<final-success>{text}</final-success>"
-        elif type == "failure":
+        if type == "failure":
             return f"<final-failure>{text}</final-failure>"
     else:
         if type == "message":

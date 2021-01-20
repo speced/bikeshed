@@ -3,17 +3,14 @@ import json
 import os
 import re
 import subprocess
-from collections import defaultdict, OrderedDict
-from datetime import datetime, timedelta, date
+from collections import OrderedDict, defaultdict
+from datetime import date, datetime, timedelta
 from functools import partial
 
 import attr
-from isodate import parse_duration, Duration
+from isodate import Duration, parse_duration
 
-from . import config
-from . import constants
-from . import datablocks
-from . import markdown
+from . import config, constants, datablocks, markdown
 from .DefaultOrderedDict import DefaultOrderedDict
 from .h import *
 from .messages import *
@@ -244,9 +241,7 @@ class MetadataManager:
                 errors.append(f"    Missing a '{name}' entry.")
         for attrName, name in recommendedSingularKeys.items():
             if getattr(self, attrName) is None:
-                warnings.append(
-                    f"    You probably want to provide a '{name}' entry."
-                )
+                warnings.append(f"    You probably want to provide a '{name}' entry.")
         for attrName, name in requiredMultiKeys.items():
             if len(getattr(self, attrName)) == 0:
                 errors.append(f"    Must provide at least one '{name}' entry.")
@@ -307,9 +302,7 @@ class MetadataManager:
         macros["date-my"] = self.date.strftime("%b %Y")
         macros["date-mmy"] = self.date.strftime("%B %Y")
         if isinstance(self.expires, date):
-            macros["expires"] = self.expires.strftime(
-                f"{self.expires.day} %B %Y"
-            )
+            macros["expires"] = self.expires.strftime(f"{self.expires.day} %B %Y")
             macros["expires-dmmy"] = self.expires.strftime(
                 f"{self.expires.day} %B %Y"
             )  # same as plain 'expires'
@@ -318,9 +311,7 @@ class MetadataManager:
             macros["expires-my"] = self.expires.strftime("%b %Y")
             macros["expires-mmy"] = self.expires.strftime("%B %Y")
         if self.deadline:
-            macros["deadline"] = self.deadline.strftime(
-                f"{self.deadline.day} %B %Y"
-            )
+            macros["deadline"] = self.deadline.strftime(f"{self.deadline.day} %B %Y")
             macros["isodeadline"] = self.deadline.strftime("%Y-%m-%d")
         if self.status in config.snapshotStatuses:
             macros[
@@ -366,7 +357,7 @@ class MetadataManager:
         else:
             shortStatus = (
                 self.rawStatus.partition("/")[2]
-                if (self.rawStatus and "/" in self.rawStatus)
+                if (self.rawStatus and "/" in str(self.rawStatus))
                 else self.rawStatus
             )
             macros[
@@ -526,7 +517,6 @@ def parseEditor(key, val, lineNum):
         "orglink": None,
         "link": None,
         "email": None,
-        "w3cid": None,
     }
     # Handle well-known pieces, split off the ambiguous ones
     ambiguousPieces = []
@@ -589,7 +579,7 @@ def parseEditor(key, val, lineNum):
     # Check if the org ends with a link
     if (
         data["org"] is not None
-        and " " in data["org"]
+        and " " in str(data["org"])
         and looksLinkish(data["org"].split()[-1])
     ):
         pieces = data["org"].split()
@@ -672,31 +662,29 @@ def parseBiblioDisplay(key, val, lineNum):
     val = val.strip().lower()
     if val in constants.biblioDisplay:
         return val
-    else:
-        die(
-            "'{0}' must be either 'inline' or 'index'. Got '{1}'",
-            key,
-            val,
-            lineNum=lineNum,
-        )
-        return constants.biblioDisplay.index
+    die(
+        "'{0}' must be either 'inline' or 'index'. Got '{1}'",
+        key,
+        val,
+        lineNum=lineNum,
+    )
+    return constants.biblioDisplay.index
 
 
 def parseRefStatus(key, val, lineNum):
     val = val.strip().lower()
     if val == "dated":
         # Legacy term that used to be allowed
-        val == "snapshot"
+        val = "snapshot"
     if val in constants.refStatus:
         return val
-    else:
-        die(
-            "'{0}' must be either 'current' or 'snapshot'. Got '{1}'",
-            key,
-            val,
-            lineNum=lineNum,
-        )
-        return constants.refStatus.current
+    die(
+        "'{0}' must be either 'current' or 'snapshot'. Got '{1}'",
+        key,
+        val,
+        lineNum=lineNum,
+    )
+    return constants.refStatus.current
 
 
 def parseComplainAbout(key, val, lineNum):
@@ -821,10 +809,9 @@ def parseInlineGithubIssues(key, val, lineNum):
             lineNum=lineNum,
         )
         return False
-    elif b is True:
+    if b is True:
         return "full"
-    else:
-        return False
+    return False
 
 
 def parseTextMacro(key, val, lineNum):
@@ -878,7 +865,7 @@ def parseRepository(key, val, lineNum):
     pieces = val.split(None, 1)
     if len(pieces) == 2:
         return Repository(url=pieces[0], name=pieces[1])
-    elif len(pieces) == 1:
+    if len(pieces) == 1:
         # Try to recognize a GitHub url
         match = re.match(r"https://github\.([\w.-]+)/([\w-]+)/([\w-]+)/?$", val)
         if match:
@@ -890,13 +877,12 @@ def parseRepository(key, val, lineNum):
             return GithubRepository("com", *match.groups())
         # Otherwise just use the url as the shortname
         return Repository(url=val)
-    else:
-        die(
-            "Repository must be a url, optionally followed by a shortname. Got '{0}'",
-            val,
-            lineNum=lineNum,
-        )
-        return config.Nil()
+    die(
+        "Repository must be a url, optionally followed by a shortname. Got '{0}'",
+        val,
+        lineNum=lineNum,
+    )
+    return config.Nil()
 
 
 def parseTranslateIDs(key, val, lineNum):
@@ -959,9 +945,9 @@ def parseAudience(key, val, lineNum):
     if not values:
         die("Audience metadata must have at least one value if specified.")
         return []
-    elif len(values) == 1 and values[0] == "ALL":
+    if len(values) == 1 and values[0] == "ALL":
         return ["all"]
-    elif len(values) >= 1:
+    if len(values) >= 1:
         ret = []
         namedAudiences = {"CWG", "LWG", "EWG", "LEWG", "DIRECTION"}
         pseudonymAudiences = {
@@ -1000,12 +986,11 @@ def parseEditorTerm(key, val, lineNum):
     values = [x.strip() for x in val.strip().split(",")]
     if len(values) == 2:
         return {"singular": values[0], "plural": values[1]}
-    else:
-        die(
-            "Editor Term metadata must be two comma-separated terms, giving the singular and plural term for editors. Got '{0}'.",
-            val,
-        )
-        return {"singular": "Editor", "plural": "Editors"}
+    die(
+        "Editor Term metadata must be two comma-separated terms, giving the singular and plural term for editors. Got '{0}'.",
+        val,
+    )
+    return {"singular": "Editor", "plural": "Editors"}
 
 
 def parseMaxToCDepth(key, val, lineNum):
@@ -1052,10 +1037,8 @@ def parsePreviousVersion(key, val, lineNum):
     if biblioMatch:
         if biblioMatch.group(1):
             return [{"type": "from-biblio", "value": biblioMatch.group(1).strip()}]
-        else:
-            return [{"type": "from-biblio-implicit"}]
-    else:
-        return [{"type": "url", "value": val}]
+        return [{"type": "from-biblio-implicit"}]
+    return [{"type": "url", "value": val}]
 
 
 def parseInlineTagCommand(key, val, lineNum):
@@ -1086,10 +1069,10 @@ def parse(lines):
             else:
                 endTag = r"</xmp>\s*"
             continue
-        elif inMetadata and re.match(endTag, line.text):
+        if inMetadata and re.match(endTag, line.text):
             inMetadata = False
             continue
-        elif inMetadata:
+        if inMetadata:
             if lastKey and (line.text.strip() == "" or re.match(r"\s+", line.text)):
                 # empty lines, or lines that start with 1+ spaces, continue previous key
                 md.addData(lastKey, line.text, lineNum=line.i)

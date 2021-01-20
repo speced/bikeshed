@@ -1,6 +1,7 @@
 import json
 from collections import OrderedDict
 from datetime import datetime
+
 from .h import *
 from .messages import *
 
@@ -237,9 +238,7 @@ class CanIUseManager:
         if not self.hasFeature(featureName):
             return
         data = json.loads(
-            self.dataFile.fetch(
-                "caniuse", f"feature-{featureName}.json", str=True
-            ),
+            self.dataFile.fetch("caniuse", f"feature-{featureName}.json", str=True),
             object_pairs_hook=OrderedDict,
         )
         self.features[featureName] = data

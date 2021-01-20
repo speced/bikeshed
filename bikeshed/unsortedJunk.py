@@ -4,7 +4,8 @@ import re
 from collections import Counter, defaultdict, namedtuple
 from urllib import parse
 
-from . import biblio, config, dfnpanels, func
+from . import biblio, config, dfnpanels
+from .func import Functor
 from .h import (
     E,
     addClass,
@@ -47,7 +48,7 @@ from .h import (
 from .messages import die, say, warn
 
 
-class MarkdownCodeSpans(func.Functor):
+class MarkdownCodeSpans(Functor):
     # Wraps a string, such that the contained text is "safe"
     # and contains no markdown code spans.
     # Thus, functions mapping over the text can freely make substitutions,
@@ -90,7 +91,8 @@ class MarkdownCodeSpans(func.Functor):
             newText += text[indexSoFar:]
         elif mode == "code":
             newText += tag + "`" * backtickCount + text[indexSoFar:]
-        self.__val__ = newText
+
+        super().__init__(newText)
 
     def map(self, fn):
         x = MarkdownCodeSpans("")
@@ -115,14 +117,12 @@ class MarkdownCodeSpans(func.Functor):
                     return "{2}<code data-opaque bs-autolink-syntax='{1}'>{0}</code>".format(
                         t, escapeAttr(repl[2]), repl[0]
                     )
-                else:
-                    return "<code data-opaque data-span-tag={0} bs-autolink-syntax='{2}'>{1}</code>".format(
-                        repl[0], escapeHTML(repl[1]), escapeAttr(repl[2])
-                    )
+                return "<code data-opaque data-span-tag={0} bs-autolink-syntax='{2}'>{1}</code>".format(
+                    repl[0], escapeHTML(repl[1]), escapeAttr(repl[2])
+                )
 
             return re.sub("\ue0ff", codeSpanReviver, self.__val__)
-        else:
-            return self.__val__
+        return self.__val__
 
 
 def stripBOM(doc):
@@ -186,7 +186,7 @@ def canonicalizeShortcuts(doc):
         "algorithm": "data-algorithm",
         "ignore": "data-var-ignore",
     }
-    for el in findAll(",".join(f"[{attr}]" for attr in attrFixup.keys()), doc):
+    for el in findAll(",".join(f"[{attr}]" for attr in attrFixup), doc):
         for attr, fixedAttr in attrFixup.items():
             if el.get(attr) is not None:
                 el.set(fixedAttr, el.get(attr))
@@ -440,7 +440,7 @@ def fixIntraDocumentReferences(doc):
                 el=el,
             )
             continue
-        elif targetID not in ids:
+        if targetID not in ids:
             die("Couldn't find target anchor {0}:\n{1}", targetID, outerHTML(el), el=el)
             continue
         if isEmpty(el):
@@ -603,18 +603,18 @@ def determineDfnType(dfn, inferCSS=False):
         text = textContent(dfn)
         if text[0:1] == "@":
             return "at-rule"
-        elif (
+        if (
             len(dfn) == 1
             and dfn[0].get("data-link-type") == "maybe"
             and emptyText(dfn.text)
             and emptyText(dfn[0].tail)
         ):
             return "value"
-        elif text[0:1] == "<" and text[-1:] == ">":
+        if text[0:1] == "<" and text[-1:] == ">":
             return "type"
-        elif text[0:1] == ":":
+        if text[0:1] == ":":
             return "selector"
-        elif re.match(r"^[\w-]+\(.*\)$", text) and not (dfn.get("id") or "").startswith(
+        if re.match(r"^[\w-]+\(.*\)$", text) and not (dfn.get("id") or "").startswith(
             "dom-"
         ):
             return "function"
@@ -680,7 +680,7 @@ def classifyDfns(doc, dfns):
                     el=el,
                 )
                 continue
-            elif el.get("data-lt") is None:
+            if el.get("data-lt") is None:
                 if dfnType == "function":
                     # CSS function, define it with no args in the text
                     primaryDfnText = (
@@ -738,9 +738,7 @@ def classifyDfns(doc, dfns):
                 )
                 el.set(
                     "data-alternate-id",
-                    config.simplifyText(
-                        f"dom-{singleFor}-{primaryDfnText}"
-                    ),
+                    config.simplifyText(f"dom-{singleFor}-{primaryDfnText}"),
                 )
                 if primaryDfnText.startswith("[["):
                     # Slots get their identifying [] stripped from their ID,
@@ -752,9 +750,7 @@ def classifyDfns(doc, dfns):
                     )
             else:
                 if dfnFor:
-                    id = config.simplifyText(
-                        f"{singleFor}-{primaryDfnText}"
-                    )
+                    id = config.simplifyText(f"{singleFor}-{primaryDfnText}")
                 else:
                     id = config.simplifyText(primaryDfnText)
             if dfnType == "dfn":
@@ -811,14 +807,13 @@ def determineLinkType(el):
     text = textContent(el)
     if config.typeRe["at-rule"].match(text):
         return "at-rule"
-    elif config.typeRe["type"].match(text):
+    if config.typeRe["type"].match(text):
         return "type"
-    elif config.typeRe["selector"].match(text):
+    if config.typeRe["selector"].match(text):
         return "selector"
-    elif config.typeRe["function"].match(text):
+    if config.typeRe["function"].match(text):
         return "functionish"
-    else:
-        return "dfn"
+    return "dfn"
 
 
 def determineLinkText(el):
@@ -1107,7 +1102,7 @@ def removeMultipleLinks(doc):
             continue
         paras[parentElement(el)][el.get("href")].append(el)
     for linkGroups in paras.values():
-        for href, links in linkGroups.items():
+        for _, links in linkGroups.items():
             if len(links) > 1:
                 for el in links[1:]:
                     el.tag = "span"
