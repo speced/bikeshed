@@ -83,7 +83,7 @@ def addExternalDfnPanel(termEl, ref, elsFromHref, doc):
     for el in elsFromHref[ref.url]:
         section = sectionName(el) or "Unnumbered Section"
         refs[section].append(el)
-    if len(refs):
+    if len(refs) > 0:
         addClass(termEl, "dfn-paneled")
         _, _, refID = ref.url.partition("#")
         termID = f"term-for-{refID}"

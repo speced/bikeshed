@@ -304,10 +304,10 @@ def addIndexSection(doc):
         container, E.h2({"class": "no-num no-ref", "id": safeID(doc, "index")}, "Index")
     )
 
-    if len(findAll(config.dfnElementsSelector, doc)):
+    if len(findAll(config.dfnElementsSelector, doc)) > 0:
         addIndexOfLocallyDefinedTerms(doc, container)
 
-    if len(list(doc.externalRefsUsed.keys())):
+    if len(list(doc.externalRefsUsed.keys())) > 0:
         addIndexOfExternallyDefinedTerms(doc, container)
 
 
@@ -680,7 +680,7 @@ def addPropertyIndex(doc):
             *[E.td(prop.get(column, "")) for column in columns[1:]],
         )
 
-    if len(props):
+    if len(props) > 0:
         # Set up the initial table columns for properties
         columns = ["Name", "Value", "Initial", "Applies to", "Inherited", "Percentages"]
         # Add any additional keys used in the document.
@@ -724,7 +724,7 @@ def addPropertyIndex(doc):
     else:
         appendChild(html, E.p("No properties defined."))
 
-    if len(atRules):
+    if len(atRules) > 0:
         atRuleNames = sorted(atRules.keys())
         for atRuleName in atRuleNames:
             descs = atRules[atRuleName]
@@ -1186,7 +1186,7 @@ def addReferencesSection(doc):
     )
 
     normRefs = sorted(doc.normativeRefs.values(), key=lambda r: r.linkText.lower())
-    if len(normRefs):
+    if len(normRefs) > 0:
         dl = appendChild(
             container,
             E.h3(
@@ -1211,7 +1211,7 @@ def addReferencesSection(doc):
         for x in sorted(doc.informativeRefs.values(), key=lambda r: r.linkText.lower())
         if x.linkText not in doc.normativeRefs
     ]
-    if len(informRefs):
+    if len(informRefs) > 0:
         dl = appendChild(
             container,
             E.h3(

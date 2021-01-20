@@ -449,7 +449,7 @@ def addLineWrappers(el, numbers=True, start=1, highlights=None):
                 else:
                     appendChild(lineWrapper, node)
                     break
-    if len(lineWrapper):
+    if len(lineWrapper) > 0:
         appendChild(el, E.span({"class": "line-no"}))
         appendChild(el, lineWrapper)
     # Number the lines
