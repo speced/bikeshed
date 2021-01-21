@@ -485,7 +485,7 @@ def fixInterDocumentReferences(doc):
         if not re.search(r"\d$", spec):
             # Unnumbered, check if there's a numbered variant in Shepherd
             vNames = doc.refs.vNamesFromSpecNames(spec)
-            if len(vNames):
+            if len(vNames) > 0:
                 fillInterDocumentReferenceFromShepherd(doc, el, vNames[0], section)
                 if len(vNames) > 1:
                     die(
