@@ -62,7 +62,10 @@ def prepareTar(doc, visibleTar=False, additionalDirectories=None):
         f = tempfile.NamedTemporaryFile(delete=False)
         tar = tarfile.open(fileobj=f, mode="w")
     tar.add(specOutput.name, arcname="Overview.html")
-    additionalFiles = extensions.BSPublishAdditionalFiles(additionalDirectories)
+    # Loaded from .include files
+    additionalFiles = extensions.BSPublishAdditionalFiles(  # pylint: disable=no-member
+        additionalDirectories
+    )
     for fname in additionalFiles:
         try:
             if isinstance(fname, str):
