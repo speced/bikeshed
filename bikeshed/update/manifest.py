@@ -56,8 +56,8 @@ def createManifest(path, dryRun=False):
         raise
 
     manifest = str(datetime.utcnow()) + "\n"
-    for path, hash in sorted(manifests, key=keyManifest):
-        manifest += f"{hash} {path}\n"
+    for p, h in sorted(manifests, key=keyManifest):
+        manifest += f"{h} {p}\n"
 
     if not dryRun:
         try:
