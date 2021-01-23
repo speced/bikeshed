@@ -175,6 +175,6 @@ def stripLineBreaks(obj):
     for key, val in it:
         if isinstance(val, str):
             obj[key] = val.rstrip("\n")
-        elif isinstance(val, dict) or isinstance(val, list):
+        elif isinstance(val, (dict, list)):
             stripLineBreaks(val)
     return obj
