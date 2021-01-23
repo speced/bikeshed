@@ -21,7 +21,7 @@ def update(path, dryRun=False):
             ca_cert_path=certifi.where(),
         )
         res = shepherd.get("test_suites")
-        if (not res) or (406 == res.status_code):
+        if (not res) or (res.status_code == 406):
             die(
                 "This version of the test suite API is no longer supported. Please update Bikeshed."
             )
