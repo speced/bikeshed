@@ -435,8 +435,7 @@ def sectionReplacer(match):
         return match.group(0)[1:]
     if linkText is None:
         linkText = ""
-    else:
-        linkText = linkText
+
     if spec is None:
         # local section link
         return E.a(
