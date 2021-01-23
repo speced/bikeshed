@@ -107,7 +107,6 @@ def createAnno(className, mdnButton, featureDivs):
 
 def panelsFromData(doc, data):
     mdnBaseUrl = "https://developer.mozilla.org/en-US/docs/Web/"
-    bcdBaseUrl = "https://github.com/mdn/browser-compat-data/blob/master/"
 
     browsersProvidingCurrentEngines = ["firefox", "safari", "chrome"]
     browsersWithBorrowedEngines = ["opera", "edge_blink"]
@@ -192,7 +191,6 @@ def panelsFromData(doc, data):
                 mdnPanelFor(
                     feature,
                     mdnBaseUrl,
-                    bcdBaseUrl,
                     nameFromCodeName,
                     browsersProvidingCurrentEngines,
                     browsersWithBorrowedEngines,
@@ -357,7 +355,6 @@ def addSupportRow(browserCodeName, nameFromCodeName, support, supportData):
 def mdnPanelFor(
     feature,
     mdnBaseUrl,
-    bcdBaseUrl,
     nameFromCodeName,
     browsersProvidingCurrentEngines,
     browsersWithBorrowedEngines,
