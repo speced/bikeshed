@@ -96,6 +96,11 @@ class InputSource:
         """
         return None
 
+    def __getattr__(self, name):
+        """will only get called for undefined attributes"""
+        print(f"No member '{name}' contained in InputSource.")
+        return ""
+
 
 class StdinInputSource(InputSource):
     def __init__(self, sourceName: str):

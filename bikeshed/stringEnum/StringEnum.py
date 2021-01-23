@@ -24,3 +24,8 @@ class StringEnum:
 
     def __getitem__(self, val):
         return self._vals[val]
+
+    def __getattr__(self, name):
+        """will only get called for undefined attributes"""
+        print(f"No member '{name}' contained in StringEnum.")
+        return ""
