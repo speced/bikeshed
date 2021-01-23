@@ -298,7 +298,7 @@ def canonicalizeStatus(rawStatus, group):
     def megaGroupsForStatus(status):
         # Returns a list of megagroups that recognize the given status
         megaGroups = []
-        for key in shortToLongStatus.keys():
+        for key in shortToLongStatus:
             mg, _, s = key.partition("/")
             if s == status:
                 megaGroups.append(mg)
