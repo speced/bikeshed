@@ -19,11 +19,11 @@ def processEl(el, shorthands):
             # Skip non-text, non-element nodes
             doneChildren.append(node)
             continue
-        elif h.isElement(node):
+        if h.isElement(node):
             processEl(node, shorthands)
             doneChildren.append(node)
             continue
-        elif isinstance(node, str):
+        if isinstance(node, str):
             if node.strip() == "":
                 doneChildren.append(node)
                 continue
@@ -89,9 +89,9 @@ def runMatcher(shClass, match, text, restNodes):
         bodyNodes = []
         if type(result) is steps.Failure:
             return False
-        elif type(result) is steps.Success:
+        if type(result) is steps.Success:
             break
-        elif type(result) is steps.NextLiteral:
+        if type(result) is steps.NextLiteral:
             # next literal needs to match *immediately*,
             # starting from the beginning of the remaining text
             match = result.regex.match(text)
@@ -101,7 +101,7 @@ def runMatcher(shClass, match, text, restNodes):
             # Set up the text for the next round
             text = text[match.end(0) :]
             continue
-        elif type(result) is steps.NextBody:
+        if type(result) is steps.NextBody:
             while True:
                 # try to find the body-ending regex anywhere in this text fragment
                 match = result.regex.search(text)
@@ -111,20 +111,20 @@ def runMatcher(shClass, match, text, restNodes):
                     # now shorten the text node for the next iteration of the outer loop
                     text = text[match.end(0) :]
                     break
-                else:
-                    # not in this text node
-                    # so all this text is in the body
-                    bodyNodes.append(text)
-                    # search forward for the next text node,
-                    # popping into bodyNodes as I go
-                    while restNodes and not isinstance(restNodes[0], str):
-                        bodyNodes.append(restNodes.pop(0))
-                    # Whoops, ran out, this is a failure then
-                    if not restNodes:
-                        return False
-                    # I've hit another text node,
-                    # set it up for the next round of this inner loop
-                    text = restNodes.pop(0)
+
+                # not in this text node
+                # so all this text is in the body
+                bodyNodes.append(text)
+                # search forward for the next text node,
+                # popping into bodyNodes as I go
+                while restNodes and not isinstance(restNodes[0], str):
+                    bodyNodes.append(restNodes.pop(0))
+                # Whoops, ran out, this is a failure then
+                if not restNodes:
+                    return False
+                # I've hit another text node,
+                # set it up for the next round of this inner loop
+                text = restNodes.pop(0)
         else:
             raise Exception(
                 f"{type(sh)}.respond() returned an unknown value '{result}'; this is a programming error."

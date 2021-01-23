@@ -14,9 +14,9 @@ class BiblioShorthand:
     def respond(self, match, dom=None):
         if self.stage == "start":
             return self.respondStart(match)
-        elif self.stage == "link text":
+        if self.stage == "link text":
             return self.respondLinkText(match, dom)
-        elif self.stage == "end":
+        if self.stage == "end":
             return self.respondEnd()
 
     def respondStart(self, match):
@@ -31,9 +31,9 @@ class BiblioShorthand:
         if hasLinkText:
             self.stage = "link text"
             return steps.NextBody(biblioEndRe)
-        else:
-            self.stage = "end"
-            return steps.NextLiteral(biblioEndRe)
+
+        self.stage = "end"
+        return steps.NextLiteral(biblioEndRe)
 
     def respondLinkText(self, match, dom):
         self.linkText = dom

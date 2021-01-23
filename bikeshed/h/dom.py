@@ -33,8 +33,7 @@ def find(sel, context=None):
     result = findAll(sel, context)
     if result:
         return result[0]
-    else:
-        return None
+    return None
 
 
 def escapeCSSIdent(val):
@@ -96,13 +95,13 @@ def validUrlUnit(char):
         ):
             return True
         return False
-    else:
-        if 0xD800 <= c <= 0xDFFF or 0xFDD0 <= c <= 0xFDEF:
-            return False
-        if (c % 0xFFFF) in [0xFFFE, 0xFFFF]:
-            # Last two bytes are FFFE or FFFF
-            return False
-        return True
+
+    if 0xD800 <= c <= 0xDFFF or 0xFDD0 <= c <= 0xFDEF:
+        return False
+    if (c % 0xFFFF) in [0xFFFE, 0xFFFF]:
+        # Last two bytes are FFFE or FFFF
+        return False
+    return True
 
 
 def textContent(el, exact=False):
@@ -113,8 +112,8 @@ def textContent(el, exact=False):
         return el.text or ""
     if exact:
         return tostring(el, method="text", with_tail=False, encoding="unicode")
-    else:
-        return textContentIgnoringDecorative(el)
+
+    return textContentIgnoringDecorative(el)
 
 
 def textContentIgnoringDecorative(el):
@@ -168,13 +167,13 @@ def parseHTML(text):
         contents = [body.text] if body.text is not None else []
         contents.extend(body.iterchildren())
         return contents
-    elif len(head) or head.text is not None:
+    if len(head) or head.text is not None:
         # Okay, anything in the head?
         contents = [head.text] if head.text is not None else []
         contents.extend(head.iterchildren())
         return contents
-    else:
-        return []
+
+    return []
 
 
 def parseDocument(text):

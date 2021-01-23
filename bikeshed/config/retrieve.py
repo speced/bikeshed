@@ -44,15 +44,15 @@ class DataFileRequester:
             fileType = self.fileType
         if fileType == "readonly":
             return scriptPath("spec-data", "readonly", *segs)
-        else:
-            return scriptPath("spec-data", *segs)
+
+        return scriptPath("spec-data", *segs)
 
     def _fail(self, location, str, okayToFail):
         if okayToFail:
             if str:
                 return ""
-            else:
-                return io.StringIO("")
+
+            return io.StringIO("")
         raise OSError(f"Couldn't find file '{location}'")
 
 

@@ -75,7 +75,7 @@ def linkTextsFromElement(el, preserveCasing=False):
 
     if el.get("data-lt") == "":
         return []
-    elif el.get("data-lt"):
+    if el.get("data-lt"):
         rawText = el.get("data-lt")
         if rawText in ["|", "||", "|||"]:
             texts = [rawText]

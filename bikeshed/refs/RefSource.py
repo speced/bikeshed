@@ -90,13 +90,11 @@ class RefSource:
     def queryRefs(self, **kwargs):
         if "exact" in kwargs:
             return self._queryRefs(**kwargs)
-        else:
-            # First search for the exact term, and only if it fails fall back to conjugating.
-            results, error = self._queryRefs(exact=True, **kwargs)
-            if error:
-                return self._queryRefs(exact=False, **kwargs)
-            else:
-                return results, error
+        # First search for the exact term, and only if it fails fall back to conjugating.
+        results, error = self._queryRefs(exact=True, **kwargs)
+        if error:
+            return self._queryRefs(exact=False, **kwargs)
+        return results, error
 
     def _queryRefs(
         self,
@@ -236,7 +234,7 @@ class RefSource:
                         )
                     ]
                 # If status is "snapshot", kill current refs if there's a corresponding snapshot ref for the same spec.
-                elif status == constants.refStatus.snapshot:
+                if status == constants.refStatus.snapshot:
                     snapshotSpecs = [
                         ref.spec for ref in refs if ref.status == "snapshot"
                     ]
@@ -246,13 +244,13 @@ class RefSource:
                         if ref.status == "snapshot"
                         or (ref.status == "current" and ref.spec not in snapshotSpecs)
                     ]
-                else:
-                    raise
-            # Status is a non-refStatus, but is a valid linkStatus, like "local"
-            elif status in config.linkStatuses:
-                return [x for x in refs if x.status == status]
-            else:
+
                 raise
+            # Status is a non-refStatus, but is a valid linkStatus, like "local"
+            if status in config.linkStatuses:
+                return [x for x in refs if x.status == status]
+
+            raise
 
         if status:
             refs = filterByStatus(refs, status)

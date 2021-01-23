@@ -14,9 +14,9 @@ class SectionShorthand:
     def respond(self, match, dom=None):
         if self.stage == "start":
             return self.respondStart(match)
-        elif self.stage == "link text":
+        if self.stage == "link text":
             return self.respondLinkText(match, dom)
-        elif self.stage == "end":
+        if self.stage == "end":
             return self.respondEnd()
 
     def respondStart(self, match):
@@ -27,9 +27,9 @@ class SectionShorthand:
         if hasLinkText:
             self.stage = "link text"
             return steps.NextBody(endRe)
-        else:
-            self.stage = "end"
-            return steps.NextLiteral(endRe)
+
+        self.stage = "end"
+        return steps.NextLiteral(endRe)
 
     def respondLinkText(self, match, dom):
         self.linkText = dom
@@ -55,7 +55,7 @@ class SectionShorthand:
                 "bs-autolink-syntax": self.bsAutolink,
             }
             return steps.Success(E.a(attrs, self.linkText))
-        elif self.justPage is not None:
+        if self.justPage is not None:
             # foreign link, to an actual page from a multipage spec
             attrs = {
                 "spec-section": self.justPage + "#",
@@ -63,14 +63,14 @@ class SectionShorthand:
                 "bs-autolink-syntax": self.bsAutolink,
             }
             return steps.Success(E.span(attrs, self.linkText))
-        else:
-            # foreign link
-            attrs = {
-                "spec-section": self.section,
-                "spec": self.spec,
-                "bs-autolink-syntax": self.bsAutolink,
-            }
-            return steps.Success(E.span(attrs, self.linkText))
+
+        # foreign link
+        attrs = {
+            "spec-section": self.section,
+            "spec": self.spec,
+            "bs-autolink-syntax": self.bsAutolink,
+        }
+        return steps.Success(E.span(attrs, self.linkText))
 
 
 SectionShorthand.startRe = re.compile(

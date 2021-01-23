@@ -28,8 +28,8 @@ def parse(
     html = parseTokens(tokens, numSpacesForIndentation)
     if fromStrings:
         return [x.text for x in html]
-    else:
-        return html
+
+    return html
 
 
 def tokenizeLines(
@@ -128,14 +128,14 @@ def tokenizeLines(
                 rawStack.pop()
                 tokens.append({"type": "raw", "prefixlen": float("inf"), "line": line})
                 continue
-            elif endTag["type"] == "fenced" and re.match(
+            if endTag["type"] == "fenced" and re.match(
                 r"\s*{}{}*\s*$".format(endTag["tag"], endTag["tag"][0]), line.text
             ):
                 rawStack.pop()
                 line.text = "</xmp>"
                 tokens.append({"type": "raw", "prefixlen": float("inf"), "line": line})
                 continue
-            elif not endTag["nest"]:
+            if not endTag["nest"]:
                 # Just an internal line, but for the no-nesting elements,
                 # so guaranteed no more work needs to be done.
                 tokens.append({"type": "raw", "prefixlen": float("inf"), "line": line})
@@ -280,13 +280,13 @@ def stripComments(lines):
             # By removing these entirely, we avoid breaking Markdown constructs with their middles commented out or something.
             # (Rather than leaving them in as blank lines.)
             continue
-        else:
-            # Otherwise, just process whatever's left as normal.
-            if line.text.endswith("\n") and not text.endswith("\n"):
-                # Put back the newline, in case it got swallowed by an unclosed comment.
-                text += "\n"
-            line.text = text
-            output.append(line)
+
+        # Otherwise, just process whatever's left as normal.
+        if line.text.endswith("\n") and not text.endswith("\n"):
+            # Put back the newline, in case it got swallowed by an unclosed comment.
+            text += "\n"
+        line.text = text
+        output.append(line)
     return output
 
 
@@ -299,19 +299,19 @@ def stripCommentsFromLine(line, inComment=False):
         if sep == "":
             # The entire line is a comment
             return "", True
-        else:
-            # Drop the comment part, see if there are any more
-            return stripCommentsFromLine(post)
-    else:
-        # The line starts out as non-comment content.
-        pre, sep, post = line.partition("<!--")
-        if sep == "":
-            # No comments in the line
-            return pre, False
-        else:
-            # Keep the non-comment part, see if there's any more to do
-            res, inComment = stripCommentsFromLine(post, inComment=True)
-            return pre + res, inComment
+
+        # Drop the comment part, see if there are any more
+        return stripCommentsFromLine(post)
+
+    # The line starts out as non-comment content.
+    pre, sep, post = line.partition("<!--")
+    if sep == "":
+        # No comments in the line
+        return pre, False
+
+    # Keep the non-comment part, see if there's any more to do
+    res, inComment = stripCommentsFromLine(post, inComment=True)
+    return pre + res, inComment
 
 
 def prefixLen(text, numSpacesForIndentation):
@@ -386,7 +386,7 @@ def parseTokens(tokens, numSpacesForIndentation):
     while True:
         if stream.ended():
             break
-        elif stream.currtype() in ("raw", "htmlblock"):
+        if stream.currtype() in ("raw", "htmlblock"):
             lines.append(stream.currline())
             stream.advance()
         elif stream.currtype() == "heading":
@@ -759,10 +759,10 @@ class TokenStream:
     def nth(self, i):
         if i < 0:
             return self.before
-        elif i >= len(self):
+        if i >= len(self):
             return self.after
-        else:
-            return self.tokens[i]
+
+        return self.tokens[i]
 
     def prev(self, i=1):
         return self.nth(self.i - i)
@@ -791,8 +791,8 @@ class TokenStream:
                     tok = self.curr()
                 if attrName in tok:
                     return tok[attrName]
-                else:
-                    raise AttributeError(attrName)
-                    return tok["raw"]
+
+                raise AttributeError(attrName)
+                return tok["raw"]
 
             return _missing

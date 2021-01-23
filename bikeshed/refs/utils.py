@@ -57,7 +57,7 @@ def linkTextVariations(str, linkType):
 
     if linkType is None:
         return
-    elif linkType == "dfn":
+    if linkType == "dfn":
         last1 = str[-1] if len(str) >= 1 else None
         last2 = str[-2:] if len(str) >= 2 else None
         last3 = str[-3:] if len(str) >= 3 else None

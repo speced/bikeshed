@@ -16,9 +16,9 @@ class IdlShorthand:
     def respond(self, match, dom=None):
         if self.stage == "start":
             return self.respondStart(match)
-        elif self.stage == "link text":
+        if self.stage == "link text":
             return self.respondLinkText(match, dom)
-        elif self.stage == "end":
+        if self.stage == "end":
             return self.respondEnd()
 
     def respondStart(self, match):
@@ -36,9 +36,9 @@ class IdlShorthand:
         if hasLinkText:
             self.stage = "link text"
             return steps.NextBody(endRe)
-        else:
-            self.stage = "end"
-            return steps.NextLiteral(endRe)
+
+        self.stage = "end"
+        return steps.NextLiteral(endRe)
 
     def respondLinkText(self, match, dom):
         self.linkText = dom

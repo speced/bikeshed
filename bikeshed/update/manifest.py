@@ -74,8 +74,7 @@ def keyManifest(manifest):
     if "/" in name:
         dir, _, file = name.partition("/")
         return 1, dir, file
-    else:
-        return 0, len(name), name
+    return 0, len(name), name
 
 
 def hashFile(fh):
@@ -149,7 +148,7 @@ def updateByManifest(path, dryRun=False):
                 localDt.strftime("%Y-%m-%d %H:%M:%S"),
             )
             return True
-        elif localDt > remoteDt:
+        if localDt > remoteDt:
             # No need to update, local data is more recent.
             say(
                 "Local data is fresher ({0}) than remote ({1}), so nothing to update.",
@@ -200,12 +199,12 @@ def updateByManifest(path, dryRun=False):
     if not badPaths:
         say("Done!")
         return True
-    else:
-        phrase = f"were {len(badPaths)} errors" if len(badPaths) > 1 else "was 1 error"
-        die(
-            f"Done, but there {phrase} (of {len(newPaths)} total) in downloading or saving. Run `bikeshed update` again to retry."
-        )
-        return True
+
+    phrase = f"were {len(badPaths)} errors" if len(badPaths) > 1 else "was 1 error"
+    die(
+        f"Done, but there {phrase} (of {len(newPaths)} total) in downloading or saving. Run `bikeshed update` again to retry."
+    )
+    return True
 
 
 async def updateFiles(localPrefix, newPaths):

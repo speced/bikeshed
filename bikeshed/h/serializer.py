@@ -107,8 +107,8 @@ class Serializer:
                 collect = []
                 yield node
                 continue
-            else:
-                collect.append(node)
+
+            collect.append(node)
         yield collect
 
     def fixWS(self, text):
@@ -188,8 +188,8 @@ class Serializer:
                 raise Exception(
                     f"Somehow a CDATA element got an element child:\n{dom.outerHTML(el)}"
                 )
-            else:
-                write(node)
+
+            write(node)
         self.endTag(tag, write)
 
     def _writeOpaqueElement(self, tag, el, write, indent):

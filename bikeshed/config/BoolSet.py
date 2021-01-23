@@ -26,8 +26,7 @@ class BoolSet(collections.MutableMapping):
     def __contains__(self, key):
         if key in self._internal:
             return self._internal[key]
-        else:
-            return self.default
+        return self.default
 
     def __getitem__(self, key):
         return key in self

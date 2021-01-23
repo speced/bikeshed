@@ -40,19 +40,19 @@ def update(path, dryRun=False):
     def simplifyStatus(s, *rest):
         if "x" in s or "d" in s or "n" in s or "p" in s:
             return "n"
-        elif "a" in s:
+        if "a" in s:
             return "a"
-        elif "y" in s:
+        if "y" in s:
             return "y"
-        elif "u" in s:
+        if "u" in s:
             return "u"
-        else:
-            die(
-                "Unknown CanIUse Status '{0}' for {1}/{2}/{3}. Please report this as a Bikeshed issue.",
-                s,
-                *rest,
-            )
-            return None
+
+        die(
+            "Unknown CanIUse Status '{0}' for {1}/{2}/{3}. Please report this as a Bikeshed issue.",
+            s,
+            *rest,
+        )
+        return None
 
     def simplifyVersion(v):
         if "-" in v:

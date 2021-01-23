@@ -427,7 +427,7 @@ class ReferenceManager:
                     return None
             if len(localRefs) == 1:
                 return localRefs[0]
-            elif len(localRefs) > 1:
+            if len(localRefs) > 1:
                 if self.testing:
                     # Generate a stable answer
                     chosenRef = sorted(localRefs, key=lambda x: x.url)[0]
@@ -487,7 +487,7 @@ class ReferenceManager:
                 return None
         if len(blockRefs) == 1:
             return blockRefs[0]
-        elif len(blockRefs) > 1:
+        if len(blockRefs) > 1:
             reportMultiplePossibleRefs(
                 simplifyPossibleRefs(blockRefs),
                 linkText=text,
@@ -640,7 +640,7 @@ class ReferenceManager:
             if zeroRefsError:
                 linkerror("No '{0}' refs found for '{1}'.", linkType, text, el=el)
             return None
-        elif failure == "export":
+        if failure == "export":
             if zeroRefsError:
                 linkerror(
                     "No '{0}' refs found for '{1}' that are marked for export.",
@@ -649,7 +649,7 @@ class ReferenceManager:
                     el=el,
                 )
             return None
-        elif failure == "spec":
+        if failure == "spec":
             if zeroRefsError:
                 linkerror(
                     "No '{0}' refs found for '{1}' with spec '{2}'.",
@@ -659,7 +659,7 @@ class ReferenceManager:
                     el=el,
                 )
             return None
-        elif failure == "for":
+        if failure == "for":
             if zeroRefsError:
                 if spec is None:
                     linkerror(
@@ -679,7 +679,7 @@ class ReferenceManager:
                         el=el,
                     )
             return None
-        elif failure == "status":
+        if failure == "status":
             if zeroRefsError:
                 if spec is None:
                     linkerror(
@@ -699,7 +699,7 @@ class ReferenceManager:
                         el=el,
                     )
             return None
-        elif failure == "ignored-specs":
+        if failure == "ignored-specs":
             if zeroRefsError:
                 linkerror(
                     "The only '{0}' refs for '{1}' were in ignored specs:\n{2}",
@@ -709,7 +709,7 @@ class ReferenceManager:
                     el=el,
                 )
             return None
-        elif failure:
+        if failure:
             die(
                 "Programming error - I'm not catching '{0}'-type link failures. Please report!",
                 failure,
@@ -936,8 +936,7 @@ def simplifyPossibleRefs(refs, alwaysShowFor=False):
 def refToText(ref):
     if ref["for_"]:
         return "spec:{spec}; type:{type}; for:{for_}; text:{text}".format(**ref)
-    else:
-        return "spec:{spec}; type:{type}; text:{text}".format(**ref)
+    return "spec:{spec}; type:{type}; text:{text}".format(**ref)
 
 
 def reportMultiplePossibleRefs(

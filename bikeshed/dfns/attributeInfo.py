@@ -84,7 +84,7 @@ def getTargetInfo(doc, el):
             el=el,
         )
         return
-    elif len(targets) > 1:
+    if len(targets) > 1:
         die(
             "Multiple potential target {1}s '{0}':\n{2}",
             referencedAttribute,

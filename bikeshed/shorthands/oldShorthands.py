@@ -443,7 +443,7 @@ def sectionReplacer(match):
             {"section": "", "href": section, "bs-autolink-syntax": match.group(0)},
             linkText,
         )
-    elif justPage is not None:
+    if justPage is not None:
         # foreign link, to an actual page from a multipage spec
         return E.span(
             {
@@ -453,16 +453,16 @@ def sectionReplacer(match):
             },
             linkText,
         )
-    else:
-        # foreign link
-        return E.span(
-            {
-                "spec-section": section,
-                "spec": spec,
-                "bs-autolink-syntax": match.group(0),
-            },
-            linkText,
-        )
+
+    # foreign link
+    return E.span(
+        {
+            "spec-section": section,
+            "spec": spec,
+            "bs-autolink-syntax": match.group(0),
+        },
+        linkText,
+    )
 
 
 propdescRe = re.compile(
