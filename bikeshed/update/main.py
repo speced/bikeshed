@@ -173,7 +173,7 @@ def remotePath(*segs):
 
 
 def getDatafilePaths(basePath):
-    for root, dirs, files in os.walk(basePath):
+    for root, _, files in os.walk(basePath):
         for filename in files:
             filePath = os.path.join(root, filename)
             yield filePath, os.path.relpath(filePath, basePath)

@@ -769,9 +769,6 @@ def addOldIDs(els):
 def dedupIDs(doc):
     import itertools as iter
 
-    def findId(id):
-        return find("#" + id, doc) is not None
-
     ids = DefaultOrderedDict(list)
     for el in findAll("[id]", doc):
         ids[el.get("id")].append(el)

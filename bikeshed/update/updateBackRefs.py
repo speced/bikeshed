@@ -11,7 +11,7 @@ TEST_DIR = os.path.abspath(os.path.join(config.scriptPath(), "..", "tests"))
 
 
 def findTestFiles():
-    for root, dirnames, filenames in os.walk(TEST_DIR):
+    for root, _, filenames in os.walk(TEST_DIR):
         for filename in filenames:
             if filename.endswith(".bs") and "/github/" in root:
                 yield os.path.join(root, filename)

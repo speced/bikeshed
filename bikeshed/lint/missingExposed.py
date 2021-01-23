@@ -49,5 +49,5 @@ def missingExposed(doc):
             if not hasattr(construct, "interface"):
                 # Just a callback function, it's fine
                 continue
-            for members in construct.interface.members:
+            for _ in construct.interface.members:
                 pass
