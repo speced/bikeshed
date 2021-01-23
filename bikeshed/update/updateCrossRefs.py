@@ -384,11 +384,11 @@ def writeAnchorsFile(anchors, path):
     for key, entries in anchors.items():
         group = config.groupFromKey(key)
         groupedEntries[group][key] = entries
-    for group, anchors in groupedEntries.items():
+    for group, group_anchors in groupedEntries.items():
         p = os.path.join(path, "anchors", f"anchors-{group}.data")
         writtenPaths.add(p)
         with open(p, "w", encoding="utf-8") as fh:
-            for key, entries in sorted(anchors.items(), key=lambda x: x[0]):
+            for key, entries in sorted(group_anchors.items(), key=lambda x: x[0]):
                 for e in entries:
                     fh.write(key + "\n")
                     for field in [
