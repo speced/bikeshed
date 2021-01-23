@@ -19,7 +19,7 @@ class Nil:
     def __setitem__(self, key, val):
         return self
 
-    def __delitem__(self, key, val):
+    def __delitem__(self, key):
         return self
 
     def __getattr__(self, name):
@@ -28,7 +28,7 @@ class Nil:
     def __setattr__(self, name, value):
         return self
 
-    def __delattr__(self, name, value):
+    def __delattr__(self, name):
         return self
 
     def __eq__(self, other):
