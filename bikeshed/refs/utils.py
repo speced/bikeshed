@@ -80,7 +80,7 @@ def linkTextVariations(str, linkType):
             yield str + "es"
 
         # Bikeshed's <-> Bikeshed
-        if last2 == "'s" or last2 == "’s":
+        if last2 in ("'s", "’s"):
             yield str[:-2]
         else:
             yield str + "'s"
@@ -92,7 +92,7 @@ def linkTextVariations(str, linkType):
             yield str + "s"
 
         # Bikesheds <-> Bikesheds'
-        if last1 == "'" or last1 == "’":
+        if last1 in ("'", "’"):
             yield str[:-1]
         else:
             yield str + "'"
