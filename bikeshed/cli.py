@@ -446,7 +446,7 @@ def main():
 
     update.fixupDataFiles()
     if options.subparserName == "update":
-        handleUpdate(options, extras)
+        handleUpdate(options)
     elif options.subparserName == "spec":
         handleSpec(options, extras)
     elif options.subparserName == "echidna":
@@ -460,20 +460,20 @@ def main():
     elif options.subparserName == "refs":
         handleRefs(options, extras)
     elif options.subparserName == "issues-list":
-        handleIssuesList(options, extras)
+        handleIssuesList(options)
     elif options.subparserName == "source":
-        handleSource(options, extras)
+        handleSource(options)
     elif options.subparserName == "test":
         handleTest(options, extras)
     elif options.subparserName == "profile":
-        handleProfile(options, extras)
+        handleProfile(options)
     elif options.subparserName == "template":
-        handleTemplate(options, extras)
+        handleTemplate()
     elif options.subparserName == "wpt":
-        handleWpt(options, extras)
+        handleWpt(options)
 
 
-def handleUpdate(options, extras):
+def handleUpdate(options):
     update.update(
         anchors=options.anchors,
         backrefs=options.backrefs,
@@ -625,7 +625,7 @@ def handleRefs(options, extras):
         p(config.printjson(refs))
 
 
-def handleIssuesList(options, extras):
+def handleIssuesList(options):
     from . import issuelist
 
     if options.printTemplate:
@@ -634,7 +634,7 @@ def handleIssuesList(options, extras):
         issuelist.printIssueList(options.infile, options.outfile)
 
 
-def handleSource(options, extras):
+def handleSource(options):
     if not options.bigText:  # If no options are given, do all options.
         options.bigText = True
     if options.bigText:
@@ -661,7 +661,7 @@ def handleTest(options, extras):
         sys.exit(0 if result else 1)
 
 
-def handleProfile(options, extras):
+def handleProfile(options):
     root = f'--root="{options.root}"' if options.root else ""
     leaf = f'--leaf="{options.leaf}"' if options.leaf else ""
     if options.svgFile:
@@ -678,7 +678,7 @@ def handleProfile(options, extras):
         )
 
 
-def handleTemplate(options, extras):
+def handleTemplate():
     p(
         """<pre class='metadata'>
 Title: Your Spec Title
@@ -699,7 +699,7 @@ Introduction here.
     )
 
 
-def handleWpt(options, extras):
+def handleWpt(options):
     if options.template:
         p(
             """
