@@ -139,7 +139,7 @@ def dataFromApi(api, *args, **kwargs):
             "This version of the anchor-data API is no longer supported. Try updating Bikeshed. If the error persists, please report it on GitHub."
         )
     if res.content_type not in anchorDataContentTypes:
-        raise Exception("Unrecognized anchor-data content-type '{0}'.", res.contentType)
+        raise Exception(f"Unrecognized anchor-data content-type '{res.contentType}'.")
     if res.status_code >= 300:
         raise Exception(
             f"Unknown error fetching anchor data; got status {res.status_code} and bytes:\n{data.decode('utf-8')}"
