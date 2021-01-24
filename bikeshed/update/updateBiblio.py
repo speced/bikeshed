@@ -119,7 +119,6 @@ def getSpecrefData():
                     "Your Python is too old (pre-2.7.10) to talk to SpecRef over HTTPS, and something's wrong with the CSSWG proxy as well. Report this to the Bikeshed repo, please?"
                 )
                 raise
-                return "{}"
     except Exception as e:
         die("Couldn't download the SpecRef biblio data.\n{0}", e)
         return "{}"

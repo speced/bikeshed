@@ -791,8 +791,7 @@ class TokenStream:
                     tok = self.curr()
                 if attrName in tok:
                     return tok[attrName]
-                else:
-                    raise AttributeError(attrName)
-                    return tok["raw"]
+
+                raise AttributeError(attrName)
 
             return _missing
