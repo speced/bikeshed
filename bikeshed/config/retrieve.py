@@ -11,7 +11,7 @@ class DataFileRequester:
     def __init__(self, type=None, fallback=None):
         self.type = type
         if self.type not in ("readonly", "latest"):
-            raise Exception("Bad value for DataFileRequester.type, got '{0}'.", type)
+            raise Exception(f"Bad value for DataFileRequester.type, got '{type}'.")
         # fallback is another requester, used if the main one fails.
         self.fallback = fallback
 
