@@ -170,7 +170,7 @@ def updateByManifest(path, dryRun=False):
 
     if not dryRun:
         deletedPaths = []
-        for filePath in localFiles.keys():
+        for filePath in localFiles:
             if filePath not in remoteFiles and os.path.exists(
                 localizePath(path, filePath)
             ):

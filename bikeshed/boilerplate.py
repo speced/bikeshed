@@ -619,7 +619,7 @@ def addPropertyIndex(doc):
         ),
     )
 
-    def extractKeyValFromRow(tr, table):
+    def extractKeyValFromRow(row, table):
         # Extract the key, minus the trailing :
         result = re.match(r"(.*):", textContent(row[0]).strip())
         if result is None:

@@ -178,7 +178,7 @@ class RefSource:
             return refs, "export"
 
         if spec:
-            refs = [x for x in refs if x.spec == spec or x.shortname == spec]
+            refs = [x for x in refs if spec in (x.spec, x.shortname)]
         if not refs:
             return refs, "spec"
 

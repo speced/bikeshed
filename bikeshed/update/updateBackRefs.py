@@ -1,17 +1,12 @@
 import os
-import urllib.parse
-from collections import defaultdict
 
-from .. import config, constants
-from ..h import findAll
-from ..messages import say
-from ..Spec import Spec
+from .. import config
 
 TEST_DIR = os.path.abspath(os.path.join(config.scriptPath(), "..", "tests"))
 
 
 def findTestFiles():
-    for root, dirnames, filenames in os.walk(TEST_DIR):
+    for root, _, filenames in os.walk(TEST_DIR):
         for filename in filenames:
             if filename.endswith(".bs") and "/github/" in root:
                 yield os.path.join(root, filename)
@@ -25,37 +20,37 @@ def testNameForPath(path):
 
 def update(path, dryRun=False):
     return  # early exit while working on this...
-    say("Downloading backref data...")
-    constants.quiet = float("inf")
-    if not dryRun:
-        backrefs = defaultdict(lambda: defaultdict(list))
-        for i, testPath in enumerate(findTestFiles()):
-            if i > 1:
-                break
-            print(i, testNameForPath(testPath))
-            doc = Spec(inputFilename=testPath)
-            doc.preprocess()
-            if doc.md.ED:
-                url = doc.md.ED
-            elif doc.md.TR:
-                url = doc.md.TR
-            else:
-                continue
-            referencingShortname = doc.md.vshortname
-            for ref in processRefs(doc.externalRefsUsed):
-                _, _, referencedID = ref.url.partition("#")
-                referencedID = urllib.parse.unquote(referencedID)
-                referencedShortname = ref.spec
-                referencingLinks = findAll(f"[href='{ref.url}']", doc)
-                referencingIDs = [
-                    link.get("id") for link in referencingLinks if link.get("id")
-                ]
-                referencingURLs = [f"{url}#{id}" for id in referencingIDs]
-                backrefs[referencedShortname][referencedID].append(
-                    {"shortname": referencingShortname, "urls": referencingURLs}
-                )
+    # say("Downloading backref data...")
+    # constants.quiet = float("inf")
+    # if not dryRun:
+    #     backrefs = defaultdict(lambda: defaultdict(list))
+    #     for i, testPath in enumerate(findTestFiles()):
+    #         if i > 1:
+    #             break
+    #         print(i, testNameForPath(testPath))
+    #         doc = Spec(inputFilename=testPath)
+    #         doc.preprocess()
+    #         if doc.md.ED:
+    #             url = doc.md.ED
+    #         elif doc.md.TR:
+    #             url = doc.md.TR
+    #         else:
+    #             continue
+    #         referencingShortname = doc.md.vshortname
+    #         for ref in processRefs(doc.externalRefsUsed):
+    #             _, _, referencedID = ref.url.partition("#")
+    #             referencedID = urllib.parse.unquote(referencedID)
+    #             referencedShortname = ref.spec
+    #             referencingLinks = findAll(f"[href='{ref.url}']", doc)
+    #             referencingIDs = [
+    #                 link.get("id") for link in referencingLinks if link.get("id")
+    #             ]
+    #             referencingURLs = [f"{url}#{id}" for id in referencingIDs]
+    #             backrefs[referencedShortname][referencedID].append(
+    #                 {"shortname": referencingShortname, "urls": referencingURLs}
+    #             )
 
-    print(config.printjson(backrefs))
+    # print(config.printjson(backrefs))
 
 
 def processRefs(refs):

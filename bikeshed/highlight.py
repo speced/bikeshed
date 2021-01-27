@@ -243,7 +243,7 @@ def coloredTextFromWidlStack(widlText):
 
 def highlightWithPygments(text, lang, el):
     import pygments
-    from pygments import formatters
+    from pygments.formatters.other import RawTokenFormatter
 
     lexer = lexerFromLang(lang)
     if lexer is None:
@@ -255,7 +255,7 @@ def highlightWithPygments(text, lang, el):
         )
         return
     rawTokens = str(
-        pygments.highlight(text, lexer, formatters.RawTokenFormatter()),
+        pygments.highlight(text, lexer, RawTokenFormatter()),
         encoding="utf-8",
     )
     coloredText = coloredTextFromRawTokens(rawTokens)

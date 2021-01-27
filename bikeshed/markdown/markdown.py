@@ -343,7 +343,7 @@ def stripPrefix(token, numSpacesForIndentation, len):
         return text
 
     offset = 0
-    for x in range(len):
+    for _ in range(len):
         if text[offset] == "\t":
             offset += 1
         elif (
@@ -791,8 +791,7 @@ class TokenStream:
                     tok = self.curr()
                 if attrName in tok:
                     return tok[attrName]
-                else:
-                    raise AttributeError(attrName)
-                    return tok["raw"]
+
+                raise AttributeError(attrName)
 
             return _missing

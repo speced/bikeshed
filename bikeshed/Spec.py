@@ -68,6 +68,18 @@ class Spec:
         else:
             self.dataFile = fileRequester
 
+        self.md = None
+        self.mdBaseline = None
+        self.mdDocument = None
+        self.mdCommandLine = None
+        self.mdDefaults = None
+        self.mdOverridingDefaults = None
+        self.lines = []
+        self.document = None
+        self.html = None
+        self.head = None
+        self.body = None
+        self.fillContainers = None
         self.valid = self.initializeState()
 
     def initializeState(self):

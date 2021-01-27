@@ -139,7 +139,7 @@ def dataFromApi(api, *args, **kwargs):
             "This version of the anchor-data API is no longer supported. Try updating Bikeshed. If the error persists, please report it on GitHub."
         )
     if res.content_type not in anchorDataContentTypes:
-        raise Exception("Unrecognized anchor-data content-type '{0}'.", res.contentType)
+        raise Exception(f"Unrecognized anchor-data content-type '{res.contentType}'.")
     if res.status_code >= 300:
         raise Exception(
             f"Unknown error fetching anchor data; got status {res.status_code} and bytes:\n{data.decode('utf-8')}"
@@ -384,11 +384,11 @@ def writeAnchorsFile(anchors, path):
     for key, entries in anchors.items():
         group = config.groupFromKey(key)
         groupedEntries[group][key] = entries
-    for group, anchors in groupedEntries.items():
+    for group, group_anchors in groupedEntries.items():
         p = os.path.join(path, "anchors", f"anchors-{group}.data")
         writtenPaths.add(p)
         with open(p, "w", encoding="utf-8") as fh:
-            for key, entries in sorted(anchors.items(), key=lambda x: x[0]):
+            for key, entries in sorted(group_anchors.items(), key=lambda x: x[0]):
                 for e in entries:
                     fh.write(key + "\n")
                     for field in [

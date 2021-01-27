@@ -246,7 +246,7 @@ class ReferenceManager:
         # Kill all the non-local anchors with the same shortname as the current spec,
         # so you don't end up accidentally linking to something that's been removed from the local copy.
         # TODO: This is dumb.
-        for term, refs in self.foreignRefs._refs.items():
+        for _, refs in self.foreignRefs._refs.items():
             for ref in refs:
                 if (
                     ref["status"] != "local"
@@ -631,7 +631,7 @@ class ReferenceManager:
                 return
             # Otherwise
 
-        if failure == "text" or failure == "type":
+        if failure in ("text", "type"):
             if linkType in ("property", "propdesc", "descriptor") and text.startswith(
                 "--"
             ):
@@ -891,7 +891,7 @@ class ReferenceManager:
         # returns the versioned names that Shepherd knows about.
 
         chosenVNames = []
-        for vSpecName in self.specs.keys():
+        for vSpecName in self.specs:
             if not vSpecName.startswith(specName):
                 continue
             match = re.match(r"-?(\d+)", vSpecName[len(specName) :])

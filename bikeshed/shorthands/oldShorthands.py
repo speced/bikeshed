@@ -435,8 +435,7 @@ def sectionReplacer(match):
         return match.group(0)[1:]
     if linkText is None:
         linkText = ""
-    else:
-        linkText = linkText
+
     if spec is None:
         # local section link
         return E.a(
@@ -705,7 +704,7 @@ inlineLinkRe = re.compile(
 
 
 def inlineLinkReplacer(match):
-    escape, text, href, title = match.groups()
+    _, text, href, title = match.groups()
     if title:
         attrs = {"href": href, "title": title}
     else:

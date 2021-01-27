@@ -87,11 +87,11 @@ def runMatcher(shClass, match, text, restNodes):
     while True:
         result = sh.respond(match, bodyNodes)
         bodyNodes = []
-        if type(result) is steps.Failure:
+        if isinstance(result, steps.Failure):
             return False
-        elif type(result) is steps.Success:
+        if isinstance(result, steps.Success):
             break
-        elif type(result) is steps.NextLiteral:
+        if isinstance(result, steps.NextLiteral):
             # next literal needs to match *immediately*,
             # starting from the beginning of the remaining text
             match = result.regex.match(text)
@@ -101,7 +101,7 @@ def runMatcher(shClass, match, text, restNodes):
             # Set up the text for the next round
             text = text[match.end(0) :]
             continue
-        elif type(result) is steps.NextBody:
+        if isinstance(result, steps.NextBody):
             while True:
                 # try to find the body-ending regex anywhere in this text fragment
                 match = result.regex.search(text)
