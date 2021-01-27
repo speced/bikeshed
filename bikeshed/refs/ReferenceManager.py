@@ -631,7 +631,7 @@ class ReferenceManager:
                 return
             # Otherwise
 
-        if failure == "text" or failure == "type":
+        if failure in ("text", "type"):
             if linkType in ("property", "propdesc", "descriptor") and text.startswith(
                 "--"
             ):
