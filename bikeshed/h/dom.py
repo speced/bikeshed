@@ -175,12 +175,12 @@ def parseHTML(text):
     doc = html5lib.parse(text, treebuilder="lxml", namespaceHTMLElements=False)
     head = doc.getroot()[0]
     body = doc.getroot()[1]
-    if len(body) or body.text is not None:
+    if len(body) > 0 or body.text is not None:
         # Body contains something, so return that.
         contents = [body.text] if body.text is not None else []
         contents.extend(body.iterchildren())
         return contents
-    elif len(head) or head.text is not None:
+    elif len(head) > 0 or head.text is not None:
         # Okay, anything in the head?
         contents = [head.text] if head.text is not None else []
         contents.extend(head.iterchildren())
@@ -234,7 +234,7 @@ def appendChild(parent, *children):
                 # when the parent already has children; the last child's tail
                 # doesn't get moved into the appended child or anything.
                 parent.append(child)
-    return children[-1] if len(children) else None
+    return children[-1] if len(children) > 0 else None
 
 
 def prependChild(parent, child):
