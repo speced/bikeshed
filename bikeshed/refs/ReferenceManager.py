@@ -631,6 +631,11 @@ class ReferenceManager:
                 return
             # Otherwise
 
+        # Check lower level publications, in case later ones are diff specs
+        # TODO: get metadata on whether a level is a diff spec instead of making this assumption
+        if failure:
+            refs, failure = self.foreignRefs.queryRefs(text=text, linkType=linkType, spec=spec, status=status, statusHint=statusHint, linkFor=linkFor, linkForHint=linkForHint, explicitFor=explicitFor, export=export, ignoreObsoletes=True, latestOnly=False)
+
         if failure == "text" or failure == "type":
             if linkType in ("property", "propdesc", "descriptor") and text.startswith(
                 "--"
