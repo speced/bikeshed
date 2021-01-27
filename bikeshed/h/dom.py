@@ -1,3 +1,4 @@
+import collections
 import hashlib
 import re
 
@@ -6,9 +7,20 @@ from lxml import etree
 from lxml.cssselect import CSSSelector
 from lxml.html import tostring
 
-from .. import config
 from ..DefaultOrderedDict import DefaultOrderedDict
 from ..messages import *
+
+
+def flatten(arr):
+    for el in arr:
+        if (
+            isinstance(el, collections.Iterable)
+            and not isinstance(el, str)
+            and not lxml.etree.iselement(el)
+        ):
+            yield from flatten(el)
+        else:
+            yield el
 
 
 def unescape(string):
@@ -203,7 +215,7 @@ def parentElement(el):
 
 def appendChild(parent, *children):
     # Appends either text or an element.
-    children = list(config.flatten(children))
+    children = list(flatten(children))
     for child in children:
         if isinstance(child, str):
             if len(parent) > 0:
