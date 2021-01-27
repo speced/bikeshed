@@ -891,7 +891,7 @@ class ReferenceManager:
         # returns the versioned names that Shepherd knows about.
 
         chosenVNames = []
-        for vSpecName in self.specs.keys():
+        for vSpecName in self.specs:
             if not vSpecName.startswith(specName):
                 continue
             match = re.match(r"-?(\d+)", vSpecName[len(specName) :])
