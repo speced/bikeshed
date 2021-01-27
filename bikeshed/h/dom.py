@@ -328,9 +328,9 @@ def wrapContents(parentEl, wrapperEl):
 
 
 def headingLevelOfElement(el):
-    for el in relevantHeadings(el, levels=[2, 3, 4, 5, 6]):
-        if el.get("data-level") is not None:
-            return el.get("data-level")
+    for heading in relevantHeadings(el, levels=[2, 3, 4, 5, 6]):
+        if heading.get("data-level") is not None:
+            return heading.get("data-level")
     return None
 
 
