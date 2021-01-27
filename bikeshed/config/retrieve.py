@@ -36,7 +36,7 @@ class DataFileRequester:
 
     def walkFiles(self, *segs, **kwargs):
         fileType = kwargs.get("type", self.type)
-        for root, dirs, files in os.walk(self._buildPath(segs, fileType=fileType)):
+        for _, _, files in os.walk(self._buildPath(segs, fileType=fileType)):
             yield from files
 
     def _buildPath(self, segs, fileType=None):

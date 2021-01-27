@@ -704,7 +704,7 @@ inlineLinkRe = re.compile(
 
 
 def inlineLinkReplacer(match):
-    escape, text, href, title = match.groups()
+    _, text, href, title = match.groups()
     if title:
         attrs = {"href": href, "title": title}
     else:

@@ -343,7 +343,7 @@ def stripPrefix(token, numSpacesForIndentation, len):
         return text
 
     offset = 0
-    for x in range(len):
+    for _ in range(len):
         if text[offset] == "\t":
             offset += 1
         elif (

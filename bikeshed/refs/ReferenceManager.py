@@ -246,7 +246,7 @@ class ReferenceManager:
         # Kill all the non-local anchors with the same shortname as the current spec,
         # so you don't end up accidentally linking to something that's been removed from the local copy.
         # TODO: This is dumb.
-        for term, refs in self.foreignRefs._refs.items():
+        for _, refs in self.foreignRefs._refs.items():
             for ref in refs:
                 if (
                     ref["status"] != "local"
