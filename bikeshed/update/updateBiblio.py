@@ -105,20 +105,6 @@ def update(path, dryRun=False):
 def getSpecrefData():
     try:
         return requests.get("https://api.specref.org/bibrefs").text
-    except requests.exceptions.RequestException:
-        # SpecRef uses SNI, which old Pythons (pre-2.7.10) don't understand.
-        # First try the older herokuapp.com URL.
-        try:
-            return requests.get("https://specref.herokuapp.com/bibrefs").text
-        except:
-            # Try the CSSWG proxy.
-            try:
-                return requests.get("https://api.csswg.org/bibrefs").text
-            except:
-                warn(
-                    "Your Python is too old (pre-2.7.10) to talk to SpecRef over HTTPS, and something's wrong with the CSSWG proxy as well. Report this to the Bikeshed repo, please?"
-                )
-                raise
     except Exception as e:
         die("Couldn't download the SpecRef biblio data.\n{0}", e)
         return "{}"
