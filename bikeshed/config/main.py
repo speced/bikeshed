@@ -100,6 +100,7 @@ def linkTextsFromElement(el, preserveCasing=False):
 
 class DuplicatedLinkText(Exception):
     def __init__(self, offendingText, allTexts, el):
+        super().__init__()
         self.offendingText = offendingText
         self.allTexts = allTexts
         self.el = el
