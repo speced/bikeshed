@@ -68,6 +68,7 @@ Definitions and autolinks have a few extra attributes that you can specify;
 check out the details in the [Autolinking](https://tabatkins.github.io/bikeshed/#autolinking) documentation.
 
 There are a few textual shortcuts to use as well:
+
 * `[[foo]]` is an autolink to a bibliography entry named "foo", and auto-generates an informative reference in the biblio section.
     Add a leading exclamation point to the value, like `[[!foo]]` for a normative reference.
 * A number of autolink types have corresponding textual shorthands: for example, `'foo'` is an autolink to the "foo" CSS property; `{{Foo}}` is an autolink to the WebIDL "Foo" interface.
@@ -86,7 +87,7 @@ Defining Properties and Descriptors
 
 If defining a property/descriptor, rather than writing out the table markup explicitly, just add a propdef or descdef block, like so:
 
-~~~~html
+```html
 <pre class='propdef'> (or 'descdef')
 Name: var-*
 Value: <<value>> | <<CDO>> | <<CDC>>
@@ -97,7 +98,7 @@ Media: all
 Computed value: specified value with variables substituted (but see prose for "invalid variables")
 Percentage: n/a
 </pre>
-~~~~
+```
 
 Common practice is to define all of the values for the property in a `<dl>` underneath the propdef table.
 If you do so, and you're only defining the values in there
