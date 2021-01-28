@@ -90,6 +90,9 @@ class ReferenceManager:
             replaced=self.replacedSpecs,
             fileRequester=fileRequester,
         )
+        self.shortname = None
+        self.specLevel = None
+        self.spec = None
 
     def initializeRefs(self, doc=None):
         """

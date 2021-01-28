@@ -10,6 +10,8 @@ class DfnShorthand:
         self.escapedText = None
         self.linkText = []
         self.bsAutolink = ""
+        self.linkFor = None
+        self.lt = None
 
     def respond(self, match, dom=None):
         if self.stage == "start":

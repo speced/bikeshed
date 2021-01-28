@@ -10,6 +10,9 @@ class BiblioShorthand:
         self.escapedText = None
         self.linkText = []
         self.bsAutolink = ""
+        self.term = None
+        self.status = None
+        self.type = None
 
     def respond(self, match, dom=None):
         if self.stage == "start":

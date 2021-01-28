@@ -11,6 +11,9 @@ class PropdescShorthand:
         self.escapedText = None
         self.linkText = []
         self.bsAutolink = ""
+        self.linkFor = None
+        self.lt = None
+        self.linkType = None
 
     def respond(self, match, dom=None):
         if self.stage == "start":
