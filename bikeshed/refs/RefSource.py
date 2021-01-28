@@ -13,7 +13,7 @@ class RefSource:
     __slots__ = [
         "dataFile",
         "source",
-        "_refs",
+        "refs",
         "methods",
         "fors",
         "specs",
@@ -37,7 +37,7 @@ class RefSource:
         self.source = source
 
         # Dict of {linking text => [anchor data]}
-        self._refs = defaultdict(list)
+        self.refs = defaultdict(list)
 
         # Dict of {argless method signatures => {"argfull signature": {"args":[args], "for":[fors]}}}
         self.methods = defaultdict(dict)
@@ -51,10 +51,10 @@ class RefSource:
         self._loadedAnchorGroups = set()
 
     def fetchRefs(self, key):
-        """Safe, lazy-loading version of self._refs[key]"""
+        """Safe, lazy-loading version of self.refs[key]"""
 
-        if key in self._refs:
-            return self._refs[key]
+        if key in self.refs:
+            return self.refs[key]
 
         if self.source not in self.lazyLoadedSources:
             return []
@@ -67,15 +67,15 @@ class RefSource:
         with self.dataFile.fetch(
             "anchors", f"anchors-{group}.data", okayToFail=True
         ) as fh:
-            self._refs.update(decodeAnchors(fh))
+            self.refs.update(decodeAnchors(fh))
             self._loadedAnchorGroups.add(group)
-        return self._refs.get(key, [])
+        return self.refs.get(key, [])
 
     def fetchAllRefs(self):
         """Nuts to lazy-loading, just load everything at once."""
 
         if self.source not in self.lazyLoadedSources:
-            return list(self._refs.items())
+            return list(self.refs.items())
 
         for file in self.dataFile.walkFiles("anchors"):
             group = re.match(r"anchors-(.{2})", file).group(1)
@@ -83,9 +83,9 @@ class RefSource:
                 # Already loaded
                 continue
             with self.dataFile.fetch("anchors", file) as fh:
-                self._refs.update(decodeAnchors(fh))
+                self.refs.update(decodeAnchors(fh))
                 self._loadedAnchorGroups.add(group)
-        return list(self._refs.items())
+        return list(self.refs.items())
 
     def queryRefs(self, **kwargs):
         if "exact" in kwargs:
