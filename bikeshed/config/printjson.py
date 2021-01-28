@@ -79,4 +79,4 @@ def printjsonprimitive(x):
         return "null"
     if isElement(x):
         return repr(x) + ":" + outerHTML(x)
-    raise Exception(x)
+    raise ValueError(f"Could not print value: {x}")

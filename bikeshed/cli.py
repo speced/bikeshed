@@ -17,7 +17,7 @@ def main():
         with open(config.scriptPath("..", "semver.txt")) as fh:
             semver = fh.read().strip()
             semverText = f"Bikeshed v{semver}: "
-    except:
+    except FileNotFoundError:
         semver = "???"
         semverText = ""
 

@@ -318,7 +318,7 @@ def dtFromManifest(lines):
         return "error"
     try:
         return datetime.strptime(lines[0].strip(), "%Y-%m-%d %H:%M:%S.%f")
-    except:
+    except ValueError:
         # Sigh, something borked
         return
 

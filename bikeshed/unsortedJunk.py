@@ -1594,7 +1594,7 @@ def inlineRemoteIssues(doc):
         elif res.status_code >= 400:
             try:
                 error = config.printjson(res.json())
-            except:
+            except ValueError:
                 error = "First 100 characters of error:\n" + res.text[0:100]
             die("{0} error when fetching GitHub Issues:\n{1}", res.status_code, error)
             continue

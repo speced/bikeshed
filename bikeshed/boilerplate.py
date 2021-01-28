@@ -109,7 +109,7 @@ def addSpecVersion(doc):
                     .decode(encoding="utf-8")
                     .strip()
                 )
-        except:
+        except subprocess.CalledProcessError:
             pass
     if revision:
         appendChild(

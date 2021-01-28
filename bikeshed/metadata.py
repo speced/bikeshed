@@ -379,7 +379,7 @@ def parseDate(key, val, lineNum):
         return datetime.utcnow().date()
     try:
         return datetime.strptime(val, "%Y-%m-%d").date()
-    except:
+    except ValueError:
         die(
             'The {0} field must be in the format YYYY-MM-DD - got "{1}" instead.',
             key,
@@ -398,7 +398,7 @@ def parseDateOrDuration(key, val, lineNum):
         if val.startswith("P"):
             return parse_duration(val)
         return datetime.strptime(val, "%Y-%m-%d").date()
-    except:
+    except ValueError:
         die(
             "The {0} field must be an ISO 8601 duration, a date in the format YYYY-MM-DD, now, never, false, no, n, or off. Got '{1}' instead.",
             key,
@@ -819,7 +819,7 @@ def parseTextMacro(key, val, lineNum):
     # followed by the text it expands to.
     try:
         name, text = val.lstrip().split(None, 1)
-    except:
+    except ValueError:
         die(
             "Text Macro lines must contain a macro name followed by the macro text. Got:\n{0}",
             val,
