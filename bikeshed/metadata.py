@@ -904,7 +904,7 @@ def parseTranslateIDs(key, val, lineNum):
 def parseTranslation(key, val, lineNum):
     # Format is <lang-code> <url> [ [ , name <name-in-spec-lang> ] || [ , native-name <name-in-the-lang> ] ]?
     pieces = val.split(",")
-    if not (1 <= len(pieces) <= 3):
+    if not 1 <= len(pieces) <= 3:
         die(
             "Format of a Translation line is <lang-code> <url> [ [ , name <name-in-spec-lang> ] || [ , native-name <name-in-the-lang> ] ]?. Got:\n{0}",
             val,
@@ -1005,7 +1005,7 @@ def parseMaxToCDepth(key, val, lineNum):
             lineNum=lineNum,
         )
         return float("inf")
-    if not (1 <= v <= 5):
+    if not 1 <= v <= 5:
         die(
             "Max ToC Depth metadata must be 'none' or an integer 1-5. Got '{0}'.",
             val,

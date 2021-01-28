@@ -463,7 +463,7 @@ def addLineWrappers(el, numbers=True, start=1, highlights=None):
         internalNewlines = countInternalNewlines(node)
         if internalNewlines:
             for i in range(1, internalNewlines + 1):
-                if (lineNumber + i) in highlights:
+                if lineNumber + i in highlights:
                     addClass(lineNo, "highlight-line")
                     addClass(node, "highlight-line")
                     lineNo.set("data-line", str(lineNumber))

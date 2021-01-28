@@ -111,7 +111,7 @@ def validUrlUnit(char):
     else:
         if 0xD800 <= c <= 0xDFFF or 0xFDD0 <= c <= 0xFDEF:
             return False
-        if (c % 0xFFFF) in [0xFFFE, 0xFFFF]:
+        if c % 0xFFFF in [0xFFFE, 0xFFFF]:
             # Last two bytes are FFFE or FFFF
             return False
         return True

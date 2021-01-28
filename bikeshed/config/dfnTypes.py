@@ -124,7 +124,7 @@ typesNotUsingFor = frozenset(
         "http-header",
     ]
 )
-assert not (typesUsingFor & typesNotUsingFor)
+assert not typesUsingFor & typesNotUsingFor
 lowercaseTypes = (
     cssTypes
     | markupTypes

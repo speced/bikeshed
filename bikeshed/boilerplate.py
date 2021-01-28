@@ -440,7 +440,7 @@ def addExplicitIndexes(doc):
                 continue
             if types is not None and ref.type not in types:
                 continue
-            if fors is not None and not (set(ref.for_) & fors):
+            if fors is not None and not set(ref.for_) & fors:
                 continue
             possibleRefs.append(ref)
 
