@@ -370,6 +370,7 @@ def processIDL(doc):
             url = None
             forceDfn = False
             ref = None
+            idlText = None
             for idlText in el.get("data-lt").split("|"):
                 if idlType == "interface" and idlText in forcedInterfaces:
                     forceDfn = True
