@@ -90,6 +90,7 @@ def parseMetadata(lines):
     md = {}
     nameMapping = {"Character Height": "height", "Space Width": "space-width"}
     valProcessors = {"height": int, "space-width": int}
+    i = 0
     for i, line in enumerate(lines):
         match = re.match(r"([^:]+):\s+(\S.*)", line)
         if not match:
