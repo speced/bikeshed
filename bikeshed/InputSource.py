@@ -96,6 +96,14 @@ class InputSource:
         """
         return None
 
+    def __getattr__(self, name):
+        """Hack to make pylint happy, since all the attrs are defined
+        on the subclasses that __new__ dynamically dispatches to.
+        See https://stackoverflow.com/a/60731663/455535
+        """
+        print(f"No member '{name}' contained in InputSource.")
+        return ""
+
 
 class StdinInputSource(InputSource):
     def __init__(self, sourceName: str):

@@ -4,6 +4,7 @@ import os
 import sys
 
 from . import config, constants, update
+from .config.printjson import getjson
 from .messages import *
 
 
@@ -579,7 +580,7 @@ def handleDebug(options, extras):
         doc = Spec(inputFilename=options.infile)
         doc.mdCommandLine = metadata.fromCommandLine(extras)
         doc.preprocess()
-        refs = doc.refs.refs[options.linkText] + doc.refs.refs[options.linkText + "\n"]
+        refs = doc.refs[options.linkText] + doc.refs[options.linkText + "\n"]
         constants.quiet = options.quiet
         if not constants.quiet:
             p(f"Refs for '{options.linkText}':")
@@ -620,7 +621,7 @@ def handleRefs(options, extras):
         exact=options.exact,
     )
     if constants.printMode == "json":
-        p(json.dumps(refs, indent=2, default=config.getjson))
+        p(json.dumps(refs, indent=2, default=getjson))
     else:
         p(config.printjson(refs))
 
