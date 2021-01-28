@@ -36,7 +36,7 @@ class BiblioEntry:
         elif self.preferredURL == constants.refStatus.current:
             self.url = self.current_url or self.snapshot_url
         else:
-            raise
+            raise ValueError(f"Invalid preferredURL value: {self.preferredURL}")
 
         if isinstance(self.authors, str):
             self.authors = [self.authors]
@@ -143,7 +143,7 @@ class SpecBasedBiblioEntry(BiblioEntry):
         elif preferredURL == constants.refStatus.current:
             self.url = spec["current_url"] or spec["snapshot_url"]
         else:
-            raise
+            raise ValueError(f"Invalid preferredURL value: {preferredURL}")
         if not self.url:
             self._valid = False
         assert self.url

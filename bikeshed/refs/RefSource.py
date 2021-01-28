@@ -246,13 +246,11 @@ class RefSource:
                         if ref.status == "snapshot"
                         or (ref.status == "current" and ref.spec not in snapshotSpecs)
                     ]
-                else:
-                    raise
             # Status is a non-refStatus, but is a valid linkStatus, like "local"
             elif status in config.linkStatuses:
                 return [x for x in refs if x.status == status]
-            else:
-                raise
+
+            raise Exception(f"Status value of '{status}' not handled")
 
         if status:
             refs = filterByStatus(refs, status)
