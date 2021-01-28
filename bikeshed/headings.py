@@ -14,19 +14,19 @@ def processHeadings(doc, scope="doc"):
         if scope == "doc" and treeAttr(el, "boilerplate"):
             continue
         headings.append(el)
-    resetHeadings(doc, headings)
-    determineHeadingLevels(doc, headings)
+    resetHeadings(headings)
+    determineHeadingLevels(headings)
     addHeadingIds(doc, headings)
-    addHeadingAlgorithms(doc, headings)
+    addHeadingAlgorithms(headings)
     fixupIDs(doc, headings)
-    addHeadingBonuses(doc, headings)
+    addHeadingBonuses(headings)
     for el in headings:
         addClass(el, "settled")
     if scope == "all" and doc.md.group in config.megaGroups["priv-sec"]:
         checkPrivacySecurityHeadings(findAll(".heading", doc))
 
 
-def resetHeadings(doc, headings):
+def resetHeadings(headings):
     for header in headings:
         # Reset to base, if this is a re-run
         if find(".content", header) is not None:
@@ -82,13 +82,13 @@ def checkPrivacySecurityHeadings(headings):
         )
 
 
-def addHeadingAlgorithms(doc, headings):
+def addHeadingAlgorithms(headings):
     for header in headings:
         if header.get("data-algorithm") == "":
             header.set("data-algorithm", textContent(header).strip())
 
 
-def determineHeadingLevels(doc, headings):
+def determineHeadingLevels(headings):
     headerLevel = [0, 0, 0, 0, 0]
 
     def incrementLevel(level):
@@ -124,7 +124,7 @@ def determineHeadingLevels(doc, headings):
         header.set("data-level", printLevel())
 
 
-def addHeadingBonuses(doc, headings):
+def addHeadingBonuses(headings):
     for header in headings:
         if header.get("data-level") is not None:
             secno = E.span({"class": "secno"}, header.get("data-level") + ". ")
