@@ -41,7 +41,7 @@ class DataFileRequester:
 
     def _buildPath(self, segs, fileType=None):
         if fileType is None:
-            fileType = self.fileType
+            fileType = self.type
         if fileType == "readonly":
             return scriptPath("spec-data", "readonly", *segs)
         else:
