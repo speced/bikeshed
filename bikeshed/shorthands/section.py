@@ -10,6 +10,9 @@ class SectionShorthand:
         self.escapedText = None
         self.linkText = []
         self.bsAutolink = ""
+        self.spec = None
+        self.section = None
+        self.justPage = None
 
     def respond(self, match, dom=None):
         if self.stage == "start":
