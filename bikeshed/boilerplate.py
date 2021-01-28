@@ -448,10 +448,9 @@ def addExplicitIndexes(doc):
         # ensuring no duplicate disambiguators.
         refsFromText = defaultdict(list)
         for ref in possibleRefs:
+            refDisambiguator = disambiguator(ref, types, specs)
             for i, existingRef in enumerate(refsFromText[ref.text]):
-                if disambiguator(existingRef, types, specs) != disambiguator(
-                    ref, types, specs
-                ):
+                if disambiguator(existingRef, types, specs) != refDisambiguator:
                     continue
                 # Whoops, found an identical entry.
                 if existingRef.status != ref.status:
