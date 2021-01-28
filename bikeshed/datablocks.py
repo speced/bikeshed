@@ -748,7 +748,7 @@ def processAnchors(anchors, doc, lineNum=None):
             status = "anchor-block"
         if anchor["type"][0] in config.lowercaseTypes:
             anchor["text"][0] = anchor["text"][0].lower()
-        doc.refs.anchorBlockRefs._refs[anchor["text"][0]].append(
+        doc.refs.anchorBlockRefs.refs[anchor["text"][0]].append(
             {
                 "linkingText": anchor["text"][0],
                 "type": anchor["type"][0].lower(),

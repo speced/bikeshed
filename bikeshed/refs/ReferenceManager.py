@@ -249,7 +249,7 @@ class ReferenceManager:
         # Kill all the non-local anchors with the same shortname as the current spec,
         # so you don't end up accidentally linking to something that's been removed from the local copy.
         # TODO: This is dumb.
-        for _, refs in self.foreignRefs._refs.items():
+        for _, refs in self.foreignRefs.refs.items():
             for ref in refs:
                 if (
                     ref["status"] != "local"
@@ -340,7 +340,7 @@ class ReferenceManager:
                     "for": dfnFor,
                     "el": el,
                 }
-                self.localRefs._refs[linkText].append(ref)
+                self.localRefs.refs[linkText].append(ref)
                 for for_ in dfnFor:
                     self.localRefs.fors[for_].append(linkText)
                 methodishStart = re.match(r"([^(]+\()[^)]", linkText)

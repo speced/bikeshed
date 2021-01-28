@@ -448,7 +448,7 @@ def nodeIter(el, clear=False, skipOddNodes=True):
     if isinstance(el, str):
         yield el
         return
-    if isinstance(el, etree._ElementTree):
+    if isinstance(el, etree.ElementTree):
         el = el.getroot()
     text = el.text
     tail = el.tail
