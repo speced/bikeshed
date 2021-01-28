@@ -11,6 +11,10 @@ from .. import config
 from ..messages import *
 
 
+def progressMessager(index, total):
+    return lambda: say(f"Downloading data for spec {index}/{total}...")
+
+
 def update(path, dryRun=False):
     say("Downloading anchor data...")
     shepherd = APIClient(
@@ -30,7 +34,7 @@ def update(path, dryRun=False):
         lastMsgTime = config.doEvery(
             s=5,
             lastTime=lastMsgTime,
-            action=lambda: say(f"Downloading data for spec {i}/{len(rawSpecData)}..."),
+            action=progressMessager(i, len(rawSpecData)),
         )
         rawSpec = dataFromApi(
             shepherd, "specifications", draft=True, anchors=True, spec=rawSpec["name"]

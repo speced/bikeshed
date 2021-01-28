@@ -354,6 +354,21 @@ def addIndexOfLocallyDefinedTerms(doc, container):
     appendChild(container, indexHTML)
 
 
+def disambiguator(ref, types, specs):
+    disambInfo = []
+    if types is None or len(types) > 1:
+        disambInfo.append(ref.type)
+    if specs is None or len(specs) > 1:
+        disambInfo.append("in " + ref.spec)
+    if ref.for_:
+        try:
+            disambInfo.append("for {}".format(", ".join(x.strip() for x in ref.for_)))
+        except:
+            # todo: The TR version of Position triggers this
+            pass
+    return ", ".join(disambInfo)
+
+
 def addExplicitIndexes(doc):
     # Explicit indexes can be requested for specs with <index spec="example-spec-1"></index>
 
@@ -413,22 +428,6 @@ def addExplicitIndexes(doc):
         else:
             export = None
 
-        def disambiguator(ref):
-            disambInfo = []
-            if types is None or len(types) > 1:
-                disambInfo.append(ref.type)
-            if specs is None or len(specs) > 1:
-                disambInfo.append("in " + ref.spec)
-            if ref.for_:
-                try:
-                    disambInfo.append(
-                        "for {}".format(", ".join(x.strip() for x in ref.for_))
-                    )
-                except:
-                    # todo: The TR version of Position triggers this
-                    pass
-            return ", ".join(disambInfo)
-
         # Initial filter of the ref database according to the <index> parameters
         possibleRefs = []
         for ref in doc.refs.queryAllRefs(
@@ -449,8 +448,9 @@ def addExplicitIndexes(doc):
         # ensuring no duplicate disambiguators.
         refsFromText = defaultdict(list)
         for ref in possibleRefs:
+            refDisambiguator = disambiguator(ref, types, specs)
             for i, existingRef in enumerate(refsFromText[ref.text]):
-                if disambiguator(existingRef) != disambiguator(ref):
+                if disambiguator(existingRef, types, specs) != refDisambiguator:
                     continue
                 # Whoops, found an identical entry.
                 if existingRef.status != ref.status:
@@ -488,7 +488,7 @@ def addExplicitIndexes(doc):
             refs = refUtils.filterOldVersions(refs)
             if refs:
                 filteredRefs[ttf[0]].extend(
-                    {"url": ref.url, "disambiguator": disambiguator(ref)}
+                    {"url": ref.url, "disambiguator": disambiguator(ref, types, specs)}
                     for ref in refs
                 )
 
