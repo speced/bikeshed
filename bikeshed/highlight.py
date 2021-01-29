@@ -422,9 +422,10 @@ def lexerFromLang(lang):
         return customLexers[lang]()
     try:
         from pygments.lexers import get_lexer_by_name
+        from pygments.util import ClassNotFound
 
         return get_lexer_by_name(lang, encoding="utf-8", stripAll=True)
-    except:
+    except ClassNotFound:
         return None
 
 

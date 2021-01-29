@@ -158,7 +158,7 @@ def _createDiagram(command, prelude, children, text=None, line=-1):
         else:
             try:
                 default = int(prelude)
-            except:
+            except ValueError:
                 die(
                     "Line {0} - Choice preludes must be an integer. Got:\n{1}",
                     line,
