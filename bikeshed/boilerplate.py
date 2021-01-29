@@ -366,11 +366,7 @@ def disambiguator(ref, types, specs):
     if specs is None or len(specs) > 1:
         disambInfo.append("in " + ref.spec)
     if ref.for_:
-        try:
-            disambInfo.append("for {}".format(", ".join(x.strip() for x in ref.for_)))
-        except:
-            # todo: The TR version of Position triggers this
-            pass
+        disambInfo.append("for {}".format(", ".join(x.strip() for x in ref.for_)))
     return ", ".join(disambInfo)
 
 
