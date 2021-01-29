@@ -278,7 +278,7 @@ def transformPropdef(lines, doc, firstLine, lineNum=None, **kwargs):
         attrs["Percentages"] = "n/a"
         attrs["Computed value"] = "as specified"
         attrs["Canonical order"] = "per grammar"
-        attrs["Animation type"] = "discrete"
+        attrs["Animation type"] = None
         ret = [
             "<table class='def propdef'{forHint}{lineNumAttr}>".format(
                 forHint=forHint, lineNumAttr=lineNumAttr
