@@ -38,6 +38,18 @@ knownFolders = [
 
 ghPrefix = "https://raw.githubusercontent.com/tabatkins/bikeshed-data/master/data/"
 
+# To avoid 'Event loop is closed' RuntimeError due to compatibility issue with aiohttp
+if sys.platform.startswith("win") and sys.version_info >= (3, 8):
+    try:
+        from asyncio import WindowsSelectorEventLoopPolicy
+    except ImportError:
+        pass
+    else:
+        if not isinstance(
+            asyncio.get_event_loop_policy(), WindowsSelectorEventLoopPolicy
+        ):
+            asyncio.set_event_loop_policy(WindowsSelectorEventLoopPolicy())
+
 
 def createManifest(path, dryRun=False):
     """Generates a manifest file for all the data files."""
