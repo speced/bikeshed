@@ -5,9 +5,9 @@ Shortname: clipboard-apis
 Level: none
 Group: webapps
 Status: w3c/ED
-Previous Version: https://www.w3.org/TR/2019/WD-clipboard-apis-20190530/
 TR: https://www.w3.org/TR/clipboard-apis/
 ED: https://w3c.github.io/clipboard-apis/
+Previous Version: from biblio
 Repository: w3c/clipboard-apis
 !Explainer: <a href="https://github.com/w3c/clipboard-apis/blob/master/explainer.adoc">Async Clipboard API Explainer</a>
 Editor: Gary Kacmarcik, Google, garykac@google.com, w3cid 59482
@@ -108,7 +108,7 @@ urlPrefix: https://w3c.github.io/FileAPI/#dfn-; type: dfn;
 			With content such as mathematics, simply copying rendered text and pasting
 			it into another application generally leads to most of the semantics being
 			lost. MathML often needs to be transformed to be copied as plain text, for
-			example to make sure "to the power of" is shown with the caret  "^" sign
+			example to make sure "to the power of" is shown with the caret "^" sign
 			in a formula plain-text input. The XML source could also be placed in the
 			clipboard with the appropriate transformation occurring at paste time.
 			</li>
@@ -189,8 +189,9 @@ urlPrefix: https://w3c.github.io/FileAPI/#dfn-; type: dfn;
 		<div id="clipboardevent-idl">
 
 		<pre class="idl" data-highlight="webidl">
-		[Constructor(DOMString type, optional ClipboardEventInit eventInitDict = {}), Exposed=Window]
+		[Exposed=Window]
 		interface ClipboardEvent : Event {
+		  constructor(DOMString type, optional ClipboardEventInit eventInitDict = {});
 		  readonly attribute DataTransfer? clipboardData;
 		};
 		</pre>
@@ -312,7 +313,7 @@ urlPrefix: https://w3c.github.io/FileAPI/#dfn-; type: dfn;
 
 	<h3 id="integration-with-other-scripts-and-events">Integration with other scripts and events</h3>
 
-		<h4 id="allow-modify-clipboard">Event handlers that are <dfn>allowed to modify the clipboard</dfn></h4>
+		<h4 id="allow-modify-clipboard">Event handlers that are <dfn export>allowed to modify the clipboard</dfn></h4>
 
 			Event handlers may write to the clipboard if any of the following is
 			true:
@@ -580,14 +581,13 @@ urlPrefix: https://w3c.github.io/FileAPI/#dfn-; type: dfn;
 	<h3 id="clipboard-interface">Clipboard Interface</h3>
 
 		<pre class="idl" data-highlight="webidl">
-
 		typedef sequence&lt;ClipboardItem> ClipboardItems;
 
 		[SecureContext, Exposed=Window] interface Clipboard : EventTarget {
 		  Promise&lt;ClipboardItems> read();
 		  Promise&lt;DOMString> readText();
-		  Promise&lt;void> write(ClipboardItems data);
-		  Promise&lt;void> writeText(DOMString data);
+		  Promise&lt;undefined> write(ClipboardItems data);
+		  Promise&lt;undefined> writeText(DOMString data);
 		};
 
 		typedef (DOMString or Blob) ClipboardItemDataType;
@@ -595,9 +595,9 @@ urlPrefix: https://w3c.github.io/FileAPI/#dfn-; type: dfn;
 
 		callback ClipboardItemDelayedCallback = ClipboardItemData ();
 
-		[Constructor(record&lt;DOMString, ClipboardItemData> items,
-		    optional ClipboardItemOptions options = {}),
-		 Exposed=Window] interface ClipboardItem {
+		[Exposed=Window] interface ClipboardItem {
+		  constructor(record&lt;DOMString, ClipboardItemData> items,
+		    optional ClipboardItemOptions options = {});
 		  static ClipboardItem createDelayed(
 		      record&lt;DOMString, ClipboardItemDelayedCallback> items,
 		      optional ClipboardItemOptions options = {});
@@ -935,8 +935,7 @@ urlPrefix: https://w3c.github.io/FileAPI/#dfn-; type: dfn;
 	<a>powerful feature</a>s like the clipboard. It allows websites to request permissions
 	from users and query which permissions they have.
 
-	For the clipboard, two separate permissions are defined:
-	<dfn enum-value for="PermissionName">"clipboard-read"</dfn> and
+	For the clipboard, one permission is defined:
 	<dfn enum-value for="PermissionName">"clipboard-write"</dfn>
 
 	Note: Clipboard permissions currently only apply to the Async Clipboard API.
@@ -960,52 +959,23 @@ urlPrefix: https://w3c.github.io/FileAPI/#dfn-; type: dfn;
 
 	There are 4 clipboard permissions:
 
-	* { name: "clipboard-read", allowWithoutGesture: false }
-	* { name: "clipboard-read", allowWithoutGesture: true }
 	* { name: "clipboard-write", allowWithoutGesture: false }
 	* { name: "clipboard-write", allowWithoutGesture: true }
 
 	With the following relationships:
 
-	* <code>{ "clipboard-read" + true }</code> is stronger than <code>{ "clipboard-read" + false }</code>
 	* <code>{ "clipboard-write" + true }</code> is stronger than <code>{ "clipboard-write" + false }</code>
-
-	Note: "clipboard-read" and "clipboard-write" are two separate permissions with no
-	inherent strength relationship. However, user agents MAY choose to impose such a
-	strength ordering on these permissions, for example by making the "clipboard-read"
-	permission act stronger than the "clipboard-write" permission. Doing this would
-	effectively turn the "clipboad-read" permission into a way to provide full
-	read/write access to the clipboard since granting (or denying) "clipboard-read" would
-	also grant (deny) "clipboard-write" access.
 
 	While user agents MUST support the {{ClipboardPermissionDescriptor}} as described
 	in this specification, they, of course, retain complete control over the default
 	settings and how (or if) they are exposed to the user.
 
 	<div class="example">
-		A user agent that wants to have separate user-settable read and write controls over the clipboad
+		A user agent that wants to have separate user-settable write controls over the clipboard
 		and always require a user gesture would handle each descriptor as follows:
 
-		* <code class="perm">{ "clipboard-read" + false }</code> is exposed for user control
-		* <code class="perm">{ "clipboard-read" + true }</code> is always <a>denied</a>
 		* <code class="perm">{ "clipboard-write" + false }</code> is exposed for user control
 		* <code class="perm">{ "clipboard-write" + true }</code> is always <a>denied</a>
-	</div>
-
-	<div class="example">
-		A user agent that wants to automatically grant "write" access (with a gesture),
-		but have a single user-settable permission that controls full gesture-less access would
-		define "clipboard-read" as being stronger than "clipboard-write" and then handle
-		each descriptor as follows:
-
-		* <code class="perm">{ "clipboard-read" + false }</code> is inherited from
-			<code class="perm">{ "clipboard-read" + true }</code>
-		* <code class="perm">{ "clipboard-read" + true }</code> is exposed for user control
-		* <code class="perm">{ "clipboard-write" + false }</code> is inherited from
-			<code class="perm">{ "clipboard-write" + true }</code>
-		* <code class="perm">{ "clipboard-write" + true }</code> is <a>granted</a> by default, but
-			may be overridden by <code class="perm">{ "clipboard-read" + true }</code> because
-			"read" is stronger than "write".
 	</div>
 
 	<h3 id="read-permission">Clipboard read permission</h3>
@@ -1013,34 +983,17 @@ urlPrefix: https://w3c.github.io/FileAPI/#dfn-; type: dfn;
 		<div class="algorithm" data-algorithm="clipboard-read-permission">
 		<h4 id="h-clipboard-read-permission"><dfn>check clipboard read permission</dfn></h4>
 
-		1. Let |readWithoutGesture| be the [=permission state=] of the
-			<code>{ name: "clipboard-read", allowWithoutGesture: true }</code>
-			permission.
-
-		1. Let |hasGesture| be true if the current script is not running as a result of
-			direct user action, false otherwise.
-
-		1. If |readWithoutGesture| is <a>granted</a>, then return true.
+		1. Let |hasGesture| be true if the [=relevant global object=] of [=this=] has
+		    [=transient activation=], false otherwise.
 
 		1. If |hasGesture| then,
 
 			<!-- System paste buttons don't require permission -->
-			1. Let |systemPaste| be true if the current script is running as a result of user
+			1. Return true if the current script is running as a result of user
 				interaction with a "Paste" element created by the user agent or operating
 				system.
 
-			1. If |systemPaste| is true, then return true.
-
-			1. Return the result of [=request permission to use=] the
-				<code>{ name: "clipboard-read", allowWithoutGesture: false }</code>
-				permission.
-
-				Note: User agents may choose to request a stronger permission that
-				will implicitly update this permission.
-
-		1. Return the result of [=request permission to use=] the
-			<code>{ name: "clipboard-read", allowWithoutGesture: true }</code>
-			permission.
+		1. Return false.
 
 		</div><!-- algorithm -->
 
@@ -1053,10 +1006,10 @@ urlPrefix: https://w3c.github.io/FileAPI/#dfn-; type: dfn;
 			<code>{ name: "clipboard-write", allowWithoutGesture: true }</code>
 			permission.
 
-		1. Let |hasGesture| be true if the current script is not running as a result of
-			direct user action, false otherwise.
-
 		1. If |writeWithoutGesture| is <a>granted</a>, then return true.
+
+		1. Let |hasGesture| be true if the [=relevant global object=] of [=this=]
+		    has [=transient activation=], false otherwise.
 
 		1. If |hasGesture| then,
 
@@ -1146,7 +1099,7 @@ urlPrefix: https://w3c.github.io/FileAPI/#dfn-; type: dfn;
 		Some implementations mitigate the risks associated with pasting rich
 		text by stripping potentially malicious content such as SCRIPT elements
 		and javascript: links by default when pasting rich text, but allow a
-		paste event handler to retrieve and process  the original, un-sanitized
+		paste event handler to retrieve and process the original, un-sanitized
 		data.
 
 	<h3 id="general-security-policies">General security policies</h3>

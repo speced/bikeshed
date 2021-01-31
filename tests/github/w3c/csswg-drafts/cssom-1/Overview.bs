@@ -109,7 +109,7 @@ urlPrefix: https://fetch.spec.whatwg.org/#concept-
 
 <pre class='link-defaults'>
 spec:css-display-3; type:value; for:display; text:table
-spec:css-color-4; type:property; text:color
+spec:css-color-4; type:value; text:color
 spec:css-position-3; type:property; text:left
 spec:html; type:element; text:style
 spec:css-namespaces-3; type:dfn; text:namespace prefix
@@ -375,8 +375,6 @@ To
  single SPACE (U+0020), followed by "<code>and</code>", followed by a single SPACE
  (U+0020), to <var>s</var>.
 
- <li>Sort the [=media features=] in lexicographical order.
-
  <li>
   Then, for each [=media feature=]:
 
@@ -412,14 +410,12 @@ To
   <tbody>
    <tr>
     <td><pre>not screen and (min-WIDTH:5px) AND (max-width:40px)</pre>
-    <td><pre>not screen and (max-width: 40px) and (min-width: 5px)</pre>
+    <td><pre>not screen and (min-width: 5px) and (max-width: 40px)</pre>
    <tr>
     <td><pre>all and (color) and (color)</pre>
-    <td><pre>(color)</pre>
+    <td><pre>(color) and (color)</pre>
  </table>
 </div>
-
-
 
 ### Serializing Media Feature Values ### {#serializing-media-feature-values}
 
@@ -507,11 +503,11 @@ An object that implements the <code>MediaList</code> interface has an associated
 <pre class=idl>
 [Exposed=Window]
 interface MediaList {
-  stringifier attribute [TreatNullAs=EmptyString] CSSOMString mediaText;
+  stringifier attribute [LegacyNullToEmptyString] CSSOMString mediaText;
   readonly attribute unsigned long length;
   getter CSSOMString? item(unsigned long index);
-  void appendMedium(CSSOMString medium);
-  void deleteMedium(CSSOMString medium);
+  undefined appendMedium(CSSOMString medium);
+  undefined deleteMedium(CSSOMString medium);
 };
 </pre>
 
@@ -910,7 +906,7 @@ interface CSSStyleSheet : StyleSheet {
   readonly attribute CSSRule? ownerRule;
   [SameObject] readonly attribute CSSRuleList cssRules;
   unsigned long insertRule(CSSOMString rule, optional unsigned long index = 0);
-  void deleteRule(unsigned long index);
+  undefined deleteRule(unsigned long index);
 };
 </pre>
 
@@ -957,7 +953,7 @@ The <dfn method for=CSSStyleSheet>deleteRule(<var>index</var>)</dfn> method must
 partial interface CSSStyleSheet {
   [SameObject] readonly attribute CSSRuleList rules;
   long addRule(optional DOMString selector = "undefined", optional DOMString style = "undefined", optional unsigned long index);
-  void removeRule(optional unsigned long index = 0);
+  undefined removeRule(optional unsigned long index = 0);
 };
 </pre>
 
@@ -1561,7 +1557,7 @@ To <dfn export>serialize a CSS rule</dfn>, perform one of the following in accor
    <li>The string "<code>@media</code>", followed by a single SPACE (U+0020).</li>
    <li>The result of performing <a>serialize a media query list</a> on rule's media query list.</li>
    <li>A single SPACE (U+0020), followed by the string "{", i.e., LEFT CURLY BRACKET (U+007B), followed by a newline.</li>
-   <li>The result of performing <a>serialize a CSS rule</a> on each rule, separated by a newline and indented by two spaces, in rule's CSSRules list.</li>
+   <li>The result of performing <a>serialize a CSS rule</a> on each rule in the rule's {{CSSGroupingRule/cssRules}} list, separated by a newline and indented by two spaces.</li>
    <li>A newline, followed by the string "}", i.e., RIGHT CURLY BRACKET (U+007D)</li>
   </ol>
 
@@ -1636,7 +1632,31 @@ To <dfn export>serialize a CSS rule</dfn>, perform one of the following in accor
  <a lt="serialize a URL">serialization as URL</a> of the
  {{CSSNamespaceRule/namespaceURI}}
  attribute, followed the character "<code>;</code>" (U+003B).
+
+ <dt>{{CSSKeyframesRule}}
+ <dd>
+  The result of concatenating the following:
+  <ol>
+   <li>The literal string "<code>@keyframes</code>", followed by a single SPACE (U+0020).
+   <li>The <a lt="serialize an identifier">serialization as an identifier</a> of the
+ {{CSSKeyframesRule/name}} attribute.
+   <li>The result of performing <a>serialize a CSS rule</a> on each rule in the rule's {{CSSKeyframesRule/cssRules}} list, separated by a newline and indented by two spaces.</li>
+   <li>A newline, followed by the string "}", i.e., RIGHT CURLY BRACKET (U+007D)</li>
+  </ol>
+
+ <dt>{{CSSKeyframeRule}}
+ <dd>
+  The result of concatenating the following:
+  <ol>
+   <li>The {{CSSKeyframeRule/keyText}}.
+   <li>The string "<code> { </code>", i.e., a single SPACE (U+0020), followed by LEFT CURLY BRACKET (U+007B),
+   <li>The result of performing <a>serialize a CSS declaration block</a> on the rule's associated declarations.
+   <li>If the rule is associated with one or more declarations, the string "<code> </code>", i.e., a single SPACE (U+0020).
+   <li>The string "<code>}</code>", RIGHT CURLY BRACKET (U+007D).
+  </ol>
 </dl>
+
+Issue: The "indented by two spaces" bit matches browsers, but needs work, see <a href="https://github.com/w3c/csswg-drafts/issues/5494">#5494</a>
 
 To <dfn export>insert a CSS rule</dfn> <var>rule</var> in a CSS rule list <var>list</var> at index <var>index</var>, follow these steps:
 <ol>
@@ -1710,7 +1730,7 @@ interface CSSRule {
   readonly attribute CSSRule? parentRule;
   readonly attribute CSSStyleSheet? parentStyleSheet;
 
-  // the following attribute and constants are historial
+  // the following attribute and constants are historical
   readonly attribute unsigned short type;
   const unsigned short STYLE_RULE = 1;
   const unsigned short CHARSET_RULE = 2;
@@ -1808,7 +1828,7 @@ On setting the {{CSSStyleRule/selectorText}} attribute these steps must be run:
 The <dfn attribute for=CSSStyleRule>style</dfn> attribute must return a <code>CSSStyleDeclaration</code> object for the style rule, with the
 following properties:
 <dl>
- <dt><a for="CSSStyleDeclaration">readonly flag</a>
+ <dt><a for="CSSStyleDeclaration">computed flag</a>
  <dd>Unset.
  <dt><a for="CSSStyleDeclaration">declarations</a>
  <dd>The declared declarations in the rule, in <a>specified order</a>.
@@ -1859,7 +1879,7 @@ The <code>CSSGroupingRule</code> interface represents an at-rule that contains o
 interface CSSGroupingRule : CSSRule {
   [SameObject] readonly attribute CSSRuleList cssRules;
   unsigned long insertRule(CSSOMString rule, optional unsigned long index = 0);
-  void deleteRule(unsigned long index);
+  undefined deleteRule(unsigned long index);
 };
 </pre>
 
@@ -1908,7 +1928,7 @@ On setting the {{CSSPageRule/selectorText}} attribute  these steps must be run:
 The <dfn attribute for=CSSGroupingRule>style</dfn> attribute must return a <code>CSSStyleDeclaration</code> object for the
 <code>@page</code> at-rule, with the following properties:
 <dl>
- <dt><a for="CSSStyleDeclaration">readonly flag</a>
+ <dt><a for="CSSStyleDeclaration">computed flag</a>
  <dd>Unset.
  <dt><a for="CSSStyleDeclaration">declarations</a>
  <dd>The declared declarations in the rule, in <a>specified order</a>.
@@ -1938,7 +1958,7 @@ included in the name. [[!CSS3SYN]]
 The <dfn attribute for=CSSMarginRule>style</dfn> attribute must return a <code>CSSStyleDeclaration</code> object for the
 margin at-rule, with the following properties:
 <dl>
- <dt><a for="CSSStyleDeclaration">readonly flag</a>
+ <dt><a for="CSSStyleDeclaration">computed flag</a>
  <dd>Unset.
  <dt><a for="CSSStyleDeclaration">declarations</a>
  <dd>The declared declarations in the rule, in <a>specified order</a>.
@@ -1996,9 +2016,9 @@ the DOM a <a>CSS declaration block</a> is a
 <a>CSS declaration block</a> has the following associated properties:
 
 <dl dfn-for="CSSStyleDeclaration" export>
- <dt><dfn>readonly flag</dfn>
- <dd>Unset if the object can be manipulated. Set if it can not be
- manipulated. Unless otherwise stated it is unset.
+ <dt><dfn>computed flag</dfn>
+ <dd>Set if the object is a computed style declaration, rather than a specified
+     style. Unless otherwise stated it is unset.
 
  <dt><dfn>declarations</dfn>
  <dd>The <a>CSS declarations</a> associated with the object.
@@ -2054,32 +2074,32 @@ To <dfn export>serialize a CSS declaration block</dfn> <var>declaration block</v
    <li>Let <var>property</var> be <var>declaration</var>'s <a for="CSS declaration">property name</a>.
    <li>If <var>property</var> is in <var>already serialized</var>, continue with the steps labeled <i>declaration loop</i>.
    <li>If <var>property</var> maps to one or more shorthand properties, let <var>shorthands</var> be an array of those shorthand properties, in
-   <a>preferred order</a>, and follow these substeps:
+   <a>preferred order</a>.
+   <li><i>Shorthand loop</i>: For each <var>shorthand</var> in <var>shorthands</var>, follow these substeps:
     <ol>
      <li>Let <var>longhands</var> be an array consisting of all <a>CSS declarations</a> in <var>declaration block</var>'s
      <a for="CSSStyleDeclaration">declarations</a> that that are not in <var>already serialized</var> and have a
      <a for="CSS declaration">property name</a> that
      maps to one of the shorthand properties in <var>shorthands</var>.
-     <li><i>Shorthand loop</i>: For each <var>shorthand</var> in <var>shorthands</var>, follow these substeps:
-      <ol>
-       <li>If all properties that map to <var>shorthand</var> are not present in <var>longhands</var>, continue with the steps labeled <i>shorthand loop</i>.
-       <li>Let <var>current longhands</var> be an empty array.
-       <li>Append all <a>CSS declarations</a> in <var>longhands</var> have a
-       <a for="CSS declaration">property name</a> that maps to <var>shorthand</var> to <var>current longhands</var>.
-       <li>If there is one or more <a>CSS declarations</a> in <var>current longhands</var> have their
-       <a for="CSS declaration">important flag</a> set and one or more with it unset, continue with
-       the steps labeled <i>shorthand loop</i>.
-       <li>Let <var>value</var> be the result of invoking <a>serialize a CSS value</a> of <var>current longhands</var>.
-       <li>If <var>value</var> is the empty string, continue with the steps labeled <i>shorthand loop</i>.
-       <li>Let <var>serialized declaration</var> be the result of invoking <a>serialize a CSS declaration</a> with property name
-       <var>shorthand</var>, value <var>value</var>, and the <i>important</i> flag set if the <a>CSS declarations</a> in
-       <var>current longhands</var> have their <a for="CSS declaration">important flag</a> set.
-       <li>Append <var>serialized declaration</var> to <var>list</var>.
-       <li>Append the property names of all items of <var>current longhands</var> to <var>already serialized</var>.
-       <li>Remove the items present in <var>current longhands</var> from <var>longhands</var>.
-      </ol>
+     <li>If all properties that map to <var>shorthand</var> are not present in <var>longhands</var>, continue with the steps labeled <i>shorthand loop</i>.
+     <li>Let <var>current longhands</var> be an empty array.
+     <li>Append all <a>CSS declarations</a> in <var>longhands</var> that have a
+     <a for="CSS declaration">property name</a> that maps to <var>shorthand</var> to <var>current longhands</var>.
+     <li>If there is one or more <a>CSS declarations</a> in <var>current longhands</var> have their
+     <a for="CSS declaration">important flag</a> set and one or more with it unset, continue with
+     the steps labeled <i>shorthand loop</i>.
+     <li>If there's any declaration in <var>declaration block</var> in between the first and the last longhand in <var>current longhands</var>
+     which belongs to the same [=logical property group=], but has a different [=mapping logic=] as any of the longhands in <var>current longhands</var>,
+     and is not in <var>current longhands</var>, continue with the steps labeled <i>shorthand loop</i>.
+     <li>Let <var>value</var> be the result of invoking <a>serialize a CSS value</a> of <var>current longhands</var>.
+     <li>If <var>value</var> is the empty string, continue with the steps labeled <i>shorthand loop</i>.
+     <li>Let <var>serialized declaration</var> be the result of invoking <a>serialize a CSS declaration</a> with property name
+     <var>shorthand</var>, value <var>value</var>, and the <i>important</i> flag set if the <a>CSS declarations</a> in
+     <var>current longhands</var> have their <a for="CSS declaration">important flag</a> set.
+     <li>Append <var>serialized declaration</var> to <var>list</var>.
+     <li>Append the property names of all items of <var>current longhands</var> to <var>already serialized</var>.
+     <li>Continue with the steps labeled <i>declaration loop</i>.
     </ol>
-   <li>If <var>property</var> is in <var>already serialized</var>, continue with the steps labeled <i>declaration loop</i>.
    <li>Let <var>value</var> be the result of invoking <a>serialize a CSS value</a> of <var>declaration</var>.
    <li>Let <var>serialized declaration</var> be the result of invoking <a>serialize a CSS declaration</a> with property name <var>property</var>, value
    <var>value</var>, and the <i>important</i> flag set if <var>declaration</var> has its <a for="CSS declaration">important
@@ -2099,7 +2119,7 @@ A <a>CSS declaration block</a> has these <a>attribute change steps</a> for its <
 with <var>localName</var>, <var>value</var>, and <var>namespace</var>:
 
 <ol>
- <li>If the <a for="CSSStyleDeclaration">readonly flag</a> is set, then return.
+ <li>If the <a for="CSSStyleDeclaration">computed flag</a> is set, then return.
  <li>If the <a for="CSSStyleDeclaration">updating flag</a> is set, then return.
  <li>If <var>localName</var> is not "<code>style</code>", or <var>namespace</var> is not null, then return.
  <li>If <var>value</var> is null, empty the <a for="CSSStyleDeclaration">declarations</a>.
@@ -2111,7 +2131,7 @@ When a <a>CSS declaration block</a> object is created, then:
 
 <ol>
  <li>Let <var>owner node</var> be the <a for="CSSStyleDeclaration">owner node</a>.
- <li>If <var>owner node</var> is null, or the <a for="CSSStyleDeclaration">readonly flag</a> is set, then return.
+ <li>If <var>owner node</var> is null, or the <a for="CSSStyleDeclaration">computed flag</a> is set, then return.
  <li>Let <var>value</var> be the result of <a lt="get an attribute by namespace and local name">getting an attribute</a>
  given null, "<code>style</code>", and <var>owner node</var>.
  <li>If <var>value</var> is not null, let the <a for="CSSStyleDeclaration">declarations</a> be the result of
@@ -2121,7 +2141,7 @@ When a <a>CSS declaration block</a> object is created, then:
 To <dfn export>update style attribute for</dfn> <var>declaration block</var> means to run the steps below:
 
 <ol>
- <li>Assert: <var>declaration block</var>'s <a for="CSSStyleDeclaration">readonly flag</a> is unset.
+ <li>Assert: <var>declaration block</var>'s <a for="CSSStyleDeclaration">computed flag</a> is unset.
  <li>Let <var>owner node</var> be <var>declaration block</var>'s <a for="CSSStyleDeclaration">owner node</a>.
  <li>If <var>owner node</var> is null, then return.
  <li>Set <var>declaration block</var>'s <a for="CSSStyleDeclaration">updating flag</a>.
@@ -2153,10 +2173,10 @@ interface CSSStyleDeclaration {
   getter CSSOMString item(unsigned long index);
   CSSOMString getPropertyValue(CSSOMString property);
   CSSOMString getPropertyPriority(CSSOMString property);
-  [CEReactions] void setProperty(CSSOMString property, [TreatNullAs=EmptyString] CSSOMString value, optional [TreatNullAs=EmptyString] CSSOMString priority = "");
+  [CEReactions] undefined setProperty(CSSOMString property, [LegacyNullToEmptyString] CSSOMString value, optional [LegacyNullToEmptyString] CSSOMString priority = "");
   [CEReactions] CSSOMString removeProperty(CSSOMString property);
   readonly attribute CSSRule? parentRule;
-  [CEReactions] attribute [TreatNullAs=EmptyString] CSSOMString cssFloat;
+  [CEReactions] attribute [LegacyNullToEmptyString] CSSOMString cssFloat;
 };
 </pre>
 
@@ -2164,11 +2184,14 @@ The object's <a>supported property indices</a> are the numbers in the range zero
 <a>CSS declarations</a> in the <a for="CSSStyleDeclaration">declarations</a>. If there are no such
 <a>CSS declarations</a>, then there are no <a>supported property indices</a>.
 
-The <dfn attribute for=CSSStyleDeclaration>cssText</dfn> attribute must return the result of
-<a lt="serialize a CSS declaration block">serializing</a> the <a for="CSSStyleDeclaration">declarations</a>.
+Getting the <dfn attribute for="CSSStyleDeclaration">cssText</dfn> attribute must run these steps:
+
+1. If the <a for="CSSStyleDeclaration">computed flag</a> is set, then return the empty string.
+2. Return the result of <a lt="serialize a CSS declaration block">serializing</a> the <a for="CSSStyleDeclaration">declarations</a>.
+
 Setting the {{CSSStyleDeclaration/cssText}} attribute must run these steps:
 <ol>
- <li>If the <a for="CSSStyleDeclaration">readonly flag</a> is set,
+ <li>If the <a for="CSSStyleDeclaration">computed flag</a> is set,
  then <a>throw</a> a {{NoModificationAllowedError}} exception.
  <li>Empty the <a for="CSSStyleDeclaration">declarations</a>.
  <li><a lt="Parse a CSS declaration block">Parse</a> the given value and, if the return value is not the empty list, insert the items in the list
@@ -2234,7 +2257,7 @@ value would be "<code>important</code>".</div>
 
 The <dfn method for=CSSStyleDeclaration>setProperty(<var>property</var>, <var>value</var>, <var>priority</var>)</dfn> method must run these steps:
 <ol>
- <li>If the <a for="CSSStyleDeclaration">readonly flag</a> is set,
+ <li>If the <a for="CSSStyleDeclaration">computed flag</a> is set,
  then <a>throw</a> a {{NoModificationAllowedError}} exception.
  <li>If <var>property</var> is not a <a>custom property</a>, follow these substeps:
   <ol>
@@ -2349,7 +2372,7 @@ use different algorithms as long as the constraints above hold.
 
 The <dfn method for=CSSStyleDeclaration>removeProperty(<var>property</var>)</dfn> method must run these steps:
 <ol>
- <li>If the <a for="CSSStyleDeclaration">readonly flag</a> is set,
+ <li>If the <a for="CSSStyleDeclaration">computed flag</a> is set,
  then <a>throw</a> a {{NoModificationAllowedError}} exception.
  <li>If <var>property</var> is not a <a>custom property</a>,
  let <var>property</var> be <var>property</var> <a lt="ASCII lowercase">converted to ASCII lowercase</a>.
@@ -2387,7 +2410,7 @@ is obtained by running the <a>CSS property to IDL attribute</a> algorithm for
 
 <pre class="idl extract">
 partial interface CSSStyleDeclaration {
-  [CEReactions] attribute [TreatNullAs=EmptyString] CSSOMString _<var>camel_cased_attribute</var>;
+  [CEReactions] attribute [LegacyNullToEmptyString] CSSOMString _<var>camel_cased_attribute</var>;
 };
 </pre>
 
@@ -2411,7 +2434,7 @@ algorithm for <var>property</var>, with the <i>lowercase first</i> flag set.
 
 <pre class="idl extract">
 partial interface CSSStyleDeclaration {
-  [CEReactions] attribute [TreatNullAs=EmptyString] CSSOMString _<var>webkit_cased_attribute</var>;
+  [CEReactions] attribute [LegacyNullToEmptyString] CSSOMString _<var>webkit_cased_attribute</var>;
 };
 </pre>
 
@@ -2436,7 +2459,7 @@ the following partial interface applies where <var>dashed attribute</var> is <va
 
 <pre class="idl extract">
 partial interface CSSStyleDeclaration {
-  [CEReactions] attribute [TreatNullAs=EmptyString] CSSOMString _<var>dashed_attribute</var>;
+  [CEReactions] attribute [LegacyNullToEmptyString] CSSOMString _<var>dashed_attribute</var>;
 };
 </pre>
 
@@ -2586,39 +2609,10 @@ depends on the component, as follows:
 
  <dt><<color>>
  <dd>
- If &lt;color&gt; is a component of a resolved or computed value, then
- return the color using the <code>rgb()</code> or <code>rgba()</code> functional
- notation as follows:
- <ol>
- <li>If the alpha component of the color is equal to one, then return the serialization of the
- <code>rgb()</code> functional equivalent of the opaque color.
- <li>If the alpha component of the color is not equal to one, then return the serialization of the
- <code>rgba()</code> functional equivalent of the non-opaque color.
- </ol>
- The serialization of the <code>rgb()</code> functional equivalent is the concatenation of the following:
- <ol>
- <li>The string "<code>rgb(</code>".
- <li>The shortest base-ten integer serialization of the color's red component.
- <li>The string "<code>, </code>".
- <li>The shortest base-ten serialization of the color's green component.
- <li>The string "<code>, </code>".
- <li>The shortest base-ten serialization of the color's blue component.
- <li>The string "<code>)</code>".
- </ol>
- The serialization of the <code>rgba()</code> functional equivalent is the concatenation of the following:
- <ol>
- <li>The string "<code>rgba(</code>".
- <li>The shortest base-ten serialization of the color's red component.
- <li>The string "<code>, </code>".
- <li>The shortest base-ten serialization of the color's green component.
- <li>The string "<code>, </code>".
- <li>The shortest base-ten serialization of the color's blue component.
- <li>The string "<code>, </code>".
- <li>The serialization of the color's alpha component as an &lt;alphavalue>.
- <li>The string "<code>)</code>".
- </ol>
+ If &lt;color&gt; is a component of a resolved value, see [[css-color-4#resolving-color-values]].
 
- In the above rules, the string "<code>, </code>" denotes a COMMA (U+002C) followed by a single SPACE (U+0020).
+ If &lt;color&gt; is a component of a computed value, see [[css-color-4#serializing-color-values]].
+
 
  If <<color>> is a component of a specified value, then
  return the color as follows:
@@ -2627,7 +2621,7 @@ depends on the component, as follows:
  <li>Otherwise, return the value that would be returned if the color were a component of a computed value.
  </ol>
 
- Issue: Should author specified values be normalized for case? Or should original case be preserved?
+ Issue: Should author specified values be normalized for case, the same as computed values? Or should original case be preserved?
 
  <dt><<alphavalue>>
  <dd>
@@ -2801,7 +2795,7 @@ interface mixin ElementCSSInlineStyle {
 </pre>
 
 The <dfn attribute for=ElementCSSInlineStyle>style</dfn> attribute must return a <a>CSS declaration block</a> object whose
-<a for="CSSStyleDeclaration">readonly flag</a> is unset, whose <a for="CSSStyleDeclaration">parent CSS rule</a> is null, and
+<a for="CSSStyleDeclaration">computed flag</a> is unset, whose <a for="CSSStyleDeclaration">parent CSS rule</a> is null, and
 whose <a for="CSSStyleDeclaration">owner node</a> is the <a>context object</a>.
 
 If the user agent supports HTML, the following IDL applies: [[HTML]]
@@ -2816,6 +2810,11 @@ If the user agent supports SVG, the following IDL applies: [[SVG11]]
 SVGElement includes ElementCSSInlineStyle;
 </pre>
 
+If the user agent supports MathML, the following IDL applies: [[MathML-Core]]
+
+<pre class=idl>
+MathMLElement includes ElementCSSInlineStyle;
+</pre>
 
 Extensions to the {{Window}} Interface {#extensions-to-the-window-interface}
 ----------------------------------------------------------------------------
@@ -2850,16 +2849,21 @@ steps:
   set <var>decls</var> to a list of all longhand properties that are
   <a lt="supported CSS property">supported CSS properties</a>, in lexicographical order,
   with the value being the <a>resolved value</a> computed for <var>obj</var>
-  using the style rules associated with <var>doc</var>.
+  using the style rules associated with <var>doc</var>. Additionally, append to
+  <var>decls</var> all the <a>custom properties</a> whose <a>computed value</a>
+  for <var>obj</var> is not the <a>guaranteed-invalid value</a>.
 
   Issue: There are UAs that handle shorthands, and all UAs handle shorthands
   that used to be longhands like 'overflow', see
   <a href="https://github.com/w3c/csswg-drafts/issues/2529">#2529</a>.
 
+  Issue: Order of custom properties is currently undefined, see
+  <a href="https://github.com/w3c/csswg-drafts/issues/4947">#4947</a>.
+
  <li>
   Return a live <a>CSS declaration block</a> with the following properties:
   <dl>
-   <dt><a for="CSSStyleDeclaration">readonly flag</a>
+   <dt><a for="CSSStyleDeclaration">computed flag</a>
    <dd>Set.
    <dt><a for="CSSStyleDeclaration">declarations</a>
    <dd><var>decls</var>.
@@ -3138,4 +3142,3 @@ initial version of the alternative style sheets API and canonicalization
 
  </body>
 </html>
-

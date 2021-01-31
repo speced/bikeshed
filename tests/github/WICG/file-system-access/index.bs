@@ -1,0 +1,1749 @@
+<pre class=metadata>
+Title: File System Access
+Shortname: file-system-access
+Abstract: This document defines a web platform API that enables developers to build
+  powerful web apps that interact with files on the user's local device.
+  It builds on [[FILE-API|File API]] for file reading capabilities, and adds new API
+  surface to enable modifying files, as well as working with directories.
+Status: CG-DRAFT
+ED: https://wicg.github.io/file-system-access/
+Level: 1
+Editor: Marijn Kruisselbrink, Google, mek@chromium.org, w3cid 72440
+Group: WICG
+Repository: wicg/file-system-access
+Indent: 2
+Complain About: accidental-2119 yes, missing-example-ids yes
+Markup Shorthands: css no, markdown yes
+</pre>
+
+<pre class=link-defaults>
+spec:webidl; type:dfn; text:resolve
+</pre>
+
+<pre class=anchors>
+urlPrefix: https://tc39.github.io/ecma262/; spec: ECMA-262
+  type: dfn; text: realm; url: realm
+urlPrefix: https://storage.spec.whatwg.org/; spec: storage
+  type: dfn; text: storage; url: site-storage
+</pre>
+
+<style>
+.domintro dt {
+    font-family: Menlo, Consolas, "DejaVu Sans Mono", Monaco, monospace;
+
+    padding-top: 0.5em;
+    padding-bottom: 1em;
+}
+.domintro dt a {
+    color: inherit; border-bottom-style: none;
+}
+.domintro dt code {
+    font-size: inherit;
+}
+.domintro::before {
+    content: 'For web developers (non-normative)';
+    text-transform: initial;
+
+}
+</style>
+
+# Introduction # {#introduction}
+
+*This section is non-normative.*
+
+This API enables developers to build powerful apps that interact with other
+(non-Web) apps on the user's device via the device's file system. Prominent
+examples of applications where users expect this functionality are IDEs,
+photo and video editors, text editors, and more.
+After a user grants a web app access, this API allows the app to read or save
+changes directly to files and folders on the user's device. Beyond reading and
+writing files, this API provides the ability to open a directory and enumerate
+its contents. Additionally, web apps can use this API to store references to
+files and directories they've been given access to, allowing the web apps to
+later regain access to the same content without requiring the user to select the
+same file again.
+
+This API is similar to <a href="https://html.spec.whatwg.org/multipage/input.html#file-upload-state-(type=file)">`<input type=file>`</a>
+and <a href="https://wicg.github.io/entries-api/#html-forms">`<input type=file webkitdirectory>`</a>
+[[entries-api]]
+in that user interaction happens through file and directory picker dialogs.
+Unlike those APIs, this API is currently purely a javascript API, and
+does not integrate with forms and/or input elements.
+
+Additionally this API also makes it possible for websites to get access to some
+directory without having to first prompt the user for access. This enables use
+cases where a website wants to save data to disk before a user has picked a
+location to save to, without forcing the website to use a completely different
+storage mechanism with a different API for such files. It also makes it easier
+to write automated tests for code using this API. The entry point for this is the
+{{StorageManager/getDirectory()|navigator.storage.getDirectory()}} method. This
+is similar to the temporary file system as defined in earlier drafts of
+[[file-system-api|File API: Directories and System]].
+
+# Files and Directories # {#files-and-directories}
+
+## Concepts ## {#concepts}
+
+An <dfn>entry</dfn> is either a [=file entry=] or a [=directory entry=].
+
+Each [=/entry=] has an associated <dfn for=entry>name</dfn> (a [=string=]).
+
+A <dfn>valid file name</dfn> is a [=string=] that is not an empty string, is not equal to "." or "..",
+and does not contain '/' or any other character used as path separator on the underlying platform.
+
+Note: This means that '\' is not allowed in names on Windows, but might be allowed on
+other operating systems. Additionally underlying file systems might have further restrictions
+on what names are or aren't allowed, so a string merely being a [=valid file name=] is not
+a guarantee that creating a file or directory with that name will succeed.
+
+Issue: We should consider having further normative restrictions on file names that will
+never be allowed using this API, rather than leaving it entirely up to underlying file
+systems.
+
+A <dfn>valid suffix code point</dfn> is a [=code point=] that is [=ASCII alphanumeric=],
+U+002B (+), or U+002E (.).
+
+Note: These code points were chosen to support most pre-existing file formats. The vast
+majority of file extensions are purely alphanumeric, but compound extensions (such as
+`.tar.gz`) and extensions such as `.c++` for C++ source code are also fairly common,
+hence the inclusion of + and . as allowed code points.
+
+A <dfn lt="file|file entry">file entry</dfn> additionally consists of
+<dfn for="file entry">binary data</dfn> (a [=byte sequence=]) and a
+<dfn for="file entry">modification timestamp</dfn> (a number representing the number of milliseconds since the <a spec=FileAPI>Unix Epoch</a>).
+
+A <dfn lt="directory|directory entry">directory entry</dfn> additionally consists of a [=/set=] of
+<dfn for="directory entry">children</dfn>, which are themselves [=/entries=]. Each member is either a [=/file=] or a [=directory=].
+
+An [=/entry=] |entry| should be [=list/contained=] in the [=children=] of at most one
+[=directory entry=], and that directory entry is also known as |entry|'s <dfn for=entry>parent</dfn>.
+An [=/entry=]'s [=entry/parent=] is null if no such directory entry exists.
+
+Note: Two different [=/entries=] can represent the same file or directory on disk, in which
+case it is possible for both entries to have a different parent, or for one entry to have a
+parent while the other entry does not have a parent. Typically an entry does not have a parent
+if it was returned by {{StorageManager/getDirectory()|navigator.storage.getDirectory()}}
+or one of the [=local file system handle factories=],
+and an entry will have a parent in all other cases.
+
+[=/Entries=] can (but don't have to) be backed by files on the host operating system's local file system,
+so it is possible for the [=binary data=], [=modification timestamp=],
+and [=children=] of entries to be modified by applications outside of this specification.
+Exactly how external changes are reflected in the data structures defined by this specification,
+as well as how changes made to the data structures defined here are reflected externally
+is left up to individual user-agent implementations.
+
+An [=/entry=] |a| is <dfn for="entry">the same as</dfn> an [=/entry=] |b| if |a| is equal to |b|, or
+if |a| and |b| are backed by the same file or directory on the local file system.
+
+Issue: TODO: Explain better how entries map to files on disk (multiple entries can map to the same file or
+directory on disk but an entry doesn't have to map to any file on disk).
+
+<div algorithm>
+To <dfn for="entry">resolve</dfn> an [=/entry=] |child| relative to a [=directory entry=] |root|,
+run the following steps:
+
+1. Let |result| be [=a new promise=].
+1. Run the following steps [=in parallel=]:
+  1. If |child| is [=the same as=] |root|,
+     [=/resolve=] |result| with an empty list, and abort.
+  1. Let |childPromises| be « ».
+  1. [=set/For each=] |entry| of |root|'s [=FileSystemHandle/entry=]'s [=children=]:
+    1. Let |p| be the result of [=entry/resolving=] |child| relative to |entry|.
+    1. [=list/Append=] |p| to |childPromises|.
+    1. [=Upon fulfillment=] of |p| with value |path|:
+      1. If |path| is not null:
+        1. [=list/Prepend=] |entry|'s [=entry/name=] to |path|.
+        1. [=/Resolve=] |result| with |path|.
+  1. [=Wait for all=] |childPromises|, with the following success steps:
+    1. If |result| hasn't been resolved yet, [=/resolve=] |result| with `null`.
+1. Return |result|.
+
+</div>
+
+## Permissions ## {#permissions}
+
+The <dfn for=PermissionName enum-value>"file-system"</dfn> [=powerful feature=]'s
+permission-related algorithms and types are defined as follows:
+
+: [=permission descriptor type=]
+:: {{FileSystemPermissionDescriptor}}, defined as:
+  <xmp class=idl>
+  enum FileSystemPermissionMode {
+    "read",
+    "readwrite"
+  };
+
+  dictionary FileSystemPermissionDescriptor : PermissionDescriptor {
+    required FileSystemHandle handle;
+    FileSystemPermissionMode mode = "read";
+  };
+  </xmp>
+
+: [=permission state constraints=]
+:: <div algorithm="permission state constraints">
+  To determine [=permission state constraints=] for a {{FileSystemPermissionDescriptor}} |desc|,
+  run these steps:
+
+  1. Let |entry| be |desc|.{{FileSystemPermissionDescriptor/handle}}'s [=FileSystemHandle/entry=].
+  1. If |entry| represents an [=/entry=] in an [=origin private file system=],
+    this descriptor's [=permission state=] must always be {{PermissionState/"granted"}}.
+  1. Otherwise, if |entry|'s [=entry/parent=] is not null, this descriptor's [=permission state=] must be
+    equal to the [=permission state=] for a descriptor with the same {{FileSystemPermissionDescriptor/mode}},
+    and a {{FileSystemPermissionDescriptor/handle}} representing |entry|'s [=entry/parent=].
+  1. Otherwise, if |desc|.{{FileSystemPermissionDescriptor/mode}} is {{"readwrite"}}:
+    1. Let |read state| be the [=permission state=] for a descriptor
+      with the same {{FileSystemPermissionDescriptor/handle}},
+      but {{FileSystemPermissionDescriptor/mode}} = {{"read"}}.
+    1. If |read state| is not {{PermissionState/"granted"}}, this descriptor's [=permission state=]
+      must be equal to |read state|.
+
+: [=permission request algorithm=]
+:: <div algorithm="permission request algorithm">
+  Given a {{FileSystemPermissionDescriptor}} |desc| and a {{PermissionStatus}} |status|,
+  run these steps:
+
+  1. Run the [=boolean permission query algorithm=] on |desc| and |status|.
+  1. If |status|.{{PermissionStatus/state}} is not {{PermissionState/"prompt"}}, abort.
+  1. Let |settings| be |desc|.{{FileSystemPermissionDescriptor/handle}}'s [=relevant settings object=].
+  1. Let |global| be |settings|'s [=environment settings object/global object=].
+  1. If |global| is not a {{Window}}, throw a {{SecurityError}}.
+  1. If |global| does not have [=transient activation=], throw a {{SecurityError}}.
+  1. If |settings|'s [=environment settings object/origin=] is not [=same origin=] with |settings|'s [=top-level origin=],
+     throw a {{SecurityError}}.
+  1. [=Request permission to use=] |desc|.
+  1. Run the [=boolean permission query algorithm=] on |desc| and |status|.
+
+  Issue(WICG/permissions-request#2): Ideally this user activation requirement would be defined upstream.
+
+<div algorithm>
+To <dfn lt="querying file system permission|query file system permission">query file system permission</dfn>
+given a {{FileSystemHandle}} |handle| and a {{FileSystemPermissionMode}} |mode|, run these steps:
+
+1. Let |desc| be a {{FileSystemPermissionDescriptor}}.
+1. Set |desc|.{{PermissionDescriptor/name}} to {{"file-system"}}.
+1. Set |desc|.{{FileSystemPermissionDescriptor/handle}} to |handle|.
+1. Set |desc|.{{FileSystemPermissionDescriptor/mode}} to |mode|.
+1. Return |desc|'s [=permission state=].
+
+</div>
+
+<div algorithm>
+To <dfn lt="requesting file system permission|request file system permission">request file system permission</dfn>
+given a {{FileSystemHandle}} |handle| and a {{FileSystemPermissionMode}} |mode|, run these steps:
+
+1. Let |desc| be a {{FileSystemPermissionDescriptor}}.
+1. Set |desc|.{{PermissionDescriptor/name}} to {{"file-system"}}.
+1. Set |desc|.{{FileSystemPermissionDescriptor/handle}} to |handle|.
+1. Set |desc|.{{FileSystemPermissionDescriptor/mode}} to |mode|.
+1. Let |status| be the result of running <a spec=permissions>create a PermissionStatus</a> for |desc|.
+1. Run the [=permission request algorithm=] for the {{"file-system"}} feature, given |desc| and |status|.
+1. Return |desc|'s [=permission state=].
+
+</div>
+
+Issue(119): Currently {{FileSystemPermissionMode}} can only be {{"read"}} or {{"readwrite"}}. In
+the future we might want to add a "write" mode as well to support write-only handles.
+
+## The {{FileSystemHandle}} interface ## {#api-filesystemhandle}
+
+<xmp class=idl>
+dictionary FileSystemHandlePermissionDescriptor {
+  FileSystemPermissionMode mode = "read";
+};
+
+enum FileSystemHandleKind {
+  "file",
+  "directory",
+};
+
+[Exposed=(Window,Worker), SecureContext, Serializable]
+interface FileSystemHandle {
+  readonly attribute FileSystemHandleKind kind;
+  readonly attribute USVString name;
+
+  Promise<boolean> isSameEntry(FileSystemHandle other);
+
+  Promise<PermissionState> queryPermission(optional FileSystemHandlePermissionDescriptor descriptor = {});
+  Promise<PermissionState> requestPermission(optional FileSystemHandlePermissionDescriptor descriptor = {});
+};
+</xmp>
+
+A {{FileSystemHandle}} object represents an [=/entry=]. Each {{FileSystemHandle}} object is associated
+with an <dfn for=FileSystemHandle>entry</dfn> (an [=/entry=]). Multiple separate objects implementing
+the {{FileSystemHandle}} interface can all be associated with the same [=/entry=] simultaneously.
+
+<div algorithm="serialization steps">
+{{FileSystemHandle}} objects are [=serializable objects=].
+
+Advisement: In the Origin Trial as available in Chrome 78, these objects are not yet serializable. 
+In Chrome 82 they are.
+
+Their [=serialization steps=], given |value|, |serialized| and <var ignore>forStorage</var> are:
+
+1. Set |serialized|.\[[Origin]] to |value|'s [=relevant settings object=]'s [=environment settings object/origin=].
+1. Set |serialized|.\[[Entry]] to |value|'s [=FileSystemHandle/entry=].
+
+</div>
+
+<div algorithm="deserialization steps">
+Their [=deserialization steps=], given |serialized| and |value| are:
+
+1. If |serialized|.\[[Origin]] is not [=same origin=] with
+   |value|'s [=relevant settings object=]'s [=environment settings object/origin=],
+   then throw a {{DataCloneError}}.
+1. Set |value|'s [=FileSystemHandle/entry=] to |serialized|.\[[Entry]]
+
+</div>
+
+<div class="note domintro">
+  : |handle| . {{FileSystemHandle/kind}}
+  :: Returns {{FileSystemHandleKind/"file"}} if |handle| is a {{FileSystemFileHandle}},
+     or {{FileSystemHandleKind/"directory"}} if |handle| is a {{FileSystemDirectoryHandle}}.
+
+     This can be used to distinguish files from directories when iterating over the contents
+     of a directory.
+
+  : |handle| . {{FileSystemHandle/name}}
+  :: Returns the [=entry/name=] of the entry represented by |handle|.
+</div>
+
+The <dfn attribute for=FileSystemHandle>kind</dfn> attribute must
+return {{FileSystemHandleKind/"file"}} if the associated [=FileSystemHandle/entry=] is a [=file entry=],
+and return {{FileSystemHandleKind/"directory"}} otherwise.
+
+The <dfn attribute for=FileSystemHandle>name</dfn> attribute must return the [=entry/name=] of the
+associated [=FileSystemHandle/entry=].
+
+### The {{FileSystemHandle/isSameEntry()}} method ### {#api-filesystemhandle-issameentry}
+
+<div class="note domintro">
+  : <var ignore>same</var> = await |handle1| . {{FileSystemHandle/isSameEntry()|isSameEntry}}( |handle2| )
+  :: Returns true if |handle1| and |handle2| represent the same file or directory.
+</div>
+
+Advisement: This method is first available in Chrome 82.
+
+<div algorithm>
+The <dfn method for=FileSystemHandle>isSameEntry(|other|)</dfn> method, when invoked, must run these steps:
+
+1. Let |realm| be [=this=]'s [=relevant Realm=].
+1. Let |p| be [=a new promise=] in |realm|.
+1. Run the following steps [=in parallel=]:
+  1. If [=this=]'s [=FileSystemHandle/entry=] is [=the same as=] |other|'s [=FileSystemHandle/entry=],
+     [=/resolve=] |p| with `true`.
+  1. Else [=/resolve=] |p| with `false`.
+1. Return |p|.
+
+</div>
+
+### The {{FileSystemHandle/queryPermission()}} method ### {#api-filesystemhandle-querypermission}
+
+<div class="note domintro">
+  : |status| = await |handle| . {{FileSystemHandle/queryPermission()|queryPermission}}({ {{FileSystemHandlePermissionDescriptor/mode}} : {{"read"}} })
+  : |status| = await |handle| . {{FileSystemHandle/queryPermission()}}
+  : |status| = (await navigator.{{Navigator/permissions}}.{{Permissions/query()|query}}({ {{PermissionDescriptor/name}} : "file-system", {{FileSystemPermissionDescriptor/handle}} : |handle| })).{{PermissionStatus/state}}
+  :: Queries the current state of the read permission of this handle. If this returns `"prompt"`
+     the website will have to call {{FileSystemHandle/requestPermission()}} before any
+     operations on the handle can be done. If this returns `"denied"` any operations will reject.
+
+     Usually handles returned by the [=local file system handle factories=] will initially return `"granted"` for
+     their read permission state, however other than through the user revoking permission, a handle
+     retrieved from IndexedDB is also likely to return `"prompt"`.
+
+  : |status| = await |handle| . {{FileSystemHandle/queryPermission()|queryPermission}}({ {{FileSystemHandlePermissionDescriptor/mode}} : {{"readwrite"}} })
+  : |status| = (await navigator.{{Navigator/permissions}}.{{Permissions/query()|query}}({ {{PermissionDescriptor/name}} : "file-system", {{FileSystemPermissionDescriptor/handle}} : |handle|, {{FileSystemPermissionDescriptor/mode}} : {{"readwrite"}}}).{{PermissionStatus/state}}
+  :: Queries the current state of the write permission of this handle. If this returns `"prompt"`,
+     attempting to modify the file or directory this handle represents will require user activation
+     and will result in a confirmation prompt being shown to the user. However if the state of the
+     read permission of this handle is also `"prompt"` the website will need to call
+     {{FileSystemHandle/requestPermission()}}. There is no automatic prompting for read access when
+     attempting to read from a file or directory.
+</div>
+
+Advisement: The integration with the permissions API's {{Permissions/query()}} method is not yet implemented in Chrome.
+
+<div algorithm>
+The <dfn method for=FileSystemHandle>queryPermission(|descriptor|)</dfn> method, when invoked, must run these steps:
+
+1. Let |result| be [=a new promise=].
+1. Run the following steps [=in parallel=]:
+  1. Let |state| be the result of [=querying file system permission=]
+     given <b>[=this=]</b> and |descriptor|.{{FileSystemHandlePermissionDescriptor/mode}}.
+  1. [=/Resolve=] |result| with |state|.
+1. Return |result|.
+
+</div>
+
+### The {{FileSystemHandle/requestPermission()}} method ### {#api-filesystemhandle-requestpermission}
+
+<div class="note domintro">
+  : |status| = await |handle| . {{FileSystemHandle/requestPermission()|requestPermission}}({ {{FileSystemHandlePermissionDescriptor/mode}} : {{"read"}} })
+  : |status| = await |handle| . {{FileSystemHandle/requestPermission()}}
+  :: If the state of the read permission of this handle is anything other than `"prompt"`, this
+     will return that state directly. If it is `"prompt"` however, user activation is needed and
+     this will show a confirmation prompt to the user. The new read permission state is then
+     returned, depending on the user's response to the prompt.
+
+  : |status| = await |handle| . {{FileSystemHandle/requestPermission()|requestPermission}}({ {{FileSystemHandlePermissionDescriptor/mode}} : {{"readwrite"}} })
+  :: If the state of the write permission of this handle is anything other than `"prompt"`, this
+     will return that state directly. If the status of the read permission of this handle is
+     `"denied"` this will return that.
+
+     Otherwise the state of the write permission is `"prompt"` and this will show a confirmation
+     prompt to the user. The new write permission state is then returned, depending on what the user
+     selected.
+</div>
+
+<div algorithm>
+The <dfn method for=FileSystemHandle>requestPermission(|descriptor|)</dfn> method, when invoked, must run these steps:
+
+1. Let |result| be [=a new promise=].
+1. Run the following steps [=in parallel=]:
+  1. Let |state| be the result of [=requesting file system permission=]
+     given <b>[=this=]</b> and |descriptor|.{{FileSystemHandlePermissionDescriptor/mode}}.
+     If that throws an exception, [=reject=] |result| with that exception and abort.
+  1. [=/Resolve=] |result| with |state|.
+1. Return |result|.
+
+</div>
+
+## The {{FileSystemFileHandle}} interface ## {#api-filesystemfilehandle}
+
+<xmp class=idl>
+dictionary FileSystemCreateWritableOptions {
+  boolean keepExistingData = false;
+};
+
+[Exposed=(Window,Worker), SecureContext, Serializable]
+interface FileSystemFileHandle : FileSystemHandle {
+  Promise<File> getFile();
+  Promise<FileSystemWritableFileStream> createWritable(optional FileSystemCreateWritableOptions options = {});
+};
+</xmp>
+
+A {{FileSystemFileHandle}}'s associated [=FileSystemHandle/entry=] must be a [=file entry=].
+
+{{FileSystemFileHandle}} objects are [=serializable objects=]. Their [=serialization steps=] and
+[=deserialization steps=] are the same as those for {{FileSystemHandle}}.
+
+Advisement: In the Origin Trial as available in Chrome 78, these objects are not yet serializable. 
+In Chrome 82 they are.
+
+### The {{FileSystemFileHandle/getFile()}} method ### {#api-filesystemfilehandle-getfile}
+
+<div class="note domintro">
+  : <var ignore>file</var> = await |fileHandle| . {{FileSystemFileHandle/getFile()}}
+  :: Returns a {{File}} representing the state on disk of the entry represented by |handle|.
+     If the file on disk changes or is removed after this method is called, the returned
+     {{File}} object will likely be no longer readable.
+</div>
+
+<div algorithm>
+The <dfn method for=FileSystemFileHandle>getFile()</dfn> method, when invoked, must run these steps:
+
+1. Let |result| be [=a new promise=].
+1. Run the following steps [=in parallel=]:
+  1. Let |permissionStatus| be the result of [=querying file system permission=]
+     given <b>[=this=]</b> and {{"read"}}.
+  1. If |permissionStatus| is not {{PermissionState/"granted"}},
+     reject |result| with a {{NotAllowedError}} and abort.
+  1. Let |entry| be <b>[=this=]</b>'s [=FileSystemHandle/entry=].
+  1. Let |f| be a new {{File}}.
+  1. Set |f|'s <a spec=FileAPI>snapshot state</a> to the current state of |entry|.
+  1. Set |f|'s underlying byte sequence to a copy of |entry|'s [=binary data=].
+  1. Initialize the value of |f|'s {{File/name}} attribute to |entry|'s [=entry/name=].
+  1. Initialize the value of |f|'s {{File/lastModified}} attribute to |entry|'s [=file entry/modification timestamp=].
+  1. Initialize the value of |f|'s {{Blob/type}} attribute to an implementation defined value, based on for example |entry|'s [=entry/name=] and/or its file extension.
+
+     Issue: The reading and snapshotting behavior needs to be better specified in the [[FILE-API]] spec,
+     for now this is kind of hand-wavy.
+  1. [=/Resolve=] |result| with |f|.
+1. Return |result|.
+
+</div>
+
+### The {{FileSystemFileHandle/createWritable()}} method ### {#api-filesystemfilehandle-createwritable}
+
+Advisement: In the Origin Trial as available in Chrome 82, createWritable replaces the createWriter method.
+
+<div class="note domintro">
+  : |stream| = await |fileHandle| . {{FileSystemFileHandle/createWritable()}}
+  : |stream| = await |fileHandle| . {{FileSystemFileHandle/createWritable()|createWritable}}({ {{FileSystemCreateWritableOptions/keepExistingData}}: true/false })
+  :: Returns a {{FileSystemWritableFileStream}} that can be used to write to the file. Any changes made through
+     |stream| won't be reflected in the file represented by |fileHandle| until the stream has been closed.
+     User agents try to ensure that no partial writes happen, i.e. the file represented by
+     |fileHandle| will either contains its old contents or it will contain whatever data was written
+     through |stream| up until the stream has been closed.
+
+     This is typically implemented by writing data to a temporary file, and only replacing the file
+     represented by |fileHandle| with the temporary file when the writable filestream is closed.
+
+     If {{FileSystemCreateWritableOptions/keepExistingData}} is `false` or not specified,
+     the temporary file starts out empty,
+     otherwise the existing file is first copied to this temporary file.
+</div>
+
+Issue(67): There has been some discussion around and desire for a "inPlace" mode for createWritable
+(where changes will be written to the actual underlying file as they are written to the writer, for
+example to support in-place modification of large files or things like databases). This is not
+currently implemented in Chrome. Implementing this is currently blocked on figuring out how to
+combine the desire to run malware checks with the desire to let websites make fast in-place
+modifications to existing large files.
+
+<div algorithm>
+The <dfn method for=FileSystemFileHandle>createWritable(|options|)</dfn> method, when invoked, must run these steps:
+
+1. Let |result| be [=a new promise=].
+1. Run the following steps [=in parallel=]:
+  1. Let |permissionStatus| be the result of [=requesting file system permission=]
+     given <b>[=this=]</b> and {{"readwrite"}}.
+     If that throws an exception, [=reject=] |result| with that exception and abort.
+  1. If |permissionStatus| is not {{PermissionState/"granted"}},
+     reject |result| with a {{NotAllowedError}} and abort.
+  1. Let |entry| be <b>[=this=]</b>'s [=FileSystemHandle/entry=].
+  1. Let |stream| be the result of [=create a new FileSystemWritableFileStream|creating a new FileSystemWritableFileStream=]
+     for |entry| in <b>[=this=]</b>'s [=relevant realm=].
+  1. If |options|.{{FileSystemCreateWritableOptions/keepExistingData}} is `true`:
+    1. Set |stream|.[=[[buffer]]=] to a copy of |entry|'s [=file entry/binary data=].
+  1. [=/Resolve=] |result| with |stream|.
+1. Return |result|.
+
+</div>
+
+## The {{FileSystemDirectoryHandle}} interface ## {#api-filesystemdirectoryhandle}
+
+<xmp class=idl>
+dictionary FileSystemGetFileOptions {
+  boolean create = false;
+};
+
+dictionary FileSystemGetDirectoryOptions {
+  boolean create = false;
+};
+
+dictionary FileSystemRemoveOptions {
+  boolean recursive = false;
+};
+
+[Exposed=(Window,Worker), SecureContext, Serializable]
+interface FileSystemDirectoryHandle : FileSystemHandle {
+  async iterable<USVString, FileSystemHandle>;
+
+  Promise<FileSystemFileHandle> getFileHandle(USVString name, optional FileSystemGetFileOptions options = {});
+  Promise<FileSystemDirectoryHandle> getDirectoryHandle(USVString name, optional FileSystemGetDirectoryOptions options = {});
+
+  Promise<undefined> removeEntry(USVString name, optional FileSystemRemoveOptions options = {});
+
+  Promise<sequence<USVString>?> resolve(FileSystemHandle possibleDescendant);
+};
+</xmp>
+
+A {{FileSystemDirectoryHandle}}'s associated [=FileSystemHandle/entry=] must be a [=directory entry=].
+
+{{FileSystemDirectoryHandle}} objects are [=serializable objects=]. Their [=serialization steps=] and
+[=deserialization steps=] are the same as those for {{FileSystemHandle}}.
+
+Advisement: In the Origin Trial as available in Chrome 78, these objects are not yet serializable. 
+In Chrome 82 they are.
+
+Advisement: In Chrome versions upto Chrome 85 `getFileHandle` and `getDirectoryHandle` where
+called `getFile` and `getDirectory` instead.
+
+### Directory iteration ### {#api-filesystemdirectoryhandle-asynciterable}
+
+<div class="note domintro">
+  : for await (let [|name|, |handle|] of |directoryHandle|) {}
+  : for await (let [|name|, |handle|] of |directoryHandle| . entries()) {}
+  : for await (let |handle| of |directoryHandle| . values()) {}
+  : for await (let |name| of |directoryHandle| . keys()) {}
+  :: Iterates over all entries whose parent is the entry represented by |directoryHandle|. Entries
+     that are created or deleted while the iteration is in progress might or might not be included.
+     No guarantees are given either way.
+</div>
+
+Advisement: In Chrome this is currently implemented as a `directoryHandle.getEntries()` method that can be used in a `for await..of` loop.
+This `getEntries()` method returns more or less the same async iterable as what is returned by `values()` in this specification.
+The proper async iterable declaration is not yet implemented.
+
+Issue(173): In the future we might want to add arguments to the async iterable declaration to
+support for example recursive iteration.
+
+<div algorithm="iterator initialization">
+The [=asynchronous iterator initialization steps=] for a {{FileSystemDirectoryHandle}} |handle|
+ant its async iterator |iterator| are:
+
+1. Let |permissionStatus| be the result of [=querying file system permission=]
+   given |handle| and {{"read"}}.
+
+1. If |permissionStatus| is not {{PermissionState/"granted"}},
+   throw a {{NotAllowedError}}.
+
+1. Set |iterator|'s <dfn for="FileSystemDirectoryHandle-iterator">past results</dfn> to an empty [=/set=].
+
+</div>
+
+<div algorithm="next iteration result">
+To [=get the next iteration result=] for a {{FileSystemDirectoryHandle}} |handle|
+and its async iterator |iterator|:
+
+1. Let |promise| be [=a new promise=].
+
+1. Let |directory| be |handle|'s [=FileSystemHandle/entry=].
+
+1. Let |permissionStatus| be the result of [=querying file system permission=]
+   given |handle| and {{"read"}}.
+
+1. If |permissionStatus| is not {{PermissionState/"granted"}},
+   reject |promise| with a {{NotAllowedError}} and return |promise|.
+
+1. Let |child| be an [=/entry=] in |directory|'s [=directory entry/children=],
+   such that |child|'s [=entry/name=] is not contained in |iterator|'s [=past results=],
+   or `null` if no such entry exists.
+
+   Note: This is intentionally very vague about the iteration order. Different platforms
+   and file systems provide different guarantees about iteration order, and we want it to
+   be possible to efficiently implement this on all platforms. As such no guarantees are given
+   about the exact order in which elements are returned.
+
+1. If |child| is `null`, then:
+  1. [=/Resolve=] |promise| with `undefined`.
+
+1. Otherwise:
+  1. [=set/Append=] |child|'s [=entry/name=] to |iterator|'s [=past results=].
+  1. If |child| is a [=file entry=]:
+    1. Let |result| be a new {{FileSystemFileHandle}} associated with |child|.
+  1. Otherwise:
+    1. Let |result| be a new {{FileSystemDirectoryHandle}} associated with |child|.
+  1. [=/Resolve=] |promise| with (|child|'s [=entry/name=], |result|).
+
+1. Return |promise|.
+
+</div>
+
+### The {{FileSystemDirectoryHandle/getFileHandle()}} method ### {#api-filesystemdirectoryhandle-getfilehandle}
+
+<div class="note domintro">
+  : |fileHandle| = await |directoryHandle| . {{FileSystemDirectoryHandle/getFileHandle()|getFileHandle}}(|name|)
+  : |fileHandle| = await |directoryHandle| . {{FileSystemDirectoryHandle/getFileHandle()|getFileHandle}}(|name|, { {{FileSystemGetFileOptions/create}}: false })
+  :: Returns a handle for a file named |name| in the directory represented by |directoryHandle|. If
+     no such file exists, this rejects.
+
+  : |fileHandle| = await |directoryHandle| . {{FileSystemDirectoryHandle/getFileHandle()|getFileHandle}}(|name|, { {{FileSystemGetFileOptions/create}}: true })
+  :: Returns a handle for a file named |name| in the directory represented by |directoryHandle|. If
+     no such file exists, this creates a new file. If no file with named |name| can be created this
+     rejects. Creation can fail because there already is a directory with the same name, because the
+     name uses characters that aren't supported in file names on the underlying file system, or
+     because the user agent for security reasons decided not to allow creation of the file.
+
+     This operation requires write permission, even if the file being returned already exists. If
+     this handle doesn't already have write permission, this could result in a prompt being shown to
+     the user. To get an existing file without needing write permission, call this method
+     with <code>{ {{FileSystemGetFileOptions/create}}: false }</code>.
+</div>
+
+<div algorithm>
+The <dfn method for=FileSystemDirectoryHandle>getFileHandle(|name|, |options|)</dfn> method, when invoked,
+must run these steps:
+
+1. Let |result| be [=a new promise=].
+1. Run the following steps [=in parallel=]:
+  1. If |name| is not a [=valid file name=], [=/reject=] |result| with a {{TypeError}} and abort.
+
+  1. Let |entry| be <b>[=this=]</b>'s [=FileSystemHandle/entry=].
+  1. If |options|.{{FileSystemGetFileOptions/create}} is `true`:
+    1. Let |permissionStatus| be the result of [=requesting file system permission=]
+       given <b>[=this=]</b> and {{"readwrite"}}.
+       If that throws an exception, [=reject=] |result| with that exception and abort.
+  1. Otherwise:
+    1. Let |permissionStatus| be the result of [=querying file system permission=]
+       given <b>[=this=]</b> and {{"read"}}.
+  1. If |permissionStatus| is not {{PermissionState/"granted"}},
+     reject |result| with a {{NotAllowedError}} and abort.
+
+  1. [=set/For each=] |child| of |entry|'s [=directory entry/children=]:
+    1. If |child|'s [=entry/name=] equals |name|:
+      1. If |child| is a [=directory entry=]:
+        1. [=/Reject=] |result| with a {{TypeMismatchError}} and abort.
+      1. [=/Resolve=] |result| with a new {{FileSystemFileHandle}} whose [=FileSystemHandle/entry=] is |child| and abort.
+  1. If |options|.{{FileSystemGetFileOptions/create}} is `false`:
+    1. [=/Reject=] |result| with a {{NotFoundError}} and abort.
+  1. Let |child| be a new [=file entry=].
+  1. Set |child|'s [=entry/name=] to |name|.
+  1. Set |child|'s [=binary data=] to an empty [=byte sequence=].
+  1. Set |child|'s [=modification timestamp=] to the current time.
+  1. [=set/Append=] |child| to |entry|'s [=directory entry/children=].
+  1. If creating |child| in the underlying file system throws an exception,
+     [=/reject=] |result| with that exception and abort.
+
+     Issue(68): Better specify what possible exceptions this could throw.
+  1. [=/Resolve=] |result| with a new {{FileSystemFileHandle}} whose [=FileSystemHandle/entry=] is |child|.
+1. Return |result|.
+
+</div>
+
+### The {{FileSystemDirectoryHandle/getDirectoryHandle()}} method ### {#api-filesystemdirectoryhandle-getdirectoryhandle}
+
+<div class="note domintro">
+  : |subdirHandle| = await |directoryHandle| . {{FileSystemDirectoryHandle/getDirectoryHandle()|getDirectoryHandle}}(|name|)
+  : |subdirHandle| = await |directoryHandle| . {{FileSystemDirectoryHandle/getDirectoryHandle()|getDirectoryHandle}}(|name|, { {{FileSystemGetDirectoryOptions/create}}: false })
+  :: Returns a handle for a directory named |name| in the directory represented by
+    |directoryHandle|. If no such directory exists, this rejects.
+
+  : |subdirHandle| = await |directoryHandle| . {{FileSystemDirectoryHandle/getDirectoryHandle()|getDirectoryHandle}}(|name|, { {{FileSystemGetDirectoryOptions/create}}: true })
+  :: Returns a handle for a directory named |name| in the directory represented by
+     |directoryHandle|. If no such directory exists, this creates a new directory. If creating the
+     directory failed, this rejects. Creation can fail because there already is a file with the same
+     name, or because the name uses characters that aren't supported in file names on the underlying
+     file system.
+
+     This operation requires write permission, even if the directory being returned already exists.
+     If this handle doesn't already have write permission, this could result in a prompt being shown
+     to the user. To get an existing directory without needing write permission, call this method
+     with <code>{ {{FileSystemGetDirectoryOptions/create}}: false }</code>.
+</div>
+
+<div algorithm>
+The <dfn method for=FileSystemDirectoryHandle>getDirectoryHandle(|name|, |options|)</dfn> method, when
+invoked, must run these steps:
+
+1. Let |result| be [=a new promise=].
+1. Run the following steps [=in parallel=]:
+  1. If |name| is not a [=valid file name=], [=/reject=] |result| with a {{TypeError}} and abort.
+
+  1. Let |entry| be <b>[=this=]</b>'s [=FileSystemHandle/entry=].
+  1. If |options|.{{FileSystemGetDirectoryOptions/create}} is `true`:
+    1. Let |permissionStatus| be the result of [=requesting file system permission=]
+       given <b>[=this=]</b> and {{"readwrite"}}.
+       If that throws an exception, [=reject=] |result| with that exception and abort.
+  1. Otherwise:
+    1. Let |permissionStatus| be the result of [=querying file system permission=]
+       given <b>[=this=]</b> and {{"read"}}.
+  1. If |permissionStatus| is not {{PermissionState/"granted"}},
+     reject |result| with a {{NotAllowedError}} and abort.
+
+  1. [=set/For each=] |child| of |entry|'s [=directory entry/children=]:
+    1. If |child|'s [=entry/name=] equals |name|:
+      1. If |child| is a [=file entry=]:
+        1. [=/Reject=] |result| with a {{TypeMismatchError}} and abort.
+      1. [=/Resolve=] |result| with a new {{FileSystemDirectoryHandle}} whose [=FileSystemHandle/entry=] is |child| and abort.
+  1. If |options|.{{FileSystemGetFileOptions/create}} is `false`:
+    1. [=/Reject=] |result| with a {{NotFoundError}} and abort.
+  1. Let |child| be a new [=directory entry=].
+  1. Set |child|'s [=entry/name=] to |name|.
+  1. Set |child|'s [=directory entry/children=] to an empty [=/set=].
+  1. [=set/Append=] |child| to |entry|'s [=directory entry/children=].
+  1. If creating |child| in the underlying file system throws an exception,
+     [=/reject=] |result| with that exception and abort.
+
+     Issue(68): Better specify what possible exceptions this could throw.
+  1. [=/Resolve=] |result| with a new {{FileSystemDirectoryHandle}} whose [=FileSystemHandle/entry=] is |child|.
+1. Return |result|.
+
+</div>
+
+### The {{FileSystemDirectoryHandle/removeEntry()}} method ### {#api-filesystemdirectoryhandle-removeentry}
+
+<div class="note domintro">
+  : await |directoryHandle| . {{FileSystemDirectoryHandle/removeEntry()|removeEntry}}(|name|)
+  : await |directoryHandle| . {{FileSystemDirectoryHandle/removeEntry()|removeEntry}}(|name|, { {{FileSystemRemoveOptions/recursive}}: false })
+  :: If the directory represented by |directoryHandle| contains a file named |name|, or an empty
+     directory named |name|, this will attempt to delete that file or directory.
+
+     Attempting to delete a file or directory that does not exist is considered success,
+     while attempting to delete a non-empty directory will result in a promise rejection.
+
+  : await |directoryHandle| . {{FileSystemDirectoryHandle/removeEntry()|removeEntry}}(|name|, { {{FileSystemRemoveOptions/recursive}}: true })
+  :: Removes the entry named |name| in the directory represented by |directoryHandle|.
+     If that entry is a directory, its contents will also be deleted recursively.
+     recursively.
+
+     Attempting to delete a file or directory that does not exist is considered success.
+</div>
+
+<div algorithm>
+The <dfn method for=FileSystemDirectoryHandle>removeEntry(|name|, |options|)</dfn> method, when invoked, must run
+these steps:
+
+1. Let |result| be [=a new promise=].
+1. Run the following steps [=in parallel=]:
+  1. If |name| is not a [=valid file name=], [=/reject=] |result| with a {{TypeError}} and abort.
+
+  1. Let |entry| be <b>[=this=]</b>'s [=FileSystemHandle/entry=].
+  1. Let |permissionStatus| be the result of [=requesting file system permission=]
+     given <b>[=this=]</b> and {{"readwrite"}}.
+     If that throws an exception, [=reject=] |result| with that exception and abort.
+  1. If |permissionStatus| is not {{PermissionState/"granted"}},
+     reject |result| with a {{NotAllowedError}} and abort.
+
+  1. [=set/For each=] |child| of |entry|'s [=directory entry/children=]:
+    1. If |child|'s [=entry/name=] equals |name|:
+      1. If |child| is a [=directory entry=]:
+        1. If |child|'s [=directory entry/children=] is not [=set/is empty|empty=] and |options|.{{FileSystemRemoveOptions/recursive}} is `false`:
+          1. [=/Reject=] |result| with an {{InvalidModificationError}} and abort.
+      1. [=set/Remove=] |child| from |entry|'s [=directory entry/children=].
+      1. If removing |child| in the underlying file system throws an exception,
+         [=/reject=] |result| with that exception and abort.
+
+         Note: If {{FileSystemRemoveOptions/recursive}} is `true`, the removal can fail
+         non-atomically. Some files or directories might have been removed while other files
+         or directories still exist.
+
+         Issue(68): Better specify what possible exceptions this could throw.
+      1. [=/Resolve=] |result| with `undefined`.
+  1. [=/Reject=] |result| with a {{NotFoundError}}.
+1. Return |result|.
+
+
+</div>
+
+### The {{FileSystemDirectoryHandle/resolve()}} method ### {#api-filesystemdirectoryhandle-resolve}
+
+<div class="note domintro">
+  : |path| = await |directory| . {{FileSystemDirectoryHandle/resolve()|resolve}}( |child| )
+  :: If |child| is equal to |directory|, |path| will be an empty array.
+  :: If |child| is a direct child of |directory|, |path| will be an array containing |child|'s name.
+  :: If |child| is a descendant of |directory|, |path| will be an array containing the names of
+     all the intermediate directories and |child|'s name as last element.
+     For example if |directory| represents `/home/user/project`
+     and |child| represents `/home/user/project/foo/bar`, this will return
+     `['foo', 'bar']`.
+  :: Otherwise (|directory| and |child| are not related), |path| will be null.
+
+     This functionality can be useful if a web application shows a directory
+     listing to highlight a file opened through a file picker in that directory listing.
+</div>
+
+Advisement: This method is first available in Chrome 82.
+
+<div class=example id=filesystemdirectoryhandle-resolve-example>
+<xmp highlight=js>
+// Assume we at some point got a valid directory handle.
+const dir_ref = current_project_dir;
+if (!dir_ref) return;
+
+// Now get a file reference by showing a file picker:
+const file_ref = await self.showOpenFilePicker();
+if (!file_ref) {
+    // User cancelled, or otherwise failed to open a file.
+    return;
+}
+
+// Check if file_ref exists inside dir_ref:
+const relative_path = await dir_ref.resolve(file_ref);
+if (relative_path === null) {
+    // Not inside dir_ref
+} else {
+    // relative_path is an array of names, giving the relative path
+    // from dir_ref to the file that is represented by file_ref:
+    assert relative_path.pop() === file_ref.name;
+
+    let entry = dir_ref;
+    for (const name of relative_path) {
+        entry = await entry.getDirectory(name);
+    }
+    entry = await entry.getFile(file_ref.name);
+
+    // Now |entry| will represent the same file on disk as |file_ref|.
+    assert await entry.isSameEntry(file_ref) === true;
+}
+</xmp>
+</div>
+
+<div algorithm>
+The <dfn method for=FileSystemDirectoryHandle>resolve(|possibleDescendant|)</dfn> method,
+when invoked, must return the result of [=entry/resolving=]
+|possibleDescendant|'s [=FileSystemHandle/entry=] relative to [=this=]'s [=FileSystemHandle/entry=].
+
+</div>
+
+
+
+## The {{FileSystemWritableFileStream}} interface ## {#api-filesystemwritablefilestream}
+
+<xmp class=idl>
+enum WriteCommandType {
+  "write",
+  "seek",
+  "truncate",
+};
+
+dictionary WriteParams {
+  required WriteCommandType type;
+  unsigned long long? size;
+  unsigned long long? position;
+  (BufferSource or Blob or USVString)? data;
+};
+
+typedef (BufferSource or Blob or USVString or WriteParams) FileSystemWriteChunkType;
+
+[Exposed=(Window,Worker), SecureContext]
+interface FileSystemWritableFileStream : WritableStream {
+  Promise<undefined> write(FileSystemWriteChunkType data);
+  Promise<undefined> seek(unsigned long long position);
+  Promise<undefined> truncate(unsigned long long size);
+};
+</xmp>
+
+A {{FileSystemWritableFileStream}} has an associated <dfn for=FileSystemWritableFileStream>\[[file]]</dfn> (a [=file entry=]).
+
+A {{FileSystemWritableFileStream}} has an associated <dfn for=FileSystemWritableFileStream>\[[buffer]]</dfn> (a [=byte sequence=]).
+It is initially empty.
+
+Note: This buffer can get arbitrarily large, so it is expected that implementations will not keep this in memory,
+but instead use a temporary file for this. All access to \[[buffer]] is done in promise returning methods and
+algorithms, so even though operations on it seem sync, implementations can implement them async.
+
+A {{FileSystemWritableFileStream}} has an associated <dfn for=FileSystemWritableFileStream>\[[seekOffset]]</dfn> (a number).
+It is initially 0.
+
+<div class="note domintro">
+A {{FileSystemWritableFileStream}} object is a {{WritableStream}} object with additional
+convenience methods, which operates on a single file on disk.
+
+Upon creation, an underlying sink will have been created and the stream will be usable.
+All operations executed on the stream are queuable and producers will be able to respond to backpressure.
+
+The underlying sink's write method, and therefore {{WritableStreamDefaultWriter/write()|WritableStreamDefaultWriter's write()}}
+method, will accept byte-like data or {{WriteParams}} as input.
+
+The {{FileSystemWritableFileStream}} has a file position cursor initialized at byte offset 0 from the top of the file.
+When using {{FileSystemWritableFileStream/write()|write()}} or by using WritableStream capabilities through the {{WritableStreamDefaultWriter/write()|WritableStreamDefaultWriter's write()}} method, this position will be advanced based on the number of bytes written through the stream object.
+
+Similarly, when piping a {{ReadableStream}} into a {{FileSystemWritableFileStream}} object, this position is updated with the number of bytes that passed through the stream.
+
+{{WritableStream/getWriter()|getWriter()}} returns an instance of {{WritableStreamDefaultWriter}}.
+</div>
+
+<div algorithm>
+To <dfn>create a new FileSystemWritableFileStream</dfn> given a [=file entry=] |file|
+in a [=/Realm=] |realm|, perform the following steps:
+
+1. Let |stream| be a [=new=] {{FileSystemWritableFileStream}} in |realm|.
+1. Set |stream|.[=FileSystemWritableFileStream/[[file]]=] to |file|.
+1. Let |writeAlgorithm| be an algorithm which takes a |chunk| argument
+   and returns the result of running the [=write a chunk=] algorithm with |stream| and |chunk|.
+1. Let |closeAlgorithm| be the following steps:
+   1. Let |closeResult| be [=a new promise=].
+   1. Run the following steps [=in parallel=]:
+      1. Let |permissionStatus| be the [=permission state=] for a {{FileSystemPermissionDescriptor}}
+         with {{FileSystemPermissionDescriptor/handle}} representing |stream|.[=[[file]]=],
+         and {{FileSystemPermissionDescriptor/mode}} = {{"readwrite"}}.
+      1. If |permissionStatus| is not {{PermissionState/"granted"}},
+         reject |closeResult| with a {{NotAllowedError}} and abort.
+      1. Perform user agent-specific [=malware scans and safe browsing checks=].
+         If these checks fail, [=/reject=] |closeResult| with an {{AbortError}} and abort.
+      1. Set |stream|.[=[[file]]=]'s [=file entry/binary data=] to |stream|.[=[[buffer]]=].
+         If that throws an exception, [=/reject=] |closeResult| with that exception and abort.
+
+         Note: It is expected that this atomically updates the contents of the file on disk
+         being written to.
+      1. [=/Resolve=] |closeResult| with `undefined`.
+   1. Return |closeResult|.
+1. Let |highWaterMark| be 1.
+1. Let |sizeAlgorithm| be an algorithm that returns `1`.
+1. [=WritableStream/Set up=] |stream| with <a for="WritableStream/set up"><var
+   ignore>writeAlgorithm</var></a> set to |writeAlgorithm|, <a for="WritableStream/set up"><var
+   ignore>closeAlgorithm</var></a> set to |closeAlgorithm|, <a for="WritableStream/set up"><var
+   ignore>highWaterMark</var></a> set to |highWaterMark|, and <a for="WritableStream/set up"><var
+   ignore>sizeAlgorithm</var></a> set to |sizeAlgorithm|.
+1. Return |stream|.
+
+</div>
+
+<div algorithm>
+The <dfn>write a chunk</dfn> algorithm,
+given a {{FileSystemWritableFileStream}} |stream| and |chunk|,
+runs these steps:
+
+1. Let |input| be the result of [=converting=] |chunk| to a {{FileSystemWriteChunkType}}.
+   If this throws an exception, then return [=a promise rejected with=] that exception.
+1. Let |p| be [=a new promise=].
+1. Run the following steps [=in parallel=]:
+   1. Let |permissionStatus| be the [=permission state=] for a {{FileSystemPermissionDescriptor}}
+      with {{FileSystemPermissionDescriptor/handle}} representing |stream|.[=[[file]]=],
+      and {{FileSystemPermissionDescriptor/mode}} = {{"readwrite"}}.
+   1. If |permissionStatus| is not {{PermissionState/"granted"}},
+      reject |p| with a {{NotAllowedError}} and abort.
+   1. Let |command| be |input|.{{WriteParams/type}} if |input| is a {{WriteParams}},
+      and {{WriteCommandType/"write"}} otherwise.
+   1. If |command| is {{WriteCommandType/"write"}}:
+      1. Let |data| be |input|.{{WriteParams/data}} if |input| is a {{WriteParams}},
+         and |input| otherwise.
+      1. If |data| is `undefined`,
+         reject |p| with a {{TypeError}} and abort.
+      1. Let |writePosition| be |stream|.[=[[seekOffset]]=].
+      1. If |input| is a {{WriteParams}} and |input|.{{WriteParams/position}} is not `undefined`,
+         set |writePosition| to |input|.{{WriteParams/position}}.
+      1. Let |oldSize| be |stream|.[=[[buffer]]=]'s [=byte sequence/length=].
+      1. If |writePosition| is larger than |oldSize|,
+         [=/reject=] |p| with a {{InvalidStateError}} and abort.
+
+         Issue: Not clear if this should reject, and if it does, is this really the right error type?
+         Chrome's implementation is actually inconsistent about this rejecting or not.
+
+      1. If |data| is a {{BufferSource}},
+         let |dataBytes| be [=get a copy of the buffer source|a copy of=] |data|.
+      1. Else if |data| is a {{Blob}}:
+         1. Let |dataBytes| be the result of performing the
+            <a spec=FileAPI>read operation</a> on |data|.
+            If this throws an exception, [=/reject=] |p| with that exception and abort.
+      1. Else:
+         1. [=Assert=]: |data| is a {{USVString}}.
+         1. Let |dataBytes| be the result of [=UTF-8 encoding=] |data|.
+
+      1. Let |head| be a [=byte sequence=] containing the first |writePosition| bytes of |stream|.[=[[buffer]]=].
+      1. Let |tail| be an empty [=byte sequence=].
+      1. If |writePosition| + |data|.[=byte sequence/length=] is smaller than |oldSize|:
+         1. Let |tail| be a [=byte sequence=] containing the last
+            |oldSize| - (|writePosition| + |data|.[=byte sequence/length=]) bytes of |stream|.[=[[buffer]]=].
+      1. Set |stream|.[=[[buffer]]=] to the concatenation of |head|, |data| and |tail|.
+      1. Set |stream|.[=[[seekOffset]]=] to |writePosition| + |data|.[=byte sequence/length=].
+      1. [=/Resolve=] |p|.
+   1. Else if |command| is {{WriteCommandType/"seek"}}:
+      1. If |chunk|.{{WriteParams/position}} is `undefined`,
+         [=/reject=] |p| with a {{TypeError}} and abort.
+      1. Set |stream|.[=[[seekOffset]]=] to |chunk|.{{WriteParams/position}}.
+      1. [=/Resolve=] |p|.
+   1. Else if |command| is {{WriteCommandType/"truncate"}}:
+      1. If |chunk|.{{WriteParams/size}} is `undefined`,
+         [=/reject=] |p| with a {{TypeError}} and abort.
+      1. Let |newSize| be |chunk|.{{WriteParams/size}}.
+      1. Let |oldSize| be |stream|.[=[[buffer]]=]'s [=byte sequence/length=].
+      1. If |newSize| is larger than |oldSize|:
+         1. Set |stream|.[=[[buffer]]=] to a [=byte sequence=] formed by concating
+            |stream|.[=[[buffer]]=] with a [=byte sequence=] containing |newSize|-|oldSize| `0x00` bytes.
+      1. Else if |newSize| is smaller than |oldSize|:
+         1. Set |stream|.[=[[buffer]]=] to a [=byte sequence=] containing the first |newSize| bytes
+            in |stream|.[=[[buffer]]=].
+      1. If |stream|.[=[[seekOffset]]=] is bigger than |newSize|,
+         set |stream|.[=[[seekOffset]]=] to |newSize|.
+      1. [=/Resolve=] |p|.
+1. Return |p|.
+
+</div>
+
+### The {{FileSystemWritableFileStream/write()}} method ### {#api-filesystemwritablefilestream-write}
+
+<div class="note domintro">
+  : await |stream| . {{FileSystemWritableFileStream/write()|write}}(|data|)
+  : await |stream| . {{FileSystemWritableFileStream/write()|write}}({
+      {{WriteParams/type}}: {{WriteCommandType/"write"}},
+      {{WriteParams/data}}: |data| })
+  :: Writes the content of |data| into the file associated with |stream| at the current file
+     cursor offset.
+
+     No changes are written to the actual file on disk until the stream has been closed.
+     Changes are typically written to a temporary file instead.
+
+  : await |stream| . {{FileSystemWritableFileStream/write()|write}}({
+      {{WriteParams/type}}: {{WriteCommandType/"write"}},
+      {{WriteParams/position}}: |position|,
+      {{WriteParams/data}}: |data| })
+  :: Writes the content of |data| into the file associated with |stream| at |position|
+     bytes from the top of the file. Also updates the current file cursor offset to the
+     end of the written data.
+
+     No changes are written to the actual file on disk until the stream has been closed.
+     Changes are typically written to a temporary file instead.
+
+  : await |stream| . {{FileSystemWritableFileStream/write()|write}}({
+      {{WriteParams/type}}: {{WriteCommandType/"seek"}},
+      {{WriteParams/position}}: |position| })
+  :: Updates the current file cursor offset the |position| bytes from the top of the file.
+
+  : await |stream| . {{FileSystemWritableFileStream/write()|write}}({
+      {{WriteParams/type}}: {{WriteCommandType/"truncate"}},
+      {{WriteParams/size}}: |size| })
+  :: Resizes the file associated with |stream| to be |size| bytes long. If |size| is larger than
+     the current file size this pads the file with null bytes, otherwise it truncates the file.
+
+     The file cursor is updated when {{truncate}} is called. If the offset is smaller than offset,
+     it remains unchanged. If the offset is larger than |size|, the offset is set to |size| to
+     ensure that subsequent writes do not error.
+
+     No changes are written to the actual file until on disk until the stream has been closed.
+     Changes are typically written to a temporary file instead.
+</div>
+
+<div algorithm>
+The <dfn method for=FileSystemWritableFileStream>write(|data|)</dfn> method, when invoked, must run
+these steps:
+
+1. Let |writer| be the result of [=WritableStream/getting a writer=] for [=this=].
+1. Let |result| be the result of [=WritableStreamDefaultWriter/writing a chunk=] to |writer| given
+   |data|.
+1. [=WritableStreamDefaultWriter/Release=] |writer|.
+1. Return |result|.
+
+</div>
+
+### The {{FileSystemWritableFileStream/seek()}} method ### {#api-filesystemwritablefilestream-seek}
+
+<div class="note domintro">
+  : await |stream| . {{FileSystemWritableFileStream/seek()|seek}}(|position|)
+  :: Updates the current file cursor offset the |position| bytes from the top of the file.
+</div>
+
+<div algorithm>
+The <dfn method for=FileSystemWritableFileStream>seek(|position|)</dfn> method, when invoked, must run these
+steps:
+
+1. Let |writer| be the result of [=WritableStream/getting a writer=] for [=this=].
+1. Let |result| be the result of [=WritableStreamDefaultWriter/writing a chunk=] to |writer| given
+    «[ "{{WriteParams/type}}" → {{WriteCommandType/"seek"}}, "{{WriteParams/position}}" →
+    |position| ]».
+1. [=WritableStreamDefaultWriter/Release=] |writer|.
+1. Return |result|.
+
+</div>
+
+### The {{FileSystemWritableFileStream/truncate()}} method ### {#api-filesystemwritablefilestream-truncate}
+
+<div class="note domintro">
+  : await |stream| . {{FileSystemWritableFileStream/truncate()|truncate}}(|size|)
+  :: Resizes the file associated with |stream| to be |size| bytes long. If |size| is larger than
+     the current file size this pads the file with null bytes, otherwise it truncates the file.
+
+     The file cursor is updated when {{truncate}} is called. If the offset is smaller than offset,
+     it remains unchanged. If the offset is larger than |size|, the offset is set to |size| to
+     ensure that subsequent writes do not error.
+
+     No changes are written to the actual file until on disk until the stream has been closed.
+     Changes are typically written to a temporary file instead.
+</div>
+
+<div algorithm>
+The <dfn method for=FileSystemWritableFileStream>truncate(|size|)</dfn> method, when invoked, must run these
+steps:
+
+1. Let |writer| be the result of [=WritableStream/getting a writer=] for [=this=].
+1. Let |result| be the result of [=WritableStreamDefaultWriter/writing a chunk=] to |writer| given
+    «[ "{{WriteParams/type}}" → {{WriteCommandType/"truncate"}}, "{{WriteParams/size}}" →
+    |size| ]».
+1. [=WritableStreamDefaultWriter/Release=] |writer|.
+1. Return |result|.
+
+</div>
+
+# Accessing Local File System # {#local-filesystem}
+
+<xmp class=idl>
+dictionary FilePickerAcceptType {
+    USVString description;
+    record<USVString, (USVString or sequence<USVString>)> accept;
+};
+
+dictionary FilePickerOptions {
+    sequence<FilePickerAcceptType> types;
+    boolean excludeAcceptAllOption = false;
+};
+
+dictionary OpenFilePickerOptions : FilePickerOptions {
+    boolean multiple = false;
+};
+
+dictionary SaveFilePickerOptions : FilePickerOptions {
+};
+
+dictionary DirectoryPickerOptions {
+};
+
+[SecureContext]
+partial interface Window {
+    Promise<sequence<FileSystemFileHandle>> showOpenFilePicker(optional OpenFilePickerOptions options = {});
+    Promise<FileSystemFileHandle> showSaveFilePicker(optional SaveFilePickerOptions options = {});
+    Promise<FileSystemDirectoryHandle> showDirectoryPicker(optional DirectoryPickerOptions options = {});
+};
+</xmp>
+
+The {{showOpenFilePicker()}}, {{showSaveFilePicker()}} and {{showDirectoryPicker()}} methods
+are together known as the <dfn>local file system handle factories</dfn>.
+
+Note: What is referred to as the "local file system" in this spec, does not have to
+strictly refer to the file system on the local device. What we call the local file system
+could just as well be backed by a cloud provider. For example on Chrome OS these
+file pickers will also let you pick files and directories on Google Drive.
+
+Advisement: In Chrome versions earlier than 85, this was implemented as a generic `chooseFileSystemEntries` method.
+
+## Local File System Permissions ## {#local-file-system-permissions}
+
+The fact that the user picked the specific files returned by the [=local file system handle factories=] in a prompt
+should be treated by the user agent as the user intending to grant read access to the website
+for the returned files. As such, at the time the promise returned by one of the [=local file system handle factories=]
+resolves, [=permission state=] for a descriptor with {{FileSystemPermissionDescriptor/handle}} set to the returned handle,
+and {{FileSystemPermissionDescriptor/mode}} set to {{"read"}}
+should be {{PermissionState/"granted"}}.
+
+Additionally for calls to {{showSaveFilePicker}}
+the [=permission state=] for a descriptor with {{FileSystemPermissionDescriptor/handle}} set to the returned handle,
+and {{FileSystemPermissionDescriptor/mode}} set to {{readwrite}}
+should be {{PermissionState/"granted"}}.
+
+<div algorithm>
+To verify that an |environment| <dfn>is allowed to show a file picker</dfn>, run these steps:
+
+1. If |environment|'s [=environment settings object/origin=] is an [=opaque origin=],
+   return [=a promise rejected with=] a {{SecurityError}}.
+
+1. If |environment|'s [=environment settings object/origin=] is not [=same origin=] with
+   |environment|'s [=top-level origin=],
+   return [=a promise rejected with=] a {{SecurityError}}.
+
+1. Let |global| be |environment|'s [=environment settings object/global object=].
+
+1. If |global| does not have [=transient activation=], throw a {{SecurityError}}.
+
+</div>
+
+## The {{showOpenFilePicker()}} method ## {#api-showopenfilepicker}
+
+<div class="note domintro">
+  : [ |handle| ] = await window . {{showOpenFilePicker()}}
+  : [ |handle| ] = await window . {{showOpenFilePicker()|showOpenFilePicker}}({ {{OpenFilePickerOptions/multiple}}: false })
+  :: Shows a file picker that lets a user select a single existing file, returning a handle for
+    the selected file.
+
+  : handles = await window . {{showOpenFilePicker()|showOpenFilePicker}}({ {{OpenFilePickerOptions/multiple}}: true })
+  :: Shows a file picker that lets a user select multiple existing files, returning handles for
+    the selected files.
+
+    Additional options can be passed to {{showOpenFilePicker()}} to indicate the types of files
+    the website wants the user to select. See [[#api-filpickeroptions-types]] for details.
+</div>
+
+<div algorithm>
+The <dfn method for=Window>showOpenFilePicker(|options|)</dfn> method, when invoked, must run
+these steps:
+
+1. Let |accepts options| be the result of [=process accept types|processing accept types=] given |options|.
+
+1. Let |environment| be <b>[=this=]</b>'s [=relevant settings object=].
+1. Let |global| be |environment|'s [=environment settings object/global object=].
+1. Verify that |environment| [=is allowed to show a file picker=].
+
+1. Let |p| be [=a new promise=].
+1. Run the following steps [=in parallel=]:
+
+  1. Optionally, wait until any prior execution of this algorithm has terminated.
+
+  1. Display a prompt to the user requesting that the user pick some files.
+     If |options|.{{OpenFilePickerOptions/multiple}} is false, there must be no more than one file selected;
+     otherwise any number may be selected.
+
+     The displayed prompt should let the user pick one of the |accepts options| to filter the list of displayed files.
+     Exactly how this is implemented, and what this prompt looks like is left up to the user agent.
+
+  1. Wait for the user to have made their selection.
+
+  1. If the user dismissed the prompt without making a selection,
+     [=/reject=] |p| with an {{AbortError}} and abort.
+
+  1. Let |entries| be a [=/list=] of [=file entries=] representing the selected files or directories.
+  1. Let |result| be a empty [=/list=].
+
+  1. [=list/For each=] |entry| of |entries|:
+    1. If |entry| is deemed [=too sensitive or dangerous=] to be exposed to this website by the user agent:
+      1. Inform the user that the selected files or directories can't be exposed to this website.
+      1. At the discretion of the user agent,
+         either go back to the beginning of these [=in parallel=] steps,
+         or [=/reject=] |p| with an {{AbortError}} and abort.
+
+    1. Add a new {{FileSystemFileHandle}} associated with |entry| to |result|.
+
+  1. Perform the <a spec=html>activation notification</a> steps in |global|'s [=Window/browsing context=].
+
+     Note: This lets a website immediately perform operations on the returned handles that
+     might require user activation, such as requesting more permissions.
+
+  1. [=/Resolve=] |p| with |result|.
+
+1. Return |p|.
+
+</div>
+
+## The {{Window/showSaveFilePicker()}} method ## {#api-showsavefilepicker}
+
+<div class="note domintro">
+  : |handle| = await window . {{showSaveFilePicker()|showSaveFilePicker}}( |options| )
+  :: Shows a file picker that lets a user select a single file, returning a handle for
+    the selected file. The selected file does not have to exist already. If the selected
+    file does not exist a new empty file is created before this method returns, otherwise
+    the existing file is cleared before this method returned.
+
+    Additional |options| can be passed to {{showSaveFilePicker()}} to indicate the types of files
+    the website wants the user to select. See [[#api-filpickeroptions-types]] for details.
+</div>
+
+<div algorithm>
+The <dfn method for=Window>showSaveFilePicker(|options|)</dfn> method, when invoked, must run
+these steps:
+
+1. Let |accepts options| be the result of [=process accept types|processing accept types=] given |options|.
+
+1. Let |environment| be <b>[=this=]</b>'s [=relevant settings object=].
+1. Let |global| be |environment|'s [=environment settings object/global object=].
+1. Verify that |environment| [=is allowed to show a file picker=].
+
+1. Let |p| be [=a new promise=].
+1. Run the following steps [=in parallel=]:
+
+  1. Optionally, wait until any prior execution of this algorithm has terminated.
+
+  1. Display a prompt to the user requesting that the user pick exactly one file.
+
+     The displayed prompt should let the user pick one of the |accepts options| to filter the list of displayed files.
+     Exactly how this is implemented, and what this prompt looks like is left up to the user agent.
+     If |accepts options| are displayed in the UI, the selected option should also be used to suggest an extension
+     to append to a user provided file name, but this is not required. In particular user agents are free to ignore
+     potentially dangerous suffixes such as those ending in `".lnk"` or `".local"`.
+
+  1. Wait for the user to have made their selection.
+
+  1. If the user dismissed the prompt without making a selection,
+     [=/reject=] |p| with an {{AbortError}} and abort.
+
+  1. Let |entry| be a [=file entry=] representing the selected file.
+
+  1. If |entry| is deemed [=too sensitive or dangerous=] to be exposed to this website by the user agent:
+    1. Inform the user that the selected files or directories can't be exposed to this website.
+    1. At the discretion of the user agent,
+       either go back to the beginning of these [=in parallel=] steps,
+       or [=/reject=] |p| with an {{AbortError}} and abort.
+
+  1. Set |entry|'s [=binary data=] to an empty [=byte sequence=].
+
+  1. Set |result| to a new {{FileSystemFileHandle}} associated with |entry|.
+
+  1. Perform the <a spec=html>activation notification</a> steps in |global|'s [=Window/browsing context=].
+
+     Note: This lets a website immediately perform operations on the returned handles that
+     might require user activation, such as requesting more permissions.
+
+  1. [=/Resolve=] |p| with |result|.
+
+1. Return |p|.
+
+</div>
+
+## {{FilePickerOptions}}.{{FilePickerOptions/types}} ## {#api-filpickeroptions-types}
+
+<div class="note domintro">
+The {{showOpenFilePicker(options)}} and {{showSaveFilePicker(options)}} methods accept a
+{{FilePickerOptions}} argument, which lets the website specify the types of files
+the file picker will let the user select.
+
+Each entry in {{FilePickerOptions/types}} specifies a single user selectable option
+for filtering the files displayed in the file picker.
+
+Each option consists of an <span class=allow-2119>optional</span> {{FilePickerAcceptType/description}}
+and a number of MIME types and extensions (specified as a mapping of
+MIME type to a list of extensions). If no description is provided one will be generated.
+Extensions have to be strings that start with a "." and only contain [=valid suffix code points=].
+Additionally extensions are limited to a length of 16 code points.
+
+In addition to complete MIME types, "\*" can be used as the subtype of a MIME type to match
+for example all image formats with "image/\*".
+
+Websites <span class=allow-2119>should</span> always provide both MIME types and file
+extensions for each option. On platforms that only use file extensions to describe file types
+user agents can match on the extensions, while on platforms that don't use extensions,
+user agents can match on MIME type.
+
+By default the file picker will also include an option to not apply any filter,
+letting the user select any file. Set {{excludeAcceptAllOption}} to `true` to not
+include this option in the file picker.
+
+For example , the following options will let the user pick one of three different filters.
+One for text files (either plain text or HTML), one for images, and a third one that doesn't apply
+any filter and lets the user select any file.
+
+<pre class=example id="filepickeroptions-example1" highlight=js>
+const options = {
+  <l>{{FilePickerOptions/types}}</l>: [
+    {
+      <l>{{FilePickerAcceptType/description}}</l>: 'Text Files',
+      <l>{{FilePickerAcceptType/accept}}</l>: {
+        'text/plain': ['.txt', '.text'],
+        'text/html': ['.html', '.htm']
+      }
+    },
+    {
+      <l>{{FilePickerAcceptType/description}}</l>: 'Images',
+      <l>{{FilePickerAcceptType/accept}}</l>: {
+        'image/*': ['.png', '.gif', '.jpeg', '.jpg']
+      }
+    }
+  ],
+};
+</pre>
+
+On the other hand, the following example will only let the user select SVG files. The dialog
+will not show an option to not apply any filters.
+
+<pre class=example id="filepickeroptions-example2" highlight=js>
+const options = {
+  <l>{{FilePickerOptions/types}}</l>: [
+    {
+      <l>{{FilePickerAcceptType/accept}}</l>: {
+        'image/svg+xml': '.svg'
+      }
+    },
+  ],
+  <l>{{FilePickerOptions/excludeAcceptAllOption}}</l>: true
+};
+</pre>
+
+</div>
+
+<div algorithm>
+To <dfn>process accept types</dfn>, given {{FilePickerOptions}} |options|,
+run these steps:
+
+1. Let |accepts options| be a empty [=/list=] of [=pairs=].
+1. [=list/For each=] |type| of |options|.{{FilePickerOptions/types}}:
+  1. Let |description| be |type|.{{FilePickerAcceptType/description}}.
+  1. [=map/For each=] |typeString| → |suffixes| of |type|.{{FilePickerAcceptType/accept}}:
+    1. Let |parsedType| be the result of [=parse a MIME type=] with |typeString|.
+    1. If |parsedType| is failure, throw a {{TypeError}}.
+    1. If |parsedType|'s [=MIME type/parameters=] are not empty, throw a {{TypeError}}.
+    1. If |suffixes| is a string:
+      1. [=Validate a suffix=] given |suffixes|.
+    1. Otherwise, [=list/for each=] |suffix| of |suffixes|:
+      1. [=Validate a suffix=] given |suffix|.
+
+  1. Let |filter| be the following steps, given a |filename| (a [=string=]), and a |type| (a [=MIME type=]):
+    1. [=map/For each=] |typeString| → |suffixes| of |type|.{{FilePickerAcceptType/accept}}:
+    1. Let |parsedType| be the result of [=parse a MIME type=] with |typeString|.
+      1. If |parsedType|'s [=MIME type/subtype=] is "*":
+        1. If |parsedType|'s [=MIME type/type=] is "*", return `true`.
+        1. If |parsedType|'s [=MIME type/type=] is |type|'s [=MIME type/type=], return `true`.
+      1. |parsedType|'s [=MIME type/essence=] is |type|'s [=MIME type/essence=], return `true`.
+      1. If |suffixes| is a string, set |suffixes| to « |suffixes| ».
+      1. [=list/For each=] |suffix| of |suffixes|:
+        1. If |filename| ends with |suffix|, return `true`.
+    1. Return `false`.
+
+  1. If |description| is an empty string,
+    set |description| to some user understandable string describing |filter|.
+
+  1. [=list/Append=] |description|/|filter| to |accepts options|.
+
+1. If either |accepts options| is [=list/empty=],
+  or |options|.{{FilePickerOptions/excludeAcceptAllOption}} is `false`:
+  1. Let |description| be a user understandable string describing "all files".
+    1. Let |filter| be an algorithm that returns `true`.
+    1. [=list/Append=] |description|/|filter| to |accepts options|.
+
+1. If |accepts options| is empty, throw a {{TypeError}}.
+
+1. Return |accepts options|.
+
+</div>
+
+<div algorithm>
+To <dfn>validate a suffix</dfn> |suffix|, run the following steps:
+
+1. If |suffix| does not [=string/starts with|start with=] ".", throw a {{TypeError}}.
+1. If |suffix| contains any [=code points=] that are not [=valid suffix code points=],
+   throw a {{TypeError}}.
+1. If |suffix| ends with ".", throw a {{TypeError}}.
+1. If |suffix|'s [=string/length=] is more than 16, throw a {{TypeError}}.
+
+</div>
+
+## The {{Window/showDirectoryPicker()}} method ## {#api-showdirectorypicker}
+
+<div class="note domintro">
+  : |handle| = await window . {{Window/showDirectoryPicker()}}
+  :: Shows a directory picker that lets the user select a single directory, returning a handle for
+    the selected directory.
+</div>
+
+<div algorithm>
+The <dfn method for=Window>showDirectoryPicker(<var ignore>options</var>)</dfn> method, when invoked, must run
+these steps:
+
+1. Let |environment| be <b>[=this=]</b>'s [=relevant settings object=].
+1. Let |global| be |environment|'s [=environment settings object/global object=].
+1. Verify that |environment| [=is allowed to show a file picker=].
+
+1. Let |p| be [=a new promise=].
+1. Run the following steps [=in parallel=]:
+
+  1. Optionally, wait until any prior execution of this algorithm has terminated.
+
+  1. Display a prompt to the user requesting that the user pick a directory.
+
+  1. Wait for the user to have made their selection.
+
+  1. If the user dismissed the prompt without making a selection,
+     [=/reject=] |p| with an {{AbortError}} and abort.
+
+  1. Let |entry| be a [=directory entry=] representing the selected directory.
+
+  1. If |entry| is deemed [=too sensitive or dangerous=] to be exposed to this website by the user agent:
+    1. Inform the user that the selected files or directories can't be exposed to this website.
+    1. At the discretion of the user agent,
+       either go back to the beginning of these [=in parallel=] steps,
+       or [=/reject=] |p| with an {{AbortError}} and abort.
+
+  1. Set |result| to a new {{FileSystemDirectoryHandle}} associated with |entry|.
+
+  1. Perform the <a spec=html>activation notification</a> steps in |global|'s [=Window/browsing context=].
+
+     Note: This lets a website immediately perform operations on the returned handles that
+     might require user activation, such as requesting more permissions.
+
+     Issue(89): Rather than requiring the website to prompt separately for a writable directory,
+     we should provide some kind of API to request a writable directory in one step.
+
+  1. [=/Resolve=] |p| with |result|.
+
+1. Return |p|.
+
+</div>
+
+## Drag and Drop ## {#drag-and-drop}
+
+<xmp class=idl>
+partial interface DataTransferItem {
+    Promise<FileSystemHandle?> getAsFileSystemHandle();
+};
+</xmp>
+
+During a <em>drag-and-drop operation</em>, dragged file and
+directory items are associated with [=file entries=] and [=directory entries=]
+respectively.
+
+<div class="note domintro">
+  : |handle| = await item . {{getAsFileSystemHandle()}}
+  :: Returns a {{FileSystemFileHandle}} object if the dragged item is a file and a {{FileSystemDirectoryHandle}} object if the dragged item is a directory.
+</div>
+
+<div algorithm>
+
+The <dfn method for=DataTransferItem>getAsFileSystemHandle()</dfn> method steps are:
+
+1. If the {{DataTransferItem}} object is not in the <a spec=html>read/write
+    mode</a> or the <a spec=html>read-only mode</a>, return 
+    [=a promise resolved with=] `null`.
+
+1. If the <a spec=html>the drag data item kind</a> is not <em>File</em>, 
+    then return [=a promise resolved with=] `null`.
+
+1. Let |p| be [=a new promise=].
+
+1. Run the following steps [=in parallel=]:
+
+  1. Let |entry| be the [=/entry=] representing the dragged file or directory.
+
+  1. If |entry| is a [=file entry=]:
+
+    1. Let |handle| be a {{FileSystemFileHandle}} associated with |entry|.
+
+  1. Else if |entry| is a [=directory entry=]:
+
+    1. Let |handle| be a {{FileSystemDirectoryHandle}} associated with |entry|.
+
+  1. [=/Resolve=] |p| with |entry|.
+
+1. Return |p|.
+
+</div>
+
+<div class=example id=draganddrop-example>
+Handling drag and drop of files and directories:
+<xmp highlight=js>
+elem.addEventListener('dragover', (e) => {
+  // Prevent navigation.
+  e.preventDefault();
+});
+elem.addEventListener('drop', async (e) => {
+  // Prevent navigation.
+  e.preventDefault();
+
+  // Process all of the items.
+  for (const item of e.dataTransfer.items) {
+    // kind will be 'file' for file/directory entries.
+    if (item.kind === 'file') {
+      const entry = await item.getAsFileSystemHandle();
+      if (entry.kind === 'file') {
+        handleFileEntry(entry);
+      } else if (entry.kind === 'directory') {
+        handleDirectoryEntry(entry);
+      }
+    }
+  }
+});
+</xmp>
+</div>
+
+Issue: This currently does not block access to [=too sensitive or dangerous=] directories, to
+be consistent with other APIs that give access to dropped files and directories. This is inconsistent
+with the [=local file system handle factories=] though, so we might want to reconsider this.
+
+# Accessing the Origin Private File System # {#sandboxed-filesystem}
+
+The <dfn>origin private file system</dfn> is a [=storage endpoint=] whose
+<a spec=storage for="storage endpoint">identifier</a> is `"fileSystem"`,
+<a spec=storage for="storage endpoint">types</a> are `« "local" »`,
+and <a spec=storage for="storage endpoint">quota</a> is null.
+
+Issue: Storage endpoints should be defined in [[storage]] itself, rather
+than being defined here. So merge this into the table there.
+
+Note: While user agents will typically implement this by persisting the contents of this
+[=origin private file system=] to disk, it is not intended that the contents are easily
+user accessible. Similarly there is no expectation that files or directories with names
+matching the names of children of the [=origin private file system=] exist.
+
+<xmp class=idl>
+[SecureContext]
+partial interface StorageManager {
+  Promise<FileSystemDirectoryHandle> getDirectory();
+};
+</xmp>
+
+Advisement: In Chrome this functionality was previously exposed as `FileSystemDirectoryHandle.getSystemDirectory({type: "sandbox"})`.
+This new method is available as of Chrome 85.
+
+<div class="note domintro">
+  : |directoryHandle| = await navigator . storage . {{StorageManager/getDirectory()}}
+  :: Returns the root directory of the origin private file system.
+</div>
+
+<div algorithm>
+The <dfn method for=StorageManager>getDirectory()</dfn> method, when
+invoked, must run these steps:
+
+1. Let |environment| be the [=current settings object=].
+
+1. Let |map| be the result of running [=obtain a local storage bottle map=]
+   with |environment| and `"fileSystem"`. If this returns failure,
+   return [=a promise rejected with=] a {{SecurityError}}.
+
+1. If |map|["root"] does not [=map/exist=]:
+  1. Let |dir| be a new [=directory entry=].
+  1. Set |dir|'s [=entry/name=] to `""`.
+  1. Set |dir|'s [=directory entry/children=] to an empty [=/set=].
+  1. Set |map|["root"] to |dir|.
+
+1. Return [=a promise resolved with=] a new {{FileSystemDirectoryHandle}},
+   whose associated [=FileSystemHandle/entry=] is |map|["root"].
+
+</div>
+
+Note: In Chrome the directory entry returned by the above algorithm refers to the same storage as the
+<a href="https://dev.w3.org/2009/dap/file-system/file-dir-sys.html#dfn-temporary">temporary
+file system</a> as used to be defined in [[file-system-api|File API: Directories and System]].
+
+# Accessibility Considerations # {#accessibility-considerations}
+
+*This section is non-normative.*
+
+When this specification is used to present information in the user interface,
+implementors will want to follow the OS level accessibility guidelines for the platform.
+
+
+# Privacy Considerations # {#privacy-considerations}
+
+*This section is non-normative.*
+
+This API does not give websites any more read access to data than the existing `<input type=file>`
+and `<input type=file webkitdirectory>` APIs already do. Furthermore similarly to those APIs, all
+access to files and directories is explicitly gated behind a file or directory picker.
+
+There are however several major privacy risks with this new API:
+
+## Users giving access to more, or more sensitive files than they intended. ## {#privacy-wide-access}
+
+This isn't a new risk with this API, but user agents should try to make sure that users are aware
+of what exactly they're giving websites access to. This is particularly important when giving
+access to a directory, where it might not be immediately clear to a user just how many files
+actually exist in that directory.
+
+A related risk is having a user give access to particularly sensitive data. This
+could include some of a user agent's configuration data, network cache or cookie store,
+or operating system configuration data such as password files. To protect against this, user agents
+are encouraged to restrict which directories a user is allowed to select in a directory picker,
+and potentially even restrict which files the user is allowed to select. This will make it much
+harder to accidentally give access to a directory that contains particularly sensitive data. Care
+must be taken to strike the right balance between restricting what the API can access while still
+having the API be useful. After all, this API intentionally lets the user use websites to interact
+with some of their most private personal data.
+
+Examples of directories that user agents might want to restrict as being
+<dfn>too sensitive or dangerous</dfn> include:
+
+* The directory or directories containing the user agent itself.
+* Directories where the user agent stores [=storage|website storage=].
+* Directories containing system files (such as `C:\Windows` on Windows).
+* Directories such as `/dev/`, `/sys`, and `/proc` on Linux that would give access to low-level devices.
+* A user's entire "home" directory.
+  Individual files and directories inside the home directory should still be allowed,
+  but user agents should not generally let users give blanket access to the entire directory.
+* The default directory for downloads, if the user agent has such a thing.
+  Individual files inside the directory again should be allowed, but the whole directory would risk leaking more data than a user realizes.
+* Files with names that end in `.lnk`, when selecting a file to write to. Writing to
+  these files on Windows is similar to creating symlinks on other operating systems,
+  and as such can be used to attempt to trick users into giving access to files they didn't intend to expose.
+* Files with names that end in `.local`, when selecting a file to write to.
+  Windows uses these files to decide what DLLs to load, and as such writing to
+  these files could be used to cause code to be executed.
+
+## Websites trying to use this API for tracking. ## {#privacy-tracking}
+
+This API could be used by websites to track the user across clearing browsing
+data. This is because, in contrast with existing file access APIs, user agents are
+able to grant persistent access to files or directories and can re-prompt. In
+combination with the ability to write to files, websites will be able to persist an
+identifier on the users' disk. Clearing browsing data will not affect those files
+in any way, making these identifiers persist through those actions.
+
+This risk is somewhat mitigated by the fact that clearing browsing data will clear all handles
+that a website had persisted (for example in IndexedDB),
+so websites won't have any handles to re-prompt for permission after browsing data was cleared.
+Furthermore user agents are encouraged to make it clear what files and directories a website has
+access to, and to automatically expire permission grants except for particularly well trusted
+origins (for example persistent permissions could be limited to "installed" web applications).
+
+User agents also are encouraged to provide a way for users to revoke permissions granted.
+Clearing browsing data is expected to revoke all permissions as well.
+
+## First-party vs third-party contexts. ## {#privacy-third-party}
+
+In third-party contexts (e.g. an iframe whose origin does not match that of the top-level frame)
+websites can't gain access to data they don't already have access to. This includes both getting
+access to new files or directories via the [=local file system handle factories=], as well as requesting
+more permissions to existing handles via the {{requestPermission}} API.
+
+Handles can also only be post-messaged to same-origin destinations. Attempts to send a handle to
+a cross-origin destination will result in a {{MessagePort/messageerror}} event.
+
+# Security Considerations # {#security-considerations}
+
+*This section is non-normative.*
+
+This API gives websites the ability to modify existing files on disk, as well as write to new
+files. This has a couple of important security considerations:
+
+## Malware ## {#security-malware}
+
+This API could be used by websites to try to store and/or execute malware on the users system.
+To mitigate this risk, this API does not provide any way to mark files as executable (on the other
+hand files that are already executable likely remain that way, even after the files are modified
+through this API). Furthermore user agents are encouraged to apply things like Mark-of-the-Web to
+files created or modified by this API.
+
+Finally, user agents are encouraged to verify the contents of files modified by this API via <dfn>malware
+scans and safe browsing checks</dfn>, unless some kind of external strong trust relation already exists.
+This of course has effects on the performance characteristics of this API.
+
+## Ransomware attacks ## {#security-ransomware}
+
+Another risk factor is that of ransomware attacks. The limitations described above regarding
+blocking access to certain sensitive directories helps limit the damage such an attack can do.
+Additionally user agents can grant write access to files at whatever granularity they deem
+appropriate.

@@ -3,15 +3,22 @@ Group: WHATWG
 H1: Storage
 Shortname: storage
 Text Macro: TWITTER storagestandard
+Text Macro: LATESTRD 2020-08
 Abstract: The Storage Standard defines an API for persistent storage and quota estimates, as well as the platform storage architecture.
 Translation: ja https://triple-underscore.github.io/storage-ja.html
+</pre>
+
+<pre class=anchors>
+urlPrefix: https://tc39.github.io/ecma262/; spec: ECMASCRIPT
+    text: agent; url: #sec-agents; type: dfn
+    text: agent cluster; url: #sec-agent-clusters; type: dfn
 </pre>
 
 
 
 <h2 id=introduction>Introduction</h2>
 
-Over the years the web has grown various APIs that can be used for storage, e.g., IndexedDB,
+<p>Over the years the web has grown various APIs that can be used for storage, e.g., IndexedDB,
 <code>localStorage</code>, and <code>showNotification()</code>. The Storage Standard consolidates
 these APIs by defining:
 
@@ -33,10 +40,10 @@ platforms to the web.
 
  <pre><code class="lang-javascript">
 navigator.storage.persist().then(persisted => {
-  if(persisted) {
+  if (persisted) {
     /* &hellip; */
   }
-})
+});
 </code></pre>
 
  <p>To not show user-agent-driven dialogs to the end user unannounced slightly more involved code
@@ -47,25 +54,27 @@ Promise.all([
   navigator.storage.persisted(),
   navigator.permissions.query({name: "persistent-storage"})
 ]).then(([persisted, permission]) => {
-  if(!persisted &amp;&amp; permission.status == "granted") {
-    navigator.storage.persist().then( /* &hellip; */ )
-  } else if(!persistent &amp;&amp; permission.status == "prompt") {
-    showPersistentStorageExplanation()
+  if (!persisted &amp;&amp; permission.state == "granted") {
+    navigator.storage.persist().then( /* &hellip; */ );
+  } else if (!persisted &amp;&amp; permission.state == "prompt") {
+    showPersistentStorageExplanation();
   }
-})
+});
 </code></pre>
 
  <p>The {{estimate()}} method can be used to determine whether there is enough space left to
  store content for an application:
 
  <pre><code class="lang-javascript">
- function retrieveNextChunk(nextChunkInfo) {
-   return navigator.storage.estimate().then(info => {
-     if(info.quota - info.usage > nextChunkInfo.size)
-       return fetch(nextChunkInfo.url)
-     else throw new Error("insufficient space to store next chunk")
-   }).then( /* &hellip; */ )
- }
+function retrieveNextChunk(nextChunkInfo) {
+  return navigator.storage.estimate().then(info => {
+    if (info.quota - info.usage > nextChunkInfo.size) {
+      return fetch(nextChunkInfo.url);
+    } else {
+      throw new Error("insufficient space to store next chunk");
+    }
+  }).then( /* &hellip; */ );
+}
 </code></pre>
 
 </div>
@@ -76,14 +85,14 @@ Promise.all([
 
 <p>This specification depends on the Infra Standard. [[!INFRA]]
 
-<p>This specification uses terminology from the DOM, HTML, IDL, Permissions API, and URL Standards.
-[[DOM]] [[HTML]] [[WEBIDL]] [[PERMISSIONS]] [[URL]]
+<p>This specification uses terminology from the HTML, IDL, and Permissions Standards.
+[[!HTML]] [[!WEBIDL]] [[!PERMISSIONS]]
 
 
 
-<h2 id=infrastructure>Infrastructure</h2>
+<h2 id=infrastructure>Lay of the land</h2>
 
-A user agent has various kinds of storage:
+<p>A <a for=/>user agent</a> has various kinds of semi-persistent state:
 
 <dl>
  <dt>Credentials
@@ -92,38 +101,345 @@ A user agent has various kinds of storage:
  <dd><p>Permissions for various features, such as geolocation
  <dt>Network
  <dd><p>HTTP cache, cookies, authentication entries, TLS client certificates
- <dt>Site
+ <dt id=site-storage>Storage
  <dd>Indexed DB, Cache API, service worker registrations, <code>localStorage</code>,
- <code>history.pushState()</code>, application caches, notifications, etc.
+ <code>sessionStorage</code>, application caches, notifications, etc.
 </dl>
 
-This specification primarily concerns itself with <dfn export id=site-storage>site storage</dfn>.
-
-<a>Site storage</a> consists of zero or more
-<dfn export id=site-storage-unit>site storage units</dfn>.
-
-Each <a for=/>origin</a> has an associated <a>site storage unit</a>. A <a>site storage unit</a>
-contains a single <dfn export id=bucket oldids=box>bucket</dfn>. [[HTML]]
+<p>This standard primarily concerns itself with storage.
 
 
-<h3 id=buckets oldids=boxes>Buckets</h3>
 
-A <a>bucket</a> has <dfn export for=bucket oldids=box-mode>mode</dfn> which is either
-"<code title>best-effort</code>" or "<code title>persistent</code>". A
-<dfn export oldids=persistent-box>persistent bucket</dfn> is a <a>bucket</a> whose
-<a for=bucket>mode</a> is "<code title>persistent</code>". A
-<dfn export oldids=non-persistent-box>non-persistent bucket</dfn> is a <a>bucket</a> whose
-<a for=bucket>mode</a> is <em>not</em> "<code title>persistent</code>".
+<h2 id=model>Model</h2>
 
-A bucket is considered to be an atomic unit. Whenever a <a>bucket</a> is cleared by the user agent,
-it must be cleared in its entirety.
+<p>Standards defining local or session storage APIs will define a <a>storage endpoint</a> and
+<a lt="registered storage endpoints">register</a> it by changing this standard. They will invoke
+either the <a>obtain a local storage bottle map</a> or the
+<a>obtain a session storage bottle map</a> algorithm, which will give them:
+
+<ul>
+ <li><p>Failure, which might mean the API has to throw or otherwise indicate there is no storage
+ available for that <a for=/>environment settings object</a>.
+
+ <li><p>A <a>storage proxy map</a> that operates analogously to a <a for=/>map</a>, which can be
+ used to store data in a manner that suits the API. This standard takes care of isolating that data
+ from other APIs, <a>storage keys</a>, and <a>storage types</a>.
+</ul>
+
+<p class=note>If you are defining a standard for such an API, consider filing an issue against this
+standard for assistance and review.
+
+<p>To isolate this data this standard defines a <a for=/>storage shed</a> which segments
+<a>storage shelves</a> by a <a>storage key</a>. A <a>storage shelf</a> in turn consists of a
+<a>storage bucket</a> and will likely consist of multiple <a>storage buckets</a> in the future to
+allow for different storage policies. And lastly, a <a>storage bucket</a> consists of
+<a>storage bottles</a>, one for each <a>storage endpoint</a>.
+
+
+<h3 id=storage-endpoints>Storage endpoints</h3>
+
+<p>A <dfn export>storage endpoint</dfn> is a <a lt="local storage">local</a> or
+<a>session storage</a> API that uses the infrastructure defined by this standard, most notably
+<a for=/>storage bottles</a>, to keep track of its storage needs.
+
+<p>A <a>storage endpoint</a> has an <dfn for="storage endpoint">identifier</dfn>, which is a
+<a>storage identifier</a>.
+
+<p>A <a>storage endpoint</a> also has <dfn for="storage endpoint">types</dfn>, which is a
+<a for=/>set</a> of <a>storage types</a>.
+
+<p>A <a>storage endpoint</a> also has a <dfn for="storage endpoint">quota</dfn>, which is null or a
+number representing a recommended <a for="storage bottle">quota</a> (in bytes) for each
+<a for=/>storage bottle</a> corresponding to this <a>storage endpoint</a>.
+
+<p>A <dfn>storage identifier</dfn> is an <a for=/>ASCII string</a>.
+
+<p>A <dfn>storage type</dfn> is "<code>local</code>" or "<code>session</code>".
+
+<hr>
+
+<p>The <dfn>registered storage endpoints</dfn> are a <a for=/>set</a> of <a>storage endpoints</a>
+defined by the following table:
+<!-- Note, these will be exposed more generally through https://github.com/whatwg/storage/pull/69 so
+     please keep https://w3ctag.github.io/design-principles/#casing-rules in mind. -->
+
+<table>
+ <tr>
+  <th><a for="storage endpoint">Identifier</a>
+  <th><a for="storage endpoint">Type</a>
+  <th><a for="storage endpoint">Quota</a>
+ <tr>
+  <td>"<code>caches</code>"
+  <td>« "<code>local</code>" »
+  <td>null
+ <tr>
+  <td>"<code>indexedDB</code>"
+  <td>« "<code>local</code>" »
+  <td>null
+ <tr>
+  <td>"<code>localStorage</code>"
+  <td>« "<code>local</code>" »
+  <td>5 &times; 2<sup>20</sup> (i.e., 5 mebibytes)
+ <tr>
+  <td>"<code>serviceWorkerRegistrations</code>"
+  <td>« "<code>local</code>" »
+  <td>null
+ <tr>
+  <td>"<code>sessionStorage</code>"
+  <td>« "<code>session</code>" »
+  <td>5 &times; 2<sup>20</sup> (i.e., 5 mebibytes)
+</table>
+
+<p class=note>As mentioned, standards can use these <a>storage identifiers</a> with
+<a>obtain a local storage bottle map</a> and <a>obtain a session storage bottle map</a>. It is
+anticipated that some APIs will be applicable to both <a>storage types</a> going forward.
+<!-- If that does not happen by 2024 we probably ought to admit defeat and simplify this a bit. -->
+
+
+<h3 id=storage-keys>Storage keys</h3>
+
+<p>A <dfn>storage key</dfn> is an <a for=/>origin</a>. [[!HTML]]
+
+<p class=XXX>This is expected to change; see
+<a href="https://privacycg.github.io/storage-partitioning/">Client-Side Storage Partitioning</a>.
+
+<p>To <dfn export>obtain a storage key</dfn>, given an <a>environment settings object</a>
+<var>environment</var>, run these steps:
+
+<ol>
+ <li><p>Let <var>key</var> be <var>environment</var>'s
+ <a for="environment settings object">origin</a>.
+
+ <li><p>If <var>key</var> is an <a>opaque origin</a>, then return failure.
+
+ <li><p>If the user has disabled storage, then return failure.
+
+ <li><p>Return <var>key</var>.
+</ol>
+
+
+<h3 id=storage-sheds>Storage sheds</h3>
+
+<p>A <dfn>storage shed</dfn> is a <a for=/>map</a> of <a>storage keys</a> to <a>storage shelves</a>.
+It is initially empty.
+
+<hr>
+
+<p>A <a for=/>user agent</a> holds a <dfn for="user agent">storage shed</dfn>, which is a
+<a for=/>storage shed</a>. A user agent's <a for="user agent">storage shed</a> holds all
+<dfn>local storage</dfn> data.
+
+<p>A <a for=/>browsing session</a> holds a <dfn for="browsing session">storage shed</dfn>, which is
+a <a for=/>storage shed</a>. A <a for=/>browsing session</a>'s
+<a for="browsing session">storage shed</a> holds all <dfn>session storage</dfn> data.
+
+<p>To <dfn export>legacy-clone a browsing session storage shed</dfn>, given a
+<a for=/>browsing session</a> <var>A</var> and a <a for=/>browsing session</a> <var>B</var>, run
+these steps:
+
+<ol>
+ <li>
+  <p><a for=map>For each</a> <var>key</var> → <var>shelf</var> of <var>A</var>'s
+  <a for="browsing session">storage shed</a>:
+
+  <ol>
+   <li><p>Let <var>newShelf</var> be the result of running <a>create a storage shelf</a> with
+   "<code>session</code>".
+
+   <li><p>Set <var>newShelf</var>'s <a>bucket map</a>["<code>default</code>"]'s
+   <a>bottle map</a>["<code>sessionStorage</code>"]'s <a for="storage bottle">map</a> to a
+   <a for=map>clone</a> of <var>shelf</var>'s <a>bucket map</a>["<code>default</code>"]'s
+   <a>bottle map</a>["<code>sessionStorage</code>"]'s <a for="storage bottle">map</a>.
+
+   <li><p>Set <var>B</var>'s <a for="browsing session">storage shed</a>[<var>key</var>] to
+   <var>newShelf</var>.
+  </ol>
+</ol>
+
+<p class="note">This is considered legacy as the benefits, if any, do not outweigh the
+implementation complexity. And therefore it will not be expanded or used outside of
+<cite>HTML</cite>. [[HTML]]
+
+
+<h3 id=storage-shelves>Storage shelves</h3>
+
+<p>A <dfn oldids=site-storage-unit lt="storage shelf|storage shelves">storage shelf</dfn> exists for
+each <a>storage key</a> within a <a for=/>storage shed</a>. It holds a <dfn>bucket map</dfn>,
+which is a <a for=/>map</a> of <a for=/>strings</a> to <a>storage buckets</a>.
+
+<p class=note>For now "<code>default</code>" is the only <a for=map>key</a> that exists in a
+<a>bucket map</a>. See <a href="https://github.com/whatwg/storage/issues/2">issue #2</a>. It is
+given a <a for=map>value</a> when a <a>storage shelf</a> is
+<a lt="obtain a storage shelf">obtained</a> for the first time.
+
+<p>To <dfn>obtain a storage shelf</dfn>, given a <a for=/>storage shed</a> <var>shed</var>, an
+<a>environment settings object</a> <var>environment</var>, and a <a>storage type</a>
+<var>type</var>, run these steps:
+
+<ol>
+ <li><p>Let <var>key</var> be the result of running <a>obtain a storage key</a> with
+ <var>environment</var>.
+
+ <li><p>If <var>key</var> is failure, then return failure.
+
+ <li><p>If <var>shed</var>[<var>key</var>] does not <a for=map>exist</a>, then set
+ <var>shed</var>[<var>key</var>] to the result of running <a>create a storage shelf</a> with
+ <var>type</var>.
+
+ <li><p>Return <var>shed</var>[<var>key</var>].
+</ol>
+
+<p>To <dfn>obtain a local storage shelf</dfn>, given an <a>environment settings object</a>
+<var>environment</var>, return the result of running <a>obtain a storage shelf</a> with the user
+agent's <a for="user agent">storage shed</a>, <var>environment</var>, and "<code>local</code>".
+
+<p>To <dfn>create a storage shelf</dfn>, given a <a>storage type</a> <var>type</var>, run these
+steps:
+
+<ol>
+ <li><p>Let <var>shelf</var> be a new <a>storage shelf</a>.
+
+ <li><p>Set <var>shelf</var>'s <a>bucket map</a>["<code>default</code>"] to the result of running
+ <a>create a storage bucket</a> with <var>type</var>.
+
+ <li><p>Return <var>shelf</var>.
+</ol>
+
+
+<h3 id=buckets oldids=boxes>Storage buckets</h3>
+
+<p>A <dfn>storage bucket</dfn> is a place for <a>storage endpoints</a> to store data.
+
+<p>A <a>storage bucket</a> has a <dfn>bottle map</dfn> of <a>storage identifiers</a> to
+<a>storage bottles</a>.
+
+<hr>
+
+<p>A <dfn id=bucket oldids=box>local storage bucket</dfn> is a <a>storage bucket</a> for
+<a>local storage</a> APIs.
+
+<p>A <a>local storage bucket</a> has a
+<dfn for="local storage bucket" id=bucket-mode oldids=box-mode>mode</dfn>, which is
+"<code>best-effort</code>" or "<code>persistent</code>". It is initially "<code>best-effort</code>".
+
+<hr>
+
+<p>A <dfn>session storage bucket</dfn> is a <a>storage bucket</a> for <a>session storage</a> APIs.
+
+<hr>
+
+<p>To <dfn>create a storage bucket</dfn>, given a <a>storage type</a> <var>type</var>, run these
+steps:
+
+<ol>
+ <li><p>Let <var>bucket</var> be null.
+
+ <li><p>If <var>type</var> is "<code>local</code>", then set <var>bucket</var> to a new
+ <a>local storage bucket</a>.
+
+ <li>
+  <p>Otherwise:
+
+  <ol>
+   <li><p>Assert: <var>type</var> is "<code>session</code>".
+
+   <li><p>Set <var>bucket</var> to a new <a>session storage bucket</a>.
+  </ol>
+
+ <li><p><a for=set>For each</a> <var>endpoint</var> of <a>registered storage endpoints</a> whose
+ <a for="storage endpoint">types</a> <a for=set>contain</a> <var>type</var>, set <var>bucket</var>'s
+ <a>bottle map</a>[<var>endpoint</var>'s <a for="storage endpoint">identifier</a>] to a new
+ <a>storage bottle</a> whose <a for="storage bottle">quota</a> is <var>endpoint</var>'s
+ <a for="storage endpoint">quota</a>.
+
+ <li><p>Return <var>bucket</var>.
+</ol>
+
+
+<h3 id=storage-bottles>Storage bottles</h3>
+
+<p>A <dfn>storage bottle</dfn> is a part of a <a>storage bucket</a> carved out for a single
+<a>storage endpoint</a>. A <a>storage bottle</a> has a <dfn for="storage bottle">map</dfn>, which is
+initially an empty <a for=/>map</a>. A <a>storage bottle</a> also has a
+<dfn for="storage bottle">proxy map reference set</dfn>, which is initially an empty
+<a for=/>set</a>. A <a>storage bottle</a> also has a <dfn for="storage bottle">quota</dfn>, which is
+null or a number representing a conservative estimate of the total amount of bytes it can hold. Null
+indicates the lack of a limit. <span class=note>It is still bound by the <a>storage quota</a> of its
+encompassing <a for=/>storage shelf</a>.
+
+<p>A <a>storage bottle</a>'s <a for="storage bottle">map</a> is where the actual data meant to be
+stored lives. User agents are expected to store this data, and make it available across <a>agent</a>
+and even <a>agent cluster</a> boundaries, in an <a>implementation-defined</a> manner, so that this
+standard and standards using this standard can access the contents.
+
+<hr>
+
+<p>To <dfn>obtain a storage bottle map</dfn>, given a <a>storage type</a> <var>type</var>,
+<a for=/>environment settings object</a> <var>environment</var>, and <a>storage identifier</a>
+<var>identifier</var>, run these steps:</p>
+
+<ol>
+ <li><p>Let <var>shed</var> be null.
+
+ <li><p>If <var>type</var> is "<code>local</code>", then set <var>shed</var> to the user agent's
+ <a for="user agent">storage shed</a>.
+
+ <li>
+  <p>Otherwise:
+
+  <ol>
+   <li><p>Assert: <var>type</var> is "<code>session</code>".
+
+   <li><p>Set <var>shed</var> to <var>environment</var>'s
+   <a for="environment settings object">browsing session</a>'s
+   <a for="browsing session">storage shed</a>.
+  </ol>
+
+ <li><p>Let <var>shelf</var> be the result of running <a>obtain a storage shelf</a>, with
+ <var>shed</var>, <var>environment</var>, and <var>type</var>.
+
+ <li><p>If <var>shelf</var> is failure, then return failure.
+
+ <li><p>Let <var>bucket</var> be <var>shelf</var>'s <a>bucket map</a>["<code>default</code>"].
+
+ <li><p>Let <var>bottle</var> be <var>bucket</var>'s <a>bottle map</a>[<var>identifier</var>].
+
+ <li><p>Let <var>proxyMap</var> be a new <a>storage proxy map</a> whose
+ <a for="storage proxy map">backing map</a> is <var>bottle</var>'s <a for="storage bottle">map</a>.
+
+ <li><p><a for=set>Append</a> <var>proxyMap</var> to <var>bottle</var>'s
+ <a for="storage bottle">proxy map reference set</a>.
+
+ <li><p>Return <var>proxyMap</var>.
+</ol>
+
+<p>To <dfn export>obtain a local storage bottle map</dfn>, given an
+<a for=/>environment settings object</a> <var>environment</var> and <a>storage identifier</a>
+<var>identifier</var>, return the result of running <a>obtain a storage bottle map</a> with
+"<code>local</code>", <var>environment</var>, and <var>identifier</var>.
+
+<p>To <dfn export>obtain a session storage bottle map</dfn>, given an
+<a for=/>environment settings object</a> <var>environment</var> and <a>storage identifier</a>
+<var>identifier</var>, return the result of running <a>obtain a storage bottle map</a> with
+"<code>session</code>", <var>environment</var>, and <var>identifier</var>.
+
+
+<h3 id=storage-proxy-maps>Storage proxy maps</h3>
+
+<p>A <dfn>storage proxy map</dfn> is equivalent to a <a for=/>map</a>, except that all operations
+are instead performed on its <dfn for="storage proxy map">backing map</dfn>.
+
+<p class="XXX">This allows for the <a for="storage proxy map">backing map</a> to be replaced. This
+is needed for <a href="https://github.com/whatwg/storage/issues/4">issue #4</a> and potentially the
+<a href="https://privacycg.github.io/storage-access/">Storage Access API</a>.
 
 
 
 <h2 id=persistence>Persistence permission</h2>
 
-A <a>bucket</a> can only be turned into a <a>persistent bucket</a> if the user (or user agent
-on behalf of the user) has granted permission to use the {{"persistent-storage"}} feature.
+<p>A <a>local storage bucket</a> can only have its <a for="local storage bucket">mode</a> change to
+"<code>persistent</code>" if the user (or user agent on behalf of the user) has granted permission
+to use the {{"persistent-storage"}} feature.
 
 <p class="note">When granted to an <a for=/>origin</a>, the persistence permission can be used to
 protect storage from the user agent's clearing policies. The user agent cannot clear storage marked
@@ -131,64 +447,93 @@ as persistent without involvement from the <a for=/>origin</a> or user. This mak
 useful for resources the user needs to have available while offline or resources the user creates
 locally.
 
-The <dfn for="PermissionName" enum-value>"<code>persistent-storage</code>"</dfn>
+<p>The <dfn for="PermissionName" enum-value>"<code>persistent-storage</code>"</dfn>
 <a>powerful feature</a>'s permission-related flags, algorithms, and types are defaulted, except for:
 
 <dl>
- <dt><a>permission state</a></dt>
- <dd>{{"persistent-storage"}}'s <a>permission state</a> must have the same value for all
- <a>environment settings objects</a> with a given <a for=/>origin</a>.</dd>
+ <dt><a>permission state</a>
+ <dd><p>{{"persistent-storage"}}'s <a>permission state</a> must have the same value for all
+ <a>environment settings objects</a> with a given <a for="environment settings object">origin</a>.
 
- <dt><a>permission revocation algorithm</a></dt>
- <dd algorithm="permission-revocation">If {{"persistent-storage"}}'s <a>permission state</a> is not
- {{"granted"}}, then set the current <a for=/>origin</a>’s <a>site storage unit</a>'s
- <a>bucket</a>'s <a for=bucket>mode</a> to "<code>best-effort</code>".</dd>
+ <dt><a>permission revocation algorithm</a>
+ <dd algorithm="permission-revocation">
+  <ol>
+   <li><p>If {{"persistent-storage"}}'s <a>permission state</a> is {{"granted"}}, then return.
+
+   <li><p>Let <var>shelf</var> be the result of running <a>obtain a local storage shelf</a> with
+   <a>current settings object</a>.
+
+   <li><p>Set <var>shelf</var>'s <a>bucket map</a>["<code>default</code>"]'s
+   <a for="local storage bucket">mode</a> to "<code>best-effort</code>".
+  </ol>
 </dl>
 
 
 
 <h2 id=usage-and-quota>Usage and quota</h2>
 
-The <dfn export>site storage usage</dfn> of an <a for=/>origin</a> <var>origin</var> is a rough
-estimate of the amount of bytes used in <var>origin</var>'s <a>site storage unit</a>.
+<p>The <dfn export>storage usage</dfn> of a <a>storage shelf</a> is an <a>implementation-defined</a>
+rough estimate of the amount of bytes used by it.
 
 <p class=note>This cannot be an exact amount as user agents might, and are encouraged to, use
-deduplication, compression, and other techniques that obscure exactly how much bytes an
-<a for=/>origin</a> uses.
+deduplication, compression, and other techniques that obscure exactly how much bytes a
+<a>storage shelf</a> uses.
 
-The <dfn export>site storage quota</dfn> of an <a for=/>origin</a> <var>origin</var> is a
-conservative estimate of the amount of bytes available to <var>origin</var>'s
-<a>site storage unit</a>. This amount should be less than the total available storage space on the
-device to give users some wiggle room.
+<p tracking-vector>The <dfn export>storage quota</dfn> of a <a>storage shelf</a> is an
+<a>implementation-defined</a> conservative estimate of the total amount of bytes it can hold. This
+amount should be less than the total storage space on the device. It must not be a function of the
+available storage space on the device.
 
-<p class=note>User agents are strongly encouraged to provide "popular" <a for=/>origins</a> with a
-larger <a>site storage quota</a>. Factors such as navigation frequency, recency of visits,
-bookmarking, and <a href="#persistence">permission</a> for {{"persistent-storage"}} can be used as
-indications of "popularity".
+<div class=note>
+ <p>User agents are strongly encouraged to consider navigation frequency, recency of visits,
+ bookmarking, and <a href="#persistence">permission</a> for {{"persistent-storage"}} when
+ determining quotas.
 
-
-
-<h2 id=ui-guidelines>User Interface Guidelines</h2>
-
-User agents should not distinguish between network storage and <a>site storage</a> in their user
-interface. Instead user agents should offer users the ability to remove all storage for each group
-of <a>schemelessly same site</a> <a for=/>origins</a>. This ensures to some extent that network
-storage cannot be used to revive <a>site storage</a>. This also reduces the amount users need to
-know about the different ways in which sites can store data.
-<!-- To some extent, since HTTP ETag... And also, permissions/credentials, maybe? -->
-
-Credentials storage should be separated as it might contain data the user might not be able to
-revive, such as an autogenerated password. Since permissions storage is mostly simple booleans it
-too can be separated to avoid inconveniencing the user. Credentials and permissions are also
-somewhat easier to understand and differentiate for users from network storage and
-<a>site storage</a>.
+ <p>Directly or indirectly revealing available storage space can lead to fingerprinting and leaking
+ information outside the scope of the <a for=/>origin</a> involved.
+</div>
 
 
-<h3 id=storage-pressure>Storage Pressure</h3>
 
-When the user agent notices it comes under storage pressure and it cannot free up sufficient space
-by clearing network storage and <a>non-persistent buckets</a> within <a>site storage</a>, then the
-user agent should alert the user and offer a way to clear <a>persistent buckets</a>.
+<h2 id=management>Management</h2>
+
+<p>Whenever a <a>storage bucket</a> is cleared by the user agent, it must be cleared in its
+entirety. User agents should avoid clearing <a>storage buckets</a> while script that is able to
+access them is running, unless instructed otherwise by the user.
+
+<p>If removal of <a>storage buckets</a> leaves the encompassing <a>storage shelf</a>'s
+<a>bucket map</a> <a for=map lt="is empty">empty</a>, then <a for=map>remove</a> that
+<a>storage shelf</a> and corresponding <a>storage key</a> from the encompassing
+<a for=/>storage shed</a>.
+
+
+<h3 id=storage-pressure>Storage pressure</h3>
+
+<p>A user agent that comes under storage pressure should clear network state and
+<a>local storage buckets</a> whose <a for="local storage bucket">mode</a> is
+"<code>best-effort</code>", ideally prioritizing removal in a manner that least impacts the user.
+
+<p>If a user agent continues to be under storage pressure, then the user agent should inform the
+user and offer a way to clear the remaining <a>local storage buckets</a>, i.e., those whose
+<a for="local storage bucket">mode</a> is "<code>persistent</code>".
+
+<p><a>Session storage buckets</a> must be cleared as <a for=/>browsing sessions</a> are closed.
+
+<p class="note">If the user agent allows for revival of <a for=/>browsing sessions</a>, e.g.,
+through reopening <a for=/>browsing sessions</a> or continued use of them after restarting the user
+agent, then clearing necessarily involves a more complex set of heuristics.
+
+
+<h3 id=ui-guidelines>User interface guidelines</h3>
+
+<p>User agents should offer users the ability to clear network state and storage for individual
+websites. User agents should not distinguish between network state and storage in their user
+interface. This ensures network state cannot be used to revive storage and reduces the number of
+concepts users need to be mindful of.
+<!-- This intentionally does not define individual website as the specific UI is still in flux. -->
+
+<p>Credentials should be separated as they contain data the user might not be able to revive, such
+as an autogenerated password. Permissions are best separated too to avoid inconveniencing the user.
 
 
 
@@ -203,11 +548,10 @@ Navigator includes NavigatorStorage;
 WorkerNavigator includes NavigatorStorage;
 </pre>
 
-Each <a>environment settings object</a> has an associated {{StorageManager}} object.
-[[HTML]]
+<p>Each <a>environment settings object</a> has an associated {{StorageManager}} object. [[!HTML]]
 
-The <dfn attribute for=NavigatorStorage><code>storage</code></dfn> attribute's getter must return
-<a>context object</a>'s <a>relevant settings object</a>'s {{StorageManager}} object.
+<p>The <dfn attribute for=NavigatorStorage><code>storage</code></dfn> getter steps are to return
+<a>this</a>'s <a>relevant settings object</a>'s {{StorageManager}} object.
 
 <pre class=idl>
 [SecureContext,
@@ -225,25 +569,24 @@ dictionary StorageEstimate {
 };
 </pre>
 
-The <dfn method for=StorageManager><code>persisted()</code></dfn> method, when invoked, must run
-these steps:
+<p>The <dfn method for=StorageManager><code>persisted()</code></dfn> method steps are:
 
 <ol>
  <li><p>Let <var>promise</var> be a new promise.
 
- <li><p>Let <var>origin</var> be <a>context object</a>'s <a>relevant settings object</a>'s
- <a for="environment settings object">origin</a>.
+ <li><p>Let <var>shelf</var> be the result of running <a>obtain a local storage shelf</a> with
+ <a>this</a>'s <a>relevant settings object</a>.
 
- <li><p>If <var>origin</var> is an <a>opaque origin</a>, then reject <var>promise</var> with a
- {{TypeError}}.
+ <li><p>If <var>shelf</var> is failure, then reject <var>promise</var> with a {{TypeError}}.
 
  <li>
   <p>Otherwise, run these steps <a>in parallel</a>:
 
   <ol>
    <li>
-    <p>Let <var>persisted</var> be true if <var>origin</var>'s <a>site storage unit</a>'s
-    <a>bucket</a> is a <a>persistent bucket</a>, and false otherwise.
+    <p>Let <var>persisted</var> be true if <var>shelf</var>'s
+    <a>bucket map</a>["<code>default</code>"]'s <a for="local storage bucket">mode</a> is
+    "<code>persistent</code>"; otherwise false.
 
     <p class=note>It will be false when there's an internal error.
 
@@ -253,17 +596,15 @@ these steps:
  <li><p>Return <var>promise</var>.
 </ol>
 
-The <dfn method for=StorageManager><code>persist()</code></dfn> method, when invoked, must run these
-steps:
+<p>The <dfn method for=StorageManager><code>persist()</code></dfn> method steps are:
 
 <ol>
  <li><p>Let <var>promise</var> be a new promise.
 
- <li><p>Let <var>origin</var> be <a>context object</a>'s <a>relevant settings object</a>'s
- <a for="environment settings object">origin</a>.
+ <li><p>Let <var>shelf</var> be the result of running <a>obtain a local storage shelf</a> with
+ <a>this</a>'s <a>relevant settings object</a>.
 
- <li><p>If <var>origin</var> is an <a>opaque origin</a>, then reject <var>promise</var> with a
- {{TypeError}}.
+ <li><p>If <var>shelf</var> is failure, then reject <var>promise</var> with a {{TypeError}}.
 
  <li>
   <p>Otherwise, run these steps <a>in parallel</a>:
@@ -277,9 +618,11 @@ steps:
     the same <a for=/>origin</a> around the same time and this algorithm is not equipped to handle
     such a scenario.
 
+   <li><p>Let <var>bucket</var> be <var>shelf</var>'s <a>bucket map</a>["<code>default</code>"].
+
    <li>
-    <p>Let <var>persisted</var> be true, if <var>origin</var>'s <a>site storage unit</a>'s
-    <a>bucket</a> is a <a>persistent bucket</a>, and false otherwise.
+    <p>Let <var>persisted</var> be true if <var>bucket</var>'s
+    <a for="local storage bucket">mode</a> is "<code>persistent</code>"; otherwise false.
 
     <p class=note>It will be false when there's an internal error.
 
@@ -287,7 +630,7 @@ steps:
     <p>If <var>persisted</var> is false and <var>permission</var> is {{"granted"}}, then:
 
     <ol>
-     <li><p>Set <var>origin</var>'s <a>site storage unit</a>'s <a>bucket</a>'s <a>mode</a> to
+     <li><p>Set <var>bucket</var>'s <a for="local storage bucket">mode</a> to
      "<code>persistent</code>".
 
      <li><p>If there was no internal error, then set <var>persisted</var> to true.
@@ -299,25 +642,23 @@ steps:
  <li><p>Return <var>promise</var>.
 </ol>
 
-The <dfn method for=StorageManager><code>estimate()</code></dfn> method, when invoked,
-must run these steps:
+<p>The <dfn method for=StorageManager><code>estimate()</code></dfn> method steps are:
 
 <ol>
  <li><p>Let <var>promise</var> be a new promise.
 
- <li><p>Let <var>origin</var> be <a>context object</a>'s <a>relevant settings object</a>'s
- <a for="environment settings object">origin</a>.
+ <li><p>Let <var>shelf</var> be the result of running <a>obtain a local storage shelf</a> with
+ <a>this</a>'s <a>relevant settings object</a>.
 
- <li><p>If <var>origin</var> is an <a>opaque origin</a>, then reject <var>promise</var> with a
- {{TypeError}}.
+ <li><p>If <var>shelf</var> is failure, then reject <var>promise</var> with a {{TypeError}}.
 
  <li>
   <p>Otherwise, run these steps <a>in parallel</a>:
 
   <ol>
-   <li><p>Let <var>usage</var> be <a>site storage usage</a> for <var>origin</var>.
+   <li><p>Let <var>usage</var> be <a>storage usage</a> for <var>shelf</var>.
 
-   <li><p>Let <var>quota</var> be <a>site storage quota</a> for <var>origin</var>.
+   <li><p>Let <var>quota</var> be <a>storage quota</a> for <var>shelf</var>.
 
    <li><p>Let <var>dictionary</var> be a new {{StorageEstimate}} dictionary whose {{usage}} member
    is <var>usage</var> and {{quota}} member is <var>quota</var>.
@@ -340,18 +681,21 @@ must run these steps:
 
 <h2 class=no-num id="acks">Acknowledgments</h2>
 
-With that, many thanks to
+<p>With that, many thanks to
 Adrian Bateman,
-Alex Russell,
 Aislinn Grigas,
+Alex Russell,
 Ali Alabbas,
+Andrew Sutherland,
 Ben Kelly,
 Ben Turner,
 Dale Harvey,
 David Grogan,
+Domenic Denicola,
 fantasai,
 Jake Archibald<!-- technically B.J. Archibald -->,
 Jeffrey Yasskin,
+Jesse Mykolyn,
 Jinho Bang,
 Jonas Sicking,
 Joshua Bell,
@@ -361,11 +705,11 @@ Luke Wagner,
 Michael Nordman,
 Mounir Lamouri,
 Shachar Zohar,
-黃強 (Shawn Huang), and
-簡冠庭 (Timothy Guan-tin Chien)
+黃強 (Shawn Huang),
+簡冠庭 (Timothy Guan-tin Chien), and
+Victor Costan
 for being awesome!
 
-This standard is written by
-<a lang=nl href=https://annevankesteren.nl/>Anne van Kesteren</a>
+<p>This standard is written by <a lang=nl href=https://annevankesteren.nl/>Anne van Kesteren</a>
 (<a href=https://www.mozilla.org/>Mozilla</a>,
 <a href=mailto:annevk@annevk.nl>annevk@annevk.nl</a>).

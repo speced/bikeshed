@@ -1,0 +1,2977 @@
+<pre class=metadata>
+Group: WHATWG
+Date: 2018-07-23
+H1: MIME Sniffing
+Shortname: mimesniff
+Text Macro: TWITTER mimesniff
+Abstract: The MIME Sniffing standard defines sniffing resources.
+!Participate: <a href="https://www.w3.org/Bugs/Public/buglist.cgi?product=WHATWG&amp;component=MIME&amp;resolution=---">legacy open bugs</a>
+Translation: ja https://triple-underscore.github.io/mimesniff-ja.html
+Markup Shorthands: css off
+</pre>
+
+<pre class=biblio>
+{
+ "FTP": {
+  "aliasOf": "RFC959"
+ },
+ "HTTP": {
+  "aliasOf": "HTTP11"
+ },
+ "MIMETYPE": {
+  "aliasOf": "RFC2046"
+ },
+ "SECCONTSNIFF": {
+  "authors": ["Adam Barth", "Juan Caballero", "Dawn Song"],
+  "href": "https://www.adambarth.com/papers/2009/barth-caballero-song.pdf",
+  "title": "Secure Content Sniffing for Web Browsers, or How to Stop Papers from Reviewing Themselves"
+ }
+}
+</pre>
+
+<pre class=anchors>
+url:https://tools.ietf.org/html/rfc7230#section-3.2.6;text:token;type:dfn;spec:http
+url:https://tools.ietf.org/html/rfc7230#section-3.2.6;text:quoted-string;type:dfn;spec:http
+url:https://tools.ietf.org/html/rfc7231#section-3.1.1.1;text:media-type;type:dfn;spec:http
+
+# https://github.com/tabatkins/bikeshed/issues/1180
+url:https://html.spec.whatwg.org/multipage/scripting.html#attr-script-type;text:type;for:script;type:element-attr;spec:html
+</pre>
+
+<pre class=link-defaults>
+spec:infra; type:dfn; text:string
+spec:html; type:element; text:script
+</pre>
+
+
+
+<h2 id=introduction>Introduction</h2>
+
+<p>
+ The HTTP <code>Content-Type</code> header field is intended to indicate the
+ MIME type of an HTTP response.
+ However, many HTTP servers supply a <code>Content-Type</code> header field
+ value that does not match the actual contents of the response.
+ Historically, web browsers have tolerated these servers by examining the
+ content of HTTP responses in addition to the <code>Content-Type</code> header
+ field in order to determine the effective MIME type of the response.
+
+<p>
+ Without a clear specification for how to "sniff" the MIME type, each user
+ agent has been forced to reverse-engineer the algorithms of other user agents
+ in order to maintain interoperability.
+ Inevitably, these efforts have not been entirely successful, resulting in
+ divergent behaviors among user agents.
+ In some cases, these divergent behaviors have had security implications, as a
+ user agent could interpret an HTTP response as a different MIME type than
+ the server intended.
+
+<p>
+ These security issues are most severe when an "honest" server allows
+ potentially malicious users to upload their own files and then serves the
+ contents of those files with a low-privilege MIME type.
+ For example, if a server believes that the client will treat a contributed
+ file as an image (and thus treat it as benign), but a user agent believes the
+ content to be HTML (and thus privileged to execute any scripts contained
+ therein), an attacker might be able to steal the user's authentication
+ credentials and mount other cross-site scripting attacks.
+ (Malicious servers, of course, can specify an arbitrary MIME type in the
+ <code>Content-Type</code> header field.)
+
+<p>
+ This document describes a content sniffing algorithm that carefully balances
+ the compatibility needs of user agent with the security constraints imposed
+ by existing web content.
+ The algorithm originated from research conducted by Adam Barth, Juan
+ Caballero, and Dawn Song, based on content sniffing algorithms present in
+ popular user agents, an extensive database of existing web content, and
+ metrics collected from implementations deployed to a sizable number of users.
+ [[!SECCONTSNIFF]]
+
+
+
+<h2 id=conformance-requirements>Conformance requirements</h2>
+
+<p>
+ The keywords "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD",
+ "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this
+ document are to be interpreted as described in RFC 2119.
+ For readability, these keywords will generally not appear in all uppercase
+ letters.
+ [[!RFC2119]]
+
+<p>
+ Requirements phrased in the imperative as part of algorithms (such as "strip
+ any leading space characters" or "return false and abort these steps") are to
+ be interpreted with the meaning of the keyword used in introducing the
+ algorithm.
+
+<p>
+ Conformance requirements phrased as algorithms or specific steps can be
+ implemented in any manner, so long as the end result is equivalent.
+ In particular, note that the algorithms defined in this specification are
+ intended to be easy to understand and are not intended to be performant.
+
+
+
+<h2 id=terminology>Terminology</h2>
+
+<p>
+ This specification depends on the Infra Standard. [[!INFRA]]
+
+<p>An <dfn>HTTP token code point</dfn> is U+0021 (!), U+0023 (#), U+0024 ($), U+0025 (%),
+U+0026 (&amp;), U+0027 ('), U+002A (*), U+002B (+), U+002D (-), U+002E (.), U+005E (^), U+005F (_),
+U+0060 (`), U+007C (|), U+007E (~), or an <a>ASCII alphanumeric</a>.</p>
+
+<p class=note>This matches the value space of the <a spec=http>token</a> token production. [[HTTP]]
+
+<p>An <dfn>HTTP quoted-string token code point</dfn> is U+0009 TAB, a <a>code point</a> in the range
+U+0020 SPACE to U+007E (~), inclusive, or a <a>code point</a> in the range U+0080 through
+U+00FF (ÿ), inclusive.
+
+<p class=note>This matches the effective value space of the <a spec=http>quoted-string</a> token
+production. By definition it is a superset of the <a>HTTP token code points</a>. [[HTTP]]
+
+<p>
+ A <dfn>binary data byte</dfn> is a <a>byte</a> in the range 0x00 to
+ 0x08 (NUL to BS), the <a>byte</a> 0x0B (VT), a <a>byte</a> in the
+ range 0x0E to 0x1A (SO to SUB), or a <a>byte</a> in the range 0x1C to
+ 0x1F (FS to US).
+
+<p>
+ A <dfn>whitespace byte</dfn> (abbreviated
+ <abbr lt="whitespace byte">0xWS</abbr>) is any one of the following
+ <a>bytes</a>: 0x09 (HT), 0x0A (LF), 0x0C (FF), 0x0D (CR),
+ 0x20 (SP).
+
+<p>
+ A <dfn>tag-terminating byte</dfn> (abbreviated
+ <abbr lt="tag terminating byte">0xTT</abbr>) is any one of the following
+ <a>bytes</a>: 0x20 (SP), 0x3E ("<code>></code>").
+
+<p>
+  Equations are using the mathematical operators as defined in
+  [[!ENCODING]]. In addition, the bitwise NOT is
+  represented by ~.
+
+
+<h2 id=understanding-mime-types>MIME types</h2>
+
+<h3 id=mime-type-representation>MIME type representation</h3>
+
+<p>A <dfn export lt="MIME type|MIME type record" id=mime-type>MIME type</dfn> represents an
+<i>internet media type</i> as defined by
+<cite>Multipurpose Internet Mail Extensions (MIME) Part Two: Media Types</cite>. It can also be
+referred to as a <a>MIME type record</a>. [[!MIMETYPE]]
+
+<p class=note>Standards are encouraged to consistently use the term <a>MIME type</a> to avoid
+confusion with the use of <i>media type</i> as described in <cite>Media Queries</cite>.
+[[MEDIAQUERIES]]
+
+<p>A <a>MIME type</a>'s <dfn export for="MIME type" id=type>type</dfn> is a non-empty
+<a>ASCII string</a>.
+
+<p>A <a>MIME type</a>'s <dfn export for="MIME type" id=subtype>subtype</dfn> is a non-empty
+<a>ASCII string</a>.
+
+<p>A <a>MIME type</a>'s <dfn export for="MIME type" id=parameters>parameters</dfn> is an
+<a>ordered map</a> whose <a for=map>keys</a> and <a for=map>values</a> are <a>ASCII strings</a>. It
+is initially empty.
+
+
+<h3 id=mime-type-miscellaneous>MIME type miscellaneous</h3>
+
+<p>The <dfn export for="MIME type">essence</dfn> of a <a>MIME type</a> <var>mimeType</var> is
+<var>mimeType</var>'s <a for="MIME type">type</a>, followed by U+002F (/), followed by
+<var>mimeType</var>'s <a for="MIME type">subtype</a>.
+
+<p>A <a>MIME type</a> is <dfn export>supported by the user agent</dfn> if the user agent has the
+capability to interpret a <a>resource</a> of that <a>MIME type</a> and present it to the user.
+
+<p class=XXX>This needs more work. See
+<a href=https://github.com/w3c/preload/issues/113>w3c/preload #113</a>.
+
+
+<h3 id=mime-type-writing>MIME type writing</h3>
+
+<p>A <dfn export id=valid-mime-type>valid MIME type string</dfn> is a string that matches the
+<a spec=http>media-type</a> token production. In particular, a <a>valid MIME type string</a> may
+include <a for="MIME type">parameters</a>. [[!RFC7231]]
+
+<p class=note>A <a>valid MIME type string</a> is supposed to be used for conformance checkers only.
+
+<div class=example id=example-valid-mime-type-string>
+ <p>"<code>text/html</code>" is a <a>valid MIME type string</a>.
+
+ <p>"<code>text/html;</code>" is not a <a>valid MIME type string</a>, though
+ <a>parse a MIME type</a> returns a <a>MIME type record</a> for it identical to if the input had
+ been "<code>text/html</code>".
+</div>
+
+<p>A
+<dfn export id=valid-mime-type-with-no-parameters>valid MIME type string with no parameters</dfn> is
+a <a>valid MIME type string</a> that does not contain U+003B (;).
+
+
+<h3 id=parsing-a-mime-type>Parsing a MIME type</h3>
+
+<p>To <dfn export>parse a MIME type</dfn>, given a string <var>input</var>, run these steps:
+
+<ol>
+ <li><p>Remove any leading and trailing <a>ASCII whitespace</a> from <var>input</var>.
+
+ <li><p>Let <var>position</var> be a <a for=string>position variable</a> for <var>input</var>,
+ initially pointing at the start of <var>input</var>.
+
+ <li><p>Let <var>type</var> be the result of <a>collecting a sequence of code points</a> that are
+ not U+002F (/) from <var>input</var>, given <var>position</var>.
+
+ <li><p>If <var>type</var> is the empty string or does not solely contain
+ <a>HTTP token code points</a>, then return failure.
+
+ <li><p>If <var>position</var> is past the end of <var>input</var>, then return failure.
+
+ <li><p>Advance <var>position</var> to the next <a>code point</a> in <var>input</var>. (This skips
+ past U+002F (/).)
+
+ <li><p>Let <var>subtype</var> be the result of <a>collecting a sequence of code points</a> that are
+ not U+003B (;) from <var>input</var>, given <var>position</var>.
+
+ <li><p>Remove any trailing <a>ASCII whitespace</a> from <var>subtype</var>.
+
+ <li><p>If <var>subtype</var> is the empty string or does not solely contain
+ <a>HTTP token code points</a>, then return failure.
+
+ <li><p>Let <var>mimeType</var> be a new <a>MIME type record</a> whose <a for="MIME type">type</a>
+ is <var>type</var>, in <a>ASCII lowercase</a>, and <a for="MIME type">subtype</a> is
+ <var>subtype</var>, in <a>ASCII lowercase</a>.
+
+ <li>
+  <p>While <var>position</var> is not past the end of <var>input</var>:
+
+  <ol>
+   <li><p>Advance <var>position</var> to the next <a>code point</a> in <var>input</var>. (This skips
+   past U+003B (;).)
+
+   <li><p><a>Skip ASCII whitespace</a> within <var>input</var> given <var>position</var>.
+
+   <li><p>Let <var>parameterName</var> be the result of <a>collecting a sequence of code points</a>
+   that are not U+003B (;) or U+003D (=) from <var>input</var>, given <var>position</var>.
+
+   <li><p>Set <var>parameterName</var> to <var>parameterName</var>, in <a>ASCII lowercase</a>.
+
+   <li>
+    <p>If <var>position</var> is not past the end of <var>input</var>, then:
+
+    <ol>
+     <li><p>If the <a>code point</a> at <var>position</var> within <var>input</var> is U+003B (;),
+     then <a for=iteration>continue</a>.
+
+     <li><p>Advance <var>position</var> to the next <a>code point</a> in <var>input</var>. (This
+     skips past U+003D (=).)
+    </ol>
+
+   <li><p>Let <var>parameterValue</var> be the empty string.
+
+   <li>
+    <p>If <var>position</var> is not past the end of <var>input</var>, then:
+
+    <ol>
+     <li>
+      <p>If the <a>code point</a> at <var>position</var> within <var>input</var> is U+0022 ("),
+      then:
+
+      <ol>
+       <li><p>Advance <var>position</var> to the next <a>code point</a> in <var>input</var>.
+
+       <li>
+        <p>While true:
+
+        <ol>
+         <li><p>Append the result of <a>collecting a sequence of code points</a> that are not
+         U+0022 (") or U+005C (\) from <var>input</var>, given <var>position</var>, to
+         <var>parameterValue</var>.
+
+         <li>
+          <p>If <var>position</var> is not past the end of <var>input</var> and the
+          <a>code point</a> at <var>position</var> within <var>input</var> is U+005C (\), then:
+
+          <ol>
+           <li><p>Advance <var>position</var> to the next <a>code point</a> in <var>input</var>.
+
+           <li>
+            <p>If <var>position</var> is not past the end of <var>input</var>, then:
+
+            <ol>
+             <li><p>Append the <a>code point</a> at <var>position</var> within <var>input</var> to
+             <var>parameterValue</var>.
+
+             <li><p>Advance <var>position</var> to the next <a>code point</a> in <var>input</var>.
+
+             <li><p><a for=iteration>Continue</a>.
+            </ol>
+
+           <li><p>Otherwise, append U+005C (\) to <var>parameterValue</var> and
+           <a for=iteration>break</a>.
+          </ol>
+
+         <li><p>Otherwise, <a for=iteration>break</a>.
+        </ol>
+
+       <li>
+        <p><a>Collect a sequence of code points</a> that are not U+003B (;) from <var>input</var>,
+        given <var>position</var>.
+
+        <p class=example id=example-mime-type-parser-trailing-garbage>Given
+        <code>text/html;charset="shift_jis"iso-2022-jp</code> you end up with
+        <code>text/html;charset=shift_jis</code>.
+      </ol>
+
+     <li>
+      <p>Otherwise:
+
+      <ol>
+       <li><p>Set <var>parameterValue</var> to the result of <a>collecting a sequence of code
+       points</a> that are not U+003B (;) from <var>input</var>, given <var>position</var>.
+
+       <li><p>Remove any trailing <a>ASCII whitespace</a> from <var>parameterValue</var>.
+      </ol>
+    </ol>
+
+   <li>
+    <p>If all of the following are true
+
+    <ul class=brief>
+     <li><var>parameterName</var> is not the empty string
+
+     <li><var>parameterValue</var> is not the empty string
+
+     <li><var>parameterName</var> solely contains <a>HTTP token code points</a>
+
+     <li><var>parameterValue</var> solely contains <a>HTTP quoted-string token code points</a>
+
+     <li><var>mimeType</var>'s <a for="MIME type">parameters</a>[<var>parameterName</var>]
+     <a for=map lt=exist>does not exist</a>
+    </ul>
+
+    <p>then <a for=map>set</a> <var>mimeType</var>'s
+    <a for="MIME type">parameters</a>[<var>parameterName</var>] to <var>parameterValue</var>.
+  </ol>
+
+ <li><p>Return <var>mimeType</var>.
+</ol>
+
+<hr>
+
+<p>To <dfn export>parse a MIME type from bytes</dfn>, given a <a>byte sequence</a> <var>input</var>,
+run these steps:
+
+<ol>
+ <li><p>Let <var>string</var> be <var>input</var>, <a>isomorphic decoded</a>.
+
+ <li><p>Return the result of <a>parse a MIME type</a> with <var>string</var>.
+</ol>
+
+
+<h3 id=serializing-a-mime-type>Serializing a MIME type</h3>
+
+<p>To <dfn export>serialize a MIME type</dfn>, given a <a>MIME type</a> <var>mimeType</var>, run
+these steps:
+
+<ol>
+ <li><p>Let <var>serialization</var> be the concatenation of <var>mimeType</var>'s
+ <a for="MIME type">type</a>, U+002F (/), and <var>mimeType</var>'s <a for="MIME type">subtype</a>.
+
+ <li>
+  <p><a for=map>For each</a> <var>name</var> → <var>value</var> of <var>mimeType</var>'s
+  <a for="MIME type">parameters</a>:
+
+  <ol>
+   <li><p>Append U+003B (;) to <var>serialization</var>.
+
+   <li><p>Append <var>name</var> to <var>serialization</var>.
+
+   <li><p>Append U+003D (=) to <var>serialization</var>.
+
+   <li>
+    <p>If <var>value</var> does not solely contain <a>HTTP token code points</a>:
+
+    <ol>
+     <li><p>Precede each occurence of U+0022 (") or U+005C (\) in <var>value</var> with U+005A (\).
+
+     <li><p>Prepend U+0022 (") to <var>value</var>.
+
+     <li><p>Append U+0022 (") to <var>value</var>.
+    </ol>
+
+   <li><p>Append <var>value</var> to <var>serialization</var>.
+  </ol>
+
+ <li><p>Return <var>serialization</var>.
+</ol>
+
+<hr>
+
+<p>To <dfn export>serialize a MIME type to bytes</dfn>, given a <a>MIME type</a>
+<var>mimeType</var>, run these steps:
+
+<ol>
+ <li><p>Let <var>stringSerialization</var> be the result of <a>serialize a MIME type</a> with
+ <var>mimeType</var>.
+
+ <li><p>Return <var>stringSerialization</var>, <a>isomorphic encoded</a>.
+</ol>
+
+
+<h3 id=mime-type-groups>MIME type groups</h3>
+
+<p>An <dfn>image MIME type</dfn> is a <a>MIME type</a> whose <a for="MIME type">type</a> is
+"<code>image</code>".
+
+<p>An <dfn>audio or video MIME type</dfn> is any <a>MIME type</a> whose <a for="MIME type">type</a>
+is "<code>audio</code>" or "<code>video</code>", or whose <a for="MIME type">essence</a> is
+"<code>application/ogg</code>".
+
+<p>A <dfn>font MIME type</dfn> is any <a>MIME type</a> whose <a for="MIME type">type</a> is
+"<code>font</code>", or whose <a for="MIME type">essence</a> is one of the following: [[!RFC8081]]
+
+<ul class="brief">
+ <li><code>application/font-cff</code>
+ <li><code>application/font-off</code>
+ <li><code>application/font-sfnt</code>
+ <li><code>application/font-ttf</code>
+ <li><code>application/font-woff</code>
+ <li><code>application/vnd.ms-fontobject</code>
+ <li><code>application/vnd.ms-opentype</code>
+</ul>
+
+<p>A <dfn>ZIP-based MIME type</dfn> is any <a>MIME type</a> whose <a for="MIME type">subtype</a>
+ends in "<code>+zip</code>" or whose <a for="MIME type">essence</a> is one of the following:
+
+<ul class="XXX brief">
+ <li><code>application/zip</code>
+</ul>
+
+<p>An <dfn>archive MIME type</dfn> is any <a>MIME type</a> whose
+<!--<span>type</span> is equal to "<code title>archive</code>" or-->
+<a for="MIME type">essence</a> is one of the following:
+
+<ul class="brief">
+ <li><code>application/x-rar-compressed</code>
+ <li><code>application/zip</code>
+ <li><code>application/x-gzip</code>
+</ul>
+
+<p>An <dfn export>XML MIME type</dfn> is any <a>MIME type</a> whose <a for="MIME type">subtype</a>
+ends in "<code>+xml</code>" or whose <a for="MIME type">essence</a> is "<code>text/xml</code>" or
+"<code>application/xml</code>". [[!RFC7303]]
+
+<p>An <dfn export>HTML MIME type</dfn> is any <a>MIME type</a> whose <a for="MIME type">essence</a>
+is "<code>text/html</code>".
+
+<p>A <dfn>scriptable MIME type</dfn> is an <a>XML MIME type</a>, <a>HTML MIME type</a>, or any
+<a>MIME type</a> whose <a for="MIME type">essence</a> is "<code>application/pdf</code>".
+
+<p>A <dfn export>JavaScript MIME type</dfn> is any <a>MIME type</a> whose
+<a for="MIME type">essence</a> is one of the following:
+
+<ul class="brief">
+ <li><code>application/ecmascript</code>
+ <li><code>application/javascript</code>
+ <li><code>application/x-ecmascript</code>
+ <li><code>application/x-javascript</code>
+ <li><code>text/ecmascript</code>
+ <li><code>text/javascript</code>
+ <li><code>text/javascript1.0</code>
+ <li><code>text/javascript1.1</code>
+ <li><code>text/javascript1.2</code>
+ <li><code>text/javascript1.3</code>
+ <li><code>text/javascript1.4</code>
+ <li><code>text/javascript1.5</code>
+ <li><code>text/jscript</code>
+ <li><code>text/livescript</code>
+ <li><code>text/x-ecmascript</code>
+ <li><code>text/x-javascript</code>
+</ul>
+
+<p>A <a>string</a> is a <dfn export>JavaScript MIME type essence match</dfn> if it is an
+<a>ASCII case-insensitive</a> match for one of the <a>JavaScript MIME type</a> essence strings.
+
+<p class="note">This hook is used by the <{script/type}> attribute of <{script}> elements.
+
+<p>A <dfn export>JSON MIME type</dfn> is any <a>MIME type</a> whose <a for="MIME type">subtype</a>
+ends in "<code>+json</code>" or whose <a for="MIME type">essence</a> is
+"<code>application/json</code>" or "<code>text/json</code>".
+
+
+<h2 id=handling-a-resource>Handling a resource</h2>
+
+<p class=XXX>
+ A <dfn>resource</dfn> is ….
+
+<p>
+ For each <a>resource</a> it handles, the user agent must keep track of
+ the following associated metadata:
+
+ <ul>
+  <li>
+   A <dfn>supplied MIME type</dfn>, the <a>MIME type</a> determined by
+   the <a>supplied MIME type detection algorithm</a>.
+
+  <li>
+   A <dfn>check-for-apache-bug flag</dfn>, which defaults to unset.
+
+  <li>
+   A <dfn>no-sniff flag</dfn>, which defaults to set if the user agent does
+   not wish to perform sniffing on the <a>resource</a> and unset
+   otherwise.
+
+   <p class=note>
+    The user agent can choose to use outside information, such as previous
+    experience with a site, to determine whether to opt out of sniffing for a
+    particular <a>resource</a>. The user agent can also choose to opt
+    out of sniffing for all <a>resources</a>. However,
+    opting out of sniffing does not exempt the user agent from using the
+    <a>MIME type sniffing algorithm</a>.
+
+  <li>
+   A <dfn>computed MIME type</dfn>, the <a>MIME type</a>
+   determined by the <a>MIME type sniffing algorithm</a>.
+ </ul>
+
+
+
+<h3 id=interpreting-the-resource-metadata>Interpreting the resource metadata</h3>
+
+<p>
+ The <a>supplied MIME type</a> of a <a>resource</a> is provided
+ to the user agent by an external source associated with that
+ <a>resource</a>.
+ The method of obtaining this information varies depending upon how the
+ <a>resource</a> is retrieved.
+
+<p>
+ To determine the <a>supplied MIME type</a> of a <a>resource</a>,
+ user agents must use the following <dfn>supplied MIME type detection
+ algorithm</dfn>:
+
+ <ol>
+  <li>
+   Let <var>supplied-type</var> be null.
+
+  <li>
+   If the <a>resource</a> is retrieved via HTTP, execute the following
+   steps:
+
+   <ol>
+    <li>
+     If one or more <code>Content-Type</code> headers are associated with the
+     <a>resource</a>, execute the following steps:
+
+     <ol>
+      <li>
+       Set <var>supplied-type</var> to the value of the last
+       <code>Content-Type</code> header associated with the
+       <a>resource</a>.
+
+       <p class=note>
+        File extensions are not used to determine the <a>supplied MIME
+        type</a> of a <a>resource</a> retrieved via HTTP because they are
+        unreliable and easily spoofed.
+
+      <li>
+       Set the <a>check-for-apache-bug flag</a> if
+       <var>supplied-type</var> is <strong>exactly</strong> equal to one of
+       the values in the following table:
+
+       <table>
+        <thead>
+         <tr>
+          <th>Bytes in Hexadecimal
+          <th>Bytes in ASCII
+
+
+        <tbody>
+         <tr>
+          <td>
+           74 65 78 74 2F 70 6C 61 69 6E
+
+          <td>
+           <code>text/plain</code>
+
+
+         <tr>
+          <td>
+           74 65 78 74 2F 70 6C 61 69 6E<br>
+           3B 20 63 68 61 72 73 65 74 3D<br>
+           49 53 4F 2D 38 38 35 39 2D 31
+
+          <td>
+           <code>text/plain; charset=ISO-8859-1</code>
+
+
+         <tr>
+          <td>
+           74 65 78 74 2F 70 6C 61 69 6E<br>
+           3B 20 63 68 61 72 73 65 74 3D<br>
+           69 73 6F 2D 38 38 35 39 2D 31
+
+          <td>
+           <code>text/plain; charset=iso-8859-1</code>
+
+
+         <tr>
+          <td>
+           74 65 78 74 2F 70 6C 61 69 6E<br>
+           3B 20 63 68 61 72 73 65 74 3D<br>
+           55 54 46 2D 38
+
+          <td>
+           <code>text/plain; charset=UTF-8</code>
+
+
+
+       </table>
+
+       <p class=note>
+        The <a>supplied MIME type detection algorithm</a> detects these
+        exact <a>byte</a> sequences because some older installations of
+        Apache contain
+        <a href=https://issues.apache.org/bugzilla/show_bug.cgi?id=13986>a
+        bug</a> that causes them to supply one of these Content-Type headers
+        when serving files with unrecognized <a lt="MIME type">MIME
+        types</a>.
+     </ol>
+   </ol>
+
+   [[!HTTP]]
+
+  <li>
+   If the <a>resource</a> is retrieved directly from the file system,
+   set <var>supplied-type</var> to the <a>MIME type</a> provided by the
+   file system.
+
+  <li>
+   If the <a>resource</a> is retrieved via another protocol (such as
+   FTP), set <var>supplied-type</var> to the <a>MIME type</a> as
+   determined by that protocol, if any.
+
+   [[!FTP]]
+
+  <li>
+   If <var>supplied-type</var> is not a <a>MIME type</a>, the
+   <a>supplied MIME type</a> is undefined.
+
+   Abort these steps.
+
+  <li>
+   The <a>supplied MIME type</a> is <var>supplied-type</var>.
+ </ol>
+
+
+
+<h3 id=reading-the-resource-header>Reading the resource header</h3>
+
+<p>
+ A <dfn>resource header</dfn> is the <a>byte sequence</a> at the
+ beginning of a <a>resource</a>, as determined by
+ <a lt="read the resource header">reading the resource header</a>.
+
+<p>
+ To <dfn>read the resource header</dfn>, perform the following steps:
+
+ <ol>
+  <li>
+   Let <var>buffer</var> be a <a>byte sequence</a>.
+
+  <li>
+   Read <a>bytes</a> of the <a>resource</a> into
+   <var>buffer</var> until one of the following conditions is met:
+
+   <ul>
+    <li>
+     the end of the <a>resource</a> is reached.
+
+    <li>
+     the number of <a>bytes</a> in <var>buffer</var> is
+     greater than or equal to 1445.
+
+    <li>
+     a reasonable amount of time has elapsed, as determined by the user
+     agent.
+   </ul>
+
+   <p class=note>
+    If the number of <a>bytes</a> in <var>buffer</var> is
+    greater than or equal to 1445, the <a>MIME type sniffing
+    algorithm</a> will be deterministic for the majority of cases.
+
+    However, certain factors (such as a slow connection) may prevent the
+    user agent from reading 1445 <a>bytes</a> in a
+    reasonable amount of time.
+
+   <li>
+    The <a>resource header</a> is <var>buffer</var>.
+ </ol>
+
+ <p class=note>
+  The <a>resource header</a> need only be determined once per
+  <a>resource</a>.
+
+
+
+<h2 id=matching-a-mime-type-pattern>Matching a MIME type pattern</h2>
+
+<p>
+ A <dfn>byte pattern</dfn> is a <a>byte sequence</a> used as a template
+ to be matched against in the <a>pattern matching algorithm</a>.
+
+<p>
+ A <dfn>pattern mask</dfn> is a <a>byte sequence</a> used to determine
+ the significance of <a>bytes</a> being compared against a
+ <a>byte pattern</a> in the <a>pattern matching algorithm</a>.
+
+<p class=note>
+ In a <a>pattern mask</a>, 0xFF indicates the <a>byte</a> is
+ strictly significant, 0xDF indicates that the <a>byte</a> is
+ significant in an ASCII case-insensitive way, and 0x00 indicates that the
+ <a>byte</a> is not significant.
+
+<p>To determine whether a <a>byte sequence</a> matches a particular <a>byte pattern</a>, use the
+following <dfn>pattern matching algorithm</dfn>. It is given a <a>byte sequence</a>
+<var>input</var>, a <a>byte pattern</a> <var>pattern</var>, a <a>pattern mask</a> <var>mask</var>,
+and a <a for=/>set</a> of <a>bytes</a> to be ignored <var>ignored</var>, and returns true or false.
+
+<ol>
+ <li><p>Assert: <var>pattern</var>'s <a for="byte sequence">length</a> is equal to
+ <var>mask</var>'s <a for="byte sequence">length</a>.
+
+ <li><p>If <var>input</var>'s <a for="byte sequence">length</a> is less than <var>pattern</var>'s
+ <a for="byte sequence">length</a>, return false.
+
+ <li><p>Let <var>s</var> be 0.
+
+ <li>
+  <p>While <var>s</var> &lt; <var>input</var>'s <a for="byte sequence">length</a>:
+
+  <ol>
+   <li><p>If <var>ignored</var> does not <a for=set>contain</a> <var>input</var>[<var>s</var>],
+   <a for=iteration>break</a>.
+
+   <li><p>Set <var>s</var> to <var>s</var> + 1.
+  </ol>
+
+ <li><p>Let <var>p</var> be 0.
+
+ <li>
+  <p>While <var>p</var> &lt; <var>pattern</var>'s <a for="byte sequence">length</a>:
+
+  <ol>
+   <li><p>Let <var>maskedData</var> be the result of applying the bitwise AND operator to
+   <var>input</var>[<var>s</var>] and <var>mask</var>[<var>p</var>].
+
+   <li><p>If <var>maskedData</var> is not equal to <var>pattern</var>[<var>p</var>], return false.
+
+   <li><p>Set <var>s</var> to <var>s</var> + 1.
+
+   <li><p>Set <var>p</var> to <var>p</var> + 1.
+  </ol>
+
+ <li><p>Return true.
+</ol>
+
+
+
+<h3 id=matching-an-image-type-pattern>Matching an image type pattern</h3>
+
+<p>To determine which <a>image MIME type</a> <a>byte pattern</a> a <a>byte sequence</a>
+<var>input</var> matches, if any, use the following
+<dfn>image type pattern matching algorithm</dfn>:
+
+ <ol>
+  <li><p>Execute the following steps for each row <var>row</var> in the following table:
+
+   <ol>
+    <li><p>Let <var>patternMatched</var> be the result of the <a>pattern matching algorithm</a>
+    given <var>input</var>, the value in the first column of <var>row</var>, the value in the second
+    column of <var>row</var>, and the value in the third column of <var>row</var>.
+
+    <li><p>If <var>patternMatched</var> is true, return the value in the fourth column of
+    <var>row</var>.
+   </ol>
+
+   <table>
+    <thead>
+     <tr>
+      <th>
+       <a>Byte Pattern</a>
+
+      <th>
+       <a>Pattern Mask</a>
+
+      <th>
+       Leading <a lt=byte>Bytes</a> to Be Ignored
+
+      <th>
+       <a>Image MIME Type</a>
+
+      <th>
+       Note
+
+
+
+    <tbody>
+     <!-- https://www.iana.org/assignments/media-types/image/vnd.microsoft.icon -->
+     <!-- https://msdn.microsoft.com/en-us/library/ms997538.aspx -->
+     <tr>
+      <td>
+       00 00 01 00
+
+      <td>
+       FF FF FF FF
+
+      <td>
+       None.
+
+      <td>
+       <code>image/x-icon</code>
+
+      <td>
+       A Windows Icon signature.
+
+
+     <!-- https://msdn.microsoft.com/en-us/library/ms997538.aspx -->
+     <tr>
+      <td>
+       00 00 02 00
+
+      <td>
+       FF FF FF FF
+
+      <td>
+       None.
+
+      <td>
+       <code>image/x-icon</code>
+
+      <td>
+       A Windows Cursor signature.
+
+
+     <tr>
+      <td>
+       42 4D
+
+      <td>
+       FF FF
+
+      <td>
+       None.
+
+      <td>
+       <code>image/bmp</code>
+
+      <td>
+       The string "<code>BM</code>", a BMP signature.
+
+
+     <!-- https://www.w3.org/Graphics/GIF/spec-gif87.txt -->
+     <tr>
+      <td>
+       47 49 46 38 37 61
+
+      <td>
+       FF FF FF FF FF FF
+
+      <td>
+       None.
+
+      <td>
+       <code>image/gif</code>
+
+      <td>
+       The string "<code>GIF87a</code>", a GIF signature.
+
+
+     <!-- https://www.w3.org/Graphics/GIF/spec-gif89a.txt -->
+     <tr>
+      <td>
+       47 49 46 38 39 61
+
+      <td>
+       FF FF FF FF FF FF
+
+      <td>
+       None.
+
+      <td>
+       <code>image/gif</code>
+
+      <td>
+       The string "<code>GIF89a</code>", a GIF signature.
+
+
+     <!-- https://developers.google.com/speed/webp/docs/riff_container#webp-file-header -->
+     <tr>
+      <td>
+       52 49 46 46 00 00 00 00 57 45 42 50 56 50
+
+      <td>
+       FF FF FF FF 00 00 00 00 FF FF FF FF FF FF
+
+      <td>
+       None.
+
+      <td>
+       <code>image/webp</code>
+
+      <td>
+       The string "<code>RIFF</code>" followed by four
+       <a>bytes</a> followed by the string
+       "<code>WEBPVP</code>".
+
+
+     <!-- https://www.w3.org/TR/PNG/#5PNG-file-signature -->
+     <tr>
+      <td>
+       89 50 4E 47 0D 0A 1A 0A
+
+      <td>
+       FF FF FF FF FF FF FF FF
+
+      <td>
+       None.
+
+      <td>
+       <code>image/png</code>
+
+      <td>
+       An error-checking <a>byte</a> followed by the string
+       "<code>PNG</code>" followed by CR LF SUB LF, the PNG signature.
+
+
+     <!-- https://www.digicamsoft.com/itu/itu-t81-36.html -->
+     <tr>
+      <td>
+       FF D8 FF
+
+      <td>
+       FF FF FF
+
+      <td>
+       None.
+
+      <td>
+       <code>image/jpeg</code>
+
+      <td>
+       The JPEG Start of Image marker followed by the indicator
+       <a>byte</a> of another marker.
+
+
+
+   </table>
+
+  <li><p>Return undefined.
+ </ol>
+
+
+
+<h3 id=matching-an-audio-or-video-type-pattern>Matching an audio or video type pattern</h3>
+
+<p>To determine which <a>audio or video MIME type</a> <a>byte pattern</a> a <a>byte sequence</a>
+<var>input</var> matches, if any, use the following <dfn>audio or video type pattern matching
+algorithm</dfn>:
+
+ <ol>
+  <li><p>Execute the following steps for each row <var>row</var> in the following table:
+
+   <ol>
+    <li><p>Let <var>patternMatched</var> be the result of the <a>pattern matching algorithm</a>
+    given <var>input</var>, the value in the first column of <var>row</var>, the value in the second
+    column of <var>row</var>, and the value in the third column of <var>row</var>.
+
+    <li><p>If <var>patternMatched</var> is true, return the value in the fourth column of
+    <var>row</var>.
+   </ol>
+
+   <table>
+    <thead>
+     <tr>
+      <th>
+       <a>Byte Pattern</a>
+
+      <th>
+       <a>Pattern Mask</a>
+
+      <th>
+       Leading <a lt=byte>Bytes</a> to Be Ignored
+
+      <th>
+       <a>Audio or Video MIME Type</a>
+
+      <th>
+       Note
+
+
+
+    <tbody>
+     <!-- http://www-mmsp.ece.mcgill.ca/Documents/AudioFormats/AU/AU.html -->
+     <tr>
+      <td>
+       2E 73 6E 64
+
+      <td>
+       FF FF FF FF
+
+      <td>
+       None.
+
+      <td>
+       <code>audio/basic</code>
+
+      <td>
+       The string "<code>.snd</code>", the basic audio signature.
+
+
+     <!-- https://multimedia.cx/mirror/AudioIFF1_2_1.htm -->
+     <tr>
+      <td>
+       46 4F 52 4D 00 00 00 00 41 49 46 46
+
+      <td>
+       FF FF FF FF 00 00 00 00 FF FF FF FF
+
+      <td>
+       None.
+
+      <td>
+       <code>audio/aiff</code>
+
+      <td>
+       The string "<code>FORM</code>" followed by four
+       <a>bytes</a> followed by the string
+       "<code>AIFF</code>", the AIFF signature.
+
+
+     <!-- http://id3.org/id3v2.4.0-structure -->
+     <tr>
+      <td>
+       49 44 33
+
+      <td>
+       FF FF FF
+
+      <td>
+       None.
+
+      <td>
+       <code>audio/mpeg</code>
+
+      <td>
+       The string "<code>ID3</code>", the ID3v2-tagged MP3 signature.
+
+
+     <tr>
+      <td>
+       4F 67 67 53 00
+
+      <td>
+       FF FF FF FF FF
+
+      <td>
+       None.
+
+      <td>
+       <code>application/ogg</code>
+
+      <td>
+       The string "<code>OggS</code>" followed by NUL, the Ogg container
+       signature.
+
+
+     <!-- https://hostr.co/LJUEw0K -->
+     <tr>
+      <td>
+       4D 54 68 64 00 00 00 06
+
+      <td>
+       FF FF FF FF FF FF FF FF
+
+      <td>
+       None.
+
+      <td>
+       <code>audio/midi</code>
+
+      <td>
+       The string "<code>MThd</code>" followed by four
+       <a>bytes</a> representing the number 6 in 32 bits
+       (big-endian), the MIDI signature.
+
+
+     <!-- http://www.jmcgowan.com/avitech.html#Format -->
+     <!-- http://www.the-labs.com/Video/odmlff2-avidef.pdf -->
+     <tr>
+      <td>
+       52 49 46 46 00 00 00 00 41 56 49 20
+
+      <td>
+       FF FF FF FF 00 00 00 00 FF FF FF FF
+
+      <td>
+       None.
+
+      <td>
+       <code>video/avi</code>
+
+      <td>
+       The string "<code>RIFF</code>" followed by four
+       <a>bytes</a> followed by the string
+       "<code>AVI </code>", the AVI signature.
+
+
+     <!-- http://www-mmsp.ece.mcgill.ca/Documents/AudioFormats/WAVE/WAVE.html -->
+     <tr>
+      <td>
+       52 49 46 46 00 00 00 00 57 41 56 45
+
+      <td>
+       FF FF FF FF 00 00 00 00 FF FF FF FF
+
+      <td>
+       None.
+
+      <td>
+       <code>audio/wave</code>
+
+      <td>
+       The string "<code>RIFF</code>" followed by four
+       <a>bytes</a> followed by the string
+       "<code>WAVE</code>", the WAVE signature.
+
+
+
+   </table>
+
+  <li><p>If <var>input</var> <a>matches the signature for MP4</a>, return "<code>video/mp4</code>".
+
+  <li><p>If <var>input</var> <a>matches the signature for WebM</a>, return
+  "<code>video/webm</code>".
+
+  <li><p>If <var>input</var> <a>matches the signature for MP3 without ID3</a>, return
+  "<code>audio/mpeg</code>".
+
+  <li><p>Return undefined.
+ </ol>
+
+
+
+<h4 id=signature-for-mp4>Signature for MP4</h4>
+
+<p>
+ To determine whether a <a>byte sequence</a> <dfn>matches the signature
+ for MP4</dfn>, use the following steps:
+
+ <ol>
+  <li>
+   Let <var>sequence</var> be the <a>byte sequence</a> to be matched,
+   where <var>sequence</var>[<var>s</var>] is <a>byte</a> <var>s</var>
+   in <var>sequence</var> and <var>sequence</var>[0] is the first
+   <a>byte</a> in <var>sequence</var>.
+
+  <li>
+   Let <var>length</var> be the number of <a>bytes</a> in
+   <var>sequence</var>.
+
+  <li>
+   If <var>length</var> is less than 12, return false.
+
+  <li>
+   Let <var>box-size</var> be the four <a>bytes</a> from
+   <var>sequence</var>[0] to <var>sequence</var>[3], interpreted as a 32-bit
+   unsigned big-endian integer.
+
+  <li>
+   If <var>length</var> is less than <var>box-size</var> or if
+   <var>box-size</var> modulo 4 is not equal to 0, return false.
+
+  <li>
+   If the four <a>bytes</a> from <var>sequence</var>[4] to
+   <var>sequence</var>[7] are not equal to 0x66 0x74 0x79 0x70
+   ("<code>ftyp</code>"), return false.
+
+  <li>
+   If the three <a>bytes</a> from <var>sequence</var>[8] to
+   <var>sequence</var>[10] are equal to 0x6D 0x70 0x34
+   ("<code>mp4</code>"), return true.
+
+  <li>
+   Let <var>bytes-read</var> be 16.
+
+   <p class=note>
+    This ignores the four <a>bytes</a> that correspond to the
+    version number of the "major brand".
+
+  <li>
+   While <var>bytes-read</var> is less than <var>box-size</var>, continuously
+   loop through these steps:
+
+   <ol>
+    <li>
+     If the three <a>bytes</a> from
+     <var>sequence</var>[<var>bytes-read</var>] to
+     <var>sequence</var>[<var>bytes-read</var> + 2] are equal to 0x6D 0x70
+     0x34 ("<code>mp4</code>"), return true.
+
+    <li>
+     Increment <var>bytes-read</var> by 4.
+   </ol>
+
+  <li>
+   Return false.
+ </ol>
+
+<h4 id=signature-for-webm>Signature for WebM</h4>
+
+<!-- https://matroska-org.github.io/libebml/specs.html -->
+<!-- https://www.matroska.org/technical/specs/index.html -->
+<!-- https://www.webmproject.org/docs/container/ -->
+
+<p>
+ To determine whether a <a>byte sequence</a> <dfn>matches the signature
+ for WebM</dfn>, use the following steps:
+
+ <ol>
+  <li>
+   Let <var>sequence</var> be the <a>byte sequence</a> to be matched,
+   where <var>sequence</var>[<var>s</var>] is <a>byte</a> <var>s</var>
+   in <var>sequence</var> and <var>sequence</var>[0] is the first
+   <a>byte</a> in <var>sequence</var>.
+
+  <li>
+   Let <var>length</var> be the number of <a>bytes</a> in
+   <var>sequence</var>.
+
+  <li>
+   If <var>length</var> is less than 4, return false.
+
+  <li>
+   If the four <a>bytes</a> from
+   <var>sequence</var>[0] to <var>sequence</var>[3], are not equal to 0x1A
+   0x45 0xDF 0xA3, return false.
+
+  <li>
+   Let <var>iter</var> be 4.
+
+  <li>
+  While <var>iter</var> is less than <var>length</var> and <var>iter</var> is
+  less than 38, continuously loop through these steps:
+
+  <ol>
+    <li> If the two bytes from <var>sequence</var>[<var>iter</var>] to
+    <var>sequence</var>[<var>iter</var> + 1] are equal to 0x42 0x82,
+    <ol>
+      <li> Increment <var>iter</var> by 2.
+      <li> If <var>iter</var> is greater or equal than <var>length</var>, abort
+      these steps.
+      <li> Let <var>number size</var> be the result
+      of <a href=#parse-a-vint>parsing a <code>vint</code></a> starting at <var>sequence</var>[<var>iter</var>].
+      <li> Increment <var>iter</var> by <var>number size</var>.
+      <li> If <var>iter</var> is less than <var>length</var> - 4, abort these
+      steps.
+      <li> Let <var>matched</var> be the result of <a href=#matching-a-padded-sequence>matching a padded
+        sequence</a> 0x77 0x65 0x62 0x6D
+      ("<code>webm</code>") on <var>sequence</var> at offset
+      <var>iter</var>.
+      <li> If <var>matched</var> is true, abort these steps and return true.
+    </ol>
+    <li> Increment <var>iter</var> by 1.
+  </ol>
+  <li> Return false.
+  </ol>
+
+To <dfn>parse a <code>vint</code></dfn> on a <a>byte sequence</a>
+<var>sequence</var> of size <var>length</var>, starting at index <var>iter</var>
+use the following steps:
+<ol>
+ <li>Let <var>mask</var> be 128.
+ <li>Let <var>max vint length</var> be 8.
+ <li>Let <var>number size</var> be 1.
+ <li>
+  While <var>number size</var> is less than <var>max vint length</var>, and less than
+  <var>length</var>, continuously loop through these steps:
+
+  <ol>
+   <li>If the <var>sequence</var>[<var>index</var>] &amp; <var>mask</var> is
+   not zero, abort these steps.
+   <li>Let <var>mask</var> be the value of <var>mask</var> >> 1.
+   <li>Increment <var>number size</var> by one.
+  </ol>
+ <li>Let <var>index</var> be 0.
+ <li>Let <var>parsed number</var> be <var>sequence</var>[<var>index</var>] &amp; ~<var>mask</var>.
+ <li>Increment <var>index</var> by one.
+ <li>Let <var>bytes remaining</var> be the value of <var>number size</var>.
+ <li>
+  While <var>bytes remaining</var> is not zero, execute there steps:
+  <ol>
+   <li>Let <var>parsed number</var> be <var>parsed number</var> &lt;&lt; 8.
+   <li>Let <var>parsed number</var> be <var>parsed number</var> |
+   <var>sequence</var>[<var>index</var>].
+   <li>Increment <var>index</var> by one.
+   <li>If <var>index</var> is greater or equal than <var>length</var>, abort these steps.
+   <li>Decrement <var>bytes remaining</var> by one.
+  </ol>
+ <li>Return <var>parsed number</var> and <var>number size</var>
+</ol>
+
+<p>
+<dfn>Matching a padded sequence</dfn> <var>pattern</var> on a sequence
+<var>sequence</var> at starting at byte <var>offset</var> and ending at by
+<var>end</var> means returning true if <var>sequence</var> has a length greater
+than <var>end</var>, and contains exactly, in the range [<var>offset</var>,
+<var>end</var>], the bytes in <var>pattern</var>, in the same order, eventually
+preceded by bytes with a value of 0x00, false otherwise.
+
+
+<h4 id=signature-for-mp3-without-id3>Signature for MP3 without ID3</h4>
+
+To determine whether a <a>byte sequence</a> <dfn>matches the signature
+for MP3 without ID3</dfn>, use the following steps:
+
+<ol>
+  <li>
+  Let <var>sequence</var> be the <a>byte sequence</a> to be matched,
+  where <var>sequence</var>[<var>s</var>] is <a>byte</a> <var>s</var> in
+  <var>sequence</var> and <var>sequence</var>[0] is the first <a>byte</a>
+  in <var>sequence</var>.
+  <li> Let <var>length</var> be the number of <a>bytes</a> in
+  <var>sequence</var>.
+  <li>Initialize s to 0.
+  <li>If the result of the operation <a href=#match-an-mp3-header>match mp3
+  header</a> is false, return false.
+  <li><a href=#parse-an-mp3-frame>Parse an mp3 frame</a> on
+  <var>sequence</var> at offset <var>s</var>
+  <li>Let <var>skipped-bytes</var> the return value of the execution of <a href=#compute-an-mp3-frame-size>mp3 framesize computation</a>
+  <li>If <var>skipped-bytes</var> is less than 4, or <var>skipped-bytes</var> is
+  greater than <var>s</var> - <var>length</var>, return false.
+  <li>Increment s by <var>skipped-bytes</var>.
+  <li>If the result of the operation <a href=#match-an-mp3-header>match mp3
+  header</a> operation is false, return false, else, return true.
+</ol>
+
+To <dfn>match an mp3 header</dfn>, using a <a>byte sequence</a>
+<var>sequence</var> of length <var>length</var> at offset <var>s</var>
+execute these steps:
+<ol>
+  <li>If <var>length</var> is less than 4, return false.
+  <li>If <var>sequence</var>[<var>s</var>] is not equal to 0xff and
+  <var>sequence</var>[<var>s</var> + 1] &amp; 0xe0 is not equal to 0xe0, return
+  false.
+  <li>Let <var>layer</var> be the result of <var>sequence</var>[<var>s</var> +
+  1] &amp; 0x06 >> 1.
+  <li>If <var>layer</var> is 0, return false.
+  <li>Let <var>bit-rate</var> be <var>sequence</var>[<var>s</var> + 2] &amp;
+  0xf0 >> 4.
+  <li>If <var>bit-rate</var> is 15, return false.
+  <li>Let <var>sample-rate</var> be <var>sequence</var>[<var>s</var> + 2] &amp;
+  0x0c >> 2.
+  <li>If <var>sample-rate</var> is 3, return false.
+  <li>Let <var>freq</var> be the value given by <var>sample-rate</var>
+  in the table sample-rate.
+  <li>Let <var>final-layer</var> be the result of 4 -
+  (<var>sequence</var>[<var>s</var> + 1]).
+  <li>If <var>final-layer</var> &amp; 0x06 >> 1 is not 3, return
+  false.
+  <li>Return true.
+</ol>
+
+To <dfn>compute an mp3 frame size</dfn>, execute these steps:
+<ol>
+  <li>If <var>version</var> is 1, let <var>scale</var> be 72, else, let
+  <var>scale</var> be 144.
+  <li>Let <var>size</var> be <var>bitrate</var> * <var>scale</var> /
+  <var>freq</var>.
+  <li>If <var>pad</var> is not zero, increment <var>size</var> by 1.
+  <li>Return <var>size</var>.
+</ol>
+
+To <dfn>parse an mp3 frame</dfn>, execute these steps:
+<ol>
+ <li>Let <var>version</var> be <var>sequence</var>[<var>s</var> + 1] &amp; 0x18 >> 3.
+ <li>Let <var>bitrate-index</var> be sequence[s + 2] &amp; 0xf0 >> 4.
+ <li>If the <var>version</var> &amp; 0x01 is non-zero, let <var>bitrate</var> be the value given by
+ <var>bitrate-index</var> in the table mp2.5-rates
+ <li>If <var>version</var> &amp; 0x01 is zero, let <var>bitrate</var> be the value given by
+ <var>bitrate-index</var> in the table mp3-rates
+ <li>Let <var>samplerate-index</var> be <var>sequence</var>[<var>s</var> + 2] &amp; 0x0c >> 2.
+ <li>Let <var>samplerate</var> be the value given by <var>samplerate-index</var> in the
+ <var>sample-rate</var> table.
+ <li>Let <var>pad</var> be <var>sequence</var>[<var>s</var> + 2] &amp; 0x02 >> 1.
+</ol>
+
+<figure>
+<figcaption>mp3-rates table</figcaption>
+<table>
+<thead>
+<tr><th>index
+<th>mp3-rates
+
+
+<tbody>
+<tr><td>0
+<td>0
+
+<tr><td>1
+<td>32000
+
+<tr><td>2
+<td>40000
+
+<tr><td>3
+<td>48000
+
+<tr><td>4
+<td>56000
+
+<tr><td>5
+<td>64000
+
+<tr><td>6
+<td>80000
+
+<tr><td>7
+<td>96000
+
+<tr><td>8
+<td>112000
+
+<tr><td>9
+<td>128000
+
+<tr><td>10
+<td>160000
+
+<tr><td>11
+<td>192000
+
+<tr><td>12
+<td>224000
+
+<tr><td>13
+<td>256000
+
+<tr><td>14
+<td>320000
+
+
+</table>
+</figure>
+
+<figure>
+<figcaption>mp2.5-rates</figcaption>
+<table>
+<thead>
+<tr><th>index
+<th>mp2.5-rates
+
+
+<tbody>
+<tr><td>0
+<td>0
+
+<tr><td>1
+<td>8000
+
+<tr><td>2
+<td>16000
+
+<tr><td>3
+<td>24000
+
+<tr><td>4
+<td>32000
+
+<tr><td>5
+<td>40000
+
+<tr><td>6
+<td>48000
+
+<tr><td>7
+<td>56000
+
+<tr><td>8
+<td>64000
+
+<tr><td>9
+<td>80000
+
+<tr><td>10
+<td>96000
+
+<tr><td>11
+<td>112000
+
+<tr><td>12
+<td>128000
+
+<tr><td>13
+<td>144000
+
+<tr><td>14
+<td>160000
+
+
+</table>
+</figure>
+
+<figure>
+<figcaption>sample-rate table</figcaption>
+<table>
+<thead>
+<tr><th>index
+<th>samplerate
+
+
+<tbody>
+<tr><td>0
+<td>44100
+
+<tr><td>1
+<td>48000
+
+<tr><td>2
+<td>32000
+
+
+</table>
+</figure>
+
+<h3 id=matching-a-font-type-pattern>Matching a font type pattern</h3>
+
+<p>To determine which <a>font MIME type</a> <a>byte pattern</a> a <a>byte sequence</a>
+<var>input</var> matches, if any, use the following <dfn>font type pattern matching algorithm</dfn>:
+
+ <ol>
+  <li><p>Execute the following steps for each row <var>row</var> in the following table:
+
+   <ol>
+    <li><p>Let <var>patternMatched</var> be the result of the <a>pattern matching algorithm</a>
+    given <var>input</var>, the value in the first column of <var>row</var>, the value in the second
+    column of <var>row</var>, and the value in the third column of <var>row</var>.
+
+    <li><p>If <var>patternMatched</var> is true, return the value in the fourth column of
+    <var>row</var>.
+   </ol>
+
+   <table>
+    <thead>
+     <tr>
+      <th>
+       <a>Byte Pattern</a>
+
+      <th>
+       <a>Pattern Mask</a>
+
+      <th>
+       Leading <a lt=byte>Bytes</a> to Be Ignored
+
+      <th>
+       <a>Font MIME Type</a>
+
+      <th>
+       Note
+
+
+
+    <tbody>
+     <!-- https://www.w3.org/Submission/EOT/ -->
+     <tr>
+      <td>
+       00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+       00 00 00 00 00 00 00 00 00 00 4C 50
+
+      <td>
+       00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+       00 00 00 00 00 00 00 00 00 00 FF FF
+
+      <td>
+       None.
+
+      <td>
+       <code>application/vnd.ms-fontobject</code>
+
+      <td>
+       34 <a>bytes</a> followed by the string
+       "<code>LP</code>", the Embedded OpenType signature.
+
+
+     <!-- https://www.microsoft.com/typography/otspec/recom.htm -->
+     <!-- https://www.ietf.org/mail-archive/web/websec/current/msg00235.html -->
+     <tr>
+      <td>
+       00 01 00 00
+
+      <td>
+       FF FF FF FF
+
+      <td>
+       None.
+
+      <td>
+       <code>font/ttf</code>
+
+      <td>
+       4 <a>bytes</a> representing the version number 1.0, a
+       TrueType signature.
+
+
+     <!-- https://www.microsoft.com/typography/otspec/recom.htm -->
+     <!-- https://www.ietf.org/mail-archive/web/websec/current/msg00235.html -->
+     <tr>
+      <td>
+       4F 54 54 4F
+
+      <td>
+       FF FF FF FF
+
+      <td>
+       None.
+
+      <td>
+       <code>font/otf</code>
+
+      <td>
+       The string "<code>OTTO</code>", the OpenType signature.
+
+
+     <!-- https://www.microsoft.com/typography/otspec/otff.htm -->
+     <!-- https://www.ietf.org/mail-archive/web/websec/current/msg00235.html -->
+     <tr>
+      <td>
+       74 74 63 66
+
+      <td>
+       FF FF FF FF
+
+      <td>
+       None.
+
+      <td>
+       <code>font/collection</code>
+
+      <td>
+       The string "<code>ttcf</code>", the TrueType Collection
+       signature.
+
+
+     <!-- https://www.ietf.org/mail-archive/web/websec/current/msg00235.html -->
+     <tr>
+      <td>
+       77 4F 46 46
+
+      <td>
+       FF FF FF FF
+
+      <td>
+       None.
+
+      <td>
+       <code>font/woff</code>
+
+      <td>
+       The string "<code>wOFF</code>", the Web Open Font Format 1.0
+       signature.
+
+     <!-- https://www.w3.org/TR/WOFF2/ -->
+     <tr>
+      <td>
+       77 4F 46 32
+
+      <td>
+       FF FF FF FF
+
+      <td>
+       None.
+
+      <td>
+       <code>font/woff2</code>
+
+      <td>
+       The string "<code>wOF2</code>", the Web Open Font Format 2.0
+       signature.
+
+
+   </table>
+
+  <li><p>Return undefined.
+ </ol>
+
+
+
+<h3 id=matching-an-archive-type-pattern>Matching an archive type pattern</h3>
+
+<p>To determine which <a>archive MIME type</a> <a>byte pattern</a> a <a>byte sequence</a>
+<var>input</var> matches, if any, use the following <dfn>archive type pattern matching
+algorithm</dfn>:
+
+ <ol>
+  <li><p>Execute the following steps for each row <var>row</var> in the following table:
+
+   <ol>
+    <li><p>Let <var>patternMatched</var> be the result of the <a>pattern matching algorithm</a>
+    given <var>input</var>, the value in the first column of <var>row</var>, the value in the second
+    column of <var>row</var>, and the value in the third column of <var>row</var>.
+
+    <li><p>If <var>patternMatched</var> is true, return the value in the fourth column of
+    <var>row</var>.
+   </ol>
+
+   <table>
+    <thead>
+     <tr>
+      <th>
+       <a>Byte Pattern</a>
+
+      <th>
+       <a>Pattern Mask</a>
+
+      <th>
+       Leading <a lt=byte>Bytes</a> to Be Ignored
+
+      <th>
+       <a>Archive MIME Type</a>
+
+      <th>
+       Note
+
+
+
+    <tbody>
+     <!-- https://tools.ietf.org/html/rfc1952 -->
+     <tr>
+      <td>
+       <!-- 0x1F 0x8B = gzip format, 0x08 = deflate compression -->
+       1F 8B 08
+
+      <td>
+       FF FF FF
+
+      <td>
+       None.
+
+      <td>
+       <code>application/x-gzip</code>
+
+      <td>
+       The GZIP archive signature.
+
+
+     <tr>
+      <td>
+       50 4B 03 04
+
+      <td>
+       FF FF FF FF
+
+      <td>
+       None.
+
+      <td>
+       <code>application/zip</code>
+
+      <td>
+       The string "<code>PK</code>" followed by ETX EOT, the ZIP archive
+       signature.
+
+
+     <tr>
+      <td>
+       52 61 72 20 1A 07 00
+
+      <td>
+       FF FF FF FF FF FF FF
+
+      <td>
+       None.
+
+      <td>
+       <code>application/x-rar-compressed</code>
+
+      <td>
+       The string "<code>Rar </code>" followed by SUB BEL NUL, the RAR
+       archive signature.
+
+
+
+   </table>
+
+  <li><p>Return undefined.
+ </ol>
+
+
+
+<h2 id=determining-the-computed-mime-type-of-a-resource>Determining the computed MIME type of a resource</h2>
+
+<p>
+ To determine the <a>computed MIME type</a> of a <a>resource</a>,
+ user agents must use the following <dfn>MIME type sniffing algorithm</dfn>:
+
+ <ol>
+  <li>
+   If the <a>supplied MIME type</a> is undefined or if the
+   <a>supplied MIME type</a>'s <a for="MIME type">essence</a> is
+   "<code>unknown/unknown</code>",
+   "<code>application/unknown</code>", or "<code>*/*</code>",
+   execute the <a>rules for identifying an unknown MIME type</a> with
+   the <a>sniff-scriptable flag</a> equal to the inverse of the
+   <a>no-sniff flag</a> and abort these steps.
+
+  <li>
+   If the <a>no-sniff flag</a> is set, the <a>computed MIME
+   type</a> is the <a>supplied MIME type</a>.
+
+   Abort these steps.
+
+  <li>
+   If the <a>check-for-apache-bug flag</a> is set, execute the
+   <a>rules for distinguishing if a resource is text or binary</a> and
+   abort these steps.
+
+  <li>
+   If the <a>supplied MIME type</a> is an <a>XML MIME type</a>, the
+   <a>computed MIME type</a> is the <a>supplied MIME type</a>.
+
+   Abort these steps.
+
+  <li>
+   If the <a>supplied MIME type</a>'s <a for="MIME type">essence</a> is "<code>text/html</code>",
+   execute the <a>rules for distinguishing if a resource is a feed or HTML</a> and
+   abort these steps.
+
+  <li>
+   If the <a>supplied MIME type</a> is an <a>image MIME type</a>
+   <a>supported by the user agent</a>, let <var>matched-type</var> be
+   the result of executing the <a>image type pattern matching
+   algorithm</a> with the <a>resource header</a> as the <a>byte
+   sequence</a> to be matched.
+
+  <li>
+   If <var>matched-type</var> is not undefined, the <a>computed MIME
+   type</a> is <var>matched-type</var>.
+
+   Abort these steps.
+
+  <li>
+   If the <a>supplied MIME type</a> is an <a>audio or video MIME type</a>
+   <a>supported by the user agent</a>, let
+   <var>matched-type</var> be the result of executing the <a>audio or video
+   type pattern matching algorithm</a> with the <a>resource
+   header</a> as the <a>byte sequence</a> to be matched.
+
+  <li>
+   If <var>matched-type</var> is not undefined, the <a>computed MIME
+   type</a> is <var>matched-type</var>.
+
+   Abort these steps.
+
+  <li>
+   The <a>computed MIME type</a> is the <a>supplied MIME
+   type</a>.
+ </ol>
+
+
+
+<h3 id=identifying-a-resource-with-an-unknown-mime-type>Identifying a resource with an unknown MIME type</h3>
+
+<p>
+ The <dfn>sniff-scriptable flag</dfn> is used by the <a>rules for
+ identifying an unknown MIME type</a> to determine whether to sniff for
+ <a>scriptable MIME types</a>.
+
+ If the setting of the <a>sniff-scriptable flag</a> is not specified
+ when calling the <a>rules for identifying an unknown MIME type</a>,
+ the <a>sniff-scriptable flag</a> must default to unset.
+
+<p>To determine the <a>computed MIME type</a> of a <a>resource</a> <var>resource</var> with an
+unknown <a>MIME type</a>, execute the following <dfn>rules for identifying an unknown MIME
+type</dfn>:
+
+ <ol>
+  <li>
+   <p>If the <a>sniff-scriptable flag</a> is set, execute the following steps for each row
+   <var>row</var> in the following table:
+
+   <ol>
+    <li><p>Let <var>patternMatched</var> be the result of the <a>pattern matching algorithm</a>
+    given <var>resource</var>'s <a>resource header</a>, the value in the first column of
+    <var>row</var>, the value in the second column of <var>row</var>, and the value in the third
+    column of <var>row</var>.
+
+    <li><p>If <var>patternMatched</var> is true, return the value in the fourth column of
+    <var>row</var>.
+   </ol>
+
+   <table>
+    <thead>
+     <tr>
+      <th>
+       <a>Byte Pattern</a>
+
+      <th>
+       <a>Pattern Mask</a>
+
+      <th>
+       Leading <a lt=byte>Bytes</a> to Be Ignored
+
+      <th>
+       <a>Computed MIME Type</a>
+
+      <th>
+       Note
+
+
+
+    <tbody>
+     <tr>
+      <td>
+       3C 21 44 4F 43 54 59 50 45 20 48 54 4D 4C <abbr lt="tag terminating byte">TT</abbr>
+
+      <td>
+       FF FF DF DF DF DF DF DF DF FF DF DF DF DF FF
+
+      <td>
+       <a lt="whitespace byte">Whitespace bytes</a>.
+
+      <td>
+       <code>text/html</code>
+
+      <td>
+       The case-insensitive string "<code>&lt;!DOCTYPE HTML</code>"
+       followed by a <a>tag-terminating byte</a>.
+
+
+     <tr>
+      <td>
+       3C 48 54 4D 4C <abbr lt="tag terminating byte">TT</abbr>
+
+      <td>
+       FF DF DF DF DF FF
+
+      <td>
+       <a lt="whitespace byte">Whitespace bytes</a>.
+
+      <td>
+       <code>text/html</code>
+
+      <td>
+       The case-insensitive string "<code>&lt;HTML</code>" followed by a
+       <a>tag-terminating byte</a>.
+
+
+     <tr>
+      <td>
+       3C 48 45 41 44 <abbr lt="tag terminating byte">TT</abbr>
+
+      <td>
+       FF DF DF DF DF FF
+
+      <td>
+       <a lt="whitespace byte">Whitespace bytes</a>.
+
+      <td>
+       <code>text/html</code>
+
+      <td>
+       The case-insensitive string "<code>&lt;HEAD</code>" followed by a
+       <a>tag-terminating byte</a>.
+
+
+     <tr>
+      <td>
+       3C 53 43 52 49 50 54 <abbr lt="tag terminating byte">TT</abbr>
+
+      <td>
+       FF DF DF DF DF DF DF FF
+
+      <td>
+       <a lt="whitespace byte">Whitespace bytes</a>.
+
+      <td>
+       <code>text/html</code>
+
+      <td>
+       The case-insensitive string "<code>&lt;SCRIPT</code>" followed by
+       a <a>tag-terminating byte</a>.
+
+
+     <tr>
+      <td>
+       3C 49 46 52 41 4D 45 <abbr lt="tag terminating byte">TT</abbr>
+
+      <td>
+       FF DF DF DF DF DF DF FF
+
+      <td>
+       <a lt="whitespace byte">Whitespace bytes</a>.
+
+      <td>
+       <code>text/html</code>
+
+      <td>
+       The case-insensitive string "<code>&lt;IFRAME</code>" followed by
+       a <a>tag-terminating byte</a>.
+
+
+     <tr>
+      <td>
+       3C 48 31 <abbr lt="tag terminating byte">TT</abbr>
+
+      <td>
+       FF DF FF FF
+
+      <td>
+       <a lt="whitespace byte">Whitespace bytes</a>.
+
+      <td>
+       <code>text/html</code>
+
+      <td>
+       The case-insensitive string "<code>&lt;H1</code>" followed by a
+       <a>tag-terminating byte</a>.
+
+
+     <tr>
+      <td>
+       3C 44 49 56 <abbr lt="tag terminating byte">TT</abbr>
+
+      <td>
+       FF DF DF DF FF
+
+      <td>
+       <a lt="whitespace byte">Whitespace bytes</a>.
+
+      <td>
+       <code>text/html</code>
+
+      <td>
+       The case-insensitive string "<code>&lt;DIV</code>" followed by a
+       <a>tag-terminating byte</a>.
+
+
+     <tr>
+      <td>
+       3C 46 4F 4E 54 <abbr lt="tag terminating byte">TT</abbr>
+
+      <td>
+       FF DF DF DF DF FF
+
+      <td>
+       <a lt="whitespace byte">Whitespace bytes</a>.
+
+      <td>
+       <code>text/html</code>
+
+      <td>
+       The case-insensitive string "<code>&lt;FONT</code>" followed by a
+       <a>tag-terminating byte</a>.
+
+
+     <tr>
+      <td>
+       3C 54 41 42 4C 45 <abbr lt="tag terminating byte">TT</abbr>
+
+      <td>
+       FF DF DF DF DF DF FF
+
+      <td>
+       <a lt="whitespace byte">Whitespace bytes</a>.
+
+      <td>
+       <code>text/html</code>
+
+      <td>
+       The case-insensitive string "<code>&lt;TABLE</code>" followed by
+       a <a>tag-terminating byte</a>.
+
+
+     <tr>
+      <td>
+       3C 41 <abbr lt="tag terminating byte">TT</abbr>
+
+      <td>
+       FF DF FF
+
+      <td>
+       <a lt="whitespace byte">Whitespace bytes</a>.
+
+      <td>
+       <code>text/html</code>
+
+      <td>
+       The case-insensitive string "<code>&lt;A</code>" followed by a
+       <a>tag-terminating byte</a>.
+
+
+     <tr>
+      <td>
+       3C 53 54 59 4C 45 <abbr lt="tag terminating byte">TT</abbr>
+
+      <td>
+       FF DF DF DF DF DF FF
+
+      <td>
+       <a lt="whitespace byte">Whitespace bytes</a>.
+
+      <td>
+       <code>text/html</code>
+
+      <td>
+       The case-insensitive string "<code>&lt;STYLE</code>" followed by
+       a <a>tag-terminating byte</a>.
+
+
+     <tr>
+      <td>
+       3C 54 49 54 4C 45 <abbr lt="tag terminating byte">TT</abbr>
+
+      <td>
+       FF DF DF DF DF DF FF
+
+      <td>
+       <a lt="whitespace byte">Whitespace bytes</a>.
+
+      <td>
+       <code>text/html</code>
+
+      <td>
+       The case-insensitive string "<code>&lt;TITLE</code>" followed by
+       a <a>tag-terminating byte</a>.
+
+
+     <tr>
+      <td>
+       3C 42 <abbr lt="tag terminating byte">TT</abbr>
+
+      <td>
+       FF DF FF
+
+      <td>
+       <a lt="whitespace byte">Whitespace bytes</a>.
+
+      <td>
+       <code>text/html</code>
+
+      <td>
+       The case-insensitive string "<code>&lt;B</code>" followed by a
+       <a>tag-terminating byte</a>.
+
+
+     <tr>
+      <td>
+       3C 42 4F 44 59 <abbr lt="tag terminating byte">TT</abbr>
+
+      <td>
+       FF DF DF DF DF FF
+
+      <td>
+       <a lt="whitespace byte">Whitespace bytes</a>.
+
+      <td>
+       <code>text/html</code>
+
+      <td>
+       The case-insensitive string "<code>&lt;BODY</code>" followed by a
+       <a>tag-terminating byte</a>.
+
+
+     <tr>
+      <td>
+       3C 42 52 <abbr lt="tag terminating byte">TT</abbr>
+
+      <td>
+       FF DF DF FF
+
+      <td>
+       <a lt="whitespace byte">Whitespace bytes</a>.
+
+      <td>
+       <code>text/html</code>
+
+      <td>
+       The case-insensitive string "<code>&lt;BR</code>" followed by a
+       <a>tag-terminating byte</a>.
+
+
+     <tr>
+      <td>
+       3C 50 <abbr lt="tag terminating byte">TT</abbr>
+
+      <td>
+       FF DF FF
+
+      <td>
+       <a lt="whitespace byte">Whitespace bytes</a>.
+
+      <td>
+       <code>text/html</code>
+
+      <td>
+       The case-insensitive string "<code>&lt;P</code>" followed by a
+       <a>tag-terminating byte</a>.
+
+
+     <tr>
+      <td>
+       3C 21 2D 2D <abbr lt="tag terminating byte">TT</abbr>
+
+      <td>
+       FF FF FF FF FF
+
+      <td>
+       <a lt="whitespace byte">Whitespace bytes</a>.
+
+      <td>
+       <code>text/html</code>
+
+      <td>
+       The string "<code>&lt;!--</code>" followed by a
+       <a>tag-terminating byte</a>.
+
+
+     <tr>
+      <td>
+       3C 3F 78 6D 6C
+
+      <td>
+       FF FF FF FF FF
+
+      <td>
+       <a lt="whitespace byte">Whitespace bytes</a>.
+
+      <td>
+       <code>text/xml</code>
+
+      <td>
+       The string "<code>&lt;?xml</code>".
+
+
+     <tr>
+      <td>
+       25 50 44 46 2D
+
+      <td>
+       FF FF FF FF FF
+
+      <td>
+       None.
+
+      <td>
+       <code>application/pdf</code>
+
+      <td>
+       The string "<code>%PDF-</code>", the PDF signature.
+
+
+
+   </table>
+
+   <p class=XXX>
+    What about feeds?
+
+  <li>
+   <p>Execute the following steps for each row <var>row</var> in the following table:
+
+   <ol>
+    <li><p>Let <var>patternMatched</var> be the result of the <a>pattern matching algorithm</a>
+    given <var>resource</var>'s <a>resource header</a>, the value in the first column of
+    <var>row</var>, the value in the second column of <var>row</var>, and the value in the third
+    column of <var>row</var>.
+
+    <li><p>If <var>patternMatched</var> is true, return the value in the fourth column of
+    <var>row</var>.
+   </ol>
+
+   <table>
+    <thead>
+     <tr>
+      <th>
+       <a>Byte Pattern</a>
+
+      <th>
+       <a>Pattern Mask</a>
+
+      <th>
+       Leading <a lt=byte>Bytes</a> to Be Ignored
+
+      <th>
+       <a>Computed MIME Type</a>
+
+      <th>
+       Note
+
+
+
+    <tbody>
+     <tr>
+      <td>
+       25 21 50 53 2D 41 64 6F 62 65 2D
+
+      <td>
+       FF FF FF FF FF FF FF FF FF FF FF
+
+      <td>
+       None.
+
+      <td>
+       <code>application/postscript</code>
+
+      <td>
+       The string "<code>%!PS-Adobe-</code>", the PostScript signature.
+
+
+     <tr>
+      <td>
+       FE FF 00 00
+
+      <td>
+       FF FF 00 00
+
+      <td>
+       None.
+
+      <td>
+       <code>text/plain</code>
+
+      <td>
+       UTF-16BE BOM
+
+
+     <tr>
+      <td>
+       FF FE 00 00
+
+      <td>
+       FF FF 00 00
+
+      <td>
+       None.
+
+      <td>
+       <code>text/plain</code>
+
+      <td>
+       UTF-16LE BOM
+
+
+     <tr>
+      <td>
+       EF BB BF 00
+
+      <td>
+       FF FF FF 00
+
+      <td>
+       None.
+
+      <td>
+       <code>text/plain</code>
+
+      <td>
+       UTF-8 BOM
+
+
+
+   </table>
+
+   <p>User agents may implicitly extend this table to support additional <a>MIME types</a>.
+
+   <p>However, user agents should not implicitly extend this table to include additional
+   <a>byte patterns</a> for any <a>computed MIME type</a> already present in this table, as doing so
+   could introduce privilege escalation vulnerabilities.
+
+   <p>User agents must not introduce any privilege escalation vulnerabilities when extending this
+   table.
+
+  <li><p>Let <var>matchedType</var> be the result of executing the
+  <a>image type pattern matching algorithm</a> given <var>resource</var>'s <a>resource header</a>.
+
+  <li><p>If <var>matchedType</var> is not undefined, return <var>matchedType</var>.
+
+  <li><p>Set <var>matchedType</var> to the result of executing the
+  <a>audio or video type pattern matching algorithm</a> given <var>resource</var>'s
+  <a>resource header</a>.
+
+  <li><p>If <var>matchedType</var> is not undefined, return <var>matchedType</var>.
+
+  <!-- Major browsers do not implement font sniffing in the regular browsing context.
+  <li>
+   Let <var>matched-type</var> be the result of executing the <span>font type
+   pattern matching algorithm</span> with the <span>resource header</span> as
+   the <span>byte sequence</span> to be matched.
+
+  <li>
+   If <var>matched-type</var> is not undefined, the <span>computed MIME
+   type</span> is <var>matched-type</var>.
+
+   Abort these steps.
+  -->
+
+  <li><p>Set <var>matchedType</var> to the result of executing the
+  <a>archive type pattern matching algorithm</a> given <var>resource</var>'s
+  <a>resource header</a>.
+
+  <li><p>If <var>matchedType</var> is not undefined, return <var>matchedType</var>.
+
+  <li><p>If <var>resource</var>'s <a>resource header</a> contains no <a>binary data bytes</a>,
+  return  "<code>text/plain</code>".
+
+  <li><p>Return "<code>application/octet-stream</code>".
+ </ol>
+
+
+
+<h3 id=sniffing-a-mislabeled-binary-resource>Sniffing a mislabeled binary resource</h3>
+
+<p>
+ To determine whether a binary <a>resource</a> has been mislabeled as
+ plain text, execute the following <dfn id=rules-for-text-or-binary>rules for
+ distinguishing if a resource is text or binary</dfn>:
+
+<ol>
+ <li>
+  Let <var>length</var> be the number of <a>bytes</a> in the
+  <a>resource header</a>.
+
+ <li>
+  If <var>length</var> is greater than or equal to 2 and the first 2 bytes of
+  the <a>resource header</a> are equal to 0xFE 0xFF (UTF-16BE BOM) or
+  0xFF 0xFE (UTF-16LE BOM), the <a>computed MIME type</a> is
+  "<code>text/plain</code>".
+
+  Abort these steps.
+
+ <li>
+  If <var>length</var> is greater than or equal to 3 and the first 3 bytes of
+  the <a>resource header</a> are equal to 0xEF 0xBB 0xBF (UTF-8 BOM),
+  the <a>computed MIME type</a> is "<code>text/plain</code>".
+
+  Abort these steps.
+
+ <li>
+  If the <a>resource header</a> contains no
+  <a>binary data bytes</a>, the <a>computed
+  MIME type</a> is "<code>text/plain</code>".
+
+  Abort these steps.
+
+ <li>
+  The <a>computed MIME type</a> is
+  "<code>application/octet-stream</code>".
+
+  <p class=warning>
+   It is critical that the <a>rules for distinguishing if a resource is
+   text or binary</a> never determine the <a>computed MIME type</a>
+   to be a <a>scriptable MIME type</a>, as this could allow a privilege
+   escalation attack.
+</ol>
+
+
+
+<h3 id=sniffing-a-mislabeled-feed>Sniffing a mislabeled feed</h3>
+
+<p>
+ To determine whether a feed has been mislabeled as HTML, execute the
+ following <dfn>rules for distinguishing if a resource is a feed or
+ HTML</dfn>:
+
+ <ol>
+  <li>
+   Let <var>sequence</var> be the <a>resource header</a>, where
+   <var>sequence</var>[<var>s</var>] is <a>byte</a> <var>s</var> in
+   <var>sequence</var> and <var>sequence</var>[0] is the first
+   <a>byte</a> in <var>sequence</var>.
+
+  <li>
+   Let <var>length</var> be the number of <a>bytes</a> in
+   <var>sequence</var>.
+
+  <li>
+   Initialize <var>s</var> to 0.
+
+  <li>
+   If <var>length</var> is greater than or equal to 3 and the three
+   <a>bytes</a> from <var>sequence</var>[0] to
+   <var>sequence</var>[2] are equal to 0xEF 0xBB 0xBF (UTF-8 BOM), increment
+   <var>s</var> by 3.
+
+  <li>
+   While <var>s</var> is less than <var>length</var>, continuously loop
+   through these steps:
+
+   <ol>
+    <li>
+     Enter loop <var>L</var>:
+
+     <ol>
+      <li>
+       If <var>sequence</var>[<var>s</var>] is undefined, the <a>computed
+       MIME type</a> is the <a>supplied MIME type</a>.
+
+       Abort these steps.
+
+      <li>
+       If <var>sequence</var>[<var>s</var>] is equal to 0x3C
+       ("<code>&lt;</code>"), increment <var>s</var> by 1 and exit loop
+       <var>L</var>.
+
+      <li>
+       If <var>sequence</var>[<var>s</var>] is not a <a>whitespace
+       byte</a>, the <a>computed MIME type</a> is the <a>supplied
+       MIME type</a>.
+
+       Abort these steps.
+
+      <li>
+       Increment <var>s</var> by 1.
+     </ol>
+
+    <li>
+     Enter loop <var>L</var>:
+
+     <ol>
+      <li>
+       If <var>sequence</var>[<var>s</var>] is undefined, the <a>computed
+       MIME type</a> is the <a>supplied MIME type</a>.
+
+       Abort these steps.
+
+      <li>
+       If <var>length</var> is greater than or equal to <var>s</var> + 3 and
+       the three <a>bytes</a> from
+       <var>sequence</var>[<var>s</var>] to
+       <var>sequence</var>[<var>s</var> + 2] are equal to 0x21 0x2D 0x2D
+       ("<code>!--</code>"), increment <var>s</var> by 3 and enter loop
+       <var>M</var>:
+
+       <ol>
+        <li>
+         If <var>sequence</var>[<var>s</var>] is undefined, the <a>computed
+         MIME type</a> is the <a>supplied MIME type</a>.
+
+         Abort these steps.
+
+        <li>
+         If <var>length</var> is greater than or equal to <var>s</var> + 3 and
+         the three <a>bytes</a> from
+         <var>sequence</var>[<var>s</var>] to
+         <var>sequence</var>[<var>s</var> + 2] are equal to 0x2D 0x2D 0x3E
+         ("<code>--></code>"), increment <var>s</var> by 3 and exit
+         loops <var>M</var> and <var>L</var>.
+
+        <li>
+         Increment <var>s</var> by 1.
+       </ol>
+
+      <li>
+       If <var>length</var> is greater than or equal to <var>s</var> + 1 and
+       <var>sequence</var>[<var>s</var>] is equal to 0x21
+       ("<code>!</code>"), increment <var>s</var> by 1 and enter loop
+       <var>M</var>:
+
+       <ol>
+        <li>
+         If <var>sequence</var>[<var>s</var>] is undefined, the <a>computed
+         MIME type</a> is the <a>supplied MIME type</a>.
+
+         Abort these steps.
+
+        <li>
+         If <var>length</var> is greater than or equal to <var>s</var> + 1 and
+         <var>sequence</var>[<var>s</var>] is equal to 0x3E
+         ("<code>></code>"), increment <var>s</var> by 1 and exit loops
+         <var>M</var> and <var>L</var>.
+
+        <li>
+         Increment <var>s</var> by 1.
+       </ol>
+
+      <li>
+       If <var>length</var> is greater than or equal to <var>s</var> + 1 and
+       <var>sequence</var>[<var>s</var>] is equal to 0x3F
+       ("<code>?</code>"), increment <var>s</var> by 1 and enter loop
+       <var>M</var>:
+
+       <ol>
+        <li>
+         If <var>sequence</var>[<var>s</var>] is undefined, the <a>computed
+         MIME type</a> is the <a>supplied MIME type</a>.
+
+         Abort these steps.
+
+        <li>
+         If <var>length</var> is greater than or equal to <var>s</var> + 2 and
+         the two <a>bytes</a> from
+         <var>sequence</var>[<var>s</var>] to
+         <var>sequence</var>[<var>s</var> + 1] are equal to 0x3F 0x3E
+         ("<code>?></code>"), increment <var>s</var> by 2 and exit loops
+         <var>M</var> and <var>L</var>.
+
+        <li>
+         Increment <var>s</var> by 1.
+       </ol>
+
+      <li>
+       If <var>length</var> is greater than or equal to <var>s</var> + 3 and
+       the three <a>bytes</a> from
+       <var>sequence</var>[<var>s</var>] to
+       <var>sequence</var>[<var>s</var> + 2] are equal to 0x72 0x73 0x73
+       ("<code>rss</code>"), the <a>computed MIME type</a> is
+       "<code>application/rss+xml</code>".
+
+       Abort these steps.
+
+      <li>
+       If <var>length</var> is greater than or equal to <var>s</var> + 4 and
+       the four <a>bytes</a> from
+       <var>sequence</var>[<var>s</var>] to
+       <var>sequence</var>[<var>s</var> + 3] are equal to 0x66 0x65 0x65 0x64
+       ("<code>feed</code>"), the <a>computed MIME type</a> is
+       "<code>application/atom+xml</code>".
+
+       Abort these steps.
+
+      <li>
+       If <var>length</var> is greater than or equal to <var>s</var> + 7 and
+       the seven <a>bytes</a> from
+       <var>sequence</var>[<var>s</var>] to
+       <var>sequence</var>[<var>s</var> + 6] are equal to 0x72 0x64 0x66 0x3A
+       0x52 0x44 0x46 ("<code>rdf:RDF</code>"), increment <var>s</var>
+       by 7 and enter loop <var>M</var>:
+
+       <ol>
+        <li>
+         If <var>sequence</var>[<var>s</var>] is undefined, the <a>computed
+         MIME type</a> is the <a>supplied MIME type</a>.
+
+         Abort these steps.
+
+        <li>
+         If <var>length</var> is greater than or equal to <var>s</var> + 24
+         and the twenty-four <a>bytes</a> from
+         <var>sequence</var>[<var>s</var>] to
+         <var>sequence</var>[<var>s</var> + 23] are equal to 0x68 0x74 0x74
+         0x70 0x3A 0x2F 0x2F 0x70 0x75 0x72 0x6C 0x2E 0x6F 0x72 0x67 0x2F 0x72
+         0x73 0x73 0x2F 0x31 0x2E 0x30 0x2F
+         ("<code>http://purl.org/rss/1.0/</code>"), increment
+         <var>s</var> by 24 and enter loop <var>N</var>:
+
+         <ol>
+          <li>
+           If <var>sequence</var>[<var>s</var>] is undefined, the
+           <a>computed MIME type</a> is the <a>supplied MIME
+           type</a>.
+
+           Abort these steps.
+
+          <li>
+           If <var>length</var> is greater than or equal to <var>s</var> + 43
+           and the forty-three <a>bytes</a> from
+           <var>sequence</var>[<var>s</var>] to
+           <var>sequence</var>[<var>s</var> + 42] are equal to 0x68 0x74 0x74
+           0x70 0x3A 0x2F 0x2F 0x77 0x77 0x77 0x2E 0x77 0x33 0x2E 0x6F 0x72
+           0x67 0x2F 0x31 0x39 0x39 0x39 0x2F 0x30 0x32 0x2F 0x32 0x32 0x2D
+           0x72 0x64 0x66 0x2D 0x73 0x79 0x6E 0x74 0x61 0x78 0x2D 0x6E 0x73
+           0x23
+           ("<code>http://www.w3.org/1999/02/22-rdf-syntax-ns#</code>"),
+           the <a>computed MIME type</a> is
+           "<code>application/rss+xml</code>".
+
+           Abort these steps.
+
+          <li>
+           Increment <var>s</var> by 1.
+         </ol>
+
+        <li>
+         If <var>length</var> is greater than or equal to <var>s</var> + 24
+         and the twenty-four <a>bytes</a> from
+         <var>sequence</var>[<var>s</var>] to
+         <var>sequence</var>[<var>s</var> + 23] are equal to 0x68 0x74 0x74
+         0x70 0x3A 0x2F 0x2F 0x77 0x77 0x77 0x2E 0x77 0x33 0x2E 0x6F 0x72 0x67
+         0x2F 0x31 0x39 0x39 0x39 0x2F 0x30 0x32 0x2F 0x32 0x32 0x2D 0x72 0x64
+         0x66 0x2D 0x73 0x79 0x6E 0x74 0x61 0x78 0x2D 0x6E 0x73 0x23
+         ("<code>http://www.w3.org/1999/02/22-rdf-syntax-ns#</code>"),
+         increment <var>s</var> by 24 and enter loop <var>N</var>:
+
+         <ol>
+          <li>
+           If <var>sequence</var>[<var>s</var>] is undefined, the
+           <a>computed MIME type</a> is the <a>supplied MIME
+           type</a>.
+
+           Abort these steps.
+
+          <li>
+           If <var>length</var> is greater than or equal to <var>s</var> + 43
+           and the forty-three <a>bytes</a> from
+           <var>sequence</var>[<var>s</var>] to
+           <var>sequence</var>[<var>s</var> + 42] are equal to 0x68 0x74 0x74
+           0x70 0x3A 0x2F 0x2F 0x70 0x75 0x72 0x6C 0x2E 0x6F 0x72 0x67 0x2F
+           0x72 0x73 0x73 0x2F 0x31 0x2E 0x30 0x2F
+           ("<code>http://purl.org/rss/1.0/</code>"), the <a>computed
+           MIME type</a> is "<code>application/rss+xml</code>".
+
+           Abort these steps.
+
+          <li>
+           Increment <var>s</var> by 1.
+         </ol>
+
+        <li>
+         Increment <var>s</var> by 1.
+       </ol>
+
+      <li>
+       The <a>computed MIME type</a> is the <a>supplied MIME
+       type</a>.
+
+       Abort these steps.
+     </ol>
+   </ol>
+
+  <li>
+   The <a>computed MIME type</a> is the <a>supplied MIME type</a>.
+ </ol>
+
+<p class=note>
+ It might be more efficient for the user agent to implement the <a>rules
+ for distinguishing if a resource is a feed or HTML</a> in parallel with
+ its algorithm for detecting the character encoding of an HTML document.
+
+
+
+<h2 id=context-specific-sniffing>Context-specific sniffing</h2>
+
+<p class=XXX>
+ A <dfn>context</dfn> is ….
+
+<p>
+ In certain <a>contexts</a>, it is only useful to identify
+ <a>resources</a> that belong to a certain subset of
+ <a>MIME types</a>.
+
+ In such <a>contexts</a>, it is appropriate to use a
+ <a>context-specific sniffing algorithm</a> in place of the <a>MIME
+ type sniffing algorithm</a> in order to determine the <a>computed MIME
+ type</a> of a <a>resource</a>.
+
+<p>
+ A <dfn>context-specific sniffing algorithm</dfn> determines the
+ <a>computed MIME type</a> of a <a>resource</a> only if the
+ <a>resource</a> is a <a>MIME type</a> relevant to a particular
+ <a>context</a>.
+
+
+
+<h3 id=sniffing-in-a-browsing-context>Sniffing in a browsing context</h3>
+
+<p class=XXX>
+ Use the <a>MIME type sniffing algorithm</a>.
+
+
+
+<h3 id=sniffing-in-an-image-context>Sniffing in an image context</h3>
+
+<p>
+ To determine the <a>computed MIME type</a> of a <a>resource</a>
+ with an <a>image MIME type</a>, execute the following <dfn>rules for
+ sniffing images specifically</dfn>:
+
+ <ol>
+  <li>
+   If the <a>supplied MIME type</a> is an <a>XML MIME type</a>, the
+   <a>computed MIME type</a> is the <a>supplied MIME type</a>.
+
+   Abort these steps.
+
+  <li>
+   Let <var>image-type-matched</var> be the result of executing the
+   <a>image type pattern matching algorithm</a> with the <a>resource
+   header</a> as the <a>byte sequence</a> to be matched.
+
+  <li>
+   If <var>image-type-matched</var> is not undefined, the <a>computed MIME
+   type</a> is <var>image-type-matched</var>.
+
+   Abort these steps.
+
+  <li>
+   The <a>computed MIME type</a> is the <a>supplied MIME
+   type</a>.
+ </ol>
+
+
+
+<h3 id=sniffing-in-an-audio-or-video-context>Sniffing in an audio or video context</h3>
+
+<p>
+ To determine the <a>computed MIME type</a> of a <a>resource</a>
+ with an <a>audio or video MIME type</a>, execute the following <dfn>rules
+ for sniffing audio and video specifically</dfn>:
+
+ <ol>
+  <li>
+   If the <a>supplied MIME type</a> is an <a>XML MIME type</a>, the
+   <a>computed MIME type</a> is the <a>supplied MIME type</a>.
+
+   Abort these steps.
+
+  <li>
+   Let <var>audio-or-video-type-matched</var> be the result of executing the
+   <a>audio or video type pattern matching algorithm</a> with the
+   <a>resource header</a> as the <a>byte sequence</a> to be
+   matched.
+
+  <li>
+   If <var>audio-or-video-type-matched</var> is not undefined, the
+   <a>computed MIME type</a> is <var>audio-or-video-type-matched</var>.
+
+   Abort these steps.
+
+  <li>
+   The <a>computed MIME type</a> is the <a>supplied MIME
+   type</a>.
+ </ol>
+
+
+
+<h3 id=sniffing-in-a-plugin-context>Sniffing in a plugin context</h3>
+
+<p>
+ To determine the <a>computed MIME type</a> of a <a>resource</a>
+ <a lt=fetch for=/>fetched</a> in a plugin context, execute
+ the following <dfn>rules for sniffing in a plugin context</dfn>:
+
+ <ol>
+  <li class=XXX>
+   If the <a>supplied MIME type</a> is undefined, the <a>computed
+   MIME type</a> is "<code>application/octet-stream</code>".
+
+  <li>
+   The <a>computed MIME type</a> is the <a>supplied MIME type</a>.
+ </ol>
+
+
+
+<h3 id=sniffing-in-a-style-context>Sniffing in a style context</h3>
+
+<p>
+ To determine the <a>computed MIME type</a> of a <a>resource</a>
+ <a lt=fetch for=/>fetched</a> in a style context, execute the
+ following <dfn>rules for sniffing in a style context</dfn>:
+
+ <ol>
+  <li class=XXX>
+   If the <a>supplied MIME type</a> is undefined, ….
+
+  <li>
+   The <a>computed MIME type</a> is the <a>supplied MIME type</a>.
+ </ol>
+
+
+
+<h3 id=sniffing-in-a-script-context>Sniffing in a script context</h3>
+
+<p>
+ To determine the <a>computed MIME type</a> of a <a>resource</a>
+ <a lt=fetch for=/>fetched</a> in a script context, execute
+ the following <dfn>rules for sniffing in a script context</dfn>:
+
+ <ol>
+  <li class=XXX>
+   If the <a>supplied MIME type</a> is undefined, ….
+
+  <li>
+   The <a>computed MIME type</a> is the <a>supplied MIME type</a>.
+ </ol>
+
+
+
+<h3 id=sniffing-in-a-font-context>Sniffing in a font context</h3>
+
+<p>
+ To determine the <a>computed MIME type</a> of a <a>resource</a>
+ with a <a>font MIME type</a>, execute the following <dfn>rules for sniffing
+ fonts specifically</dfn>:
+
+ <ol>
+  <li>
+   If the <a>supplied MIME type</a> is an <a>XML MIME type</a>, the
+   <a>computed MIME type</a> is the <a>supplied MIME type</a>.
+
+   Abort these steps.
+
+  <li>
+   Let <var>font-type-matched</var> be the result of executing the <a>font
+   type pattern matching algorithm</a> with the <a>resource
+   header</a> as the <a>byte sequence</a> to be matched.
+
+  <li>
+   If <var>font-type-matched</var> is not undefined, the <a>computed MIME
+   type</a> is <var>font-type-matched</var>.
+
+   Abort these steps.
+
+  <li>
+   The <a>computed MIME type</a> is the <a>supplied MIME
+   type</a>.
+ </ol>
+
+
+
+<h3 id=sniffing-in-a-text-track-context>Sniffing in a text track context</h3>
+
+<p class=XXX>
+ The <a>computed MIME type</a> is "<code>text/vtt</code>".
+
+
+
+<h3 id=sniffing-in-a-cache-manifest-context>Sniffing in a cache manifest context</h3>
+
+<p class=XXX>
+ The <a>computed MIME type</a> is
+ "<code>text/cache-manifest</code>".
+
+
+
+<h2 class=no-num id=acknowledgements>Acknowledgments</h2>
+
+<p>
+ Special thanks to Adam Barth and Ian Hickson for maintaining previous
+ incarnations of this document.
+
+<p>
+ Thanks also to
+ Alfred Hönes,
+ Anne van Kesteren,
+ Boris Zbarsky,
+ David Singer,
+ Domenic Denicola,
+ Henri Sivonen,
+ Jonathan Neal,
+ Joshua Cranmer,
+ Larry Masinter,
+ 罗泽轩,
+ Mariko Kosaka,
+ Mark Pilgrim,
+ Paul Adenot,
+ Peter Occil,
+ Russ Cox,
+ Simon Pieters, and
+ triple-underscore
+ for their invaluable contributions.
+
+<p>This standard is written by <a href=https://gphemsley.org/>Gordon P. Hemsley</a>
+(<a href=mailto:me@gphemsley.org>me@gphemsley.org</a>).

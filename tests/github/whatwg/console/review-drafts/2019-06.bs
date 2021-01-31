@@ -1,0 +1,589 @@
+<pre class="metadata">
+Group: WHATWG
+Date: 2019-06-17
+H1: Console
+Shortname: console
+Text Macro: TWITTER consolelog
+Abstract: This specification defines APIs for console debugging facilities.
+Translation: ja https://triple-underscore.github.io/console-ja.html
+Indent: 2
+Markup Shorthands: markdown yes
+</pre>
+
+<pre class="link-defaults">
+spec:infra; type:dfn; text:list
+spec:infra; type:dfn; text:string
+</pre>
+
+<pre class="anchors">
+urlPrefix: https://tc39.github.io/ecma262/#; spec: ECMASCRIPT
+  type: abstract-op
+    text: ObjectCreate; url: sec-objectcreate
+    text: Type; url: sec-ecmascript-data-types-and-values
+    text: ToString; url: sec-tostring
+    text: Call; url: sec-call
+  type: interface
+    text: %ObjectPrototype%; url: sec-properties-of-the-object-prototype-object
+  type: constructor
+    text: %String%; url: sec-string-constructor
+  type: dfn
+    text: %parseFloat%; url: sec-parsefloat-string
+    text: %parseInt%; url: sec-parseint-string-radix
+</pre>
+
+<h2 id="status" class="no-num no-toc">Status</h2>
+
+This specification is an early work in progress that welcomes feedback to refine toward more
+precise and compatible definitions. It is also the editors' first specification, so please be kind
+and constructive.
+
+Please join us in the <a href="https://github.com/whatwg/console/issues">issue tracker</a> for more
+discussion.
+
+<h2 id="console-namespace" oldids="console-interface">Namespace {{console}}</h2>
+
+<pre class="idl">
+[Exposed=(Window,Worker,Worklet)]
+namespace console { // but see namespace object requirements below
+  // Logging
+  void assert(optional boolean condition = false, any... data);
+  void clear();
+  void debug(any... data);
+  void error(any... data);
+  void info(any... data);
+  void log(any... data);
+  void table(any tabularData, optional sequence&lt;DOMString> properties);
+  void trace(any... data);
+  void warn(any... data);
+  void dir(any item, optional object? options);
+  void dirxml(any... data);
+
+  // Counting
+  void count(optional DOMString label = "default");
+  void countReset(optional DOMString label = "default");
+
+  // Grouping
+  void group(any... data);
+  void groupCollapsed(any... data);
+  void groupEnd();
+
+  // Timing
+  void time(optional DOMString label = "default");
+  void timeLog(optional DOMString label = "default", any... data);
+  void timeEnd(optional DOMString label = "default");
+};
+</pre>
+
+<p class="note">
+  For historical reasons, {{console}} is lowercased.
+</p>
+
+<p class="note">
+  It is important that {{console}} is always visible and usable to scripts, even if the developer
+  console has not been opened or does not exist.
+</p>
+
+For historical web-compatibility reasons, the <a>namespace object</a> for {{console}} must have as
+its \[[Prototype]] an empty object, created as if by
+<a abstract-op>ObjectCreate</a>({{%ObjectPrototype%}}), instead of {{%ObjectPrototype%}}.
+
+<h3 id="logging">Logging methods</h3>
+
+<h4 id="assert" oldids="assert-condition-data,dom-console-assert" method for="console">assert(|condition|, ...|data|)</h4>
+
+1. If |condition| is true, return.
+1. Let |message| be a string without any formatting specifiers indicating generically an assertion
+   failure (such as "Assertion failed").
+1. If |data| is [=list/is empty|empty=], [=list/append=] |message| to |data|.
+1. Otherwise:
+  1. Let |first| be |data|[0].
+  1. If <a abstract-op>Type</a>(|first|) is not String, then [=list/prepend=] |message| to |data|.
+  1. Otherwise:
+    1. Let |concat| be the concatenation of |message|, U+003A (:), U+0020 SPACE, and |first|.
+    1. Set |data|[0] to |concat|.
+1. Perform <a abstract-op>Logger</a>("assert", |data|).
+
+<h4 id="clear" oldids="dom-console-clear" method for="console">clear()</h4>
+
+1. [=stack/Empty=] the appropriate <a>group stack</a>.
+1. If possible for the environment, clear the console. (Otherwise, do nothing.)
+
+<h4 id="debug" oldids="debug-data,dom-console-debug" method for="console">debug(...|data|)</h4>
+
+1. Perform <a abstract-op>Logger</a>("debug", |data|).
+
+<h4 id="error" oldids="error-data,dom-console-error" method for="console">error(...|data|)</h4>
+
+1. Perform <a abstract-op>Logger</a>("error", |data|).
+
+<h4 id="info" oldids="info-data,dom-console-info" method for="console">info(...|data|)</h4>
+
+1. Perform <a abstract-op>Logger</a>("info", |data|).
+
+<h4 id="log" oldids="log-data,dom-console-log" method for="console">log(...|data|)</h4>
+
+1. Perform <a abstract-op>Logger</a>("log", |data|).
+
+<h4 id="table" oldids="table-tabulardata-properties,dom-console-table" method for="console">table(|tabularData|, |properties|)</h4>
+
+Try to construct a table with the columns of the properties of |tabularData| (or use
+|properties|) and rows of |tabularData| and log it with a logLevel of "log". Fall
+back to just logging the argument if it can't be parsed as tabular.
+
+<p class="XXX">TODO: This will need a good algorithm.</p>
+
+<h4 id="trace" oldids="trace-data,dom-console-trace" method for="console">trace(...|data|)</h4>
+
+1. Let |trace| be some implementation-specific, potentially-interactive representation of the
+   callstack from where this method was called.
+1. Optionally, let |formattedData| be the result of <a abstract-op>Formatter</a>(|data|), and
+   incorporate |formattedData| as a label for |trace|.
+1. Perform <a abstract-op>Printer</a>("trace", « |trace| »).
+
+<p class="note">
+  The identifier of a function printed in a stack trace is implementation-dependant. It is also not
+  guaranteed to be the same identifier that would be seen in `new Error().stack`.
+</p>
+
+<h4 id="warn" oldids="warn-data,dom-console-warn" method for="console">warn(...|data|)</h4>
+
+1. Perform <a abstract-op>Logger</a>("warn", |data|).
+
+<h4 id="dir" method for="console">dir(|item|, |options|)</h4>
+
+1. Let |object| be |item| with <a>generic JavaScript object formatting</a> applied.
+1. Perform <a abstract-op>Printer</a>("dir", « |object| », |options|).
+
+<h4 id="dirxml" method for="console">dirxml(...|data|)</h4>
+
+1. Let |finalList| be a new <a>list</a>, initially empty.
+1. [=list/For each=] |item| of |data|:
+  1. Let |converted| be a DOM tree representation of |item| if possible; otherwise let
+    |converted| be |item| with <a>optimally useful formatting</a> applied.
+  1. Append |converted| to |finalList|.
+1. Perform <a abstract-op>Logger</a>("dirxml", |finalList|).
+
+<h3 id="counting">Counting methods</h3>
+
+Each {{console}} namespace object has an associated <dfn>count map</dfn>, which is a <a>map</a> of
+<a>strings</a> to numbers, initially empty.
+
+<h4 id="count" oldids="count-label,dom-console-count" method for="console">count(|label|)</h4>
+
+1. Let |map| be the associated <a>count map</a>.
+1. If |map|[|label|] [=map/exists=], [=map/set=] |map|[|label|] to |map|[|label|] + 1.
+1. Otherwise, [=map/set=] |map|[|label|] to 1.
+1. Let |concat| be the concatenation of |label|, U+003A (:), U+0020 SPACE, and
+   <a abstract-op>ToString</a>(|map|[|label|]).
+1. Perform <a abstract-op>Logger</a>("count", « |concat| »).
+
+<h4 id="countreset" method for="console">countReset(|label|)</h4>
+
+1. Let |map| be the associated <a>count map</a>.
+1. If |map|[|label|] [=map/exists=], [=map/set=] |map|[|label|] to 0.
+1. Otherwise:
+  1. Let |message| be a string without any formatting specifiers indicating generically that the
+    given label does not have an associated count.
+  1. Perform <a abstract-op>Logger</a>("countReset", « |message| »);
+
+<h3 id="grouping">Grouping methods</h3>
+
+A <dfn id="concept-group">group</dfn> is an implementation-specific, potentially-interactive view
+for output produced by calls to <a abstract-op>Printer</a>, with one further level of indentation
+than its parent. Each {{console}} namespace object has an associated <dfn>group stack</dfn>, which
+is a <a>stack</a>, initially empty. Only the last <a>group</a> in a <a>group stack</a> will host
+output produced by calls to <a abstract-op>Printer</a>.
+
+<h4 id="group" oldids="group-data,dom-console-group" method for="console">group(...|data|)</h4>
+
+1. Let |group| be a new <a>group</a>.
+1. If |data| is not [=list/is empty|empty=], let |groupLabel| be the result of
+   <a abstract-op>Formatter</a>(|data|). Otherwise, let |groupLabel| be an implementation-chosen
+   label representing a <a>group</a>.
+1. Incorporate |groupLabel| as a label for |group|.
+1. Optionally, if the environment supports interactive groups, |group| should be expanded by
+   default.
+1. Perform <a abstract-op>Printer</a>("group", « |group| »).
+1. <a>Push</a> |group| onto the appropriate <a>group stack</a>.
+
+<h4 id="groupcollapsed" oldids="groupcollapsed-data,dom-console-groupcollapsed" method for="console">groupCollapsed(...|data|)</h4>
+
+1. Let |group| be a new <a>group</a>.
+1. If |data| is not empty, let |groupLabel| be the result of
+   <a abstract-op>Formatter</a>(|data|). Otherwise, let |groupLabel| be an implementation-chosen
+   label representing a <a>group</a>.
+1. Incorporate |groupLabel| as a label for |group|.
+1. Optionally, if the environment supports interactive groups, |group| should be collapsed by
+   default.
+1. Perform <a abstract-op>Printer</a>("groupCollapsed", « |group| »).
+1. <a>Push</a> |group| onto the appropriate <a>group stack</a>.
+
+<h4 id="groupend" oldids="dom-console-groupend" method for="console">groupEnd()</h4>
+
+1. <a>Pop</a> the last <a>group</a> from the <a>group stack</a>.
+
+<h3 id="timing">Timing methods</h3>
+
+Each {{console}} namespace object has an associated <dfn>timer table</dfn>, which is a <a>map</a> of
+<a>strings</a> to times, initially empty.
+
+<h4 id="time" oldids="time-label,dom-console-time" method for="console">time(|label|)</h4>
+
+1. If the associated <a>timer table</a> [=map/contains=] an entry with key |label|, return,
+   optionally reporting a warning to the console indicating that a timer with label |label| has
+   already been started.
+1. Otherwise, [=map/set=] the value of the entry with key |label| in the associated
+   <a>timer table</a> to the current time.
+
+<h4 id="timelog" method for="console">timeLog(|label|, ...|data|)</h4>
+
+1. Let |timerTable| be the associated <a>timer table</a>.
+1. Let |startTime| be |timerTable|[|label|].
+1. Let |duration| be a string representing the difference between the current time and
+   |startTime|, in an implementation-defined format.
+   <p class="example" id="duration-string-example">"4650", "4650.69 ms", "5 seconds", and "00:05"
+   are all reasonable ways of displaying a 4650.69 ms duration.</p>
+1. Let |concat| be the concatenation of |label|, U+003A (:), U+0020 SPACE, and |duration|.
+1. [=list/prepend|Prepend=] |concat| to |data|.
+1. Perform <a abstract-op>Printer</a>("timeLog", data).
+
+<div class="example" id="timelog-example">
+  The |data| parameter in calls to {{console/timeLog()}} is included in the call to
+  <a abstract-op>Logger</a> to make it easier for users to supply intermediate timer logs with
+  some extra data throughout the life of a timer. For example:
+
+  <pre><code class="lang-javascript">
+    console.time("MyTimer");
+    console.timeLog("MyTimer", "Starting application up…");
+    // Perhaps some code runs to bootstrap a complex app
+    // ...
+    console.timeLog("MyTimer", "UI is setup, making API calls now");
+    // Perhaps some fetch()'s here filling the app with data
+    // ...
+    console.timeEnd("MyTimer");
+  </code></pre>
+</div>
+
+<h4 id="timeend" oldids="timeend-label,dom-console-timeend" method for="console">timeEnd(|label|)</h4>
+
+1. Let |timerTable| be the associated <a>timer table</a>.
+1. Let |startTime| be |timerTable|[|label|].
+1. [=map/Remove=] |timerTable|[|label|].
+1. Let |duration| be a string representing the difference between the current time and
+   |startTime|, in an implementation-defined format.
+1. Let |concat| be the concatenation of |label|, U+003A (:), U+0020 SPACE, and |duration|.
+1. Perform <a abstract-op>Printer</a>("timeEnd", « |concat| »).
+
+<p class="note">See <a href="https://github.com/whatwg/console/issues/134">whatwg/console#134</a>
+for plans to make {{console/timeEnd()}} and {{console/timeLog()}} formally report warnings to the
+console when a given |label| does not exist in the associated <a>timer table</a>.
+</p>
+
+<h2 id="supporting-ops">Supporting abstract operations</h2>
+
+<h3 id="logger" abstract-op lt="Logger">Logger(|logLevel|, |args|)</h3>
+
+The logger operation accepts a log level and a [=list=] of other arguments. Its main output is the
+implementation-defined side effect of printing the result to the console. This specification
+describes how it processes format specifiers while doing so.
+
+1. If |args| is [=list/is empty|empty=], return.
+1. Let |first| be |args|[0].
+1. Let |rest| be all elements following |first| in |args|.
+1. If |rest| is [=list/is empty|empty=], perform
+   <a abstract-op>Printer</a>(|logLevel|, « |first| ») and return.
+1. If |first| does not contain any format specifiers, perform
+   <a abstract-op>Printer</a>(|logLevel|, |args|).
+1. Otherwise, perform <a abstract-op>Printer</a>(|logLevel|, <a abstract-op>Formatter</a>(|args|)).
+1. Return *undefined*.
+
+<div class="note">
+  It's important that the printing occurs before returning from the algorithm. Many developer
+  consoles print the result of the last operation entered into them. In such consoles, when a
+  developer enters `console.log("hello!")`, this will first print "hello!", then the
+  undefined return value from the console.log call.
+
+  <img alt="Indicating that printing is done before return" src="images/print-before-returning.png">
+</div>
+
+<h3 id="formatter" abstract-op lt="Formatter">Formatter(|args|)</h3>
+
+The formatter operation tries to format the first argument provided, using the other arguments. It
+will try to format the input until no formatting specifiers are left in the first argument, or no
+more arguments are left. It returns a [=list=] of objects suitable for printing.
+
+1. Let |target| be the first element of |args|.
+1. Let |current| be the second element of |args|.
+1. Find the first possible format specifier |specifier|, from the left to the right in |target|.
+  1. If |specifier| is `%s`, let |converted| be the result of
+     [$Call$](<a idl>%String%</a>, **undefined**, « |current| »).
+  1. If |specifier| is `%d` or `%i`:
+    1. If [$Type$](|current|) is Symbol, let |converted| be `NaN`
+    1. Otherwise, let |converted| be the result of
+      [$Call$]([=%parseInt%=], **undefined**, « |current|, 10 »).
+  1. If |specifier| is `%f`:
+    1. If [$Type$](|current|) is Symbol, let |converted| be `NaN`
+    1. Otherwise, let |converted| be the result of
+      [$Call$]([=%parseFloat%=], **undefined**, « |current| »).
+  1. If |specifier| is `%o`, optionally let |converted| be |current| with
+     <a>optimally useful formatting</a> applied.
+  1. If |specifier| is `%O`, optionally let |converted| be |current| with
+     <a>generic JavaScript object formatting</a> applied.
+  1. <p class="XXX">TODO: process %c</p>
+  1. If any of the previous steps set |converted|, replace |specifier| in |target| with
+     |converted|.
+  1. Let |result| be a [=list=] containing |target| together with the elements of |args| starting
+     from the third onward.
+1. If |target| does not have any format specifiers left, return |result|.
+1. If |result|'s [=list/size=] is 1, return |result|.
+1. Return <a abstract-op>Formatter</a>(|result|).
+
+<h4 id="formatting-specifiers">Summary of formatting specifiers</h4>
+
+The following is an informative summary of the format specifiers processed by the above algorithm.
+
+<table>
+  <thead>
+    <tr>
+      <th>Specifier</th>
+      <th>Purpose</th>
+      <th>Type Conversion</th>
+    </tr>
+  </thead>
+  <tr>
+    <td>`%s`</td>
+    <td>Element which substitutes is converted to a string</td>
+    <td><a idl>%String%</a>(|element|)</td>
+  </tr>
+  <tr>
+    <td>`%d` or `%i`</td>
+    <td>Element which substitutes is converted to an integer</td>
+    <td><a>%parseInt%</a>(|element|, 10)</td>
+  </tr>
+  <tr>
+    <td>`%f`</td>
+    <td>Element which substitutes is converted to a float</td>
+    <td><a>%parseFloat%</a>(|element|, 10)</td>
+  </tr>
+  <tr>
+    <td>`%o`</td>
+    <td>Element is displayed with <a>optimally useful formatting</a></td>
+    <td>n/a</td>
+  </tr>
+  <tr>
+    <td>`%O`</td>
+    <td>Element is displayed with <a>generic JavaScript object formatting</a></td>
+    <td>n/a</td>
+  </tr>
+  <tr>
+    <td>`%c`</td>
+    <td>Applies provided CSS</td>
+    <td>n/a</td>
+  </tr>
+</table>
+
+<h3 id="printer" abstract-op lt="Printer">Printer(|logLevel|, |args|[, |options|])</h3>
+
+The printer operation is implementation-defined. It accepts a log level indicating severity, a List
+of arguments to print, and an optional object of implementation-specific formatting options.
+Elements appearing in |args| will be one of the following:
+
+- JavaScript objects of any type.
+- Implementation-specific representations of printable things such as a stack trace or <a>group</a>.
+- Objects with either <a>generic JavaScript object formatting</a> or
+  <a>optimally useful formatting</a> applied.
+
+If the |options| object is passed, and is not undefined or null, implementations may use |options|
+to apply implementation-specific formatting to the elements in |args|.
+
+How the implementation prints |args| is up to the implementation, but implementations should
+separate the objects by a space or something similar, as that has become a developer expectation.
+
+By the time the printer operation is called, all format specifiers will have been taken into
+account, and any arguments that are meant to be consumed by format specifiers will not be present in
+|args|. The implementation's job is simply to print the List. The output produced by calls to
+Printer should appear only within the last <a>group</a> on the appropriate <a>group stack</a> if the
+<a>group stack</a> is not empty, or elsewhere in the console otherwise.
+
+If the console is not open when the printer operation is called, implementations should buffer
+messages to show them in the future up to an implementation-chosen limit (typically on the order of
+at least 100).
+
+<h4 id="loglevel-severity">Indicating |logLevel| severity</h4>
+
+Each {{console}} method uses a unique value for the |logLevel| parameter when calling
+Printer, allowing implementations to customize each printed message depending on the method from
+which it originated. However, it is common practice to group together certain methods and treat
+their output similarly, in four broad categories. This table summarizes these common groupings:
+
+<table>
+  <thead>
+    <tr>
+      <th>Grouping</th>
+      <th>{{console}} methods</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tr>
+    <td>log</td>
+    <td>
+      {{console/log()}}, {{console/trace()}}, {{console/dir()}}, {{console/dirxml()}},
+      {{console/group()}}, {{console/groupCollapsed()}}, {{console/debug()}}, {{console/timeLog()}}
+    </td>
+    <td>
+      A generic log
+    </td>
+  </tr>
+  <tr>
+    <td>info</td>
+    <td>{{console/count()}}, {{console/info()}}, {{console/timeEnd()}}</td>
+    <td>
+      An informative log
+    </td>
+  </tr>
+  <tr>
+    <td>warn</td>
+    <td>
+      {{console/warn()}}, {{console/countReset()}}
+    </td>
+    <td>
+      A log warning the user of something indicated by the message
+    </td>
+  </tr>
+  <tr>
+    <td>error</td>
+    <td>{{console/error()}}, {{console/assert()}}</td>
+    <td>
+      A log indicating an error to the user
+    </td>
+  </tr>
+</table>
+
+These groupings are meant to document common practices, and do not constrain implementations from
+providing special behavior for each method, as in the following examples:
+
+<div class="example" id="timeEnd-formatting">
+  Here you can see one implementation chose to make output produced by calls to
+  {{console/timeEnd()}} blue, while leaving {{console/info()}} a more neutral color.
+
+  <img alt="A demonstration of timeEnd and info formatting differences" src="images/timeEnd-formatting.png">
+</div>
+
+<div class="example" id="count-output">
+  Calls to {{console/count()}} might not always print new output, but instead could update
+  previously-output counts.
+
+  <img alt="A demonstration of count behavior" src="images/edge-Count.png">
+</div>
+
+<h4 id="printer-ux-innovation">Printer user experience innovation</h4>
+
+Since <a abstract-op>Printer</a> is implementation-defined, it is common to see UX innovations in
+its implementations. The following is a non-exhaustive list of potential UX enhancements:
+
+<ul>
+  <li>
+    <p>De-duplication of identical output to prevent spam.</p>
+    <div class="example" id="dedupe-example">
+      In this example, the implementation not only batches multiple identical messages, but also
+      provides the number of messages that have been batched together.
+
+      <img alt="A demonstration of console message de-duplication" src="images/dedupe.png">
+    </div>
+  </li>
+  <li>
+    <p>Extra UI off to the side allowing the user to filter messages by log level severity.</p>
+    <div class="example" id="severity-filter-example">
+      <img alt="" src="images/severity-filter.png">
+    </div>
+  </li>
+  <li>
+    Extra UI off to the side indicating the current state of the <a>timer table</a>,
+    <a>group stack</a>, or other internally maintained data.
+  </li>
+  <li>Flashing portions of the console to alert the user of something important.</li>
+</ul>
+
+<h4 id="object-formats">Common object formats</h4>
+
+Typically objects will be printed in a format that is suitable for their context. This section
+describes common ways in which objects are formatted to be most useful in their context. It should
+be noted that the formatting described in this section is applied to implementation-specific object
+representations that will eventually be passed into <a abstract-op>Printer</a>, where the actual
+side effect of formatting will be seen.
+
+An object with <dfn>generic JavaScript object formatting</dfn> is a potentially expandable
+representation of a generic JavaScript object. An object with
+<dfn>optimally useful formatting</dfn> is an implementation-specific, potentially-interactive
+representation of an object judged to be maximally useful and informative.
+
+<h4 id="nodejs-printer">Example printer in Node.js</h4>
+
+<div class="example" id="nodejs-printer-example">
+  The simplest way to implement the printer operation on the Node.js platform is to join the
+  previously formatted arguments separated by a space and write the output to `stdout`
+  or `stderr`.
+
+  Example implementation in Node.js using [[!ECMASCRIPT]]:
+
+  <pre><code class="lang-javascript">
+    const util = require('util');
+
+    function print(logLevel, ...args) {
+      const message = util.format(...args);
+
+      if (logLevel === 'error') {
+        process.stderr.write(message + '\n');
+      } else if (logLevel === 'log' || logLevel === 'info' || logLevel === 'warn') {
+        process.stdout.write(message + '\n');
+      }
+    }
+  </code></pre>
+
+  Here a lot of the work is done by the `util.format` function. It stringifies nested objects, and
+  converts non-string arguments into a readable string version, e.g. undefined becomes the string
+  "undefined" and false becomes "false":
+
+  <pre><code class="lang-javascript">
+    print('log', 'duck', [{foo: 'bar'}]);     // prints: `duck [ { foo: 'bar' } ]\n` on stdout
+    print('log', 'duck', false);              // prints: `duck false\n` on stdout
+    print('log', 'duck', undefined);          // prints: `duck undefined\n` on stdout
+  </code></pre>
+</div>
+
+<h3 id="reporting-warnings">Reporting warnings to the console</h3>
+
+To <dfn export>report a warning to the console</dfn> given a generic description of a warning
+|description|, implementations must run these steps:
+
+1. Let |warning| be an implementation-defined string derived from |description|.
+1. Perform <a abstract-op>Printer</a>("reportWarning", « |warning| »).
+
+<h2 id="acks" class="no-num">Acknowledgments</h2>
+
+The editors would like to thank
+Boris Zbarsky,
+Brent S.A. Cowgill,
+Brian Grinstead,
+Corey Farwell,
+Ian Kilpatrick,
+Jeff Carpenter,
+Joseph Pecoraro,
+Justin Woo,
+Luc Martin,
+Noah Bass,
+Paul Irish,
+Raphaël, and
+Victor Costan
+for their contributions to this specification. You are awesome!
+
+This standard is written by
+<a href="https://terinstock.com">Terin Stock</a>
+(<a href="mailto:terin@terinstock.com">terin@terinstock.com</a>),
+<a href="http://kowalski.gd">Robert Kowalski</a>
+(<a href="mailto:rok@kowalski.gd">rok@kowalski.gd</a>), and
+<a href="https://domfarolino.com">Dominic Farolino</a>
+(<a href="mailto:domfarolino@gmail.com">domfarolino@gmail.com</a>)
+with major help from <a href="https://domenic.me/">Domenic Denicola</a>
+(<a href="https://google.com">Google</a>,
+<a href="mailto:d@domenic.me">d@domenic.me</a>).

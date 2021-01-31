@@ -1,0 +1,2016 @@
+<pre class='metadata'>
+Status: CG-DRAFT
+Title: Text Fragments
+ED: https://wicg.github.io/scroll-to-text-fragment/
+Shortname: text-fragments
+Level: 1
+Editor: Nick Burris, Google https://www.google.com, nburris@chromium.org
+Editor: David Bokan, Google https://www.google.com, bokan@chromium.org
+Abstract: Text Fragments adds support for specifying a text snippet in the URL
+    fragment. When navigating to a URL with such a fragment, the user agent
+    can quickly emphasise and/or bring it to the user's attention.
+Group: wicg
+Repository: wicg/scroll-to-text-fragment
+Markup Shorthands: markdown yes
+WPT Display: inline
+</pre>
+
+<pre class='link-defaults'>
+spec:css-display-3; type:value; for:display; text:flex
+spec:css-display-3; type:value; for:display; text:grid
+spec:dom; type:dfn; for:/; text:element
+spec:html; type:element; text:link
+spec:html; type:dfn; for:/; text:origin
+spec:html; type:element; text:script
+spec:html; type:element; text:style
+spec:url; type:dfn; text:fragment
+</pre>
+
+<pre class="biblio">
+  {
+    "document-policy": {
+      "authors": [
+        "Ian Clelland"
+      ],
+      "href": "https://w3c.github.io/webappsec-permissions-policy/document-policy.html",
+      "title": "Document Policy",
+      "status": "ED",
+      "publisher": "W3C",
+      "deliveredBy": [
+        "https://www.w3.org/2011/webappsec/"
+      ]
+    },
+    "fetch-metadata": {
+      "authors": [
+        "Mike West"
+      ],
+      "href": "https://w3c.github.io/webappsec-fetch-metadata/",
+      "title": "Fetch Metadata Request Headers",
+      "status": "WD",
+      "publisher": "W3C",
+      "deliveredBy": [
+        "https://www.w3.org/TR/fetch-metadata/"
+      ]
+    }
+  }
+</pre>
+
+<h2 id=infrastructure>Infrastructure</h2>
+
+<p>This specification depends on the Infra Standard. [[!INFRA]]
+
+# Introduction # {#introduction}
+
+<div class='note'>This section is non-normative</div>
+
+## Use cases ## {#use-cases}
+
+### Web text references ### {#web-text-references}
+The core use case for text fragments is to allow URLs to serve as an exact text
+reference across the web. For example, Wikipedia references could link to the
+exact text they are quoting from a page. Similarly, search engines can serve
+URLs that direct the user to the answer they are looking for in the page rather
+than linking to the top of the page.
+
+### User sharing ### {#user-sharing}
+With text fragments, browsers may implement an option to 'Copy URL to here'
+when the user opens the context menu on a text selection. The browser can then
+generate a URL with the text selection appropriately specified, and the
+recipient of the URL will have the specified text conveniently indicated.
+Without text fragments, if a user wants to share a passage of text from a page,
+they would likely just copy and paste the passage, in which case the receiver
+loses the context of the page.
+
+# Description # {#description}
+
+## Indication ## {#indication}
+
+<div class='note'>This section is non-normative</div>
+
+This specification intentionally doesn't define what actions a user agent
+should or could take to "indicate" a text match. There are different
+experiences and trade-offs a user agent could make. Some examples of possible
+actions:
+
+* Providing visual emphasis or highlight of the text passage
+* Automatically scrolling the passage into view when the page is navigated
+* Activating a UA's find-in-page feature on the text passage
+* Providing a "Click to scroll to text passage" notification
+* Providing a notification when the text passage isn't found in the page
+
+<div class='note'>
+The choice of action can have implications for user security and privacy.  See
+the [[#security-and-privacy]] section for details.
+</div>
+
+## Syntax ## {#syntax}
+
+<div class='note'>This section is non-normative</div>
+
+A [=text fragment directive=] is specified in the [=fragment directive=] (see
+[[#the-fragment-directive]]) with the following format:
+<pre>
+#:~:text=[prefix-,]textStart[,textEnd][,-suffix]
+          context  |-------match-----|  context
+</pre>
+<em>(Square brackets indicate an optional parameter)</em>
+
+The text parameters are percent-decoded before matching. Dash (-), ampersand
+(&), and comma (,) characters in text parameters must be percent-encoded to
+avoid being interpreted as part of the text directive syntax.
+
+The only required parameter is textStart. If only textStart is specified, the
+first instance of this exact text string is the target text.
+
+<div class="example">
+<code>#:~:text=an%20example%20text%20fragment</code> indicates that the
+exact text "an example text fragment" is the target text.
+</div>
+
+If the textEnd parameter is also specified, then the text directive refers to a
+range of text in the page. The target text range is the text range starting at
+the first instance of textStart, until the first instance of textEnd that
+appears after textStart. This is equivalent to specifying the entire text range
+in the textStart parameter, but allows the URL to avoid being bloated with a
+long text directive.
+
+<div class="example">
+<code>#:~:text=an%20example,text%20fragment</code> indicates that the first
+instance of "an example" until the following first instance of "text fragment"
+is the target text.
+</div>
+
+### Context Terms ### {#context-terms}
+
+<div class='note'>This section is non-normative</div>
+
+The other two optional parameters are context terms. They are specified by the
+dash (-) character succeeding the prefix and preceding the suffix, to
+differentiate them from the textStart and textEnd parameters, as any
+combination of optional parameters may be specified.
+
+Context terms are used to disambiguate the target text fragment. The context
+terms can specify the text immediately before (prefix) and immediately after
+(suffix) the text fragment, allowing for whitespace.
+
+<div class="note">
+While the context terms must be the immediate text surrounding the target text
+fragment, any amount of whitespace is allowed between context terms and the
+text fragment. This helps allow context terms to be across element boundaries,
+for example if the target text fragment is at the beginning of a paragraph and
+it must be disambiguated by the previous element's text as a prefix.
+</div>
+
+The context terms are not part of the targeted text fragment and must not be
+visually indicated.
+
+<div class="example">
+<code>#:~:text=this%20is-,an%20example,-text%20fragment</code> would match
+to "an example" in "this is an example text fragment", but not match to "an
+example" in "here is an example text".
+</div>
+
+### BiDi Considerations ### {#bidi-considerations}
+
+<div class='note'>This section is non-normative</div>
+
+<div class='note'>
+  See <a
+  href="https://www.w3.org/International/articles/inline-bidi-markup/uba-basics.en">Unicode
+  Bidirectional Algorithm basics</a> for a good overview of how Bidirectional
+  text works.
+</div>
+
+Since URL strings are ASCII encoded, they provide no built-in support for
+bi-directional text. However, the content that we wish to target on a page may
+be LTR (left-to-right), RTL (right-to-left) or both (Bidirectional/BiDi). This
+section provides an intuitive description the behavior implicitly described by
+the normative sections further in this spec.
+
+The characters of each term in the text fragment are in <em>logical order</em>,
+that is, the order in which a native reader would read them in (and also the
+order in which characters are stored in memory).
+
+Similarly, the <code>prefix</code> and <code>textStart</code> terms identify
+text coming before another term in logical order, while <code>suffix</code> and
+<code>textEnd</code> follow other terms in logical order.
+
+Note: user agents may visually render URLs in a manner friendlier to a native
+reader, for example, by converting the displayed string to Unicode. However, the
+string representation of a URL remains plain ASCII characters.
+
+<div class="example">
+  Suppose we want to select the text <code>مِصر‎</code> (Egypt, in Arabic),
+  that's preceeded by <code>البحرين‎</code> (Bahrain, in Arabic). We would
+  first percent encode each term:
+
+  <code>مِصر‎</code> becomes "%D9%85%D8%B5%D8%B1" (Note: UTF-8 character
+  [0xD9,0x85] is the first (right-most) character of the Arabic word.)
+
+  <code>البحرين‎</code> becomes "%D8%A7%D9%84%D8%A8%D8%AD%D8%B1%D9%8A%D9%86"
+
+  The text fragment would then become:
+
+  <code>
+    :~:text=%D8%A7%D9%84%D8%A8%D8%AD%D8%B1%D9%8A%D9%86-,%D9%85%D8%B5%D8%B1
+  </code>
+
+  When displayed in a browser's address bar, the browser may visually render the
+  text in its natural RTL direction, appearing to the user:
+
+  <code>
+    :~:text=البحرين-,مِصر
+  </code>
+</div>
+
+## The Fragment Directive ## {#the-fragment-directive}
+
+To avoid compatibility issues with usage of existing URL fragments, this spec
+introduces the [=fragment directive=]. The [=fragment directive=] is a portion
+of the URL [=url/fragment=] that follows the [=fragment directive delimiter=].
+
+The <dfn>fragment directive delimiter</dfn> is the string ":~:", that is the
+three consecutive code points U+003A (:), U+007E (~), U+003A (:).
+
+<div class="note">
+  The [=fragment directive=] is part of the URL fragment. This means it must
+  always appear after a U+0023 (#) code point in a URL.
+</div>
+
+<div class="example">
+  To add a [=fragment directive=] to a URL like https://example.com, a fragment
+  must first be appended to the URL: https://example.com#:~:text=foo.
+</div>
+
+The fragment directive is meant to carry instructions, such as
+<code>text=</code>, for the UA rather than for the document.
+
+To prevent impacting page operation, it is stripped from a [=Document=]'s
+[=Document/URL=] so that author scripts can't directly interact with it. This
+also ensures future directives could be added without introducing breaking
+changes to existing content.  Potential examples could be: image-fragments,
+translation-hints.
+
+
+### Processing the fragment directive ### {#processing-the-fragment-directive}
+
+The fragment directive is processed and removed from the fragment whenever the
+UA sets the [=Document/URL=] on a [=Document=]. This is defined with the
+following additions and changes.
+
+To the definition of [=Document=], add:
+
+>   <strong>Monkeypatching [[DOM]]:</strong>
+>
+>   <em>
+>     Each document has an associated <dfn>fragment directive</dfn> which is
+>     either null or an ASCII string holding data used by the UA to process the
+>     resource. It is initially null.
+>   </em>
+
+Whenever the fragment directive is stripped from the URL, it is set to the
+Document's [=fragment directive=].
+
+Add a series of steps that will process a fragment directive on a [=Document/URL=]:
+
+>   <strong>Monkeypatching [[DOM]]:</strong>
+>
+>   To <dfn>process and consume fragment directive</dfn> from a [=/URL=]
+>   |url| and [=Document=] |document|, run these steps:
+>   1. Let |raw fragment| be equal to |url|'s [=url/fragment=].
+>   1. If |raw fragment| is non-null and contains the [=fragment directive
+>       delimiter=] as a substring:
+>       1. Let |fragmentDirectivePosition| be the index of the first instance
+>           of the [=fragment directive delimiter=] in |raw fragment|.
+>       1. Let |fragment| be the substring of |raw fragment| starting at 0 of
+>           count |fragmentDirectivePosition|.
+>       1. Advance |fragmentDirectivePosition| by the length of [=fragment
+>           directive delimiter=].
+>       1. Let |fragment directive| be the substring of |raw fragment| starting
+>           at |fragmentDirectivePosition|.
+>       1. Set |url|'s [=url/fragment=] to |fragment|.
+>       1. Set |document|'s [=fragment directive=] to |fragment directive|.
+>           <div class="note">This is stored on the document but currently not
+>           web-exposed</div>
+
+<div class="note">
+  These changes make a URL's fragment end at the [=fragment directive
+  delimiter=]. The [=fragment directive=] includes all characters that follow,
+  but not including, the delimiter.
+</div>
+
+<div class="example">
+<code>https://example.org/#test:~:text=foo</code> will be parsed such that
+the fragment is the string "test" and the [=fragment directive=] is the string
+"text=foo".
+</div>
+
+
+Amend the
+<a href="https://html.spec.whatwg.org/multipage/browsing-the-web.html#initialise-the-document-object">
+create and initialize a Document object</a> steps to parse and remove the
+[=fragment directive=] by inserting the following steps right before the
+setting |document|'s [=Document/URL=]
+(<a href="https://html.spec.whatwg.org/commit-snapshots/6ccb1ec8b8e79116880ea7a519d5a96fe8558afc/#initialise-the-document-object">currently</a>
+step 9):
+
+>   <strong>Monkeypatching [[HTML]]:</strong>
+>
+>   9. Run the [=process and consume fragment directive=] steps on
+>     |creationURL| and |document|.
+>   10. Set |document|'s [=Document/URL=] to be |creationURL|.
+
+Amend the
+<a href="https://html.spec.whatwg.org/multipage/browsing-the-web.html#traverse-the-history">
+traverse the history</a> steps to process the [=fragment directive=]
+during a history navigation by inserting steps before setting the |newDocument|'s URL (<a
+href="https://html.spec.whatwg.org/commit-snapshots/6ccb1ec8b8e79116880ea7a519d5a96fe8558afc/#traverse-the-history">currently</a>
+step 6).
+
+>   <strong>Monkeypatching [[HTML]]:</strong>
+>
+>   6. Let |processedURL| be a copy of <var ignore="">entry</var>'s URL.
+>   7. Run the [=process and consume fragment directive=] steps on
+>       |processedURL| and |document|.
+>   8. Set |newDocument|'s URL to |processedURL|.
+
+<div class="note">
+  <p>
+    The changes in this section imply that a URL is only stripped of its fragment
+    directive when it is set on a Document. Notably, since a window's
+    {{Location}} object is a representation of the [=/URL=] of the [=active
+    document=], all getters on it will show a fragment-directive-stripped
+    version of the URL.
+  </p>
+
+  <p>
+    Some examples should help clarify various edge cases.
+  </p>
+</div>
+
+<div class="example">
+  ```
+  window.location = 'https://example.com#foo:~:bar';
+  ```
+
+  The page loads and when the document's URL is set the fragment directive is
+  stripped out during the "create and initialize a Document object" steps.
+
+  ```
+  console.log(window.location.href); // 'https://example.com#foo'
+  console.log(window.location.hash); // '#foo'
+  ```
+
+  Since same document navigations are made by adding a new session history
+  entry and using the "traverse the history" steps, the the fragment directive
+  will be stripped here as well.
+
+  ```
+  window.location.hash = 'fizz:~:buzz';
+  console.log(window.location.href); // 'https://example.com#fizz'
+  console.log(window.location.hash); // '#fizz'
+  ```
+
+  The hashchange event is dispatched when only the fragment directive changes
+  because the comparison for it is done on the URLs in the session history
+  entries, where the fragment directive hasn't been removed.
+
+  ```
+  onhashchange = () => {console.log('HASHCHANGE');};
+  window.location.hash = 'fizz:~:zillch'; // 'HASHCHANGE'
+  console.log(window.location.href); // 'https://example.com#fizz'
+  console.log(window.location.hash); // '#fizz'
+  ```
+</div>
+
+<div class="example">
+  In other cases where a Document's URL is not set by the UA, there is no
+  fragment directive stripping.
+
+  For URL objects:
+
+  ```
+  let url = new URL('https://example.com#foo:~:bar');
+  console.log(url.href); // 'https://example.com#foo:~:bar'
+  console.log(url.hash); // '#foo:~:bar'
+
+  document.url = url;
+  console.log(document.url.href); // 'https://example.com#foo:~:bar'
+  console.log(document.url.hash); // '#foo:~:bar'
+
+  ```
+
+  The `<a>` or `<area>` elements:
+
+  ```
+  <a id='anchor' href="https://example.com#foo:~:bar">Anchor</a>
+  <script>
+    console.log(anchor.href); // 'https://example.com#foo:~:bar'
+    console.log(anchor.hash); // '#foo:~:bar'
+  </script>
+  ```
+</div>
+
+<div class="example">
+  History pushState will create a session history entry where the URL's
+  fragment directive isn't stripped. However, traversing to the entry will
+  cause it to set its URL on the document which will process the fragment
+  directive before setting it on the Document (but the fragment directive
+  remains on the entry).
+
+
+  ```
+  history.pushState({}, 'title', 'index.html#foo:~:bar');
+  window.location = 'newpage.html';
+  // on newpage.html
+  history.back();
+  ```
+
+  Results in the current document having "bar" as the fragment directive.
+</div>
+
+
+### Parsing the fragment directive ### {#parsing-the-fragment-directive}
+
+A <dfn>ParsedTextDirective</dfn> is a <a spec=infra>struct</a> that consists of
+four strings: <dfn for="ParsedTextDirective">textStart</dfn>,
+<dfn for="ParsedTextDirective">textEnd</dfn>,
+<dfn for="ParsedTextDirective">prefix</dfn>, and
+<dfn for="ParsedTextDirective">suffix</dfn>. [=ParsedTextDirective/textStart=]
+is required to be non-null. The other three items may be set to null,
+indicating they weren't provided. The empty string is not a valid value for any
+of these items.
+
+See [[#syntax]] for the what each of these components means and how they're
+used.
+
+<div algorithm="parse a text directive">
+
+To <dfn>parse a text directive</dfn>, on an <a spec="infra">ASCII string</a> |text
+directive input|, run these steps:
+
+<div class="note">
+  <p>
+    This algorithm takes a single text directive string as input (e.g.
+    "text=prefix-,foo,bar") and attempts to parse the string into the
+    components of the directive (e.g. ("prefix", "foo", "bar", null)). See
+    [[#syntax]] for the what each of these components means and how they're
+    used.
+  </p>
+  <p>
+    Returns null if the input is invalid or fails to parse in any way.
+    Otherwise, returns a [=ParsedTextDirective=].
+  </p>
+</div>
+
+  <ol class="algorithm">
+    1. [=/Assert=]: |text directive input| matches the production [=TextDirective=].
+    1. Let |textDirectiveString| be the substring of |text directive
+        input| starting at index 5.
+        <div class="note">
+          This is the remainder of the |text directive input| following,
+          but not including, the "text=" prefix.
+        </div>
+    1. Let |tokens| be a <a for=/>list</a> of strings that is the result of
+        <a lt="split on commas">splitting |textDirectiveString| on commas</a>.
+    1. If |tokens| has size less than 1 or greater than 4, return null.
+    1. If any of |tokens|'s items are the empty string, return null.
+    1. Let |retVal| be a [=ParsedTextDirective=] with each of its items initialized
+        to null.
+    1. Let |potential prefix| be the first item of |tokens|.
+    1. If the last character of |potential prefix| is U+002D (-), then:
+        1. Set |retVal|'s [=ParsedTextDirective/prefix=] to the
+            [=string/percent-decode|percent-decoding=] of the result of removing the
+            last character from |potential prefix|.
+        1. <a spec=infra for=list>Remove</a> the first item of the list |tokens|.
+    1. Let |potential suffix| be the last item of |tokens|, if one exists, null
+        otherwise.
+    1. If |potential suffix| is non-null and its first character is U+002D (-),
+        then:
+        1. Set |retVal|'s [=ParsedTextDirective/suffix=] to the
+            [=string/percent-decode|percent-decoding=] of the result of removing the
+            first character from |potential suffix|.
+        1. <a spec=infra for=list>Remove</a> the last item of the list |tokens|.
+    1. If |tokens| has <a spec=infra for=list>size</a> not equal to 1 nor 2 then
+        return null.
+    1. Set |retVal|'s [=ParsedTextDirective/textStart=] be the
+        [=string/percent-decode|percent-decoding=] of the first item of |tokens|.
+    1. If |tokens| has <a spec=infra for=list>size</a> 2, then set |retVal|'s
+        [=ParsedTextDirective/textEnd=] be the
+        [=string/percent-decode|percent-decoding=] of the last item of |tokens|.
+    1. Return |retVal|.
+  </ol>
+</div>
+
+### Fragment directive grammar ### {#fragment-directive-grammar}
+
+A <dfn>valid fragment directive</dfn> is a sequence of characters that appears
+in the [=fragment directive=] that matches the production:
+<dl>
+  <code>
+    <dt>
+      <dfn id="fragmentdirectiveproduction">FragmentDirective</dfn> ::=
+    </dt>
+    <dd>
+      ([=TextDirective=] | [=UnknownDirective=]) ("&" [=FragmentDirective=])?
+    </dd>
+  </code>
+  <code>
+    <dt>
+      <dfn>UnknownDirective</dfn> ::=
+    </dt>
+    <dd>
+      [=CharacterString=]
+    </dd>
+  </code>
+  <code>
+    <dt>
+      <dfn>CharacterString</dfn> ::=
+    </dt>
+    <dd>
+      ([=ExplicitChar=] | [=PercentEncodedChar=])+
+    </dd>
+  </code>
+  <code>
+    <dt>
+      <dfn>ExplicitChar</dfn> ::=
+    </dt>
+    <dd>
+      [a-zA-Z0-9] | "!" | "$" | "'" | "(" | ")" | "*" | "+" | "." | "/" | ":" |
+      ";" | "=" | "?" | "@" | "_" | "~" | "&" | "," | "-"
+    </dd>
+  </code>
+  <div class = "note">
+    An [=ExplicitChar=] may be any [=URL code point=].
+  </div>
+</dl>
+
+<div class="note">
+  The [=FragmentDirective=] may contain multiple directives split by the "&"
+  character. Currently this means we allow multiple text directives to enable
+  multiple indicated strings in the page, but this also allows for future
+  directive types to be added and combined. For extensibility, we do not fail to
+  parse if an unknown directive is in the &-separated list of directives.
+</div>
+
+The <dfn>text fragment directive</dfn> is one such [=fragment directive=] that
+enables specifying a piece of text on the page, that matches the production:
+
+<dl>
+  <code>
+    <dt><dfn>TextDirective</dfn> ::=</dt>
+    <dd>"text=" [=TextDirectiveParameters=]</dd>
+  </code>
+
+  <code>
+    <dt><dfn>TextDirectiveParameters</dfn> ::=</dt>
+    <dd>
+      ([=TextDirectivePrefix=] ",")? [=TextDirectiveString=]
+      ("," [=TextDirectiveString=])?  ("," [=TextDirectiveSuffix=])?
+    </dd>
+  </code>
+
+  <code>
+    <dt><dfn>TextDirectivePrefix</dfn> ::=</dt>
+    <dd>[=TextDirectiveString=]"-"</dd>
+  </code>
+
+  <code>
+    <dt><dfn>TextDirectiveSuffix</dfn> ::=</dt>
+    <dd>"-"[=TextDirectiveString=]</dd>
+  </code>
+
+  <code>
+    <dt><dfn>TextDirectiveString</dfn> ::=</dt>
+    <dd>([=TextDirectiveExplicitChar=] | [=PercentEncodedChar=])+</dd>
+    </code>
+
+  <code>
+    <dt><dfn>TextDirectiveExplicitChar</dfn> ::=</dt>
+    <dd>
+      [a-zA-Z0-9] | "!" | "$" | "'" | "(" | ")" | "*" | "+" | "." | "/" | ":" |
+      ";" | "=" | "?" | "@" | "_" | "~"
+    </dd>
+  </code>
+
+  <div class = "note">
+    A [=TextDirectiveExplicitChar=] may be any [=URL code point=] that is not
+    explicitly used in the [=TextDirective=] syntax, that is "&", "-", and ",",
+    which must be percent-encoded.
+  </div>
+
+  <code>
+    <dt><dfn>PercentEncodedChar</dfn> ::=</dt>
+    <dd>"%" [a-zA-Z0-9]+</dd>
+  </code>
+</dl>
+
+## Security and Privacy ## {#security-and-privacy}
+
+### Motivation ### {#motivation}
+
+<div class="note">This section is non-normative</div>
+
+Care must be taken when implementing [=text fragment directive=] so that it
+cannot be used to exfiltrate information across origins. Scripts can navigate a
+page to a cross-origin URL with a [=text fragment directive=]. If a malicious
+actor can determine that the text fragment was successfully found in victim
+page as a result of such a navigation, they can infer the existence of any text
+on the page.
+
+The following subsections restrict the feature to mitigate the expected attack
+vectors. In summary, the text fragment directives are invoked only on full
+(non-same-page) navigations that are the result of a user activation.
+Additionally, navigations originating from a different origin than the
+destination will require the navigation to take place in a "noopener" context,
+such that the destination page is known to be sufficiently isolated.
+
+### Scroll On Navigation ### {#scroll-on-navigation}
+
+A UA may choose to automatically scroll a matched text passage into view. This
+can be a convenient experience for the user but does present some risks that
+implementing UAs should be aware of.
+
+There are known (and potentially unknown) ways a scroll on navigation might be
+detectable and distinguished from natural user scrolls.
+
+<div class="example">
+  An origin embedded in an iframe in the target page registers an
+  IntersectionObserver and determines in the first 500ms of page load whether
+  a scroll has occurred. This scroll can be indicative of whether the text
+  fragment was successfully found on the page.
+</div>
+
+<div class="example">
+  Two users share the same network on which traffic is visible between them.
+  A malicious user sends the victim a link with a text fragment to a
+  page. The searched-for text appears nearby to a resource located on a unique
+  (on the page) domain. The attacker may be able to infer the success or failure
+  of the fragment search based on the order of requests for DNS lookup.
+</div>
+
+<div class="example">
+  A malicious page embeds a cross-origin victim in an iframe. The victim page
+  contains information sensitive to the user. The malicious page navigates the
+  victim to a text fragment. Since a successful fragment match will cause
+  focus, the malicious page can determine if the text appears in the victim by
+  listening for a blur event in its own document.
+</div>
+
+<div class="example">
+  An attacker sends a link to a victim, sending them to a page that displays
+  a private token. The attacker asks the victim to read back the token. Using
+  a text fragment, the attacker gets the page to load for the victim such that
+  warnings about keeping the token secret are scrolled out of view.
+</div>
+
+All known cases like this rely on specific circumstances about the target page
+so don't apply generally. With additional restrictions about when the text
+fragment can invoke an attacker is further restricted. Nonetheless, different
+UAs can come to different conclusions about whether these risks are acceptable.
+UAs should consider these factors when determining whether to scroll as part of
+navigating to a text fragment.
+
+Conforming UAs may choose not to scroll automatically on navigation. Such UAs
+may, instead, provide UI to initiate the scroll ("click to scroll") or none
+at all. In these cases UA should provide some indication to the user that an
+indicated passage exists further down on the page.
+
+The examples above illustrate that in specific circumstances, it may be
+possible for an attacker to extract 1 bit of information about content on the
+page.  However, care must be taken so that such opportunities cannot be
+exploited to extract arbitrary content from the page by repeating the attack.
+For this reason, restrictions based on user activation and browsing context
+isolation are very important and must be implemented.
+
+<div class="note">
+  Browsing context isolation ensures that no other document can script the
+  target document which helps reduce the attack surface.
+
+  However, it also ensures any malicious use is difficult to hide. A browsing
+  context that's the only one in a group must be a top level browsing context
+  (i.e. a full tab/window).
+</div>
+
+If a UA does choose to scroll automatically, it must ensure no scrolling is
+performed while the document is in the background (for example, in an inactive
+tab). This ensures any malicious usage is visible to the user and prevents
+attackers from trying to secretly automate a search in background documents.
+
+### Search Timing ### {#search-timing}
+
+A naive implementation of the text search algorithm could allow information
+exfiltration based on runtime duration differences between a matching and non-
+matching query. If an attacker could find a way to synchronously navigate
+to a [=text fragment directive=]-invoking URL, they would be able to determine
+the existence of a text snippet by measuring how long the navigation call takes.
+
+<div class="note">
+  The restrictions in [[#restricting-the-text-fragment]] should prevent this
+  specific case; in particular, the no-same-document-navigation restriction.
+  However, these restrictions are provided as multiple layers of defence.
+</div>
+
+For this reason, the implementation <em>must ensure the runtime of
+[[#navigating-to-text-fragment]] steps does not differ based on whether a match
+has been successfully found</em>.
+
+This specification does not specify exactly how a UA achieves this as there are
+multiple solutions with differing tradeoffs. For example, a UA <em>may</em>
+continue to walk the tree even after a match is found in [=find a range from a
+text directive=].  Alternatively, it <em>may</em> schedule an asynchronous task
+to find and set the indicated part of the document.
+
+### Restricting the Text Fragment ### {#restricting-the-text-fragment}
+
+Amend the definition of a [=/request=] and of a [=Document=] to include a new
+field for the [=document/textFragmentToken=]:
+
+>   <strong>Monkeypatching [[FETCH]]:</strong>
+>
+>   A [=/request=] has an associated <dfn for="request">textFragmentToken</dfn> flag
+
+>   <strong>Monkeypatching [[HTML]]:</strong>
+>
+>   A [=Document=] has a <dfn for="document">textFragmentToken</dfn> flag that is
+>   consumed in order to allow a single activation of a text fragment. This flag is
+>   generated only during loading if the navigation occurs as a result of a user
+>   activation.
+>
+>   If the [=Document=]'s [=document/textFragmentToken=] isn't consumed to activate
+>   a text fragment, it may be consumed to set the [=request/textFragmentToken=]
+>   flag of a navigation [=/request=]. In this way, a [=document/textFragmentToken=]
+>   can be propagated from one [=Document=] to another across a navigation.
+>
+>   Reading either the [=Document=]'s [=document/textFragmentToken=] or the
+>   [=/request=]'s [=request/textFragmentToken=] must always consume the value,
+>   such that the token cannot be cloned.
+
+<div class="note">
+  <p>
+    A [=document/textFragmentToken=] is generated when a [=Document=] is loaded
+    as a result of a user gesture. It grants its holder permission (in terms of
+    user activation) to activate a single text fragment. Alternatively, it may be
+    propagated through a navigation to allow a future document to activate a text
+    fragment from this navigation's user gesture.
+  </p>
+
+  <p>
+    This mechanism allows text fragments to activate through a common redirect
+    technique used my many popular web sites. Such sites redirect users to
+    their intended destination by responding with a 200 status code containing
+    script to set the <tt>window.location</tt>.
+  </p>
+
+  <p>
+    Unlike real HTTP (<tt>status 3xx</tt>) redirects, these "client-side"
+    redirects cannot propagate the fact that the navigation is the result of a
+    user gesture. The [=document/textFragmentToken=] mechanism allows passing
+    through this specifically scoped user-activation through such navigations.
+    This means a page can programmatically navigate to a text fragment, a
+    single time, as if it has a user gesture. However, further navigations
+    require a new user gesture.
+  </p>
+  <p>
+    The following diagram demonstrates how the token is used to activate a text
+    fragment through a client-side redirect service:
+  </p>
+  <img style="margin-left:auto;margin-right:auto;display:block"
+       src="https://raw.githubusercontent.com/WICG/scroll-to-text-fragment/master/text_fragment_token.png"
+       alt="Diagram showing how a text fragment token is created and used">
+
+  <p>
+    See [redirects.md](redirects.md) for a more in-depth discussion.
+  </p>
+</div>
+
+>   <strong>Monkeypatching [[HTML]]:</strong>
+>
+>   A [=Document=] has an <dfn for="document">allowTextFragmentDirective</dfn>
+>   flag that is used to determine whether a text fragment directive should be
+>   allowed to activate. If this flag is false, the text fragment must not
+>   cause any observable effects.
+
+<div class="note">
+  <p>
+    [=document/textFragmentToken=] is analogous to a user-activation state
+    while [=allowTextFragmentDirective=] is more comprehensive, taking into
+    account various pieces of information, one of which is the existence of a
+    textFragmentToken.
+  </p>
+  <p>
+    The reason we compute allowTextFragmentDirective and keep it as a flag,
+    rather than performing the checks at the time of use, is that it relies on
+    the properties of the navigation while the invocation will occur as part of
+    the <a spec=HTML>scroll to the fragment</a> steps which can happen outside
+    the context of a navigation.
+  </p>
+</div>
+
+<div class="note">
+  TODO: This should really only prevent potentially observable side-effects like
+  automatic scrolling. Unobservable effects like a highlight could be safely
+  allowed in all cases.
+</div>
+
+Amend the <a
+href="https://html.spec.whatwg.org/multipage/browsing-the-web.html#initialise-the-document-object">create
+and initialize a Document object</a> steps by adding the following steps before returning |document|:
+
+>   <strong>Monkeypatching [[HTML]]:</strong>
+>
+>   15. Set the [=document/textFragmentToken=] flag on |document|:
+>       1. Let |is user activated| be true if the current navigation was initiated from
+>           a window that had a <a spec="html">transient activation</a> at the time the
+>           navigation was initiated, or the UA has reason to believe it comes from a
+>           direct user gesture (e.g. user typed into the address bar).
+>           <div class="note">
+>             TODO: it'd be better to refer to the userActivationFlag on the
+>             |request|. See
+>             <a href="https://w3c.github.io/webappsec-fetch-metadata/#request-user-activation-flag">Sec-Fetch-User</a> in [[FETCH-METADATA]].
+>           </div>
+>       1. If <var ignore=''>browsing context</var> is a top-level browsing context and if either of |is
+>           user activated| or the [=request/textFragmentToken=] flag of
+>           |navigationParam|'s
+>           <a href="https://html.spec.whatwg.org/multipage/browsing-the-web.html#navigation-params-request">request</a>
+>           object is true, set the |document|'s [=document/textFragmentToken=]
+>           flag to true. Otherwise, set it to false.
+>           <div class="note">
+>             It's important that the token not be copyable so that at most one token
+>             is created per user-activated navigation.
+>           </div>
+>   16. Set the [=document/allowTextFragmentDirective=] flag on |document| by
+>       following these sub-steps:
+>       1. If |document|'s [=fragment directive=] field is null or empty, set
+>           [=document/allowTextFragmentDirective=] to false and abort these sub-steps.
+>       1. Let |textFragmentToken| be the value of |document|'s
+>           [=document/textFragmentToken=] and set |document|'s
+>           [=document/textFragmentToken=] to false.
+>       1. If the |navigationParam|'s
+>           <a href="https://html.spec.whatwg.org/multipage/browsing-the-web.html#navigation-params-request">request</a>
+>           has a <a href="https://w3c.github.io/webappsec-fetch-metadata/#http-headerdef-sec-fetch-site">sec-fetch-site</a>
+>           header and its value is `"none"` set [=document/allowTextFragmentDirective=] to true and abort these sub-steps.
+>           <div class="note">
+>             <p>
+>               If a navigation originates from browser UI, it's always ok to allow it
+>               since it'll be user triggered and the page/script isn't providing the
+>               text snippet.
+>             </p>
+>             <p>
+>               Note: Depending on the UA, there may be cases where the <var
+>               ignore=''>incumbentNavigationOrigin</var> parameter is null but
+>               it's not clear that the navigation should be considered as
+>               initiated from browser UI. E.g. an "open in new window" context
+>               menu item when right clicking on a link.  The intent in this item
+>               is to distinguish cases where the app/page is able to set the URL
+>               from those that are fully under the user's control.  In the former
+>               we want to prevent activation of the text fragment unless the
+>               destination is loaded in a separate browsing context group (so that
+>               the source cannot both control the text snippet and observe
+>               side-effects in the navigation).
+>             </p>
+>             <p>
+>               See <a
+>               href="https://w3c.github.io/webappsec-fetch-metadata/#directly-user-initiated">sec-fetch-site</a>
+>               for a more detailed discussion of how this should apply.
+>             </p>
+>           </div>
+>       1. If |textFragmentToken| is false, set
+>           [=document/allowTextFragmentDirective=] to false and abort these sub-steps.
+>       1. If the [=document=] of the <a spec=HTML>latest entry</a> in
+>           |document|'s [=Document/browsing context=]'s <a spec=HTML>session history</a> is
+>           equal to |document|, set [=document/allowTextFragmentDirective=] to false
+>           and abort these sub-steps.
+>           <div class="note">
+>             i.e. Forbidden on a same-document navigation.
+>           </div>
+>       1. If the |navigationParam|'s
+>           <a href="https://html.spec.whatwg.org/multipage/browsing-the-web.html#navigation-params-request">request</a>
+>           has a <a href="https://w3c.github.io/webappsec-fetch-metadata/#http-headerdef-sec-fetch-site">sec-fetch-site</a>
+>           header and its value is `"same-origin"` set
+>           [=document/allowTextFragmentDirective=] to true and abort these
+>           sub-steps.
+>       1. If |document|'s [=Document/browsing context=] is a [=top-level browsing
+>           context=] and its
+>           <a href="https://html.spec.whatwg.org/multipage/browsers.html#tlbc-group">group</a>'s
+>           <a spec=HTML>browsing context set</a> has length 1, set
+>           [=document/allowTextFragmentDirective=] to true and abort these sub-steps.
+>           <div class="note">
+>             i.e. Only allow navigation from a cross-origin element/script if the
+>             document is loaded in a noopener context. That is, a new top level
+>             browsing context group to which the navigator does not have script access
+>             and which may be placed into a separate process.
+>           </div>
+>       1. Otherwise, set [=document/allowTextFragmentDirective=] to false.
+
+Amend step 2 of the
+<a href="https://html.spec.whatwg.org/multipage/browsing-the-web.html#process-a-navigate-fetch">
+process a navigate fetch</a> steps to additionally set |request|'s
+[=request/textFragmentToken=] to the value of the [=active document=]'s
+[=document/textFragmentToken=] and set the [=active document=]'s value to
+false.
+
+>   <strong>Monkeypatching [[HTML]]:</strong>
+>
+>   2. Set request's client to sourceBrowsingContext's active document's relevant
+>       settings object, destination to "document", mode to "navigate", credentials
+>       mode to "include", use-URL-credentials flag, redirect mode to "manual",
+>       replaces client id to browsingContext's active document's relevant settings
+>       object's id, and [=request/textFragmentToken=] to
+>       sourceBrowsingContext's active document's
+>       [=document/textFragmentToken=]. Set sourceBrowsingContext's active
+>       document's [=document/textFragmentToken=] to false.
+
+
+Amend the <a spec=HTML>try to scroll to the fragment</a> steps by replacing the
+steps of the task queued in step 2:
+
+>   <strong>Monkeypatching [[HTML]]:</strong>
+>
+>   1. If document has no parser, or its parser has stopped parsing, or the user
+>       agent has reason to believe the user is no longer interested in scrolling to
+>       the fragment, then clear <em>document</em>'s
+>       [=allowTextFragmentDirective=] flag and abort these steps.
+>   2. Scroll to the fragment given in document's URL. If this does not find an
+>       indicated part of the document, then try to scroll to the fragment for
+>       document.
+>   3. Clear <em>document</em>'s [=allowTextFragmentDirective=] flag
+
+
+## Navigating to a Text Fragment ## {#navigating-to-text-fragment}
+
+<div class="note">
+The text fragment specification proposes an amendment to
+[[html#scroll-to-fragid]]. In summary, if a [=text fragment directive=] is
+present and a match is found in the page, the text fragment takes precedent over
+the element fragment as the indicated part of the document. We amend the
+indicated part of the document to optionally include a [=range=] that
+may be scrolled into view instead of the containing element.
+</div>
+
+Replace step 3.1 of the <a spec=HTML>scroll to the fragment</a> algorithm with
+the following:
+
+>   <strong>Monkeypatching [[HTML]]:</strong>
+>
+>   1. Let <em>target, range</em> be the [=/element=] and [=range=] that is
+>       <a spec=HTML>the indicated part of the document</a>.
+
+Replace step 3.3 of the <a spec=HTML>scroll to the fragment</a> algorithm with
+the following:
+
+>   <strong>Monkeypatching [[HTML]]:</strong>
+>
+>   3. <a href="https://w3c.github.io/webappsec-permissions-policy/document-policy.html#algo-get-policy-value">Get
+>       the policy value</a> for `force-load-at-top` in the
+>       [=Document=]. If the result is true, abort these steps.
+>   4. If <em>range</em> is non-null:
+>       1. If the UA supports scrolling of text fragments on navigation, invoke
+>           [=scroll a Range into view|Scroll range into view=], with range
+>           <em>range</em>, containingElement <em>target</em>, <em>behavior</em> set
+>           to "auto", <em>block</em> set to "center", and <em>inline</em> set to
+>           "nearest".
+>   5. Otherwise:
+>       1. <a spec=cssom-view lt="scroll an element into view">Scroll target
+>           into view</a>, with <em>behavior</em> set to "auto", <em>block</em>
+>           set to "start", and <em>inline</em> set to "nearest".
+>           <div class="note">
+>               This otherwise case is the same as the current step 3.3.
+>           </div>
+
+Add the following steps to the beginning of the processing model for
+<a spec=HTML>the indicated part of the document</a>:
+
+>   <strong>Monkeypatching [[HTML]]:</strong>
+>
+>   1. Let |fragment directive string| be the document's [=fragment directive=].
+>   1. If the document's [=allowTextFragmentDirective=] flag is true then:
+>       1. Let |ranges| be a <a spec=infra>list</a> that is the result of running
+>           the [=process a fragment directive=] steps with |fragment directive
+>           string| and the document.
+>       1. If |ranges| is non-empty, then:
+>           1. Let |range| be the first item of |ranges|.
+>               <div class="note">
+>                 The first [=range=] in |ranges| is specifically
+>                 scrolled into view. This [=range=], along with the
+>                 remaining |ranges| should be visually indicated in a way that
+>                 is not revealed to script, which is left as UA-defined behavior.
+>               </div>
+>           1. Let |node| be the [=first common ancestor=] of |range|'s
+>               [=range/start node=] and [=range/end node=].
+>           1. While |node| is non-null and is not an [=element=], set |node| to
+>               |node|'s [=tree/parent=].
+>           1. The indicated part of the document is |node| and |range|; return.
+
+<div algorithm="first common ancestor">
+To find the <dfn>first common ancestor</dfn> of two nodes |nodeA| and |nodeB|,
+follow these steps:
+
+
+  <ol class="algorithm">
+    1. Let |commonAncestor| be |nodeA|.
+    1. While |commonAncestor| is non-null and is not a [=shadow-including inclusive
+        ancestor=] of |nodeB|, let |commonAncestor| be |commonAncestor|’s
+        [=shadow-including parent=].
+    1. Return |commonAncestor|.
+  </ol>
+</div>
+
+<div algorithm="shadow-including parent">
+To find the <dfn>shadow-including parent</dfn> of |node| follow these steps:
+
+  <ol class="algorithm">
+    1. If |node| is a [=/shadow root=], return |node|'s [=DocumentFragment/host=].
+    1. Otherwise, return |node|'s [=tree/parent=].
+  </ol>
+</div>
+
+### Scroll a DOMRect into view ### {#scroll-rect-into-view}
+<div class="note">
+  This section describes a refactoring of the CSSOMVIEW's
+  <a spec=cssom-view>scroll an element into view</a> algorithm
+  to separate the steps for scrolling a DOMRect into view, so it can be used to
+  scroll a Range into view.
+</div>
+
+Move the <a spec=cssom-view>scroll an element into view</a> algorithm's steps
+3-14 into a new algorithm <dfn>scroll a DOMRect into view</dfn>, with input
+{{DOMRect}} |bounding box|, {{ScrollIntoViewOptions}} dictionary |options|, and
+[=element=] |startingElement|.
+
+Also move the recursive behavior described at the top of the <a
+spec=cssom-view>scroll an element into view</a> algorithm to the [=scroll a
+DOMRect into view=] algorithm: "run these steps for each ancestor element or
+viewport <b>of |startingElement|</b> that establishes a scrolling box <var
+ignore=''>scrolling box</var>, in order of innermost to outermost scrolling box".
+
+<div class="note">
+  |bounding box| is renamed from |element bounding border box|.
+</div>
+
+>   <strong>Monkeypatching [[CSSOM-VIEW]]:</strong>
+>
+>   To scroll a DOMRect into view given a {{DOMRect}} |bounding box|,
+>   a scroll behavior |behavior|,
+>   a block flow direction position |block|,
+>   and an inline base direction position |inline|,
+>   and [=element=] |startingElement|, means to run these steps for each ancestor element or viewport of |startingElement| that establishes
+>   a scrolling box <var ignore=''>scrolling box</var>, in order of innermost to outermost scrolling box:
+>
+>   <em>OMITTED</em>
+>
+>   <div class="note">
+>     TODO: There's more to do here since the |bounding box| needs to be
+>     transformed with each step to an ancestor element or viewport.
+>   </div>
+
+
+Replace steps 3-14 of the <a spec=cssom-view>scroll an element into view</a>
+algorithm with a call to [=scroll a DOMRect into view=]:
+
+>   <strong>Monkeypatching [[CSSOM-VIEW]]:</strong>
+>
+>   To scroll an element into view |element|,
+>   with a scroll behavior |behavior|,
+>   a block flow direction position |block|,
+>   and an inline base direction position |inline|,
+>   means to run these steps:
+>
+>   1. If the {{Document}} associated with |element| is not same origin with the {{Document}} associated with the element or viewport associated with <var ignore=''>box</var>, terminate these steps.
+>   1. Let |element bounding border box| be the box that the return value of invoking {{Element/getBoundingClientRect()}} on |element| represents.
+>   1. Perform [=scroll a DOMRect into view=] given |element bounding border box|,
+>       |options| and |element|.
+
+Define a new algorithm for scrolling [=Range=] into view:
+
+>   <strong>Monkeypatching [[CSSOM-VIEW]]:</strong>
+>
+>   To <dfn>scroll a Range into view</dfn>, with input
+>   [=range=] |range|,
+>   scroll behavior |behavior|,
+>   a block flow direction position |block|,
+>   an inline base direction position |inline|,
+>   and an [=element=] |containingElement|:
+>   1. Let |bounding rect| be the {{DOMRect}} that is the return value of
+>       invoking {{Range/getBoundingClientRect()}} on |range|.
+>   2. Perform [=scroll a DOMRect into view=] given |bounding rect|, |behavior|, |block|, |inline|, and
+>       |containingElement|.
+
+### Finding Ranges in a Document ### {#finding-ranges-in-a-document}
+
+<div class="note">
+  This section outlines several algorithms and definitions that specify how to
+  turn a full fragment directive string into a list of [=Ranges=] in the
+  document.
+
+  At a high level, we take a fragment directive string that looks like this:
+  <pre>
+    text=prefix-,foo&unknown&text=bar,baz
+  </pre>
+
+  We break this up into the individual text directives:
+
+  <pre>
+    text=prefix-,foo
+    text=bar,baz
+  </pre>
+
+  For each text directive, we perform a search in the document for the first
+  instance of rendered text that matches the restrictions in the directive.
+  Each search is independent of any others; that is, the result is the same
+  regardless of how many other directives are provided or their match result.
+
+  If a directive successfully matches to text in the document, it returns a
+  [=range=] indicating that match in the document. The [=process a fragment
+  directive=] steps are the high level API provided by this section. These
+  return a <a spec=infra>list</a> of [=ranges=] that were matched by the
+  individual directive matching steps, in the order the directives were
+  specified in the fragment directive string.
+
+  If a directive was not matched, it does not add an item to the returned
+  list.
+</div>
+
+<div algorithm="process a fragment directive">
+To <dfn>process a fragment directive</dfn>, given as input an <a
+spec=infra>ASCII string</a> |fragment directive input| and a [=Document=]
+|document|, run these steps:
+
+<div class="note">
+  This algorithm takes as input a the |fragment directive input|, that is the
+  raw text of the fragment directive and the |document| over which it operates.
+  It returns a <a spec=infra>list</a> of [=ranges=] that are to be visually
+  indicated, the first of which may be scrolled into view (if the UA scrolls
+  automatically).
+</div>
+
+  <ol class="algorithm">
+    1. If |fragment directive input| is not a [=valid fragment directive=], then
+        return an empty <a spec=infra>list</a>.
+    2. Let |directives| be a <a spec=infra>list</a> of <a spec=infra>ASCII string</a>s
+        that is the result of [=strictly split a string|strictly splitting the
+        string=] |fragment directive input| on "&".
+    3. Let |ranges| be a <a spec=infra>list</a> of [=ranges=], initially empty.
+    4. For each <a spec=infra>ASCII string</a> |directive| of |directives|:
+        1. If |directive| does not match the production [=TextDirective=],
+            then [=iteration/continue=].
+        1. Let |parsedValues| be the result of running the [=parse a text
+            directive=] steps on |directive|.
+        1. If |parsedValues| is null then [=iteration/continue=].
+        1. If the result of running [=find a range from a text directive=] given
+            |parsedValues| and |document| is non-null, then [=list/append=] it to
+            |ranges|.
+    5. Return |ranges|.
+  </ol>
+</div>
+
+<div algorithm="find a range from a text directive">
+To <dfn>find a range from a text directive</dfn>, given a
+[=ParsedTextDirective=] |parsedValues| and [=Document=] |document|, run the
+following steps:
+
+<div class="note">
+  This algorithm takes as input a successfully parsed text directive and a
+  document in which to search. It returns a [=range=] that points to the first
+  text passage within the document that matches the searched-for text and
+  satisfies the surrounding context. Returns null if no such passage exists.
+
+  [=ParsedTextDirective/textEnd=] may be null. If omitted, this is an "exact"
+  search and the returned [=range=] must contain a string exactly matching
+  [=ParsedTextDirective/textStart=]. If [=ParsedTextDirective/textEnd=] is
+  provided, this is a "range" search; the returned [=range=] must start with
+  [=ParsedTextDirective/textStart=] and end with
+  [=ParsedTextDirective/textEnd=]. In the normative text below, we'll call a
+  text passage that matches the provided [=ParsedTextDirective/textStart=] and
+  [=ParsedTextDirective/textEnd=], regardless of which mode we're in, the
+  "matching text".
+
+  Either or both of [=ParsedTextDirective/prefix=] and
+  [=ParsedTextDirective/suffix=] may be null, in which case context on that
+  side of a match is not checked. E.g. If [=ParsedTextDirective/prefix=] is
+  null, text is matched without any requirement on what text precedes it.
+</div>
+<div class="note">
+  While the matching text and its prefix/suffix can span across
+  block-boundaries, the individual parameters to these steps cannot. That is,
+  each of [=ParsedTextDirective/prefix=], [=ParsedTextDirective/textStart=],
+  [=ParsedTextDirective/textEnd=], and [=ParsedTextDirective/suffix=] will only
+  match text within a single block.
+
+  <div class="example">
+    <pre>:~:text=The quick,lazy dog</pre> will fail to match in
+
+    ```
+    <div>The<div> </div>quick brown fox</div>
+    <div>jumped over the lazy dog</div>
+    ```
+
+    because the starting string "The quick" does not appear within a single,
+    uninterrupted block. The instance of "The quick" in the document has a
+    block element between "The" and "quick".
+
+    It does, however, match in this example:
+
+    ```
+    <div>The quick brown fox</div>
+    <div>jumped over the lazy dog</div>
+    ```
+
+  </div>
+</div>
+  <ol class="algorithm">
+    1. Let |searchRange| be a [=range=] with [=range/start=] (|document|, 0) and
+        [=range/end=] (|document|, |document|'s [=Node/length=])
+    1. While |searchRange| is not [=range/collapsed=]:
+        1. Let |potentialMatch| be null.
+        1. If |parsedValues|'s [=ParsedTextDirective/prefix=] is not null:
+            1. Let |prefixMatch| be the the result of running the [=find a string
+                in range=] steps with |query| |parsedValues|'s
+                [=ParsedTextDirective/prefix=], |searchRange| |searchRange|,
+                |wordStartBounded| true and |wordEndBounded| false.
+            1. If |prefixMatch| is null, return null.
+            1. Set |searchRange|'s [=range/start=] to the first [=/boundary point=]
+                [=boundary point/after=] |prefixMatch|'s [=range/start=]
+            1. Let |matchRange| be a [=range=] whose [=range/start=] is
+                |prefixMatch|'s [=range/end=] and [=range/end=] is |searchRange|'s
+                [=range/end=].
+            1. Advance |matchRange|'s [=range/start=] to the
+                [=next non-whitespace position=].
+            1. If |matchRange| is [=range/collapsed=] return null.
+                <div class="note">
+                  This can happen if |prefixMatch|'s [=range/end=] or its subsequent
+                  non-whitespace position is at the end of the document.
+                </div>
+            1. [=/Assert=]: |matchRange|'s [=range/start node=] is a {{Text}} node.
+                <div class="note">
+                  |matchRange|'s [=range/start=] now points to the next
+                  non-whitespace text data following a matched prefix.
+                </div>
+            1. Let |mustEndAtWordBoundary| be true if |parsedValues|'s
+                [=ParsedTextDirective/textEnd=] is non-null or
+                |parsedValues|'s [=ParsedTextDirective/suffix=] is null, false
+                otherwise.
+            1. Set |potentialMatch| to the result of running the [=find a string in
+                range=] steps with |query| |parsedValues|'s
+                [=ParsedTextDirective/textStart=], |searchRange| |matchRange|,
+                |wordStartBounded| false, and |wordEndBounded|
+                |mustEndAtWordBoundary|.
+            1. If |potentialMatch| is null, return null.
+            1. If |potentialMatch|'s [=range/start=] is not |matchRange|'s
+                [=range/start=], then [=iteration/continue=].
+                <div class="note">
+                  In this case, we found a prefix but it was followed by something
+                  other than a matching text so we'll continue searching for the
+                  next instance of [=ParsedTextDirective/prefix=].
+                </div>
+        1. Otherwise:
+            1. Let |mustEndAtWordBoundary| be true if |parsedValues|'s
+                [=ParsedTextDirective/textEnd=] is non-null or
+                |parsedValues|'s [=ParsedTextDirective/suffix=] is null, false
+                otherwise.
+            1. Set |potentialMatch| to the result of running the [=find a string in
+                range=] steps with |query| |parsedValues|'s
+                [=ParsedTextDirective/textStart=], |searchRange| |searchRange|,
+                |wordStartBounded| true, and |wordEndBounded|
+                |mustEndAtWordBoundary|.
+            1. If |potentialMatch| is null, return null.
+            1. Set |searchRange|'s [=range/start=] to the first [=/boundary point=]
+                [=boundary point/after=] |potentialMatch|'s [=range/start=]
+        1. If |parsedValues|'s [=ParsedTextDirective/textEnd=] item is
+            non-null, then:
+            1. Let |textEndRange| be a [=range=] whose [=range/start=] is
+                |potentialMatch|'s [=range/end=] and whose [=range/end=] is
+                |searchRange|'s [=range/end=].
+            1. Let |mustEndAtWordBoundary| be true if |parsedValues|'s
+                [=ParsedTextDirective/suffix=] is null, false otherwise.
+            1. Let |textEndMatch| be the result of running the [=find a string
+                in range=] steps with |query| |parsedValues|'s
+                [=ParsedTextDirective/textEnd=], |searchRange| |textEndRange|,
+                |wordStartBounded| true, and |wordEndBounded|
+                |mustEndAtWordBoundary|.
+            1. If |textEndMatch| is null then return null.
+            1. Set |potentialMatch|'s [=range/end=] to |textEndMatch|'s
+                [=range/end=].
+        1. [=/Assert=]: |potentialMatch| is non-null, not [=range/collapsed=] and
+            represents a range exactly containing an instance of matching text.
+        1. If |parsedValues|'s [=ParsedTextDirective/suffix=] is null, return
+            |potentialMatch|.
+        1. Let |suffixRange| be a [=range=] with [=range/start=] equal to
+            |potentialMatch|'s [=range/end=] and [=range/end=] equal to
+            |searchRange|'s [=range/end=].
+        1. Advance |suffixRange|'s [=range/start=] to the [=next non-whitespace
+            position=].
+        1. Let |suffixMatch| be result of running the [=find a string in range=]
+            steps with |query| |parsedValues|'s [=ParsedTextDirective/suffix=],
+            |searchRange| |suffixRange|, |wordStartBounded| false, and
+            |wordEndBounded| true.
+        1. If |suffixMatch| is null then return null.
+            <div class="note">
+              If the suffix doesn't appear in the remaining text of the document,
+              there's no possible way to make a match.
+            </div>
+        1. If |suffixMatch|'s [=range/start=] is |suffixRange|'s [=range/start=],
+            return |potentialMatch|.
+    1. Return null
+  </ol>
+
+</div>
+
+<wpt>
+  /scroll-to-text-fragment/find-range-from-text-directive.html
+</wpt>
+
+<div algorithm="advance range start to next non-whitespace position">
+To advance a [=range=] |range|'s [=range/start=] to the <dfn>next
+non-whitespace position</dfn> follow the steps:
+
+  <ol class="algorithm">
+    1. While |range| is not collapsed:
+        1. Let |node| be |range|'s [=range/start node=].
+        1. Let |offset| be |range|'s [=range/start offset=].
+        1. If |node| is part of a [=non-searchable subtree=] then:
+            1. Set |range|'s [=range/start node=] to the next node, in
+                [=shadow-including tree order=], that isn't a [=shadow-including
+                descendant=] of |node|, and set its [=range/start offset=] to 0.
+            1. [=iteration/Continue=].
+        1. If |node| is not a [=visible text node=]:
+            1. Set |range|'s [=range/start node=] to the next node, in
+                [=shadow-including tree order=], and set its [=range/start offset=]
+                to 0.
+            1. [=iteration/Continue=].
+        1. If the [=Text/substring data=] of |node| at offset |offset|
+            and count 6 is equal to the string "&amp;nbsp;" then:
+            1. Add 6 to |range|'s [=range/start offset=].
+        1. Otherwise, if the [=Text/substring data=] of |node| at offset |offset|
+            and count 5 is equal to the string "&amp;nbsp" then:
+            1. Add 5 to |range|'s [=range/start offset=].
+        1. Otherwise:
+            1. Let |cp| be the [=code point=] at the |offset| index in |node|'s
+                [=CharacterData/data=].
+            1. If |cp| does not have the <a
+                href="http://www.unicode.org/reports/tr44/#White_Space">White_Space</a>
+                property set, return.
+            1. Add 1 to |range|'s [=range/start offset=].
+        1. If |range|'s [=range/start offset=] is equal to |node|'s
+            [=Node/length=], set |range|'s [=range/start node=] to the next node in
+            [=shadow-including tree order=], and set its [=range/start offset=] to 0.
+  </ol>
+</div>
+
+<div algorithm="find a string in a range">
+To <dfn>find a string in range</dfn> given a <a spec=infra>string</a> |query|, a
+[=range=] |searchRange|, and booleans |wordStartBounded| and |wordEndBounded|,
+run these steps:
+
+<div class="note">
+  This algorithm will return a [=range=] that represents the first instance of
+  the |query| text that is fully contained within |searchRange|, optionally
+  restricting itself to matches that start and/or end at word boundaries (see
+  [[#word-boundaries]]). Returns null if none is found.
+</div>
+
+<div class="note">
+  <p>
+    The basic premise of this algorithm is to walk all searchable text nodes
+    within a block, collecting them into a list. The list is then concatenated
+    into a single string in which we can search, using the node list to
+    determine offsets with a node so we can return a [=range=].
+  </p>
+
+  <p>
+    Collection breaks when we hit a block node, e.g. searching over this tree:
+
+    ```
+      <div>
+        a<em>b</em>c<div>d</div>e
+      </div>
+    ```
+  </p>
+
+  Will perform a search on "abc", then on "d", then on "e".
+
+  Thus, |query| will only match text that is continuous (i.e. uninterrupted by
+  a block-level container) within a single block-level container.
+</div>
+
+  <ol class="algorithm">
+    1. While |searchRange| is not [=range/collapsed=]:
+        1. Let |curNode| be |searchRange|'s [=range/start node=].
+        1. If |curNode| is part of a [=non-searchable subtree=]:
+            1. Set |searchRange|'s [=range/start node=] to the next node, in
+                [=shadow-including tree order=], that isn't a [=shadow-including
+                descendant=] of |curNode|.
+            1. [=iteration/Continue=].
+        1. If |curNode| is not a [=visible text node=]:
+            1. Set |searchRange|'s [=range/start node=] to the next node, in
+                [=shadow-including tree order=], that is not a [=doctype=], and
+                set its [=range/start offset=] to 0.
+            1. [=iteration/Continue=].
+        1. Let |blockAncestor| be the [=nearest block ancestor=] of |curNode|.
+        1. Let |textNodeList| be a <a spec=infra>list</a> of {{Text}} nodes,
+            initially empty.
+        1. While |curNode| is a [=shadow-including descendant=] of |blockAncestor|
+            and the position of the [=/boundary point=] (|curNode|, 0) is not
+            [=boundary point/after=] |searchRange|'s [=range/end=]:
+            1. If |curNode| [=has block-level display=] then [=iteration/break=].
+            1. If |curNode| is [=search invisible=]:
+                1. Set |curNode| to the next node, in [=shadow-including tree
+                    order=], that isn't a [=shadow-including descendant=] of
+                    |curNode|.
+                2. [=iteration/Continue=].
+            1. If |curNode| is a [=visible text node=] then append it to
+                |textNodeList|.
+            1. Set |curNode| to the next node in [=shadow-including tree order=].
+        1. Run the [=find a range from a node list=] steps given |query|,
+            |searchRange|, |textNodeList|, |wordStartBounded| and |wordEndBounded|
+            as input. If the resulting [=range=] is not null, then return it.
+        1. If |curNode| is null, then [=iteration/break=].
+        1. [=/Assert=]: |curNode| [=tree/following|follows=] |searchRange|'s
+            [=range/start node=].
+        1. Set |searchRange|'s [=range/start=] to the [=/boundary point=] (|curNode|,
+            0).
+    1. Return null.
+  </ol>
+</div>
+
+A node is <dfn>search invisible</dfn> if it is an [=element=] in the [=HTML
+namespace=] and meets any of the following conditions:
+1. The [=computed value=] of its 'display' property is ''display/none''.
+1. If the node <a spec=html>serializes as void</a>.
+1. Is any of the following types: {{HTMLIFrameElement}}, {{HTMLImageElement}},
+    {{HTMLMeterElement}}, {{HTMLObjectElement}}, {{HTMLProgressElement}},
+    {{HTMLStyleElement}}, {{HTMLScriptElement}}, {{HTMLVideoElement}},
+    {{HTMLAudioElement}}
+1. Is a <{select}> element whose <{select/multiple}> content attribute is absent.
+
+A node is part of a <dfn>non-searchable subtree</dfn> if it is or has a
+[=shadow-including ancestor=] that is [=search invisible=].
+
+A node is a <dfn>visible text node</dfn> if it is a {{Text}} node, the
+[=computed value=] of its [=parent element=]'s 'visibility' property is
+''visibility/visible'', and it is <a spec=html>being rendered</a>.
+
+A node <dfn>has block-level display</dfn> if it is an [=element=] and the [=computed value=] of its
+'display' property is any of ''display/block'', ''display/table'',
+''display/flow-root'', ''display/grid'', ''display/flex'',
+''display/list-item''.
+
+<div algorithm="nearest block ancestor">
+To find the <dfn>nearest block ancestor</dfn> of a |node| follow the steps:
+  <ol class="algorithm">
+    1. Let |curNode| be |node|.
+    1. While |curNode| is non-null
+        1. If |curNode| is not a {{Text}} node and it [=has block-level display=] then
+            return |curNode|.
+        1. Otherwise, set |curNode| to |curNode|'s [=tree/parent=].
+    1. Return |node|'s [=Node/node document=]'s [=document element=].
+  </ol>
+</div>
+
+<div algorithm="range from node list">
+To <dfn>find a range from a node list</dfn> given a search string |queryString|,
+a [=range=] |searchRange|, a [=/list=] of {{Text}} nodes |nodes|, and booleans
+|wordStartBounded| and |wordEndBounded|, follow these steps:
+
+<div class="note">
+  Optionally, this will only return a match if the matched text begins and/or
+  ends on a [=word boundary=]. For example:
+
+  <div class="example">
+    The query string “range” will always match in “mountain range”, but
+    1. When requiring a word boundary at the beginning, it will not match in “color orange”.
+    2. When requiring a word boundary at the end, it will not match in “forest ranger”.
+  </div>
+
+  See [[#word-boundaries]] for details and more examples.
+</div>
+
+  <ol class="algorithm">
+    1. Let |searchBuffer| be the [=string/concatenate|concatenation=] of the
+        [=CharacterData/data=] of each item in |nodes|.
+
+        ISSUE(WICG/scroll-to-text-fragment#98): [=CharacterData/data=] is not
+        correct here since that's the text data as it exists in the DOM. This
+        algorithm means to run over the text as rendered (and then convert back
+        to Ranges in the DOM).
+    1. Let |searchStart| be 0.
+    1. If the first item in |nodes| is |searchRange|'s [=range/start node=] then
+        set |searchStart| to |searchRange|'s [=range/start offset=].
+    1. Let |start| and |end| be [=/boundary points=], initially null.
+    1. Let |matchIndex| be null.
+    1. While |matchIndex| is null
+        1. Set |matchIndex| to the index of the first instance of |queryString| in
+            |searchBuffer|, starting at |searchStart|. The string search must be
+            performed using a base character comparison, or the
+            <a href="http://www.unicode.org/reports/tr10/#Multi_Level_Comparison">primary
+            level</a>, as defined in [[!UTS10]].
+            <div class="note">
+              Intuitively, this is a case-insensitive search also ignoring accents
+              and other marks.
+            </div>
+        1. If |matchIndex| is null, return null.
+        1. Let |endIx| be |matchIndex| + |queryString|'s [=string/length=].
+            <div class="note">
+               |endIx| is the index of the last character in the match + 1.
+            </div>
+        1. Set |start| to the [=/boundary point=] result of [=get boundary point at
+            index=] |matchIndex| run over |nodes| with |isEnd| false.
+        1. Set |end| to the [=/boundary point=] result of [=get boundary point at
+            index=] |endIx| run over |nodes| with |isEnd| true.
+        1. If |wordStartBounded| is true and |matchIndex| [=is at a word boundary|is
+            not at a word boundary=] in |searchBuffer|, given the <a
+            spec=html>language</a> from |start|'s [=boundary point/node=] as the
+            |locale|; or |wordEndBounded| is true and |matchIndex| + |queryString|'s
+            [=string/length=] [=is at a word boundary|is not at a word boundary=] in
+            |searchBuffer|, given the <a spec=html>language</a> from |end|'s
+            [=boundary point/node=] as the |locale|:
+            1. Set |searchStart| to |matchIndex| + 1.
+            1. Set |matchIndex| to null.
+    1. Let |endInset| be 0.
+    1. If the last item in |nodes| is |searchRange|'s [=range/end node=] then set
+        |endInset| to (|searchRange|'s [=range/end node=]'s [=Node/length=] &minus;
+        |searchRange|'s [=range/end offset=])
+        <div class="note">
+          |endInset| is the offset from the last position in the last node in the
+          reverse direction. Alternatively, it is the length of the node that's not
+          included in the range.
+        </div>
+    1. If |matchIndex| + |queryString|'s [=string/length=] is greater than
+        |searchBuffer|'s length &minus; |endInset| return null.
+        <div class="note">
+          If the match runs past the end of the search range, return null.
+        </div>
+    1. [=/Assert=]: |start| and |end| are non-null, valid [=/boundary points=] in
+        |searchRange|.
+    1. Return a [=range=] with [=range/start=] |start| and [=range/end=] |end|.
+  </ol>
+</div>
+
+<div algorithm="boundary point at index">
+To <dfn>get boundary point at index</dfn>, given an integer |index|, [=/list=]
+of {{Text}} nodes |nodes|, and a boolean |isEnd|, follow these steps:
+
+<div class="note">
+  <p>
+    This is a small helper routine used by the steps above to determine which
+    node a given index in the concatenated string belongs to.
+  </p>
+  <p>
+    |isEnd| is used to differentiate start and end indices. An end index points
+    to the "one-past-last" character of the matching string. If the match ends
+    at node boundary, we want the end offset to remain within that node, rather
+    than the start of the next node.
+  </p>
+</div>
+
+  <ol class="algorithm">
+    1. Let |counted| be 0.
+    1. For each |curNode| of |nodes|:
+        1. Let |nodeEnd| be |counted| + |curNode|'s [=Node/length=].
+        1. If |isEnd| is true, add 1 to |nodeEnd|.
+        1. If |nodeEnd| is greater than |index| then:
+            1. Return the [=/boundary point=] (|curNode|, |index| &minus; |counted|).
+        1. Increment |counted| by |curNode|'s [=Node/length=].
+    1. Return null.
+  </ol>
+</div>
+
+### Word Boundaries ### {#word-boundaries}
+<div class="note">
+  Limiting matching to word boundaries is one of the mitigations to limit
+  cross-origin information leakage.
+</div>
+<div class="note">
+  See <a
+  href="https://github.com/tc39/proposal-intl-segmenter">Intl.Segmenter</a>, a
+  proposal to specify unicode segmentation, including word segmentation. Once
+  specified, this algorithm may be improved by making use of the Intl.Segmenter
+  API for word boundary matching.
+</div>
+
+<p>
+  A <dfn>word boundary</dfn> is defined in [[!UAX29]] in
+  [[UAX29#Word_Boundaries]]. [[UAX29#Default_Word_Boundaries]] defines a
+  default set of what constitutes a word boundary, but as the specification
+  mentions, a more sophisticated algorithm should be used based on the locale.
+</p>
+<p>
+  Dictionary-based word bounding should take specific care in locales without a
+  word-separating character. E.g. In English, words are separated by the space
+  character (' '); however, in Japanese there is no character that separates one
+  word from the next. In such cases, and where the alphabet contains fewer
+  than 100 characters, the dictionary must not contain more than 20% of the
+  alphabet as valid, one-letter words.
+</p>
+
+A <dfn>locale</dfn> is a <a spec=infra>string</a> containing a valid [[BCP47]]
+language tag, or the empty string. An empty string indicates that the primary
+language is unknown.
+
+A substring is <dfn>word bounded</dfn> in a <a spec=infra>string</a> |text|,
+given [=locales=] |startLocale| and |endLocale|, if both the position of its
+first character [=is at a word boundary=] given |startLocale|, and the position
+after its last character [=is at a word boundary=] given |endLocale|.
+
+A number |position| <dfn>is at a word boundary</dfn> in a <a spec=infra>string</a>
+|text|, given a [=locale=] |locale|, if, using |locale|, either a [=word
+boundary=] immediately precedes the |position|th code unit, or |text|'s length
+is more than 0 and |position| equals either 0 or |text|'s length.
+
+<div class="note">
+  Intuitively, a substring is [=word bounded=] if it neither begins nor ends in
+  the middle of a word.
+
+  In languages with a word separator (e.g. " " space) this is (mostly)
+  straightforward; though there are details covered by the above technical
+  reports such as new lines, hyphenations, quotes, etc.
+
+  Some languages do not have such a separator (notably,
+  Chinese/Japanese/Korean). Languages such as these requires dictionaries to
+  determine what a valid word in the given locale is.
+</div>
+
+<div class="example">
+  <p>
+    Text fragments are restricted such that match terms, when combined with
+    their adjacent context terms, must be word bounded. For example, in an
+    exact search like <code>prefix,textStart,suffix</code>,
+    <code>"prefix+textStart+suffix"</code> must be word bounded. However, in a
+    range search like <code>prefix,textStart,textEnd,suffix</code>, both
+    <code>"prefix+textStart"</code> and <code>"textEnd+suffix"</code> must be
+    word bounded.
+  </p>
+
+  <p>
+    The goal is that a third-party must already know the full tokens they are
+    matching against. A range match like <code>textStart,textEnd</code> must be
+    word bounded on the inside of the two terms; otherwise a third party could
+    use this repeatedly to try and reveal a token (e.g. on a page with
+    <code>"Balance: 123,456 $"</code>, a third-party could set
+    <code>prefix="Balance: ", textEnd="$"</code> and vary <code>textStart</code>
+    to try and guess the numeric token one digit at a time).
+  </p>
+
+  <p>
+    For more details, refer to the [Security Review Doc](https://docs.google.com/document/d/1YHcl1-vE_ZnZ0kL2almeikAj2gkwCq8_5xwIae7PVik/edit#heading=h.78iny7nejmx2)
+  </p>
+</div>
+
+<div class="example">
+  The substring "mountain range" is word bounded within the string "An impressive
+  mountain range" but not within "An impressive mountain ranger".
+</div>
+
+<div class="example">
+  In the Japanese string "ウィキペディアへようこそ" (Welcome to Wikipedia),
+  "ようこそ" (Welcome) is considered word-bounded but "ようこ" is not.
+</div>
+
+## Indicating The Text Match ## {#indicating-the-text-match}
+
+The UA may choose to scroll the text fragment into view as part of the <a
+spec=HTML>try to scroll to the fragment</a> steps or by some other mechanism;
+however, it is not required to scroll the match into view.
+
+The UA should visually indicate the matched text in some way such that the user
+is made aware of the text match, such as with a high-contrast highlight.
+
+The UA should provide to the user some method of dismissing the match, such
+that the matched text no longer appears visually indicated.
+
+The exact appearance and mechanics of the indication are left as UA-defined.
+However, the UA must not use the Document's <a
+href="https://w3c.github.io/selection-api/#dfn-selection">selection</a> to
+indicate the text match as doing so could allow attack vectors for content
+exfiltration.
+
+The UA must not visually indicate any provided context terms.
+
+Since the indicator is not part of the document's content, UAs should consider
+ways to differentiate it from the page's content as perceived by the user.
+
+<div class="example">
+  The UA could provide an in-product help prompt the first few times the
+  indicator appears to help train the user that it comes from the linking page
+  and is provided by the UA.
+</div>
+
+### URLs in UA features ### {#urls-in-ua-features}
+
+<div class='note'>
+  This section is non-normative.
+</div>
+
+UAs provide a number of consumers for a document's URL (outside of programmatic
+APIs like <code>window.location</code>). Examples include a location bar
+indicating the URL of the currently visible document, or the URL used when a
+user requests to create a bookmark for the current page.
+
+To avoid user confusion, UAs should be consistent in whether such URLs include
+the [=fragment directive=]. This section provides a default set of
+recommendations for how UAs should handle these cases.
+
+<div class='note'>
+  <p>
+  We provide these as a baseline for consistent behavior; however, as these
+  features don't affect cross-UA interoperability, they are not strict
+  conformance requirements.
+  </p>
+
+  <p>
+  Exact behavior is left up to the implementing UA which may have differing
+  constraints or reasons for modifying the behavior. e.g. UAs may allow users
+  to configure defaults or expose UI options so users can choose whether they
+  prefer to include fragment directives in these URLs.
+
+  It's also useful to allow UAs to experiment with providing a better
+  experience. E.g. perhaps a URL should elide the text fragment if the user
+  scrolls it out of view?
+  </p>
+</div>
+
+The general principle is that a URL should include the [=fragment directive=]
+only while the visual indicator is visible (i.e. not dismissed). If the user
+dismisses the indicator, the URL should not include the [=fragment directive=].
+
+If the URL includes a text fragment but a match wasn't found in the current
+page, the UA may choose to omit it from the exposed URL.
+
+<div class='note'>
+  <p>
+  A text fragment that isn't found on the page may be useful information to
+  surface to a user to indicate that the page may have changed since the link
+  was created.
+  </p>
+
+  <p>
+  However, it's unlikely to be useful to the user in a bookmark.
+  </p>
+</div>
+
+A few common examples are provided below.
+
+<div class='note'>
+  We use "text fragment" and "fragment directive" interchangeably here as text
+  fragments are assumed to be the only kind of directive. Should additional
+  directives be added in the future, the UX in these cases may have to be
+  re-evaluated separately for new directive types.
+</div>
+
+#### Location Bar #### {#urls-in-location-bar}
+
+The location bar's URL should include a text fragment while it is visually
+indicated. The [=fragment directive=] should be stripped from the location bar
+URL when the user dismisses the indication.
+
+It is recommended that the text fragment be displayed in the location bar's URL
+even if a match wasn't located in the document.
+
+#### Bookmarks #### {#urls-in-bookmarks}
+
+Many UAs provide a "bookmark" feature allowing users to store a convenient link
+to the current page in the UA's interface.
+
+A newly created bookmark should, by default, include the [=fragment directive=]
+in the URL if, and only if, a match was found and the visual indicator hasn't
+been dismissed.
+
+Navigating to a URL from a bookmark should process a [=fragment directive=] as
+if it were navigated to in a typical navigation.
+
+#### Sharing #### {#urls-in-sharing}
+
+Some UAs provide a method for users to share the current page with others,
+typically by providing the URL to another app or messaging service.
+
+When providing a URL in these situations, it should include the [=fragment
+directive=] if, and only if, a match was found and the visual indicator hasn't
+been dismissed.
+
+## Document Policy Integration ## {#document-policy-integration}
+
+<!-- TODO:Replace manual links with autolinks to document-policy definitions
+          once it's referrable.  Also remember to autolink the ref in the
+          navigating-to-text-fragment section -->
+
+This specification defines a <a href="https://w3c.github.io/webappsec-permissions-policy/document-policy.html#configuration-point">configuration point</a>
+in [[!document-policy|Document Policy]] with name "force-load-at-top". Its
+<a href="https://w3c.github.io/webappsec-permissions-policy/document-policy.html#configuration-point-type">type</a> is `boolean`
+with <a href="https://w3c.github.io/webappsec-permissions-policy/document-policy.html#configuration-point-default-value">default value</a>
+`false`.
+
+<div class="note">
+  When enabled, this policy disables all automatic scroll-on-load features:
+  text-fragments, element fragments, history scroll restoration.
+</div>
+<div class='example'>
+  Suppose the user navigates to `https://example.com#:~:text=foo`. The
+  example.com server response includes the header:
+
+  ```
+  Document-Policy: force-load-at-top
+  ```
+
+  When the page loads, the element containing "foo" will be marked as the
+  indicated part of the document and set as the document's target element.
+  However, "foo" will not be scrolled into view.
+</div>
+
+Fragment-based scroll blocking from this policy is specified in an amendment to the
+<a spec=HTML>scroll to the fragment</a> algorithm in the
+[[#navigating-to-text-fragment]] section of this document.
+
+History scroll restoration is blocked by amending the <a spec="HTML">restore
+persisted state</a> steps by inserting a new step after 2:
+
+3. <a href="https://w3c.github.io/webappsec-permissions-policy/document-policy.html#algo-get-policy-value">Get
+    the document policy value</a> of the "force-load-at-top" feature for the [=Document=]. If
+    the result is true, then the user agent should not restore the scroll
+    position for the [=Document=] or any of its scrollable regions. Scroll
+    positions for [=child browsing contexts=] should be restored based on the
+    value of this policy in the child [=Document=].
+
+
+## Feature Detectability ## {#feature-detectability}
+
+For feature detectability, we propose adding a new FragmentDirective interface
+that is exposed via <code>document.fragmentDirective</code> if the UA supports
+the feature.
+
+<pre class='idl'>
+  [Exposed=Window]
+  interface FragmentDirective {
+  };
+</pre>
+
+We amend the {{Document}} interface to include a <code>fragmentDirective</code>
+property:
+
+<pre class='idl'>
+  partial interface Document {
+      [SameObject] readonly attribute FragmentDirective fragmentDirective;
+  };
+</pre>
+
+This object may be used to expose additional information about the text
+fragment or other fragment directives in the future.
+
+# Generating Text Fragment Directives # {#generating-text-fragment-directives}
+
+<div class='note'>
+  This section is non-normative.
+</div>
+
+This section contains recommendations for UAs automatically generating URLs
+with a [=text fragment directive=]. These recommendations aren't normative but
+are provided to ensure generated URLs result in maximally stable and usable
+URLs.
+
+## Prefer Exact Matching To Range-based ## {#prefer-exact-matching-to-range-based}
+
+The match text can be provided either as an exact string "text=foo%20bar%20baz"
+or as a range "text=foo,bar".
+
+UAs should prefer to specify the entire string where practical. This ensures
+that if the destination page is removed or changed, the intended destination can
+still be derived from the URL itself.
+
+<div class='example'>
+  Suppose we wish to craft a URL to
+  https://en.wikipedia.org/wiki/History_of_computing quoting the sentence:
+
+  <pre>
+    The first recorded idea of using digital electronics for computing was the
+    1931 paper "The Use of Thyratrons for High Speed Automatic Counting of
+    Physical Phenomena" by C. E. Wynn-Williams.
+  </pre>
+
+  We could create a range-based match like so:
+
+  <a href="https://en.wikipedia.org/wiki/History_of_computing#:~:text=The%20first%20recorded,Williams">
+  https://en.wikipedia.org/wiki/History_of_computing#:~:text=The%20first%20recorded,Williams</a>
+
+  Or we could encode the entire sentence using an exact match term:
+
+  <a href="https://en.wikipedia.org/wiki/History_of_computing#:~:text=The%20first%20recorded%20idea%20of%20using%20digital%20electronics%20for%20computing%20was%20the%201931%20paper%20%22The%20Use%20of%20Thyratrons%20for%20High%20Speed%20Automatic%20Counting%20of%20Physical%20Phenomena%22%20by%20C.%20E.%20Wynn-Williams">
+  https://en.wikipedia.org/wiki/History_of_computing#:~:text=The%20first%20recorded%20idea%20of%20using%20digital%20electronics%20for%20computing%20was%20the%201931%20paper%20%22The%20Use%20of%20Thyratrons%20for%20High%20Speed%20Automatic%20Counting%20of%20Physical%20Phenomena%22%20by%20C.%20E.%20Wynn-Williams</a>
+
+  The range-based match is less stable, meaning that if the page is changed to
+  include another instance of "The first recorded" somewhere earlier in the
+  page, the link will now target an unintended text snippet.
+
+  The range-based match is also less useful semantically. If the page is
+  changed to remove the sentence, the user won't know what the intended
+  target was. In the exact match case, the user can read, or the UA can
+  surface, the text that was being searched for but not found.
+</div>
+
+Range-based matches can be helpful when the quoted text is excessively long
+and encoding the entire string would produce an unwieldy URL.
+
+It is recommended that text snippets shorter than 300 characters always be
+encoded using an exact match. Above this limit, the UA should encode the string
+as a range-based match.
+
+<div class='note'>
+  TODO:  Can we determine the above limit in some less arbitrary way?
+</div>
+
+## Use Context Only When Necessary ## {#use-context-only-when-necessary}
+
+Context terms allow the [=text fragment directive=] to disambiguate text
+snippets on a page. However, their use can make the URL more brittle in some
+cases. Often, the desired string will start or end at an element boundary. The
+context will therefore exist in an adjacent element. Changes to the page
+structure could invalidate the [=text fragment directive=] since the context and
+match text may no longer appear to be adjacent.
+
+<div class='example'>
+  Suppose we wish to craft a URL for the following text:
+
+  <pre>
+    &lt;div class="section"&gt;HEADER&lt;/div&gt;
+    &lt;div class="content"&gt;Text to quote&lt;/div&gt;
+  </pre>
+
+  We could craft the [=text fragment directive=] as follows:
+
+  <pre>
+    text=HEADER-,Text%20to%20quote
+  </pre>
+
+  However, suppose the page changes to add a "[edit]" link beside all section
+  headers. This would now break the URL.
+</div>
+
+Where a text snippet is long enough and unique, a UA should prefer to avoid
+adding superfluous context terms.
+
+It is recommended that context should be used only if one of the following is
+true:
+<ul>
+  <li>The UA determines the quoted text is ambiguous</li>
+  <li>The quoted text contains 3 or fewer words</li>
+</ul>
+
+<div class="note">
+  TODO: Determine the numeric limit above in less arbitrary way.
+</div>
+
+## Determine If Fragment Id Is Needed ## {#determine-if-fragment-id-is-needed}
+
+When the UA navigates to a URL containing a [=text fragment directive=], it will
+fallback to scrolling into view a regular element-id based fragment if it
+exists and the text fragment isn't found.
+
+This can be useful to provide a fallback, in case the text in the document
+changes, invalidating the [=text fragment directive=].
+
+<div class='example'>
+  Suppose we wish to craft a URL to
+  https://en.wikipedia.org/wiki/History_of_computing quoting the sentence:
+
+  <pre>
+    The earliest known tool for use in computation is the Sumerian abacus
+  </pre>
+
+  By specifying the section that the text appears in, we ensure that, if the
+  text is changed or removed, the user will still be pointed to the relevant
+  section:
+
+  <a href="https://en.wikipedia.org/wiki/History_of_computing#Early_computation:~:text=The%20earliest%20known%20tool%20for%20use%20in%20computation%20is%20the%20Sumerian%20abacus">
+  https://en.wikipedia.org/wiki/History_of_computing#Early_computation:~:text=The%20earliest%20known%20tool%20for%20use%20in%20computation%20is%20the%20Sumerian%20abacus</a>
+</div>
+
+However, UAs should take care that the fallback element-id fragment is the
+correct one:
+
+<div class='example'>
+  Suppose the user navigates to
+  https://en.wikipedia.org/wiki/History_of_computing#Early_computation. They
+  now scroll down to the Symbolic Computations section. There, they select a
+  text snippet and choose to create a URL to it:
+
+  <pre>
+    By the late 1960s, computer systems could perform symbolic algebraic
+    manipulations
+  </pre>
+
+  The UA should note that, even though the current URL of the page is:
+  https://en.wikipedia.org/wiki/History_of_computing#Early_computation, using
+  #Early_computation as a fallback is inappropriate. If the above sentence is
+  changed or removed, the page will load in the #Early_computation section
+  which could be quite confusing to the user.
+
+  If the UA cannot reliably determine an appropriate fragment to fallback to,
+  it should remove the fragment id from the URL:
+
+  <a href="https://en.wikipedia.org/wiki/History_of_computing#:~:text=By%20the%20late%201960s,%20computer%20systems%20could%20perform%20symbolic%20algebraic%20manipulations">
+  https://en.wikipedia.org/wiki/History_of_computing#:~:text=By%20the%20late%201960s,%20computer%20systems%20could%20perform%20symbolic%20algebraic%20manipulations</a>
+</div>
+
+If a UA chooses not to scroll text fragments into view on navigation (reasons
+why a UA may make this choice are discussed in [[#security-and-privacy]]), it
+must scroll the element-id into view, if provided, regardless of whether a text
+fragment was matched. Not doing so would allow detecting the text fragment
+match based on whether the element-id was scrolled.

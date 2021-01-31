@@ -1,0 +1,626 @@
+<pre class='metadata'>
+Group: WHATWG
+Date: 2019-02-18
+H1: Quirks Mode
+Shortname: quirks
+Text Macro: TWITTER quirksstandard
+Abstract: Quirks Mode defines quirks in CSS and Selectors that are necessary to support for Web browsers for compatibility with the Web.
+</pre>
+
+<pre class="biblio">
+{
+    "INTRINSIC": {
+        "authors": [ "David Baron" ],
+        "href": "https://dbaron.org/css/intrinsic/",
+        "title": "More Precise Definitions of Intrinsic Widths and Table Layout (Proposal)"
+    }
+}
+</pre>
+
+<pre class=anchors>
+urlPrefix: https://drafts.csswg.org/css2/; spec:css2
+    urlPrefix: visuren.html
+        type: dfn; text: block container element
+    urlPrefix: conform.html
+        type: dfn; text: illegal
+        type: dfn; text: replaced element
+    urlPrefix: box.html
+        type: dfn; text: border box; url: #border-edge
+        type: dfn; text: content box; url: #content-edge
+urlPrefix: https://dbaron.org/css/intrinsic/
+    type: dfn;
+        text: min-content width of an inline formatting context; url: #inline-intrinsic-min
+        text: outer min-content width of a table cell; url: #autotable
+</pre>
+
+<pre class=link-defaults>
+spec:css2; type:property;
+    text:min-width
+    text:min-height
+    text:max-width
+    text:max-height
+spec:css-sizing-3
+    type:property; text:box-sizing
+    type:value; for:box-sizing; text:border-box
+spec:css-tables-3; type:property; text:border-spacing
+spec:css-color-4; type:property; text:color
+spec:cssom-1; type:interface; text:CSS
+spec:selectors-4; type:selector
+    text::active
+    text::hover
+</pre>
+
+<style>
+ .logo { position:absolute; top:1em; right:1em; width:106px; height:106px; border:1px outset gray; margin-top:-4px; margin-right:-4px }
+ div.head .logo > img { top:2px; right:2px; border:1px inset gray }
+ @media (max-width: 767px) {
+  .logo { width:calc(4em + 6px); height:calc(4em + 6px) }
+ }
+</style>
+
+
+<h2 id=introduction>Introduction</h2>
+
+<h3 id=history>History</h3>
+
+<p>Browsers have several rendering modes to render HTML documents. The reason for this is basically
+a historical accident. The CSS specification was incompatible with the behavior of existing browsers
+which existing Web content relied on. In order to comply with the specification while not breaking
+existing content, browsers introduced a new rendering mode (no-quirks mode). Some browsers still had
+the shrink-wrapping behavior for images in table cells in their no-quirks mode, and sites started
+relying on that, so browsers that implemented the specification's behavior introduced a third mode
+(limited-quirks mode). In hindsight, it would have been better to make the default CSS behavior be
+compatible with what the existing content relied on and providing opt-ins to different behavior. The
+different modes have since gained a few differences outside of CSS.
+
+
+<h3 id=goals>Goals</h3>
+
+<ul>
+
+ <li>
+  <p>Create a specification for rendering old (or indeed new, if they happen to have a particular
+  pragma) HTML documents.
+
+  <p class=note>The HTML specification <a
+  href="https://html.spec.whatwg.org/multipage/syntax.html#the-initial-insertion-mode">defines</a>
+  when a document is set to <a>quirks mode</a>, <a>limited-quirks mode</a> or <a>no-quirks mode</a>.
+  [[HTML]]
+
+ <li>
+
+  <p>Remove quirks from implementations that are not needed for Web compatibility.
+
+  <p class=example id=example-removed-quirks>For example, <a
+  href="https://bugzilla.mozilla.org/show_bug.cgi?id=648331">Gecko has removed a quirk about list
+  item bullet size</a>, and <a
+  href="https://bugs.chromium.org/p/chromium/issues/detail?id=369979">Chromium has removed a quirk
+  where display was forced to table or inline-table on <code>table</code> elements</a>.</p>
+
+ <li>
+
+  <p>Get interoperability on quirks that <em>are</em> needed for Web compatibility.
+
+  <p class=example id=example-interop-quirks>For example, <a
+  href="https://bugzilla.mozilla.org/show_bug.cgi?id=783213">Gecko aligned their implementation of
+  the :active and :hover quirk</a> with this specification and thereby achieved closer
+  interoperability with other browsers.
+
+ <li>
+
+  <p>Where possible, limit quirks to a fixed set of legacy features so they don't propagate into
+  new features.
+
+  <p class=example id=example-limit-quirks>For example, <a>quirky colors</a> are limited to a fixed
+  set of CSS properties so that they do not apply in SVG features that also accept colors, or in <a
+  href="https://bugs.webkit.org/show_bug.cgi?id=153730">CSS gradients where the grammar could
+  otherwise become ambiguous</a>.
+
+</ul>
+
+<p class=note>This specification does not enumerate all quirks that currently exist in browsers. A
+number of quirks are specified in HTML, DOM, CSSOM and CSSOM View. [[HTML]] [[DOM]] [[CSSOM]]
+[[CSSOM-VIEW]] If a quirk is not specified anywhere, it is probably due to the second bullet point
+above.
+
+
+<h2 id=common-infrastructure>Common infrastructure</h2>
+
+<h3 id=conformance>Conformance</h3>
+
+<p>All diagrams, examples, and notes in this specification are non-normative, as are all sections
+explicitly marked non-normative. Everything else in this specification is normative.
+
+<p>The key words "MUST", "MUST NOT", "REQUIRED", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT
+RECOMMENDED", "MAY", and "OPTIONAL" in the normative parts of this specification are to be
+interpreted as described in RFC2119. For readability, these words do not appear in all uppercase
+letters in this specification. [[!RFC2119]]
+
+
+<h3 id=terminology>Terminology</h3>
+
+<p>When this specification refers to a "<code>|foo|</code> element", it means an element with the
+local name |foo| and having the namespace <code>http://www.w3.org/1999/xhtml</code>.
+
+<p>When this specification refers to a "<code>|foo|</code> attribute", it means an attribute with
+the local name |foo| and having no namespace.
+
+<p>The <dfn>document's body element</dfn> is the first <a spec=dom>child</a> of the <a
+spec=dom>document element</a> that is a <{body}> element, if there is one, and the <a
+spec=dom>document element</a> is an <{html}> element. Otherwise it is null.
+
+<p class=note>The <a>document's body element</a> is different from HTML's <a spec=html>the body
+element</a>, since the latter can be a <{frameset}> element.
+
+
+<h2 id=css>CSS</h2>
+
+<h3 algorithm id=the-hashless-hex-color-quirk>The hashless hex color quirk</h3>
+
+<p><dfn export lt="quirky color">Quirky colors</dfn> are denoted by <dfn export type
+id=quirky-color-value>&lt;quirky-color></dfn>. A <a>quirky color</a> corresponds to a
+<<number-token>>, a <<dimension-token>> or an <<ident-token>> <a>component value</a> in the syntax.
+The value of a <a>quirky color</a> is obtained from the possible <a>component values</a> using the
+following algorithm, aborting on the first step that returns a value:
+
+<ol>
+
+ <li><p>Let |cv| be the <a>component value</a>.
+
+ <li>
+
+  <p>If |cv| is a <<number-token>> or a <<dimension-token>>, follow these substeps:
+
+  <ol>
+
+   <li>
+
+    <p>If |cv|'s type flag is not "integer", return an error.
+
+    <p class="note">This means that values that happen to use scientific notation, e.g.,
+    <code>5e5e5e</code>, will fail to parse.
+
+    <!-- https://www.w3.org/Bugs/Public/show_bug.cgi?id=29489 -->
+
+   <li><p>If |cv|'s value is less than zero, return an error.
+
+   <li><p>Let |serialization| be the serialization of |cv|'s value, as a base-ten integer using
+   digits 0-9 (U+0030 to U+0039) in the shortest form possible.
+
+   <li><p>If |cv| is a <<dimension-token>>, append the unit to |serialization|.
+
+   <li><p>If |serialization| consists of fewer than six characters, prepend zeros (U+0030) so that
+   it becomes six characters.
+
+  </ol>
+
+ <li><p>Otherwise, |cv| is an <<ident-token>>; let |serialization| be |cv|'s value.
+
+ <li><p>If |serialization| does not consist of three or six characters, return an error.
+
+ <li><p>If |serialization| contains any characters not in the range [0-9A-Fa-f] (U+0030 to U+0039,
+ U+0041 to U+0046, U+0061 to U+0066), return an error.
+
+ <li><p>Return the concatenation of "<code>#</code>" (U+0023) and |serialization|.
+
+</ol>
+
+<p>If the value of a <a>quirky color</a> is an error, it is an <a>illegal</a> value.
+Otherwise, the value of a <a>quirky color</a> must be interpreted as an RGB value in hexadecimal
+notation using the same rules as for <<color>>.
+
+<p>In <a spec=dom>quirks mode</a>, the following properties must have
+their "Value" grammar changed by replacing <<color>> with:
+
+<pre class=prod>
+[ <<color>> | <<quirky-color>> ]
+</pre>
+
+<ul class=brief>
+ <li>'background-color'
+ <li>'border-color'
+ <li>'border-top-color'
+ <li>'border-right-color'
+ <li>'border-bottom-color'
+ <li>'border-left-color'
+ <li>'color'
+</ul>
+
+<p>Any property not listed above must not support <<quirky-color>> even if it references one of the
+above properties in its "Value" grammar.
+
+<p>This quirk must apply inside an <a>@supports</a> at-rule.
+
+<p>The <<quirky-color>> value must not be supported in arguments to CSS expressions, and must not be
+supported in the <code><a method for=CSS lt="supports(property, value)">supports()</a></code> static
+method of the {{CSS}} interface.</p>
+
+
+<h3 id=the-unitless-length-quirk>The unitless length quirk</h3>
+
+<p><dfn export lt="quirky length">Quirky lengths</dfn> are denoted by <dfn export type
+id=quirky-length-value>&lt;quirky-length></dfn>. A <a>quirky length</a> is a <a>number</a> and
+corresponds to a <<number-token>> <a>component value</a> in the syntax. The value of a <a>quirky
+length</a> is obtained from the <a>component value</a>'s value.
+
+<p>The value of a <a>quirky length</a> must be interpreted as a <<length>> where the unit is ''px''.
+
+<p>In <a spec=dom>quirks mode</a>, the following properties must have
+their "Value" grammar changed by replacing <<length>> with:
+
+<pre class=prod>
+[ <<length>> | <<quirky-length>> ]
+</pre>
+
+<ul class=brief>
+ <li>'background-position'
+ <li>'border-spacing'
+ <li>'border-top-width'
+ <li>'border-right-width'
+ <li>'border-bottom-width'
+ <li>'border-left-width'
+ <li>'border-width'
+ <li>'bottom'
+ <li>'clip'
+ <li>'font-size'
+ <li>'height'
+ <li>'left'
+ <li>'letter-spacing'
+ <li>'margin-right'
+ <li>'margin-left'
+ <li>'margin-top'
+ <li>'margin-bottom'
+ <li>'margin'
+ <li>'max-height'
+ <li>'max-width'
+ <li>'min-height'
+ <li>'min-width'
+ <li>'padding-top'
+ <li>'padding-right'
+ <li>'padding-bottom'
+ <li>'padding-left'
+ <li>'padding'
+ <li>'right'
+ <li>'text-indent'
+ <li>'top'
+ <li>'vertical-align'
+ <li>'width'
+ <li>'word-spacing'
+</ul>
+
+<p>Any property not listed above must not support <<quirky-length>> even if it references one of the
+above properties in its "Value" grammar.
+
+<p>This quirk must apply inside an <a>@supports</a> at-rule.
+
+<p>The <<quirky-length>> value must not be supported in arguments to CSS expressions other than the
+<a>rect()</a> expression, and must not be supported in the <code><a method for=CSS
+lt="supports(property, value)">supports()</a></code> static method of the {{CSS}} interface.</p>
+
+
+<h3 algorithm id=the-line-height-calculation-quirk>The line height calculation quirk</h3>
+
+<p>In <a spec=dom>quirks mode</a> and <a spec=dom>limited-quirks mode</a>, an inline box that
+matches the following conditions, must, for the purpose of line height calculation, act as if the
+box had a 'line-height' of zero.
+
+<ul>
+
+ <li><p>The 'border-top-width', 'border-bottom-width', 'padding-top' and 'padding-bottom' properties
+ have a <a>used value</a> of zero and the box has a <a>vertical writing mode</a>, or the
+ 'border-right-width', 'border-left-width', 'padding-right' and 'padding-left' properties have a
+ <a>used value</a> of zero and the box has a <a>horizontal writing mode</a>.
+
+ <!-- This matches WebKit. Presto and IE9 don't have this [Presto has now implemented this
+(CORE-19183)]. Gecko has this rule for all margins, paddings and borders. -->
+
+ <li><p>It either contains no text or it contains only collapsed whitespace.
+
+ <!-- This matches Gecko and WebKit. IE still uses the quirk in "<pre><img> ". Presto still uses the
+ quirk in "<p><img> <img>". -->
+
+ <!-- For the purpose of this bullet point, the 'white-space' processing model must not remove a
+ space (U+0020) at the end of a line has 'white-space' set to 'normal', 'nowrap', or 'pre-line' as
+ each line is laid out. (This matches Firefox but not WebKit. Presto had a bug about a site that
+ relied on the Firefox behavior.)-->
+
+</ul>
+
+
+<h3 id=the-blocks-ignore-line-height-quirk>The blocks ignore line-height quirk</h3>
+
+<p>In <a spec=dom>quirks mode</a> and <a spec=dom>limited-quirks mode</a>, for a <a>block container
+element</a> whose content is composed of <a>inline-level</a> elements, the element's 'line-height'
+must be ignored for the purpose of calculating the minimal height of line boxes within the element.
+
+<p class=note>This means that the "strut" is not created.</p>
+
+
+<h3 algorithm id=the-percentage-height-calculation-quirk>The percentage height calculation
+quirk</h3>
+
+<p>In <a spec=dom>quirks mode</a>, for the purpose of calculating the 'height' of an element
+|element|, if the <a>computed value</a> of the 'position' property of |element| is
+''position/relative'' or ''position/static'', the specified value for the 'height' property of
+|element| is a <<percentage>>, and |element| does not have a <a>computed value</a> of the 'display'
+property that is ''display/table-row'', ''display/table-row-group'', ''display/table-header-group'',
+''display/table-footer-group'', ''display/table-cell'' or ''display/table-caption'', the
+<a>containing block</a> of |element| must be calculated using the following algorithm, aborting on
+the first step that returns a value:
+
+<ol>
+
+ <li><p>Let |element| be the nearest ancestor <a>block container box</a> of |element|, if there is
+ one. Otherwise, return the <a>initial containing block</a>.
+
+ <li><p>If |element| has a <a>computed value</a> of the 'display' property that is
+ ''display/table-cell'', return a UA-defined value.
+
+ <li><p>If |element| has a <a>computed value</a> of the 'height' property that is not
+ ''height/auto'', return |element|.
+
+ <li><p>If |element| has a <a>computed value</a> of the 'position' property that is
+ ''position/absolute'', return |element|.
+
+ <li><p>Jump to the first step.
+
+</ol>
+
+<p class=note>It is at the time or writing undefined how percentage heights inside tables work in
+CSS. This specification does not try to specify what to use as the containing block for calculating
+percentage heights in tables. Godspeed!
+
+<p class=issue>This quirk needs to take writing modes into account and maybe bail for grids.</p>
+
+
+<h3 algorithm id=the-html-element-fills-the-viewport-quirk>The <{html}> element fills the viewport
+quirk</h3>
+
+<p>In <a spec=dom>quirks mode</a>, if the <a spec=dom>document element</a> |element| matches the
+following conditions:
+
+<ul>
+
+ <li><p>|element| is an <{html}> element.
+
+ <li><p>The <a>computed value</a> of the 'width' property of |element| is ''width/auto'' and
+ |element| has a <a>vertical writing mode</a>, or the <a>computed value</a> of the 'height' property
+ of |element| is ''height/auto'' and |element| has a <a>horizontal writing mode</a>.
+ [[!CSS-WRITING-MODES-3]]
+
+</ul>
+
+<p>...then |element| must have its <a>border box</a> size in the <a>block flow direction</a> set
+using the following algorithm:
+
+<ol>
+
+ <li><p>Let |margins| be sum of the <a>used values</a> of the 'margin-left' and 'margin-right'
+ properties of |element| if |element| has a <a>vertical writing mode</a>, otherwise let |margins| be
+ the sum of the <a>used values</a> of the 'margin-top' and 'margin-bottom' properties of |element|.
+
+ <li><p>Let |size| be the size of the <a>initial containing block</a> in the <a>block flow
+ direction</a> minus |margins|.
+
+ <li><p>Return the bigger value of |size| and the normal <a>border box</a> size the element would
+ have according to the CSS specification.
+
+</ol>
+
+
+<h3 id=the-body-element-fills-the-html-element-quirk>The <{body}> element fills the <{html}> element
+quirk</h3>
+
+<p>In <a spec=dom>quirks mode</a>, if the <a>document's body element</a> |body| is not null and if
+it matches the following conditions:
+
+<ul>
+
+ <li><p>The <a>computed value</a> of the 'width' property of |body| is ''width/auto'' and |body| has
+ a <a>vertical writing mode</a>, or the <a>computed value</a> of the 'height' property of |body| is
+ ''height/auto'' and |body| has a <a>horizontal writing mode</a>. [[!CSS-WRITING-MODES-3]]
+
+ <li><p>The <a>computed value</a> of the 'position' property of |body| is not ''position/absolute''
+ or ''position/fixed''.
+
+ <li><p>The <a>computed value</a> of the 'float' property of |body| is ''float/none''.
+
+ <li><p>|body| is not an <a>inline-level</a> element.
+
+ <li><p>|body| is not a <a>spanning element</a>. [[!CSS3-MULTICOL]]
+
+</ul>
+
+<p>...then |body| must have its <a>border box</a> size in the <a>block flow direction</a> set using
+the following algorithm:
+
+<ol>
+
+ <li><p>Let |margins| be the sum of the <a>used values</a> of the 'margin-left' and 'margin-right'
+ properties of |body| if |body| has a <a>vertical writing mode</a>, otherwise |margins| it be the
+ sum of the <a>used values</a> of the 'margin-top' and 'margin-bottom' properties of |body|.
+
+ <li><p>Let |size| be the size of |body|'s parent element's <a>content box</a> in the <a>block flow
+ direction</a> minus |margins|.
+
+ <li><p>Return the bigger value of |size| and the normal <a>border box</a> size the element would
+ have according to the CSS specification.
+
+</ol>
+
+<p class=big-issue>What should happen if the <{html}> and the <{body}> have different writing modes?
+
+
+<h3 id=the-table-cell-width-calculation-quirk>The table cell width calculation quirk</h3>
+
+<p>In <a spec=dom>quirks mode</a>, for the purpose of calculating the <a>min-content width of an
+inline formatting context</a> for which a table cell |cell| is the <a>containing block</a>, if
+|cell| has a <a>computed value</a> of the 'width' property that is ''width/auto'', <{img}> elements
+that are <a>inline-level</a> <a>replaced elements</a> in that <a>inline formatting context</a> must
+not have a <a>soft wrap opportunity</a> before or after them. [[!CSS-TEXT-3]] [[!INTRINSIC]]</p>
+
+<!-- http://mxr.mozilla.org/mozilla-central/source/layout/generic/nsImageFrame.cpp#2053 -->
+
+
+<h3 id=the-table-cell-nowrap-minimum-width-calculation-quirk>The table cell nowrap minimum width
+calculation quirk</h3>
+
+<p>In <a spec=dom>quirks mode</a>, an element |cell| that matches the following conditions must act
+as if it had an <a>outer min-content width of a table cell</a> in the automatic table layout
+algorithm that is the bigger value of |cell|'s <a>computed value</a> of the 'width' property and the
+<a>outer min-content width of a table cell</a>. [[!INTRINSIC]]
+
+<ul>
+
+ <li><p>|cell| is a <{td}> element or a <{th}> element.
+
+ <li><p>|cell| has a <code>nowrap</code> attribute.
+
+ <li><p>The <a>computed value</a> of the 'width' property of |cell| is a <<length>> that is not
+ zero.
+
+</ul>
+
+
+<h3 id=the-collapsing-table-quirk>The collapsing table quirk</h3>
+
+<p>In <a spec=dom>quirks mode</a>, an element |table| that matches the following conditions must
+have a <a>used value</a> of the 'height' property of ''0'' and a <a>used value</a> of the
+'border-style' property of ''border-style/none''.
+
+<ul>
+
+ <li><p>|table| has a <a>computed value</a> of the 'display' property that is ''display/table''.
+
+ <li><p>|table| has no child ''display/table-row-group'', ''display/table-header-group'',
+ ''display/table-footer-group'' or ''display/table-caption'' box.
+
+ <li><p>|table| has no child ''display/table-column-group'' box that itself has a child
+ ''display/table-column'' box.
+
+</ul>
+
+
+<h3 id=the-text-decoration-doesnt-propagate-into-tables-quirk>The text decoration doesn't propagate
+into tables quirk</h3>
+
+<p>In <a spec=dom>quirks mode</a>, text decoration must not propagate
+into <{table}> elements.</p>
+
+<!-- http://mxr.mozilla.org/mozilla-central/source/layout/generic/nsTextFrameThebes.cpp#4582 -->
+
+
+<h3 algorithm id=the-tables-inherit-color-from-body-quirk>The tables inherit color from body
+quirk</h3>
+
+<p>In <a spec=dom>quirks mode</a>, the initial value of the 'color'
+property must be ''quirk-inherit'', a special value that has no keyword mapping to it.
+
+<p>The <a>computed value</a> of the 'color' property of an element |element| must be calculated
+using the following algorithm:
+
+<ol>
+
+ <li><p>If the specified value of the 'color' property of |element| is not
+ ''quirk-inherit'', jump to the last step.
+
+ <li><p>If |element| is not a <{table}> element, jump to the last step.
+
+ <li><p>If the <a>document's body element</a> is null, jump to the last step.
+
+ <li><p>Return the <a>used value</a> of the 'color' property of the <a>document's body element</a>.
+ Abort these steps.
+
+ <li><p>If the specified value of the 'color' property of |element| is ''quirk-inherit'', let the
+ specified value of the 'color' property of |element| be the initial value of the 'color' property
+ according to the CSS specification. Return the <a>computed value</a> of the 'color' property of
+ |element| as specified in the CSS specification.
+
+</ol>
+
+
+<!--
+<h3 id=the-font-size-calculation-quirk>The font size calculation quirk</h3>
+
+<p class="note">Status: Needs research.
+
+<pre class=XXX>http://mxr.mozilla.org/mozilla-central/source/layout/style/nsStyleUtil.cpp#64
+http://trac.webkit.org/browser/trunk/Source/WebCore/css/CSSStyleSelector.cpp?rev=113922#L4920</pre>
+
+Presto and IE (any mode) don't have this quirk.
+
+https://bugzilla.mozilla.org/show_bug.cgi?id=747464
+https://bugs.webkit.org/show_bug.cgi?id=84469
+https://code.google.com/p/chromium/issues/detail?id=585390
+-->
+
+
+<h3 id=the-table-cell-height-box-sizing-quirk>The table cell height box sizing quirk</h3>
+
+<p>In <a spec=dom>quirks mode</a>, elements that have a <a>computed value</a> of the 'display'
+property of ''display/table-cell'' must act as they have <a>used value</a> of the 'box-sizing'
+property of ''box-sizing/border-box'', but only for the purpose of the 'height', 'min-height' and
+'max-height' properties.
+
+
+<h2 id=selectors>Selectors</h2>
+
+<p class=big-issue>The following test appears to be invalid. See <a
+href="https://bugs.chromium.org/p/chromium/issues/detail?id=733682#c20">chromium issue
+733682</a>.</p>
+
+
+<h3 algorithm id=the-active-and-hover-quirk>The :active and :hover quirk</h3>
+
+<p>In <a spec=dom>quirks mode</a>, a <a>compound selector</a> |selector| that matches the following
+conditions must not match elements that would not also match the '':any-link'' selector.
+[[!SELECTORS4]]
+
+<ul>
+
+ <li><p>|selector| uses the '':active'' or '':hover'' <a>pseudo-classes</a>.
+
+ <li><p>|selector| does not use a <a>type selector</a>.
+
+ <li><p>|selector| does not use an <a>attribute selector</a>.
+
+ <li><p>|selector| does not use an <a>ID selector</a>.
+
+ <li><p>|selector| does not use a <a>class selector</a>.
+
+ <li><p>|selector| does not use a <a>pseudo-class</a> selector other than '':active'' and
+ '':hover''.
+
+ <li><p>|selector| does not use a <a>pseudo-element</a> selector.
+
+ <li><p>|selector| is not part of an argument to a <a>functional pseudo-class</a> or
+ <a>pseudo-element</a>.
+
+</ul>
+
+
+<h2 class=no-num id=security-privacy>Security and Privacy Considerations</h2>
+
+<p>There are no known security or privacy impacts in this specification.</p>
+
+
+<h2 class=no-num id=acknowledgments>Acknowledgments</h2>
+
+<p>Thanks to
+Anne van Kesteren,
+Boris Zbarsky,
+Chris Rebert,
+David Baron,
+Kang-Hao Lu,
+Ms2ger,
+Simon Sapin,
+and
+Tab Atkins
+for their useful comments.
+
+<p>Special thanks to Boris Zbarsky and David Baron for documenting <a
+href="https://developer.mozilla.org/en-US/docs/Mozilla/Mozilla_quirks_mode_behavior">Mozilla's
+quirks in MDN</a>.
+
+<p>This standard is written by Simon Pieters (<a href="https://bocoup.com/">Bocoup</a>, <a
+href="mailto:zcorpan@gmail.com">zcorpan@gmail.com</a>).

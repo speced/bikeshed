@@ -203,6 +203,7 @@ spec:dom; type:interface; text:DocumentOrShadowRoot
 spec:dom; type:interface; text:EventTarget
 spec:dom; type:interface; text:Event
 spec:dom; type:dfn; for:/; text:shadow root
+spec:css-color-4; type:value; text:transparent
 spec:css-values-3; type:type; text:<ident>
 spec:css-backgrounds-3; type:property;
     text:border-width
@@ -447,7 +448,7 @@ refer to updating the property directly <em>without</em> invoking any related
 procedure.
 
 Further documentation conventions that are not specific to this specification
-are described in [[#document-conventions]].
+are described in [[#conventions]].
 
 Web Animations model overview {#web-animations-model-overview}
 =======================================
@@ -615,18 +616,11 @@ a timing node is not in a state to produce a <a>time value</a>.
 Timelines {#timelines}
 ----------------------------------------
 
-A <dfn>timeline</dfn> provides a source of <a>time values</a> for the
+A <dfn export>timeline</dfn> provides a source of <a>time values</a> for the
 purpose of synchronization.
 
 At any given moment, a [=timeline=] has a single current [=time value=] known
 simply as the timeline's <dfn lt="timeline current time">current time</dfn>.
-
-A <a>timeline</a> may not always be able to return a meaningful <a>time
-value</a>, but only an <a>unresolved</a> time value. For example, it may
-be defined relative to a moment that has yet to occur, such as the firing of
-a document's load event.
-A <a>timeline</a> is considered to be <dfn lt="inactive timeline">inactive</dfn>
-when its <a>time value</a> is <a>unresolved</a>.
 
 A <a>timeline</a> is <dfn export lt="monotonically increasing timeline"
 local-lt="monotonically increasing">monotonically increasing</dfn> if its
@@ -708,6 +702,22 @@ animation model to change, but these operations in themselves do not create
 a new [=animation frame=], rather they merely update the current <a>animation
 frame</a>.
 
+### Timeline Phase ### {#timeline-phases}
+
+A [=timeline=] may be in one of four possible
+<dfn export lt="timeline phase">phases</dfn>:
+
+1.  <dfn export lt="timeline inactive phase">inactive</dfn>
+1.  <dfn export lt="timeline before phase">before</dfn>
+1.  <dfn export lt="timeline active phase">active</dfn>
+1.  <dfn export lt="timeline after phase">after</dfn>
+
+A [=timeline=] in the [=timeline inactive phase|inactive phase=] can
+also be called an <dfn>inactive timeline</dfn>
+
+An [=inactive timeline=] has an [=unresolved=]
+[=timeline current time|current time=].
+
 ### Document timelines ### {#document-timelines}
 
 A <dfn>document timeline</dfn> is a type of <a>timeline</a> that is <a
@@ -721,15 +731,23 @@ time</dfn>.
 Issue(2079): There must be a better term than &ldquo;origin time&rdquo;&mdash;
              it's too similar to &ldquo;time origin&rdquo;.
 
-Prior to establishing the [=time origin=] for its associated document,
-a [=document timeline=] is <a lt="inactive timeline">inactive</a>.
+
+The [=timeline phase|phase=] of a <a>document timeline</a> at a given moment is
+the [=timeline phase|phase=] corresponding to the <em>first</em> matching
+condition from the following:
+
+<div class="switch">
+
+:   If the associated document is not an [=active document=] or its
+    [=time origin=] has not yet been established
+::  &rarr; [=timeline inactive phase|inactive=]
+:   Otherwise,
+::  &rarr; [=timeline active phase|active=]
+
+</div>
 
 After a [=document timeline=] becomes [=inactive timeline|active=], it is
 [=monotonically increasing=].
-
-A <a>document timeline</a> that is associated with a {{Document}} which is not
-an <a>active document</a> is also considered to be
-<a lt="inactive timeline">inactive</a>.
 
 To <a lt="timeline time to origin-relative time">convert a timeline
 time, |timeline time|, to an origin-relative time</a> for a document timeline,
@@ -738,8 +756,8 @@ time=]. If |timeline| is inactive, return an [=unresolved=] [=time value=].
 
 ### The default document timeline ### {#the-documents-default-timeline}
 
-Each {{Document}} has a <a>document timeline</a> called the <dfn>default
-document timeline</dfn>.
+Each {{Document}} has a <a>document timeline</a> called the
+<dfn export>default document timeline</dfn>.
 The <a>default document timeline</a> is unique to each document and persists for
 the lifetime of the document including calls to <a>document.open()</a> [[!HTML]].
 
@@ -796,7 +814,7 @@ An animation's start time is initially <a>unresolved</a>.
 
 An <a>animation</a> also maintains a <dfn>hold time</dfn> <a>time value</a>
 which is used to fix the animation's output <a>time value</a>, called its
-<a>current time</a>, in circumstances such as pausing</a>.
+<a>current time</a>, in circumstances such as pausing.
 The <a>hold time</a> is initially <a>unresolved</a>.
 
 In order to establish the relative ordering of conflicting <a>animations</a>,
@@ -827,31 +845,6 @@ follows:
 1.  Run the procedure to <a>update an animation's finished state</a> for
     <var>animation</var> with the <var>did seek</var> flag set to false, and
     the <var>synchronously notify</var> flag set to false.
-
-<h4 id="responding-to-a-newly-inactive-timeline">Responding to a newly inactive
-  timeline</h4>
-
-Issue(2080): With the set of timelines defined in this level of this
-             specification, this situation is not expected to occur. As
-             a result, this section will likely be moved to a subsequent level
-             of this specification.
-
-When the <a>timeline</a> associated with an <a>animation</a>,
-<var>animation</var>, becomes newly <a lt="inactive timeline">inactive</a>,
-if <var>animation</var>'s <a>previous current time</a> is <a
-lt="unresolved">resolved</a>, the procedure to <a>silently set the current
-time</a> of <var>animation</var> to <a>previous current time</a> is run.
-
-<div class="note">
-
-This step makes the behavior when an <a>animation</a>'s <a>timeline</a> becomes
-<a lt="inactive timeline">inactive</a> consistent with when it is
-disassociated with a <a>timeline</a>.
-Furthermore, it ensures that the only occasion on which an <a>animation</a>
-becomes <a lt="idle play state">idle</a>, is when the procedure to
-<a>cancel an animation</a> is performed.
-
-</div>
 
 <h4 id="setting-the-associated-effect" oldids="setting-the-target-effect">Setting the associated effect of an animation</h4>
 
@@ -1148,6 +1141,9 @@ as CSS Animations [[CSS-ANIMATIONS-1]].
     <var>animation</var> has a <a>pending pause task</a>, and false otherwise.
 1.  Let <var>has pending ready promise</var> be a boolean flag that is
     initially false.
+1.  Let <var>seek time</var> be a <a>time value</a> that is initially <a>unresolved</a>.
+1.  Let <var>has finite timeline</var> be true if |animation| has an associated
+    <a>timeline</a> that is not [=monotonically increasing=].
 1.  Perform the steps corresponding to the <em>first</em> matching
     condition from the following, if any:
 
@@ -1161,7 +1157,8 @@ as CSS Animations [[CSS-ANIMATIONS-1]].
         *   <a>current time</a> &lt; zero, or
         *   <a>current time</a> &ge; <a>associated effect end</a>,
 
-    ::  Set <var>animation</var>'s <a>hold time</a> to zero.
+    ::  Set <var>seek time</var> to zero.
+
     :   If |animation|'s [=effective playback rate=] &lt; 0,
         the <var>auto-rewind</var> flag is true and <em>either</em>
         <var>animation</var>'s:
@@ -1169,17 +1166,39 @@ as CSS Animations [[CSS-ANIMATIONS-1]].
         *   <a>current time</a> is <a>unresolved</a>, or
         *   <a>current time</a> &le; zero, or
         *   <a>current time</a> &gt; <a>associated effect end</a>,
+    ::
+        <div class="switch">
 
-    ::  If <a>associated effect end</a> is positive infinity,
-        <a>throw</a> an "{{InvalidStateError}}" {{DOMException}} and
-        abort these steps.
-        Otherwise, set <var>animation</var>'s <a>hold time</a> to <a>associated
-        effect end</a>.
+        :   If <a>associated effect end</a> is positive infinity,
+        ::  <a>throw</a> an "{{InvalidStateError}}" {{DOMException}} and
+            abort these steps.
+        :   Otherwise,
+        ::  Set <var>seek time</var> to |animation|'s <a>associated effect end</a>.
+
+        </div>
+
     :   If |animation|'s [=effective playback rate=] = 0 and |animation|'s
         [=current time=] is [=unresolved=],
-    ::  Set <var>animation</var>'s <a>hold time</a> to zero.
+
+        ::  Set <var>seek time</var> to zero.
 
     </div>
+
+1.  If |seek time| is <a lt=unresolved>resolved</a>,
+
+        <div class="switch">
+
+        :   If |has finite timeline| is true,
+        ::  1.  Set <var>animation</var>'s <a>start time</a> to <var>seek time</var>.
+            1.  Let |animation|'s [=hold time=] be <a>unresolved</a>.
+            1.  [=Apply any pending playback rate=] on |animation|.
+        :   Otherwise,
+        ::  Set <var>animation</var>'s <a>hold time</a> to <var>seek time</var>.
+
+        </div>
+
+1.  If <var>animation</var>'s <a>hold time</a> is <a lt=unresolved>resolved</a>,
+    let its [=start time=] be <a>unresolved</a>.
 
 1.  If <var>animation</var> has a <a>pending play task</a> or a
     <a>pending pause task</a>,
@@ -1187,16 +1206,14 @@ as CSS Animations [[CSS-ANIMATIONS-1]].
     1.  Cancel that task.
     1.  Set <var>has pending ready promise</var> to true.
 
-1.  If the following three conditions are <em>all</em> satisfied:
+1.  If the following four conditions are <em>all</em> satisfied:
 
     * |animation|'s [=hold time=] is [=unresolved=], and
+    * |seek time| is [=unresolved=], and
     * |aborted pause| is false, and
     * |animation| does <em>not</em> have a [=pending playback rate=],
 
     abort this procedure.
-
-1.  If <var>animation</var>'s <a>hold time</a> is <a lt=unresolved>resolved</a>,
-    let its [=start time=] be <a>unresolved</a>.
 
 1.  If <var>has pending ready promise</var> is false,
     let <var>animation</var>'s <a>current ready promise</a> be
@@ -1322,23 +1339,42 @@ follows:
 1.  If <var>animation</var> has a <a>pending pause task</a>, abort these steps.
 1.  If the <a>play state</a> of <var>animation</var> is <a
     lt="paused play state">paused</a>, abort these steps.
+1.  Let <var>seek time</var> be a <a>time value</a> that is initially <a>unresolved</a>.
+1.  Let <var>has finite timeline</var> be true if |animation| has an associated
+    <a>timeline</a> that is not [=monotonically increasing=].
 1.  If the <var>animation</var>'s <a>current time</a> is <a>unresolved</a>,
     perform the steps according to the first matching condition from below:
 
     <div class="switch">
 
-    :    If <var>animation</var>'s [=playback rate=] is &ge; 0,
-    ::   Let <var>animation</var>'s <a>hold time</a> be zero.
+    :   If <var>animation</var>'s [=playback rate=] is &ge; 0,
+    ::  Set <var>seek time</var> to zero.
+    :   Otherwise,
+    ::
+        <div class="switch">
 
-    :    Otherwise,
-    ::   If <a>associated effect end</a> for <var>animation</var> is positive
-         infinity,
-         <a>throw</a> an "{{InvalidStateError}}" {{DOMException}}
-         and abort these steps.
-         Otherwise, let <var>animation</var>'s <a>hold time</a> be
-         <a>associated effect end</a>.
+        :   If <a>associated effect end</a> for <var>animation</var> is positive
+            infinity,
+        ::  <a>throw</a> an "{{InvalidStateError}}" {{DOMException}}
+            and abort these steps.
+        :   Otherwise,
+        ::  Set <var>seek time</var> to <var>animation</var>'s <a>associated effect
+            end</a>.
+
+        </div>
 
     </div>
+
+1.  If |seek time| is <a lt=unresolved>resolved</a>,
+
+        <div class="switch">
+
+        :   If |has finite timeline| is true,
+        ::  Set <var>animation</var>'s <a>start time</a> to <var>seek time</var>.
+        :   Otherwise,
+        ::  Set <var>animation</var>'s <a>hold time</a> to <var>seek time</var>.
+
+        </div>
 
 1.  Let <var>has pending ready promise</var> be a boolean flag that is
     initially false.
@@ -1347,10 +1383,14 @@ follows:
 1.  If <var>has pending ready promise</var> is false,
     set <var>animation</var>'s <a>current ready promise</a> to
     <a>a new promise</a> in the <a>relevant Realm</a> of <var>animation</var>.
-1.  Schedule a task to be executed at the first possible moment after
-    the user agent has performed any processing necessary to suspend
-    the playback of
-    <var>animation</var>'s <a>associated effect</a>, if any.
+1.  Schedule a task to be executed at the first possible moment where
+    <em>both</em> of the following conditions are true:
+    *   the user agent has performed any processing necessary to suspend
+        the playback of <var>animation</var>'s <a>associated effect</a>, if any.
+
+    *   the animation is associated with a <a>timeline</a> that is not
+        <a lt="inactive timeline">inactive</a>.
+
     The task shall perform the following steps:
 
     1.  Let <var>ready time</var> be the time value of the timeline associated
@@ -1620,7 +1660,7 @@ enters the finished state. If notification of the finished state occurred
 synchronously this code would cause the <a>finish event</a> to be queued
 and the <a>current finished promise</a> to be resolved. However, if we
 reverse the order of the two statements such that the
-<code>iterationCount</code> is updated first, this would not happen.
+<code>iterations</code> is updated first, this would not happen.
 To avoid this surprising behavior, notification about the finished state of
 an animation is typically performed asynchronously.
 
@@ -1628,7 +1668,7 @@ an animation is typically performed asynchronously.
 var animation = elem.animate({ left: '100px' }, 2000);
 animation.playbackRate = 2;
 animation.currentTime = 1000; // animation is now finished
-animation.effect.updateTiming({ iterationCount: 2 }); // animation is no longer finished
+animation.effect.updateTiming({ iterations: 2 }); // animation is no longer finished
 </pre></div>
 
 The one exception to this asynchronous behavior is when the <a>finish an
@@ -1645,7 +1685,7 @@ animation.finish(); // finish event is queued immediately and finished promise
 animation.currentTime = 0;
 </pre></div>
 
-Note that like the procedure to <a>finish an animation</a>, 
+Note that like the procedure to <a>finish an animation</a>,
 the procedure to <a>cancel an animation</a> similarly queues the
 <a>cancel event</a> and rejects the <a>current finished promise</a> and
 <a>current ready promise</a> in a <em>synchronous</em> manner.
@@ -1927,18 +1967,21 @@ The procedure to <dfn>reverse an animation</dfn> of <a>animation</a>
 ### Play states ### {#play-states}
 
 An <a>animation</a> may be described as being in one of the following
-<dfn lt="play state">play states</dfn> for each of which, a 
+<dfn lt="play state">play states</dfn> for each of which, a
 non-normative description is also provided:
 
 <div class=informative-bg>
 
 :   <a lt="idle play state">idle</a>
 ::  The <a>current time</a> of the animation is <a>unresolved</a> and
+    the <a>start time</a> of the animation is <a>unresolved</a> and
     there are no pending tasks.
     In this state the animation has no effect.
 :   <a lt="running play state">running</a>
 ::  The animation has a resolved <a>current time</a> that changes on each
-    <a>animation frame</a> (provided the [=playback rate=] is not zero).
+    <a>animation frame</a> (provided the [=playback rate=] is not zero
+    and the <a>timeline</a> is [=inactive timeline|active=] and
+    [=monotonically increasing=]).
 :   <a lt="paused play state">paused</a>
 ::  The animation has been suspended and the <a>current time</a>
     is no longer changing.
@@ -1956,6 +1999,8 @@ condition from the following:
 
 :   <em>All</em> of the following conditions are true:
     *   The <a>current time</a> of <var>animation</var> is <a>unresolved</a>,
+        <em>and</em>
+    *   the <a>start time</a> of <var>animation</var> is <a>unresolved</a>,
         <em>and</em>
     *   <var>animation</var> does <em>not</em> have <em>either</em>
         a <a>pending play task</a> <em>or</em> a <a>pending pause task</a>,
@@ -2384,7 +2429,7 @@ the style as illustrated below:
 
 <div class="example"><pre class="lang-javascript">
 // In the first frame after the following animation finishes, the callback for
-// the `finished` promise will run BEFORE style is updated and hence will NOT
+// the \`finished\` promise will run BEFORE style is updated and hence will NOT
 // flicker.
 elem.animate({ transform: 'translateY(100px)' }, 200).finished(() => {
   elem.style.transform = 'translateY(100px)';
@@ -2410,11 +2455,11 @@ For example:
 <div class="example"><pre class="lang-javascript">
 elem.addEventListener('click', async evt => {
   const animation = elem.animate(
-    { transform: `translate(${evt.clientX}px, ${evt.clientY}px)` },
+    { transform: \`translate(${evt.clientX}px, ${evt.clientY}px)\` },
     { duration: 800, fill: 'forwards' }
   );
   await animation.finished;
-  // commitStyles will record the style up to and including `animation` and
+  // commitStyles will record the style up to and including \`animation\` and
   // update elem's specified style with the result.
   animation.commitStyles();
   animation.cancel();
@@ -3253,13 +3298,50 @@ If the <a>keyframe-specific composite operation</a> for a <a>keyframe</a>
 is not set, the <a>composite operation</a> specified for the
 <a>keyframe effect</a> as a whole is used for values specified in that keyframe.
 
+### Computing property values ### {#computing-property-values}
+
+<div algorithm>
+To <dfn>compute a property value</dfn> given a property <var>property</var>,
+a value <var>value</var>, and an {{Element}} <var>element</var>:
+resolve <var>value</var> according to the "Computed Value" line of the
+<var>property</var>'s definition table, using the <a>computed values</a> of
+<var>element</var> as the context for resolving dependencies, and return the
+result.
+
+  Note: The <a>computed values</a> on <var>element</var> are not affected by
+  this algorithm.
+
+This algorithm implies that property values specified in keyframes can
+establish order dependencies.
+When [=compute a property value|computing a property value=], the
+<a>computed values</a> of dependencies held by <var>value</var> must be
+calculated <em>first</em>.
+
+<div class="example">
+<pre class="lang-javascript">
+var animation = elem.animate([{ fontSize: '10px', width: '10em' },
+                              { fontSize: '20px', width: '20em' }], 1000);
+animation.currentTime = 500;
+console.log(getComputedStyle(elem).fontSize); // Should be 15px
+console.log(getComputedStyle(elem).width); // Should be 225px
+</pre>
+In this example, in order to <a>compute a property value</a> for
+<code>10em</code>, we must know the <a>computed value</a> of
+'font-size' on the <a>target element</a>, which in turn is determined
+by the <a>effect value</a> for 'font-size', which in turn requires that we
+compute property values for 'font-size'.
+Hence, computing property values are subject to ordering constraints.
+</div>
+
+</div>
+
 ### Calculating computed keyframes ### {#calculating-computed-keyframes}
 
 Before calculating the <a>effect value</a> of a <a>keyframe effect</a>,
-the property values specified on its <a>keyframes</a> are resolved to
-<a>computed values</a>, and the offset to use for any keyframes with a null
-<a>keyframe offset</a> is computed. The result of resolving these values is
-a set of <dfn>computed keyframes</dfn>.
+the property values on its <a>keyframes</a> are
+<a href="#computing-property-values">computed</a>, and the offset to use for any
+keyframes with a null <a>keyframe offset</a> is computed. The result of
+resolving these values is a set of <dfn>computed keyframes</dfn>.
 
 The calculated <a>keyframe offsets</a> of a set of <a>keyframe</a> that
 includes suitable values for each null <a>keyframe offset</a> are referred
@@ -3323,24 +3405,25 @@ an <a>effect target</a> for which computed property values can be calculated.
     1.  Add a new empty <a>keyframe</a>, <var>computed keyframe</var>, to
         <var>computed keyframes</var>.
 
-    1.  For each property specified in <var>keyframe</var>, calculate the
-        computed value specified on <var>keyframe</var> using the <a>effect
-        target</a> as the context for computing values and add the
-        corresponding property and computed value to <var>computed
-        keyframe</var>.
-        For shorthand properties, add the equivalent longhand properties.
-        For logical properties [[!CSS-LOGICAL-1]], add the [=equivalent physical
-        properties=] [[!CSS-WRITING-MODES-4]] based on the computed value of
-        'writing-mode' and/or 'direction' for the <a>effect target</a>.
+    1.  For each property specified in <var>keyframe</var>:
+        -   <a>Compute a property value</a> using the value specified on
+            <var>keyframe</var> as the value, and the <a>target element</a> as
+            the element; then add the property and resulting value to
+            <var>computed keyframe</var>.
+        -   For shorthand properties, add the equivalent longhand properties.
+        -   For logical properties [[!CSS-LOGICAL-1]], add the [=equivalent physical
+            properties=] [[!CSS-WRITING-MODES-4]] based on the computed value of
+            'writing-mode' and/or 'direction' for the <a>effect target</a>.
 
         For example, if <var>keyframe</var> has a value of &lsquo;12pt&rsquo;
-        for the 'border-width' property, the user agent may produce a computed
-        value of &lsquo;16px&rsquo; for each of the longhand properties:
+        for the 'border-width' property, the user agent may
+        <a>compute a property value</a>
+        of &lsquo;16px&rsquo; for each of the longhand properties:
         'border-bottom-width', 'border-left-width', 'border-right-width', and
         'border-top-width'.
         As a result, <var>computed keyframe</var> would <em>not</em> have a
         value for the 'border-width' property, but would instead include
-        each of the longhand properties, and each with the computed value,
+        each of the longhand properties, and each with the value
         &lsquo;16px&rsquo;.
 
         If conflicts arise when expanding shorthand properties or replacing
@@ -3523,6 +3606,20 @@ Note: this procedure permits overlapping <a>keyframes</a>.
     progress</a> values less than 0 or greater than
     or equal to 1 is the value of the first <a>keyframe</a> or the last
     <a>keyframe</a> in <var>keyframes</var> respectively.
+
+<div class="note">
+    Note that <a>computed keyframes</a> are "live":
+    user-agents must behave as if they are recreated every time the
+    <a>effect value</a> is calculated.
+
+    For example, if there is an ongoing transition on the 'font-size' property
+    from <code>10px</code> to <code>20px</code>, a property value specified as
+    <code>1em</code> in a <a>keyframe</a> would during
+    <a href="#calculating-computed-keyframes">keyframe computation</a>
+    resolve against the <a>computed value</a> in the range
+    [<code>10px</code>, <code>20px</code>] produced by the transition on
+    'font-size'.
+</div>
 
 <div class="issue">
     In the presence of certain timing functions, the input iteration
@@ -3772,7 +3869,7 @@ For example, consider the following code:
 <div class="example"><pre class="lang-javascript">
 elem.addEventListener('mousemove', evt => {
   circle.animate(
-    { transform: `translate(${evt.clientX}px, ${evt.clientY}px)` },
+    { transform: \`translate(${evt.clientX}px, ${evt.clientY}px)\` },
     { duration: 500, fill: 'forwards' }
   );
 });
@@ -3930,6 +4027,7 @@ The <code>AnimationTimeline</code> interface {#the-animationtimeline-interface}
 [Exposed=Window]
 interface AnimationTimeline {
     readonly attribute double? currentTime;
+    readonly attribute TimelinePhase phase;
 };
 </pre>
 
@@ -3939,6 +4037,8 @@ interface AnimationTimeline {
 ::  Returns the <a lt="timeline current time">current time</a> for this timeline
     or <code>null</code> if this timeline is <a lt="inactive
     timeline">inactive</a>.
+:   <dfn attribute for=AnimationTimeline>phase</dfn>
+::  Returns the <a lt="timeline phase">phase</a> for this timeline.
 
 </div>
 
@@ -4004,7 +4104,7 @@ interface Animation : EventTarget {
                 optional AnimationTimeline? timeline);
              attribute DOMString                id;
              attribute AnimationEffect?         effect;
-    readonly attribute AnimationTimeline?       timeline;
+             attribute AnimationTimeline?       timeline;
              attribute double?                  startTime;
              attribute double?                  currentTime;
              attribute double                   playbackRate;
@@ -4016,14 +4116,14 @@ interface Animation : EventTarget {
              attribute EventHandler             onfinish;
              attribute EventHandler             oncancel;
              attribute EventHandler             onremove;
-    void cancel();
-    void finish();
-    void play();
-    void pause();
-    void updatePlaybackRate(double playbackRate);
-    void reverse();
-    void persist();
-    void commitStyles();
+    undefined cancel();
+    undefined finish();
+    undefined play();
+    undefined pause();
+    undefined updatePlaybackRate(double playbackRate);
+    undefined reverse();
+    undefined persist();
+    undefined commitStyles();
 };
 </pre>
 
@@ -4074,6 +4174,8 @@ interface Animation : EventTarget {
     the procedure to <a>set the associated effect of an animation</a>.
 :   <dfn attribute for=Animation>timeline</dfn>
 ::  The <a>timeline</a> associated with this animation.
+    Setting this attribute updates the object's <a>timeline</a> using
+    the procedure to <a>set the timeline of an animation</a>.
 :   <dfn attribute for=Animation>startTime</dfn>
 ::  Returns the [=start time=] of this animation.
     Setting this attribute updates the [=start time=] using
@@ -4244,8 +4346,7 @@ To <dfn>commit computed styles</dfn> for an [=animation=], |animation|:
           If |target| does not [=has an attribute|have=]
           a [=style attribute=],
           let |inline style| be a new empty [=CSS declaration block=] with
-          the <a for=CSSStyleDeclaration>readonly flag</a> unset and
-          <a for=CSSStyleDeclaration>owner node</a> set to |target|.
+          the <a for=CSSStyleDeclaration>owner node</a> set to |target|.
 
      1.   Let |targeted properties| be the [=ordered set|set=]
           of physical longhand properties
@@ -4306,6 +4407,21 @@ enum AnimationReplaceState { "active", "removed", "persisted" };
 :   <code>persisted</code>
 ::  Corresponds to the [=persisted replace state=].
 
+### The <code>TimelinePhase</code> enumeration ### {#the-timelinephase-enumeration}
+
+<pre class='idl'>
+enum TimelinePhase { "inactive", "before", "active", "after" };
+</pre>
+
+:   <code>inactive</code>
+::  Corresponds to the [=timeline inactive phase=].
+:   <code>before</code>
+::  Corresponds to the [=timeline before phase=].
+:   <code>active</code>
+::  Corresponds to the [=timeline active phase=].
+:   <code>after</code>
+::  Corresponds to the [=timeline after phase=].
+
 The <code>AnimationEffect</code> interface {#the-animationeffect-interface}
 ----------------------------------------
 
@@ -4317,7 +4433,7 @@ abstract {{AnimationEffect}} interface.
 interface AnimationEffect {
     EffectTiming         getTiming();
     ComputedEffectTiming getComputedTiming();
-    void                 updateTiming(optional OptionalEffectTiming timing = {});
+    undefined            updateTiming(optional OptionalEffectTiming timing = {});
 };
 </pre>
 
@@ -4700,7 +4816,7 @@ interface KeyframeEffect : AnimationEffect {
     attribute CSSOMString?       pseudoElement;
     attribute CompositeOperation composite;
     sequence&lt;object&gt; getKeyframes();
-    void             setKeyframes(object? keyframes);
+    undefined        setKeyframes(object? keyframes);
 };
 </pre>
 
@@ -4935,9 +5051,21 @@ interface KeyframeEffect : AnimationEffect {
     used to prepare the result of this method is defined in prose below:
 
     1.  Let <var>result</var> be an empty sequence of objects.
-    1.  Let <var>keyframes</var> be the result of applying the procedure to
-        <a>compute missing keyframe offsets</a> to the <a>keyframes</a>
-        for this <a>keyframe effect</a>.
+    1.  Let <var>keyframes</var> be one of the following:
+
+        1.  If this <a>keyframe effect</a> is associated with a
+            {{CSSAnimation}}, and its <a>keyframes</a> have not been replaced
+            by a successful call to {{KeyframeEffect/setKeyframes()}};
+            the <a>computed keyframes</a> for this <a>keyframe effect</a>.
+
+        1.  Otherwise, the result of applying the procedure
+            <a>compute missing keyframe offsets</a> to the <a>keyframes</a>
+            for this <a>keyframe effect</a>.
+
+        Note: We return <a>computed keyframes</a> for CSS Animations
+              because not all keyframes specified in CSS can be
+              represented by a dictionary.
+
     1.  For each <var>keyframe</var> in <var>keyframes</var>
         perform the following steps:
 
@@ -4963,9 +5091,8 @@ interface KeyframeEffect : AnimationEffect {
             keyframe-specific <a>timing function</a>, and
             <a>keyframe-specific composite operation</a>
             values of <var>keyframe</var>.
-        1.  For each animation property-value pair specified on
-            <var>keyframe</var>, <var>declaration</var>, perform the following
-            steps:
+        1.  For each animation property-value pair in <var>keyframe</var>,
+            <var>declaration</var>, perform the following steps:
 
             1.  Let <var>property name</var> be the result of applying the
                 <a>animation property name to IDL attribute name</a> algorithm
@@ -5730,6 +5857,7 @@ interface mixin Animatable {
 
 dictionary KeyframeAnimationOptions : KeyframeEffectOptions {
     DOMString id = "";
+    AnimationTimeline? timeline;
 };
 
 dictionary GetAnimationsOptions {
@@ -5754,17 +5882,21 @@ dictionary GetAnimationsOptions {
         If the above procedure causes an exception to be thrown, propagate the
         exception and abort this procedure.
 
+    1.  If <var>options</var> is a {{KeyframeAnimationOptions}} object, let
+        <var>timeline</var> be the <code>timeline</code> member of
+        <var>options</var> or, if <code>timeline</code> member of
+        <var>options</var> is missing, be the <a>default document timeline</a>
+        of the <a>node document</a> of the element on which this method was
+        called.
+
     1.  Construct a new {{Animation}} object, <var>animation</var>, in
         the <a>relevant Realm</a> of <var>target</var> by using the
         same procedure as the {{Animation()}} constructor, passing
-        <var>effect</var> as the argument of the same name, and
-        the <a>default document timeline</a> of the <a>node document</a>
-        of the element on which this method was called as the
-        <var>timeline</var> argument.
+        <var>effect</var> and <var>timeline</var> as arguments of the same name.
 
     1.  If <var>options</var> is a {{KeyframeAnimationOptions}} object,
-        assign the value of the <code>id</code> member of <var>options</var> to
-        <var>animation</var>'s {{Animation/id}} attribute.
+        assign the value of the <code>id</code> member of <var>options</var>
+        to <var>animation</var>'s {{Animation/id}} attribute.
 
     1.  Run the procedure to <a>play an animation</a> for
         <var>animation</var> with the <var>auto-rewind</var> flag set to true.
@@ -5797,10 +5929,8 @@ animation.play();</pre>
         same interpretation as defined for that constructor.
     :   <dfn argument for="Animatable/animate(keyframes, options)"
         lt="options">options</dfn>
-    ::  The timing and animation options for the created {{KeyframeEffect}}.
-        This value is passed to the {{KeyframeEffect(target, keyframes,
-        options)}} constructor as the <var>options</var> parameter and has the
-        same interpretation as defined for that constructor.
+    ::  The timing and animation options for the created {{KeyframeEffect}} and
+        {{Animation}}.
 
     </div>
 
@@ -5850,6 +5980,10 @@ animation.play();</pre>
 :   <dfn dict-member for=KeyframeAnimationOptions>id</dfn>
 ::  The string to assign to the generated {{Animation}}'s {{Animation/id}}
     attribute.
+
+:   <dfn dict-member for=KeyframeAnimationOptions>timeline</dfn>
+::  An optional value which, if present, specifies the <a>timeline</a>
+    with which to associate the newly-created <a>animation</a>.
 
 :   <dfn dict-member for=GetAnimationsOptions>subtree</dfn>
 ::  If true, indicates that [=animations=] associated with an

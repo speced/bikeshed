@@ -32,7 +32,7 @@ urlPrefix: http://www.ecma-international.org/ecma-262/6.0/index.html; spec: ECMA
 
 *This section is non-normative.*
 
-The APIs specified in this specification are used to compress and decompress streams of data. They support "deflate" and "gzip" as compression algorithms. They are widely used in web developers.
+The APIs specified in this specification are used to compress and decompress streams of data. They support "deflate" and "gzip" as compression algorithms. They are widely used by web developers.
 
 # Conformance #  {#conformance}
 
@@ -92,26 +92,6 @@ A <dfn>compression context</dfn> is the internal state maintained by a compressi
    * A `gzip` stream may only contain one "member".
    * It is an error if there is additional input data after the end of the "member".
 
-# Interface Mixin `GenericTransformStream` #  {#generic-transform-stream}
-
-The {{GenericTransformStream}} interface mixin represents the concept of a transform stream in IDL. It is not a TransformStream, though it has the same interface and it delegates to one.
-
-<pre class="idl">
-interface mixin GenericTransformStream {
-  readonly attribute ReadableStream readable;
-  readonly attribute WritableStream writable;
-};
-</pre>
-
-An object that includes {{GenericTransformStream}} has an associated <dfn>transform</dfn> of type TransformStream.
-
-## Attributes ##  {#outgoing-stream-attributes}
-
-: <dfn attribute for="GenericTransformStream">readable</dfn>
-:: The `readable` attribute's getter, when invoked, must return this object's transform \[[readable]].
-: <dfn attribute for="GenericTransformStream">writable</dfn>
-:: The `writable` attribute's getter, when invoked, must return this object's transform \[[writable]].
-
 # Interface `CompressionStream` #  {#compression-stream}
 
 <pre class="idl">
@@ -124,33 +104,26 @@ CompressionStream includes GenericTransformStream;
 
 A {{CompressionStream}} has an associated <dfn for=CompressionStream>format</dfn> and <a>compression context</a> <dfn for=CompressionStream>context</dfn>.
 
-The {{CompressionStream}}(*format*) constructor, when invoked, must run these steps:
-    1. If *format* is unsupported in CompressionStream, then throw a TypeError.
-    1. Let *cs* be a new CompressionStream object.
-    1. Set *cs*'s <a for=CompressionStream>format</a> to *format*.
-    1. Let *startAlgorithm* be an algorithm that takes no arguments and returns nothing.
-    1. Let *transformAlgorithm* be an algorithm which takes a *chunk* argument and runs the <a>compress and enqueue a chunk</a> algorithm with *cs* and *chunk*.
-    1. Let *flushAlgorithm* be an algorithm which takes no argument and runs the <a>compress flush and enqueue</a> algorithm with *cs*.
-    1. Let *transform* be the result of calling <a abstract-op>CreateTransformStream</a>(*startAlgorithm*, *transformAlgorithm*, *flushAlgorithm*).
-    1. Set *cs*'s <a>transform</a> to *transform*.
-    1. Return *cs*.
+The <dfn constructor for=CompressionStream lt="CompressionStream(format)"><code>new CompressionStream(|format|)</code></dfn> steps are:
+    1. If *format* is unsupported in {{CompressionStream}}, then throw a {{TypeError}}.
+    1. Set [=this=]'s <a for=CompressionStream>format</a> to *format*.
+    1. Let *transformAlgorithm* be an algorithm which takes a *chunk* argument and runs the <a>compress and enqueue a chunk</a> algorithm with [=this=] and *chunk*.
+    1. Let *flushAlgorithm* be an algorithm which takes no argument and runs the <a>compress flush and enqueue</a> algorithm with [=this=].
+    1. Set [=this=]'s [=GenericTransformStream/transform=] to the result of [=TransformStream/creating=] a {{TransformStream}} with <a for=TransformStream/create><var ignore>transformAlgorithm</var></a> set to *transformAlgorithm* and <a for=TransformStream/create><var ignore>flushAlgorithm</var></a> set to *flushAlgorithm*.
 
-The <dfn>compress and enqueue a chunk</dfn> algorithm, given a CompressionStream object *cs* and a *chunk*, runs these steps:
-    1. If *chunk* is not a {{BufferSource}} type, then return <a>a promise rejected with</a> a TypeError.
+The <dfn>compress and enqueue a chunk</dfn> algorithm, given a {{CompressionStream}} object *cs* and a *chunk*, runs these steps:
+    1. If *chunk* is not a {{BufferSource}} type, then throw a {{TypeError}}.
     1. Let *buffer* be the result of compressing *chunk* with *cs*'s <a for=CompressionStream>format</a> and <a for=CompressionStream>context</a>.
-    1. Let *controller* be *cs*'s transform.\[[TransformStreamController]].
-    1. If *buffer* is empty, return <a>a promise resolved with</a> undefined.
-    1. Split *buffer* into one or more non-empty pieces and convert them into Uint8Arrays.
-    1. For each Uint8Array *array*, call <a abstract-op>TransformStreamDefaultControllerEnqueue</a>(*controller*, *array*).
-    1. Return <a>a promise resolved with</a> undefined.
+    1. If *buffer* is empty, return.
+    1. Split *buffer* into one or more non-empty pieces and convert them into {{Uint8Array}}s.
+    1. For each {{Uint8Array}} *array*, [=TransformStream/enqueue=] *array* in *cs*'s [=GenericTransformStream/transform=].
 
-The <dfn>compress flush and enqueue</dfn> algorithm, which handles the end of data from the input ReadableStream object, given a CompressionStream object *cs*, runs these steps:
+The <dfn>compress flush and enqueue</dfn> algorithm, which handles the end of data from the input {{ReadableStream}} object, given a {{CompressionStream}} object *cs*, runs these steps:
 
     1. Let *buffer* be the result of compressing an empty input with *cs*'s <a for=CompressionStream>format</a> and <a for=CompressionStream>context</a>, with the finish flag.
-    1. If *buffer* is empty, return <a>a promise resolved with</a> undefined.
-    1. Split *buffer* into one or more non-empty pieces and convert them into Uint8Arrays.
-    1. For each Uint8Array *array*, call <a abstract-op>TransformStreamDefaultControllerEnqueue</a>(*controller*, *array*).
-    1. Return <a>a promise resolved with</a> undefined.
+    1. If *buffer* is empty, return.
+    1. Split *buffer* into one or more non-empty pieces and convert them into {{Uint8Array}}s.
+    1. For each {{Uint8Array}} *array*, [=TransformStream/enqueue=] *array* in *cs*'s [=GenericTransformStream/transform=].
 
 
 # Interface `DecompressionStream` #  {#decompression-stream}
@@ -165,34 +138,27 @@ DecompressionStream includes GenericTransformStream;
 
 A {{DecompressionStream}} has an associated <dfn for=DecompressionStream>format</dfn> and <a>compression context</a> <dfn for=DecompressionStream>context</dfn>.
 
-The {{DecompressionStream}}(*format*) constructor, when invoked, must run these steps:
-    1. If *format* is unsupported in DecompressionStream, then throw a TypeError.
-    1. Let *ds* be a new DecompressionStream object.
-    1. Set *ds*'s <a for=DecompressionStream>format</a> to *format*.
-    1. Let *startAlgorithm* be an algorithm that takes no arguments and returns nothing.
+The <dfn constructor for=DecompressionStream lt="DecompressionStream(format)"><code>new DecompressionStream(|format|)</code></dfn> steps are:
+    1. If *format* is unsupported in {{DecompressionStream}}, then throw a {{TypeError}}.
+    1. Set [=this=]'s <a for=DecompressionStream>format</a> to *format*.
     1. Let *transformAlgorithm* be an algorithm which takes a *chunk* argument and runs the <a>decompress and enqueue a chunk</a> algorithm with *ds* and *chunk*.
     1. Let *flushAlgorithm* be an algorithm which takes no argument and runs the <a>decompress flush and enqueue</a> algorithm with *ds*.
-    1. Let *transform* be the result of calling <a abstract-op>CreateTransformStream</a>(*startAlgorithm*, *transformAlgorithm*, *flushAlgorithm*).
-    1. Set *ds*'s <a>transform</a> to *transform*.
-    1. Return *ds*.
+    1. Set [=this=]'s [=GenericTransformStream/transform=] to the result of [=TransformStream/creating=] a {{TransformStream}} with <a for=TransformStream/create><var ignore>transformAlgorithm</var></a> set to *transformAlgorithm* and <a for=TransformStream/create><var ignore>flushAlgorithm</var></a> set to *flushAlgorithm*.
 
-The <dfn>decompress and enqueue a chunk</dfn> algorithm, given a DecompressionStream object *ds* and a *chunk*, runs these steps:
-    1. If *chunk* is not a {{BufferSource}} type, then return <a>a promise rejected with</a> a TypeError.
-    1. Let *buffer* be the result of decompressing *chunk* with *ds*'s <a for=DecompressionStream>format</a> and <a for=DecompressionStream>context</a>. If this results in an error, then return <a>a promise rejected with</a> a TypeError.
-    1. Let *controller* be *ds*'s <a>transform</a>.\[[TransformStreamController]].
-    1. If *buffer* is empty, return <a>a promise resolved with</a> undefined.
-    1. Split *buffer* into one or more non-empty pieces and convert them into Uint8Arrays.
-    1. For each Uint8Array *array*, call <a abstract-op>TransformStreamDefaultControllerEnqueue</a>(*controller*, *array*).
-    1. Return <a>a promise resolved with</a> undefined.
+The <dfn>decompress and enqueue a chunk</dfn> algorithm, given a {{DecompressionStream}} object *ds* and a *chunk*, runs these steps:
+    1. If *chunk* is not a {{BufferSource}} type, then throw a {{TypeError}}.
+    1. Let *buffer* be the result of decompressing *chunk* with *ds*'s <a for=DecompressionStream>format</a> and <a for=DecompressionStream>context</a>. If this results in an error, then throw a {{TypeError}}.
+    1. If *buffer* is empty, return.
+    1. Split *buffer* into one or more non-empty pieces and convert them into {{Uint8Array}}s.
+    1. For each {{Uint8Array}} *array*, [=TransformStream/enqueue=] *array* in *ds*'s [=GenericTransformStream/transform=].
 
-The <dfn>decompress flush and enqueue</dfn> algorithm, which handles the end of data from the input ReadableStream object, given a DecompressionStream object *ds*, runs these steps:
+The <dfn>decompress flush and enqueue</dfn> algorithm, which handles the end of data from the input {{ReadableStream}} object, given a {{DecompressionStream}} object *ds*, runs these steps:
 
     1. Let *buffer* be the result of decompressing an empty input with *ds*'s <a for=DecompressionStream>format</a> and <a for=DecompressionStream>context</a>, with the finish flag.
-    1. If the end of the compressed input has not been reached, return <a>a promise rejected with</a> a TypeError.
-    1. If *buffer* is empty, return <a>a promise resolved with</a> undefined.
-    1. Split *buffer* into one or more non-empty pieces and convert them into Uint8Arrays.
-    1. For each Uint8Array *array*, call <a abstract-op>TransformStreamDefaultControllerEnqueue</a>(*controller*, *array*).
-    1. Return <a>a promise resolved with</a> undefined.
+    1. If the end of the compressed input has not been reached, then throw a {{TypeError}}.
+    1. If *buffer* is empty, return.
+    1. Split *buffer* into one or more non-empty pieces and convert them into {{Uint8Array}}s.
+    1. For each {{Uint8Array}} *array*, [=TransformStream/enqueue=] *array* in *ds*'s [=GenericTransformStream/transform=].
 
 
 # Privacy and Security Considerations #  {#privacy-security}

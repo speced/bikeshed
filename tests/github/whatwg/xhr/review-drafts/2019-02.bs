@@ -1,0 +1,2134 @@
+<pre class=metadata>
+Group: WHATWG
+Date: 2019-02-18
+H1: XMLHttpRequest
+Shortname: xhr
+Text Macro: TWITTER xhrstandard
+Abstract: The XMLHttpRequest Standard defines an API that provides scripted client functionality for transferring data between a client and a server.
+Translation: ja https://triple-underscore.github.io/XHR-ja.html
+Translate IDs: enumdef-xmlhttprequestresponsetype xmlhttprequestresponsetype,dictdef-progresseventinit progresseventinit,typedefdef-formdataentryvalue formdataentryvalue
+</pre>
+
+<pre class=link-defaults>
+spec:dom; type:interface; text:Document
+</pre>
+
+<pre class=anchors>
+urlPrefix: https://w3c.github.io/DOM-Parsing/; spec: dom-parsing
+    type: dfn; text: fragment serializing algorithm; url: dfn-fragment-serializing-algorithm
+</pre>
+
+<pre class=biblio>
+{
+  "DOMPS": {
+    "aliasOf": "DOM-PARSING"
+  },
+  "HTTP": {
+    "aliasOf": "HTTP11"
+  },
+  "XMLNS": {
+    "aliasOf": "XML-NAMES"
+  }
+}</pre>
+
+
+<h2 id=introduction>Introduction</h2>
+
+<p><em>This section is non-normative.</em>
+
+<p>The {{XMLHttpRequest}} object is an API for <a for=/>fetching</a> resources.
+
+<p>The name {{XMLHttpRequest}} is historical and has no bearing on its functionality.
+
+<div id=example-xhr class=example>
+ <p>Some simple code to do something with data from an XML document
+ fetched over the network:
+
+ <pre><code class=lang-javascript>
+function processData(data) {
+  // taking care of data
+}
+
+function handler() {
+  if(this.status == 200 &amp;&amp;
+    this.responseXML != null &amp;&amp;
+    this.responseXML.getElementById('test').textContent) {
+    // success!
+    processData(this.responseXML.getElementById('test').textContent);
+  } else {
+    // something went wrong
+    …
+  }
+}
+
+var client = new XMLHttpRequest();
+client.onload = handler;
+client.open("GET", "unicorn.xml");
+client.send();</code></pre>
+
+ <p>If you just want to log a message to the server:
+
+ <pre><code class=lang-javascript>
+function log(message) {
+  var client = new XMLHttpRequest();
+  client.open("POST", "/log");
+  client.setRequestHeader("Content-Type", "text/plain;charset=UTF-8");
+  client.send(message);
+}</code></pre>
+
+ <p>Or if you want to check the status of a document on the server:
+
+ <pre><code class=lang-javascript>
+function fetchStatus(address) {
+  var client = new XMLHttpRequest();
+  client.onload = function() {
+    // in case of network errors this might not give reliable results
+    returnStatus(this.status);
+  }
+  client.open("HEAD", address);
+  client.send();
+}</code></pre>
+</div>
+
+
+<h3 id=specification-history>Specification history</h3>
+
+<p>The {{XMLHttpRequest}} object was initially defined as part of
+the WHATWG's HTML effort. (Based on Microsoft's implementation many years prior.)
+It moved to the W3C in 2006. Extensions (e.g. progress events and
+cross-origin requests) to {{XMLHttpRequest}} were developed in a
+separate draft (XMLHttpRequest Level 2) until end of 2011, at which point
+the two drafts were merged and {{XMLHttpRequest}} became a single
+entity again from a standards perspective. End of 2012 it moved back to the
+WHATWG.
+
+<p>Discussion that led to the current draft can be found in the following mailing list
+archives:
+
+<ul class=brief>
+ <li><a href=https://lists.w3.org/Archives/Public/public-whatwg-archive/>whatwg@whatwg.org</a>
+ <li><a href=https://lists.w3.org/Archives/Public/public-webapps/>public-webapps@w3.org</a>
+ <li><a href=https://lists.w3.org/Archives/Public/public-webapi/>public-webapi@w3.org</a>
+ <li><a href=https://lists.w3.org/Archives/Public/public-appformats/>public-appformats@w3.org</a>
+</ul>
+
+
+<h2 id=conformance>Conformance</h2>
+
+<p>All diagrams, examples, and notes in this specification are
+non-normative, as are all sections explicitly marked non-normative.
+Everything else in this specification is normative.
+
+<p>The key words "MUST", "MUST NOT", "REQUIRED", <!--"SHALL", "SHALL
+NOT",--> "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and
+"OPTIONAL" in the normative parts of this specification are to be
+interpreted as described in RFC2119. For readability, these words do
+not appear in all uppercase letters in this specification.
+[[!RFC2119]]
+
+
+<h3 id=extensibility>Extensibility</h3>
+
+<p>User agents, Working Groups, and other interested parties are
+<em>strongly encouraged</em> to discuss new features with the WHATWG
+community.
+
+
+<h2 id=terminology>Terminology</h2>
+
+<p>This specification uses terminology, cross-linked throughout, from DOM,
+DOM Parsing and Serialization, Encoding, Feature Policy, Fetch, File API, HTML,
+HTTP, URL, Web IDL, and XML.
+
+[[!DOM]]
+[[!DOMPS]]
+[[!ENCODING]]
+[[!FEATURE-POLICY]]
+[[!FETCH]]
+[[!FILEAPI]]
+[[!HTML]]
+[[!HTTP]]
+[[!URL]]
+[[!WEBIDL]]
+[[!XML]] [[!XMLNS]]
+
+<p>It uses the typographic conventions from HTML. [[!HTML]]
+
+<h2 id=interface-xmlhttprequest>Interface {{XMLHttpRequest}}</h2>
+
+<pre class=idl>
+[Exposed=(Window,DedicatedWorker,SharedWorker)]
+interface XMLHttpRequestEventTarget : EventTarget {
+  // event handlers
+  attribute EventHandler onloadstart;
+  attribute EventHandler onprogress;
+  attribute EventHandler onabort;
+  attribute EventHandler onerror;
+  attribute EventHandler onload;
+  attribute EventHandler ontimeout;
+  attribute EventHandler onloadend;
+};
+
+[Exposed=(Window,DedicatedWorker,SharedWorker)]
+interface XMLHttpRequestUpload : XMLHttpRequestEventTarget {
+};
+
+enum XMLHttpRequestResponseType {
+  "",
+  "arraybuffer",
+  "blob",
+  "document",
+  "json",
+  "text"
+};
+
+[Constructor,
+ Exposed=(Window,DedicatedWorker,SharedWorker)]
+interface XMLHttpRequest : XMLHttpRequestEventTarget {
+  // event handler
+  attribute EventHandler onreadystatechange;
+
+  // states
+  const unsigned short UNSENT = 0;
+  const unsigned short OPENED = 1;
+  const unsigned short HEADERS_RECEIVED = 2;
+  const unsigned short LOADING = 3;
+  const unsigned short DONE = 4;
+  readonly attribute unsigned short readyState;
+
+  // request
+  void open(ByteString method, USVString url);
+  void open(ByteString method, USVString url, boolean async, optional USVString? username = null, optional USVString? password = null);
+  void setRequestHeader(ByteString name, ByteString value);
+           attribute unsigned long timeout;
+           attribute boolean withCredentials;
+  [SameObject] readonly attribute XMLHttpRequestUpload upload;
+  void send(optional (Document or BodyInit)? body = null);
+  void abort();
+
+  // response
+  readonly attribute USVString responseURL;
+  readonly attribute unsigned short status;
+  readonly attribute ByteString statusText;
+  ByteString? getResponseHeader(ByteString name);
+  ByteString getAllResponseHeaders();
+  void overrideMimeType(DOMString mime);
+           attribute XMLHttpRequestResponseType responseType;
+  readonly attribute any response;
+  readonly attribute USVString responseText;
+  [Exposed=Window] readonly attribute Document? responseXML;
+};</pre>
+
+<p>An {{XMLHttpRequest}} object has an associated
+{{XMLHttpRequestUpload}} object.
+
+<p>An {{XMLHttpRequest}} object has an associated
+<dfn id=concept-xmlhttprequest-state>state</dfn>, which is one of
+<i>unsent</i>,
+<i>opened</i>,
+<i>headers received</i>,
+<i>loading</i>, and
+<i>done</i>. Unless stated otherwise it is <i>unsent</i>.
+
+<p>An {{XMLHttpRequest}} object has an associated
+<dfn id=send-flag><code>send()</code> flag</dfn>. Unless stated otherwise it is unset.
+
+
+<h3 id=constructors>Constructors</h3>
+
+<dl class=domintro>
+ <dt><code><var>client</var> = new <a constructor for=XMLHttpRequest>XMLHttpRequest()</a></code>
+ <dd>Returns a new {{XMLHttpRequest}} object.
+</dl>
+
+<p>The <dfn id=dom-xmlhttprequest constructor for=XMLHttpRequest><code>XMLHttpRequest()</code></dfn>
+constructor, when invoked, must return a new {{XMLHttpRequest}} object.
+
+
+<h3 id=garbage-collection>Garbage collection</h3>
+<!-- Based on EventSource and WebSocket. Not sure what I am doing. -->
+
+<p>An {{XMLHttpRequest}} object must not be garbage collected if its
+<a>state</a> is either
+<i>opened</i> with the <a><code>send()</code> flag</a> set,
+<i>headers received</i>, or <i>loading</i>, and it has one or more
+<a>event listeners</a>
+registered whose <b>type</b> is one of
+<a event><code>readystatechange</code></a>,
+<a event><code>progress</code></a>,
+<a event><code>abort</code></a>,
+<a event><code>error</code></a>,
+<a event><code>load</code></a>,
+<a event><code>timeout</code></a>, and
+<a event><code>loadend</code></a>.
+<!-- No need to mention upload event listeners as they happen during /opened/. -->
+
+<p>If an {{XMLHttpRequest}} object is garbage collected while its
+connection is still open, the user agent must <a for=fetch lt=terminated>terminate</a> the ongoing
+fetch operated by the {{XMLHttpRequest}} object.
+
+
+<h3 id=event-handlers>Event handlers</h3>
+
+<p>The following are the
+<a>event handlers</a> (and their corresponding
+<a>event handler event types</a>)
+that must be supported on objects implementing an interface that inherits
+from {{XMLHttpRequestEventTarget}} as attributes:
+
+<table>
+ <thead>
+  <tr>
+   <th><a lt="event handlers">event handler</a>
+   <th><a>event handler event type</a>
+ <tbody>
+  <tr>
+   <td><dfn id=handler-xhr-onloadstart attribute for=XMLHttpRequestEventTarget><code>onloadstart</code></dfn>
+   <td><a event><code>loadstart</code></a>
+  <tr>
+   <td><dfn id=handler-xhr-onprogress attribute for=XMLHttpRequestEventTarget><code>onprogress</code></dfn>
+   <td><a event><code>progress</code></a>
+  <tr>
+   <td><dfn id=handler-xhr-onabort attribute for=XMLHttpRequestEventTarget><code>onabort</code></dfn>
+   <td><a event><code>abort</code></a>
+  <tr>
+   <td><dfn id=handler-xhr-onerror attribute for=XMLHttpRequestEventTarget><code>onerror</code></dfn>
+   <td><a event><code>error</code></a>
+  <tr>
+   <td><dfn id=handler-xhr-onload attribute for=XMLHttpRequestEventTarget><code>onload</code></dfn>
+   <td><a event><code>load</code></a>
+  <tr>
+   <td><dfn id=handler-xhr-ontimeout attribute for=XMLHttpRequestEventTarget><code>ontimeout</code></dfn>
+   <td><a event><code>timeout</code></a>
+  <tr>
+   <td><dfn id=handler-xhr-onloadend attribute for=XMLHttpRequestEventTarget><code>onloadend</code></dfn>
+   <td><a event><code>loadend</code></a>
+</table>
+
+<p>The following is the
+<a lt="event handlers">event handler</a>
+(and its corresponding
+<a>event handler event type</a>) that must be
+supported as attribute solely by the
+{{XMLHttpRequest}} object:
+
+<table>
+ <thead>
+  <tr>
+   <th><a lt="event handlers">event handler</a>
+   <th><a>event handler event type</a>
+ <tbody>
+  <tr>
+   <td><dfn id=handler-xhr-onreadystatechange attribute for=XMLHttpRequest><code>onreadystatechange</code></dfn>
+   <td><a event><code>readystatechange</code></a>
+</table>
+
+
+<h3 id=states>States</h3>
+
+<dl class=domintro>
+ <dt><code><var>client</var> . <a attribute for=XMLHttpRequest>readyState</a></code>
+ <dd><p>Returns <var>client</var>'s
+ <a>state</a>.
+</dl>
+
+<p>The
+<dfn attribute for=XMLHttpRequest><code>readyState</code></dfn>
+attribute's getter must return the value from the table below in the cell of the second column, from
+the row where the value in the cell in the first column is <a>context object</a>'s <a>state</a>:
+
+<table>
+ <tbody><tr>
+  <td><i>unsent</i>
+  <td><dfn const for=XMLHttpRequest><code>UNSENT</code></dfn> (numeric value 0)
+  <td>The object has been constructed.
+ <tr>
+  <td><i>opened</i>
+  <td><dfn const for=XMLHttpRequest><code>OPENED</code></dfn> (numeric value 1)
+  <td>The <a method for=XMLHttpRequest lt="open(method, url)"><code>open()</code></a> method has
+   been successfully invoked. During this state request headers can be set using
+   <a><code>setRequestHeader()</code></a> and the fetch can be initiated using the
+   <a><code>send()</code></a> method.
+ <tr>
+  <td><i>headers received</i>
+  <td><dfn const for=XMLHttpRequest><code>HEADERS_RECEIVED</code></dfn>
+   (numeric value 2)
+  <td>All redirects (if any) have been followed and all HTTP headers of the
+   <a>response</a> have been received.
+ <tr>
+  <td><i>loading</i>
+  <td><dfn const for=XMLHttpRequest><code>LOADING</code></dfn> (numeric value 3)
+  <td>The <a>response</a>'s
+  <a for=response>body</a> is being received.
+ <tr>
+  <td><i>done</i>
+  <td><dfn const for=XMLHttpRequest><code>DONE</code></dfn> (numeric value 4)
+  <td>The data transfer has been completed or something went wrong during the transfer
+   (e.g. infinite redirects).
+</table>
+
+
+<h3 id=request>Request</h3>
+
+<p>Each {{XMLHttpRequest}} object has the following request-associated concepts:
+<dfn>request method</dfn>,
+<dfn>request URL</dfn>,
+<dfn id=author-request-headers>author request headers</dfn>,
+<dfn>request body</dfn>,
+<dfn>synchronous flag</dfn>,
+<dfn id=upload-complete-flag>upload complete flag</dfn>,
+<dfn>upload listener flag</dfn>, and
+<dfn>timed out flag</dfn>.
+
+<p>The <a>author request headers</a> is an initially empty
+<a for=/>header list</a>.
+
+<p>The <a>request body</a> is initially null.
+
+<p>The <a>synchronous flag</a>, <a>upload complete flag</a>, <a>upload listener flag</a> and
+<a>timed out flag</a> are initially unset.
+
+<p class="note no-backref" id=event-listeners-and-preflight>Registering one or more event listeners
+on an {{XMLHttpRequestUpload}} object will result in a <a>CORS-preflight request</a>. (That is
+because registering an event listener causes the <a>upload listener flag</a> to be set, which in
+turn causes the <a>use-CORS-preflight flag</a> to be set.)
+
+
+<h4 id=the-open()-method>The <code>open()</code> method</h4>
+
+<dl class=domintro>
+ <dt><code><var>client</var> . <a method for=XMLHttpRequest lt="open(method, url)">open(<var>method</var>, <var>url</var> [, <var>async</var> = true [, <var>username</var> = null [, <var>password</var> = null]]])</a></code>
+
+ <dd>
+  <p>Sets the <a>request method</a>, <a>request URL</a>, and
+  <a>synchronous flag</a>.
+
+  <p>Throws a "{{SyntaxError!!exception}}" {{DOMException}} if either <var>method</var> is not a
+  valid HTTP method or <var>url</var> cannot be parsed.
+
+  <p>Throws a "{{SecurityError!!exception}}" {{DOMException}} if <var>method</var> is a
+  case-insensitive match for `<code>CONNECT</code>`, `<code>TRACE</code>`, or `<code>TRACK</code>`.
+
+  <p>Throws an "{{InvalidAccessError!!exception}}" {{DOMException}} if <var>async</var> is false,
+  <a>current global object</a> is a {{Window}} object, and the {{XMLHttpRequest/timeout!!attribute}}
+  attribute is not zero or the {{XMLHttpRequest/responseType}} attribute is not the empty string.
+</dl>
+
+<p class="critical no-backref" id=sync-warning>Synchronous {{XMLHttpRequest}} outside of workers is
+in the process of being removed from the web platform as it has detrimental effects to the end
+user's experience. (This is a long process that takes many years.) Developers must not pass false
+for the <var>async</var> argument when <a>current global object</a> is a {{Window}} object. User
+agents are strongly encouraged to warn about such usage in developer tools and may experiment with
+<a lt=throw>throwing</a> an "{{InvalidAccessError!!exception}}" {{DOMException}} when it occurs.
+
+<p>The
+<dfn id=dom-xmlhttprequest-open method for=XMLHttpRequest><code>open(<var>method</var>, <var>url</var>)</code></dfn>
+and
+<dfn method for=XMLHttpRequest><code>open(<var>method</var>, <var>url</var>, <var>async</var>, <var>username</var>, <var>password</var>)</code></dfn>
+methods, when invoked, must run these steps:
+
+<ol>
+ <li><p>Let <var>settingsObject</var> be <a>context object</a>'s <a>relevant settings object</a>.
+
+ <li><p>If <var>settingsObject</var> has a <a>responsible document</a> and it is <em>not</em>
+ <a>fully active</a>, then <a>throw</a> an "{{InvalidStateError!!exception}}" {{DOMException}}.
+
+ <li><p>If <var>method</var> is not a <a for=/>method</a>, then <a>throw</a> a
+ "{{SyntaxError!!exception}}" {{DOMException}}.
+
+ <li><p>If <var>method</var> is a <a>forbidden method</a>, then <a>throw</a> a
+ "{{SecurityError!!exception}}" {{DOMException}}.
+
+ <li><p><a for=method>Normalize</a> <var>method</var>.
+
+ <li><p>Let <var>parsedURL</var> be the result of <a lt="URL parser">parsing</a> <var>url</var> with
+ <var>settingsObject</var>'s <a for="environment settings object">API base URL</a> and
+ <var>settingsObject</var>'s <a for="environment settings object">API URL character encoding</a>.
+
+ <li><p>If <var>parsedURL</var> is failure, then <a>throw</a> a "{{SyntaxError!!exception}}"
+ {{DOMException}}.
+
+ <li>
+  <p>If the <var>async</var> argument is omitted, set <var>async</var> to true, and set
+  <var>username</var> and <var>password</var> to null.
+
+  <p class=note>Unfortunately legacy content prevents treating the <var>async</var>
+  argument being <code>undefined</code> identical from it being omitted.
+
+ <li>
+  <p>If <var>parsedURL</var>'s <a for=url>host</a>
+  is non-null, run these substeps:
+
+  <ol>
+   <li><p>If the <var>username</var> argument is not null,
+   <a>set the username</a> given <var>parsedURL</var> and
+   <var>username</var>.
+
+   <li><p>If the <var>password</var> argument is not null,
+   <a>set the password</a> given <var>parsedURL</var> and
+   <var>password</var>.
+  </ol>
+
+ <li><p>If <var>async</var> is false, <a>current global object</a> is a {{Window}} object, and the
+ {{XMLHttpRequest/timeout!!attribute}} attribute value is not zero or the
+ {{XMLHttpRequest/responseType}} attribute value is not the empty string, then <a>throw</a> an
+ "{{InvalidAccessError!!exception}}" {{DOMException}}.
+
+ <li>
+  <p><a for=fetch lt=terminated>Terminate</a> the ongoing fetch operated by the
+  {{XMLHttpRequest}} object.
+
+  <p class=note>A <a for=/>fetch</a> can be
+  ongoing at this point.
+
+ <li>
+  <p>Set variables associated with the object as follows:
+
+  <ul>
+   <li><p>Unset the <a><code>send()</code> flag</a> and <a>upload listener flag</a>.
+   <li><p>Set <a>request method</a> to <var>method</var>.
+   <li><p>Set <a>request URL</a> to <var>parsedURL</var>.
+   <li><p>Set the <a>synchronous flag</a>, if <var>async</var> is false, and unset
+   the <a>synchronous flag</a> otherwise.
+   <li><p>Empty <a>author request headers</a>.
+   <li><p>Set <a>response</a> to a
+   <a>network error</a>.
+   <li><p>Set <a>received bytes</a> to the empty byte sequence.
+   <li><p>Set <a>response object</a> to null.
+  </ul>
+
+  <p class=note><a>Override MIME type</a> is not overridden here as the
+  <code>overrideMimeType()</code> method can be invoked before the <code>open()</code> method.
+
+ <li>
+  <p>If the <a>state</a> is not
+  <i>opened</i>, run these substeps:
+
+  <ol>
+   <li><p>Set <a>state</a> to
+   <i>opened</i>.
+
+   <li><p><a>Fire an event</a> named <a event><code>readystatechange</code></a>.
+  </ol>
+</ol>
+
+<p class=note>The reason there are two <code>open()</code> methods defined is due to a limitation of
+the editing software used to write the XMLHttpRequest Standard.
+
+
+
+<h4 id=the-setrequestheader()-method>The <code>setRequestHeader()</code> method</h4>
+
+<dl class=domintro>
+ <dt><code><var>client</var> . <a method for=XMLHttpRequest>setRequestHeader(<var>name</var>, <var>value</var>)</a></code>
+
+ <dd>
+  <p>Combines a <a>header</a> in <a>author request headers</a>.
+
+  <p>Throws an "{{InvalidStateError!!exception}}" {{DOMException}} if either <a>state</a> is not
+  <i>opened</i> or the <a><code>send()</code> flag</a> is set.
+
+  <p>Throws a "{{SyntaxError!!exception}}" {{DOMException}} if <var>name</var> is not a header name
+  or if <var>value</var> is not a header value.
+</dl>
+
+<p>The
+<dfn id=dom-xmlhttprequest-setrequestheader method for=XMLHttpRequest><code>setRequestHeader(<var>name</var>, <var>value</var>)</code></dfn>
+method must run these steps:
+
+<ol>
+ <li><p>If <a>state</a> is not <i>opened</i>, then <a>throw</a> an
+ "{{InvalidStateError!!exception}}" {{DOMException}}.
+
+ <li><p>If the <a><code>send()</code> flag</a> is set, then <a>throw</a> an
+ "{{InvalidStateError!!exception}}" {{DOMException}}.
+
+ <li><p><a for=header/value>Normalize</a> <var>value</var>.
+
+ <li>
+  <p>If <var>name</var> is not a <a for=header>name</a> or <var>value</var> is not a
+  <a for=header>value</a>, then <a>throw</a> a "{{SyntaxError!!exception}}" {{DOMException}}.
+
+  <p class="note no-backref">An empty byte sequence represents an empty <a>header</a>
+  <a for=header>value</a>.
+
+ <li><p>Terminate these steps if <var>name</var> is a
+ <a>forbidden header name</a>.
+
+ <li><p><a for="header list">Combine</a> <var>name</var>/<var>value</var> in
+ <a>author request headers</a>.
+</ol>
+
+<div id=example-setting-header-twice class=example>
+ <p>Some simple code demonstrating what happens when setting the same
+ header twice:
+
+ <pre><code class=lang-javascript>
+// The following script:
+var client = new XMLHttpRequest();
+client.open('GET', 'demo.cgi');
+client.setRequestHeader('X-Test', 'one');
+client.setRequestHeader('X-Test', 'two');
+client.send();
+
+// …results in the following header being sent:
+// X-Test: one, two</code></pre>
+</div>
+
+
+<h4 id=the-timeout-attribute>The <code>timeout</code> attribute</h4>
+
+<dl class=domintro>
+ <dt><code><var>client</var> . <a attribute for=XMLHttpRequest>timeout</a></code>
+ <dd>
+  <p>Can be set to a time in milliseconds. When set to a non-zero value will cause
+  <a for=/>fetching</a> to terminate after the given time has passed. When the time has passed, the
+  request has not yet completed, and the <a>synchronous flag</a> is unset, a
+  <a event><code>timeout</code></a> event will then be <a>dispatched</a>, or a
+  "{{TimeoutError!!exception}}" {{DOMException}} will be <a lt=throw>thrown</a> otherwise (for the
+  <a><code>send()</code></a> method).
+
+  <p>When set: throws an "{{InvalidAccessError!!exception}}" {{DOMException}} if the
+  <a>synchronous flag</a> is set and <a>current global object</a> is a {{Window}} object.
+</dl>
+
+<p>The <dfn attribute for=XMLHttpRequest><code>timeout</code></dfn>
+attribute must return its value. Initially its value must be zero.
+
+<p>Setting the {{XMLHttpRequest/timeout!!attribute}}
+attribute must run these steps:
+
+<ol>
+ <li><p>If <a>current global object</a> is a {{Window}} object and the <a>synchronous flag</a> is
+ set, then <a>throw</a> an "{{InvalidAccessError!!exception}}" {{DOMException}}.
+
+ <li><p>Set its value to the new value.
+</ol>
+
+<p class=note>This implies that the
+{{XMLHttpRequest/timeout!!attribute}} attribute can be
+set while <a for=/>fetching</a> is in
+progress. If that occurs it will still be measured relative to the start
+of <a for=/>fetching</a>.
+
+
+<h4 id=the-withcredentials-attribute>The <code>withCredentials</code> attribute</h4>
+
+<dl class=domintro>
+ <dt><code><var>client</var> . <a attribute for=XMLHttpRequest>withCredentials</a></code>
+ <dd>
+  <p>True when <a>credentials</a> are to be included in a cross-origin request. False when they are
+  to be excluded in a cross-origin request and when cookies are to be ignored in its response.
+  Initially false.
+
+  <p>When set: throws an "{{InvalidStateError!!exception}}" {{DOMException}} if <a>state</a> is not
+  <i>unsent</i> or <i>opened</i>, or if the <a><code>send()</code> flag</a> is set.
+</dl>
+
+<p>The
+<dfn attribute for=XMLHttpRequest><code>withCredentials</code></dfn>
+attribute must return its value. Initially its value must be false.
+
+<p>Setting the
+{{XMLHttpRequest/withCredentials}}
+attribute must run these steps:
+
+<ol>
+ <li><p>If <a>state</a> is not <i>unsent</i> or <i>opened</i>, then <a>throw</a> an
+ "{{InvalidStateError!!exception}}" {{DOMException}}.
+
+ <li><p>If the <a><code>send()</code> flag</a> is set, then <a>throw</a> an
+ "{{InvalidStateError!!exception}}" {{DOMException}}.
+
+ <li><p>Set the {{XMLHttpRequest/withCredentials}}
+ attribute's value to the given value.
+</ol>
+
+<p class=note>The {{XMLHttpRequest/withCredentials}}
+attribute has no effect when
+<a for=/>fetching</a>
+<a lt="same origin">same-origin</a> resources.
+
+
+<h4 id=the-upload-attribute>The <code>upload</code> attribute</h4>
+
+<dl class=domintro>
+ <dt><code><var>client</var> . <a attribute for=XMLHttpRequest>upload</a></code>
+ <dd><p>Returns the associated {{XMLHttpRequestUpload}}
+ object. It can be used to gather transmission information when data is
+ transferred to a server.
+</dl>
+
+<p>The
+<dfn attribute for=XMLHttpRequest><code>upload</code></dfn>
+attribute must return the associated
+{{XMLHttpRequestUpload}} object.
+
+<p class=note>As indicated earlier, each {{XMLHttpRequest}}
+object has an associated {{XMLHttpRequestUpload}} object.
+
+
+<h4 id=the-send()-method>The <code>send()</code> method</h4>
+
+<dl class=domintro>
+ <dt><code><var>client</var> . <a method for=XMLHttpRequest lt="send(body)">send([<var>body</var> = null])</a></code>
+ <dd>
+  <p>Initiates the request. The <var>body</var> argument provides the <a>request body</a>, if any,
+  and is ignored if the <a>request method</a> is <code>GET</code> or <code>HEAD</code>.
+
+  <p>Throws an "{{InvalidStateError!!exception}}" {{DOMException}} if either <a>state</a> is not
+  <i>opened</i> or the <a><code>send()</code> flag</a> is set.
+</dl>
+
+<p>The <dfn method for=XMLHttpRequest><code>send(<var>body</var>)</code></dfn>
+method must run these steps:
+
+<ol>
+ <li><p>If <a>state</a> is not <i>opened</i>, then <a>throw</a> an
+ "{{InvalidStateError!!exception}}" {{DOMException}}.
+
+ <li><p>If the <a><code>send()</code> flag</a> is set, then <a>throw</a> an
+ "{{InvalidStateError!!exception}}" {{DOMException}}.
+
+ <li><p>If the <a>request method</a> is <code>GET</code> or
+ <code>HEAD</code>, set <var>body</var> to null.
+
+ <li>
+  <p>If <var>body</var> is not null, then:
+
+  <ol>
+   <li><p>Let <var>extractedContentType</var> be null.
+
+   <li><p>If <var>body</var> is a {{Document}}, then set <a>request body</a> to
+   <var>body</var>, <a lt="fragment serializing algorithm">serialized</a>,
+   <a lt="obtain Unicode">converted to Unicode</a>, and <a lt="UTF-8 encode">UTF-8 encoded</a>.
+
+   <li><p>Otherwise, set <a>request body</a> and <var>extractedContentType</var> to the result of
+   <a for=BodyInit>extracting</a> <var>body</var>.
+
+   <li>
+    <p>If <a>author request headers</a> <a for="header list">contains</a>
+    `<code>Content-Type</code>`, then:
+
+    <ol>
+     <li>
+      <p>If <var>body</var> is a {{Document}} or a {{USVString}}, then:
+
+      <ol>
+       <li><p>Let <var>originalAuthorContentType</var> be the <a for=header>value</a> of the
+       <a>header</a> whose <a for=header>name</a> is a <a>byte-case-insensitive</a> match for
+       `<code>Content-Type</code>` in <a>author request headers</a>.
+       <!-- XXX: add a primitive for this in Fetch -->
+
+       <li><p>Let <var>contentTypeRecord</var> be the result of
+       <a lt="parse a MIME type from bytes">parsing</a> <var>originalAuthorContentType</var>.
+
+       <li>
+        <p>If <var>contentTypeRecord</var> is not failure, <var>contentTypeRecord</var>'s
+        <a for="MIME type">parameters</a>["<code>charset</code>"] <a for=map>exists</a>, and
+        <a for="MIME type">parameters</a>["<code>charset</code>"] is not an
+        <a>ASCII case-insensitive</a> match for "<code>UTF-8</code>", then:
+
+        <ol>
+         <li><p><a for=map>Set</a> <var>contentTypeRecord</var>'s
+         <a for="MIME type">parameters</a>["<code>charset</code>"] to "<code>UTF-8</code>".
+
+         <li><p>Let <var>newContentTypeSerialized</var> be the result of
+         <a lt="serialize a MIME type to bytes">serializing</a> <var>contentTypeRecord</var>.
+
+         <li><p><a for="header list">Set</a>
+         `<code>Content-Type</code>`/<var>newContentTypeSerialized</var> in
+         <a>author request headers</a>.
+        </ol>
+      </ol>
+    </ol>
+   <li>
+    Otherwise:
+
+    <ol>
+     <li><p>If <var>body</var> is a <a>HTML document</a>, <a for="header list">set</a>
+     `<code>Content-Type</code>`/`<code>text/html;charset=UTF-8</code>` in
+     <a>author request headers</a>.
+
+     <li><p>Otherwise, if <var>body</var> is an <a>XML document</a>, <a for="header list">set</a>
+     `<code>Content-Type</code>`/`<code>application/xml;charset=UTF-8</code>` in
+     <a>author request headers</a>.
+
+     <li><p>Otherwise, if <var>extractedContentType</var> is not null, <a for="header list">set</a>
+     `<code>Content-Type</code>`/<var>extractedContentType</var> in <a>author request headers</a>.
+    </ol>
+  </ol>
+
+ <li><p>If one or more event listeners are registered on the associated
+ {{XMLHttpRequestUpload}} object, then set <a>upload listener flag</a>.
+
+ <li>
+  <p>Let <var>req</var> be a new
+  <a for=/>request</a>, initialized as
+  follows:
+
+  <dl>
+   <dt><a for=request>method</a>
+   <dd><a>request method</a>
+   <dt><a for=request>url</a>
+   <dd><a>request URL</a>
+   <dt><a for=request>header list</a>
+   <dd><a>author request headers</a>
+   <dt><a for=request>unsafe-request flag</a>
+   <dd>Set.
+   <dt><a for=request>body</a>
+   <dd><a>request body</a>
+   <dt><a for=request>client</a>
+   <dd><a>context object</a>'s
+   <a>relevant settings object</a>
+   <dt><a for=request>synchronous flag</a>
+   <dd>Set if the <a>synchronous flag</a> is set.
+   <dt><a for=request>mode</a>
+   <dd>"<code>cors</code>"
+   <dt><a for=request>use-CORS-preflight flag</a>
+   <dd>Set if <a>upload listener flag</a> is set.
+   <dt><a for=request>credentials mode</a>
+   <dd>If the {{XMLHttpRequest/withCredentials}}
+   attribute value is true, "<code>include</code>", and "<code>same-origin</code>"
+   otherwise.
+   <dt><a for=request>use-URL-credentials flag</a>
+   <dd>Set if either <a>request URL</a>'s
+   <a for=url>username</a>
+   is not the empty string or <a>request URL</a>'s
+   <a for=url>password</a> is non-null.
+  </dl>
+
+ <li><p>Unset the <a>upload complete flag</a>.
+
+ <li><p>Unset the <a>timed out flag</a>.
+
+ <li><p>If <var>req</var>'s
+ <a for=request>body</a> is null,
+ set the <a>upload complete flag</a>.
+
+ <li><p>Set the <a><code>send()</code> flag</a>.
+
+ <li>
+  <p>If the <a>synchronous flag</a> is unset, run these substeps:
+
+  <ol>
+   <li><p><a>Fire a progress event</a> named <a event><code>loadstart</code></a> with 0 and 0.
+
+   <li><p>If the <a>upload complete flag</a> is unset and <a>upload listener flag</a> is
+   set, then <a>fire a progress event</a> named
+   <a event><code>loadstart</code></a> on the
+   {{XMLHttpRequestUpload}} object with 0 and <var>req</var>'s
+   <a for=request>body</a>'s
+   <a>total bytes</a>.
+
+   <li><p>If <a>state</a> is not <i>opened</i> or the <a><code>send()</code> flag</a> is unset, then
+   return.
+
+   <li>
+    <p><a for=/>Fetch</a> <var>req</var>.
+    Handle the <a>tasks</a>
+    <a lt="queue a task">queued</a> on the
+    <a>networking task source</a> per below.
+
+    <p>Run these subsubsteps <a>in parallel</a>:
+
+    <ol>
+     <li>
+      <p>Wait until either <var>req</var>'s <a for=request>done flag</a> is set or
+
+      <ol>
+       <li><p>the {{XMLHttpRequest/timeout!!attribute}} attribute value number of milliseconds has
+       passed since these subsubsteps started
+       <li><p>while {{XMLHttpRequest/timeout!!attribute}} attribute value is not zero.
+      </ol>
+
+     <li><p>If <var>req</var>'s <a for=request>done flag</a> is unset, then set the
+     <a>timed out flag</a> and <a for=fetch>terminate</a> <a for=/>fetching</a>.
+    </ol>
+
+    <p>To <a>process request body</a> for
+    <var>request</var>, run these subsubsteps:
+
+    <ol>
+     <li><p>If not roughly 50ms have passed since these subsubsteps were last invoked,
+     terminate these subsubsteps.
+
+     <li><p>If <a>upload listener flag</a> is set, then
+     <a>fire a progress event</a> named
+     <a event><code>progress</code></a> on the
+     {{XMLHttpRequestUpload}} object with <var>request</var>'s
+     <a for=request>body</a>'s
+     <a>transmitted bytes</a> and
+     <var>request</var>'s
+     <a for=request>body</a>'s
+     <a>total bytes</a>.
+     <!-- upload complete flag can never be set here I hope -->
+    </ol>
+
+    <p class=note>These subsubsteps are only invoked when new bytes are transmitted.
+
+    <p>To <a>process request end-of-body</a> for
+    <var>request</var>, run these subsubsteps:
+
+    <ol>
+     <li><p>Set the <a>upload complete flag</a>.
+
+     <li><p>If <a>upload listener flag</a> is unset, then terminate these subsubsteps.
+
+     <li><p>Let <var>transmitted</var> be <var>request</var>'s
+     <a for=request>body</a>'s
+     <a>transmitted bytes</a>.
+
+     <li><p>Let <var>length</var> be <var>request</var>'s
+     <a for=request>body</a>'s
+     <a>total bytes</a>.
+
+     <li><p><a>Fire a progress event</a> named
+     <a event><code>progress</code></a> on the
+     {{XMLHttpRequestUpload}} object with <var>transmitted</var> and
+     <var>length</var>.
+
+     <li><p><a>Fire a progress event</a> named
+     <a event><code>load</code></a> on the
+     {{XMLHttpRequestUpload}} object with <var>transmitted</var> and
+     <var>length</var>.
+
+     <li><p><a>Fire a progress event</a> named
+     <a event><code>loadend</code></a> on the
+     {{XMLHttpRequestUpload}} object with <var>transmitted</var> and
+     <var>length</var>.
+    </ol>
+    <!-- upload complete flag can never be set here I hope -->
+
+    <p>To <a>process response</a> for <var>response</var>,
+    run these subsubsteps:
+
+    <ol>
+     <li><p>Set <a>response</a> to <var>response</var>.
+
+     <li><p><a>Handle errors</a> for <var>response</var>.
+
+     <li><p>If <a>response</a> is a
+     <a>network error</a>,
+     return.
+
+     <li><p>Set <a>state</a> to
+     <i>headers received</i>.
+
+     <li><p><a>Fire an event</a> named
+     <a event><code>readystatechange</code></a>.
+
+     <li><p>If <a>state</a> is not
+     <i>headers received</i>, then return.
+
+     <li><p>If <var>response</var>'s
+     <a for=response>body</a> is null,
+     then run <a>handle response end-of-body</a> and return.
+
+     <li>
+      <p>Let <var>reader</var> be the result of
+      <a lt="get a reader" for=ReadableStream>getting a reader</a> from
+      <var>response</var>'s <a for=response>body</a>'s
+      <a for=body>stream</a>.
+
+      <p><span class="note no-backref">This operation will not throw an exception.</span>
+
+     <li>
+      <p>Let <var>read</var> be the result of
+      <a lt="read a chunk" for=ReadableStream>reading a chunk</a>
+      from <var>response</var>'s
+      <a for=response>body</a>'s
+      <a>stream</a> with <var>reader</var>.
+
+      <p>When <var>read</var> is fulfilled with an object whose <code>done</code> property is false
+      and whose <code>value</code> property is a <code>Uint8Array</code> object, run these
+      subsubsubsteps and then run the above subsubstep again:
+
+      <ol>
+       <li><p>Append the <code>value</code> property to <a>received bytes</a>.
+
+       <li><p>If not roughly 50ms have passed since these subsubsubsteps were last invoked,
+       then terminate these subsubsubsteps.
+
+       <li><p>If <a>state</a> is
+       <i>headers received</i>, then set
+       <a>state</a> to <i>loading</i>.
+
+       <li>
+        <p><a>Fire an event</a> named
+        <a event><code>readystatechange</code></a>.
+
+        <p class="note no-backref">Web compatibility is the reason
+        <a event><code>readystatechange</code></a> fires more often than
+        <a>state</a> changes.
+
+       <li><p><a>Fire a progress event</a> named
+       <a event><code>progress</code></a> with <var>response</var>'s
+       <a for=response>body</a>'s
+       <a>transmitted bytes</a> and
+       <var>response</var>'s <a for=response>body</a>'s
+       <a>total bytes</a>.
+      </ol>
+
+      <p class=note>These subsubsubsteps are only invoked when new bytes are transmitted.
+
+      <p>When <var>read</var> is fulfilled with an object whose <code>done</code> property is true,
+      run <a>handle response end-of-body</a> for <var>response</var>.
+
+      <p>When <var>read</var> is rejected with an exception, run <a>handle errors</a> for
+      <var>response</var>.
+    </ol>
+  </ol>
+
+ <li>
+  <p>Otherwise, if the <a>synchronous flag</a> is set, run these substeps:
+
+  <ol>
+   <li><p>If <a>context object</a>'s <a>relevant settings object</a> has a
+   <a>responsible document</a> which is <em>not</em> <a>allowed to use</a> the
+   "<code><a>sync-xhr</a></code>" feature, then run <a>handle response end-of-body</a> for a
+   <a>network error</a> and return.
+
+   <li>
+    <p>Let <var>response</var> be the result of
+    <a for=/>fetching</a> <var>req</var>.
+
+    <p>If the {{XMLHttpRequest/timeout!!attribute}} attribute value is not zero, then set the
+    <a>timed out flag</a> and <a for=fetch>terminate</a> <a for=/>fetching</a> if it has not
+    returned within the amount of milliseconds from the {{XMLHttpRequest/timeout!!attribute}}.
+
+   <li><p>If <var>response</var>'s
+   <a for=response>body</a> is null,
+   then run <a>handle response end-of-body</a> and return.
+
+   <li>
+    <p>Let <var>reader</var> be the result of
+    <a lt="get a reader" for=ReadableStream>getting a reader</a> from
+    <var>response</var>'s <a for=response>body</a>'s
+    <a for=body>stream</a>.
+
+    <p><span class="note no-backref">This operation will not throw an exception.</span>
+
+   <li><p>Let <var>promise</var> be the result of
+   <a lt="read all bytes" for=ReadableStream>reading all bytes</a> from <var>response</var>'s
+   <a for=response>body</a>'s <a for=body>stream</a> with <var>reader</var>.
+
+   <li><p>Wait for <var>promise</var> to be fulfilled or rejected.
+
+   <li><p>If <var>promise</var> is fulfilled with <var>bytes</var>, then append <var>bytes</var>
+   to <a>received bytes</a>.
+
+   <li><p>Run <a>handle response end-of-body</a> for <var>response</var>.
+  </ol>
+</ol>
+
+<p id=handle-response-end-of-file>To <dfn>handle response end-of-body</dfn> for
+<var>response</var>, run these steps:
+
+<ol>
+ <li><p>If the <a>synchronous flag</a> is set, set <a>response</a> to
+ <var>response</var>.
+
+ <li><p><a>Handle errors</a> for <var>response</var>.
+
+ <li><p>If <a>response</a> is a
+ <a>network error</a>, return.
+
+ <li><p>If the <a>synchronous flag</a> is unset, update <a>response</a>'s
+ <a for=response>body</a> using
+ <var>response</var>.
+
+ <li><p>Let <var>transmitted</var> be <var>response</var>'s <a for=response>body</a>'s
+ <a for=body>transmitted bytes</a>.
+
+ <li><p>Let <var>length</var> be <var>response</var>'s <a for=response>body</a>'s
+ <a for=body>total bytes</a>.
+
+ <li><p>If the <a>synchronous flag</a> is unset, <a>fire a progress event</a> named
+ <a event><code>progress</code></a> with <var>transmitted</var> and <var>length</var>.
+
+ <li><p>Set <a>state</a> to <i>done</i>.
+
+ <li><p>Unset the <a><code>send()</code> flag</a>.
+
+ <li><p><a>Fire an event</a> named <a event><code>readystatechange</code></a>.
+
+ <li><p><a>Fire a progress event</a> named <a event><code>load</code></a>
+ with <var>transmitted</var> and <var>length</var>.
+
+ <li><p><a>Fire a progress event</a> named <a event><code>loadend</code></a>
+ with <var>transmitted</var> and <var>length</var>.
+</ol>
+
+<p>To <dfn>handle errors</dfn> for <var>response</var> run these steps:
+
+<ol>
+ <li><p>If the <a><code>send()</code> flag</a> is unset, return.
+
+ <li><p>If the <a>timed out flag</a> is set, then run the <a>request error steps</a> for event
+ <a event><code>timeout</code></a> and exception "{{TimeoutError!!exception}}" {{DOMException}}.
+
+ <li><p>If <var>response</var> is a <a>network error</a>, then run the <a>request error steps</a>
+ for event <a event><code>error</code></a> and exception "{{NetworkError!!exception}}"
+ {{DOMException}}.
+
+ <li>
+  <p>Otherwise, if <var>response</var>'s <a for=response>body</a>'s <a for=body>stream</a> is
+  <a for=ReadableStream>errored</a>, then:
+
+  <ol>
+   <li><p>Set <a>state</a> to <i>done</i>.
+
+   <li><p>Unset the <a><code>send()</code> flag</a>.
+
+   <li><p>Set <a>response</a> to a <a>network error</a>.
+  </ol>
+
+ <li><p>Otherwise, if <var>response</var>'s <a for=response>aborted flag</a> is set, then run the
+ <a>request error steps</a> for event <a event><code>abort</code></a> and exception
+ "{{AbortError!!exception}}" {{DOMException}}.
+</ol>
+
+<p>The <dfn>request error steps</dfn> for event <var>event</var> and optionally an
+exception <var>exception</var> are:
+
+<ol>
+ <li><p>Set <a>state</a> to <i>done</i>.
+
+ <li><p>Unset the <a><code>send()</code> flag</a>.
+
+ <li><p>Set <a>response</a> to a
+ <a>network error</a>.
+
+ <li><p>If the <a>synchronous flag</a> is set,
+ <a>throw</a> an <var>exception</var>
+ exception.
+
+ <li>
+  <p><a>Fire an event</a> named <a event><code>readystatechange</code></a>.
+
+  <p class=note>At this point it is clear that the <a>synchronous flag</a> is unset.
+
+ <li>
+  <p>If the <a>upload complete flag</a> is unset, follow these substeps:
+
+  <ol>
+   <li><p>Set the <a>upload complete flag</a>.
+
+   <li><p>If <a>upload listener flag</a> is unset, then terminate these substeps.
+
+   <li><p><a>Fire a progress event</a> named
+   <var>event</var> on the {{XMLHttpRequestUpload}} object with 0 and 0.
+
+   <li><p><a>Fire a progress event</a> named
+   <a event><code>loadend</code></a> on the {{XMLHttpRequestUpload}}
+   object with 0 and 0.
+  </ol>
+
+ <li><p><a>Fire a progress event</a> named
+ <var>event</var> with 0 and 0.
+
+ <li><p><a>Fire a progress event</a> named
+ <a event><code>loadend</code></a> with 0 and 0.
+</ol>
+
+
+<h4 id=the-abort()-method>The <code>abort()</code> method</h4>
+
+  <dl class=domintro>
+   <dt><code><var>client</var> . <a method for=XMLHttpRequest>abort()</a></code>
+   <dd>Cancels any network activity.
+  </dl>
+
+<p>The <dfn method for=XMLHttpRequest><code>abort()</code></dfn> method,
+when invoked, must run these steps:
+
+<ol>
+ <li><p><a for=fetch lt=terminated>Terminate</a> the ongoing fetch with the <i>aborted</i> flag set.
+
+ <li><p>If <a>state</a> is either
+ <i>opened</i> with the <a><code>send()</code> flag</a> set,
+ <i>headers received</i>, or <i>loading</i>, run the
+ <a>request error steps</a> for event <a event><code>abort</code></a>.
+
+ <li>
+  <p>If <a>state</a> is <i>done</i>, then set <a>state</a> to <i>unsent</i> and <a>response</a> to a
+  <a>network error</a>.
+
+  <p class=note>No <a event><code>readystatechange</code></a> event
+  is dispatched.
+</ol>
+
+
+<h3 id=xmlhttprequest-response>Response</h3>
+
+<p>An {{XMLHttpRequest}} has an associated <dfn>response</dfn>. Unless stated
+otherwise it is a
+<a>network error</a>.
+
+<p>An {{XMLHttpRequest}} also has an associated <dfn>received bytes</dfn> (a byte
+sequence). Unless stated otherwise it is the empty byte sequence.
+
+
+<h4 id=the-responseurl-attribute>The <code>responseURL</code> attribute</h4>
+
+<p>The <dfn attribute for=XMLHttpRequest><code>responseURL</code></dfn> attribute
+must return the empty string if <a>response</a>'s
+<a for=response>url</a> is null and its
+<a lt="URL serializer">serialization</a> with the
+<i>exclude fragment flag</i> set otherwise.
+
+
+<h4 id=the-status-attribute>The <code>status</code> attribute</h4>
+
+<p>The
+<dfn attribute for=XMLHttpRequest><code>status</code></dfn>
+attribute must return the <a>response</a>'s
+<a for=response>status</a>.
+
+
+<h4 id=the-statustext-attribute>The <code>statusText</code> attribute</h4>
+
+<p>The
+<dfn attribute for=XMLHttpRequest><code>statusText</code></dfn>
+attribute must return the <a>response</a>'s
+<a>status message</a>.
+
+
+<h4 id=the-getresponseheader()-method>The <code>getResponseHeader()</code> method</h4>
+
+<p>The <dfn method for=XMLHttpRequest><code>getResponseHeader(<var>name</var>)</code></dfn> method,
+when invoked, must return the result of <a for="header list">getting</a> <var>name</var> from
+<a>response</a>'s <a for=response>header list</a>
+
+<p class="note no-backref">The Fetch Standard filters <a>response</a>'s
+<a for=response>header list</a>. [[!FETCH]]
+
+<div id=example-getresponseheader class=example>
+ <p>For the following script:
+
+ <pre><code class=lang-javascript>
+var client = new XMLHttpRequest();
+client.open("GET", "unicorns-are-teh-awesome.txt", true);
+client.send();
+client.onreadystatechange = function() {
+  if(this.readyState == this.HEADERS_RECEIVED) {
+    print(client.getResponseHeader("Content-Type"));
+  }
+}</code></pre>
+
+ <p>The <code>print()</code> function will get to process something like:
+
+ <pre><code>
+text/plain; charset=UTF-8</code></pre>
+</div>
+
+
+<h4 id=the-getallresponseheaders()-method>The <code>getAllResponseHeaders()</code> method</h4>
+
+<p>The
+<dfn method for=XMLHttpRequest><code>getAllResponseHeaders()</code></dfn>
+method, when invoked, must run these steps:
+
+<ol>
+ <li><p>Let <var>output</var> be an empty byte sequence.
+
+ <li><p>Let <var>headers</var> be the result of running <a>sort and combine</a> with
+ <a>response</a>'s <a for=response>header list</a>.
+
+ <li><p><a for=list>For each</a> <var>header</var> in <var>headers</var>, append <var>header</var>'s
+ <a for=header>name</a>, followed by a 0x3A 0x20 byte pair, followed by <var>header</var>'s
+ <a for=header>value</a>, followed by a 0x0D 0x0A byte pair, to <var>output</var>.
+
+ <li><p>Return <var>output</var>.
+</ol>
+
+<p class="note no-backref">The Fetch Standard filters <a>response</a>'s
+<a for=response>header list</a>.
+[[!FETCH]]
+
+<div id=example-getresponseheaders class=example>
+ <p>For the following script:
+
+ <pre><code class=lang-javascript>
+var client = new XMLHttpRequest();
+client.open("GET", "narwhals-too.txt", true);
+client.send();
+client.onreadystatechange = function() {
+  if(this.readyState == this.HEADERS_RECEIVED) {
+    print(this.getAllResponseHeaders());
+  }
+}</code></pre>
+
+ <p>The <code>print()</code> function will get to process something
+ like:
+
+ <pre><code>
+connection: Keep-Alive
+content-type: text/plain; charset=utf-8
+date: Sun, 24 Oct 2004 04:58:38 GMT
+keep-alive: timeout=15, max=99
+server: Apache/1.3.31 (Unix)
+transfer-encoding: chunked</code></pre>
+</div>
+
+
+<h4 id=response-body>Response body</h4>
+
+<p>The <dfn id=response-mime-type>response MIME type</dfn> is the result of running these steps:
+
+<ol>
+ <li><p>Let <var>mimeType</var> be the result of <a for="header list">extracting a MIME type</a>
+ from <a>response</a>'s <a for=response>header list</a>.
+
+ <li><p>If <var>mimeType</var> is the empty byte sequence, then set <var>mimeType</var> to
+ `<code>text/xml</code>`.
+
+ <li><p>Return <var>mimeType</var>.
+</ol>
+
+<p>The <dfn id=override-mime-type>override MIME type</dfn> is initially null and can get a value
+when {{overrideMimeType()}} is invoked. The <dfn id=final-mime-type>final MIME type</dfn> is the
+<a>override MIME type</a> unless that is null in which case it is the <a>response MIME type</a>.
+
+<p>The <dfn id=final-charset>final charset</dfn> is the return value of these steps:
+
+<ol>
+ <li><p>Let <var>label</var> be null.
+
+ <li><p>If <a>response MIME type</a>'s <a for="MIME type">parameters</a>["<code>charset</code>"]
+ <a for=map>exists</a>, then set <var>label</var> to it.
+
+ <li><p>If <a>override MIME type</a>'s <a for="MIME type">parameters</a>["<code>charset</code>"]
+ <a for=map>exists</a>, then set <var>label</var> to it.
+
+ <li><p>If <var>label</var> is null, then return null.
+
+ <li><p>Let <var>encoding</var> be the result of <a>getting an encoding</a> from <var>label</var>.
+
+ <li><p>If <var>encoding</var> is failure, then return null.
+
+ <li><p>Return <var>encoding</var>.
+</ol>
+
+<p class=note>The above steps intentionally do not use the <a>final MIME type</a> as it would yield
+the wrong result.
+
+<hr>
+
+<p>An {{XMLHttpRequest}} object has an associated <dfn>response object</dfn> (an object, failure,
+or null). Unless stated otherwise it is null.
+
+
+<p>An <dfn>arraybuffer response</dfn> is the return value of these steps:
+
+<ol>
+ <li>
+  <p>Set <a>response object</a> to a new {{ArrayBuffer}} object representing <a>received bytes</a>.
+  If this throws an exception, then set <a>response object</a> to failure and return null.
+
+  <p class=note>Allocating an {{ArrayBuffer}} object is not guaranteed to succeed. [[!ECMASCRIPT]]
+
+ <li><p>Return <a>response object</a>.
+</ol>
+
+
+<p>A <dfn>blob response</dfn> is the return value of these steps:
+
+<ol>
+ <li><p>Set <a>response object</a> to a new {{Blob}} object representing <a>received bytes</a> with
+ {{Blob/type}} set to the <a>final MIME type</a>.
+
+ <li><p>Return <a>response object</a>.
+</ol>
+
+
+<p>A <dfn>document response</dfn> is the return value of these steps:
+
+<ol>
+ <li><p>If <a>response</a>'s
+ <a for=response>body</a> is null, then return null.
+
+ <li><p>If the <a>final MIME type</a> is not an <a>HTML MIME type</a> or an <a>XML MIME type</a>,
+ then return null.
+
+ <li>
+  <p>If {{XMLHttpRequest/responseType}} is the empty string and the <a>final MIME type</a> is an
+  <a>HTML MIME type</a>, then return null.
+
+  <p class=note>This is restricted to
+  {{XMLHttpRequest/responseType}} being
+  "<code>document</code>" in order to prevent breaking legacy
+  content.
+
+ <li>
+  <p>If the <a>final MIME type</a> is an <a>HTML MIME type</a>, then:
+
+  <ol>
+   <li><p>Let <var>charset</var> be the <a>final charset</a>.
+
+   <li><p>If <var>charset</var> is null,
+   <a lt="prescan a byte stream to determine its encoding">prescan</a>
+   the first 1024 bytes of <a>received bytes</a> and if
+   that does not terminate unsuccessfully then let <var>charset</var> be
+   the return value.
+
+   <li><p>If <var>charset</var> is null, then set <var>charset</var> to <a>UTF-8</a>.
+
+   <li><p>Let <var>document</var> be a
+   <a>document</a> that
+   represents the result parsing <a>received bytes</a> following the rules set
+   forth in the HTML Standard for an HTML parser with scripting disabled and
+   <a>a known definite encoding</a> <var>charset</var>.
+   [[!HTML]]
+
+   <li><p>Flag <var>document</var> as an
+   <a>HTML document</a>.
+  </ol>
+
+ <li>
+  <p>Otherwise, let <var>document</var> be a
+  <a>document</a>
+  that represents the result of running the <a>XML parser</a>
+  with <a>XML scripting support disabled</a> on
+  <a>received bytes</a>. If that fails (unsupported character encoding,
+  namespace well-formedness error, etc.), then return null.
+  [[!HTML]]
+
+  <p class=note>Resources referenced will not be loaded and no associated XSLT will be
+  applied. <!-- XXX more formally?! -->
+
+ <li><p>If <var>charset</var> is null, then set <var>charset</var> to <a>UTF-8</a>.
+ <!-- can only happen in the XML case -->
+
+ <li><p>Set <var>document</var>'s
+ <a for=Document>encoding</a> to
+ <var>charset</var>.
+
+ <li><p>Set <var>document</var>'s <a>content type</a> to the <a>final MIME type</a>.
+
+ <li><p>Set <var>document</var>'s
+ <a for=Document>URL</a> to
+ <a>response</a>'s
+ <a for=response>url</a>.
+
+ <li><p>Set <var>document</var>'s <a for=Document>origin</a> to
+ <a>context object</a>'s
+ <a>relevant settings object</a>'s
+ <a for="environment settings object">origin</a>.
+
+ <li><p>Set <a>response object</a> to
+ <var>document</var> and return it.
+</ol>
+
+
+<p>A <dfn>JSON response</dfn> is the return value of these steps:
+
+<ol>
+ <li><p>If <a>response</a>'s <a for=response>body</a> is null, then return null.
+
+ <li><p>Let <var>jsonObject</var> be the result of running <a>parse JSON from bytes</a> on
+ <a>received bytes</a>. If that threw an exception, then return null.
+
+ <li><p>Set <a>response object</a> to <var>jsonObject</var> and return it.
+</ol>
+
+
+<p>A <dfn>text response</dfn> is the return value of these steps:
+
+<ol>
+ <li><p>If <a>response</a>'s
+ <a for=response>body</a> is null, then return the
+ empty string.
+
+ <li><p>Let <var>charset</var> be the <a>final charset</a>.
+
+ <li>
+  <p>If {{XMLHttpRequest/responseType}} is the empty string, <var>charset</var> is null, and the
+  <a>final MIME type</a> is an <a>XML MIME type</a>, then use the rules set forth in the XML
+  specifications to determine the encoding. Let <var>charset</var> be the determined encoding.
+  [[!XML]] [[!XMLNS]]
+
+  <p class=note>This is restricted to
+  {{XMLHttpRequest/responseType}} being
+  the empty string to keep the non-legacy
+  {{XMLHttpRequest/responseType}} value
+  "<code>text</code>" simple.
+
+ <li><p>If <var>charset</var> is null, then set <var>charset</var> to <a>UTF-8</a>.
+
+ <li><p>Return the result of running
+ <a>decode</a> on <a>received bytes</a> using fallback
+ encoding <var>charset</var>.
+</ol>
+
+<p class=note>Authors are strongly encouraged to always encode their resources using <a>UTF-8</a>.
+
+
+<h4 id=the-overridemimetype()-method>The <code>overrideMimeType()</code> method</h4>
+
+<dl class=domintro>
+ <dt><code><var>client</var> . <a method for=XMLHttpRequest>overrideMimeType(<var>mime</var>)</a></code>
+ <dd>
+  <p>Acts as if the `<code>Content-Type</code>` header value for <a>response</a> is <var>mime</var>.
+  (It does not actually change the header though.)
+
+  <p>Throws an "{{InvalidStateError!!exception}}" {{DOMException}} if <a>state</a> is <i>loading</i>
+  or <i>done</i>.
+</dl>
+
+<p>The <dfn method for=XMLHttpRequest><code>overrideMimeType(<var>mime</var>)</code></dfn> method,
+when invoked, must run these steps:
+
+<ol>
+ <li><p>If <a>state</a> is <i>loading</i> or <i>done</i>, then <a>throw</a> an
+ "{{InvalidStateError!!exception}}" {{DOMException}}.
+
+ <li><p>Set <a>override MIME type</a> to the result of <a lt="parse a MIME type">parsing</a>
+ <var>mime</var>.
+
+ <li><p>If <a>override MIME type</a> is failure, then set <a>override MIME type</a> to
+ <code>application/octet-stream</code>.
+</ol>
+
+
+<h4 id=the-responsetype-attribute>The <code>responseType</code> attribute</h4>
+
+<dl class=domintro>
+ <dt><code><var>client</var> . <a attribute for=XMLHttpRequest>responseType</a> [ = <var>value</var> ]</code>
+ <dd>
+  <p>Returns the response type.
+  <p>Can be set to change the response type. Values are:
+  the empty string (default),
+  "<code>arraybuffer</code>",
+  "<code>blob</code>",
+  "<code>document</code>",
+  "<code>json</code>", and
+  "<code>text</code>".
+  <p>When set: setting to "<code>document</code>" is ignored if
+  <a>current global object</a> is <em>not</em> a
+  {{Window}} object.
+
+  <p>When set: throws an "{{InvalidStateError!!exception}}" {{DOMException}} if <a>state</a> is
+  <i>loading</i> or <i>done</i>.
+
+  <p>When set: throws an "{{InvalidAccessError!!exception}}" {{DOMException}} if the
+  <a>synchronous flag</a> is set and <a>current global object</a> is a {{Window}} object.
+</dl>
+
+
+<p>The
+<dfn attribute for=XMLHttpRequest><code>responseType</code></dfn>
+attribute must return its value. Initially its value must be the empty
+string.
+
+<p>Setting the
+{{XMLHttpRequest/responseType}}
+attribute must run these steps:
+
+<ol>
+ <li><p>If <a>current global object</a> is <em>not</em> a
+ {{Window}} object and the given value is
+ "<code>document</code>", terminate these steps.
+
+ <li><p>If <a>state</a> is <i>loading</i> or <i>done</i>, then <a>throw</a> an
+ "{{InvalidStateError!!exception}}" {{DOMException}}.
+
+ <li><p>If <a>current global object</a> is a {{Window}} object and the <a>synchronous flag</a> is
+ set, then <a>throw</a> an "{{InvalidAccessError!!exception}}" {{DOMException}}.
+
+ <li><p>Set the
+ {{XMLHttpRequest/responseType}}
+ attribute's value to the given value.
+</ol>
+
+
+<h4 id=the-response-attribute>The <code>response</code> attribute</h4>
+
+<dl class=domintro>
+ <dt><code><var>client</var> . <a attribute for=XMLHttpRequest>response</a></code>
+ <dd><p>Returns the <a>response</a>'s
+ <a for=response>body</a>.
+</dl>
+
+<p>The
+<dfn attribute for=XMLHttpRequest><code>response</code></dfn>
+attribute must return the result of running these
+steps:
+
+<dl class=switch>
+ <dt>If {{XMLHttpRequest/responseType}}
+ is the empty string or "<code>text</code>"
+ <dd>
+  <ol>
+   <li><p>If <a>state</a> is not
+   <i>loading</i> or <i>done</i>, return the empty string.
+
+   <li><p>Return the <a>text response</a>.
+  </ol>
+
+ <dt>Otherwise
+ <dd>
+  <ol>
+   <li><p>If <a>state</a> is not
+   <i>done</i>, return null.
+
+   <li><p>If <a>response object</a> is failure, then return null.
+
+   <li><p>If <a>response object</a> is non-null, then return it.
+
+   <li>
+    <dl class=switch>
+     <dt>If
+     {{XMLHttpRequest/responseType}} is
+     "<code>arraybuffer</code>"
+     <dd><p>Return the <a>arraybuffer response</a>.
+
+     <dt>If
+     {{XMLHttpRequest/responseType}} is
+     "<code>blob</code>"
+     <dd><p>Return the <a>blob response</a>.
+
+     <dt>If
+     {{XMLHttpRequest/responseType}} is
+     "<code>document</code>"
+     <dd><p>Return the <a>document response</a>.
+
+     <dt>If
+     {{XMLHttpRequest/responseType}} is
+     "<code>json</code>"
+     <dd><p>Return the <a>JSON response</a>.
+    </dl>
+  </ol>
+</dl>
+
+
+<h4 id=the-responsetext-attribute>The <code>responseText</code> attribute</h4>
+
+<dl class=domintro>
+ <dt><code><var>client</var> . <a attribute for=XMLHttpRequest>responseText</a></code>
+ <dd>
+  <p>Returns the <a>text response</a>.
+
+  <p>Throws an "{{InvalidStateError!!exception}}" {{DOMException}} if
+  {{XMLHttpRequest/responseType}} is not the empty string or "<code>text</code>".
+</dl>
+
+<p>The
+<dfn attribute for=XMLHttpRequest><code>responseText</code></dfn>
+attribute must return the result of running these
+steps:
+
+<ol>
+ <li><p>If {{XMLHttpRequest/responseType}} is not the empty string or "<code>text</code>", then
+ <a>throw</a> an "{{InvalidStateError!!exception}}" {{DOMException}}.
+
+ <li><p>If <a>state</a> is not <i>loading</i> or <i>done</i>, then return the empty string.
+
+ <li><p>Return the <a>text response</a>.
+</ol>
+
+
+<h4 id=the-responsexml-attribute>The <code>responseXML</code> attribute</h4>
+
+<dl class=domintro>
+ <dt><code><var>client</var> . <a attribute for=XMLHttpRequest>responseXML</a></code>
+ <dd>
+  <p>Returns the <a>document response</a>.
+
+  <p>Throws an "{{InvalidStateError!!exception}}" {{DOMException}} if
+  {{XMLHttpRequest/responseType}} is not the empty string or "<code>document</code>".
+</dl>
+
+<p>The
+<dfn attribute for=XMLHttpRequest><code>responseXML</code></dfn>
+attribute must return the result of running these steps:
+
+<ol>
+ <li><p>If {{XMLHttpRequest/responseType}} is not the empty string or "<code>document</code>", then
+ <a>throw</a> an "{{InvalidStateError!!exception}}" {{DOMException}}.
+
+ <li><p>If <a>state</a> is not <i>done</i>, then return null.
+
+ <li><p>Assert: <a>response object</a> is not failure.
+
+ <li><p>If <a>response object</a> is non-null, then return it.
+
+ <li><p>Return the <a>document response</a>.
+</ol>
+
+
+<h3 id=events>Events summary</h3>
+
+<p><em>This section is non-normative.</em>
+
+<p>The following events are dispatched on {{XMLHttpRequest}} or {{XMLHttpRequestUpload}} objects:
+
+<table>
+ <thead>
+  <tr>
+   <th>Event name
+   <th>Interface
+   <th>Dispatched when…
+ <tbody>
+  <tr>
+   <td><dfn id=event-xhr-readystatechange event for=XMLHttpRequest><code>readystatechange</code></dfn>
+   <td><code>Event</code>
+   <td>The {{XMLHttpRequest/readyState}} attribute changes
+   value, except when it changes to <a const for=XMLHttpRequest>UNSENT</a>.
+  <tr>
+   <td><dfn id=event-xhr-loadstart event for=XMLHttpRequest><code>loadstart</code></dfn>
+   <td>{{ProgressEvent}}
+   <td>The fetch initiates.
+  <tr>
+   <td><dfn id=event-xhr-progress event for=XMLHttpRequest><code>progress</code></dfn>
+   <td>{{ProgressEvent}}
+   <td>Transmitting data.
+  <tr>
+   <td><dfn id=event-xhr-abort event for=XMLHttpRequest><code>abort</code></dfn>
+   <td>{{ProgressEvent}}
+   <td>When the fetch has been aborted. For instance, by invoking the
+   {{XMLHttpRequest/abort()}} method.
+  <tr>
+   <td><dfn id=event-xhr-error event for=XMLHttpRequest><code>error</code></dfn>
+   <td>{{ProgressEvent}}
+   <td>The fetch failed.
+  <tr>
+   <td><dfn id=event-xhr-load event for=XMLHttpRequest><code>load</code></dfn>
+   <td>{{ProgressEvent}}
+   <td>The fetch succeeded.
+  <tr>
+   <td><dfn id=event-xhr-timeout event for=XMLHttpRequest><code>timeout</code></dfn>
+   <td>{{ProgressEvent}}
+   <td>The author specified timeout has passed before the fetch completed.
+  <tr>
+   <td><dfn id=event-xhr-loadend event for=XMLHttpRequest><code>loadend</code></dfn>
+   <td>{{ProgressEvent}}
+   <td>The fetch completed (success or failure).
+</table>
+
+
+<h3 id=feature-policy-integration>Feature Policy integration</h3>
+
+<p>This specification defines a <a>policy-controlled feature</a> identified by the string
+"<code><dfn>sync-xhr</dfn></code>". Its <a>default allowlist</a> is <code>*</code>.
+
+
+<h2 id=interface-formdata>Interface {{FormData}}</h2>
+
+<pre class=idl>
+typedef (File or USVString) FormDataEntryValue;
+
+[Constructor(optional HTMLFormElement form),
+ Exposed=(Window,Worker)]
+interface FormData {
+  void append(USVString name, USVString value);
+  void append(USVString name, Blob blobValue, optional USVString filename);
+  void delete(USVString name);
+  FormDataEntryValue? get(USVString name);
+  sequence&lt;FormDataEntryValue> getAll(USVString name);
+  boolean has(USVString name);
+  void set(USVString name, USVString value);
+  void set(USVString name, Blob blobValue, optional USVString filename);
+  iterable&lt;USVString, FormDataEntryValue>;
+};</pre>
+
+<p>Each {{FormData}} object has an associated
+<dfn id=concept-formdata-entry-list export for=FormData>entry list</dfn> (a <a for=/>list</a> of
+<a>entries</a>). It is initially the empty list.
+
+<p>An <dfn id=concept-formdata-entry export for=FormData lt=entry|entries>entry</dfn> consists of a
+<dfn id=concept-formdata-entry-name export for=FormData/entry>name</dfn> and a
+<dfn id=concept-formdata-entry-value export for=FormData/entry>value</dfn>.
+
+<p>For the purposes of interaction with other algorithms, an <a for=FormData>entry</a>'s filename is
+the empty string if <a for=FormData/entry>value</a> is not a {{File}} object, and otherwise its
+filename is the value of <a for=FormData>entry</a>'s <a for=FormData/entry>value</a>'s {{File/name}}
+attribute.
+
+<p>To <dfn>create an entry</dfn> for <var>name</var>, <var>value</var>, and optionally a
+<var>filename</var>, run these steps:
+
+<ol>
+ <li><p>Let <var>entry</var> be a new <a for=FormData>entry</a>.
+
+ <li><p>Set <var>entry</var>'s <a for=FormData/entry>name</a> to <var>name</var>.
+
+ <li><p>If <var>value</var> is a {{Blob}} object and not a {{File}} object, then set
+ <var>value</var> to a new {{File}} object, representing the same bytes, whose {{File/name}}
+ attribute value is "<code>blob</code>".
+ <!-- XXX at some point File API should get internal slots for this -->
+
+ <li><p>If <var>value</var> is (now) a {{File}} object and <var>filename</var> is given, then set
+ <var>value</var> to a new {{File}} object, representing the same bytes, whose {{File/name}}
+ attribute value is <var>filename</var>.
+
+ <li><p>Set <var>entry</var>'s <a for=FormData/entry>value</a> to <var>value</var>.
+
+ <li><p>Return <var>entry</var>.
+</ol>
+
+<hr>
+
+<p>The
+<dfn id=dom-formdata constructor for=FormData><code>FormData(<var>form</var>)</code></dfn>
+constructor must run these steps:
+
+<ol>
+ <li><p>Let <var>fd</var> be a new {{FormData}} object.
+
+ <li>
+  <p>If <var>form</var> is given, then:
+
+  <ol>
+   <li><p>Let <var>list</var> be the result of <a>constructing the entry list</a> for
+   <var>form</var>.
+
+   <li><p>If <var>list</var> is null, then <a>throw</a> an "{{InvalidStateError!!exception}}"
+   {{DOMException}}.
+
+   <li><p>Set <var>fd</var>'s <a for=FormData>entry list</a> to <var>list</var>.
+  </ol>
+
+ <li><p>Return <var>fd</var>.
+</ol>
+
+<p>The
+<dfn id=dom-formdata-append method for=FormData><code>append(<var>name</var>, <var>value</var>)</code></dfn>
+and
+<dfn id=dom-formdata-append-blob method for=FormData><code>append(<var>name</var>, <var>blobValue</var>, <var>filename</var>)</code></dfn>
+methods, when invoked, must run these steps:
+
+<ol>
+ <li><p>Let <var>value</var> be <var>value</var> if given, and <var>blobValue</var> otherwise.
+
+ <li><p>Let <var>entry</var> be the result of <a lt="create an entry">creating an entry</a> with
+ <var>name</var>, <var>value</var>, and <var>filename</var> if given.
+
+ <li><p><a for=list>Append</a> <var>entry</var> to the <a>context object</a>'s
+ <a for=FormData>entry list</a>.
+</ol>
+
+<p class=note>The reason there is an argument named <var>value</var> as well as <var>blobValue</var>
+is due to a limitation of the editing software used to write the XMLHttpRequest Standard.
+
+<p>The <dfn id=dom-formdata-delete method for=FormData><code>delete(<var>name</var>)</code></dfn>
+method, when invoked, must <a for=list>remove</a> all <a for=FormData>entries</a> whose
+<a for=FormData/entry>name</a> is <var>name</var> from the <a>context object</a>'s
+<a for=FormData>entry list</a>.
+
+<p>The <dfn id=dom-formdata-get method for=FormData><code>get(<var>name</var>)</code></dfn> method,
+when invoked, must return the <a for=FormData/entry>value</a> of the first <a for=FormData>entry</a>
+whose <a for=FormData/entry>name</a> is <var>name</var> from the <a>context object</a>'s
+<a for=FormData>entry list</a>, and null otherwise.
+
+<p>The <dfn id=dom-formdata-getall method for=FormData><code>getAll(<var>name</var>)</code></dfn>
+method, when invoked, must return the <a for=FormData/entry>values</a> of all
+<a for=FormData>entries</a> whose <a for=FormData/entry>name</a> is <var>name</var>, in order, from
+the <a>context object</a>'s <a for=FormData>entry list</a>, and the empty list otherwise.
+
+<p>The <dfn id=dom-formdata-has method for=FormData><code>has(<var>name</var>)</code></dfn> method,
+when invoked, must return true if there is an <a for=FormData>entry</a> whose
+<a for=FormData/entry>name</a> is <var>name</var> in the <a>context object</a>'s
+<a for=FormData>entry list</a>, and false otherwise.
+
+<p>The
+<dfn id=dom-formdata-set method for=FormData><code>set(<var>name</var>, <var>value</var>)</code></dfn>
+and
+<dfn id=dom-formdata-set-blob method for=FormData><code>set(<var>name</var>, <var>blobValue</var>, <var>filename</var>)</code></dfn>
+methods, when invoked, must run these steps:
+
+<ol>
+ <li><p>Let <var>value</var> be <var>value</var> if given, and <var>blobValue</var> otherwise.
+
+ <li><p>Let <var>entry</var> be the result of <a lt="create an entry">creating an entry</a> with
+ <var>name</var>, <var>value</var>, and <var>filename</var> if given.
+
+ <li><p>If there are any <a for=FormData>entries</a> in the <a>context object</a>'s
+ <a for=FormData>entry list</a> whose <a for=FormData/entry>name</a> is <var>name</var>, then
+ <a for=list>replace</a> the first such <a for=FormData>entry</a> with <var>entry</var> and
+ <a for=list>remove</a> the others.
+
+ <li><p>Otherwise, <a for=list>append</a> <var>entry</var> to the <a>context object</a>'s
+ <a for=FormData>entry list</a>.
+</ol>
+
+<p class=note>The reason there is an argument named <var>value</var> as well as <var>blobValue</var>
+is due to a limitation of the editing software used to write the XMLHttpRequest Standard.
+
+<p>The <a>value pairs to iterate over</a> are the <a>context object</a>'s
+<a for=FormData>entry list</a>'s <a for=FormData>entries</a> with the key being the
+<a for=FormData/entry>name</a> and the value being the <a for=FormData/entry>value</a>.
+
+
+<h2 id=interface-progressevent>Interface {{ProgressEvent}}</h2>
+
+<pre class=idl>
+[Constructor(DOMString type, optional ProgressEventInit eventInitDict),
+ Exposed=(Window,DedicatedWorker,SharedWorker)]
+interface ProgressEvent : Event {
+  readonly attribute boolean lengthComputable;
+  readonly attribute unsigned long long loaded;
+  readonly attribute unsigned long long total;
+};
+
+dictionary ProgressEventInit : EventInit {
+  boolean lengthComputable = false;
+  unsigned long long loaded = 0;
+  unsigned long long total = 0;
+};</pre>
+
+<p><a>Events</a> using the {{ProgressEvent}} interface indicate some kind of progression.
+
+<p>The
+<dfn attribute for=ProgressEvent><code>lengthComputable</code></dfn>,
+<dfn attribute for=ProgressEvent><code>loaded</code></dfn>, and
+<dfn attribute for=ProgressEvent><code>total</code></dfn>
+attributes must return the value they were initialized to.
+
+
+<h3 id=firing-events-using-the-progressevent-interface>Firing events using the {{ProgressEvent}} interface</h3>
+
+<p>To <dfn id=concept-event-fire-progress>fire a progress event</dfn> named <var>e</var> at
+<var>target</var>, given <var>transmitted</var> and <var>length</var>, means to <a>fire an event</a>
+named <var>e</var> at <var>target</var>, using {{ProgressEvent}}, with the {{ProgressEvent/loaded}}
+attribute initialized to <var>transmitted</var>, and if <var>length</var> is not 0, with the
+{{ProgressEvent/lengthComputable}} attribute initialized to true and the {{ProgressEvent/total}}
+attribute initialized to <var>length</var>.
+
+
+<h3 id=suggested-names-for-events-using-the-progressevent-interface>Suggested names for events using the {{ProgressEvent}} interface</h3>
+
+<p><em>This section is non-normative.</em>
+
+<p>The suggested {{Event/type}}
+attribute values for use with
+<a>events</a> using the
+{{ProgressEvent}} interface are summarized in the table below.
+Specification editors are free to tune the details to their specific
+scenarios, though are strongly encouraged to discuss their usage with the
+WHATWG community to ensure input from people familiar with the subject.
+
+<table>
+ <tbody>
+  <tr>
+   <th>{{Event/type}} attribute value
+   <th>Description
+   <th>Times
+   <th>When
+  <tr>
+   <th><code>loadstart</code>
+   <td>Progress has begun.
+   <td>Once.
+   <td>First.
+  <tr>
+   <th><a event><code>progress</code></a>
+   <td>In progress.
+   <td>Once or more.
+   <td>After <code>loadstart</code> has been
+    <a>dispatched</a>.
+  <tr>
+   <th><code>error</code>
+   <td>Progression failed.
+   <td rowspan=4>Zero or once (mutually exclusive).
+   <td rowspan=4>After the last <a event><code>progress</code></a> has
+    been
+    <a>dispatched</a>.
+  <tr>
+   <th><code>abort</code>
+   <td>Progression is terminated.
+  <tr>
+   <th><code>timeout</code>
+   <td>Progression is terminated due to preset time expiring.
+  <tr>
+   <th><code>load</code>
+   <td>Progression is successful.
+  <tr>
+   <th><code>loadend</code>
+   <td>Progress has stopped.
+   <td>Once.
+   <td>After one of <code>error</code>, <code>abort</code>,
+    <code>timeout</code> or <code>load</code> has been
+    <a>dispatched</a>.
+</table>
+
+<p>The <code>error</code>, <code>abort</code>, <code>timeout</code>, and
+<code>load</code> event types are mutually exclusive.
+
+<p>Throughout the web platform the <code>error</code>, <code>abort</code>,
+<code>timeout</code> and <code>load</code> event types have
+their {{Event/bubbles}} and {{Event/cancelable}}
+attributes initialized to false, so it is suggested that for consistency all
+<a>events</a> using the
+{{ProgressEvent}} interface do the same.
+
+
+<h3 id=security-considerations>Security considerations</h3>
+
+<p>For cross-origin requests some kind of opt-in, e.g. the
+<a>CORS protocol</a> defined in the Fetch Standard, has to be
+used before <a>events</a> using the
+{{ProgressEvent}} interface are
+<a>dispatched</a>
+as information (e.g. size) would be revealed that cannot be obtained
+otherwise. [[!FETCH]]
+
+
+<h3 id=example>Example</h3>
+
+<div id=example-progress-events class=example>
+ <p>In this example {{XMLHttpRequest}}, combined with concepts
+ defined in the sections before, and the HTML
+ <{progress}> element are used together to
+ display the process of
+ <a for=/>fetching</a> a resource.
+
+ <pre><code class=lang-html>
+&lt;!DOCTYPE html>
+&lt;title>Waiting for Magical Unicorns&lt;/title>
+&lt;progress id=p>&lt;/progress>
+&lt;script>
+  var progressBar = document.getElementById("p"),
+      client = new XMLHttpRequest()
+  client.open("GET", "magical-unicorns")
+  client.onprogress = function(pe) {
+    if(pe.lengthComputable) {
+      progressBar.max = pe.total
+      progressBar.value = pe.loaded
+    }
+  }
+  client.onloadend = function(pe) {
+    progressBar.value = pe.loaded
+  }
+  client.send()
+&lt;/script></code></pre>
+
+ <p>Fully working code would of course be more elaborate and deal with more
+ scenarios, such as network errors or the end user terminating the request.
+</div>
+
+
+<h2 class=no-num id=acknowledgments>Acknowledgments</h2>
+
+<p>Thanks to
+Addison Phillips,
+Adrian Bateman,
+Ahmed Kamel,
+Alan Thomas,
+Alex Hopmann,
+Alex Vincent,
+Alexey Proskuryakov,
+Ali Alabbas,
+Andrea Marchesini,
+Asbjørn Ulsberg,
+Bertrand Guay-Paquet,
+Björn Höhrmann,
+Boris Zbarsky,
+Caitlin Potter,
+Cameron McCormack,
+白丞祐 (Cheng-You Bai),
+Chris Marrin,
+Christophe Jolif,
+Charles McCathieNevile,
+Dan Winship,
+David Andersson,
+David Flanagan,
+David Håsäther,
+David Levin,
+Dean Jackson,
+Denis Sureau,
+Domenic Denicola,
+Dominik Röttsches,
+Doug Schepers,
+Douglas Livingstone,
+Elliott Sprehn,
+Elliotte Harold,
+Eric Lawrence,
+Eric Uhrhane,
+Erik Arvidsson,
+Erik Dahlström,
+Feras Moussa,
+Gideon Cohn,
+Glenn Adams,
+Gorm Haug Eriksen,
+Håkon Wium Lie,
+Hallvord R. M. Steen,
+Henri Sivonen,
+Hiroshige Hayashizaki,
+Huub Schaeks,
+Ian Clelland,
+Ian Davis,
+Ian Hickson,
+Ivan Herman,
+Jake Archibald,
+Jared Jacobs,
+Jarred Nicholls,
+Jeff Walden,
+Jens Lindström,
+Jim Deegan,
+Jim Ley,
+Joe Farro,
+Jonas Sicking,
+Julian Reschke,
+송정기 (Jungkee Song),
+呂康豪 (Kang-Hao Lu),
+Karl Dubost,
+Keith Yeung,
+田村健人 (Kent TAMURA),
+Lachlan Hunt,
+Maciej Stachowiak,
+Magnus Kristiansen,
+Manish Goregaokar,
+Marc Hadley,
+Marcos Caceres,
+Mark Baker,
+Mark Birbeck,
+Mark Nottingham,
+Mark S. Miller,
+Martin Hassman,
+Mohamed Zergaoui,
+Ms2ger,
+Odin Hørthe Omdal,
+Olli Pettay,
+Pawel Glowacki,
+Peter Michaux,
+Philip Jägenstedt,
+Philip Taylor,
+Robin Berjon,
+Rune <span title=Fabulous>F.</span> Halvorsen,
+Ruud Steltenpool,
+Ryo Onodera,
+Sam Sneddon,
+Sergiu Dumitriu,
+Shivakumar Jagalur Matt,
+Sigbjørn Finne,
+Simon Pieters,
+Stewart Brodie,
+Sunava Dutta,
+Takeshi Kurosawa,
+Takeshi Yoshino,
+Thomas Roessler,
+Thomas Wisniewski,
+Tom Magliery,
+Travis Leithead,
+triple-underscore,
+Yehuda Katz,
+Youenn Fablet, and
+Zhenbin Xu
+for their contributions to this standard.
+
+<p>Special thanks to the Microsoft employees who first implemented the
+<code>XMLHttpRequest</code> interface, which was first widely deployed by the
+Windows Internet Explorer browser.
+
+<p>Special thanks to Ian Hickson for drafting an initial version of this specification in
+the HTML Standard (then Web Applications 1.0). [[!HTML]]
+
+<p>Special thanks to the W3C SVG WG for drafting the original
+{{ProgressEvent}} class as part of the
+<a href=https://www.w3.org/TR/2008/REC-SVGTiny12-20081222/svgudom.html>SVG Micro DOM</a>.
+
+<p>This standard is written by
+<a href=https://annevankesteren.nl/ lang=nl>Anne van Kesteren</a>
+(<a href=https://www.mozilla.org/>Mozilla</a>,
+<a href=mailto:annevk@annevk.nl>annevk@annevk.nl</a>).

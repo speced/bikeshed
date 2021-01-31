@@ -116,6 +116,20 @@ spec: RFC7231; urlPrefix: https://tools.ietf.org/html/rfc7231#
         text: HTTP media type; url: section-3.1.1.1
     type: http-header
         text: Date; url: section-7.1.1.2
+spec: 7230; urlPrefix: https://tools.ietf.org/html/rfc7230#
+    type: grammar
+        text: quoted-string; url: section-3.2.6
+        text: token; url: section-3.2.6
+spec: RFC8288; urlPrefix: https://tools.ietf.org/html/rfc8288#
+    type: dfn
+        text: Target Attribute; url: section-2.2
+        text: Link Target; url: section-3.1
+        text: Link Context; url: section-3.2
+        text: Relation Type; url: section-3.3
+        text: Serialisation-Defined Target Attribute; url: section-3.4
+        text: Parsing a Link Field Value; url: appendix-B.2
+    type: http-header
+        text: Link; url: section-3
 spec: RFC8446; urlPrefix: https://tools.ietf.org/html/draft-ietf-tls-tls13-28#
     text: ecdsa_secp256r1_sha256; type: dfn; url: section-4.2.3
 spec: draft-ietf-httpbis-variants; urlPrefix: https://httpwg.org/http-extensions/draft-ietf-httpbis-variants.html#
@@ -144,13 +158,38 @@ spec: draft-ietf-httpbis-header-structure; urlPrefix: https://tools.ietf.org/htm
     text: Parsing HTTP1 Header Fields into Structured Headers; type: dfn; url: section-4.2
 spec: http-dig-alg; urlPrefix: https://www.iana.org/assignments/http-dig-alg/http-dig-alg.xhtml#
     type: dfn; text: Digest algorithm; url: http-dig-alg-1
+spec: html; urlPrefix: https://html.spec.whatwg.org/multipage/
+    type: attr-value;
+        for: link/rel; text: alternate; url: links.html#rel-alternate
+        for: link/rel; text: prefetch; url: links.html#link-type-prefetch
+        for: link/rel; text: preload; url: links.html#link-type-preload
+    type: element-attr;
+        for: link; text: crossorigin; url: semantics.html#attr-link-crossorigin
+        for: link; text: href; url: semantics.html#attr-link-href
+    type: dfn;
+        text: Anonymous; url: urls-and-fetching.html#attr-crossorigin-anonymous
+        text: CORS settings attribute; url: urls-and-fetching.html#cors-settings-attribute
+        text: creating a potential-cors request; url: urls-and-fetching.html#create-a-potential-cors-request
+        text: fetch and process the linked resource; url: semantics.html#fetch-and-process-the-linked-resource
+        text: linked resource fetch setup steps; url: semantics.html#linked-resource-fetch-setup-steps
+        text: navigation params; url: browsing-the-web.html#navigation-params
+        text: No CORS; url: urls-and-fetching.html#attr-crossorigin-none
+        text: process the linked resource; url: semantics.html#process-the-linked-resource
+        text: response; for: navigation params; url: browsing-the-web.html#navigation-params-response
+        text: selecting an image source; url: images.html#select-an-image-source
+        text: Use Credentials; url: urls-and-fetching.html#attr-crossorigin-use-credentials
+        text: Page load processing model for HTML files; url: browsing-the-web.html#read-html
 spec: SHA2; urlPrefix: http://csrc.nist.gov/publications/fips/fips180-4/fips-180-4.pdf
     type: dfn
         text: SHA-256; url: #
+spec: CSS2; urlPrefix: https://drafts.csswg.org/css2/
+    type: dfn
+        text: viewport; url: #viewport
 </pre>
 <pre class='link-defaults'>
 spec:fetch; type:dfn; for:/; text:response
 spec:streams; type:interface; text:ReadableStream
+spec:html; type:element; text:link
 </pre>
 
 <section class="non-normative">
@@ -239,6 +278,28 @@ Rewrite [=request/clone|clone a request=] to run these steps:
 
  <li>Return |newRequest|.
 </ol>
+
+## New response fields ## {#mp-response}
+
+A [=response=] has an associated <dfn for="response" lt="came from a signed
+exchange|did not come from a signed exchange">came from a signed exchange</dfn>
+boolean. Unless stated otherwise, it is false.
+
+A [=response=] has an associated <dfn for="response">signed exchange outer
+header list</dfn> (a [=header list=]). Unless stated otherwise it is empty.
+
+A [=response=] has an associated <dfn for="response">header integrity
+value</dfn>, either null or, for responses that [=response/came from a signed
+exchange=], a [=byte sequence=] holding the [=SHA-256=] hash that verified the
+[=exchange/response=]'s [=response/header list=]. Unless stated otherwise, it is
+null.
+
+Note: The [=response/header integrity value=] doesn’t change even if the
+publisher signs the content again or changes the signing key, but it does change
+if any of the headers or body change. (It catches changes to the body because a
+valid signed exchange's headers have to include a `Digest` value that covers the
+body.)
+
 
 <h3 algorithm id="mp-response-date">Response date</h3>
 
@@ -330,6 +391,427 @@ add the following steps:
 Note: Applying the signed exchange's response here has the effect of letting a
 newer HTTP cache entry override a signed exchange's content, and of not storing
 the signed exchange's response in the HTTP cache.
+
+# Subresource substitution # {#subresource-substitution}
+
+When prenavigating to a page held in a signed exchange, it can be useful to
+also prefetch subresources of that page as signed exchanges from the same
+server. To identify those transitive prefetchable resources, this section
+introduces an extension to the HTTP <a http-header>Link</a> header.
+
+<div class="example" id="example-alternate-signed-exchange-link">
+
+The following is an example HTTP response for
+`https://feed.example/sxg.publisher.example/page.html.wbn` showing the right
+Link headers to let a browser prefetch subresources.
+
+```http
+Content-Type: application/signed-exchange;v=b3
+Link: <https://feed.example/sxg.publisher.example/lib.js.sxg>;
+    rel="alternate";
+    type="application/signed-exchange";
+    anchor="https://cdn.publisher.example/lib.js"
+
+A signed exchange, whose request URL is https://sxg.publisher.example/page.html:
+
+    Content-Type: text/html
+    Link: <https://cdn.publisher.example/lib.js>;
+        rel="preload";
+        as="script"
+    Link: <https://cdn.publisher.example/lib.js>;
+        rel="allowed-alt-sxg";
+        header-integrity="sha256-XXXXXX"
+
+    <html>
+      <head>
+        <script src="https://cdn.publisher.example/lib.js"></script>
+      </head>
+      ...
+    </html>
+```
+
+If another page includes a `<link rel="prefetch"
+href="https://feed.example/sxg.publisher.example/page.html.wbn">`, the above
+response allows it to transitively prefetch a signed exchange that it can use to
+satisfy the `https://cdn.publisher.example/lib.js` `<script>` element.
+
+</div>
+
+* Link type "<dfn attr-value for="link/rel">allowed-alt-sxg</dfn>"
+
+    The <{link/rel/allowed-alt-sxg}> keyword may be used in the HTTP <a
+    http-header>Link</a> header of the inner HTTP response of the main resource
+    signed exchange to indicate that the content of the [=Link Target=] is also
+    available as a particular signed exchange identified by the
+    <{link/header-integrity}> parameter. The <dfn element-attr
+    for="link">header-integrity</dfn> parameter holds the value of the
+    [=response/header integrity value=] of the [=alternate signed exchange=],
+    encoded as a [[CSP]] <a grammar>hash-source</a>.
+* An <dfn>alternate signed exchange link</dfn> is a <a http-header>Link</a>
+    header sent with a signed exchange |S|, with the <{link/rel/alternate}> link
+    type, the `type` parameter set to `application/signed-exchange`, and a
+    [=Link Context=] (an `anchor` parameter). The [=Link Context=] MUST be the
+    [=Link Target=] of a <{link/rel/preload}> <a http-header>Link</a> header
+    inside the signed content of |S|, and the [=alternate signed exchange link=]
+    means that this resource can also be found inside the <dfn
+    dfn-type=dfn>alternate signed exchange</dfn> at the [=Link Target=] of the
+    [=alternate signed exchange link=].
+
+* New [=serialisation-defined Target Attributes=] on the <a http-header>Link</a>
+    header.
+
+    * The <dfn element-attr for="link">variants</dfn> target attribute has the
+        same values as the <a http-header>Variants</a> Header Field.  There MUST
+        NOT be more than one <{link/variants}> attribute in a link-value;
+        occurrences after the first MUST be ignored by parsers. It is serialized
+        to an HTTP link-param by first encoding as if it were a <a
+        http-header>Variants</a> Header Field value, and then if there are
+        characters that don't match the <a grammar>token</a> production,
+        encoding as a <a grammar>quoted-string</a>.
+
+        This parameter is used in <{link/rel/allowed-alt-sxg}> links and
+        [=alternate signed exchange links=] to indicate what representations are
+        available for the resource at the time that the response is produced.
+
+    * The <dfn element-attr for="link">variant-key</dfn> target attribute has
+        the same values as the <a http-header>Variant-Key</a> Header Field.
+        There MUST NOT be more than one <{link/variant-key}> attribute in a
+        link-value; occurrences after the first MUST be ignored by parsers. It
+        is serialized to an HTTP link-param by first encoding as if it were a <a
+        http-header>Variant-Key</a> Header Field value, and then if there are
+        characters that don't match the <a grammar>token</a> production,
+        encoding as a <a grammar>quoted-string</a>.
+
+        This parameter is used in <{link/rel/allowed-alt-sxg}> links and
+        [=alternate signed exchange links=] to indicate one or more sets of
+        available-values that identify the representation of the resource.
+
+<h3 algorithm id="mp-document">New Document fields</h3>
+
+At the end of
+[the Document object](https://html.spec.whatwg.org/multipage/dom.html#the-document-object)
+section, add the following lines:
+
+<blockquote dfn-for="Document">
+
+The {{Document}} has a map of <dfn dfn>prefetched signed exchanges for
+navigation</dfn>, which is a [=map=] of [=URLs=] to [=exchanges=], initially
+empty.  <span class="note">This might merge with the set of prefetched resources
+when <{link/rel/prefetch}> is specified more completely.</span>
+
+The {{Document}} has a set of <dfn dfn>prefetched
+subresource signed exchanges</dfn>, which is a set of [=exchanges=], initially
+empty.
+
+</blockquote>
+
+<h3 algorithm id="mp-navigation-params">New navigation params struct field</h3>
+
+In the [=navigation params=] struct, add the following items:
+
+<dl dfn-for="navigation params">
+
+: <dfn>prefetched subresource signed exchanges</dfn>
+:: A set of [=exchanges=], empty unless specified otherwise.
+
+</dl>
+
+<h3 algorithm id="mp-link-type-prefetch">Monkeypatch Link type "prefetch"</h3>
+
+Note: To prefetch the [=alternate signed exchanges=] when the UA receives a
+prefetched main resource signed exchange, this section monkeypatches Link type
+"<{link/rel/prefetch}>". This algorithm gets all the [=alternate signed exchange
+links=] from the outer response, checks if they are allowed by the inner
+response's <{link/rel/allowed-alt-sxg}> links, and if they are, associates them
+with the inner response's <{link/rel/preload}> links.
+
+Issue(w3c/resource-hints#77): Currently the behavior of recursive prefetch is
+not specified. This section monkeypatches Link type "<{link/rel/prefetch}>" to
+add support only for the [=alternate signed exchanges=] subresources. When we
+change the HTML spec to support general recursive prefetching, this section
+needs to align with that change.
+
+To [=process the linked resource|process this type of linked resource=]
+("<{link/rel/prefetch}>"), given a link element |el|, boolean |success|, and
+[=response=] |response|:
+
+1. If |success| is true, [=fire an event=] named {{HTMLElement/load}} at |el|.
+1. Otherwise, [=fire an event=] named {{HTMLElement/error}} at |el|.
+1. If |success| is false, then return.
+1. If the |response| [=response/did not come from a signed exchange=], then
+    return.
+1. Let |requestUrl| be the first item of |response|'s [=response/URL list=].
+1. Let |clonedExchange| be the result of creating a new [=exchange=] with
+    |requestUrl| and the result of [=response/cloning=] |response|.
+1. Let |prefetchedSignedExchanges| be |el|'s [=Node/node document=]'s
+    [=Document/prefetched signed exchanges for navigation=].
+1. [=map/Set=] |prefetchedSignedExchanges|[|requestUrl|] to |clonedExchange|.
+1. Let |outerLinkHeader| be the result of [=header list/getting=] `` `Link` ``
+    from |response|'s [=response/signed exchange outer header list=].
+1. If |outerLinkHeader| is null, then return.
+1. Let |outerLinks| be the result of [=Parsing a Link Field Value=] from
+    |outerLinkHeader|.
+1. If |outerLinks| is empty, then return.
+1. Let |innerLinkHeader| be the result of [=header list/getting=] `` `Link` ``
+    from |response|'s [=response/header list=].
+1. If |innerLinkHeader| is null, then return.
+1. Let |innerLinks| be the result of [=Parsing a Link Field Value=] from
+    |innerLinkHeader|.
+1. If |innerLinks| is empty, then return.
+1. Let |alternateLinks| be the result of [=getting alternate signed exchange
+    link info=] from |outerLinks|.
+1. Let |allowedSxgLinks| be the result of [=getting allowed signed exchange link
+    info=] from |innerLink|.
+1. For each |innerLink| of |innerLinks|:
+    1. If |innerLink|'s [=Relation Type=] is not 'preload', then continue.
+    1. Let |linkTarget| be |innerLink|'s [=Link Target=].
+    1. Let |asAttribute| be |innerLink|'s [=Target Attribute named=] `"as"`.
+    1. If |asAttribute| is not a [=potential destination=], continue.
+    1. If |asAttribute| is `"image"`, then:
+        1. Let |imagesrcset| be |innerLink|'s [=Target Attribute named=]
+            `"imagesrcset"`.
+        1. Let |imagesizes| be |innerLink|'s [=Target Attribute named=]
+            `"imagesizes"`.
+        1. Create a <{link}> element |linkElement| whose <{link/href}> attribute
+            is |linkTarget|, and <{link/imagesrcset}> attribute is
+            |imagesrcset|, and <{link/imagesizes}> attribute is |imagesizes|.
+        1. Let |selected source| and <var ignore=''>selected pixel density</var>
+            be the URL and pixel density that results from [=selecting an image
+            source=] given |linkElement|, respectively.
+        1. If |selected source| is not null, then set |linkTarget| to the result
+            of [=URL parser|parsing=] |selected source|, with a base URL of
+            |response|'s [=response/URL=].
+    1. For each |allowedSxgLink| of |allowedSxgLinks|:
+        1. If |allowedSxgLink|'s [=allowed signed exchange link info/target=]
+            isn't the same as |linkTarget|, then continue.
+        1. Let |storedExchange| be the result of creating an [=exchange=] with
+            |linkTarget| and a new [=response=].
+        1. If |allowedSxgLink|'s [=allowed signed exchange link info/variants=]
+            is not null, [=header list/set=] `` `Variants` ``/|allowedSxgLink|'s
+            [=allowed signed exchange link info/variants=] in |storedExchange|'s
+            [=exchange/response=]'s [=response/header list=].
+        1. If |allowedSxgLink|'s [=allowed signed exchange link info/variant
+            key=] is not null, [=header list/set=] `` `Variant-Key`
+            ``/|allowedSxgLink|'s [=allowed signed exchange link info/variant
+            key=] in |storedExchange|'s [=exchange/response=]'s
+            [=response/header list=].
+        1. Let |requestForMatch| be the result of [=creating a potential-CORS
+            request=] given a url of |linkTarget|, a destination of the result
+            of [=destination/translating=] |asAttribute|, and a
+            corsAttributeState of [=No CORS=].
+        1. If |requestForMatch| [=doesn't match the stored exchange=]
+            |storedExchange|, then continue.
+        1. Let |alternateSxgUrl| be the [=alternate signed exchange link
+            info/target=] of the first [=alternate signed exchange link info=]
+            of |alternateLinks| whose
+
+            * [=alternate signed exchange link info/variants=] is
+                [=string/identical to=] |allowedSxgLink|'s [=allowed signed
+                exchange link info/variants=],
+            * [=alternate signed exchange link info/variant key=] is
+                [=string/identical to=] |allowedSxgLink|'s [=allowed signed
+                exchange link info/variant key=], and
+            * [=alternate signed exchange link info/context=] [=url/equals=]
+                |linkTarget|
+
+            or continue if no such link is present.
+        1. Let |sxgRequest| be the result of [=creating a potential-CORS
+            request=] given a url of |alternateSxgUrl|, a destination of the
+            result of [=destination/translating=] |asAttribute|, and a
+            corsAttributeState of [=No CORS=].
+        1. Run the following steps [=in parallel=]:
+            1. Let |sxgResponse| be the result of [=fetching=] |sxgRequest|.
+            1. If |sxgResponse|'s [=response/came from a signed exchange=] is
+                true, and |sxgResponse|'s [=response/URL=] is the same as
+                |linkTarget|, then [=queue a task=] on the [=networking task source=] to:
+                1. Let |sxgExchange| be a new [=exchange=] with a
+                    [=exchange/request URL=] of |linkTarget| and a
+                    [=exchange/response=] of |sxgResponse|.
+                1. [=set/Append=] |sxgExchange| to |el|'s [=Node/node
+                    document=]'s [=Document/prefetched subresource signed
+                    exchanges=].
+
+
+<h3 algorithm id="mp-process-a-navigate-fetch">Monkeypatch process a navigate fetch</h3>
+
+In [process a navigate fetch](https://html.spec.whatwg.org/multipage/browsing-the-web.html#process-a-navigate-fetch)
+before
+
+> 4. Let <var ignore>reservedEnvironment</var> be null.
+
+add the following steps:
+
+4. If |sourceBrowsingContext|'s [=active document=]'s [=Document/prefetched
+    signed exchanges for navigation=] [=map/contains=] an entry for a key of
+    |request|'s [=request/url=], then:
+
+    1. Let |prefetchedExchange| be |sourceBrowsingContext|'s [=active
+        document=]'s [=Document/prefetched signed exchanges for
+        navigation=][|request|'s [=request/url=]].
+
+    1. Set |request|'s [=request/stashed exchange=] to the result of creating a
+        new [=exchange=] with |prefetchedExchange|'s [=exchange/request URL=]
+        and the result of [=response/cloning=] |prefetchedExchange|'s
+        [=exchange/response=].
+
+
+And in
+
+> 16. Let <var ignore>navigationParams</var> be a new [=navigation params=]
+>     whose ...
+
+add:
+
+16. ... [=navigation params/prefetched subresource signed exchanges=] is
+    |sourceBrowsingContext|'s [=active document=]'s [=Document/prefetched
+    subresource signed exchanges=], ...
+
+Note: As browsers move toward partitioned HTTP caches, the source document's
+    cache will likely be separate from the target's cache, so we can't just pass
+    prefetched content through the cache.
+
+
+<h3 algorithm id="mp-page-load-processing-model-for-html-fiiles">
+Monkeypatch Page load processing model for HTML files</h3>
+
+Note: To use the [=navigation params/prefetched subresource signed exchanges=]
+after the navigation, this section monkeypatches [=Page load processing model
+for HTML files=]. This gets all the <{link/rel/allowed-alt-sxg}> links from the
+inner response that are also preloaded and uses the [=navigation
+params/prefetched subresource signed exchanges=] if all of those links were
+prefetched.
+
+Issue(whatwg/html#4224): Currently the processing model of the HTTP <a
+http-header>Link</a> header is not defined in the HTML spec. This section
+monkeypatches only for <a http-header>Link</a> rel=preload HTTP headers. When we
+will change the HTML spec to generally support <a http-header>Link</a> HTTP
+headers, this section must be made to align with the change.
+
+
+In [=Page load processing model for HTML files=] before
+
+> 2. Create an HTML parser and ...
+
+add the following steps:
+2. Run the following steps [=in parallel=]:
+    1. Wait until |document|'s [=viewport=] is known.
+
+        Note: When the |document|'s [=viewport=] is known is not normatively
+        defined in the HTML spec. Need to define the behavior of
+        the preload scanner to define this.
+    1. Let |linkHeader| be the result of [=header list/getting=] `` `Link`
+        `` from |navigationParams|'s [=navigation params/response=]'s
+        [=response/header list=].
+    1. If |linkHeader| is null, then return.
+    1. Let |links| be the result of [=Parsing a Link Field Value=] from
+        |linkHeader|.
+    1. Let |allowedSxgLinks| be the result of [=getting allowed signed
+        exchange link info=] from |links|.
+    1. Let |preloadLinkItems| be an empty [=list=].
+    1. Let |canLoadAlternateSxg| be true.
+    1. For each |link| of |links|:
+        1. If |link|'s [=Relation Type=] is not 'preload', then continue.
+        1. Let |linkTarget| be |link|'s [=Link Target=].
+        1. Let |asAttribute| be |link|'s [=Target Attribute named=] `"as"`.
+        1. If |asAttribute| is not a [=potential destination=], continue.
+        1. If |asAttribute| is `"image"`, then:
+            1. Let |imagesrcset| be |link|'s [=Target Attribute named=]
+                `"imagesrcset"`.
+            1. Let |imagesizes| be |link|'s [=Target Attribute named=]
+                `"imagesizes"`.
+            1. Create a <{link}> element |linkElement| whose <{link/href}>
+                attribute is |linkTarget|, and <{link/imagesrcset}>
+                attribute is |imagesrcset|, and <{link/imagesizes}>
+                attribute is |imagesizes|.
+            1. Let |selected source| and <var ignore=''>selected pixel
+                density</var> be the URL and pixel density that results from
+                [=selecting an image source=] given |linkElement|,
+                respectively.
+            1. If |selected source| is not null, then set |linkTarget| to
+                the result of [=URL parser|parsing=] |selected source|, with
+                a base URL of |navigationParams|'s [=navigation
+                params/response=]'s [=response/URL=].
+        1. Let |headerIntegrity| be null.
+        1. For each |allowedSxgLink| of |allowedSxgLinks|:
+            1. Let |storedExchange| be the result of creating an
+                [=exchange=] with the URL of |allowedSxgLink|'s [=allowed
+                signed exchange link info/target=] and a new [=response=].
+            1. If |allowedSxgLink|'s [=allowed signed exchange link
+                info/variants=] is null, [=header list/set=] `` `Variants`
+                ``/|allowedSxgLink|'s [=allowed signed exchange link
+                info/variants=] in |storedExchange|'s
+                [=exchange/response=]'s [=response/header list=].
+            1. If |allowedSxgLink|'s [=allowed signed exchange link
+                info/variant key=] is not null, [=header list/set=] ``
+                `Variant-Key` ``/|allowedSxgLink|'s [=allowed signed
+                exchange link info/variant key=] in |storedExchange|'s
+                [=exchange/response=]'s [=response/header list=].
+            1. Let |requestForMatch| be the result of [=creating a
+                potential-CORS request=] given a url of |allowedSxgLink|'s
+                [=allowed signed exchange link info/target=], a destination of
+                the result of [=destination/translating=] |asAttribute|, and a
+                corsAttributeState of [=No CORS=].
+            1. If |requestForMatch| [=matches the stored exchange=]
+                |storedExchange|, then:
+                1. Set |headerIntegrity| to |allowedSxgLink|'s [=allowed signed
+                    exchange link info/header integrity=].
+                1. Break out of the |allowedSxgLinks| loop.
+        1. Let |prefetched alternate exchange| be null.
+        1. For each |sxg| of |navigationParams|'s [=navigation
+            params/prefetched subresource signed exchanges=]:
+            1. If |headerIntegrity| is the same as the value of |sxg|'s
+                [=exchange/response=]'s [=response/header integrity value=]
+                encoded as a [[CSP]] <a grammar>hash-source</a>, then set
+                |prefetched alternate exchange| to |sxg|.
+        1. If |headerIntegrity| is not null and |prefetched alternate
+            exchange| is null, then set |canLoadAlternateSxg| to false.
+
+            Note: This means that there is a matching
+            <{link/rel/allowed-alt-sxg}> link for the <{link/rel/preload}>
+            |link|, but the matching signed exchange has not been
+            prefetched. In this case the UA can't use the prefetched
+            subresource signed exchanges for other  <{link/rel/preload}>
+            links. This is intended to prevent the referrer page from
+            encoding a tracking ID into the set of subresources it
+            prefetches.
+        1. [=list/Append=] the [=alternate signed exchange preload info=]
+            (|link|, |linkTarget|, |prefetched alternate exchange|) to
+            |preloadLinkItems|.
+    1. For each |preloadLinkItem| of |preloadLinkItems|:
+        1. Let |asAttribute| be |preloadLinkItem|'s [=alternate signed exchange
+            preload info/link=]'s [=Target Attribute named=] `"as"`.
+        1. Assert: |asAttribute| is a [=potential destination=].
+        1. Let |corsAttributeState| be the state of a synthetic [=CORS settings
+            attribute=] with a value of |preloadLinkItem|'s [=alternate signed
+            exchange preload info/link=]'s [=Target Attribute named=]
+            `"crossorigin"`.
+        1. Let |request| be the result of [=creating a potential-CORS request=]
+            given a url of |preloadLinkItem|'s [=alternate signed exchange
+            preload info/target=], a destination of the result of
+            [=destination/translating=] |asAttribute|, and a corsAttributeState
+            of |corsAttributeState|.
+        1. Set |request|'s [=request/synchronous flag=].
+        1. Set |request|'s [=request/client=] to |document|.
+        1. Set |request|'s [=request/cryptographic nonce metadata=] to
+            |preloadLinkItem|'s [=alternate signed exchange preload
+            info/link=]'s [=Target Attribute named=] `"nonce"`.
+        1. Set |request|'s [=request/integrity metadata=] to
+            |preloadLinkItem|'s [=alternate signed exchange preload
+            info/link=]'s [=Target Attribute named=] `"integrity"`.
+        1. Set |request|'s [=request/referrer policy=] to be the [=referrer
+            policy attribute=] of |preloadLinkItem|'s [=alternate signed
+            exchange preload info/link=]'s [=Target Attribute named=]
+            `"referrerpolicy"`.
+        1. If |canLoadAlternateSxg| is true, then set |request|'s
+            [=request/stashed exchange=] to |preloadLinkItem|'s [=alternate
+            signed exchange preload info/prefetched alternate exchange=].
+
+            Note: When |canLoadAlternateSxg| if false or there is no
+            matching prefetched alternate exchange, the original resource
+            declared in the  <{link/rel/preload}> <a http-header>Link</a>
+            header |link| will be fetched.
+        1. [=Fetch=] |request| [=in parallel=].
+
 
 # Structures # {#structs}
 
@@ -449,6 +931,63 @@ An exchange signature is a [=struct=] with the following items:
 :: The POSIX time at which the signature stops being valid.
 
 </dl>
+
+<h3 dfn-type=dfn export>Allowed signed exchange link info</h3>
+
+An allowed signed exchange link info is a [=struct=] with the following items,
+holding a parsed <{link/rel/allowed-alt-sxg}> link:
+
+<dl dfn-for="allowed signed exchange link info">
+: <dfn>target</dfn>
+:: A [=URL=] holding the value of the link's [=Link Target=].
+: <dfn>header integrity</dfn>
+:: A [=string=] holding the value of the link's [=Target Attribute=] named
+    `"header-integrity"`.
+: <dfn>variants</dfn>
+:: A [=string=] holding the value of the link's [=Target Attribute=] named
+    `"variants"`, or null.
+: <dfn>variant key</dfn>
+:: A [=string=] holding the value of the link's [=Target Attribute=] named
+    `"variant key"`, or null.
+
+</dl>
+
+<h3 dfn-type=dfn export>Alternate signed exchange link info</h3>
+
+An alternate signed exchange link info is a [=struct=] with the following items,
+holding a parsed <{link/rel/alternate}> link:
+
+<dl dfn-for="alternate signed exchange link info">
+: <dfn>target</dfn>
+:: A [=URL=] holding the value of the link's [=Link Target=].
+: <dfn>context</dfn>
+:: A [=URL=] holding the value of the link's [=Link Context=].
+: <dfn>variants</dfn>
+:: A [=string=] holding the value of the link's [=Target Attribute=] named
+    `"variants"`, or null.
+: <dfn>variant key</dfn>
+:: A [=string=] holding the value of the link's [=Target Attribute=] named
+    `"variant key"`, or null.
+
+</dl>
+
+<h3 dfn-type=dfn export>Alternate signed exchange preload info</h3>
+
+An alternate signed exchange preload info is a [=struct=] with the following items:
+
+<dl dfn-for="alternate signed exchange preload info">
+: <dfn>link</dfn>
+:: A link object [=Parsing a Link Field Value|parsed=] from a HTTP <a
+    http-header>Link</a> header.
+: <dfn>target</dfn>
+:: A URL to be preloaded. <span class="note">This can be different from
+    [=alternate signed exchange preload info/link=]'s [=Link Target=], when
+    `"imagesrcset"` is used for image preload.</span>
+: <dfn>prefetched alternate exchange</dfn>
+:: The [=exchange=] of the prefetched [=alternate signed exchange=], or null.
+
+</dl>
+
 
 # Algorithms # {#algorithms}
 
@@ -570,13 +1109,15 @@ following steps
     : `b3`
     :: the result of [=parsing b3 CBOR headers=] given |headerBytes| and
         |requestUrl|.
+1. Set |parsedExchange|'s [=exchange/response=]'s [=response/came from a signed
+    exchange=] to true.
+1. Set |parsedExchange|'s [=exchange/response=]'s [=response/signed exchange
+    outer header list=] to |response|'s [=response/header list=].
+1. Set |parsedExchange|'s [=exchange/response=]'s [=response/header integrity
+    value=] to the [=SHA-256=] hash of |headerBytes|.
 1. If |parsedSignature| [=exchange signature/does not establish cross-origin
     trust=] for |parsedExchange|, return
     "[=signed exchange report/cert_verification_error=]".
-1. Set |parsedExchange|'s [=exchange/response=]'s [=response/HTTPS state=] to
-    either "`deprecated`" or "`modern`".
-
-    Note: See <a spec="fetch">HTTP-network fetch</a> for details of this choice.
 1. If |parsedExchange|'s [=exchange/response=]'s [=response/status=] is a
     [=redirect status=] or the [=signed exchange version=] of |parsedExchange|'s
     [=exchange/response=] is not undefined, return
@@ -720,9 +1261,13 @@ reporting to a [=signed exchange report=] |report|, returns a
     "[=signed exchange report/cert_fetch_error=]".
 1. If |certResponse|'s [=response/body=] is null or that body's [=body/stream=]
     is null, return "[=signed exchange report/cert_parse_error=]".
-1. Let |bytes| be the result of [=ReadableStream/read all bytes|reading all
-    bytes=] from |certResponse|'s [=response/body=]'s [=body/stream=] with a
-    [=ReadableStream/get a reader|new reader=] over the same stream.
+1. Let |reader| be the result of [=ReadableStream/getting a reader=] for
+    |certResponse|'s [=response/body=]'s [=body/stream=].
+1. Assert: Getting a reader did not throw an exception, because the response was
+    created in this algorithm and not passed anywhere that could create a reader
+    for its body.
+1. Let |bytes| be the result of [=ReadableStreamDefaultReader/reading all
+    bytes=] from |reader|.
 1. Wait for |bytes| to settle.
 1. If |bytes| was rejected, return "[=signed exchange report/cert_parse_error=]".
 1. Let |chain| be the [=certificate chain=] produced by parsing |bytes|' value
@@ -991,8 +1536,9 @@ To <dfn lt="reading a body|read a body">read a body</dfn> from a [=read buffer=]
 1. Let |cancel| be the following steps, taking |reason| as an argument:
     1. [=ReadableStream/Cancel=] |stream|'s [=read buffer/stream=] with
         |reason|.
-1. Let |outputStream| be the result of [=ReadableStream/construct a
-    ReadableStream object|constructing a ReadableStream=] with |cancel|.
+1. Let |outputStream| be the result of [=ReadableStream/creating=] a
+    {{ReadableStream}} with a [=ReadableStream/create/cancelAlgorithm=] of
+    |cancel|.
 1. Set |body|'s [=body/stream=] to |outputStream|.
 1. Set |response|'s [=response/body=] to |body|.
 1. [=In parallel=]:
@@ -1000,7 +1546,7 @@ To <dfn lt="reading a body|read a body">read a body</dfn> from a [=read buffer=]
 
 <h3 algorithm id="request-matching">Request matching</h3>
 
-A [=request=] |browserRequest| <dfn>matches the stored exchange</dfn>
+A [=request=] |browserRequest| <dfn lt="matches the stored exchange|doesn't match the stored exchange">matches the stored exchange</dfn>
 |storedExchange| if the following steps return "match":
 
 1. If |browserRequest|'s [=request/method=] is not `` `GET` `` or `` `HEAD` ``,
@@ -1200,8 +1746,8 @@ To <dfn for="read buffer" lt="reading up to">read up to</dfn> |N| bytes from a
 1. While |done| is `false` and the length of |buffer|'s [=read buffer/bytes=]
     item is less than |N| bytes:
 
-    1. Let |chunk| be the result of [=ReadableStream/read a chunk|reading a
-        chunk=] with |buffer|'s [=read buffer/reader=].
+    1. Let |chunk| be the result of [=ReadableStreamDefaultReader/read a
+        chunk|reading a chunk=] from |buffer|'s [=read buffer/reader=].
 
     1. Wait for |chunk| to settle.
 
@@ -1255,15 +1801,8 @@ To <dfn for="read buffer">Dump</dfn> a [=read buffer=] |input| to a
 {{ReadableStream}} |output|, the UA MUST:
 
 1. Assert: This algorithm is running [=in parallel=].
-1. Let |enqueue| be the following steps, taking |bytes|:
-    1. [=ReadableStream/Enqueue=] a {{Uint8Array}} object wrapping an
-        {{ArrayBuffer}} containing |bytes| to |output|. Both objects are created
-        in |output|'s realm.
-    1. If that threw an exception |ex|, [=ReadableStream/error=] |output| with
-        |ex| and [=ReadableStream/cancel=] |input|'s [=read buffer/stream=] with
-        |ex|.
-    1. Abort this algorithm.
-1. |enqueue| |input|'s [=read buffer/bytes=].
+1. [=ReadableStream/Enqueue=] a {{Uint8Array}} wrapping an {{ArrayBuffer}}
+    containing |input|'s [=read buffer/bytes=] into |output|.
 1. While |input|'s [=read buffer/stream=] is [=ReadableStream/readable=]:
     1. Wait until |output| is [=ReadableStream/closed=],
         [=ReadableStream/errored=], or [=ReadableStream/need more data|needs
@@ -1271,8 +1810,8 @@ To <dfn for="read buffer">Dump</dfn> a [=read buffer=] |input| to a
     1. If |output| is [=ReadableStream/closed=] or [=ReadableStream/errored=],
         [=ReadableStream/cancel=] |input|'s [=read buffer/stream=] and abort
         these steps.
-    1. Let |chunk| be the result of [=ReadableStream/read a chunk|reading a
-        chunk=] with |input|'s [=read buffer/reader=].
+    1. Let |chunk| be the result of [=ReadableStreamDefaultReader/read a
+        chunk|reading a chunk=] with |input|'s [=read buffer/reader=].
     1. Wait for |chunk| to settle.
     1. If |chunk| is:
 
@@ -1280,7 +1819,8 @@ To <dfn for="read buffer">Dump</dfn> a [=read buffer=] |input| to a
 
         : Fulfilled with an object whose `done` property is `false` and whose
             `value` property is a {{Uint8Array}} object |bytes|:
-        :: |enqueue| |bytes|.
+        :: [=ReadableStream/Enqueue=] a {{Uint8Array}} wrapping an
+            {{ArrayBuffer}} containing |bytes| into |output|.
 
         : Fulfilled with an object whose `done` property is `true`:
         :: [=ReadableStream/Close=] |output|.
@@ -1289,6 +1829,55 @@ To <dfn for="read buffer">Dump</dfn> a [=read buffer=] |input| to a
         :: [=ReadableStream/Error=] |output| with reason |e|.
 
         </dl>
+
+<h3 algorithm id="dump-value-of-target-attributes">Get value of [=Target Attributes=]</h3>
+
+A link header value |link|'s <dfn noexport>Target Attribute named</dfn> |name|
+is the second item of the first tuple of |link|'s [=Target Attributes=] whose
+first item matches the string |name|, or null if no such tuple is present.
+
+
+<h3 algorithm id="get-allowed-signed-exchange-links">Get allowed signed exchange link info</h3>
+
+The result of <dfn>getting allowed signed exchange link info</dfn> from a
+[=list=] |links| is returned by the following steps:
+
+1. Let |allowedSxgLinks| be an empty [=list=].
+1. For each |link| of |links|:
+    1. If |link|'s [=Relation Type=] is not 'allowed-alt-sxg', then continue.
+    1. Let |linkTarget| be |link|'s [=Link Target=].
+    1. Let |headerIntegrity| be |link|'s [=Target Attribute named=]
+        `"header-integrity"`.
+    1. If |headerIntegrity| is null, then continue.
+    1. Let |linkVariants| be |link|'s [=Target Attribute named=] `"variants"`.
+    1. Let |linkVariantKey| be |link|'s [=Target Attribute named=]
+        `"variant-key"`.
+    1. [=list/Append=] the [=allowed signed exchange link info=] (|linkTarget|,
+        |headerIntegrity|, |linkVariants|, |linkVariantKey|) to
+        |allowedSxgLinks|.
+1. Return |allowedSxgLinks|.
+
+<h3 algorithm id="get-alternate-signed-exchange-links">Get alternate signed
+exchange link info</h3>
+
+The result of <dfn>getting alternate signed exchange link info</dfn> from a
+[=list=] |links| is returned by the following steps:
+
+1. Let |alternateSxgLinks| be an empty [=list=].
+1. For each |link| of |links|:
+    1. If |link|'s [=Relation Type=] is not 'alternate', then continue.
+    1. If |link|'s [=Target Attributes=] doesn't [=list/contain=]
+        (`"type"`,`"application/signed-exchange"`), then continue.
+    1. Let |linkTarget| be |link|'s [=Link Target=].
+    1. Let |linkContext| be |link|'s [=Link Context=].
+    1. Let |linkVariants| be |link|'s [=Target Attribute named=] `"variants"`.
+    1. Let |linkVariantKey| be |link|'s [=Target Attribute named=]
+        `"variant-key"`.
+    1. [=list/Append=] the [=alternate signed exchange link info=]
+        (|linkTarget|, |linkContext|, |linkVariants|, |linkVariantKey|) to
+        |alternateSxgLinks|.
+1. Return |alternateSxgLinks|.
+
 
 # Security Considerations # {#seccons}
 
