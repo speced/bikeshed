@@ -85,6 +85,9 @@ def createHTML(doc, blockEl, testNames, testData):
         addClass(blockEl, "wpt-tests-block")
         clearContents(blockEl)
         for testName in testNames:
+            if testName not in testData:
+                warn(f"Cannot find '{testName}' in the test data.")
+                continue
             if ".https." in testName or ".serviceworker." in testName:
                 liveTestScheme = "https"
             else:
