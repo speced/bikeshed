@@ -17,6 +17,9 @@ for user in os.listdir("tests/github"):
 try:
     githubClient = Github(os.environ["GITHUB_SEARCH_TOKEN"])
 except KeyError:
+    print(
+        "GitHub search API limit is limited to 10, unless setting a read token in your environment of GITHUB_SEARCH_TOKEN"
+    )
     githubClient = Github()
 
 for repo in repos:
