@@ -5,7 +5,7 @@ from . import steps
 
 
 class HashMultShorthand:
-    def respond(self, match, dom=None):
+    def respond(self, match, dom=None):  # pylint: disable=unused-argument
         return steps.Success(
             E.a(
                 {"data-link-type": "grammar", "data-lt": "#", "for": ""}, match.group(0)
@@ -17,7 +17,7 @@ HashMultShorthand.startRe = re.compile(r"#{\s*\d+(\s*,(\s*\d+)?)?\s*}")
 
 
 class MultShorthand:
-    def respond(self, match, dom=None):
+    def respond(self, match, dom=None):  # pylint: disable=unused-argument
         return steps.Success(
             E.a(
                 {"data-link-type": "grammar", "data-lt": "{A}", "for": ""},
@@ -30,7 +30,7 @@ MultShorthand.startRe = re.compile(r"{\s*\d+\s*}")
 
 
 class MultRangeShorthand:
-    def respond(self, match, dom=None):
+    def respond(self, match, dom=None):  # pylint: disable=unused-argument
         return steps.Success(
             E.a(
                 {"data-link-type": "grammar", "data-lt": "{A,B}", "for": ""},
@@ -43,7 +43,7 @@ MultRangeShorthand.startRe = re.compile(r"{\s*\d+\s*,(\s*\d+)?\s*}")
 
 
 class SimpleTokenShorthand:
-    def respond(self, match, dom=None):
+    def respond(self, match, dom=None):  # pylint: disable=unused-argument
         return steps.Success(
             E.a(
                 {"data-link-type": "grammar", "data-lt": match.group(0), "for": ""},

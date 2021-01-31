@@ -171,16 +171,16 @@ def highlightWithWebIDL(text, el):
 
     class HighlightMarker:
         # Just applies highlighting classes to IDL stuff.
-        def markup_type_name(self, text, construct):
+        def markup_type_name(self, text, construct):  # pylint: disable=unused-argument
             return ("\1n\2", "\3")
 
-        def markup_name(self, text, construct):
+        def markup_name(self, text, construct):  # pylint: disable=unused-argument
             return ("\1g\2", "\3")
 
-        def markup_keyword(self, text, construct):
+        def markup_keyword(self, text, construct):  # pylint: disable=unused-argument
             return ("\1b\2", "\3")
 
-        def markup_enum_value(self, text, construct):
+        def markup_enum_value(self, text, construct):  # pylint: disable=unused-argument
             return ("\1s\2", "\3")
 
     if "\1" in text or "\2" in text or "\3" in text:

@@ -866,7 +866,7 @@ class ReferenceManager:
     def _bestCandidateBiblio(self, candidates):
         return stripLineBreaks(sorted(candidates, key=itemgetter("order"))[0])
 
-    def getLatestBiblioRef(self, key, el=None, quiet=False):
+    def getLatestBiblioRef(self, key):
         # Takes a biblio reference name,
         # returns the latest dated variant of that name
         # (names in the form FOO-19700101)

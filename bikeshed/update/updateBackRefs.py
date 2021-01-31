@@ -18,7 +18,7 @@ def testNameForPath(path):
     return path
 
 
-def update(path, dryRun=False):
+def update(path, dryRun=False):  # pylint: disable=unused-argument
     return  # early exit while working on this...
     # say("Downloading backref data...")
     # constants.quiet = float("inf")

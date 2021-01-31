@@ -75,7 +75,7 @@ class InputSource:
         """Suitable for passing to subprocess(cwd=)."""
         raise TypeError("{} instances don't have directories.".format(type(self)))
 
-    def relative(self, relativePath) -> Optional[InputSource]:
+    def relative(self, _) -> Optional[InputSource]:
         """Resolves relativePath relative to this InputSource.
 
         For example, InputSource("/foo/bar/baz.txt").relative("quux/fuzzy.txt")
@@ -89,7 +89,7 @@ class InputSource:
         """Returns the last modification time of this source, if that's known."""
         return None
 
-    def cheaplyExists(self, relativePath) -> Optional[bool]:
+    def cheaplyExists(self, _) -> Optional[bool]:
         """If it's cheap to determine, returns whether relativePath exists.
 
         Otherwise, returns None.
@@ -133,7 +133,7 @@ class UrlInputSource(InputSource):
         stop=tenacity.stop_after_attempt(3),
         wait=tenacity.wait_random(1, 2),
     )
-    def _fetch(self, *args, **kwargs):
+    def _fetch(self):
         response = requests.get(self.sourceName, timeout=10)
         if response.status_code == 404:
             # This matches the OSErrors expected by older uses of
@@ -144,7 +144,7 @@ class UrlInputSource(InputSource):
         return response
 
     def read(self) -> InputContent:
-        response = self._fetch(self.sourceName)
+        response = self._fetch()
         date = None
         if "Date" in response.headers:
             # Use the response's Date header, although servers don't always set

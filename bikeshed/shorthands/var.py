@@ -5,7 +5,7 @@ from . import steps
 
 
 class VarShorthand:
-    def respond(self, match, dom=None):
+    def respond(self, match, dom=None):  # pylint: disable=unused-argument
         escape, text = match.groups()
         if escape:
             return steps.Success(skips=["|"], nodes=[match.group(0)[1:]])
