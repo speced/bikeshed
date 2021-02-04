@@ -1073,6 +1073,9 @@ def parse(lines):
             inMetadata = False
             continue
         if inMetadata:
+            # Skip newlines except for multiline blocks
+            if line.text.strip() == "" and lastKey not in ("Abstract", "Status Text"):
+                continue
             if lastKey and (line.text.strip() == "" or re.match(r"\s+", line.text)):
                 # empty lines, or lines that start with 1+ spaces, continue previous key
                 md.addData(lastKey, line.text, lineNum=line.i)
