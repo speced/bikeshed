@@ -10,6 +10,7 @@ Group: webappsec
 Editor: Mounir Lamouri, w3cid 45389, Google Inc. https://google.com/
 Editor: Marcos Cáceres, w3cid 39125, Mozilla https://mozilla.com/
 Editor: Jeffrey Yasskin, w3cid 72192, Google Inc. https://google.com/
+Previous Version: https://www.w3.org/TR/2017/WD-permissions-20170925/
 Previous Version: https://www.w3.org/TR/2015/WD-permissions-20150407/
 
 Abstract: The <cite>Permissions Standard</cite> defines common infrastructure for other specifications that need to interact with browser permissions. It also defines an API to allow web applications to query and request changes to the status of a given permission.
@@ -44,7 +45,7 @@ spec: sensors; urlPrefix: https://w3c.github.io/sensors/#
 spec: manifest; urlPrefix: https://w3c.github.io/manifest/#
     type: dfn
         text: install; url: dfn-install
-spec: webdriver; urlPrefix: https://w3c.github.io/webdriver/webdriver-spec.html#
+spec: webdriver; urlPrefix: https://w3c.github.io/webdriver/#
     type: dfn
         text: current browsing context; url: dfn-current-browsing-context
         text: WebDriver error; url: dfn-error
@@ -58,32 +59,8 @@ spec: webdriver; urlPrefix: https://w3c.github.io/webdriver/webdriver-spec.html#
         text: success; url: dfn-success
 </pre>
 <pre class="link-defaults">
-spec: dom
-    type: interface
-        text: Document
-spec: html
-    type: dfn
-        text: event handler
-        text: event handler event type
-        text: in parallel
-        text: origin; for: /
-        text: queue a task
-spec: storage
-    type: enum-value
-        for: PermissionName; text: "persistent-storage"
-spec: infra
-    type: dfn
-        text: list
-        for: list; text: append
-spec: ui-events
-    type: dfn
-        text: user agent
-spec: web-bluetooth
-    type: enum-value
-        for: PermissionName; text: "bluetooth"
-spec: webidl
-    type: interface
-        text: Promise
+spec:infra; type:dfn; text:user agent
+spec:infra; type:dfn; text:list
 </pre>
 
 <section class='non-normative'>
@@ -510,7 +487,7 @@ spec: webidl
       and <var>status</var>.
     </li>
     <li>
-      <a>Queue a task</a> on the <dfn>permission task source</dfn> to
+      <a>Queue a task</a> on the <dfn export>permission task source</dfn> to
       <a>fire an event</a> named <code>change</code> at
       <var>status</var>.
     </li>
@@ -612,7 +589,7 @@ spec: webidl
       <a enum-value>"midi"</a>,
       <a enum-value>"camera"</a>,
       <a enum-value>"microphone"</a>,
-      <a enum-value>"speaker"</a>,
+      <a enum-value>"speaker-selection"</a>,
       <a enum-value>"device-info"</a>,
       <a enum-value>"background-fetch"</a>,
       <a enum-value>"background-sync"</a>,
@@ -622,7 +599,8 @@ spec: webidl
       <a enum-value>"accelerometer"</a>,
       <a enum-value>"gyroscope"</a>,
       <a enum-value>"magnetometer"</a>,
-      <a enum-value>"clipboard"</a>,
+      <a enum-value>"clipboard-read"</a>,
+      <a enum-value>"clipboard-write"</a>,
       <a enum-value>"display-capture"</a>,
       <a enum-value>"nfc"</a>,
     };
@@ -810,11 +788,9 @@ spec: webidl
     </h3>
     <p dfn-for="PermissionName" dfn-type="enum-value">
       The <dfn>"camera"</dfn>, <dfn>"microphone"</dfn> , and
-      <dfn>"speaker"</dfn>
+      <dfn>"speaker-selection"</dfn>
       permissions are associated with permission to use media devices as
-      specified in [[GETUSERMEDIA]] and [[audio-output]]. {{"speaker"}} is
-      <a>allowed in non-secure contexts</a>. {{"camera"}} and {{"microphone"}}
-      MAY be <a>allowed in non-secure contexts</a>.
+      specified in [[GETUSERMEDIA]] and [[audio-output]].
     </p>
     <dl>
       <dt>
@@ -824,6 +800,10 @@ spec: webidl
         <pre class='idl'>
           dictionary DevicePermissionDescriptor : PermissionDescriptor {
             DOMString deviceId;
+          };
+
+          dictionary CameraDevicePermissionDescriptor : DevicePermissionDescriptor {
+            boolean panTiltZoom = false;
           };
         </pre>
         <p>
@@ -844,6 +824,10 @@ spec: webidl
           If a permission state is present for access to some, but not all,
           cameras, a query without the {{DevicePermissionDescriptor/deviceId}}
           will return {{"prompt"}}.
+        </p>
+        <p>
+          `{name: "camera", panTiltZoom: true}` is <a>stronger than</a>
+          `{name: "camera", panTiltZoom: false}`.
         </p>
         <p>
           Note that a "granted" permission is no guarantee that getUserMedia
@@ -997,13 +981,23 @@ spec: webidl
     </p>
   </section>
   <section>
-    <h3 id="clipboard">
-      Clipboard
+    <h3 id="clipboard-read">
+      Clipboard Read
     </h3>
     <p>
-      The <dfn for="PermissionName" enum-value>"clipboard"</dfn>
+      The <dfn for="PermissionName" enum-value>"clipboard-read"</dfn>
       permission is the permission associated with the usage of the
-      asynchronous methods in the [[clipboard-apis]].
+      asynchronous read methods in the [[clipboard-apis]].
+    </p>
+  </section>
+  <section>
+    <h3 id="clipboard-write">
+      Clipboard Write
+    </h3>
+    <p>
+      The <dfn for="PermissionName" enum-value>"clipboard-write"</dfn>
+      permission is the permission associated with the usage of the
+      asynchronous write methods in the [[clipboard-apis]].
     </p>
   </section>
   <section>
@@ -1071,7 +1065,7 @@ spec: webidl
         </tr>
       </tbody>
     </table>
-    <p>The <dfn>Set Permission</dfn> <a>extension command</a> simulates user
+    <p>The <dfn noexport>Set Permission</dfn> <a>extension command</a> simulates user
     modification of a {{PermissionDescriptor}}'s <a>permission state</a>.</p>
     <p>The <a>remote end steps</a> are:</p>
     <ol>
@@ -1115,8 +1109,9 @@ spec: webidl
         For each <a>environment settings object</a> |target| in |targets|:
         <ol>
           <li><a>Queue a task</a> |task| on the <a>permission task source</a>
-            of |target|'s [=environment settings object/responsible browsing
-            context=] to perform the following step:</li>
+            of |target|'s [=relevant settings object=]'s [=environment settings
+            object/global object=]'s [=Window/browsing context=] to perform the
+            following step:</li>
             <ol>
             <li>Interpret |parameters|.{{PermissionSetParameters/state}} as if
               it were the result of an invocation of <a>permission state</a>
@@ -1124,7 +1119,7 @@ spec: webidl
               moment.</li>
             </ol>
           </li>
-          <li><a>Append</a> |task| to |tasks|.</li>
+          <li>[=list/Append=]</a> |task| to |tasks|.</li>
         </ol>
       </li>
       <li>Wait for all <a>tasks</a> in |tasks| to have executed.</li>

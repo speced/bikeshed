@@ -64,9 +64,12 @@ urlPrefix: https://drafts.csswg.org/web-animations-1/; type: dfn; spec: web-anim
     text: target element
     text: target effect
     text: target effect end
+    text: timeline
     text: unresolved
+    text: default document timeline
 urlPrefix: https://drafts.csswg.org/css-writing-modes-4/; type: dfn; spec: css-writing-modes-4
     text: equivalent physical property; url: logical-to-physical
+urlPrefix: https://drafts.csswg.org/css-values-4/; spec:css-values-4; type:dfn; text:css identifier
 </pre>
 
 <h2 id="delta">Delta specification</h2>
@@ -296,8 +299,6 @@ and the position of the animation in |element|'s 'animation-name' list,
      1.   Iterate over all declarations in the keyframe block and
           add them to |keyframe| such that:
 
-          *     All variable references are resolved to their current values.
-
           *     Each shorthand property is expanded to its longhand
                 subproperties.
 
@@ -315,9 +316,7 @@ and the position of the animation in |element|'s 'animation-name' list,
                 have already added at this same |keyframe offset|,
                 they should be skipped.
 
-           *    All property values are replaced with their computed values.
-
-     1.   Add each physical longhand property name that was added to |keyframe|
+     1.   Add each property name that was added to |keyframe|
           to |animated properties|.
 
 1.   If there is no keyframe in |keyframes| with offset 0,
@@ -359,20 +358,6 @@ It could be rewritten so this is not required but that will likely change
 the behavior for some edge cases.
 We should verify what current implementations do and possible remove the
 requirement to iterate in reverse.
-
-Issue: In practice, implementations will likely maintain specified values and
-variable references internally and only resolve them to computed values when
-{{KeyframeEffect/getKeyframes()}} is called on a {{KeyframeEffect}}
-associated with a {{CSSAnimation}}
-(and, more specifically, a {{CSSAnimation}} whose effect has not been replaced
-and whose keyframes have not been overridden
-using {{KeyframeEffect/setKeyframes()}}).
-It is not clear that soing so would produce an observable difference in
-behavior, however.
-If it does, the above procedure might need to be adjusted so that the
-requirement to expand variables and convert to property values to computed
-values is limited to the result of {{KeyframeEffect/getKeyframes()}} and
-not the internal representation of keyframes.
 
 ## The 'animation-duration' property ## {#animation-duration}
 
@@ -515,6 +500,76 @@ keyframe specifying each property.
 
   Issue: Create pictures of these examples and verify they make sense.
 </div>
+
+
+## The 'animation-timeline' property ## {#animation-timeline}
+
+The 'animation-timeline' property defines the <a>timeline</a> used with the
+animation.
+
+Note: This specification does not introduce any syntax to specify animation
+timelines but instead it is up to others specifications such as Scroll-linked
+Animations [[SCROLL-ANIMATIONS]] to do so.
+
+<pre class='propdef'>
+Name: animation-timeline
+Value: <<single-animation-timeline>>#
+Initial: auto
+Applies to: all elements
+Inherited: no
+Percentages: N/A
+Computed value: list, each item either a case-sensitive [=css identifier=] or 
+    the keywords ''single-animation-timeline/none'',
+    ''single-animation-timeline/auto''.
+Canonical order: per grammar
+Animatable: no
+</pre>
+
+<pre>
+<dfn>&lt;single-animation-timeline></dfn> = auto | none | <<timeline-name>>
+</pre>
+
+The 'animation-timeline' property is similar to properties like 'animation-name'
+and 'animation-duration' in that it can have one or more values, each one
+imparting additional behavior to a corresponding [=animation=] on the element,
+with the timelines matched up with animations as described
+[[css-animations-1#animation-name|here]].
+
+Each value has type <<single-animation-timeline>>, whose possible values have
+the following effects:
+
+:   <dfn for="single-animation-timeline" dfn-type=value>auto</dfn>
+::  The animation's [=timeline=] is a {{DocumentTimeline}}, more specifically
+    the <a>default document timeline</a>.
+
+:   <dfn for="single-animation-timeline" dfn-type=value>none</dfn>
+::  The animation is not associated with a [=timeline=].
+
+:   <dfn>&lt;timeline-name></dfn>
+::  Find the last timeline at-rule in document order with its name matching
+    <<timeline-name>>. If such a timeline at-rule exists, then the animation's
+    [=timeline=] is a timeline as defined by that rule. Otherwise the animation
+    is not associated with a [=timeline=].
+    <pre>
+      &lt;timeline-name> = <<custom-ident>> | <<string>>
+    </pre>
+
+
+Issue: Make it easier to use 'animation-name' to select the timeline when
+'animation-timeline' is not specified. Allowing 'animation-name' to be used for
+selecting timeline enables most common animations to have to use a single name
+for both their keyframes and timeline which is simple and ergonomics. The
+'animation-timeline' property gives authors additional control to independently
+select keyframes and timeline if necessary.
+
+
+## The 'animation' shorthand property ## {#animation-shorthand}
+
+The 'animation' shorthand property syntax is as follows:
+
+<dfn>&lt;single-animation></dfn> = <<time>> || <<easing-function>> || <<time>> || <<single-animation-iteration-count>> || <<single-animation-direction>> || <<single-animation-fill-mode>> || <<single-animation-play-state>> || [ none | <<keyframes-name>> ] || <<single-animation-timeline>>
+
+
 
 # Animation Events # {#events}
 

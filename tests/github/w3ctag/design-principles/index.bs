@@ -1,13 +1,15 @@
 <pre class="metadata">
-Title: Client-side API Design Principles
-Group: W3C TAG
+Title: Web Platform Design Principles
+Group: tag
 Shortname: design-principles
 Repository: w3ctag/design-principles
-Status: DREAM
+Status: ED
+Level: none
+ED: https://w3ctag.github.io/design-principles/
 Editor: Sangwhan Moon, Invited Expert, https://sangwhan.com
 Former Editor: Domenic Denicola, Google https://www.google.com/, https://domenic.me/, d@domenic.me
 Former Editor: Travis Leithead, Microsoft, travil@microsoft.com
-Abstract: This document contains a small-but-growing set of design principles collected by the W3C TAG while <a href="https://github.com/w3ctag/spec-reviews/">reviewing</a> specifications.
+Abstract: This document contains a set of design principles to be used when designing Web Platform technologies. These principles have been collected during the Technical Architecture Group's discussions in <a href="https://github.com/w3ctag/design-reviews/">reviewing</a> developing specifications. We encourage specification designers to read this document and use it as a resource when making design decisions.
 Default Biblio Status: current
 Markup Shorthands: markdown on
 Boilerplate: feedback-header off
@@ -17,11 +19,16 @@ Boilerplate: feedback-header off
 Link Defaults: html (dfn) queue a task/in parallel/reflect
 </pre>
 <pre class="link-defaults">
-spec:html; type:dfn; for:/; 
-    text:browsing context
+spec:html; type:dfn; for:/;
     text:focus update steps
     text:task queue
 spec:webidl; type:dfn; text:namespace
+spec:selectors-4; type:selector; text::hover
+spec:css-cascade-5; type:dfn; text:inherit
+spec:html; type:dfn; for:/; text:event loop
+spec:html; type:element-attr; for:a; text:href
+spec:dom; type:dfn; text:aborted flag
+spec:dom; type:method; for:Document; text:getElementsByTagName(qualifiedName)
 </pre>
 <pre class="anchors">
 url: https://tc39.github.io/ecma262/#sec-error-objects; type: interface; text: Error;
@@ -35,6 +42,23 @@ url: https://w3c.github.io/IntersectionObserver/;
 url: https://wicg.github.io/ResizeObserver/;
     type: interface; text: ResizeObserver; url: #resizeobserver
 url: https://dom.spec.whatwg.org/#ref-for-concept-getelementsbytagname; type: interface; text: getElementsByTagName; for: Document
+url: https://drafts.csswg.org/css-transitions-1/#transitions; type: dfn; text: CSS Transitions
+</pre>
+<!-- Route around bugs in other specs.
+     https://github.com/whatwg/html/issues/5515
+     https://github.com/w3c/remote-playback/issues/137
+     https://github.com/whatwg/url/issues/522
+     https://github.com/whatwg/html/issues/6053
+     -->
+<pre class="anchors">
+urlPrefix: https://html.spec.whatwg.org/multipage/; spec: HTML
+    text: file; for: input/type; type: attr-value; url: input.html#file-upload-state-%28type=file%29
+urlPrefix: https://w3c.github.io/remote-playback/; spec: REMOTE-PLAYBACK
+    text: RemotePlayback; type:interface; url: #remoteplayback-interface
+    text: remote playback device; type:dfn; url: #dfn-remote-playback-devices
+urlPrefix: https://url.spec.whatwg.org/; spec: URL;
+    type: abstract-op; url: #percent-encode; text: percent-encode
+url: https://html.spec.whatwg.org/multipage/offline.html#dom-navigator-online; type: attribute; for: NavigatorOnline; text: onLine;
 </pre>
 
 <style>
@@ -46,126 +70,2168 @@ url: https://dom.spec.whatwg.org/#ref-for-concept-getelementsbytagname; type: in
 
 <h2 id="basic-principles">Principles behind design of Web APIs</h2>
 
+<h3 id="priority-of-constituencies">Put user needs first (Priority of Constituencies)</h3>
+
+If a trade-off needs to be made,
+always put user needs above all.
+
+Similarly, when beginning to design an API,
+be sure to understand and document the user need that the API aims to address.
+
+[The internet is for end users](https://tools.ietf.org/html/rfc8890):
+any change made to the web platform has the potential to affect vast numbers of people,
+and may have a profound impact on any person's life. [[RFC8890]]
+
+User needs come before the needs of web page authors,
+which come before than the needs of user agent implementors,
+which come before than the needs of specification writers,
+which come before theoretical purity.
+
+Like all principles,
+this isn't absolute.
+Ease of authoring affects how content reaches users.
+User agents have to prioritize finite engineering resources,
+which affects how features reach authors.
+Specification writers also have finite resources,
+and theoretical concerns reflect underlying needs of all of these groups.
+
+See also:
+
+* <a href="https://www.w3.org/2001/tag/doc/ethical-web-principles/#noharm">The web should not cause harm to society</a>
+* [[RFC8890]]
+
 <h3 id="safe-to-browse">It should be safe to visit a web page</h3>
 
-Hyperlinks, links from one page to another, are one of the foundations of the Web.
+When adding new features,
+design them to preserve the user expectation
+that visiting a web page is generally safe.
 
-Following a link, or visiting a web page, should be safe:
-users doing this
-should not have to fear for the security of their computer
-or for essential aspects of their privacy.
-(But it's not completely safe,
-in the sense that users may face consequences
-if their use of the Web is harming others.)
-Furthermore, users should understand that it is safe (and how it isn't)
-so they can make informed decisions between use of the Web versus other technologies.
+The Web is named for its hyperlinked structure.
+In order for the web to remain vibrant,
+users need to be able to expect that merely visiting any given link
+won't have implications for the security of their computer,
+or for any essential aspects of their privacy.
 
-Saying “essential aspects” here skips over quite a bit of detail.
-The Web today is far from being perfectly private.
-One aspect of privacy problems is when reality doesn't meet expectations.
-For example,
-a person walking down the street generally expects to be recognized by their friends,
-but (depending on the country)
-may not expect that they walked down that street at that time
-to be recorded in a permanent government database.
-Online, people might have less understanding of what is or isn't possible,
-and their expectations might differ more widely.
-<!-- Can we cite research on this??? -->
+For example, an API which allows any website to
+[detect the use of assistive technologies](#do-not-expose-use-of-assistive-tech)
+may make users of these technologies feel unsafe visiting unknown web pages,
+since any web page may detect this private information.
 
-We can probably make privacy on the Web better than it is today:
+If users have a realistic expectation of safety,
+they can make informed decisions
+between Web-based technologies and other technologies.
+For example, users may choose to use a web-based food ordering page,
+rather than installing an app,
+since installing a native app is riskier than visiting a web page.
+
+To work towards making sure the reality of safety on the web matches users' expectations,
+we can take complementary approaches when adding new features:
   * We can improve the user interfaces through which the Web is used
-    to make it clearer what users of the Web should expect.
+    to make it clearer what users of the Web should (and should not) expect;
   * We can change the technical foundations of the Web
-    so that they match user expectations of privacy.
+    so that they match user expectations of privacy;
   * We can consider the cases where users would be better off
     if expectations were higher,
     and in those cases
-    try to change both technical foundations and expectations
+    try to change both technical foundations and expectations.
 
-When we add new features to the Web
-that might weaken the security or privacy characteristics that the Web currently has,
-we should consider the tradeoffs involved in that particular feature.
-A new feature with security risks might still make users safer, for example,
-because they would download and run native binary software less often,
-and downloading and running binaries is much riskier than visiting a Web page.
-However, we should also consider the tradeoff
-against the *idea* that it is safe to visit Web pages:
-adding a risky feature to the Web teaches the Web's users that the Web is less safe,
-and this erodes one of the core values of the Web:  that it is safe to visit websites.
-We should seek to give users a true picture of the safety of the Web
-so that they can act based on that understanding of safety
-(in comparison to the safety of alternatives),
-and at the same time we should seek to keep the Web safe for its users
-and work to make it safer.
+A new feature which introduces safety risks may still improve user safety overall,
+if it allows users to perform a task more safely on a web page
+than it would be for them to install a native app to do the same thing.
+However, this benefit needs to be weighed against the common goal
+of users having a reasonable expectation of safety on web pages.
+
+See also:
+
+* [Security and Privacy Self-Review](https://www.w3.org/TR/security-privacy-questionnaire/)
 
 <h3 id="trusted-ui">Trusted user interface should be trustworthy</h3>
 
-Since users of the Web can follow links to sites they might not know already,
-software that lets them access the Web generally provides user interface
-to show the user who they're interacting with and how,
-such as by displaying part or all of the URL or other information about the site,
-or whether the connection is secure.
-Since users rely on this information to learn what site they're on
-and to make judgments about whether it is trustworthy,
-this software is designed so that
-sites are not able to override this user interface
-or spoof it in a way that would confuse users.
-Therefore, when we add new features to the web,
-we should consider whether they require new complexity in this user interface,
-and whether that complexity would reduce users' ability
-to make correct judgments about who they're interacting with
-or whether the user interface is trustworthy or spoofed.
+Consider whether new features impact trusted user interfaces.
+
+Users depend on trusted user interfaces
+such as the address bar, security indicators and permission prompts,
+to understand who they are interacting with and how.
+These trusted user interfaces must be able to be designed in a way
+that enables users to trust
+that the information they provide is genuine,
+and hasn't been spoofed or hijacked by the website.
+
+If a new feature allows untrusted user interfaces
+to resemble trusted user interfaces,
+this makes it more difficult for users to understand what information is trustworthy.
+
+<p class="example">
+For example, JavaScript `alert()` allows a page to show a modal dialog which looks like part of the browser.
+This is often used to attempt to trick users into visiting scam websites.
+If this feature was proposed today, it would probably not proceed.
+</p>
 
 <h3 id="consent">Ask users for meaningful consent when appropriate</h3>
 
-In some cases,
-we might add features to the Web that are not appropriate to allow for any website a user visits,
-but that are reasonable to have if the user agrees to use the feature
-based on a reasonable understanding of what will happen as a result.
-One example of such a feature might be support for location:
-many users seem likely to understand what it means to share their current location with a website
-and be able to consent to doing so
-(even though they might not fully understand the privacy implications of doing so).
-Another example of such a feature would be camera access,
-where users understand that they're sharing the image
-in the rectangle visible to the camera
-(even if they might not understand everything someone might do with the data).
+If a useful feature has the potential to cause harm to users,
+make sure that the user can give *meaningful consent* for that feature to be used,
+and that they can refuse consent effectively.
 
-We should not depend on asking the user for consent
-(via a permission prompt or other mechanism)
-if we don't have a way to express that request in a way
-that users will understand what is being requested
-and the main implications of giving their consent.
-Understanding whether this is the case may require
-studying users understanding of potential user interfaces,
-although in many cases experienced user experience designers
-may be able to extrapolate from previous experience.
+In order to give *meaningful consent*, the user must:
+- **understand** what permission they may choose whether to grant the web page
+- be able to choose to give or refuse that permission **effectively**.
 
-We should also not ask users to consent to something
-that can also happen if the user does not consent.
-The existence of prompts
-that request a user's consent for something
-(from trusted user interface in their browser or other user agent)
-imply that the thing for which consent is being requested
-will not happen if the user doesn't consent.
-Therefore we should not have user agents request consent
-for something that they can't effectively prevent.
-Doing so would send the wrong message about the safety characteristics of the Web
-and would lead users to be disappointed when the expectations of privacy,
-which they learned from trusted user interface,
-did not match reality.
+If a feature is powerful enough to require a user consent,
+but it's impossible to explain to a typical user what they are consenting to,
+that's a signal that you may need to reconsider the design of the feature.
 
-Asking users for consent via permission prompts
-can reinforce the idea that <a href="#safe-to-browse">the web is safe</a>
-by showing the user that certain things won't happen without their permission.
-But frequently asking users for consent can also show how scary a place the web is
-by showing how many sites are willing to ask for intrusive and unnecessary permissions.
+If a permission prompt is shown,
+and the user doesn't grant permission,
+the Web page should not be able to do anything
+that the user believes they have refused consent for.
+
+By asking for consent,
+we can inform the user of what capabilities the web page does or doesn't have,
+reinforcing their confidence that <a href="#safe-to-browse">the web is safe</a>.
+However, the <a href="priority-of-constituencies">user benefit</a>
+of a new feature must justify the additional burden on users
+to decide whether to grant permission for each feature
+whenever it's requested by a Web page.
+
+<p class="example">
+For example,
+the [Geolocation API](https://www.w3.org/TR/geolocation-API/)
+grants access to a user's location.
+This can help users in some contexts,
+like a mapping application,
+but may be dangerous to some users in other contexts -
+especially if used without the user's knowledge.
+So that the user may decide whether their location may be used by a Web page,
+a permission prompt should be shown to the user asking whether to grant location access.
+If the user refuses permission,
+no location information is available to the Web page.
+</p>
+
+<h3 id="devices-platforms">Support the full range of devices and platforms (Media Independence)</h3>
+<!-- was "Media Independence" in the HTML Design Principles -->
+
+As much as possible,
+ensure that features on the web work across different input and output devices,
+screen sizes, interaction modes, platforms, and  media.
+
+One of the main values of the Web is that it's extremely flexible:
+a Web page may be viewed on virtually any consumer computing device
+at a very wide range of screen sizes,
+may be used to generate printed media,
+and may be interacted with in a large number of different ways.
+New features should match the existing flexibility of the Web platform.
+
+<div class="note">
+This doesn't imply that features which don't work in *every* possible context should be excluded.
+For example, hyperlinks can't be visited when printed on paper,
+and the ''click'' event doesn't translate perfectly to touch input devices
+where positioning and clicking the pointer occur in the same gesture (a "tap").
+
+These features still work across a wide variety of contexts,
+and can be adapted to devices that don't support their original intent -
+for example, a tap on a mobile device will fire a ''click'' event as a fallback.
+</div>
+
+Features should also be designed so that the easiest way to use them
+maintains flexibility.
+
+<div class="example">
+The <a href="https://www.w3.org/TR/CSS2/visuren.html#block-formatting">`display: block`</a>,
+<a href="https://drafts.csswg.org/css-flexbox-1/#box-model">`display: flex`</a>
+and <a href="https://www.w3.org/TR/css-grid-1/#grid-containers">`display: grid`</a> layout models in CSS
+all default to placing content within the available space and without overlap,
+so that it works across screen sizes,
+and allows users to choose their own font and font size without causing text to overflow.
+</div>
 
 <h2 id="api-across-languages">API Design Across Languages</h2>
 
-<h3 id="naming-is-hard">Naming things</h3>
+<h3 id="simplicity">Prefer simple solutions</h3>
+<!-- was "Avoid Needless Complexity" in the HTML Design Principles -->
 
-Naming is hard! We would all like a silver-bullet for naming APIs...
+Look hard for simple solutions to the
+<a href="#priority-of-constituencies">user needs</a>
+you intend to address.
+
+Simple solutions are generally better than complex solutions,
+although they may be harder to find.
+Simpler features are easier for user agents to implement and test,
+more likely to be interoperable,
+and easier for authors to understand.
+
+Make sure that your <a href="#priority-of-constituencies">user needs</a>
+are well-defined.
+This allows you to avoid scope creep,
+and make sure that your API does actually meet the needs of all users.
+
+See also:
+
+* [[LEAST-POWER]]
+
+<h3 id="name-thoughtfully">Name things thoughtfully</h3>
+
+Name APIs with care.
+Naming APIs well makes it much easier for authors to use them correctly.
+
+See the more detailed <a href="#naming-is-hard">Naming principles</a> section
+for specific guidance on naming.
+
+<h3 id="feature-detect">New features should be detectable</h3>
+
+Provide a way for authors to programmatically detect
+whether your feature is available,
+so that web content may gracefully handle the feature not being present.
+
+An existing feature may not be available on a page for a number of reasons.
+Two of the more common reasons are
+because it hasn't been implemented yet, or
+because it's only available in <a href="#secure-context">secure contexts</a>.
+
+Authors shouldn't need to write different code to handle each scenario.
+That way, even if an author only knows or cares about one scenario,
+the code will handle all of them.
+
+<p class="note">
+When a feature is available but isn't feasible to use
+because a required device isn't present,
+it's better to expose that the feature is available
+and have a separate way to detect that the device isn't.
+This allows authors to handle a device not being available differently
+from the feature not being available,
+for example by suggesting the user connect or enable the device.
+
+See [[#device-enumeration]].
+</p>
+
+Authors should always be able to detect a feature from JavaScript,
+and in some cases the feature should also be detectable
+in the language where it's used
+(such as ''@supports'' in CSS).
+
+In some cases, it may **not** be appropriate to allow feature detection.
+Whether the feature should be detectable or not
+should be based on the <a href="#priority-of-constituencies">user need</a>
+for the feature:
+if there is a user need or design principle which would fail
+if feature detection were available for the feature,
+then you should not support feature detection.
+
+Also, if a feature is generally not exposed to developers,
+it is not appropriate to support feature detection.
+For example, private browsing mode is a concept
+which is recognised in web specifications,
+but not exposed to authors.
+For private browsing mode to support the user's needs,
+it must not be feature detected.
+
+See also:
+
+* [[#do-not-expose-use-of-private-browsing-mode]]
+* [[#do-not-expose-use-of-assistive-tech]]
+* [[#secure-context]]
+
+<h3 id="secure-context">Consider limiting new features to secure contexts</h3>
+
+Always limit your feature to secure contexts
+if it would pose a risk to the user
+without the authentication, integrity, or confidentiality
+that's present only in secure contexts.
+
+<div class="example">
+One example of a feature that should be limited to secure contexts
+is [Geolocation](https://www.w3.org/TR/geolocation-API/),
+since it would be a risk to users' privacy to transmit their location in an insecure way.
+</div>
+
+For other features, TAG members past and present
+haven't reached consensus on general advice.
+Some believe that all new features
+(other than features which are additions to existing features)
+should be limited to secure contexts.
+This would help encourage the use of HTTPS,
+helping users be more secure in general.
+
+Others believe that features should only be limited to secure contexts
+if they have a known security or privacy impact.
+This lowers the barrier to entry for creating web pages
+that take advantage of new features which don't impact user security or privacy.
+
+<div class="note">
+Specification authors can limit most features defined in
+<a href="https://heycam.github.io/webidl/">Web IDL</a>,
+to secure contexts
+by using the
+<code>[<a href="https://w3c.github.io/webappsec-secure-contexts/#integration-idl">SecureContext</a>]</code> extended attribute
+on interfaces, namespaces, or their members (such as methods and attributes).
+
+However, for some types of API (e.g., dispatching an event),
+limitation to secure contexts should just
+be defined in normative prose in the specification.
+If this is the case,
+consider whether there might be scope for adding a similar mechanism
+to <code>[SecureContext]</code>
+to make this process easier for future API developers.
+</div>
+
+<div class="note">
+As described in [[#feature-detect]],
+you should provide a way to programmatically detect whether a feature is available,
+including cases where the feature is unavailable because the context isn't secure.
+
+However, if, for some reason
+there is no way for code to gracefully handle the feature not being present,
+limiting the feature to secure contexts might cause problems
+for code (such as libraries) that may be used in either secure or non-secure contexts.
+</div>
+
+<h3 id="do-not-expose-use-of-private-browsing-mode">Don't reveal that private browsing mode is engaged</h3>
+
+Make sure that your feature doesn't give authors a way to detect private browsing mode.
+
+Some people use [private browsing mode](https://www.w3.org/2001/tag/doc/private-browsing-modes/)
+to protect their own personal safety.
+Because of this, the fact that someone is using private browsing mode
+may be [sensitive information](https://www.w3.org/TR/security-privacy-questionnaire/#sensitive-data) about them.
+This information may [harm](https://www.w3.org/2001/tag/doc/ethical-web-principles/#noharm) people
+if it is revealed to a web site controlled by others who have power over them
+(such as employers, parents, partners,
+or [state actors](https://www.w3.org/2001/tag/doc/ethical-web-principles/#expression)).
+
+Given such dangers,
+websites should not be able to detect that private browsing mode is engaged.
+
+<div class="example">
+User Agents which support [IndexedDB](https://www.w3.org/TR/IndexedDB/)
+should not disable it in private browsing mode,
+because that would reveal that private browsing mode is engaged
+</div>
+
+<div class="example">
+The [Payment Request API](https://www.w3.org/TR/payment-request/)'s
+[show() method](https://www.w3.org/TR/payment-request/#show-method),
+when called,
+allows User Agents <q cite="https://www.w3.org/TR/payment-request/#show-method">to act
+as if the user had immediately
+[aborted the payment request](https://www.w3.org/TR/payment-request/#dfn-user-aborts-the-payment-request)</q>.
+
+This enables User Agents to automatically abort payment requests
+in private browsing mode
+(thus protecting [sensitive information](https://www.w3.org/TR/security-privacy-questionnaire/#sensitive-data)
+such as the user's shipping or billing address)
+without revealing that private browsing mode is engaged.
+</div>
+
+See also:
+
+* [Security and privacy are essential](https://www.w3.org/2001/tag/doc/ethical-web-principles/#privacy)
+* [What data does this specification expose to an origin?](https://www.w3.org/TR/security-privacy-questionnaire/#underlying-platform-data)
+* [[#private-browsing-mode]]
+
+<h3 id="private-browsing-mode">Consider how your API should behave in private browsing mode</h3>
+
+If necessary, specify how your API should behave differently
+in private browsing mode.
+
+For example, if your API would reveal information
+that would allow someone to correlate
+a single user’s activity
+both in and out of private browsing mode,
+consider possible [mitigations](https://www.w3.org/TR/security-privacy-questionnaire/#mitigations)
+such as introducing noise,
+or using permission prompts to give the user extra information
+to help them meaningfully consent to this tracking (see [[#consent]]).
+
+Private browsing modes enable users to browse the web
+without leaving any trace of their private browsing on their device.
+Therefore, APIs which provide client-side storage
+should not persist data stored
+while private browsing mode is engaged
+after it's disengaged.
+This can and should be done
+without revealing any detectable API differences to the site.
+
+<div class="example">
+User Agents which support
+[localStorage](https://html.spec.whatwg.org/multipage/webstorage.html#dom-localstorage)
+should not persist storage area changes
+made while private browsing mode is engaged.
+
+If the User Agent has two simultaneous sessions with a site,
+one in private browsing mode and one not,
+storage area changes made in the private browsing mode session
+should not be revealed to the other browsing session,
+and vice versa.
+(The [storage event](https://html.spec.whatwg.org/multipage/indices.html#event-storage) should not be fired
+at the other session's [window object](https://html.spec.whatwg.org/multipage/window-object.html#window).)
+</div>
+
+See also:
+
+* [[#do-not-expose-use-of-private-browsing-mode]]
+* [Does this specification introduce new state for an origin that persists across browsing sessions?](https://www.w3.org/TR/security-privacy-questionnaire/#persistent-origin-specific-state)
+* [Security and privacy self review: Private Browsing](https://www.w3.org/TR/security-privacy-questionnaire/#private-browsing)
+
+<h3 id="do-not-expose-use-of-assistive-tech">Don't reveal that assistive technologies are being used</h3>
+
+Make sure that your API doesn't provide a way
+for authors to detect that a user is using assistive technology
+without the user's consent.
+
+[The web platform must be accessible to people with disabilities.](https://www.w3.org/2001/tag/doc/ethical-web-principles/#allpeople)
+If a site can detect that a user is using an assistive technology,
+that site can deny or restrict the user's access to the services it provides.
+
+People who make use of assistive technologies
+are often [vulnerable members of society](https://www.w3.org/2001/tag/doc/ethical-web-principles/#noharm);
+their use of assistive technologies is [sensitive information](https://www.w3.org/TR/security-privacy-questionnaire/#sensitive-data) about them.
+If an API provides access to this information
+without the user's [consent](#consent),
+this sensitive information may be revealed to others
+(including [state actors](https://www.w3.org/2001/tag/doc/ethical-web-principles/#expression))
+who may wish them harm.
+
+Sometimes people propose features which aim to improve the user experience
+for users of assistive technology,
+but which would reveal the user's use of assistive technology as a side effect.
+While these are well intentioned,
+they violate [[#safe-to-browse]],
+so alternative solutions must be found.
+
+<div class="example">
+
+The [Accessibility Object Model](https://wicg.github.io/aom/) (AOM)
+used to define a set of events which, when fired,
+[revealed the use of assistive technology](https://github.com/WICG/aom/issues/81).
+
+AOM has since removed these events and
+[replaced them](https://github.com/WICG/aom/blob/gh-pages/explainer.md#user-action-events-from-assistive-technology) with synthetic DOM events
+which don't reveal the use of assistive technology.
+
+</div>
+
+See also:
+
+* [Web Technology Accessibility Guidelines](https://w3c.github.io/apa/fast/)
+* [Security and privacy are essential](https://www.w3.org/2001/tag/doc/ethical-web-principles/#privacy)
+* [What data does this specification expose to an origin?](https://www.w3.org/TR/security-privacy-questionnaire/#underlying-platform-data)
+
+<h2 id="css">Cascading Style Sheets (CSS)</h2>
+
+This section details design principles for features which are exposed via CSS.
+
+<h3 id="css-property-separation">Separate CSS properties based on what should cascade separately</h3>
+
+Decide which values should be grouped together as CSS properties
+and which should be separate properties
+based on what makes sense to set independently.
+
+[CSS cascading](https://www.w3.org/TR/2011/REC-CSS2-20110607/cascade.html#cascade)
+allows [declarations](https://www.w3.org/TR/2011/REC-CSS2-20110607/syndata.html#declaration)
+from different rules or different style sheets
+to override one another.
+A set of values that should all be overridden together
+should be grouped together in a single property so that they cascade together.
+Likewise, values that should be able to be overridden independently
+should be separate properties.
+
+<div class="example">For example, the "size" and "sink" aspects of the 'initial-letter' property
+belong in a single property
+because they are part of a single initial letter effect
+(e.g., a drop cap, sunken cap, or raised cap).
+
+However, the 'initial-letter-align' property should be separate because it
+sets an alignment policy for all of these effects across the document
+which is a general stylistic choice
+and a function of the script (e.g., Latin, Cyrillic, Arabic) used in the document.
+</div>
+
+<h3 id="css-inherited-or-not">Make appropriate choices for whether CSS properties are inherited</h3>
+
+Decide whether a property should be [inherited](https://drafts.csswg.org/css-cascade-3/#inherited-property)
+based on whether the effect of the property should be overridden or added to
+if set on an ancestor as well as a descendant.
+
+If setting the property on a descendant element needs to override (rather than add to)
+the effect of setting it on an ancestor,
+then the property should probably be inherited.
+
+If setting the property on a descendant element is a separate effect
+that adds to setting it on an ancestor,
+then the property should probably **not** be inherited.
+
+A specification of an non-inherited property requiring that the handling of an element
+look at the value of that property on its ancestors (which may also be slow)
+is a "code smell" that suggests that the property likely should have been inherited.
+A specification of an inherited property requiring that the handling of an element
+ignore the value of a property if it's the same as the value on the parent element
+is a "code smell" that suggests that the property likely should not have been inherited.
+
+<div class="note">
+If a property has an effect on text,
+then it's almost always true that
+a descendant element needs to override (rather than add to)
+the effect of setting it on an ancestor,
+and the property should be inherited.
+This is also needed to maintain the design principle that
+inserting an unstyled inline element around a piece of text
+doesn't change the appearance of that text.
+</div>
+
+<div class="example">
+For example, the 'background-image' property is **not** inherited.
+
+If the 'background-image' property had been inherited,
+then the specification would have had to create a good bit of complexity
+to avoid a partially-transparent image
+being visibly repeated for each descendant element.
+This complexity probably would have involved
+behaving differently if the property had the same value on the parent element,
+which is the "code smell" mentioned above that suggests
+that a property likely should not have been inherited.
+</div>
+
+<div class="example">
+Another example is the 'font-size' property, which **is** inherited.
+It sets the size of the font used for the text in the element,
+and continues to apply to any descendants that don't
+have a declaration setting 'font-size' to a different value.
+
+If the 'font-size' property were not inherited,
+then it would probably have to have an initial value
+that requires walking up the ancestor chain to find the nearest ancestor
+that doesn't have that value.
+This is the "code smell" mentioned above that suggests
+that a property likely should have been inherited.
+</div>
+
+<h3 id="css-computed-value">Choose the computed value type based on how the property should inherit</h3>
+
+Choose the <a>computed value</a> of a CSS property
+based on how it will [=inherit=],
+including how values where it depends on other properties should inherit.
+
+Inheritance means that
+an element gets the same computed value for a property that its parent has.
+This means that processing steps that happen before reaching the computed value
+affect the value that is inherited,
+and those that happen after (such as for the <a>used value</a>) do not.
+
+<div class="note">
+Note: the <a>computed value</a> should not be confused with the [=resolved value=]
+which is returned from the {{getComputedStyle()}} method.
+</div>
+
+<div class="example">
+For example, the 'line-height' property may accept a <<number>> value,
+such as ''line-height: 1.4''.
+This value represents a multiple of the 'font-size',
+so if the 'font-size' is ''20px'',
+the [=actual value=] for the line height is ''28px''.
+
+However, the <a>computed value</a> in this case is the <<number>> ''1.4'',
+not the <<length>> ''28px''.
+(The <a>used value</a> is ''28px''.)
+
+The 'line-height' property can be inherited
+into elements that have a different 'font-size',
+and any property on those elements which depends on 'line-height'
+must take the relevant 'font-size' into account,
+rather than the 'font-size' for the element from which
+the 'line-height' value was inherited.
+
+  <pre highlight=html>
+&lt;body style="font-size: 20px; line-height: 1.4"&gt;
+
+  &lt;p&gt;This body text has a line height of 28px.&lt;/p&gt;
+
+  &lt;h2 style="font-size: 200%"&gt;
+    This heading has a line-height of 56px,
+    not 28px, even though the line-height was declared on the body.
+    This means that the 40px font won't overflow the line height.
+  &lt;/h2&gt;
+&lt;/body&gt;
+  </pre>
+
+These number values are generally the preferred values to use for 'line-height'
+because they inherit better than length values.
+</div>
+
+See also:
+
+* [Computed Values Patterns](https://wiki.csswg.org/spec/computed-values)
+
+<h3 id="css-naming">Naming of CSS properties and values</h3>
+
+The names of CSS properties are usually nouns,
+and the names of their values are usually adjectives (although sometimes nouns).
+
+Words in properties and values are separated by hyphens.
+Abbreviations are generally avoided.
+
+Use the root form of words when possible
+rather than a form with a grammatical prefix or suffix
+(for example, "size" rather than "sizing").
+
+The list of values of a property should generally be chosen
+so that new values can be added.
+Avoid values like ''yes'', ''no'', ''true'', ''false'',
+or things with more complex names that are basically equivalent to them.
+
+Avoid words like "mode" or "state" in the names of properties,
+since properties are generally setting a mode or state.
+
+See [[#naming-is-hard]] for general (cross-language) advice on naming.
+
+<h3 id="css-content-should-be-visible">Content should be viewable and accessible by default</h3>
+
+Design CSS properties or CSS layout systems (which are typically values of the `display` property), 
+to preserve the content as viewable, accessible and usable by default.  
+
+<div class="example">
+For example, the default behavior of all layout systems in CSS will not lead to content being clipped, 
+content overlapping other content, or content being unreachable by scrolling. 
+These things should only happen if CSS features are used that are more explicitly choosing 
+such a behavior (for example, `overflow: hidden` or `left: -40em`). They should not happen by 
+default as a result of something like `display: flex` or `position: relative`.
+</div>
+
+<h2 id="js">JavaScript Language</h2>
+
+<h3 id="js-only">Web APIs are for JavaScript</h3>
+
+When designing imperative APIs for the Web,
+use JavaScript.
+In particular,
+you can freely rely upon language-specific semantics and conventions,
+with no need to keep things generalized.
+
+<div class="example">
+For example,
+the {{CustomElementRegistry/define(name, constructor)|CustomElementRegistry.define()}} method takes a reference to
+a <a href="https://tc39.es/ecma262/#sec-static-semantics-constructormethod">Constructor Method</a>.
+
+This takes advantage of the relatively recent addition of classes to JavaScript,
+and the fact that function references are very easy to use in JavaScript.
+</div>
+
+<div class="note">
+JavaScript is standardized under the name [[!ECMASCRIPT]].
+</div>
+
+<div class="note">
+[[WEBIDL]] defines a separate "ECMAScript binding" section,
+but this doesn't imply that Web IDL is intended
+to have bindings in other programming languages.
+</div>
+
+<h3 id="js-rtc">Preserve run-to-completion semantics</h3>
+
+Don't modify data accessed via JavaScript APIs
+while a JavaScript <a>event loop</a> is running.
+
+A JavaScript Web API is generally a wrapper around
+a feature implemented in a lower-level language,
+such as C++ or Rust.
+Unlike those languages,
+when using JavaScript developers can expect
+that once a piece of code begins executing,
+it will continue executing until it has completed.
+
+Because of that, JavaScript authors take for granted
+that the data available to a function won’t change unexpectedly
+while the function is running.
+
+So if a JavaScript Web API exposes some piece of data,
+such as an object property,
+the user agent must not update that data
+while a JavaScript task is running.
+Instead, if the underlying data changes,
+<a>queue a task</a> to modify the exposed version of the data.
+
+<div class="example">
+If a JavaScript task has accessed the {{NavigatorOnline/onLine|navigator.onLine}} property,
+and browser's online status changes,
+the property won't be updated until the next task runs.
+</div>
+
+<h3 id="js-gc">Don't expose garbage collection</h3>
+
+Ensure your JavaScript Web APIs don't provide a way
+for an author to know the timing of garbage collection.
+
+The timing of garbage collection is different in different user agents,
+and may change over time as user agents work on improving performance.
+If an API exposes the timing of garbage collection,
+it can cause programs to behave differently
+in different contexts.
+This means that authors need to write extra code to handle these differences.
+It may also make it more difficult for user agents
+to implement different garbage collection strategies,
+if there is enough code which depends on timing working a particular way.
+
+This means that you shouldn't expose any API that acts as a weak reference,
+e.g. with a property that becomes <code highlight="js">null</code>
+once garbage collection runs.
+Object and data lifetimes in JavaScript code should be predictable.
+
+<div class="example">
+{{Document/getElementsByTagName}} returns an {{HTMLCollection}} object,
+which may be re-used if the method is called twice on the same Document object,
+with the same tag name.
+In practice,
+this means that the same object will be returned
+if and only if it has not been garbage collected.
+This means that the behaviour is different depending on
+the timing of garbage collection.
+
+If {{Document/getElementsByTagName}} were designed today,
+the advice to the designers would be
+to either reliably reuse the output,
+or to produce a new {{HTMLCollection}} each time it's invoked.
+</div>
+
+{{Document/getElementsByTagName}} gives no sign that
+it may depend on the timing of garbage collection.
+In contrast, APIs which are explicitly designed
+to depend on garbage collection,
+like `WeakRef` or `FinalizationGroup`,
+set accurate author expectations about
+the interaction with garbage collection.
+
+<h2 id="api-surface">JavaScript API Surface Concerns</h2>
+
+<h3 id="attributes-like-data">Attributes should behave like data properties</h3>
+
+[[!WEBIDL]] attributes should act like simple JavaScript object properties.
+
+In reality, IDL attributes are implemented as accessor properties
+with separate getter and setter functions.
+To make them act like JavaScript object properties:
+
+* Getters must not have any observable side effects.
+* Getters should not perform any complex operations.
+* Ensure that <code highlight="js">obj.attribute === obj.attribute</code> is always true.
+    Don't create a new value each time the getter is called.
+* If possible, ensure that given <code highlight="js">obj.attribute = x</code>,
+    <code highlight="js">obj.attribute === x</code> is true.
+    (This may not be possible if some kind of conversion is necessary for `x`.)
+
+If you were thinking about using an attribute,
+but it doesn't behave this way,
+you should probably use a method instead.
+
+<div class="example">
+For example, <code highlight="js">offsetTop</code> performs layout,
+which can be complex and time-consuming.
+It would have been better if this had been a method like {{Element/getBoundingClientRect()}}.
+</div>
+
+<h3 id="live-vs-static">Consider whether objects should be live or static</h3>
+
+If an API gives access to an object
+representing some internal state,
+decide whether that object should continue to be updated as the state changes.
+
+An object which represents the current state at all times
+is a <dfn export>live object</dfn>,
+while an object which represents the state at the time it was created
+is a <dfn export>static object</dfn>.
+
+<h4 id="live-objects" class="no-num no-toc">Live objects</h4>
+
+If an object allows the author to change the internal state,
+that object should be live.
+For example, DOM {{Node}}s are live objects,
+to allow the author to make changes to the document
+with an understanding of the current state.
+
+Properties of live objects may be computed as they are accessed,
+instead of when the object is created.
+This makes live objects sometimes a better choice
+if the data needed is complex to compute,
+since there is no need to compute all the data before the object is returned.
+
+A live object may also use less memory,
+since there is no need to copy data to a static version.
+
+<h4 id="static-objects" class="no-num no-toc">Static objects</h4>
+
+If an object represents a list that might change,
+most often the object should be static.
+This is so that code iterating over the list
+doesn't need to handle the possibility of the list changing in the middle.
+
+<div class="example">
+{{Document/getElementsByTagName}} returns a live object which represents a list,
+meaning that authors need to take care when iterating over its items:
+
+```js
+let list = document.getElementsByTagName("td");
+
+for (let i = 0; i < list.length; i++) {
+    let td = list[i];
+    let tr = document.createElement("tr");
+    tr.innerHTML = td.outerHTML;
+
+    // This has the side-effect of removing td from the list,
+    // causing the iteration to become unpredictable.
+    td.parentNode.replaceChild(tr, td);
+}
+```
+
+The choice to have {{ParentNode/querySelectorAll()}} return static objects
+was made after spec authors noticed that {{getElementsByTagName}}
+was causing problems.
+
+{{URLSearchParams}} isn't static,
+even though it represents a list,
+because it's the way for authors to change the query string of a URL.
+</div>
+
+Note:  For <a>maplike</a> and <a>setlike</a> types,
+this advice may not apply,
+since these types were designed to behave well
+when they change while being iterated.
+
+If it would not be possible to compute properties
+at the time they are accessed,
+a static object avoids having to keep the object updated
+until it's garbage collected,
+even if it isn't being used.
+
+If a static object represents some state which may change frequently,
+it should be returned from a method,
+rather than available as an attribute.
+
+See also:
+
+* [[#attributes-like-data]]
+
+<h3 id="prefer-dict-to-bool">Prefer dictionary parameters over primitive parameters</h3>
+
+API methods should generally use dictionary parameters
+instead of a series of optional primitive parameters.
+
+This makes the code that calls the method much more readable.
+It also makes the API more extensible in the future,
+particularly if multiple parameters with the same type are needed.
+
+<div class="example">
+For example,
+
+<pre highlight="js">
+new Event("example",
+          { bubbles: true,
+            cancelable: false})
+</pre>
+
+is much more readable than
+
+<pre highlight="js">
+new Event("example", true, false)
+</pre>
+
+Also,
+
+<pre highlight="js">
+window.scrollBy({ left: 50, top: 0 })
+</pre>
+
+is more readable than
+
+<pre highlight="js">
+window.scrollBy(50, 0)
+</pre>
+
+</div>
+
+The dictionary itself should be an optional parameter,
+so that if the author is happy with all of the default options,
+they can avoid passing an extra argument.
+
+<div class="example">
+For example,
+<pre highlight="js">
+element.scrollIntoView(false, {});
+</pre>
+is equivalent to
+<pre highlight="js">
+element.scrollIntoView(false);
+</pre>
+</div>
+
+See also:
+
+* <a href="https://ariya.io/2011/08/hall-of-api-shame-boolean-trap">Hall of API Shame: Boolean Trap</a>.
+* <a href="https://lists.w3.org/Archives/Public/public-script-coord/2013OctDec/0302.html">APIs that have boolean arguments defaulting to true</a>
+* [[#optional-parameters]]
+* [[#naming-optional-parameters]]
+
+<h3 id="optional-parameters">Make function parameters optional if possible</h3>
+
+If a parameter for an API function has a reasonable default value,
+make that parameter optional and specify the default value.
+
+<div class="example">
+{{EventTarget/addEventListener()}} takes an optional boolean `useCapture` argument.
+Thie defaults to `false`, meaning that
+the event should be dispatched to the listener in the bubbling phase by default.
+</div>
+
+Note: Exceptions have been made for legacy interoperability reasons
+(such as {{XMLHttpRequest}}),
+but this should be considered a design mistake rather than recommended practice.
+
+The API must be designed so that if a parameter is left out,
+the default value used is the same as
+converting `undefined` to the type of the parameter.
+For example, if a boolean parameter isn't set,
+it must default to false.
+
+See also:
+
+* [[#prefer-dict-to-bool]]
+
+<h3 id="naming-optional-parameters">Naming optional parameters</h3>
+
+Name optional parameters to make the default behavior obvious
+without being named negatively.
+
+This applies whether they are provided in a [dictionary](#prefer-dict-to-bool)
+or as [single parameters](#optional-parameters).
+
+<div class="example">
+{{EventTarget/addEventListener()}} takes an `options` object
+which includes an option named `once`.
+This indicates that the listener should **not** be invoked repeatedly.
+
+This option could have been named `repeat`,
+but that would require the [default](#optional-parameters) to be `true`.
+Instead of naming it `noRepeat`,
+the API authors named it `once`,
+to reflect the default behaviour without using a negative.
+
+Other examples:
+* `passive` rather than `active`, or
+* `isolate` rather than `connect`, or
+* `private` rather than `public`
+
+</div>
+
+See also:
+
+* [[#naming-is-hard]]
+
+<h3 id="constructors">Classes should have constructors when possible</h3>
+
+Make sure that any class that's part of your API has a constructor,
+if appropriate.
+
+By default, [[!WEBIDL]] interfaces generate "non-constructible" classes:
+trying to create instances of them using `new X()` will throw a {{TypeError}}.
+To make them constructible,
+you can add appropriate [=constructor operation=] to your interface,
+and defining the algorithm for creating new instances of your class.
+
+This allows JavaScript developers
+to create instances of the class
+for purposes such as testing, mocking,
+or interfacing with third-party libraries which accept instances of that class.
+It also gives authors the ability to create a subclass of the class,
+which is otherwise prevented,
+because of the way JavaScript handles subclasses.
+
+This won't be appropriate in all cases.
+For example:
+* Some objects represent access to privileged resources,
+    so they need to be constructed by factory methods
+    which can access those resources.
+* Some objects have very carefully controlled lifecycles,
+    so they need to be created and accessed through specific methods.
+* Some objects represent an abstract base class,
+    which shouldn't be constructed,
+    and which authors should not be able to define subclasses for.
+
+<p class="example">
+The {{Event}} class, and all its derived interfaces, are constructible.
+This is useful when testing code which handles events:
+an author can construct an {{Event}} to pass to a method
+which handles that type of event.
+</p>
+
+<p class="example">
+The {{Window}} class isn't constructible,
+because creating a new window is a privileged operation
+with significant side effects.
+Instead, the {{Window/open(url, target, features)|window.open()}} method
+is used to create new windows.
+</p>
+
+<p class="example">
+The {{ImageBitmap}} class isn't constructible,
+as it represents an immutable, ready-to-paint bitmap image,
+and the process of getting it ready to paint must be done asynchronously.
+Instead, the {{createImageBitmap()}} factory method is used to create it.
+</p>
+
+
+<p class="example">
+The {{DOMTokenList}} class is, sadly,
+<a href="https://www.w3.org/Bugs/Public/show_bug.cgi?id=27114">not constructible</a>.
+This prevents the creation of <a>custom elements</a>
+that expose their token list attributes as {{DOMTokenList}}s.
+</p>
+
+<div class="example">
+Several non-constructible classes,
+like {{Navigator}}, {{History}}, or {{Crypto}},
+are non-constructible because they are singletons
+representing access to per-window information.
+In these cases, something like the Web IDL <a>namespace</a> feature
+might have been a better fit,
+but these features were designed before namespaces,
+and go beyond what is currently possible with namespaces.
+
+If your API requires this type of singleton,
+consider using a <a>namespace</a>,
+and <a href="https://github.com/heycam/webidl/issues/new">File an issue on Web IDL</a>
+if there is some problem with using them.
+</div>
+
+<h3 id="synchronous">Use synchronous when appropriate</h3>
+
+Where possible, prefer synchronous APIs when designing a new API.
+Synchronous APIs are simpler to use,
+and need less infrastructure set-up (such as making functions `async`).
+
+An API should generally be synchronous if the following rules of thumb apply:
+
+  * The API is not expected to ever be gated behind a permission prompt, or another dialog such as a device selector.
+  * The API implementation will not be blocked by a lock, filesystem or network access, for example, inter-process communication.
+  * The execution time is short and deterministic.
+
+
+<h3 id="promises">Design asynchronous APIs using Promises</h3>
+
+If an API function needs to be asynchronous, use Promises,
+not callback functions.
+
+Using Promises consistently across the Web platform
+means that APIs are easier to use together,
+such as by chaining promises.
+Promise-using code also tends to be easier to understand
+than code using callback functions.
+
+An API might need to be asynchronous if:
+  * the user agent needs to prompt the user for [permission](#consent),
+  * some information might need to be read from disk,
+    or requested from the network,
+  * the user agent may need to do a significant amount of work on another thread,
+    or in another process, before returning the result.
+
+See also:
+
+* <a href="https://www.w3.org/2001/tag/doc/promises-guide">Writing Promise-Using Specifications</a>
+
+<h3 id="aborting">Cancel asynchronous APIs/operations using AbortSignal</h3>
+
+If an asynchronous function can be cancelled,
+allow authors to pass in an {{AbortSignal}} as part of an options dictionary.
+
+<div class="example">
+```js
+const controller = new AbortController();
+const signal = controller.signal;
+geolocation.read({ signal });
+```
+</div>
+
+Using `AbortSignal` consistently
+as the way to cancel an asychronous operation
+means that authors can write less complex code.
+
+For example, there's a pattern of using a single `AbortSignal`
+for several ongoing operations,
+and then using the corresponding `AbortController`
+to cancel all of the operations at once if necessary
+(such as if the user presses "cancel",
+or a single-page app navigation occurs.)
+
+Even if cancellation can't be guaranteed,
+you can still use an {{AbortController}},
+because a call to {{AbortController/abort()}} on `AbortController`
+is a request, rather than a guarantee.
+
+<h3 id="string-constants">Use strings for constants and enums</h3>
+
+If your API needs a constant, or a set of enumerated values,
+use string values.
+
+Strings are easier for developers to inspect,
+and in JavaScript engines there is no performance benefit
+from using integers instead of strings.
+
+If you need to express a state which is a combination of properties,
+which might be expressed as a bitmask in another language,
+use a dictionary object instead.
+This object can be passed around as easily as a single bitmask value.
+
+<h2 id="event-design">Event Design</h2>
+
+<h3 id="one-time-events">Use promises for one time events</h3>
+
+Follow the <a href="https://www.w3.org/2001/tag/doc/promises-guide#one-time-events">advice</a>
+in the <strong><a href="https://www.w3.org/2001/tag/doc/promises-guide">Writing
+Promise-Using Specifications</a></strong> guideline.
+
+<h3 id="promises-and-events">Events should fire before Promises resolve</h3>
+
+If a Promise-based asynchronous algorithm dispatches events,
+it should dispatch them before the Promise resolves,
+rather than after.
+
+This guarantees that once the Promise resolves,
+all effects of the algorithm have been applied.
+For example, if an author changes some state
+in reaction to an event which the Promise dispatches,
+they can be sure that all of the state is consistent if the Promise is resolved.
+
+<h3 id="dont-invent-event-like">Don’t invent your own event listener-like infrastructure</h3>
+
+When creating an API which allows authors to start and stop a process which generates notifications,
+use the existing event infrastructure to allow listening for the notifications.
+Create separate API controls to start/stop the underlying process.
+
+<div class="example">
+For example, the Web Bluetooth API provides a `startNotifications()` method
+on the `BluetoothRemoteGATTCharacteristic` global object,
+which adds the object to the "active notification context set".
+
+When the User Agent receives a notification from the Bluetooth device,
+it fires an event at the `BluetoothRemoteGATTCharacteristic` objects
+in the active notification context set.
+</div>
+
+See:
+- [[#events-are-for-notification]]
+- [[#events-vs-observers]]
+- [[#state-and-subclassing]]
+
+<h3 id="always-add-event-handlers">Always add event handler attributes</h3>
+
+If your API adds a new event type,
+add a corresponding <code>on<em>yourevent</em></code> [=event handler IDL attribute=]
+to the interface of any {{EventHandler}} which may handle the new event.
+
+it's important to continue to define event handler IDL attributes because:
+
+* they preserve consistency in the platform
+* they enable feature-detection for the supported events (see [[#feature-detect]])
+
+<p class="note">
+For consistency, if the event needs to be handled by HTML and SVG elements,
+add the [=event handler IDL attributes=]
+on the {{GlobalEventHandlers}} interface mixin,
+instead of directly on the relevant element interface(s).
+Similarly, add [=event handler IDL attributes=]
+to {{WindowEventHandlers}} rather than {{Window}}.
+</p>
+
+<h3 id="events-are-for-notification">Events are for notification</h3>
+
+Events shouldn't be used to trigger changes,
+only to deliver a notification that a change has already finished happening.
+
+<div class="example">
+When a window is resized,
+an event named <code>[resize](https://drafts.csswg.org/cssom-view/#eventdef-window-resize)</code>
+is fired at the `Window` object.
+
+It's not possible to stop the resize from happening by intercepting the event.
+Nor is it possible to fire a constructed `resize` event
+to cause the window to change size.
+The event can only notify the author that the resize has already happened.
+</div>
+
+<h3 id="guard-against-recursion">Guard against potential recursion</h3>
+
+If your API includes a long-running or complicated algorithm,
+prevent calling into the algorithm if it's already running.
+
+If an API method causes a long-running algorithm to begin,
+you should use [[#events-are-for-notification|events]]
+to notify user code of the progress of the algorithm.
+However, the user code which handles the event may call the same API method,
+causing the complex algorithm to run recursively.
+The same event may be fired again,
+causing the same event handler to be fired, and so on.
+
+To prevent this, make sure that any "recursive" call into the API method
+simply returns immediately. This technique is "guarding" the algorithm.
+
+<div class="example">
+{{AbortSignal}}'s [=AbortSignal/add=],
+[=AbortSignal/remove=] and [=signal abort=]
+each begin with a check
+of the signal's [=aborted flag=].
+If the flag is set, the rest of the algorithm doesn't run.
+
+In this case, a lot of the important complexity is
+in the algorithms run during the [=signal abort=] steps.
+These steps iterate through a collection of algorithms
+which are managed by the [=AbortSignal/add=] and [=AbortSignal/remove=] methods.
+
+For example, the
+[ReadableStreamPipeTo](https://streams.spec.whatwg.org/#readable-stream-pipe-to)
+definition [=AbortSignal/add=]s an algorithm
+into the {{AbortSignal}}'s set of algorithms to be run
+when the [=signal abort=] steps are triggered,
+by calling {{AbortController/abort()}}
+on the {{AbortController}} associated with the signal.
+
+This algorithm is likely to resolve promises causing code to run,
+which may include attempting to call any of the methods on {{AbortSignal}}.
+Since [=signal abort=] involves iterating through the collection of algorithms,
+it should not be possible to modify that collection while it's running.
+
+And since [=signal abort=] would have triggered the code which caused
+the recursive call back in to [=signal abort=],
+it's important to avoid running these steps again
+if the signal is already in the process of the [=signal abort=] steps,
+to avoid recursion.
+</div>
+
+Note: A caution about early termination:
+if the algorithm being terminated
+would go on to ensure some critical state consistency,
+be sure to also make the relevant adjustments in state
+before early termination of the algorithm.
+Not doing so can lead to inconsistent state
+and end-user-visible bugs when implemented as-specified.
+
+Note: Be cautious about throwing exceptions in early termination.
+Keep in mind the scenario in which developers will be invoking the algorithm,
+and whether they would reasonably expect to handle an exception
+in this [perhaps rare] case.
+For example, will this be the only exception in the algorithm?
+
+<!-- Previously the below read as:
+Sometimes "guarding" as illustrated above cannot be done because of the complexity
+of the algorithm, the number of potential algorithm entry-points, or the side-effects
+beyond the algorithm's control.
+
+I'm not sure what a good example of "the complexity of the algorithm" or
+"side effects beyond the algorithm's control" might be.
+-->
+
+You won't always be able to "guard" in this way.
+For example, an algorithm may have too many entry-points to reliably check all of them.
+If that's the case,
+another option is to defer calling the author code
+to a later task or microtask.
+This avoids a stack of recursion,
+but can't avoid the risk of an endless loop of follow-up tasks.
+
+Deferring an event is often specified as "[=queue a task=] to [=fire an event=]...".
+
+You should always defer events
+if the algorithm that triggers the event could be running
+on a different thread or process.
+In this case, deferral ensures the events
+can be processed on the correct task in the [=task queue=].
+
+Both the "guarding" and the "deferring" approach have trade-offs.
+
+"Guarding" an algorithm guarantees:
+
+* at the time events are fired,
+    there is no chance that the state may have changed
+    between the guarded algorithm ending and the event firing.
+* events fired during the algorithm,
+    such as events to notify user code of a state change made as part of the algorithm,
+    can be fired immediately,
+    notifying code of the change without needing to wait for the next task.
+* user code running in the event handler can observe relevant state directly
+    on the instance object they were fired on,
+    rather than needing to be given a copy of the relevant state with the event.
+
+If the events are deferred instead:
+
+* there is no guarantee that they will be first in the [=task queue=]
+    once the algorithm completes.
+* any other task may change the object's state
+    you should include any state relevant to the event with the deferred event.
+    * This usually involves a new subclass of {{Event}},
+        with new attributes to hold the state.
+
+        For example, the {{ProgressEvent}} adds {{ProgressEvent/loaded}},
+        {{ProgressEvent/total}}, etc. attributes to hold the state.
+* if different parts of an algorithm need to coordinate,
+    you may need to define an explicit state machine (well-defined state transitions)
+    to ensure that when a deferred event fires,
+    the behavior of inspecting or changing state is well-defined.
+
+    For example, in [[payment-request]],
+    the {{PaymentRequest}}'s [=[[state]]=] internal slot
+    explicitly tracks the object's state
+    through its well-defined transitions.
+    * These state transitions often use the guarding technique themselves,
+         to ensure the state transitions happen appropriately.
+
+         For example, in [[payment-request]]
+         note the guards used around the [=[[state]]=] internal slot,
+         such as in the {{PaymentRequest/show()}} algorithm.
+* if the deferred event doesn't need extra state,
+    or a state machine,
+    this probably means that the event is just signalling the completion of the algorithm.
+    If this is true, the API should probably return a {{Promise}}
+    instead of firint the event.
+    See [[#one-time-events]].
+
+Note: events that expose the possibility of recursion as described in this section
+were sometimes called "synchronous events".
+This terminology is discouraged
+as it implies that it's possible to dispatch an event asynchronously.
+All events are dispatched synchronously.
+What is more often implied by "asynchronous event" is to defer firing an event.
+
+<h3 id="state-and-subclassing">State and {{Event}} subclasses</h3>
+
+Where possible, use a plain {{Event}} with a specified `type`,
+and capture any state information in the {{Event/target}} object.
+
+It's usually not necessary to create new subclasses of {{Event}}.
+
+<h3 id="events-vs-observers">How to decide between Events and Observers</h3>
+
+In general, use {{EventTarget}} and notification {{Event}}s,
+rather than an Observer pattern,
+unless an {{EventTarget}} can't work well for your feature.
+
+Using an {{EventTarget}} ensures your feature benefits from
+improvements to the shared base class,
+such as the addition of the {{AddEventListenerOptions/once}}.
+
+If using events causes problems,
+such as unavoidable [[#guard-against-recursion|recursion]],
+consider using an Observer pattern instead.
+
+{{MutationObserver}},
+<a href="https://w3c.github.io/IntersectionObserver">Intersection Observer</a>,
+<a href="https://drafts.csswg.org/resize-observer/#resize-observer-interface">Resize Observers</a>,
+and <a href="https://github.com/WICG/indexed-db-observers">IndexedDB Observers</a>
+are all examples of an Observer pattern.
+
+<div class="example">
+{{MutationObserver}} replaced the deprecated
+<a href="https://www.w3.org/TR/DOM-Level-3-Events/#events-mutationevents">DOM Mutation Events</a>
+after developers [noticed](https://lists.w3.org/Archives/Public/public-webapps/2011JulSep/0779.html)
+that DOM Mutation Events
+* fire too often
+* don't benefit from event propagation, which makes them too slow to be useful
+* cause [[#guard-against-recursion|recursion]] which is too difficult to guard against.
+
+Mutation Observers:
+* can batch up mutations to be sent to observers
+    after mutations have finished being applied;
+* don't need to go through event capture and bubbling phases;
+* provide a richer API for expressing what mutations have occurred.
+
+Note: Events can also batch up notifications,
+but DOM Mutation Events were not designed to do this.
+Events don't always need to participate in event propagation,
+but events on DOM Nodes usually do.
+</div>
+
+The Observer pattern works like this:
+
+* Each instance of the Observer class
+    is constructed with a callback,
+    and optionally with some options to customize what should be observed.
+* Instances begin observing specific targets,
+    using a method named `observe()`,
+    which takes a reference to the target to be observed.
+    The options to customize what should be observed
+    may be provided here instead of to the constructor.
+    The callback provided in the constructor is invoked
+    when something interesting happens to those targets.
+* Callbacks receive *change records* as arguments.
+    These records contain the details
+    about the interesting thing that happened.
+    Multiple records can be delivered at once.
+* The author may stop observing by calling a method called
+    `unobserve()` or `disconnect()` on the Observer instance.
+* Optionally, a method may be provided to immediately return records
+    for all observed-but-not-yet-delivered occurrences.
+
+<div class="example">
+    <a href="https://w3c.github.io/IntersectionObserver">`IntersectionObserver`</a>
+    may be used like this:
+
+    <pre highlight="js">
+function checkElementStillVisible(element, observer) {
+    delete element.visibleTimeout;
+
+    // Process any observations which may still be on the task queue
+    processChanges(observer.takeRecords());
+
+    if ('isVisible' in element) {
+        delete element.isVisible;
+        logAdImpressionToServer();
+
+        // Stop observing this element
+        observer.unobserve(element);
+    }
+}
+
+function processChanges(changes) {
+    changes.forEach(function(changeRecord) {
+        var element = changeRecord.target;
+        element.isVisible = isVisible(changeRecord.boundingClientRect,
+                                      changeRecord.intersectionRect);
+        if ('isVisible' in element) {
+            // Element became visible
+            element.visibleTimeout = setTimeout(() => {
+                checkElementStillVisible(element, observer);
+            }, 1000);
+        } else {
+            // Element became hidden
+            if ('visibleTimeout' in element) {
+                clearTimeout(element.visibleTimeout);
+                delete element.visibleTimeout;
+            }
+        }
+    });
+}
+
+// Create IntersectionObserver with callback and options
+var observer = new IntersectionObserver(processChanges,
+                                        { threshold: [0.5] });
+
+// Begin observing "ad" element
+var ad = document.querySelector('#ad');
+observer.observe(ad);
+</pre>
+
+    (Example code adapted from
+    <a href="https://github.com/w3c/IntersectionObserver/blob/master/explainer.md">the `IntersectionObserver` explainer</a>.)
+</div>
+
+To use the Observer pattern, you need to define:
+1. the new Observer object type,
+2. an object type for observation options, and
+3. an object type for the records to be observed.
+
+The trade-off for this extra work is the following advantages:
+
+* Instances can be customized at observation time, or at creation time.
+    The constructor for an `Observer`,
+    or its `observe()` method,
+    can take options allowing authors to customize what is observed for each callback.
+    This isn't possible with {{EventTarget/addEventListener()}}.
+* It's easy to stop listening on multiple callbacks using the
+    `disconnect()` or `unobserve()` method on the `Observer` object.
+* You have the option to provide a method like `takeRecords()`,
+    which immediately fetches the relevant data,
+    instead of waiting for an event to fire.
+* Because Observers are single-purpose, you don't need to specify an event type.
+
+`Observer`s and {{EventTarget}}s have these things in common:
+
+* Both can be customized at creation time.
+* Both can batch occurrences and deliver them at any time.
+    {{EventTarget}}s don't need to be synchronous;
+    they can use microtask timing, idle timing, animation-frame timing, etc.
+    You don't need an `Observer` to get special timing or batching.
+* Neither {{EventTarget}}s nor `Observer`s need to participate in a DOM tree
+    (bubbling/capture and cancellation).
+    Most prominent {{EventTarget}}s are {{Node}}s in the DOM tree,
+    but many other events are standalone;
+    for example, {{IDBDatabase}} and {{XMLHttpRequestEventTarget}}.
+    Even when using {{Node}}s,
+    your events may be designed to be non-bubbling and non-cancelable.
+
+<div class="example">
+    Here is an example of using a hypothetical version of {{IntersectionObserver}}
+    that's an {{EventTarget}} subclass:
+
+    <pre highlight="js">
+    const io = new ETIntersectionObserver(element, { root, rootMargin, threshold });
+
+    function listener(e) {
+        for (const change of e.changes) {
+            // ...
+        }
+    }
+
+    io.addEventListener("intersect", listener);
+    io.removeEventListener("intersect", listener);
+    </pre>
+
+    Compared to the `Observer` version:
+    * it's more difficult to observe multiple elements with the same options;
+    * there is no way to request data immediately;
+    * it's more work to remove multiple event listeners for the same event;
+    * the author has to provide a redundant `"intersect"` event type.
+
+    In common with the `Observer` version:
+    * it can still do batching;
+    * it has the same timing (based on the JavaScript event queue);
+    * authors can still customize what to listen for; and
+    * events don't go through capture or bubbling.
+
+    These aspects can be achieved with either design.
+</div>
+
+See also:
+
+* [[#events-are-for-notification]]
+* [[#state-and-subclassing]]
+
+<h2 id="types-and-units">Web IDL, Types, and Units</h2>
+
+<h3 id="numeric-types">Use numeric types appropriately</h3>
+
+If an API you're designing uses numbers,
+use one of the following [[!WEBIDL]] numeric types,
+unless there is a specific reason not to:
+
+  : <code>unrestricted double</code>
+  :: Any JavaScript number, including infinities and NaN
+
+  : <code>double</code>
+  :: Any JavaScript number, excluding infinities and NaN
+
+  : <code>[EnforceRange] long long</code>
+  :: Any JavaScript number from -2<sup>63</sup> to 2<sup>63</sup>,
+     rounded to the nearest integer.
+     If a number outside this range is given,
+     the generated bindings will throw a <code highlight="js">TypeError</code>.
+
+  : <code>[EnforceRange] unsigned long long</code>
+  :: Any JavaScript number from 0 to 2<sup>64</sup>,
+     rounded to the nearest integer.
+     If a number outside this range is given,
+     the generated bindings will throw a <code highlight="js">TypeError</code>.
+
+JavaScript has only one numeric type, `Number`:
+IEEE 754 double-precision floating point, including ±0, ±Infinity, and NaN.
+[[!WEBIDL]] numeric types represent
+rules for modifying any JavaScript number
+to belong to a subset with particular properties.
+These rules are run when a number is passed to the interface defined in IDL,
+whether a method or a property setter.
+
+If you have extra rules which need to be applied to the number,
+you can specify those in your algorithm.
+
+<div class="note">
+The <a href="https://heycam.github.io/webidl/#es-integer-types">WEBIDL rules</a>
+for converting a JavaScript number to a number with fewer bits,
+such as an `octet` (8 bits, in the range [0, 255]),
+involves taking the modulo of the JavaScript number.
+For example, to convert a JavaScript number value of 300
+to an `octet`,
+the bindings will first compute 300 modulo 255,
+so the resulting number will be 45,
+which might be surprising.
+
+Instead, you can use
+<code><a href="https://heycam.github.io/webidl/#EnforceRange">[EnforceRange]</a> octet</code>
+to throw a `TypeError` for values outside of the `octet` range,
+or <code><a href="https://heycam.github.io/webidl/#Clamp">[Clamp]</a> octet</code>
+to clamp values to the octet range (for example, converting 300 to 255).
+
+This also works for the other shorter types, such as `short` or `long`.
+</div>
+
+<code>bigint</code> should be used only when values greater than 2<sup>53</sup>
+ or less than -2<sup>53</sup> are expected.
+
+ An API should not support both `BigInt` and `Number` simultaneously,
+either by supporting both types via polymorphism,
+or by adding separate, otherwise identical APIs which take `BigInt` and `Number`.
+This risks losing precision through implicit conversions,
+which defeats the purpose of `BigInt`.
+<h3 id="idl-string-types">Represent strings appropriately</h3>
+
+<!--
+    This has been discussed in a number of places.
+    When editing this section,
+    please try not to lose any of the nuance
+    distilled from the discussions in these issues:
+
+    https://github.com/w3c/css-houdini-drafts/issues/687
+    https://github.com/w3c/csswg-drafts/issues/1217
+    https://github.com/w3c/csswg-drafts/issues/3307
+    https://github.com/heycam/webidl/issues/84
+    https://github.com/w3ctag/design-reviews/issues/87
+-->
+
+When designing a web platform feature which operates on [=strings=],
+use {{DOMString}} unless you have a specific reason not to.
+
+Most string operations don't need
+to interpret the [=code units=] inside of the string,
+so {{DOMString}} is the best choice.
+In the specific cases explained below, it might be appropriate to use either
+{{USVString}} or {{ByteString}} instead. [[!INFRA]] [[!WEBIDL]]
+
+{{USVString}} is the Web IDL type that represents [=scalar value strings=].
+For strings whose most common algorithms operate on [=scalar values=]
+(such as [$percent-encode|percent-encoding$]),
+or for operations which can't handle [=surrogates=] in input
+(such as APIs that pass strings through to native platform APIs),
+{{USVString}} should be used.
+
+<p class=example>
+[=reflect|Reflecting IDL attributes=]
+whose content attribute is defined to contain a [=/URL=]
+(such as <{a/href}>)
+should use {{USVString}}. [[HTML]]
+</p>
+
+{{ByteString}} should only be used for representing
+data from protocols like HTTP
+which don't distinguish between bytes and strings.
+It isn't a general-purpose string type.
+If you need to represent a [=sequence types|sequence=] of {{byte|bytes}},
+use {{Uint8Array}}.
+
+<h3 id="milliseconds">Use milliseconds for time measurement</h3>
+
+If you are designing an API that accepts a time measurement,
+express the time measurement in milliseconds.
+
+Even if seconds (or some other time unit) are more natural in the domain of an API,
+sticking with milliseconds ensures that APIs
+are interoperable with one another.
+This means that authors don't need to convert values used in one API
+to be used in another API,
+or keep track of which time unit is needed where.
+
+This convention began with <code highlight="js">setTimeout</code> and the
+<code highlight="js">Date</code> API,
+and has been used since then.
+
+Note: high-resolution time is usually represented as fractional milliseconds
+using a floating point value,
+not as an integer value of a smaller time unit like nanoseconds.
+
+<h3 id="times-and-dates">Use the appropriate type to represent times and dates</h3>
+
+When representing date-times on the platform, use the {{DOMTimeStamp}} type.
+Use {{DOMHighResTimeStamp}} if authors
+must always be able to compare timestamps,
+regardless of the user's time settings.
+
+Don't use the JavaScript <code highlight="js">Date</code> class for representing
+specific date-time values.
+<code highlight="js">Date</code> objects are mutable (may have their value changed),
+and there is no way to make them immutable.
+
+<div class="note">
+    For more background on why <code highlight="js">Date</code> must not be used,
+    see the following:
+
+    * <a href="https://esdiscuss.org/topic/frozen-date-objects">Frozen date objects?</a> on
+        es-discuss
+    * <a href="https://www.w3.org/Bugs/Public/show_bug.cgi?id=22824">Remove Date from Web IDL</a>
+        on the Web IDL Bugzilla
+</div>
+
+{{DOMTimeStamp}} values represent
+the number of milliseconds since 1970-01-01T00:00:00Z.
+They are derived from the system's clock,
+which may be changed by the user,
+or automatically for things like time zone updates
+or daylight savings.
+This means that, in practice, a {{DOMTimeStamp}}
+created later in real time
+may have a lower value than a {{DOMTimeStamp}} created earlier.
+Also, if two {{DOMTimeStamp}}s are created within the same millisecond,
+there's no way to know which was created earlier.
+
+So, if a date-time is only used to compare timing of events,
+and not to show a formatted date-time value to the user,
+consider using {{DOMHighResTimeStamp}} instead.
+See [[!HIGHRES-TIME]] for more details.
+
+<h3 id="error-types">Use Error or DOMException for errors</h3>
+
+Represent errors in web APIs as ECMAScript error objects (e.g., {{Error}})
+or as {{DOMException}}.
+whether they are exceptions, promise rejection values, or properties.
+
+<h2 id="device-apis">OS and Device Wrapper APIs</h2>
+
+New APIs are now being developed in the web platform for interacting with devices.
+For example, authors wish to be able to use the web to connect with their
+<a href="https://www.w3.org/TR/mediacapture-streams/">microphones and cameras</a>,
+<a href="https://www.w3.org/TR/generic-sensor/">generic sensors</a> (such as gyroscope and
+accelerometer),
+<a href="https://www.w3.org/community/web-bluetooth/">Bluetooth</a> and
+<a href="https://wicg.github.io/webusb/">USB</a>-connected peripherals,
+<a href="https://www.w3.org/community/autowebplatform/">automobiles</a>, etc.
+
+These can be functionality provided by the underlying operating system,
+or provided by a native third-party library
+to interact with a device.
+These are an abstraction which "wrap" the native functionality
+without introducing significant complexity,
+while securing the API surface to the browser.
+So, these are called wrapper APIs.
+
+This section contains principles for consideration when designing APIs for devices.
+
+<h3 id="device-ids">Use care when exposing identifying information about devices</h3>
+
+
+If you need to give web sites access to information about a device,
+use the guidelines below to decide what information to expose.
+
+Firstly, think carefully about whether it is really necessary
+to expose identifying information about the device at all.
+Consider whether your [user needs](#priority-of-constituencies) could be satisfied
+by a less powerful API.
+
+Exposing the presence of a device,
+additional information about a device,
+or device identifiers,
+each increase the risk of harming the user's privacy.
+
+One risk is that as more specific information is shared,
+the set of
+[fingerprinting data](https://www.w3.org/TR/fingerprinting-guidance/)
+available to sites gets larger.
+There are also [other potential risks](https://w3cping.github.io/privacy-threat-model/)
+to user privacy.
+
+Issue: Privacy Threat Model is not ready for prime time.
+
+If there is no way to design a less powerful API,
+use these guidelines when exposing device information:
+
+: Limit information in the id
+:: Include as little identifiable information as possible
+    in device ids exposed to the web plaform.
+    Identifiable information includes
+    branding, make and model numbers, etc
+    You can usually use a random number
+    or a unique id instead.
+    Make sure that your ids aren't guessable,
+    and aren't re-used.
+: Keep the user in control
+:: When the user chooses to clear browsing data,
+    make sure any stored device ids are cleared.
+: Hide sensitive ids behind a user permission
+:: If you can't create a device id in an anonymous way,
+    limit access to it.
+    Make sure the user can provide
+    [[#consent|meaningful consent]]
+    to a Web page accessing this information.
+: Tie ids to the same-origin model
+:: Create distinct unique ids for the same physical device
+    for each origin that has has access to it.
+:: If the same device is requested more than once
+    by the same origin, return the same id for it
+    (unless the user has cleared their browsing data).
+    This allows authors to avoid having
+    several copies of the same device.
+: Persistable when necessary
+:: If a device id is time consuming to obtain,
+    make sure authors can store an id generated in one session
+    for use in a later session.
+    You can do this by making sure that
+    the procedure to generate the id
+    consistently produces the same id
+    for the same device,
+    for each origin.
+
+See also:
+
+* [[LEAST-POWER]]
+* [[FINGERPRINTING-GUIDANCE]]
+* [[UNSANCTIONED-TRACKING]]
+
+<h3 id="device-enumeration">Use care when exposing APIs for selecting or enumerating devices</h3>
+
+Look for ways to avoid enumerating devices.
+If you can't avoid it, expose the least information possible.
+
+If an API exposes the the existence, capabilities, or identifiers of more than one device,
+all of the risks in [[#device-ids]]
+are multiplied by the number of devices.
+For the same reasons,
+consider whether your [user needs](#priority-of-constituencies) could be satisfied
+by a less powerful API. [[LEAST-POWER]]
+
+If the purpose of the API
+is to enable the user **to select a device**
+from the set of available devices of a particular kind,
+you may not need to expose a list to script at all.
+An API which invokes a User-Agent-provided device picker could suffice.
+Such an API:
+- keeps the user in control,
+- doesn't expose any device information without the user's [consent](#consent),
+- doesn't expose any fingerprinting data about the user's environment by default, and
+- only exposes information about one device at a time.
+
+When designing API which allows users to select a device,
+it may be necessary to also expose
+the fact that there are devices are available to be picked.
+This does expose one bit of fingerprinting data about the user's environment
+to websites,
+so it isn't quite as safe as an API which doesn't have such a feature.
+
+<div class=example>
+The {{RemotePlayback}} interface
+doesn't expose a list of available [=remote playback devices=].
+Instead, it allows the user to choose one device
+from a device picker provided by the User Agent.
+
+It does enable websites to detect whether or not
+any [=remote playback device=] is available,
+so the website can show or hide a control
+the user can use to show the device picker.
+
+The trade-off is that by allowing websites
+this extra bit of information,
+the API lets authors make their user interface less confusing.
+They can choose to show a button to trigger the picker
+only if at least one device is available.
+</div>
+
+If you must expose a list of devices,
+try to **expose the smallest subset**
+that satisfies your user needs.
+
+For example, an API which allows the website
+to request **a filtered or constrained list** of devices
+is one option to keep the number of devices smaller.
+However, if authors are allowed to make multiple requests with different constraints,
+they may still be able to access the full list.
+
+Finally, if you must expose the full list of devices of a particular kind,
+please rigorously **define the order** in which devices will be listed.
+This can reduce interoperability issues,
+and helps to mitigate fingerprinting.
+(Sort order could reveal other information:
+see [[FINGERPRINTING-GUIDANCE#a_standardized_profile]] for more.)
+
+Note: While APIs should not
+expose a full list of devices in an [=implementation-defined=] order,
+they may need to for web compatibility reasons.
+
+<h3 id="wrapper-apis">Native APIs don't typically translate well to the web</h3>
+
+
+When adapting native operating system APIs for the web,
+make sure the new web APIs are designed with web platform principles in mind.
+
+ : Design based on functionality, not based on the existing API
+ :: You will probably not be able to directly translate
+    an API available to native applications
+    to be a web API.
+
+    Instead, consider the functionality available from the native API,
+    and the user needs it addresses,
+    and design an API which meets those user needs,
+    even if the implmentation depends on the existing native API.
+
+    Be particularly careful about exposing
+    the exact lifecycle and data structures of the underlying native APIs.
+
+ : Make sure the web API can be implemented on more than one platform
+ :: When designing a wrapper API,
+    consider how different platforms provide its functionality.
+
+    Ideally, all implementations should work exactly the same,
+    but in some cases you may have a reason to expose options
+    which only work on some platforms.
+    If this happens, be sure to explain
+    how authors should write code which works on all platforms.
+    See [[#feature-detect]].
+
+ : Underlying protocols should be open
+ :: APIs which require exchange with external hardware or services
+    should not depend on closed or proprietary protocols.
+    Depending on non-open protocols undermines the open nature of the web.
+
+ : Design APIs to handle the user being off-line
+ :: If an API depends on some service which is provided by a remote server,
+    make sure that the API functions well when the user can't access the remote server
+    for any reason.
+
+ : Avoid additional fingerprinting surfaces
+ :: Wrapper APIs can unintentionally expose the user to
+    a wider fingerprinting surface.
+    Please read the TAG's finding on
+    <a href="http://www.w3.org/2001/tag/doc/unsanctioned-tracking/">unsanctioned tracking</a>
+    for additional details.
+
+<h2 id="other-considerations">Other API Design Considerations</h2>
+
+<h3 id="polyfills">Polyfills</h3>
+
+Polyfills can be hugely beneficial
+in helping to roll out new features to the web platform.
+The Technical Architecture Group <a href="https://www.w3.org/2001/tag/doc/polyfills/">finding on Polyfills and the Evolution of the Web</a>
+offers guidance that should be considered in the development of new features, notably:
+
+* Being "polyfillable" isn't essential but <strong>is</strong> beneficial
+* [[#feature-detect]]
+* Polyfill development should be encouraged
+
+<h3 id="new-data-formats">New Data Formats</h3>
+
+Always define a corresponding MIME type and extend existing APIs to support this type
+for any new data format.
+
+There are cases when a new capability on the web involves adding a new data format.
+This can be an image, video, audio, or any other type of data that a browser is expected
+to ingest. New formats should have a standardized MIME type, which is strictly validated.
+
+While legacy media formats do not always have strict enforcement for MIME types (and
+sometimes rely on peeking at headers, to workaround this), this is mostly for legacy
+compatibility reasons and should not be expected or implemented for new formats.
+
+It is expected that spec authors also integrate the new format to existing APIs, so that
+they are safelisted in both ingress (e.g. decoding from a ReadableStream) and egress
+(e.g. encoding to a WriteableStream) points from a browser's perspective.
+
+For example. if you are to add an image format to the web platform, first add a new MIME
+type for the format. After this, you would naturally add a decoder (and presumably an
+encoder) for said image format to support decoding in HTMLImageElements. On top of this,
+you are also expected to add support to egress points such as HTMLCanvasElement.toBlob()
+and HTMLCanvasElement.toDataURL().
+
+For legacy reasons browsers support MIME type sniffing, but we do not recommend extending
+the [pattern matching algorithm](https://mimesniff.spec.whatwg.org/#image-type-pattern-matching-algorithm),
+due to security implications, and instead recommend enforcing strict MIME types for newer formats.
+
+New MIME types should have a specification and should be registered with the Internet Assigned Numbers Authority (IANA).
+
+
+<h3 id="extend-manifests">Extend existing manifest files rather than creating new ones</h3>
+
+If your feature requires a manifest,
+investigate whether you can extend an existing manifest schema.
+
+New web features should be self-contained and self-describing and ideally should not require an additional manifest file.
+Some of the existing manifest files include
+
+* <a href="https://www.w3.org/TR/appmanifest/">Web App Manifest</a> which contains features related to web applications.
+* <a href="https://www.w3.org/TR/payment-method-manifest/">Payment Method Manifest</a> which is used for payment methods in the context of the web payment API
+* <a href="https://www.w3.org/TR/pub-manifest/">Publication Manifest</a> which is used by some web publications working group standards
+* <a href="https://wicg.github.io/origin-policy/">Origin Policy</a> which is used to set security policies.
+
+We encourage people to extend existing manifest files.
+Always try to get the changes into the original spec,
+or at least discuss the extension with the spec editors.
+Having this discussion is more likely to result in a better design
+and lead to something that better integrates with the platform.
+
+When designing new keys and values for a manifest, make sure they are needed (that is, they enable well-thought-out use-cases).
+Also, please check if a similar key exists. If an existing key/value pair does more or less what is needed,
+work with the existing spec to extend it to your use-case if possible.
+
+
+<div class="note">
+There are certain times the original spec authors might not want
+to integrate changes to their manifest format immediately.
+This may be due to process (like going to CR),
+or due to the addition having a different scope,
+like extensions to Web App Manifest only affecting store or payment use-cases.
+In that case, it is acceptable to monkey-patch
+as long as that is agreed with the original spec editors.
+
+ISSUE(184): when we write up a principle on monkey patching,
+be sure to take this nuance into account.
+
+An example of something that was done as a monkey patch
+that is scheduled to be integrated into the web app manifest in a future level (post-CR):
+
+* https://wicg.github.io/web-share-target/#extension-to-the-web-app-manifest
+
+</div>
+
+However, if your feature requires a complex set of metadata specific to a functional domain,
+the creation of a new manifest may be justified.
+
+You may need to make a new manifest file if the domain of the manifest file is different from the existing manifest files.
+For example, if the fetch timing is different, or if the complexity of the manifest warrants it.  Application metadata should be added
+to the Web App Manifest or be an extension of it.
+Manifests designated to be used for specific applications or which require interoperability with non-browsers may need to take a different approach.
+Payment Method Manifest, Publication Manifest, and Origin Policy are examples of these cases.
+
+For example, if you have a single piece of metadata, even if the fetch timing is different than an existing manifest,
+it is probably best to use an existing manifest (or ideally design the feature in such a way that a manifest is not required).
+However, if your feature requires a complex set of metadata specific to a functional domain, the creation of a new manifest may be justified.
+
+Note that in all cases, the naming conventions should be harmonized (see [[#naming-is-hard]]).
+
+Note: By principle, existing manifests use lowercase, underscore-delimited names.
+There have been times where it was useful to re-use dictionaries from a manifest in DOM APIs as well,
+which meant converting the names to camel-cased version.
+One such example is the <a href="https://w3c.github.io/image-resource/">image resource</a>.
+For this reason, if a key can clearly be expressed as a single word, that is recommended.
+
+<h3 id="debuggability">Features should be developer-friendly</h3>
+
+Any new feature should be developer-friendly.
+While it is hard to quantify friendliness, at least consider the following points.
+
+While error text in exceptions should be generic,
+developer-oriented error messages (such as those from a developer console) must be meaningful.
+When a developer encounters an error,
+the message should be specific to that error case,
+and not overly generic.
+
+Ideally, developer-oriented error messages should have enough information
+to guide the developer in pinpointing where the problem is.
+
+Declarative features such as CSS,
+may require extra work in the implementation for debuggability.
+Defining this in the specification not only makes the feature more developer-friendly,
+it also ensures a consistent development experience for the users.
+
+A good example where debuggability was defined as
+part of the specification is [Web Animations](https://www.w3.org/TR/web-animations-1/#use-cases).
+
+<h2 id="spec-writing">Writing good specifications</h2>
+
+This document mostly covers API design for the Web,
+but those who design APIs are hopefully also writing specifications
+for the APIs that they design.
+
+<h3 id="requirements-on-authors-and-implementers">Identify the audience of each requirement in your specification</h3>
+<!-- was "Conformance for Documents and Implementations" in the HTML Design Principles -->
+
+Document both how authors should write good code using your API,
+and how implementers of your API should handle poorly-written code.
+
+The web, especially in comparison to other platforms,  is
+designed to be robust in accepting poorly-formed markup.
+This means that web pages which use older versions of web standards
+can still be viewed in newer user agents,
+and also that authors have a shallower learning curve.
+
+To support this,
+web specification writers need to describe how to interpret
+poorly-formed markup,
+as well as well-formed markup.
+
+Implementers need to be able to understand the "supported language",
+which is more complex than the "conforming language"
+which authors should be aiming to use.
+
+<div class="example">
+For example,
+the [Processing model](https://html.spec.whatwg.org/multipage/tables.html#table-processing-model)
+for the `<table>` element
+explains how to process the contents of a `<table>` element,
+including cases where the contents do not conform
+to the [Content model](https://html.spec.whatwg.org/multipage/tables.html#the-table-element:concept-element-content-model).
+</div>
+
+<h3 id="avoid-ambiguity">Specify completely and avoid ambiguity</h3>
+<!-- was "Well-defined behavior" in the HTML Design Principles -->
+
+When specifying how a feature should work,
+make sure that there is enough information
+so that authors don't have to
+write different code to work with different implementations.
+
+If a specification isn't specific enough,
+implementers might make different choices
+which force authors to write extra code to handle the differences.
+
+Implementers shouldn't need to check details of other implementations
+to avoid this situation.
+Instead, the specification should be complete and clear enough
+on its own.
+
+Note: This doesn't mean that implementations can't render things differently,
+or show different user interfaces for things like permission prompts.
+
+Note: Implementers should file bugs against specifications
+which don't give them clear enough information to write the implementation.
+
+<h4 id="algorithms">Defining algorithms in specifications</h4>
+
+Write algorithms in a way that is clear and concise.
+
+The most common way to write algorithms
+is to write an explicit sequence of steps.
+This often looks like pseudo-code.
+
+<div class="example">
+The {{HTMLDialogElement/showModal()}} method is described as a numbered sequence of steps
+which clearly explains when to throw exceptions
+and when to run algorithms defined in other parts of the HTML spec.
+</div>
+
+When writing a sequence of steps,
+imagine that it is a piece of functional code.
+
+- Clearly specify the inputs and outputs,
+    name the algorithm and the variables it uses well,
+    and explicitly note the points in the algorithm where the algorithm may
+    return a result or error.
+- As much as possible, avoid writing algorithms which have side effects.
+
+Summarize the purpose of the algorithm before going into detail,
+so that readers can decide whether to read the steps or skip over them.
+For example take the following steps, which ensure that there is at most one pending X
+callback per top-level browsing context.
+
+A plain sequence of steps is not always the best way to write an algorithm.
+For example, it might make sense to define
+or re-use a formal syntax or grammar
+to avoid repetition,
+or define specific states to be used in a state machine.
+When using extra constructs like these,
+the earlier advice still applies.
+
+As much as possible,
+describe algorithms as closely as possible to how they would be implmented.
+This may make the spec harder to write,
+but it means that implementations don't need to figure out
+how to translate what's written in the specification
+to how it should actually be implemented.
+In particular, that may mean that different implementations
+make different decisions
+that may lead to later features being feasible in one implementation
+but not another.
+
+<p class="example">
+CSS selectors are read and understood from left to right,
+but in practice are matched from right to left in implementations.
+This allows the most specific term to be matched or not matched
+quickly, avoiding unnecessary work.
+The CSS selector matching algorithm is written this way,
+instead of a hypothetical algorithm which would more closely match
+how CSS selectors are often read by CSS authors.
+</p>
+
+See also:
+* <a href="https://infra.spec.whatwg.org/#algorithms">some useful definitions
+    and terminology</a> from [[!INFRA]]
+
+<h4 id="use-flags-for-states">Use explicit flags for state</h4>
+
+Instead of describing state with words,
+use explicit flags for state when writing algorithms.
+
+Using explicit flags makes it clear
+whether or not the state changes in different error conditions,
+and makes it clear when the state described by the flags is reset.
+
+<!-- TODO: add examples -->
+
+<h2 id="naming-is-hard">Naming principles</h2>
 
 Names take meaning from:
 
@@ -173,29 +2239,143 @@ Names take meaning from:
 * use (how people come to understand the name over time)
 * context (the object on the left-hand side, for example)
 
-Consistency is a good principle that helps to create a platform that users can navigate intuitively
-and by name association.
+<h3 id="naming-common-words">Use common words</h4>
+
+API naming *must* be done in easily readable US English.
+Keep in mind that most web developers aren't native English speakers.
+Whenever possible, names should be chosen that use common vocabulary
+a majority of English speakers are likely to understand when first encountering the name.
+
+<div class="example">
+
+For example `setSize` is
+a more English-readable name
+than `cardinality`.
+
+</div>
+
+Value readability over brevity.
+Keep in mind, however, that sometimes
+the shorter name is the clearer one.
+For instance,
+it may be appropriate to use technical language or well-known terms of art
+in the specification where the API is defined.
+
+<div class="example">
+
+For example,
+the Fetch API's {{Body}} mixin's {{Body/json()}} method
+is named for the kind of object it returns.
+JSON is a well-known term of art
+among web developers likely to use the Fetch API.
+It would harm comprehension
+to name this API less directly connected to its return type. [[FETCH]]
+
+</div>
+
+<h3 id="naming-charset">Use ASCII names</h4>
+
+Names must adhere to the local language restrictions, for example CSS ident rules etc.
+and *should* be in the [=ascii code point|ASCII range=].
+
+<h3 id="naming-consultation">Consultation</h4>
 
 Please consult widely on names in your APIs.
 
-API naming *must* be done in easily readable US English. For example `horizontalAlignment` 
-is a more English-readable name than `alignmentHorizontal`. Whenever possible consider 
-readability over brevity.
+You may find good names or inspiration in surprising places.
+- What are similar APIs named on other platforms,
+    or in popular libraries in various programming languages?
+- Ask end users and developers what they call
+    things that your API works with or manipulates.
+- Look at other web platform specifications,
+    and seek advice from others working in related areas of the platform.
+- Also, consult if the names used are inclusive.
 
-Names should adhere to the local language restrictions, for example CSS ident rules etc. 
-and *should* be in the [ASCII range](https://infra.spec.whatwg.org/#ascii-code-point).
+Pay particular attention to advice you receive
+with clearly-stated rationale based on underlying principles.
+
+<div class="example">
+
+Tantek Çelik [extensively researched](https://tantek.com/2011/238/b1/many-ways-slice-url-name-pieces)
+how to name the various pieces of a URL.
+The editors of the [URL spec](https://url.spec.whatwg.org)
+have relied on this research
+when editing that document. [[URL]]
+
+</div>
+
+<h4 id="naming-web-consistency" class="no-num no-toc">Use Web consistent names</h4>
+When choosing a name for feature or API that has exposure in other technology stacks,
+the preference should be towards the Web ecosystem naming convention rather than other
+communities.
+
+<div class ="example">
+
+The NFC standard uses the term `media` to refer to what the Web calls
+[MIME type](https://mimesniff.spec.whatwg.org/#mime-type-representation).
+In such cases, the naming of features or API for the purposes of Web NFC must prefer
+naming consistent with `MIME type`.
+
+</div>
+
+<h4 id="naming-inclusive" class="no-num no-toc">Use Inclusive Language</h4>
+
+Use inclusive language whenever possible.
+
+For example,
+you should use blocklist and allowlist
+instead of blacklist and whitelist,
+and source and replica
+instead of master and slave.
+
+If you need to refer to a generic persona, 
+such as an author or user, 
+use the generic pronoun "they", "their", etc.
+For example, "A user may wish to adjust their preferences".
+<h3 id="naming-future-proofing">Future-proofing</h4>
+
+Naming should be generic and future-proof whenever possible.
+
+The name should not be directly associated with a brand or specific revision of
+the underlying technology whenever possible; technology becomes obsolete, and
+removing APIs from the web is difficult.
+
+<div class="example">
+
+The Remote Playback API was not named
+after one of the pre-existing, proprietary systems it was inspired by
+(such as Chromecast or AirPlay).
+Instead, general terms that describe what the API does were chosen. [[REMOTE-PLAYBACK]]
+
+</div>
+
+<div class="example">
+
+The `keydown` and `keyup` {{KeyboardEvent}}s were not named
+for the specific hardware bus that keyboards used at the time.
+Instead, generic names were chosen
+that are as applicable to today's Bluetooth and USB keyboards
+as they were to PS/2 and ADB keyboards back then. [[UIEVENTS]]
+
+</div>
+
+<h3 id="naming-consistency">Consistency</h4>
+Naming schemes should aim for consistency, to avoid confusion.
+
+Sets of related names should agree with each other in:
+  * part of speech  - noun, verb, etc.
+  * negation, for example all of the names in a set should either describe what is allowed
+    or they should all describe what is denied
+
+<h4 id="naming-booleans" class="no-num no-toc">Boolean properties vs.
+  boolean-returning methods</h5>
 
 Boolean properties, options, or API parameters which are asking a question about
 their argument *should not* be prefixed with <code>is</code>, while methods
 that serve the same purpose, given that it has no side effects, *should* be
 prefixed with <code>is</code> to be consistent with the rest of the platform.
 
-The name should not be directly associated with a brand or specific revision of
-the underlying technology whenever possible; technology becomes obsolete, but
-since removing APIs from the web is difficult, naming should be generic and
-future-proof whenever possible.
-
-<h3 id="casing-rules">Use casing rules consistent with existing APIs</h3>
+<h4 id="casing-rules" class="no-num no-toc">Use casing rules consistent with existing APIs</h5>
 
 Although they haven't always been uniformly followed, through the history of web platform API
 design, the following rules have emerged:
@@ -266,7 +2446,7 @@ design, the following rules have emerged:
 
 <div class="non-normative">
 Note that in particular, when a HTML attribute is <a>reflected</a> as a property, the attribute
-and property's casings will not necessarily match. For example, the HTML attribute
+and property's casings won't necessarily match. For example, the HTML attribute
 <{img/ismap}> on <{img}> elements is <a>reflected</a> as the
 {{HTMLImageElement/isMap}} property on {{HTMLImageElement}}.
 
@@ -275,997 +2455,22 @@ or stored on disk, and don't apply to the general notion of JavaScript object ke
 
 Repeated initialisms are particularly non-uniform throughout the platform. Infamous historical
 examples that violate the above rules are {{XMLHttpRequest}} and
-{{HTMLHtmlElement}}. Do not follow their example; instead always capitalize your
+{{HTMLHtmlElement}}. Don't follow their example; instead always capitalize your
 initialisms, even if they are repeated.
 </div>
 
-<h3 id="feature-detect">New features should be detectable</h3>
+<h3 id="naming-unsafe">Warning about dangerous features</h4>
 
-The existence of new features should generally be detectable,
-so that web content can act appropriately whether the feature is present or not.
-This applies both to features that
-are not present because they are not implemented,
-and to features that may not be present in a particular configuration
-(ranging from features that are present only on particular platforms
-to features that are
-only available in secure contexts).
+Where possible, mark features that weaken
+the guarantees provided to developers
+by making their names start with "unsafe" so that this is more noticeable.
 
-It should generally be indistinguishable why a feature is unavailable,
-so that feature detection code written for one case of unavailability
-(e.g., the feature not being implemented yet in some browsers)
-also works in other cases
-(e.g., a library being used in a non-secure context when
-the feature is limited to secure contexts).
-
-Detection should always be possible from script,
-but in some cases the feature should also be detectable
-in the language where it is used
-(such as ''@supports'' in CSS).
-
-<h3 id="secure-context">Consider limiting new features to secure contexts</h3>
-
-It may save you significant time and effort
-to pre-emptively restrict your feature to Secure Contexts.
-
-The TAG is on the record in supporting
-an industry-wide move to [Secure the Web](https://www.w3.org/2001/tag/doc/web-https)
-and applaud [efforts](https://blog.mozilla.org/security/2017/01/20/communicating-the-dangers-of-non-secure-http/)
-to shift web traffic to secure connections.
-A great deal of effort has gone into debating
-which features should be restricted to [Secure Contexts](https://w3c.github.io/webappsec-secure-contexts/).
-Opinions vary amongst engine vendors, leading to difficult choices for feature designers.
-Some vendors require *all* new features be restricted this way,
-whereas others take a more selective approach.
-
-This backdrop makes it difficult to provide
-advice about the extent to which your feature should be restricted.
-What we *can* highlight is that Secure Context-restricted features
-face the least friction in gaining wide adoption amongst these varying regimes.
-
-Specification authors can limit most features defined in
-<a href="https://heycam.github.io/webidl/">WebIDL</a>,
-to secure contexts
-by using the
-<code>[<a href="https://w3c.github.io/webappsec-secure-contexts/#integration-idl">SecureContext</a>]</code> extended attribute
-on interfaces, namespaces, or their members (such as methods and attributes).
-Similar ways of marking features as limited to secure contexts should be added
-to other major points where the Web platform is extended over time
-(for example, the definition of a new CSS property).
-However, for some types of extension points (e.g., dispatching an event),
-limitation to secure contexts should just
-be defined in normative prose in the specification.
-
-As described in [[#feature-detect]],
-the existence of features should generally be detectable,
-so that web content can act appropriately if the feature is present or not.
-Since the detection should be the same no matter why the feature is unavailable,
-a feature that is limited to secure contexts should, in non-secure contexts,
-be indistinguishable from a feature that is not implemented.
-However, if, for some reason
-(a reason that itself requires serious justification),
-it is not possible for developers to detect whether a feature is present,
-limiting the feature to secure contexts
-might cause problems
-for libraries that may be used in either secure or non-secure contexts.
-
-If a feature would pose a risk to user privacy or security
-without the authentication, integrity, or confidentiality
-that is present only in secure contexts,
-then the feature must be limited to secure contexts.
-One example of a feature that should be limited to secure contexts
-is geolocation, since the authentication and confidentiality provided by
-secure contexts reduce the risks to user privacy.
-
-<h2 id="js">JavaScript Language</h2>
-
-<h3 id="js-only">Web APIs are for JavaScript</h3>
-
-The language that web APIs are meant to be used in, and specified for, is JavaScript (also known as
-[[!ECMASCRIPT]]). They are not language-agnostic, and are not meant to be.
-
-This is sometimes a confusing point because [[WEBIDL]] descended from the language-agnostic OMG IDL
-(and at one point, included "Java Bindings"). Even today, the structure of the document contains a
-confusing and redundant division between the "Interface definition language" and the "ECMAScript
-binding". Rest assured that this division is simply a historical artifact of document structure,
-and does not imply anything about the intent of Web IDL in general. The only reason it remains is
-that nobody has taken the time to eradicate it.
-
-As such, when designing your APIs, your primary concern should be with the interface you present to
-JavaScript developers. You can freely rely upon language-specific semantics and conventions, with
-no need to keep things generalized.
-
-<h3 id="js-rtc">Preserve run-to-completion semantics</h3>
-
-Web APIs are essentially vehicles for extruding C++- (or Rust-) authored capabilities into the
-JavaScript code that developers write. As such, it's important to respect the invariants that are
-in play in normal JavaScript code. One of the most important of these is <em>run-to-completion
-semantics</em>: wherein each turn of the JavaScript event loop is processed completely before
-returning control to the user agent.
-
-In particular, this means that JavaScript functions cannot be preempted mid-execution, and thus
-that any data observed within the function will stay constant as long as that function is active.
-This is not the case in other languages, which allow data races via multithreading or other
-techniques—a C function can be preempted at any time, with the bindings it has access to changing
-values from one line to the next.
-
-This no-data-races invariant is extensively relied upon in JavaScript programs. As such, the
-invariant must never be violated—even by web APIs, which are often implemented in languages that
-<em>do</em> allow data races. Although the user agent may be using threads or other techniques to
-modify state <a>in parallel</a>, web APIs must never expose such changing state directly to
-developers. Instead, they should <a>queue a task</a> to modify author-observable state (such as an
-object property).
-
-<h3 id="js-gc">Do not expose garbage collection</h3>
-
-Web APIs should not expose a way for author code to deduce when/if garbage collection of JavaScript
-objects has run.
-
-Although some APIs may expose garbage collection, such as some implementations of
-{{Document/getElementsByTagName}}, and the JavaScript <a
-href="https://github.com/tc39/proposal-weakrefs">WeakRefs proposal</a> (which has multiple
-implementer support), API designers are strongly encouraged to avoid points in their own APIs that
-depend on this timing.
-
-The reason for this is somewhat subtle. The more that Web API semantics are affected by garbage
-collection timing (or whether objects are collected at all), the more programs will be affected by
-changes in this timing. But user agents differ significantly in both the timing of garbage
-collection and whether certain objects are collected at all, which means the resulting code will be
-non-interoperable. Worse, according to the usual rules of game theory as applied to browsers, this
-kind of scenario could force other user agents to copy the garbage collection timing of the
-original in order to create interoperability. This would cause current garbage collection
-strategies to ossify, preventing improvement in one of the most dynamic areas of JavaScript
-virtual machine technology.
-
-In particular, this means that you shouldn't expose any API that acts as a weak reference, e.g. with a
-property that becomes <code highlight="js">null</code> once garbage collection runs. Such freeing of
-memory should be entirely deterministic.
-
-For example, currently, {{Document/getElementsByTagName}} permits reusing the {{HTMLCollection}}
-which it creates, when it's called with the same receiver and tag name. In practice, engines reuse
-the output if it has not been garbage collected. This creates behavior which differs based on the
-details of garbage collection, which is strongly discouraged. If {{Document/getElementsByTagName}}
-were designed today, the advice to the specification authors would be to either reliably reuse
-the output, or to produce a new {{HTMLCollection}} each time it's invoked.
-
-The case of {{Document/getElementsByTagName}} is particularly insidious because nothing about
-the API visibly relates to garbage collection details. By contrast, special APIs for this particular
-purpose such as `WeakRef` and `FinalizationGroup` have their GC interaction as a specific part of
-their contract with the developer.
-
-<h2 id="api-surface">JavaScript API Surface Concerns</h2>
-
-<h3 id="attributes-like-data">Attributes should behave like data properties</h3>
-
-[[!WEBIDL]] attributes are reified in JavaScript as accessor properties, i.e. properties with
-separate getter and setter functions which can react independently. This is in contrast to the
-"default" style of JavaScript properties, data properties, which do not have configurable behavior
-but instead can simply be set and retrieved, or optionally marked read-only so that they cannot be
-set.
-
-Data property semantics are what are generally expected by JavaScript developers when interfacing
-with objects. As such, although getters and setters allow infinite customizability when defining
-your Web IDL attributes, you should endeavor to make the resulting accessor properties behave as
-much like a data property as possible. Specific guidance in this regard includes:
-
-* Getters must not have any (observable) side effects.
-* Getters should not perform any expensive operations. (A notable failure of the platform in this
-    regard is getters like <code highlight="js">offsetTop</code> performing layout; do not repeat this mistake.)
-* Ensure that your attribute's getter returns the same object each time it is called, until some
-    occurrence in another part of the system causes a logical "reset" of the property's value. In
-    particular, <code highlight="js">obj.attribute === obj.attribute</code> must always hold, and so returning a
-    new value from the getter each time is not allowed.
-* Whenever possible, preserve values given to the setter for return from the getter. That is,
-    given <code highlight="js">obj.attribute = x</code>, a subsequent <code highlight="js">obj.attribute === x</code> should be
-    true. (This will not always be the case, e.g. if a normalization or type conversion step is
-    necessary, but should be held as a goal for normal code paths.)
-
-<h3 id="live-vs-static">Consider whether objects should be live or static</h3>
-
-Objects returned from functions, attribute getters, etc.,
-can either be live or static.
-A <dfn export>live object</dfn> is one that continues to reflect
-changes made after it was returned to the caller.
-A <dfn export>static object</dfn> is one that reflects
-the state at the time it was returned.
-
-Objects that are the way state is mutated are generally live.
-For example, DOM nodes are returned as live objects,
-since they are the API through which attributes are set and other changes
-to the DOM are made.
-They also reflect changes to the DOM made in other ways
-(such as through user interaction with forms).
-
-Objects that represent a collection
-that might change over time
-(and that are not the way state is mutated)
-should generally be returned as static objects.
-This is because it is confusing to users of the API when
-a collection changes while being iterated.
-Because of this,
-it is generally considered a mistake that methods like
-{{Document/getElementsByTagName()}} return live objects;
-{{ParentNode/querySelectorAll()}} was made to return static objects
-as a result of this experience.
-On the other hand, even though {{URLSearchParams}} represents a collection,
-it should be live because the collection is mutated through that object.
-
-Note:  It's possible that some of this advice should be reconsidered
-for <a>maplike</a> and <a>setlike</a> types,
-where iterators have reasonable behavior
-for mutation that happens during iteration.
-This point likely needs further discussion,
-and perhaps further experience of use of these types.
-
-It's also worth considering the implications of having
-live versus static objects for the speed of implementations of the API.
-When the data needed by an object are expensive to compute up-front,
-there is an advantage for that object to be live so that the results
-can be computed lazily, such as for {{Window/getComputedStyle()}}.
-On the other hand,
-if the data needed by an object are expensive to keep up-to-date,
-such as for the {{NodeList}} returned from {{ParentNode/querySelectorAll()}},
-then providing a static object avoids
-having to keep the object updated until it is garbage collected
-(which may be substantially after its last use).
-
-Likewise, the choice of live versus static objects
-can influence the memory use of an API.
-If each call of a method returns a new static object,
-and the objects are large,
-then substantial amounts of memory can be wasted
-until the next garbage collection.
-
-The choice of whether an object is live or static may also
-influence whether it should be returned
-from an attribute getter or from a method.
-See [[#attributes-like-data]].
-In particular,
-if a result that changes frequently is returned as a static object,
-it should probably be returned from a method rather than an attribute getter.
-
-<h3 id="prefer-dict-to-bool">Prefer dictionary parameters over boolean parameters or other unreadable parameters</h3>
-
-APIs should generally prefer dictionary parameters
-(with named booleans in the dictionary)
-over boolean parameters.
-This makes the code that calls the API
-<a href="https://ariya.io/2011/08/hall-of-api-shame-boolean-trap">much more readable</a>.
-It also makes the API more extensible in the future,
-particularly if multiple booleans are needed.
-
-<p class="example">For example,
-<code highlight="js">new Event("exampleevent", { bubbles: true, cancelable: false})</code>
-is much more readable than
-<code highlight="js">new Event("exampleevent", true, false)</code>.
-
-Furthermore,
-the booleans in dictionaries need to be designed so that they all default to false.
-If booleans default to true, then
-<a href="https://lists.w3.org/Archives/Public/public-script-coord/2013OctDec/0302.html">users of the API will find unexpected JavaScript behavior</a> since <code highlight="js">{ passive: false }</code> and <code highlight="js">{ passive: undefined }</code> will produce different results.
-But at the same time, it's important to avoid naming booleans in negative ways,
-because then code will have confusing double-negatives.
-These pieces of advice may sometimes conflict,
-but the conflict can be avoided by using opposite words without negatives,
-such as &ldquo;repeat&rdquo; versus &ldquo;once&rdquo;,
-&ldquo;isolate&rdquo; versus &ldquo;connect&rdquo;,
-or &ldquo;private&rdquo; versus &ldquo;public&rdquo;.
-
-Likewise, APIs should use dictionary parameters to avoid other cases
-of difficult to understand sequences of parameters.
 For example,
-<code highlight="js">window.scrollBy({ left: 50, top: 0 })</code>
-is more readable than
-<code highlight="js">window.scrollBy(50, 0)</code>.
-
-<h3 id="constructors">Classes should have constructors when possible</h3>
-
-By default, [[!WEBIDL]] interfaces are reified in JavaScript as "non-constructible" classes: trying
-to create instances of them using the normal pattern in JavaScript, `new X()`, will throw a
-{{TypeError}}. This is a poor experience for JavaScript developers, and doesn't match the design of
-most of the JavaScript standard library or of the classes JavaScript developers themselves create.
-
-From a naive perspective, it's not even coherent: how can instances of this thing ever exist, if
-they can't be constructed? The answer is that the platform has magic powers: it can create instances
-of Web IDL-derived classes without ever actually calling their constructor.
-
-You should strive to reduce such magic in designing your own APIs, and give them constructors which
-allow JavaScript developers to create them, just like the platform does. This means adding an
-appropriate [=constructor operation=] to your interface, and defining the algorithm for
-creating new instances of your class.
-
-Apart from reducing the magic in the platform, adding constructors allows JavaScript developers to
-create instances of the class for their own purposes, such as testing, mocking, or interfacing with
-third-party libraries which accept instances of that class. Additionally, because of how
-JavaScript's class design works, it is only possible to create a subclass of the class if it is
-constructible.
-
-Sometimes this isn't the right answer: for example, some objects essentially wrap handles to
-privileged resources, and it isn't reasonable to create some representation of that privileged
-resource in JavaScript so that you can pass it to the constructor. Or the object's lifecycle needs
-to be very carefully controlled, so that creating new ones is only possible through privileged
-operations. Or the interface represents an abstract base class for which it doesn't make sense to
-construct an instance, or create an author-defined subclass. But cases like these should be the
-exception, not the norm.
-
-<p class="example">The {{Event}} class, and all its derived interfaces, are constructible. This
-allows JavaScript developers to synthesize instances of them, which can be useful in testing or
-shimming scenarios. For example, a library designed for {{MouseEvent}} instances can still be used
-by another library that accepts as input {{TouchEvent}} instances, by writing a small bit of adapter
-code that creates synthetic {{MouseEvent}}s.</p>
-
-<p class="example">The {{DOMTokenList}} class is, very unfortunately, <a
-href="https://www.w3.org/Bugs/Public/show_bug.cgi?id=27114">not constructible</a>. This prevents the
-creation of <a>custom elements</a> that expose their token list attributes as {{DOMTokenList}}s.</p>
-
-<p class="example">No HTML elements are constructible. This is largely due to some unfortunate
-design decisions that <a href="https://github.com/whatwg/html/issues/896">would take some effort to
-work around</a>. In the meantime, for the purposes of the <a>customized built-in elements</a>
-feature, they have been made subclassable through a specifically-designed one-off solution: the
-[{{HTMLConstructor}}] extended attribute.</p>
-
-<p class="example">The {{Window}} class is not constructible, because creating a new window is a
-privileged operation with significant side effects. Instead, the {{Window/open|window.open()}}
-method is used to create new windows.</p>
-
-<p class="example">The {{ImageBitmap}} class is not constructible, as it represents an immutable,
-ready-to-paint bitmap image, and the process of getting it ready to paint must be done
-asynchronously. Instead, the {{createImageBitmap()}} method is used to create it.</p>
-
-<p class="example">Several non-constructible classes, like {{Navigator}}, {{History}}, or
-{{Crypto}}, are non-constructible because they are singletons representing access to per-window
-information. In these cases, the Web IDL <a>namespace</a> feature or some evolution of it might have
-been a better fit, but they were designed before namespaces existed, and somewhat exceed the current
-capabilities of namespaces. If you're designing a new singleton, strongly consider using a
-<a>namespace</a> instead of a non-constructible class; if namespaces don't yet have enough
-capabilities, <a href="https://github.com/heycam/webidl/issues/new">file an issue on Web IDL</a> to
-discuss.</p>
-
-<div class="note">
-    <p>For any JavaScript developers still incredulous that it is possible to create an instance of
-    a non-constructible class, we provide the following code example:</p>
-
-    <pre highlight="js">
-        const secret = {};
-
-        class NonConstructible {
-            constructor(theSecret = undefined) {
-                if (theSecret !== secret) {
-                    throw new TypeError("Illegal constructor.");
-                }
-
-                // Set up the object.
-            }
-        }
-    </pre>
-
-    <p>If the author of this code never exposes the `secret` variable to the outside world, they can
-    reserve the ability to create instances of `NonConstructible` for themself: they can always do
-    <code highlight="js">const instance = new NonConstructible(secret)</code>. But the outside world
-    can never successfully "guess" the secret, and thus will always receive a {{TypeError}} when
-    trying to construct an instance of `NonConstructible`.</p>
-
-    <p>From this perspective, what browsers are doing when they create non-constructible classes
-    isn't magic: it's just very tricky. The above section is aimed at urging browsers to avoid such
-    tricks (or their equivalents in C++/Rust/etc.) whenever reasonable.</p>
-</div>
-
-
-<h3 id="promises">Design asynchronous APIs using Promises</h3>
-
-Asynchronous APIs should generally be designed using promises
-rather than callback functions.
-This is the pattern that we've settled on for the Web platform,
-and having APIs consistently use promises means that the APIs are
-easier to use together (such as by chaining promises).
-This pattern also tends to produce cleaner code than the use
-of APIs with callback functions.
-
-Furthermore, you should carefully consider whether an API might need
-to be asynchronous before making it a synchronous API.
-An API might need to be asynchronous if:
-  * some implementations may (in at least some cases) wish to prompt the user
-    or ask the user for permission before allowing use of the API,
-  * implementations may need to consider information that might be stored
-    on disk in order to compute the result,
-  * implementations may need to interact with the network before returning
-    the result, or
-  * implementations may wish to do work on another thread or in another
-    process before returning the result.
-
-For more information on how to design APIs using promises,
-and on when to use promises and when not to use promises,
-see <strong><a href="https://www.w3.org/2001/tag/doc/promises-guide">Writing
-Promise-Using Specifications</a></strong>.
-
-<h3 id="aborting">Cancel asynchronous APIs/operations using AbortSignal</h3>
-
-Async functions that need cancellation should take an `AbortSignal` as part
-of an options dictionary.
-
-Example:
-
-```js
-const controller = new AbortController();
-const signal = controller.signal;
-geolocation.read({ signal });
-```
-
-Reusing the same primitive everywhere has multiplicative effects throughout
-the platform. In particular, there's a common pattern of using a single
-`AbortSignal` for a bunch of ongoing operations, and then aborting them
-(with the corresponding `AbortController`) when e.g. the user presses cancel,
-or a single-page-app navigation occurs, or similar. So the minor extra
-complexity for an individual API leads to a large reduction in complexity
-when used with multiple APIs together.
-
-There might be cases where cancellation cannot be guaranteed. In these cases,
-the `AbortController` can still be used because a call to `abort()` on
-`AbortController` is a request to abort. How you react to it depends on your spec.
-Note, requestAbort() was considered in the AbortController design instead
-of abort(), but the latter was chosen for brevity.
-
-<h3 id="string-constants">Constants, enums, and bitmasks</h3>
-
-In many other platforms and programming languages, constants and enums are
-commonly expressed using a integer constant, sometimes in conjunction with
-a bitmask mechanism.
-
-However on the Web platform, it is more common to use a string constant for
-the cases where a constant is needed. This is much more inspection friendly
-for both development and expressing the constant codes through a user facing
-interface, and in JavaScript engines, using integers offers no significant
-performance benefit over strings.
-
-Strings do not directly address the use case for bitmasks. For these cases,
-you should use an object dictionary which contains the state that the
-bitmask is attempting to express, as object dictionaries can then be passed
-around from method to method as needed as easily as the state in a single
-bitmask value.
-
-<h2 id="event-design">Event Design</h2>
-
-<h3 id="one-time-events">Use promises for one time events</h3>
-
-Follow the <a href="https://www.w3.org/2001/tag/doc/promises-guide#one-time-events">advice</a>
-in the <strong><a href="https://www.w3.org/2001/tag/doc/promises-guide">Writing
-Promise-Using Specifications</a></strong> guideline.
-
-<h3 id="promises-and-events">Events should fire before Promises resolve</h3>
-
-In the case that an asynchronous algorithm (Promise based) intends to dispatch
-events, then such events should be dispatched before the Promise resolves, rather
-than after.
-
-This ensures consistency, for instance if you have event handlers changing
-state, you want all that state to be applied before acting on the resolved
-promise, as you can subscribe to a promise at any time (before/after it has
-resolved or rejected).
-
-<h3 id="dont-invent-event-like">Don't invent your own event listener-like infrastructure</h3>
-
-For recurring events, it could be convenient to create a custom pair of APIs to
-`"register"`/`"unregister"`, `"subscribe"`/`"unsubscribe"`, etc., that take a
-callback and get invoked multiple times until paired cancel API is called.
-
-Instead, use the existing event registration pattern and separate API controls
-to start/stop the underlying process (since event listeners should not have
-[[#events-are-for-notification|side-effects]]).
-
-If the callback would have been provided specific data, then this data should
-be added to an `Event` object (but see <a href="#state-and-subclassing">State
-and `Event` subclasses</a> as this is not always necessary).
-
-In some cases, you can transfer the state that would be surfaced in callback
-parameters into a more persistent object which, in turn, can inherit from
-`EventTarget`.
-
-In some cases you might not have an object to inherit from `EventTarget` but
-it is usually possible to create such an object.
-
-For instance with Web Bluetooth you can add event listeners on a `Characteristic`
-object, which is obtained via `getCharacteristic()`. If you need to filter events,
-it might be possible to create a filter like
-
-```js
-const filter = navigator.nfc.createReadFilter({
-  recordType: "json"
-});
-
-const onMessage = message => { … };
-filter.addEventListener('exchange', onMessage);
-```
-
-<h3 id="always-add-event-handlers">Always add event handler attributes</h3>
-
-For an object that inherits from {{EventTarget}}, there are two techniques available for registering
-an event handler (e.g., an event named "somethingchanged"):
-
-1. {{EventTarget/addEventListener()}} which allows authors to register for the event using the
-    event's name (i.e.,
-    <code highlight="js">someobject.addEventListener("somethingchanged", myhandler)</code>) and
-2. `onsomethingchanged` IDL attributes which allow one event handler to be directly assigned to the
-    object (i.e., <code highlight="js">someobject.onsomethingchanged</code>).
-
-Because there are two techniques for registering events on objects inheriting from {{EventTarget}},
-authors may be tempted to omit the corresponding [=event handler IDL attributes=]. They may assume
-that event handler IDL attributes are a legacy registration technique or are simply not needed
-given that {{EventTarget/addEventListener()}} is available as an alternative. However, it is
-important to continue to define event handler IDL attributes because:
-
-* they preserve consistency in the platform
-* they enable feature-detection for the supported events (see [[#feature-detect]])
-
-So, if the object inherits from {{EventTarget}}, add a corresponding
-<code>on<em>yourevent</em></code> [=event handler IDL attribute=] to the interface.
-
-<p class="note">Note that for HTML and SVG elements, it is traditional to add the
-[=event handler IDL attributes=] on the {{GlobalEventHandlers}} interface mixin, instead of
-directly on the relevant element interface(s). Similarly, [=event handler IDL attributes=]
-are traditionally added to {{WindowEventHandlers}} rather than {{Window}}.</p>
-
-
-<h3 id="events-are-for-notification">Events are for notification</h3>
-
-Try to design DOM events to deliver after-the-fact notifications of changes. It may be tempting to try to trigger side-effects from the action of {{EventTarget/dispatchEvent()}}, but in general this is <a href="https://lists.w3.org/Archives/Public/public-webapps/2014AprJun/0510.html">strongly discouraged</a> as it requires changes to the DOM specification when added. Your design will proceed more quickly if you avoid this pattern.
-
-<h3 id="guard-against-recursion">Guard against potential recursion</h3>
-
-When designing a long-running or complicated algorithm that is initiated by an 
-API call, events are appropriate for [[#events-are-for-notification|notifying]]
-user code of the ongoing process. However, they also introduce the possibility of unexpected
-re-execution of the current algorithm before it has finished! Because user code gets
-to run in the middle of the algorithm, recursion can happen if that user code triggers
-the algorithm again (directly or indirectly).
-
-To address this, if the algorithmic complexity and call graph is reasonably understood, add appropriate
-state to track that the algorithm is in progress and terminate immediately if the algorithm
-is already concurrently running. This technique is "guarding" the algorithm:
-
-<div class="example">
-    The following is a technique (e.g., as used in the [=AbortSignal/add|AbortSignal's add algorithm=]
-    or as a stack-based variation in the [=focus update steps=])
-    for guarding against unplanned recursion. 
-    
-    In this example, an object of type <dfn noexport interface>MyObject</dfn> has
-    a method <dfn method for="MyObject">doComplexOpWithEvents()</dfn> and
-    an internal state attribute [[<dfn noexport attribute for="MyObject">started</dfn>]]
-    referenced below as
-    {{MyObject|this}}.[[{{started}}]] whose initial
-    value is `false`.
-
-    The {{doComplexOpWithEvents()}} method must act as follows:
-    
-    1. If {{MyObject|this}}.[[{{started}}]] is not `false` then throw an {{InvalidStateError}}
-        {{DOMException}} and terminate this algorithm.
-        
-        Note: {{doComplexOpWithEvents()}} is not allowed to be run again
-        (e.g., from within a `"currentlyinprogress"` event handler) before it finishes
-        its original execution.
-
-    2. Set {{MyObject|this}}.[[{{started}}]] to `true`.
-
-    3. ...Do complex stuff...
-
-    4. [=Fire an event=] named `"currentlyinprogress"` at {{MyObject|this}}.
-
-    5. ...Finish up complex stuff...
-
-    6. Set {{MyObject|this}}.[[{{started}}]] to `false`.
-</div>
-
-Note: A caution about early termination: if the algorithm being terminated would go 
-on to ensure some critical state consistency, be sure to also make the relevant adjustments 
-in state before early termination of the algorithm. Not doing so can lead to inconsistent
-state and end-user-visible bugs when implemented as-specified.
-
-Note: A caution about throwing exceptions in early termination: keep in mind the scenario
-in which developers will be invoking the algorithm, and whether they would reasonably
-expect to handle an exception in this [perhaps rare] case. For example, will this
-be the only exception in the algorithm?
-
-Sometimes "guarding" as illustrated above cannot be done because of the complexity
-of the algorithm, the number of potential algorithm entry-points, or the side-effects
-beyond the algorithm's control. In these cases another form of protecting the integrity
-of the algorithm's state is to "defer" the event to a subsequent task or microtask.
-Deferral ensures that any stack-based recursion is avoided (but does not eliminate
-potentially problematic loops, as they could now occur as unending follow-up tasks).
-
-Deferring an event is often specified as "[=queue a task=] to [=fire an event=]...".
-
-By way of illustration, the deprecated
-[Mutation Events](https://developer.mozilla.org/en-US/docs/Web/Guide/Events/Mutation_events)
-fired in the middle of node insertion and removal algorithms, and
-could be triggered by a variety of common API calls like {{Node/appendChild()}}. The side-effects
-from recursively running node mutation algorithms caused many years of security issues.
-A more robust approach embodied in
-{{MutationObserver}}
-applies the principle of deferral of notification — in this case to the microtask queue
-following the algorithm.
-
-Also note that deferral of events is always necessary if the algorithm that triggers
-the event could be running on a different thread or process. In this case deferral 
-ensures the events can be processed on the correct task in the [=task queue=].
-
-Both approaches to protecting against unwanted recursion have trade-offs. Some things
-to consider when choosing the guarding approach:
-
-* all state management can be rationalized within one "turn" of the algorithm (no
-    need to consider any state changes or API invocations between the time the algorithm
-    completes and when the event fires).
-* events can reveal internal state changes as early as possible when dispatched immediately
-    in the algorithm (resulting in minimal delay to user code that wants to act on
-    that state).
-* events do not need to carry snapshots (copies) of internal state because user code
-    running in the event handler can observe relevant state directly on the instance
-    object they were fired on (avoiding the need to derive a new type of {{Event}}
-    to hold such state snapshots).
-
-When deferring, event handlers will run after the algorithm ends (or starts 
-to run [=in parallel=]) and any number of other tasks or microtasks may run in between 
-that invalidate the object's state. Since the object's state will be unknown when
-the deferred event is dispatched, consider the following:
-
-* state relevant to the event should be packaged with the deferred event, usually 
-    involving a new {{Event}}-derived type with new attributes to hold the state.
-    For example, the {{ProgressEvent}} adds {{ProgressEvent/loaded}}, 
-    {{ProgressEvent/total}}, etc. attributes to hold the state.
-* any coordination needed among parts of an algorithm using deferred events often
-    requires defining an explicit state machine (well-defined state transitions) to
-    ensure that when a deferred event fires, the behavior of inspecting or changing
-    state is well-defined. For example, in [[payment-request]], the {{PaymentRequest}}'s
-    [=[[state]]=] internal slot explicitly tracks the object's state
-    through its well-defined transitions.
-    * in addition to defining state transitions, each coordinated algorithm usually 
-        applies the guarding technique (anyway) to ensure the algorithm can only proceed
-        under the appropriate set of states. For example, in [[payment-request]] note
-        the guards used often around the [=[[state]]=] internal
-        slot such as in the {{MerchantValidationEvent/complete()}} algorithm.
-    
-Finally, dispatching a deferred event that does not seem to require
-packaging extra state or defining a state machine for the algorithm as mentioned above,
-could mean that all of the state transitions have been completed and that the event 
-is meant to signal completion of the algorithm. In this case, it's likely that instead
-of using an event to signal completion, the API should be designed to return and complete
-a {{Promise}} instead. See [[#one-time-events]].
-
-Note: events that expose the possibility of recursion as described in this section
-were sometimes called "synchronous events". This terminology is discouraged as it
-implies that it is possible to dispatch an event asynchronously. All events are dispatched
-synchronously. What is more often implied by "asynchronous event" is to defer firing
-an event.
-
-<h3 id="state-and-subclassing">State and {{Event}} subclasses</h3>
-
-It's tempting to create subclasses of {{Event}} for all event types. This is frequently unnecessary. Consider subclassing {{Event}} when adding unique methods and large amounts of state. In all other cases, using a "vanilla" event with state captured in the {{Event/target}} object.
-
-<h3 id="events-vs-observers">How to decide between Events and Observers</h3>
-
-Several recent additions to the platform employ an Observer pattern. {{MutationObserver}}, {{IntersectionObserver}}, {{ResizeObserver}}, and <a href="https://github.com/WICG/indexed-db-observers">IndexedDB Observers</a> provide precedents for new Observer types.
-
-Many designs can be described as either Observers or {{EventTarget}}s. How to decide?
-
-In general, start your design process using an {{EventTarget}} and only move to Observers if and when events can't be made to work well. Using an {{EventTarget}} ensures your feature benefits from improvements to the shared base class, such as the recent addition of the {{AddEventListenerOptions/once}}.
-
-Observers have the following properties:
-
-* Each instance is constructed with a callback, and optionally with some global options.
-* Instances observe specific targets, using the `observe()` and `unobserve()` methods. The callback provided in the constructor is invoked when something interesting happens to those targets.
-* Callbacks receive change records as arguments. These records contain the details about the interesting thing that happened. Multiple records can be delivered at once.
-* Observation can be customized with additional options passed to `observe()`.
-* `disconnect()` stops observation.
-* `takeRecords()` synchronously returns records for all observed-but-not-yet-delivered occurrences.
-
-<p class="example">
-    {{MutationObserver}} takes a callback which receives {{MutationRecord}}s. It cannot be customized at construction time, but each observation can be customized using the {{MutationObserverInit}} set of options. It observes {{Node}}s as targets.
-</p>
-
-<p class="example">
-    {{IntersectionObserver}} takes a callback which receives {{IntersectionObserverEntry}}s. It can be customized at construction time using the {{IntersectionObserverInit}} set of options, but each observation is not further customizable. It observers {{Element}}s as targets.
-</p>
-
-Observers involve defining a new class, dictionaries for options, and a new type for the delivered records. For the cost, you gain a few advantages:
-
-* Instances can be customized at observation time. The `observe()` method of an `Observer` can take options, allowing per-callback customization. This is not possible with {{EventTarget/addEventListener()}}.
-* Reuse of their creation-time customizations on multiple targets.
-* Easy disconnection from multiple targets via `disconnect()`.
-* Built-in support for synchronously probing system state. Both `Observer`s and {{EventTarget}}s can batch occurrences and deliver them later, but `Observer`s have a `takeRecords()` method which allows synchronously probing waiting until the next batched delivery.
-* Because they are single-purpose, you don't need to specify an event type.
-
-`Observer`s and {{EventTarget}}s overlap in the following ways:
-
-* Both can be customized at creation time.
-* Both can batch occurrences and deliver them at any time. {{EventTarget}}s don't need to be synchronous; they can use microtask timing, idle timing, animation-frame timing, etc. You don't need an `Observer` to get special timing or batching.
-* Neither {{EventTarget}}s nor `Observer`s need participate in a DOM tree (bubbling/capture and cancellation). Most prominent {{EventTarget}}s are {{Node}}s in the DOM tree, but many other events are standalone; e.g. {{IDBDatabase}} and {{XMLHttpRequestEventTarget}}. Even when using {{Node}}s, you can leave your events can be designed to be non-bubbling and non-cancelable to get that `Observer`-esque feel.
-
-<div class="example">
-    Here is an example of using a hypothetical version of {{IntersectionObserver}} that is an {{EventTarget}} subclass:
-
-    <pre highlight="js">
-    const io = new ETIntersectionObserver(element, { root, rootMargin, threshold });
-
-    function listener(e) {
-        for (const change of e.changes) {
-            // ...
-        }
-    }
-
-    io.addEventListener("intersect", listener);
-    io.removeEventListener("intersect", listener);
-    </pre>
-
-    As you can see, we've lost some functionality compared to the `Observer` version: the ability to easily observe multiple elements with the same options, or the `takeRecords()` and `disconnect()` methods. We're also forced to add the rather-redundant `"intersect"` event type to our subscription calls.
-
-    However, we haven't lost the batching, timing, or creation-time customization, and the `ETIntersectionObserver` doesn't participate in a hierarchy. These aspects can be achieved with either design.
-</div>
-
-<h2 id="types-and-units">Types and Units</h2>
-
-<h3 id="numeric-types">Use numeric types appropriately</h3>
-
-[[!WEBIDL]] contains many numeric types. However, it is very
-rare that its more specific ones are actually appropriate.
-
-JavaScript has only one numeric type, Number: IEEE 754 double-precision
-floating point, including ±0, ±Infinity, and NaN (although thankfully only one). The Web IDL "types" are coercion rules that apply when accepting an argument or triggering a setter. For example, a Web IDL <code>unsigned short</code> roughly says: "when someone passes this as an argument, take it modulo 65536 before doing any further processing". That is very rarely a useful thing to do.
-
-Instead, you will want to stick with one of:
-
-  : <code>unrestricted double</code>
-  :: When truly any JavaScript number will do, including infinities and NaN
-
-  : <code>double</code>
-  :: Any JavaScript number excluding infinities and NaN
-
-  : <code>[EnforceRange] long long</code>
-  :: Any JavaScript number in the integer-representable range, throwing a <code highlight="js">TypeError</code>
-      outside the range and rounding inside of it
-
-  : <code>[EnforceRange] unsigned long long</code>
-  :: Any nonnegative JavaScript number in the integer-representable range, throwing a
-      <code highlight="js">TypeError</code> outside the range and rounding inside of it
-
-  : <code>bigint</code>
-  :: When the possible integer values range more broadly than JavaScript numbers can accurately represent
-
-Additionally, you can combine any of the above with an extra line in your
-algorithm to validate that the number is within the expected domain-specific
-range, and throwing or performing other actions in response. (While it is very
-rarely appropriate to modify author input by taking it modulo 65536, it might be
-appropriate to take it modulo 360, for example.)
-
-A special case of domain-specific validation, which Web IDL already has you
-covered for, is the 0–255 range. This can be written as <code>[EnforceRange]
-octet</code>: any JavaScript number in the range 0–255, throwing a <code
-highlight="js">TypeError</code> outside the range and rounding inside of it.
-(And indeed, if it turns out that the other power-of-two ranges are semantically
-meaningful for your domain, such that you want the modulo or range-checking
-behavior, feel free to use them.)
-
-<div class="note">
-Those coming from other languages should carefully note that despite their
-names, <code>long long</code> and <code>unsigned long long</code> only have 53
-bits of precision, and not 64.
-</div>
-
-<code>bigint</code> is recommended to be used <em>only</em> in circumstances
-where a <code>[EnforceRange] long long</code> or <code>[EnforceRange] unsigned
-long long</code> would not work in terms of expressivity: that is, only when
-values greater than 2<sup>53</sup> or less than -2<sup>53</sup> are expected. In
-particular, APIs should not use the <code>bigint</code> type simply because the
-input is an integer&mdash;<code>bigint</code> is for big integers (hence the
-name!).
-
-Transparent support for inputs being either JavaScript Number of BigInt types is
-discouraged, unless there is a domain-specific requirement to support it. As far
-as ergonomics, JavaScript developers are expected to keep track of whether their
-values are Numbers or BigInts. Sloppiness or implicit conversions here could
-lead to a loss of precision, defeating the purpose of using BigInt.
-
-Further, try to resist doubling up the surface area of an API in order to
-provide both `BigInt` and `Number` variants of an API. As an API designer,
-consider it your job to chose the correct numeric type for the feature being
-exposed.
-
-<h3 id="milliseconds">Use milliseconds for time measurement</h3>
-
-Any web API that accepts a time measurement should do so in milliseconds. This
-is a tradition stemming from <code highlight="js">setTimeout</code> and the
-<code highlight="js">Date</code> API, and carried through since then.
-
-Even if seconds (or some other unit) are more natural in the domain of an API, sticking with
-milliseconds ensures interoperability with the rest of the platform, allowing easy arithmetic with
-other time quantities.
-
-Note that high-resolution time is usually represented as fractional milliseconds, not e.g. as
-nanoseconds.
-
-<h3 id="times-and-dates">Use the appropriate type to represent times and dates</h3>
-
-When representing date-times on the platform, use the {{DOMTimeStamp}} type, with values being the
- number of milliseconds relative to 1970-01-01T00:00:00Z.
-
-The JavaScript <code highlight="js">Date</code> class must not be used for this purpose. <code highlight="js">Date</code> objects
-are mutable (and there is no way to make them immutable), which comes with a host of attendant
-problems.
-
-<div class="note">
-    For more background on why <code highlight="js">Date</code> must not be used, see the following:
-
-    * <a href="https://esdiscuss.org/topic/frozen-date-objects">Frozen date objects?</a> on
-        es-discuss
-    * <a href="https://www.w3.org/Bugs/Public/show_bug.cgi?id=22824">Remove Date from Web IDL</a>
-        on the Web IDL Bugzilla
-</div>
-
-While in theory time is monotonically increasing,
-values like {{DOMTimeStamp}} that represent time since 1970 are derived from the system's clock,
-which may sometimes move backwards
-(for example, from NTP or manual adjustment),
-causing the timestamp values to decrease over time.
-They may also remain the same due to the limitation of millisecond resolution.
-Thus, for time stamps that do not need to correspond to an absolute time,
-consider using {{DOMHighResTimeStamp}},
-which provides monotonically non-decreasing sub-millisecond timestamps
-that are comparable within a single <a>browsing context</a> or web worker.
-See [[!HIGHRES-TIME]] for more details.
-
-<h3 id="error-types">Use Error or DOMException for errors</h3>
-
-Errors in web APIs should be represented as
-ECMAScript error objects (e.g., {{Error}})
-or as {{DOMException}}.
-There was at one point a trend to use {{DOMError}} when
-objects had a property representing an error.
-However, we no longer believe there was value in this split,
-and therefore suggest that ECMAScript error objects (e.g., {{TypeError}})
-or {{DOMException}}
-should be used for errors,
-whether they are exceptions, promise rejection values, or properties.
-
-<h2 id="device-apis">OS and Device Wrapper APIs</h2>
-
-It is increasingly common to see new APIs developed in the web platform for interacting with
-devices. For example, authors wish to be able to use the web to connect with their
-<a href="https://www.w3.org/TR/mediacapture-streams/">microphones and cameras</a>,
-<a href="https://www.w3.org/TR/generic-sensor/">generic sensors</a> (such as gyroscope and
-accelerometer),
-<a href="https://www.w3.org/community/web-bluetooth/">Bluetooth</a> and
-<a href="https://wicg.github.io/webusb/">USB</a>-connected peripherals,
-<a href="https://www.w3.org/community/autowebplatform/">automobiles</a>, toothbrush, etc. This
-section contains principles for consideration when designing APIs for devices.
-
-These can be functionality provided by the underlying operating system, or provided by a native
-third-party library to interact with a device. These are an abstraction which "wrap" the
-native functionality without introducing significant complexity while securing the API surface
-to the browser, hence are called wrapper APIs.
-
-<h3 id="device-ids">Use care when exposing device identifiers</h3>
-
-Exposing device identifiers increases the fingerprinting surface of a user
-agent conversely reducing the user's privacy. Think carefully about whether it is really necessary
-to expose the unique identifier at all. Please read the TAG's finding on
-<a href="http://www.w3.org/2001/tag/doc/unsanctioned-tracking/">unsanctioned tracking</a> for
-additional details. Despite this general concern, it may be very useful or necessary to expose a
-device's unique identifier to the web platform. The following guidelines will help ensure that this
-is done in a consistent and privacy-friendly way:
-
- : Limit identifiable information in the id
- :: As much as possible, device ids exposed to the web platform should not contain identifiable
-     information such as branding, make and model numbers, etc. In many cases using a randomized
-     number or unique id is preferable to a generic string identifier such as "device1".
- :: Device ids expressed as numbers should contain sufficient entropy so as to avoid re-use or
-     potential sharing among other devices, and should not be easily guessable.
-
- : Keep the user in control
- :: Any existing device ids mapped to or stored with the current session by the user agent should
-     be cleared when users elect to "clear their cookies" (and other related settings). Above all,
-     the user should be in control of this potential tracking state and be able to reset it on
-     demand.
-
- : Hide sensitive ids behind a user permission
- :: Where device identification does not make sense to be expressed in an anonymous way, access to
-     the identifier should be limited by default. One way to limit exposure is to only surface the
-     identifier to author code <em>after</em> obtaining permission from the user.
-
- : Tie ids to the same-origin model
- :: Identifiers should be unique to the origin of the web content that is attempting to access
-     them. Web content from one origin should receive an identifier that is distinct from the
-     identifier given to web content from any other origin despite the physical device being the
-     same.
- :: Within an origin, ids may have a stable representation to web content. This ensures a
-     consistent developer experience if requesting the same device twice.
-
- : Persistable when necessary
- :: Device identifiers obtained after a complex or time-consuming device selection process may
-     prefer that author code be allowed to persist the id for use in a later session in order to
-     avoid the selection process a second time. In this case, the API should not only provide a
-     stable id during the session for the given origin, but also be able to deterministically produce
-     the same id in subsequent sessions.
-
-<h3 id="wrapper-apis">Native APIs don't typically translate well to the web</h3>
-
-Many modern operating systems come with convenience APIs, which abstract away
-normally complex technology in the form of higher level user-friendly APIs.
-
-Exposing these APIs to the web platform is getting more and more common, but you
-need to be careful when exposing these to the web platform.
-
- : Generalize interface when underlying API is overly specific
- :: Don't blindly map native convenience APIs 1:1 to the web platform.
-    Native APIs do not translate well to the web platform, and doing so may result
-    in a API shape which is difficult to implement across a variety of underlying
-    platforms and native libraries.
-
-    Especially be careful about exposing the exact lifecycle and data
-    structures of the underlying native APIs. Think about making an API that
-    [[#string-constants|fits well in with existing web platform APIs]] and which can be expressed in
-    commonly available low-level APIs.
-
- : Prefer asynchronous function by returning promises
- :: Even if the underlying API is synchronous, this does not necessarily mean it
-    translates well when ported to the web platform. Exposing a synchronous native
-    API to the web platform is generally discouraged, and should be
-    provided as a promise based API whenever possible.
-
-    Doing this also allows putting the API behind a permission if it is
-    necessary, especially if the API depends on I/O or in the future may need to
-    be isolated to a separate process.
-
- : Don't overconstrain or overfit the API to the underlying (wrapped) OS
- :: When designing a wrapper API, you should consider how different implementations
-    (operating systems and platforms) provide this functionality. Ideally the entire
-    specification is implementable across platforms, but in some cases it may be
-    desirable to expose distinctions made on only some platforms.
-
-    These distinctions should be clearly noted if they are known in advance.
-
- : Do not propose black-box proprietary library or dedicated hardware processor dependencies
- :: Black-box dependencies are strongly discouraged, as this not only prevents wide
-    implementor adoption, but is unhealthy to the open nature of the web.
-
- : Underlying protocols should be open
- :: APIs which require exchange with external hardware or services should not depend
-    on closed protocols.
-
- : Be offline friendly
- :: Web platform APIs should ideally not have a hard dependency on online services.
-    The availability of these services across different regions may vary, users
-    may be offline, and the online services have no guarantee of being always
-    available.
-
- : Avoid additional fingerprinting surfaces
- :: Wrapper APIs can expose unintentionally expose the user to a wider fingerprinting surface.
-    Please read the TAG's finding on
-    <a href="http://www.w3.org/2001/tag/doc/unsanctioned-tracking/">unsanctioned tracking</a>
-    for additional details.
-
-<h2 id="other-considerations">Other API Design Considerations</h2>
-
-<h3 id="design-resources">Privacy, Security, Accessibility, and Internationalization</h3>
-
-It is important not to neglect other aspects of API design such as privacy, security, accessibility, and internationalization.
-Please take advantage of these other excellent resources in your design process:
-
-* <a href="https://w3c.github.io/privacy-considerations/">Privacy Considerations for Web Protocols</a>
-* <a href="https://www.w3.org/TR/security-privacy-questionnaire/">Self-Review Questionnaire: Security and Privacy</a>
-* <a href="https://w3c.github.io/apa/fast/">Web Technology Accessibility Guidelines</a>
-* <a href="https://w3c.github.io/bp-i18n-specdev/">Internationalization Best Practices for Spec Developers</a> <!-- also at https://www.w3.org/TR/international-specs/ -->
-
-<h3 id="polyfills">Polyfills</h3>
-
-Polyfills can be hugely beneficial in helping to roll out new features to the web platform. The
-Technical Architecture Group <a href="https://www.w3.org/2001/tag/doc/polyfills/">finding on Polyfills and the Evolution of the Web</a> offers guidance
-that should be considered in the development of new features, notably:
-
-* Being "polyfillable" is not essential but <strong>is</strong> beneficial
-* [[#feature-detect]]
-* Polyfill development should be encouraged
-
-<h2 id="spec-writing">Writing good specifications</h2>
-
-This document mostly covers API design for the Web,
-but those who design APIs are hopefully also writing specifications
-for the APIs that they design.
+[Content Security Policy (CSP)](https://w3c.github.io/webappsec-csp/)
+provides protection against certain types of content injection vulnerabilities.
+CSP also provides features that weaken this guarantee,
+such as the `unsafe-inline` keyword,
+which reduces CSP's own protections by allowing inline scripts.
 
 <h3 id="writing-resources">Other resources</h3>
 
@@ -1274,86 +2479,107 @@ Some useful advice on how to write specifications is available elsewhere:
     specifications: Kinds of statements</a> (Ian Hickson, 2006)
   * <a href="https://www.w3.org/TR/qaframe-spec/">QA Framework:
     Specification Guidelines</a> (W3C QA Working Group, 2005)
+  * <a href="https://w3c.github.io/privacy-considerations/">Privacy Considerations for Web Protocols</a>
+  * <a href="https://www.w3.org/TR/security-privacy-questionnaire/">Self-Review Questionnaire: Security and Privacy</a>
+  * <a href="https://w3c.github.io/apa/fast/">Web Technology Accessibility Guidelines</a>
+  * <a href="https://w3c.github.io/bp-i18n-specdev/">Internationalization Best Practices for Spec Developers</a> <!-- also at https://www.w3.org/TR/international-specs/ -->
 
-<h3 id="algorithms">Specify clearly enough so that algorithms are unambiguous</h3>
 
-Specification text is often more precise
-when it is written using an explicit sequence of steps.
-Using an ordered sequence of steps makes it clear how the required behaviors interact.
-For example, if there are multiple error conditions present,
-a specification that describes the behavior using a sequence of steps
-will make it clear which error will be reported,
-since the different errors would be checked and reported in different steps.
 
-Likewise, describing state using explicit flags also makes behavior clearer.
-Using explicit flags makes it clear
-whether or not the state changes in different error conditions,
-and makes it clear when the state described by the flags is reset.
+<h2 id="acks" class="no-num">Acknowledgments</h2>
 
-Whenever these differences could be observable to web content
-and there isn't a good reason to allow variation between implementations,
-it is important that they be specified unambiguously,
-so that implementations interoperate
-and web content doesn't end up
-depending on the behavior of one implementation and failing in another
-(which can cause higher development costs to fix the content for all browsers,
-or costs to users of broken content if it wasn't detected).
+This document consists of
+principles which have been collected
+by TAG members past and present
+during TAG [design reviews](https://github.com/w3ctag/design-reviews/).
+We are indebted to everyone who has requested a design review from us.
 
-However, sequences of steps are not the only way of making the specification precise enough.
-When there are particular characteristics
-that specification editors want to ensure the specification always satisfies,
-it may be better to use a less algorithmic way of formal specification
-that ensures these characteristics are always true.
-Developing these other ways of specifying behavior formally
-is more important when the algorithms would be more repetitive.
-These formal specification techniques can include dependencies on
-languages such as [[WEBIDL]], on grammar productions,
-or the development of new languages for defining pieces of the specification.
-Merely having a formal syntax is not sufficient, though;
-the requirements that the formal definitions place on implementations must still be clearly defined,
-which generally requires specifying some algorithms (or, sometimes, another layer of formal syntax) that define what the formal syntax means,
-and then using the more-readable formal syntax to avoid
-excessive repetition of the less-readable algorithms.
-There are also possibilities in-between, for example,
-if it is desirable to ensure that an algorithm can be implemented with a state machine,
-it may be preferable to specify it in an algorithmic way that incorporates explicit states
-so that the specification authors avoid accidentally creating more states than intended.
+The TAG would like to thank
+Adrian Hope-Bailie,
+Alan Stearns,
+Aleksandar Totic,
+Alex Russell,
+<!-- Alice Boxhall, (current TAG member) -->
+Andreas Stöckel,
+Andrew Betts,
+Anne van Kesteren,
+Benjamin C. Wiley Sittler,
+Boris Zbarsky,
+Brian Kardell,
+Charles McCathieNevile,
+Chris Wilson,
+Dan Connolly,
+<!-- Daniel Appelquist, (current TAG member) -->
+Daniel Ehrenberg,
+Daniel Murphy,
+<!-- David Baron, (current TAG member) -->
+Domenic Denicola,
+Eiji Kitamura,
+Eric Shepherd,
+Ethan Resnick,
+fantasai,
+François Daoust,
+<!-- Hadley Beeman, (current TAG member) -->
+Henri Sivonen,
+HE Shi-Jun,
+Ian Hickson,
+Irene Knapp,
+Jake Archibald,
+Jeffrey Yasskin,
+Jeremy Roman,
+Jirka Kosek,
+<!-- Kenneth Rohde Christiansen, (current TAG member) -->
+Kevin Marks,
+Lachlan Hunt,
+Léonie Watson,
+L. Le Meur,
+Lukasz Olejnik,
+Maciej Stachowiak,
+Marcos Cáceres,
+Mark Nottingham,
+Martin Thomson,
+Matt Giuca,
+Matt Wolenetz,
+Michael[tm] Smith,
+Mike West,
+Nick Doty,
+Nigel Megitt,
+Nik Thierry,
+Ojan Vafai,
+Olli Pettay,
+Pete Snyder,
+<!-- Peter Linss, (current TAG member) -->
+Philip Jägenstedt,
+Philip Taylor,
+Reilly Grant,
+Richard Ishida,
+Rick Byers,
+<!-- Rossen Atanassov, (current TAG member) -->
+Ryan Sleevi,
+<!-- Sangwhan Moon, (current TAG member) -->
+Sergey Konstantinov,
+Stefan Zager,
+Stephen Stewart,
+Steven Faulkner,
+Surma,
+Tab Atkins-Bittner,
+Tantek Çelik,
+<!-- Theresa O'Connor, (current TAG member) -->
+<!-- Tim Berners-Lee, (current TAG member) -->
+Tobie Langel,
+Travis Leithead,
+and
+Yoav Weiss
+<!-- Yves Lafon (current TAG member) -->
+for their contributions to this & the [HTML Design Principles](https://www.w3.org/TR/html-design-principles/) document which preceded it.
 
-When specifying in an algorithmic way,
-it is generally good to match the algorithms that implementations would use,
-even if this is somewhat less convenient for specification authors,
-as long as doing so would not significantly increase the specification's complexity.
-For example, it is better to specify CSS selector matching
-by moving right to left across <a>combinators</a>,
-since that is what implementations do.
-This avoids the risk of future problems caused by new features
-that would be slightly different (in unimportant ways)
-between implementations based on one algorithm and implementations based on a different one.
-Thus, it avoids small future divergence in behavior between specification and implementations.
-It also helps to keep the costs of specifying features aligned with implementing them,
-since the complexity of adding a feature to the specification is more likely to be related
-to the cost of adding it to implementations.
+Special thanks to
+Anne van Kesteren
+and
+Maciej Stachowiak,
+who edited the [HTML Design Principles](https://www.w3.org/TR/html-design-principles/) document.
 
-Algorithms in specifications should also reflect best practices in programming.
-For example, they should explicitly describe the inputs and outputs of the algorithm,
-rather than relying on "stack introspection" or handwaving.
-They should also avoid side-effects when possible.
-
-The Infra Standard offers
-<a href="https://infra.spec.whatwg.org/#algorithms">some useful definitions
-and terminology</a>
-for defining algorithms.
-
-Specifications that define things using step-by-step algorithms should still be readable.
-Partly, this is through good practices that also apply to writing code,
-such as avoiding unneeded extra steps, and by using good naming.
-However, it's often useful to explain the purpose of the algorithm in prose
-(e.g., "take the following steps, which ensure that there is at most one pending X
-callback per toplevel browsing context")
-so that readers can quickly decide whether they need to read the steps in detail.
-
-<pre class="anchors">
-url: https://w3c.github.io/hr-time/#dom-domhighrestimestamp; spec: HIGHRES-TIME; type: typedef
-    text: DOMHighResTimeStamp
-</pre>
-
+If you contributed to this document
+but your name is not listed above,
+please let the editors know
+so they can correct this omission.

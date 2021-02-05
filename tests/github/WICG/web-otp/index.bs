@@ -1,0 +1,522 @@
+<pre class='metadata'>
+Title: Web OTP API
+Shortname: webotp
+Level: 1
+Status: CG-DRAFT
+Group: WICG
+ED: http://wicg.github.io/WebOTP
+Repository: WICG/WebOTP
+Editor: Sam Goto, Google Inc. https://google.com, goto@google.com
+Favicon: logo-otp.png
+Markup Shorthands: markdown yes, css no, biblio yes
+Text Macro: FALSE <code>false</code>
+Text Macro: TRUE <code>true</code>
+Abstract: A Javascript API to request one time passwords for verifying credentials (e.g. phone numbers, emails).
+Test Suite: https://github.com/web-platform-tests/wpt/tree/master/sms
+</pre>
+
+<pre class=anchors>
+spec: ecma262; urlPrefix: https://tc39.github.io/ecma262/
+    type: dfn
+        text: time values; url: sec-time-values-and-time-range
+        text: promise; url: sec-promise-objects
+
+spec: credential-management-1; urlPrefix: https://w3c.github.io/webappsec-credential-management/
+    type: dictionary
+        text: CredentialRequestOptions; url: dictdef-credentialrequestoptions
+    for: Credential
+        type: method
+            text: [[CollectFromCredentialStore]](origin, options, sameOriginWithAncestors)
+            text: [[Create]](origin, options, sameOriginWithAncestors)
+            text: [[DiscoverFromExternalSource]](origin, options, sameOriginWithAncestors)
+            text: [[Store]](credential, sameOriginWithAncestors)
+    type: dfn
+        text: signal
+        text: same-origin with its ancestors; url: same-origin-with-its-ancestors
+
+</pre>
+
+<pre class=link-defaults>
+spec:infra; type:dfn; text:list
+spec:html; type:dfn; for:environment settings object; text:global object
+spec:webidl; type:dfn; text:resolve
+</pre>
+
+<style>
+dl.domintro dt {
+    font-family: Menlo, Consolas, "DejaVu Sans Mono", Monaco, monospace;
+
+    padding-top: 0.5em;
+    padding-bottom: 1em;
+}
+dl.domintro dt a {
+    color: inherit; border-bottom-style: none;
+}
+dl.domintro dt code {
+    font-size: inherit;
+}
+</style>
+
+<img src="logo-otp.svg" alt="logo"
+    style="height: 100px; width: 100px; position: absolute; right: 20px; top: 30px;">
+
+<!-- ============================================================ -->
+# Introduction # {#intro}
+<!-- ============================================================ -->
+
+*This section is non-normative.*
+
+Many web sites need to verify credentials (e.g. phone numbers and
+email addresses) as part of their authentication flows. They currently
+rely on sending one-time-passwords (OTP) to these communication channels to
+be used as proof of ownership. The one-time-password is manually
+handed back by the user (typically by copying/pasting) to the web app
+which is onerous and erroneous.
+
+This a proposal for a client side javascript API that enables web
+sites to request OTPs and a set of transport-specific conventions (we
+start with SMS while leaving the door open to others) that can be used
+in coordination with browsers.
+
+<!-- ============================================================ -->
+## The client side API ## {#intro-client}
+<!-- ============================================================ -->
+
+In this proposal, websites have the ability to call a browser API to
+request OTPs coming from specific transports (e.g. via SMS).
+
+The browser intermediates the receipt of the SMS and the handing off
+to the calling website (typically asking for the user's consent), so
+the API returns a promise asynchronously.
+
+<div class=example>
+```js
+let {code, type} = await navigator.credentials.get({
+  otp: {
+    transport: ["sms"]
+  }
+});
+```
+</div>
+
+<!-- ============================================================ -->
+## The server side API ## {#intro-server}
+<!-- ============================================================ -->
+
+Once the client side API is called, the website's server can send
+OTPs to the client via the requested transport mechanisms. For each
+of these transport mechanism, a server side convention is set in
+place to guarantee that the OTP is delivered safely and
+programatically.
+
+For SMS, for example, servers should send [=origin-bound one-time code messages=] to clients. [[sms-one-time-codes]]
+
+<!-- ============================================================ -->
+## Feature Detection ## {#intro-feature-detection}
+<!-- ============================================================ -->
+
+Not all user agents necessarily need to implement the WebOTP API at
+the exact same moment in time, so websites need a mechanism to detect
+if the API is available.
+
+Websites can check for the presence of the OTPCredential global
+interface:
+
+<div class=example>
+```js
+if (!window.OTPCredential) {
+  // feature not available
+  return;
+}
+```
+</div>
+
+<!-- ============================================================ -->
+## Web Components ## {#intro-wc}
+<!-- ============================================================ -->
+
+For the most part, OTP verification largely relies on:
+
+- input, forms and copy/paste, on the client side and
+- third party frameworks to send SMS, on the server side.
+
+We expect some of these frameworks to develop declarative versions of
+this API to facilitate the deployment of their customer's existing
+code.
+
+<div class=example>
+Web Component Polyfills
+
+```html
+<script src="sms-sdk.js"></script>
+
+<form>
+  <input is="one-time-code" required />
+  <input type="submit" />
+</form>
+```
+</div>
+
+And here is an example of how a framework could implement it
+using web components:
+
+<div class=example>
+Web Component Polyfills
+
+```js
+customElements.define("one-time-code",
+  class extends HTMLInputElement {
+    connectedCallback() {
+      this.receive();
+    }
+    async receive() {
+      let {code, type} = await navigator.credentials.get({
+        otp: {
+         transport: ["sms"]
+        }
+      });
+      this.value = otp;
+      this.form.submit();
+    }
+  }, {
+    extends: "input"
+});
+```
+</div>
+
+<!-- ============================================================ -->
+## Abort API ## {#intro-abort}
+<!-- ============================================================ -->
+
+Many modern websites handle navigations on the client side. So, if a
+user navigates away from an OTP flow to another flow, the request
+needs to be cancelled so that the user isn't bothered with a
+permission prompt that isn't relevant anymore.
+
+To facilitate that, an abort controller can be passed to abort the
+request:
+
+<div class=example>
+```js
+const abort = new AbortController();
+
+setTimeout(() => {
+  // abort after two minutes
+  abort.abort();
+}, 2 * 60 * 1000);
+  
+let {code, type} = await navigator.credentials.get({
+  signal: abort.signal,
+  otp: {
+    transport: ["sms"]
+  }
+});
+```
+</div>
+
+<!-- ============================================================ -->
+# Client Side API # {#API}
+<!-- ============================================================ -->
+
+Websites call <code><a idl for="CredentialsContainer" lt="get()">navigator.credentials.get({otp:..., ...})</a></code> to retrieve an OTP.
+
+The algorithm of {{CredentialsContainer/get()|navigator.credentials.get()}} looks through all of the interfaces that inherit from {{Credential}} in the <a abstract-op>Request a `Credential`</a> abstract operation.
+
+In that operation, it finds {{OTPCredential}} which inherits from {{Credential}}. It calls
+<code>OTPCredential.{{OTPCredential/[[CollectFromCredentialStore]]()}}</code> to collect any [=credentials=] that
+should be available without [=user mediation=], and if it does not find
+exactly one of those, it then calls <code>OTPCredential.{{OTPCredential/[[DiscoverFromExternalSource]]()}}</code> to have
+the user select a credential source and fulfill the request.
+
+Since this specification requires an [=authorization gesture=] to create OTP [=credentials=], the <code>OTPCredential.{{OTPCredential/[[CollectFromCredentialStore]]()}}</code> [=internal method=] inherits the default behavior of
+{{Credential/[[CollectFromCredentialStore]]()|Credential.[[CollectFromCredentialStore]]()}}, of returning an empty set.
+
+It is then the responsibility of <code>OTPCredential.{{OTPCredential/[[DiscoverFromExternalSource]]()}}</code> to provide an OTP.
+
+<!-- ============================================================ -->
+## The OTPCredential Interface ## {#OTPCredential}
+<!-- ============================================================ -->
+
+The {{OTPCredential}} interface extends {{Credential}} and contains
+the attributes that are returned to the caller when a new one time
+password is retrieved.
+
+{{OTPCredential}}'s [=interface object=] inherits {{Credential}}'s implementation of
+{{Credential/[[CollectFromCredentialStore]](origin, options, sameOriginWithAncestors)}}, and defines its own
+implementation of {{OTPCredential/[[DiscoverFromExternalSource]](origin, options, sameOriginWithAncestors)}}.
+
+<xmp class=idl>
+[Exposed=Window, SecureContext]
+interface OTPCredential : Credential {
+    readonly attribute DOMString code;
+};
+</xmp>
+
+<dl dfn-type="attribute" dfn-for="OTPCredential">
+    :   {{Credential/id}}
+    ::  This attribute is inherited from {{Credential}}
+
+    :   <dfn>\[[type]]</dfn>
+    ::  The {{OTPCredential}} [=interface object=]'s {{Credential/[[type]]}} [=internal slot=]'s value is the string
+        "`otp`".
+
+    :   <dfn>{{OTPCredential/code}}</dfn>
+    ::  The retrieved one time password. 
+
+</dl>
+
+
+<!-- ============================================================ -->
+### The <code><dfn for="OTPCredential" method>\[[DiscoverFromExternalSource]](origin, options, sameOriginWithAncestors)</dfn></code> Method ### {#sctn-discover-from-external-source}
+<!-- ============================================================ -->
+
+This method is called every time <code><a idl for="CredentialsContainer" lt="get()">navigator.credentials.get({otp:..., ...})</a></code> and is responsible for returning an OTP when one is requested (i.e. when <code>|options|.{{CredentialRequestOptions/otp}}</code> is passed).
+
+This [=internal method=] accepts three arguments:
+
+<dl dfn-type="argument" dfn-for="PublicKeyCredential/[[DiscoverFromExternalSource]](origin, options, sameOriginWithAncestors)">
+
+    :   <dfn>origin</dfn>
+    ::  This argument is the [=relevant settings object=]'s [=environment settings object/origin=], as determined by the
+        calling {{CredentialsContainer/get()}} implementation, i.e., {{CredentialsContainer}}'s <a abstract-op>Request a `Credential`</a> abstract operation.
+
+    :   <dfn>options</dfn>
+    ::  This argument is a {{CredentialRequestOptions}} object whose
+        <code>|options|.{{CredentialRequestOptions/otp}}</code> member contains a {{OTPCredentialRequestOptions}}
+        object specifying the desired attributes of the OTP to retrieve.
+
+    :   <dfn>sameOriginWithAncestors</dfn>
+    ::  This argument is a Boolean value which is [TRUE] if and only if the caller's [=environment settings object=] is
+        [=same-origin with its ancestors=]. It is [FALSE] if caller is cross-origin.
+</dl>
+
+Note: <strong>This algorithm is synchronous:</strong> the {{Promise}} resolution/rejection is handled by
+{{CredentialsContainer/get()|navigator.credentials.get()}}.
+
+When this method is invoked, the user agent MUST execute the following algorithm:
+
+1. Assert: <code>|options|.{{CredentialRequestOptions/otp}}</code> is [=present=].
+1. Let |options| be the value of <code>|options|.{{CredentialRequestOptions/otp}}</code>.
+1. Let |callerOrigin| be {{OTPCredential/[[DiscoverFromExternalSource]](origin, options, sameOriginWithAncestors)/origin}}.
+    If |callerOrigin| is an [=opaque origin=], return a {{DOMException}} whose name is "{{NotAllowedError}}", and terminate this algorithm.
+1. Let |effectiveDomain| be the |callerOrigin|'s [=effective domain=].
+    If [=effective domain=] is not a [=valid domain=], then return a
+    {{DOMException}} whose name is "{{SecurityError}}" and terminate this algorithm.
+
+        Note: An [=effective domain=] may resolve to a [=host=], which can be represented in various manners,
+        such as [=domain=], [=ipv4 address=], [=ipv6 address=], [=opaque host=], or [=empty host=].
+        Only the [=domain=] format of [=host=] is allowed here. This is for simplification and also is
+        in recognition of various issues with using direct IP address identification in concert with
+        PKI-based security.
+1. If the <code>|options|.{{CredentialRequestOptions/signal}}</code> is [=present=] and its
+    [=AbortSignal/aborted flag=] is set to [TRUE], return a {{DOMException}} whose name is "{{AbortError}}"
+    and terminate this algorithm.
+1. TODO(goto): figure out how to connect the dots here with the transport algorithms.
+
+During the above process, the user agent SHOULD show some UI to the user to guide them in the process of sharing the OTP with the origin.
+
+<!-- ============================================================ -->
+## `CredentialRequestOptions` ## {#CredentialRequestOptions}
+<!-- ============================================================ -->
+
+To support obtaining OTPs via {{CredentialsContainer/get()|navigator.credentials.get()}},
+this document extends the {{CredentialRequestOptions}} dictionary as follows:
+
+<xmp class="idl">
+    partial dictionary CredentialRequestOptions {
+        OTPCredentialRequestOptions otp;
+    };
+</xmp>
+
+<div dfn-type="dict-member" dfn-for="CredentialRequestOptions">
+    :   <dfn>otp</dfn>
+    ::  This OPTIONAL member is used to make WebOTP requests.
+</div>
+
+<!-- ============================================================ -->
+## `OTPCredentialRequestOptions` ## {#OTPCredentialRequestOptions}
+<!-- ============================================================ -->
+
+The {{OTPCredentialRequestOptions}} dictionary supplies
+{{CredentialsContainer/get()|navigator.credentials.get()}} with the data it needs to retrieve an
+OTP.
+
+<xmp class="idl">
+    dictionary OTPCredentialRequestOptions {
+      sequence<OTPCredentialTransportType> transport = [];
+    };
+</xmp>
+
+<div dfn-type="dict-member" dfn-for="OTPCredentialRequestOptions">
+    :   <dfn>transport</dfn>
+    ::  This OPTIONAL member contains a hint as to how the [=server=] might receive the OTP.
+        The values SHOULD be members of {{OTPCredentialTransportType}} but [=client platforms=] MUST ignore unknown values.
+</div>
+
+<!-- ============================================================ -->
+## `OTPCredentialTransportType` ## {#enum-transport}
+<!-- ============================================================ -->
+
+<xmp class="idl">
+    enum OTPCredentialTransportType {
+        "sms",
+    };
+</xmp>
+
+<div dfn-type="enum-value" dfn-for="OTPCredentialTransportType">
+    User Agents may implement various transport mechanisms to allow
+    the retrieval of OTPs. This enumeration defines hints as to how
+    user agents may communicate with the transport mechanisms. 
+
+    :   <dfn>sms</dfn>
+    ::  Indicates that the OTP is expected to arrive via SMS.
+</div>
+
+<!-- ============================================================ -->
+# Transports # {#transports}
+<!-- ============================================================ -->
+
+We expect a variety of different transport mechanisms to enable OTPs
+to be received, most notably via SMS, email and hardware devices.
+
+Each of these transport mechanisms will need their own conventions on
+how to provide OTPs to the browser.
+
+In this draft, we leave the API surface to be extensible to any number
+of transports.
+
+<!-- ============================================================ -->
+## SMS ## {#transports-sms}
+<!-- ============================================================ -->
+
+One of the most commonly used transport mechanisms for OTP is via
+SMS messages, allowing developers to verify phone numbers. They
+are typically sent embedded in an SMS message, which gets copied and
+pasted by users.
+
+[[sms-one-time-codes]] defines [=origin-bound one-time code messages=], a format for sending OTPs over SMS and associating them with origins.
+
+<!-- ============================================================ -->
+# Security # {#security}
+<!-- ============================================================ -->
+
+From a security perspective, there are two considerations with this
+API:
+
+* addressing: preventing crossing an origin boundary between the
+    sending and the receiving of OTPs.
+* tampering: preventing attacks based on the modification of the message.
+
+<!-- ============================================================ -->
+## Availability ## {#security-availability}
+<!-- ============================================================ -->
+
+This API is only available on:
+
+* top level frames and
+* https (or localhost, for development purposes)
+
+This API is also only available on top level frames, to avoid abuse by
+third party iframes / libraries. It could be made available to inner
+frames when the origin match, but we haven't yet found a concrete
+requirement / demand for this feature, so we keep it more constrained
+for the moment. 
+
+This API is also only available via https or localhost (for development
+purposes). We don't entirely adopt the concept of trustworthy urls
+because it covers more schemes (e.g. data://123) than we would like to
+(our initial intuition is that (a) https and localhost covers most
+cases and (b) it needs to be clear to the user what public facing
+entity its sending the SMS).
+
+<!-- ============================================================ -->
+## Addressing ## {#security-addressing}
+<!-- ============================================================ -->
+
+Each transport mechanism is responsible for guaranteeing that the
+browser has enough information to route the OTP appropriately to the
+intended origin.
+
+For example, [=origin-bound one-time code messages=] explicitly
+identify the origin on which the OTP can be used.
+
+The addressing scheme must be enforced by the agent to guarantee that
+it gets routed appropriately.
+
+<!-- ============================================================ -->
+## Tampering ## {#security-tampering}
+<!-- ============================================================ -->
+
+There isn't any built-in cryptographic guarantee that the OTP that is
+being handed back by this API hasn't been tampered with. For example,
+an attacker could send an [=origin-bound one-time code message=] to the
+user's phone with an arbitrary origin which the agent happilly passes
+back to the requesting call.
+
+<div class=example>
+```
+Your verification code is: MUAHAHAHA
+
+@example.com #MUAHAHAHA
+```
+</div>
+
+It is the responsibility for the caller to:
+
+* put in place the checks necessary to verify that the OTP that was received
+    is a valid one, for example:
+    * parsing it carefully according to its known formatting expectations
+        (e.g. only alpha numeric values),
+    * storing and checking OTPs that were sent on a server side database.
+* degrade gracefully when an invalid OTP is received (e.g. re-request one).
+
+<!-- ============================================================ -->
+# Privacy # {#privacy}
+<!-- ============================================================ -->
+
+From a privacy perspective, the most notable consideration is for a user agent
+to enforce the consensual exchange of information between the user and the
+website.
+
+Specifically, this API allows the programatic verification of personally
+identifiable attributes of the user, for example email addresses and phone
+numbers.
+
+The attack vector that is most frequently raised is a targeted attack:
+websites trying to find a **very** specific user accross all of its user
+base. In this attack, if left unattended, a website can use this API to
+try to find a **specific** user that owns a **specific** phone number by
+sending all / some (depending on the confidence level) of its users an
+[=origin-bound one-time code message=] and detecting when one is received.
+
+Notably, this API doesn't help with the **acquisition** of the personal
+information, but rather with its **verification**. That is, this API helps
+**verifying** whether the user owns a specific phone number, but doesn't
+help acquiring the phone number in the first place (it assumes that the
+website already has access to it).
+
+Nonetheless, the verification of the possession of these attributes is extra
+information about the user and should be handled responsibly by a user
+agent, typically via **permission prompts** before handing back the OTP
+to the website.
+
+<!-- ====================================================================== -->
+# Acknowledgements # {#acknowledgements}
+<!-- ====================================================================== -->
+
+Many thanks to
+Steven Soneff,
+Ayu Ishii,
+Reilly Grant,
+Eiji Kitamura,
+Alex Russell,
+Owen Campbell-Moore,
+Joshua Bell,
+Ricky Mondello and
+Mike West
+for helping craft this proposal.
+
+Special thanks to Tab Atkins, Jr. for creating and maintaining
+[Bikeshed](https://github.com/tabatkins/bikeshed), the specification
+authoring tool used to create this document, and for his general
+authoring advice.

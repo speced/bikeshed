@@ -1,0 +1,2117 @@
+<pre class=metadata>
+Title: WebDriver BiDi
+Shortname: webdriver-bidi
+Level: 1
+Status: ED
+Group: browser-testing-tools
+URL: https://w3c.github.io/webdriver-bidi/
+Repository: w3c/webdriver-bidi
+No Editor: true
+Abstract: This document defines the BiDirectional WebDriver Protocol, a mechanism for remote control of user agents.
+Boilerplate: conformance no
+Complain About: accidental-2119 yes, missing-example-ids yes
+Default Ref Status: current
+Indent: 2
+</pre>
+
+<pre class=anchors>
+spec: RFC6455; urlPrefix: https://tools.ietf.org/html/rfc6455
+  type: dfn
+    text: WebSocket URI; url: section-3
+    text: Establishes a WebSocket Connection; url: section-4.1
+    text: Server-Side Requirements; url: section-4.2
+    text: Reading the Client's Opening Handshake; url: section-4.2.1
+    text: %x1 denotes a text frame; url: section-5.2
+    text: Send a WebSocket Message; url: section-6.1
+    text: A WebSocket Message Has Been Received; url: section-6.2
+    text: The WebSocket Closing Handshake is Started; url: section-7.1.3
+    text: The WebSocket Connection is Closed; url: section-7.1.4
+    text: Fail the WebSocket Connection; url: section-7.1.7
+    text: Status Codes; url: section-7.4
+    text: Handling Errors in UTF-8-Encoded Data; url: section-8.1
+spec: RFC8610; urlPrefix: https://tools.ietf.org/html/rfc8610
+  type: dfn
+    text: match a CDDL specification; url: appendix-C
+spec: WEBDRIVER; urlPrefix: https://w3c.github.io/webdriver/
+  type: dfn
+    text: additional capability deserialization algorithm; url: dfn-additional-capability-deserialization-algorithm
+    text: additional WebDriver capability; url: dfn-additional-webdriver-capability
+    text: capability name; url: dfn-capability-name
+    text: current session; url: dfn-current-session
+    text: endpoint node; url: dfn-endpoint-node
+    text: error code; url: dfn-error-code
+    text: error; url: dfn-errors
+    text: getting a property; url: dfn-get-a-property
+    text: intermediary node; url: dfn-intermediary-node
+    text: invalid argument; url: dfn-invalid-argument
+    text: unknown command; url: dfn-unknown-command
+    text: no such element; url: dfn-no-such-element
+    text: no such frame; url: dfn-no-such-frame
+    text: active sessions; url: dfn-active-session
+    text: local end; url: dfn-local-ends
+    text: matched capability serialization algorithm; url: dfn-matched-capability-serialization-algorithm
+    text: remote end; url: dfn-remote-ends
+    text: remote end steps; url: dfn-remote-end-steps
+    text: session; url: dfn-sessions
+    text: session ID; url: dfn-session-id
+    text: set a property; url: dfn-set-a-property
+    text: success; url: dfn-success
+    text: try; url: dfn-try
+    text: WebDriver new session algorithm; url: dfn-webdriver-new-session-algorithm
+    text: web element reference; url: dfn-web-element-reference
+    text: window handle; url: dfn-window-handle
+spec: ECMASCRIPT; urlPrefix: https://tc39.es/ecma262/
+  type: dfn
+    text: Array; url: sec-array-objects
+    text: CreateArrayFromList; url: sec-createarrayfromlist
+    text: CreateArrayIterator; url: sec-createarrayiterator
+    text: CreateListFromArrayLike; url: sec-createlistfromarraylike
+    text: CreateMapIterator; url: sec-createmapiterator
+    text: CreateSetIterator; url: sec-createsetiterator
+    text: EnumerableOwnPropertyNames; url: sec-enumerableownpropertynames
+    text: Get; url: sec-get
+    text: HasProperty; url: sec-hasproperty
+    text: internal slot; url: sec-object-internal-methods-and-internal-slots
+    text: IsArray; url: sec-isarray
+    text: IsCallable; url: sec-iscallable
+    text: IsPromise; url: sec-ispromise
+    text: IsRegExp; url: sec-isregexp
+    text: LengthOfArrayLike; url: sec-lengthofarraylike
+    text: Object; url: sec-object-objects
+    text: Set; url: sec-set
+    text: ThisTimeValue; url: thistimevalue
+    text: ToDateString; url: sec-todatestring
+    text: ToString; url: sec-tostring
+    text: Type; url: sec-ecmascript-data-types-and-values
+    text: realm; url: sec-code-realms
+spec: HTML; urlPrefix: https://html.spec.whatwg.org/
+  type: dfn
+    text: a browsing context is discarded; url: a-browsing-context-is-discarded
+    text: create a new browsing context; url: creating-a-new-browsing-context
+    text: environment settings object's Realm; url: environment-settings-object's-realm
+    text: remove a browsing context; url: bcg-remove
+    text: session history; url: session-history
+    text: set up a window environment settings object; url: set-up-a-window-environment-settings-object
+    text: set up a worker environment settings object; url: set-up-a-worker-environment-settings-object
+    text: worker event loop; url: worker-event-loop-2
+    text: worklet global scopes; url: concept-document-worklet-global-scopes
+</pre>
+
+<pre class="link-defaults">
+spec:infra; type:dfn; for:/; text:set
+</pre>
+
+# Introduction # {#intro}
+
+<em>This section is non-normative.</em>
+
+[[WEBDRIVER|WebDriver]] defines a protocol for introspection and
+remote control of user agents. This specification extends WebDriver by
+introducing bidirectional communication. In place of the strict
+command/response format of WebDriver, this permits events to stream
+from the user agent to the controlling software, better matching the
+evented nature of the browser DOM.
+
+# Infrastructure # {#infrastructure}
+
+This specification depends on the Infra Standard. [[!INFRA]]
+
+Network protocol messages are defined using CDDL. [[!RFC8610]]
+
+# Protocol # {#protocol}
+
+This section defines the basic concepts of the WebDriver BiDi
+protocol. These terms are distinct from their representation at the
+<a href=#transport>transport</a> layer.
+
+The protocol is defined using a [[!RFC8610|CDDL]] definition. For the
+convenience of implementors two seperate CDDL definitions are defined; the
+<dfn>remote end definition</dfn> which defines the format of messages produced
+on the [=local end=] and consumed on the [=remote end=], and the <dfn>local end
+definition</dfn> which defines the format of messages produced on the [=remote
+end=] and consumed on the [=local end=]
+
+## Definition ## {#protocol-definition}
+
+Issue: Should this be an appendix?
+
+This section gives the initial contents of the [=remote end definition=] and
+[=local end definition=]. These are augmented by the definition fragments defined in
+the remainder of the specification.
+
+[=Remote end definition=]
+
+<pre class="cddl remote-cddl">
+Command = {
+  id: uint,
+  CommandData,
+  *text => any,
+}
+
+CommandData = (
+  SessionCommand //
+  BrowsingContextCommand
+)
+
+EmptyParams = { *text }
+</pre>
+
+[=Local end definition=]
+
+<pre class="cddl local-cddl">
+Message = (
+  CommandResponse //
+  ErrorResponse //
+  Event
+)
+
+CommandResponse = {
+  id: uint,
+  result: ResultData,
+  *text => any
+}
+
+ErrorResponse = {
+  id: uint / null,
+  error: "unknown error" / "unknown method" / "invalid argument",
+  message: text,
+  ?stacktrace: text,
+  *text => any
+}
+
+ResultData = (
+  EmptyResult //
+  SessionResult //
+  BrowsingContextResult //
+  ScriptResult
+)
+
+EmptyResult = {}
+
+Event = {
+  EventData,
+  *text => any
+}
+
+EventData = (
+  BrowsingContextEvent //
+  ScriptEvent
+)
+</pre>
+
+## Session ## {#session}
+
+WebDriver BiDi uses the same [=/session=] concept as WebDriver.
+
+## Modules ## {#protocol-modules}
+
+The WebDriver BiDi protocol is organized into modules.
+
+Each <dfn export>module</dfn> represents a collection of related
+[=commands=] and [=events=] pertaining to a certain aspect of the user
+agent. For example, a module might contain functionality for inspecting and
+manipulating the DOM, or for script execution.
+
+Each module has a <dfn>module name</dfn> which is a string. The
+[=command name=] and [=event name=] for commands and events defined in the
+module start with the [=module name=] followed by a period "<code>.</code>".
+
+Modules which contain [=commands=] define [=remote end definition=]
+fragments. These provide choices in the <code>CommandData</code> group for the
+module's [=commands=], and can also define additional definition properties. They
+can also define [=local end definition=] fragments that provide additional choices
+in the <code>ResultData</code> group for the results of commands in the module.
+
+Modules which contain events define [=local end definition=] fragments that are
+choices in the <code>Event</code> group for the module's [=events=].
+
+An implementation may define <dfn>extension modules</dfn>. These must have a
+[=module name=] that contains a single colon "<code>:</code>" character. The
+part before the colon is the prefix; this is typically the same for all
+extension modules specific to a given implementation and should be unique for a
+given implementation. Such modules extend the [=local end definition=] and [=remote
+end definition=] providing additional groups as choices for the defined
+[=commands=] and [=events=].
+
+## Commands ## {#commands}
+
+A <dfn export>command</dfn> is an asynchronous operation, requested by
+the [=local end=] and run on the [=remote end=], resulting in either a
+result or an error being returned to the [=local end=]. Multiple
+commands can run at the same time, and commands can potentially be
+long-running. As a consequence, commands can finish out-of-order.
+
+Each [=command=] is defined by:
+
+- A <dfn export for=command>command type</dfn> which is defined by a [=remote
+   end definition=] fragment containing a group. Each such group has two fields:
+    - <code>method</code> which is a string literal of the form <code>[module
+      name].[method name]</code>. This is the <dfn export for=command>command
+      name</dfn>.
+    - <code>params</code> which defines a mapping containing data that to be passed into
+      the command. The populated value of this map is the
+      <dfn export for=command>command parameters</dfn>.
+- A <dfn export for=command>result type</dfn>, which is defined by a [=local
+  end definition=] fragment.
+- A set of [=remote end steps=] which define the actions to take for a command
+  given [=command parameters=] and return an instance of the command [=return
+  type=].
+
+When commands are send from the [=local end=] they have a command id. This is an
+identifier used by the [=local end=] to identify the response from a particular
+command. From the point of view of the [=remote end=] this identifier is opaque
+and cannot be used internally to identify the command.
+
+Note: This is because the command id is entirely controlled by the [=local end=]
+and isn't necessarily unique over the course of a session. For example a [=local
+end=] which ignores all responses could use the same command id for each command.
+
+The <dfn export for=command>set of all command names</dfn> is a set containing
+all the defined [=command names=], including any belonging to [=extension
+modules=].
+
+## Events ## {#events}
+
+An <dfn export>event</dfn> is a notification, sent by the [=remote
+end=] to the [=local end=], signaling that something of interest has
+occurred on the [=remote end=].
+
+ - An <dfn export for=event>event type</dfn> is defined by a [=local
+   end definition=] fragment containing a group. Each such group has two fields:
+    - <code>method</code> which is a string literal of the form <code>[module
+      name].[event name]</code>. This is the <dfn export for=event>event
+      name</dfn>.
+
+    - <code>params</code> which defines a mapping containing event data. The
+      populated value of this map is the <dfn export for=command>event
+      parameters</code>.
+ - A <dfn export>remote end event trigger</dfn> which defines when the event is
+   triggered and steps to construct the [=event type=] data.
+
+A [=/session=] has a <dfn export for=event>global event set</dfn> which is a set
+containing the event names for events that are enabled for all
+browsing contexts. This initially contains the [=event name=] for events that
+are <dfn export for=event>in the default event set</dfn>.
+
+A [=/session=] has a <dfn export for=event>browsing context event map</dfn>,
+which is a map with [=/browsing context=] keys and values that are maps from an
+[=event name=] to a boolean indicating whether the specified event is enabled or
+disabled for a given browsing context.
+
+<div algorithm>
+
+To determine if an <dfn export>event is enabled</dfn> given |session|,
+|event name| and |browsing contexts|:
+
+Note: |browsing contexts| is a set because a [=shared worker=] can be associated
+      with multiple contexts.
+
+  1. For each |browsing context| in |browsing contexts|:
+
+    1. While |browsing context| is not null:
+
+      1. Let |event map| be the [=browsing context event map=] for |session|.
+
+      1. If |event map| [=contains=] |browsing context|, let |browsing context
+         events| be |event map|[|browsing context|].  Otherwise let |browsing
+         context events| be null.
+
+      1. If |browsing context events| is not null, and |browsing context events|
+         [=contains=] for |event name| return |browsing context
+         events|[|event name|].
+
+      1. Let |browsing context| be the [=parent browsing context=] of |browsing
+         context|, if it has one, or null otherwise.
+
+  1. If the [=global event set=] for |session| [=contains=] |event name| return
+     true.
+
+  1. Return false.
+
+</div>
+
+<div algorithm>
+
+To <dfn>obtain a set of event names</dfn> given an |name|:
+
+  1. Let |events| be an empty set.
+
+  1. If |name| contains a U+002E (period):
+
+    1. If |name| is the [=event name=] for an event, append |name| to |events|
+       and return [=success=] with data |events|.
+
+    1. Return an [=error=] with [=error code=] [=Invalid Argument=]
+
+  1. Otherwise |name| is interpreted as representing all the events in a
+     module. If |name| is not a [=module name=] return an [=error=] with
+     [=error code=] [=Invalid Argument=].
+
+  1. Append the [=event name=] for each [=event=] in the module with name |name| to
+     |events|.
+
+  1. Return [=success=] with data |events|.
+</div>
+
+# Transport # {#transport}
+
+Message transport is provided using the WebSocket protocol.
+[[!RFC6455]]
+
+Note: In the terms of the WebSocket protocol, the [=local end=] is the
+client and the [=remote end=] is the server / remote host.
+
+Note: The encoding of [=commands=] and [=events=] as messages is
+similar to JSON-RPC, but this specification does not normatively
+reference it. [[JSON-RPC]] The normative requirements on [=remote
+ends=] are instead given as a precise processing model, while no
+normative requirements are given for [=local ends=].
+
+A <dfn>WebSocket listener</dfn> is a network endpoint that is able
+to accept incoming [[!RFC6455|WebSocket]] connections.
+
+A [=WebSocket listener=] has a <dfn for=listener>host</dfn>, a <dfn
+for=listener>port</dfn>, a <dfn for=listener>secure flag</dfn>, and a
+<dfn>list of WebSocket resources</dfn>.
+
+When a [=WebSocket listener=] |listener| is created, a [=remote end=]
+must start to listen for WebSocket connections on the host and port
+given by |listener|'s [=listener/host=] and [=listener/port=]. If
+|listener|'s [=listener/secure flag=] is set, then connections
+established from |listener| must be TLS encrypted.
+
+A [=remote end=] has a [=set=] of [=WebSocket listeners=] <dfn>active
+listeners</dfn>, which is initially empty.
+
+A WebDriver [=/session=] has a <dfn>WebSocket connection</dfn> which is
+a network connection that follows the requirements of the
+[[!RFC6455|WebSocket protocol]]. This is initially null.
+
+<div>
+
+When a client [=establishes a WebSocket connection=] |connection| by
+connecting to one of the set of [=active listeners=] |listener|, the
+implementation must proceed according to the WebSocket [=server-side
+requirements=], with the following steps run when deciding whether to
+accept the incoming connection:
+
+1. Let |resource name| be the resource name from [=reading the
+   client's opening handshake=]. If |resource name| is not in
+   |listener|'s [=list of WebSocket resources=], then stop
+   running these steps and act as if the requested service is not
+   available.
+
+2. [=Get a session ID for a WebSocket resource=] with |resource name|
+   and let |session id| be that value. If |session id| is null then
+   stop running these steps and act as if the requested service is not
+   available.
+
+3. If there is a [=/session=] in the list of [=active sessions=] with
+   |session id| as its [=session ID=] then let |session| be that
+   session. Otherwise stop running these steps and act as if the
+   requested service is not available.
+
+4. Run any other implementation-defined steps to decide if the
+   connection should be accepted, and if it is not stop running these
+   steps and act as if the requested service is not available.
+
+5. Otherwise set |session|'s [=WebSocket connection=] to
+   |connection|, and proceed with the WebSocket [=server-side
+   requirements=] when a server chooses to accept an incoming connection.
+
+Issue: Do we support > 1 connection for a single session?
+
+</div>
+
+When [=a WebSocket message has been received=] for a [=WebSocket
+connection=] |connection| with type |type| and data |data|, a [=remote
+end=] must [=handle an incoming message=] given |connection|, |type|
+and |data|.
+
+When [=the WebSocket closing handshake is started=] or when [=the
+WebSocket connection is closed=] for a [=WebSocket connection=]
+|connection|, a [=remote end=] must [=handle a connection closing=]
+given |connection|.
+
+Note: Both conditions are needed because it is possible for a
+WebSocket connection to be closed without a closing handshake.
+
+<div algorithm>
+
+To <dfn lt="construct a WebSocket resource name|constructing a
+WebSocket resource name">construct a WebSocket resource name</dfn>
+given a [=/session=] |session|:
+
+1. Return the result of concatenating the string "<code>/session/</code>"
+   with |session|'s [=session ID=].
+
+</div>
+
+<div algorithm>
+
+To <dfn lt="construct a WebSocket URL|constructing a WebSocket
+URL">construct a WebSocket URL</dfn> given a [=WebSocket listener=]
+|listener| and [=/session=] |session|:
+
+1. Let |resource name| be the result of [=constructing a WebSocket
+   resource name=] given |session|.
+
+2. Return a [=WebSocket URI=] constructed with host set to
+   |listener|'s [=listener/host=], port set to |listener|'s
+   [=listener/port=], path set to |resource name|, following the wss-URI
+   construct if |listener|'s [=listener/secure flag=] is set and the ws-URL
+   construct otherwise.
+
+</div>
+
+<div algorithm>
+
+To <dfn>get a session ID for a WebSocket resource</dfn>
+given |resource name|:
+
+1. If |resource name| doesn't begin with the byte string
+   "<code>/session/</code>", return null.
+
+2. Let |session id| be the bytes in |resource name| following the
+   "<code>/session/</code>" prefix.
+
+3. If |session id| is not the string representation of a
+   [[!RFC4122|UUID]], return null.
+
+4. Return |session id|.
+
+</div>
+
+<div algorithm>
+To <dfn>start listening for a WebSocket connection</dfn> given a
+[=/session=] |session|:
+
+ 1. If there is an existing [=WebSocket listener=] in the set of
+    [=active listeners=] which the [=remote end=] would like to reuse,
+    let |listener| be that listener. Otherwise let |listener| be a new
+    [=WebSocket listener=] with [=implementation-defined=]
+    [=listener/host=], [=listener/port=], [=listener/secure flag=],
+    and an empty [=list of WebSocket resources=].
+
+ 2. Let |resource name| be the result of [=constructing a WebSocket
+    resource name=] given |session|.
+
+ 3. Append |resource name| to the [=list of WebSocket resources=] for
+    |listener|.
+
+ 4. [=set/Append=] |listener| to the [=remote end=]'s [=active
+     listeners=].
+
+ 5. Return |listener|.
+
+</div>
+
+Note: An [=intermediary node=] handling multiple sessions can use one
+or many WebSocket listeners. [[!WEBDRIVER|WebDriver]] defines that
+an [=endpoint node=] supports at most one session at a time, so it's
+expected to only have a single listener.
+
+Note: For an [=endpoint node=] the [=listener/host=] in the above steps will
+typically be "<code>localhost</code>".
+
+<div algorithm>
+To <dfn>handle an incoming message</dfn> given a [=WebSocket connection=]
+|connection|, type |type| and data |data|:
+
+ 1. If |type| is not [=%x1 denotes a text frame|text=], [=respond with an
+    error=] given |connection|, null, and [=invalid argument=], and finally
+    return.
+
+ 1. [=Assert=]: |data| is a [=scalar value string=], because the
+     WebSocket [=handling errors in UTF-8-encoded data=] would already
+     have [=fail the WebSocket connection|failed the WebSocket
+     connection=] otherwise.
+
+    Issue: Nothing seems to define what [=status codes|status code=]
+    is used for UTF-8 errors.
+
+1. Let |parsed| be the result of [=parse JSON into Infra values|parsing JSON
+   into Infra values=] given |data|. If this throws an exception, then [=respond
+   with an error=] given |connection|, null, and [=invalid argument=], and
+   finally return.
+
+ 1. Match |parsed| against the [=remote end definition=]. If this results in a
+    match:
+
+    1. Let |matched| be the map representing the matched data.
+
+    1. Assert: |matched| [=contains=] "<code>id</code>", "<code>method</code>", and
+       "<code>params</code>".
+
+    1. Let |command id| be |matched|["<code>id</code>"].
+
+    1. Let |method| be |matched|["<code>method</code>"]
+
+    1. Run the following steps in parallel:
+
+      1. Let |result| be the result of running the [=remote end steps=] for the
+         command with [=command name=] |method| given [=command parameters=]
+         |matched|["<code>params</code>"]
+
+      1. If |result| is an [=error=], then [=respond with an error=] given
+         |connection|, |command id|, and |result|'s [=error code=], and finally
+         return.
+
+      1. Let |value| be |result|'s data.
+
+      1. Assert: |value| matches the definition for the [=result type=]
+         corresponding to the command with [=command name=] |method|.
+
+      1. Let |response| be a new map matching the <code>CommandResponse</code>
+         production in the [=local end definition=] with the <code>id</code>
+         field set to |command id| and the <code>value</code> field set to
+         |value|.
+
+      1. Let |serialized| be the result of [=serialize an infra value to JSON
+         bytes=] given |response|.
+
+      1. [=Send a WebSocket message=] comprised of |serialized| over
+         |connection| and return.
+
+ 1. Otherwise:
+
+    1. Let |command id| be null.
+
+    1. If |parsed| is a map and |parsed|["<code>id</code>"] exists and is an
+       integer greater than or equal to zero, set |command id| to that integer.
+
+    1. Let |error code| be [=invalid argument=].
+
+    1. If |parsed| is a map and |parsed|["<code>method</code>"] exists and is a
+       string, but |parsed|["<code>method</code>"] is not in the [=set of all
+       command names=], set |error code| to [=unknown command=].
+
+    1. [=Respond with an error=] given |connection|, |command id|, and
+       |error code|.
+
+</div>
+
+<div algorithm>
+To <dfn export>emit an event</dfn> given |body| and |related contexts|:
+
+ 1. [=Assert=]: |body| has [=map/size=] 2 and [=contains=] "<code>method</code>"
+    and "<code>params</code>".
+
+ 1. If the [=current session=] is null, or the [=current session=]'s [=WebSocket
+    Connection=] is null then return.
+
+ 1. If [=event is enabled=] given [=current session=],
+    |body|["<code>method</code>"] and |related contexts|:
+
+   1. Let |connection| be the [=current session=]'s [=WebSocket connection=].
+
+   1. Let |serialized| be the result of [=serialize an infra value to JSON
+        bytes=] given |body|.
+
+   1. [=Send a WebSocket message=] comprised of |serialized| over |connection|.
+
+</div>
+
+<div algorithm>
+To <dfn>respond with an error</dfn> given a [=WebSocket connection=]
+|connection|, |command id|, and |error code|:
+
+ 1. Let |error data| be a new map matching the <code>ErrorResponse</code>
+    production in the [=local end definition=], with the <code>id</code> field
+    set to |command id|, the <code>error</code> field set to |error code|, the
+    <code>message</code> field set to an implementation-defined string
+    containing a human-readable definition of the error that occurred and the
+    <code>stacktrace</code> field optionally set to an implementation-defined
+    string containing a stack trace report of the active stack frames at the
+    time when the error occurred.
+
+ 1. Let |response| be the result of [=serialize an infra value to JSON bytes=]
+    given |error data|.
+
+    Note: |command id| can be null, in which case the <code>id</code> field will
+    also be set to null, not omitted from |response|.
+
+ 1. [=Send a WebSocket message=] comprised of |response| over |connection|.
+
+</div>
+
+
+<div algorithm>
+To <dfn>handle a connection closing</dfn> given a
+[=WebSocket connection=] |connection|:
+
+ 1. If there is a WebDriver [=/session=] with |connection| as its [=connection=],
+    set the [=connection=] on that [=/session=] to null.
+
+Issue: This should also reset any internal state
+
+</div>
+
+Note: This does not end any [=/session=].
+
+Issue: Need to hook in to the session ending to allow the UA to close
+the listener if it wants.
+
+## Establishing a Connection ## {#establishing}
+
+WebDriver clients opt in to a bidirectional connection by requesting a
+capability with the name "<code>webSocketUrl</code>" and value
+true.
+
+This specification defines an
+[=additional webdriver capability=] with the [=capability name=] "<code>webSocketUrl</code>".
+
+<div algorithm="webSocketUrl capability deserialization algorithm">
+The [=additional capability deserialization algorithm=] for the
+"<code>webSocketUrl</code>" capability, with parameter |value| is:
+
+ 1. If |value| is not a boolean, return [=error=] with [=error code|code=]
+    [=invalid argument=].
+
+ 2. Return [=success=] with data |value|.
+
+</div>
+
+<div algorithm="webSocketUrl capability serialization algorithm">
+The [=matched capability serialization algorithm=] for the "<code>webSocketUrl</code>" capability,
+with parameter |value| is:
+
+ 1. If |value| is false, return [=success=] with data null.
+
+ 2. Return [=success=] with data true.
+
+</div>
+
+<div algorithm="webSocketUrl new session algorithm">
+The [=WebDriver new session algorithm=] defined by this specification,
+with parameters |session| and |capabilities| is:
+
+ 1. Let |webSocketUrl| be the result of [=getting a property=] named
+    "<code>webSocketUrl</code>" from |capabilities|.
+
+ 2. If |webSocketUrl| is undefined, return.
+
+ 3. [=Assert=]: |webSocketUrl| is true.
+
+ 4. Let |listener| be the result of [=start listening for a WebSocket
+    connection=] given |session|.
+
+ 5. Set |webSocketUrl| to the result of [=constructing a WebSocket
+    URL=] given |listener| and |session|.
+
+ 6. [=Set a property=] on |capabilities| named
+    "<code>webSocketUrl</code>" to |webSocketUrl|.
+
+</div>
+
+# Common Data Types # {#data-types}
+
+## Remote Value ## {#type-common-RemoteValue}
+
+Values accessible from the ECMAScript runtime are represented by a mirror
+object, specified as <code>RemoteValue</code>. The value's type is specified in
+the <code>type</code> property. In the case of JSON-representable primitive
+values, this contains the value in the <code>value</code> property; in the case
+of non-JSON-representable primitives, the <code>value</code> property contains a
+string representation of the value. For non-primitive objects, the
+<code>objectId</code> property contains a string id that provides a unique
+handle to the object, valid for its lifetime inside the engine. For some
+non-primitive types, the <code>value</code> property contains a representation
+of the data in the ECMAScript object; for container types this can contain
+further <code>RemoteValue</code> instances. The <code>value</code> property can
+be null if there is a duplicate object i.e. the object has already been
+serialized in the current <code>RemoteValue</code>, perhaps as part of a
+cycle, or otherwise when the maximum serialization depth is reached.
+
+[=Nodes=] are also represented by <code>RemoteValue</code> instances. These have
+a partial serialization of the node in the value property.
+
+Note: mirror objects do not keep the original object alive in the runtime. If an
+object is discarded in the runtime subsequent attempts to access it via the
+protocol will result in an error.
+
+A [=/session=] has an <dfn>object id map</dfn>. This is a weak map from objects to
+their corresponding id.
+
+Issue: Should this be explicitly per realm?
+
+<div algorithm>
+To get the <dfn>object id for an object</dfn> given an |object|:
+
+  1. If the [=object id map=] for the [=current session=] does not contain |object|
+     run the following steps:
+
+     1. Let |object id| be a new, unique, string identifier for |object|. If
+        |object| is an [=/element=] this must be the [=web element reference=]
+        for |object|; if it's a {{WindowProxy}} object, this must be the
+        [=window handle=] for |object|.
+
+    1. Set the value of |object| in the [=object id map=] to |object id|.
+
+  1. Return the result of getting the value for |object| in [=object id map=].
+</div>
+
+<!--
+<div algorithm>
+To get the <dfn>object for an object id</dfn> given an |object id|:
+
+  1. For each |object| → |id value| of [=object id map=]:
+
+    1. If |id value| is equal to |object id|, return [=success=] with data
+       |object|
+
+  1. Return [=error=] with [=error code=] [=no such element=]
+
+  Issue: This error code isn't right.
+</div>
+-->
+
+[=remote end definition=] and [=local end definition=]
+```
+RemoteValue = {
+  UndefinedValue //
+  NullValue //
+  StringValue //
+  NumberValue //
+  BooleanValue //
+  BigIntValue //
+  SymbolValue //
+  ArrayValue //
+  FunctionValue //
+  ObjectValue //
+  FunctionValue //
+  RegExpValue //
+  DateValue //
+  MapValue //
+  SetValue //
+  WeakMapValue //
+  WeakSetValue //
+  IteratorValue //
+  GeneratorValue //
+  ErrorValue //
+  ProxyValue //
+  PromiseValue //
+  TypedArrayValue //
+  ArrayBufferValue //
+  NodeValue //
+  WindowProxyValue //
+}
+
+ObjectId = text;
+
+ListValue = [*RemoteValue];
+
+MappingValue = [*[(RemoteValue / text), RemoteValue]];
+
+UndefinedValue = {
+  type: "undefined",
+}
+
+NullValue = {
+  type: "null",
+}
+
+StringValue = {
+  type: "string",
+  value: text,
+}
+
+SpecialNumber = "NaN" / "-0" / "+Infinity" / "-Infinity";
+
+NumberValue = {
+  type: "number",
+  value: number / SpecialNumber,
+}
+
+BooleanValue = {
+  type: "boolean",
+  value: bool,
+}
+
+BigIntValue = {
+  type: "bigint",
+  value: text,
+}
+
+SymbolValue = {
+  type: "symbol",
+  objectId: ObjectId,
+}
+
+ArrayValue = {
+  type: "array",
+  objectId: ObjectId,
+  value?: ListValue,
+}
+
+ObjectValue = {
+  type: "object",
+  objectId: ObjectId,
+  value?: MappingValue,
+}
+
+FunctionValue = {
+  type: "function",
+  objectId: ObjectId,
+}
+
+RegExpValue = {
+  type: "regexp",
+  objectId: ObjectId,
+  value: text
+}
+
+DateValue = {
+  type: "date",
+  objectId: ObjectId,
+  value: text
+}
+
+MapValue = {
+  type: "map",
+  objectId: ObjectId,
+  value?: MappingValue,
+}
+
+SetValue = {
+  type: "set",
+  objectId: ObjectId,
+  value?: ListValue
+}
+
+WeakMapValue = {
+  type: "weakmap",
+  objectId: ObjectId,
+}
+
+WeakSetValue = {
+  type: "weakset",
+  objectId: ObjectId,
+}
+
+ErrorValue = {
+  type: "error",
+  objectId: ObjectId,
+}
+
+PromiseValue = {
+  type: "promise",
+  objectId: ObjectId,
+}
+
+TypedArrayValue = {
+  type: "typedarray",
+  objectId: ObjectId,
+}
+
+ArrayBufferValue = {
+  type: "arraybuffer",
+  objectId: ObjectId,
+}
+
+NodeValue = {
+  type: "node",
+  objectId: ObjectId,
+  value?: NodeProperties,
+}
+
+NodeProperties = {
+  nodeType: uint,
+  nodeValue: text,
+  localName?: text,
+  namespaceURI?: text,
+  childNodeCount: uint,
+  children?: [*NodeValue],
+  attributes?: {*text => text},
+  shadowRoot?: NodeValue / null,
+}
+
+WindowProxyValue = {
+  type: "window",
+  objectId: ObjectId,
+}
+```
+
+Issue: Add WASM types?
+
+Issue: Should WindowProxy get attributes in a similar style to Node?
+
+Issue: handle String / Number / etc. wrapper objects specially?
+
+<div algorithm>
+
+To <dfn>serialize as a remote value</dfn> given an |value|, a |max depth|,
+|node details|, and a |set of known objects|:
+
+  1. In the following list of conditions and associated steps, run the first set
+     of steps for which the associated condition is true:
+
+    <dl>
+      <dt>[=Type=](|value|) is Undefined
+      <dd>Let |remote value| be a map matching the <code>UndefinedValue</code>
+      production in the [=local end definition=].
+
+      <dt>[=Type=](|value|) is Null
+      <dd>Let |remote value| be a map matching the <code>NullValue</code>
+      production in the [=local end definition=].
+
+      <dt>[=Type=](|value|) is String
+      <dd>Let |remote value| be a map matching the <code>StringValue</code>
+      production in the [=local end definition=], with the <code>value</code>
+      property set to |value|.
+
+      Issue: This doesn't handle lone surrogates
+
+      <dt>[=Type=](|value|) is Number
+      <dd>
+      1. Switch on the value of |value|:
+        <dl>
+          <dt>NaN
+          <dd>Let |serialized| be <code>"NaN"</code>
+          <dt>-0
+          <dd>Let |serialized| be <code>"-0"</code>
+          <dt>+Infinity
+          <dd>Let |serialized| be <code>"+Infinity"</code>
+          <dt>-Infinity
+          <dd>Let |serialized| be <code>"-Infinity"</code>
+          <dt>Otherwise:
+          <dd>Let |serialized| be |value|
+        </dl>
+
+      1. Let |remote value| be a map matching the <code>NumberValue</code>
+         production in the [=local end definition=], with the <code>value</code>
+         property set to |serialized|.
+
+      <dt>[=Type=](|value|) is Boolean
+      <dd>Let |remote value| be a map matching the <code>BooleanValue</code>
+          production in the [=local end definition=], with the <code>value</code>
+          property set to |value|.
+
+      <dt>[=Type=](|value|) is BigInt
+      <dd>Let |remote value| be a map matching the <code>BigIntValue</code>
+          production in the [=local end definition=], with the <code>value</code>
+          property set to the result of running the [=ToString=] operation on
+          |value|.
+
+      <dt>[=Type=](|value|) is Symbol
+      <dd>Let |remote value| be a map matching the <code>SymbolValue</code>
+          production in the [=local end definition=], with the <code>objectId</code>
+          property set to the [=object id for an object=] |value|.
+
+      <dt>[=IsArray=](|value|)
+      <dd>
+      1. Let |serialized| be null.
+
+      1. If |value| is not in the |set of known objects|, and |max depth|
+         is not null and greater than 0, run the following steps:
+             1. Append |value| to the |set of known objects|
+
+             1. Let |serialized| be the result of [=serialize as a list=] given
+                [=CreateArrayIterator=](|value|, value), |max depth|, |node details| and
+                |set of known objects|.
+
+      1. Let |remote value| be a map matching the <code>ArrayValue</code> production
+         in the [=local end definition=], with the <code>objectId</code> property set
+         to the [=object id for an object=] |value|, and the <code>value</code>
+         field set to |serialized| if it's not null, or ommitted otherwise.
+
+      <dt>[=IsRegExp=](|value|)
+      <dd>
+          1. Let |pattern| be [=ToString=]([=Get=](|value|, "source")).
+
+          1. Let |flags| be [=ToString=]([=Get=](|value|, "flags")).
+
+          1. Let |serialized| be the string-concatenation of "/", |pattern|, "/", and |flags|.
+
+          1. Let |remote value| be a map matching the <code>RegExpValue</code>
+             production in the [=local end definition=], with the <code>objectId</code>
+             property set to the [=object id for an object=] |object| and the value
+             set to |serialized|
+
+      <dt>|value| has a \[[DateValue]] [=internal slot=].
+      <dd>
+        1. Let |serialized| be [=ToDateString=]([=thisTimeValue=](|value|)).
+
+        1. Let |remote value| be a map matching the <code>DateValue</code>
+           production in the [=local end definition=], with the <code>objectId</code>
+           property set to the [=object id for an object=] |object| and the value
+           set to |serialized|.
+
+      <dt>|value| has a \[[MapData]] [=internal slot=]
+      <dd>
+        1. Let |serialized| be null.
+
+        1. If |value| is not in the |set of known objects|, and |max depth|
+           is not null and greater than 0, run the following steps:
+             1. Append |value| to the |set of known objects|
+
+             1. Let |serialized| be the result of [=serialize as a mapping=] given
+                [=CreateMapIterator=](|value|, key+value), |max depth|, |node details| and
+                |set of known objects|.
+
+      1. Let |remote value| be a map matching the <code>MapValue</code>
+         production in the [=local end definition=], with the
+         <code>objectId</code> property set to the [=object id for an object=]
+         |value|, and the <code>value</code> field set to |serialized| if it's
+         not null, or ommitted otherwise.
+
+      <dt>|value| has a \[[SetData]] [=internal slot=]
+      <dd>
+        1. Let |serialized| be null.
+
+        1. If |value| is not in the |set of known objects|, and |max depth|
+           is not null and greater than 0, run the following steps:
+             1. Append |value| to the |set of known objects|
+
+             1. Let |serialized| be the result of [=serialize as a list=] given
+                [=CreateSetIterator=](|value|, value), |max depth|, |node details| and
+                |set of known objects|.
+
+       1. Let |remote value| be a map matching the <code>SetValue</code>
+          production in the [=local end definition=], with the
+          <code>objectId</code> property set to the [=object id for an object=]
+          |value|, and the <code>value</code> field set to |serialized| if it's
+          not null, or ommitted otherwise.
+
+      <dt>|value| has a \[[WeakMapData]] [=internal slot=]
+      <dd>Let |remote value| be a map matching the <code>WeakMapValue</code>
+          production in the [=local end definition=], with the <code>objectId</code>
+          property set to the [=object id for an object=] |value|.
+
+      <dt>|value| has a \[[WeakSetData]] [=internal slot=]
+      <dd>Let |remote value| be a map matching the <code>WeakSetValue</code>
+          production in the [=local end definition=], with the <code>objectId</code>
+          property set to the [=object id for an object=] |value|.
+
+      <dt>|value| has an \[[ErrorData]] [=internal slot=]
+      <dd>Let |remote value| be a map matching the <code>ErrorValue</code>
+          production in the [=local end definition=], with the <code>objectId</code>
+          property set to the [=object id for an object=] |value|.
+
+      <dt>[=IsPromise=](|value|)
+      <dd>Let |remote value| be a map matching the <code>PromiseValue</code>
+          production in the [=local end definition=], with the <code>objectId</code>
+          property set to the [=object id for an object=] |value|.
+
+      <dt>|value| has a \[[TypedArrayName]] [=internal slot=]
+      <dd>Let |remote value| be a map matching the <code>TypedArrayValue</code>
+          production in the [=local end definition=], with the <code>objectId</code>
+          property set to the [=object id for an object=] |value|.
+
+      <dt>|value| has an \[[ArrayBufferData]] [=internal slot=]
+      <dd>Let |remote value| be a map matching the <code>ArrayBufferValue</code>
+          production in the [=local end definition=], with the <code>objectId</code>
+          property set to the [=object id for an object=] |value|.
+
+      <dt>|value| is a [=platform object=] that implements [=Node=]
+      <dd>
+        1. Let |serialized| be null.
+
+        1. If |node details| is true, run the following steps:
+
+            1. Let |serialized| be a map.
+
+            1. "nodeType", [=Get=](|value|, "nodeType"), false)
+
+            1. Set |serialized|["<code>nodeValue</code>"] to [=Get=](|value|, "nodeValue")
+
+            1. If |value| is an [=/Element=] or an <a spec=dom>Attribute</a>:
+
+
+              1. Set |serialized|["<code>localName</code>" to [=Get=](|value|, "localName")
+
+              1. Set |serialized|["<code>namespaceURI</code>"] to [=Get=](|value|, "namespaceURI")
+
+
+            1. Let |child node count| be the [=list/size=] of |serialized|'s [=children=].
+
+            1. Set |serialized|["<code>childNodeCount</code>" to |child node count|
+
+            1. If |max depth| is equal to 0 let |children| be null.
+               Otherwise, let |children| be an empty list and, for each node
+               |child| in the [=children=] of |value|:
+
+              1. Let |serialized| be the result of [=serialize as a remote value=]
+                 with |child|, |max depth| - 1, |node details| and
+                 |set of known objects|.
+
+              1. Append |serialized| to |children|.
+
+            1. Set |serialized|["<code>children</code>"] to |children|.
+
+            1. If |value| is an [=/Element=]:
+
+               1. Let |attributes| be a new map.
+
+               1. For each |attribute| in |value|'s [=Element/attribute list=]:
+
+                 1. Let |name| be |attribute|'s [=Attr/qualified name=]
+
+                 1. Let |value| be |attribute|'s [=Attr/value=].
+
+                 1. Set |attributes|[|name|] to |value|
+
+               1. Set |serialized|["<code>attributes</code>"] to |attributes|.
+
+               1. Let |shadow root| be |value|'s [=Element/shadow root=].
+
+               1. If |shadow root| is null, let |serialized shadow| be null.
+                  Otherwise let |serialized shadow| be the result of
+                  [=serialize as a remote value=] with |shadow root|, |max depth| - 1,
+                  false and |set of known objects|.
+
+                  Note: this means the <code>objectId</code> for the shadow root
+                  will be serialized irrespective of whether the shadow is open or closed,
+                  but no properties of the node will be returned.
+
+               1. Set= |serialized|["<code>shadowRoot</code>"] to |serialized shadow|.
+
+        1. Let |remote value| be a map matching the <code>NodeValue</code>
+           production in the [=local end definition=], with the <code>objectId</code>
+           property set to the [=object id for an object=] |value|, and <code>value</code>
+           set to |serialized|, if |serialized| is not null.
+
+      <dt>|value| is a [=platform object=] that implements {{WindowProxy}}
+      <dd>1. Let |remote value| be a map matching the <code>WindowProxyValue</code>
+             production in the [=local end definition=], with the <code>objectId</code>
+             property set to the [=object id for an object=] |value|.
+
+      <dt>|value| is a [=platform object=]
+      <dd>1. Let |remote value| be a map matching the <code>ObjectValue</code>
+             production in the [=local end definition=], with the <code>objectId</code>
+             property set to the [=object id for an object=] |value|.
+
+      <dt>[=IsCallable=](|value|)
+      <dd>Let |remote value| be a map matching the <code>FunctionValue</code>
+          production in the [=local end definition=], with the <code>objectId</code>
+          property set to the [=object id for an object=] |value|.
+
+      <dt>Otherwise:
+      <dd>
+      1. [=Assert=]: [=type=](|value|) is Object
+
+      1. let |serialized| be null.
+
+      1. If |value| is not in the |set of known objects|, and |max depth|
+         is greater than 0, run the following steps:
+         1. Append |value| to the |set of known objects|
+
+         1. Let |serialized| be the result of [=serialize as a mapping=] given
+            [=EnumerableOwnPropertyNames=](|value|, key+value), |max depth|, |node
+            details| and |set of known objects|
+
+      1. Let |remote value| be a map matching the <code>ObjectValue</code> production
+         in the [=local end definition=], with the <code>objectId</code> property set
+         to the [=object id for an object=] |value|, and the <code>value</code> field
+         set to |serialized|.
+    </dl>
+
+  1. Return |remote value|
+
+Issue: Does it make sense to use the same depth parameter for nodes and objects
+in general?
+
+</div>
+
+<div algorithm>
+To <dfn>serialize as a list</dfn> given |iterable|, |max depth|,
+|node details| and |set of known objects|:
+
+  1. Let |serialized| be a new list.
+
+  1. For each |child value| in |iterable|:
+
+    1. Let |serialized child| be the result of [=serialize as a
+       remote value=] with arguments |child value|, |max
+       depth| - 1, |node details| and |set of known objects|.
+
+    1. Append |serialized child| to |serialized|.
+
+  1. Return |serialized|
+</div>
+
+Issue: this assumes for-in works on iterators
+
+<div algorithm>
+To <dfn>serialize as a mapping</dfn> given |iterable|, |max depth|,
+|node details| and |set of known objects|:
+
+  1. Let |serialized| be a new list.
+
+  1. For |item| in |iterable|:
+    1. Assert: [=IsArray=](|item|)
+
+    1. Let |property| be [=CreateListFromArrayLike=](|item|)
+
+    1. Assert: |property| is a list of [=list/size=] 2
+
+    1. Let |key| be |property|[0] and let |value| be |property|[1]
+
+    1. If [=Type=](|key|) is String, let |serialized key| be |child key|,
+       otherwise let |serialized key| be the result of [=serialize as a remote
+       value=] with arguments |child key|, |max depth| - 1, |node details| and
+       |set of known objects|.
+
+    1. Let |serialized value| be the result of [=serialize as a
+       remote value=] with arguments |value|, |max
+       depth| - 1, |node details| and |set of known objects|.
+
+    1. Let |serialized child| be («|serialized key|, |serialized value|»).
+
+    1. Append |serialized child| to |serialized|.
+
+  1. Return |serialized|
+</div>
+
+# Modules # {#modules}
+
+## The session Module ## {#module-session}
+
+The <dfn export for=modules>session</dfn> module contains commands and
+events for monitoring the status of the remote end.
+
+### Definition ### {#module-session-definition}
+
+[=remote end definition=]
+
+<pre class="cddl remote-cddl">
+SessionCommand = (SessionStatusCommand //
+                  SessionSubscribeCommand)
+</pre>
+
+[=local end definition=]
+
+<pre class="cddl local-cddl">
+
+SessionResult = (StatusResult)
+
+</pre>
+
+<div algorithm>
+
+To <dfn lt="updating the event map">update the event map</dfn>, given
+|session|, |list of event names|, |list of contexts|, and |enabled|:
+
+  1. Let |global event set| be the [=global event set=] for |session|.
+
+  1. Let |event map| be the [=browsing context event map=] for |session|.
+
+  1. Let |event names| be an empty set.
+
+    1. For each entry |name| in the |list of event names|, let |event names| be
+       the union of |event names| and the result of [=trying=] to [=obtain a set
+       of event names=] with |name|.
+
+    1. If the |list of contexts| is null:
+
+      1. If |enabled| is true, for each |event name| in |event names|,
+         append |event name| to |global event set|. Otherwise for for each
+         |event name| in |event names|, if the |global event set| [=contains=]
+         |event name|, remove |event name| from the |global event set|.
+
+      1. Return
+
+    1. Let |targets| be an empty list.
+
+    1. For each entry |context id| in the |list of contexts|:
+
+      1. Let |context| be the result of [=trying=] to [=get a browsing context=]
+         with |context id|.  If the |event map| does not contain an entry for
+         |context|, set the value of the entry for |context| to a new empty map.
+
+      1. Get the entry from the |event map| for |context| and append it to
+         |targets|.
+
+    1. For each |target| in |targets|:
+
+      1. For each |event name| in |event names|:
+
+        1. Set |target|[|event name|] to |enabled|.
+
+    1. Return [=success=] with data null.
+
+    Note: Implementations that do additional work when an event is enabled,
+    e.g. subscribing to the relevant engine-internal events, will likely perform
+    those additional steps when updating the event map. This specification uses
+    a model where hooks are always called and then the event map is used to
+    filter only those that ought to be returned to the local end.
+</div>
+
+### Commands ### {#module-session-commands}
+
+#### The session.status Command #### {#command-session-status}
+
+The <dfn export for=commands>session.status</dfn> command returns information about
+whether a remote end is in a state in which it can create new sessions,
+but may additionally include arbitrary meta information that is specific
+to the implementation.
+
+<dl>
+   <dt>Command Type</dt>
+   <dd>
+      <pre class="cddl remote-cddl">
+      SessionStatusCommand = {
+        method: "session.status",
+        params: EmptyParams,
+      }
+      </pre>
+   </dd>
+   <dt>Return Type</dt>
+   <dd>
+      <pre class="cddl local-cddl">
+      SessionStatusResult = {
+        ready: bool,
+        message: text,
+      }
+      </pre>
+   </dd>
+</dl>
+
+The [=remote end steps=] are:
+
+1. Let |body| be a new [=map=] with the following properties:
+
+   <dl>
+      <dt>"ready"</dt>
+      <dd>The [=remote end=]’s readiness state.</dd>
+
+      <dt>"message"</dt>
+      <dd>An implementation-defined string explaining the [=remote end=]’s readiness
+   state.</dd>
+   </dl>
+
+2. Return [=success=] with data |body|
+
+#### The session.subscribe Command #### {#command-session-subscribe}
+
+The <dfn export for=commands>session.subscribe</dfn> command enables certain events
+either globally or for a set of browsing contexts
+
+Issue: This needs to be generalized to work with realms too
+
+<dl>
+   <dt>Command Type</dt>
+   <dd>
+      <pre class="cddl remote-cddl">
+      SessionSubscribeCommand = {
+        method: "session.subscribe",
+        params: SubscribeParameters
+      }
+
+      SessionSubscribeParameters = {
+        events: [*text],
+        ?contexts: [*BrowsingContext],
+      }
+      </pre>
+   </dd>
+   <dt>Return Type</dt>
+   <dd>
+    <pre class="cddl local-cddl">
+        EmptyResult
+    </pre>
+   </dd>
+</dl>
+
+The [=remote end steps=] with |command parameters| are:
+<div algorithm="remote end steps for session.subscribe">
+    1. Let the |list of event names| be the value of the <code>events</code> field of
+       |command parameters|.
+
+    1. Let the |list of contexts| be the value of the <code>contexts</code>
+       field of |command parameters| if it is present or null if it isn't.
+
+    1. Return the result of [=updating the event map=] with [=current session=],
+       |list of event names|, |list of contexts| and enabled true.
+</div>
+
+#### The session.unsubscribe Command #### {#command-session-unsubscribe}
+
+The <dfn export for=commands>session.unsubscribe</dfn> command disables events
+either globally or for a set of browsing contexts
+
+Issue: This needs to be generalised to work with realms too
+
+<dl>
+   <dt>Command Type</dt>
+   <dd>
+     <pre class="cddl remote-cddl">
+     SessionUnsubscribeCommand = {
+       method: "session.unsubscribe",
+       params: SubscribeParameters
+     }
+     </pre>
+   </dd>
+   <dt>Return Type</dt>
+   <dd>
+      <pre class="cddl local-cddl">
+        EmptyResult
+      </pre>
+   </dd>
+</dl>
+
+The [=remote end steps=] with |command parameters| are:
+<div algorithm="remote end steps for session.unsubscribe">
+    1. Let the |list of event names| be the value of the <code>events</code> field of
+       |command parameters|.
+
+    1. Let the |list of contexts| be the value of the <code>contexts</code>
+       field of |command parameters| if it is present or null if it isn't.
+
+    1. Return the result of [=updating the event map=] with [=current session=],
+       |list of event names|, |list of contexts| and enabled false.
+</div>
+
+
+## The browsingContext Module ## {#module-browsingContext}
+
+The <dfn export for=modules>browsingContext</dfn> module contains commands and
+events relating to browsing contexts.
+
+### Definition ### {#module-browsingContext-definition}
+
+[=remote end definition=]
+
+<pre class="cddl remote-cddl">
+
+BrowsingContextCommand = (BrowsingContextGetTreeCommand)
+</pre>
+
+[=local end definition=]
+
+<pre class="cddl local-cddl">
+
+BrowsingContextResult = (BrowsingContextGetTreeResult)
+
+BrowsingContextEvent = (
+    BrowsingContextCreatedEvent //
+    BrowsingContextDestroyedEvent
+)
+
+</pre>
+
+### Types ### {#module-browsingcontext-types}
+
+#### The browsingContext.BrowsingContext Type #### {#type-browsingContext-Browsingcontext}
+
+[=remote end definition=] and [=local end definition=]
+
+<pre class="cddl remote-cddl local-cddl">
+BrowsingContext = text;
+</pre>
+
+Each [=/browsing context=] has an associated <dfn export>browsing context
+id</dfn>, which is a string uniquely identifying that browsing context. This is
+implicitly set when the context is created. For browsing contexts with an
+associated WebDriver [=window handle=] the [=/browsing context id=] must be the
+same as the [=window handle=].
+
+<div algorithm>
+To <dfn>get a browsing context</dfn> given |context id|:
+
+ 1. If |context id| is null, return [=success=] with data null.
+
+ 1. If there is no browsing context with [=browsing context id=] |context id| return
+    [=error=] with [=error code=] [=no such frame=]
+
+ 1. Let |context| be the browsing context with id |context id|.
+
+ 1. Return [=success=] with data |context|
+
+</div>
+
+#### The browsingContext.BrowsingContextInfo Type #### {#type-browsingContext-BrowsingContextInfo}
+
+[=local end definition=]
+
+<pre class="cddl local-cddl">
+
+BrowsingContextInfoList = [* BrowsingContextInfo]
+
+BrowsingContextInfo = {
+  context: BrowsingContext,
+  ?parent: BrowsingContext / null,
+  url: text,
+  children: BrowsingContextInfoList / null
+}
+
+</pre>
+
+The <code>BrowsingContextInfo</code> type represents the properties of a
+browsing context.
+
+<div algorithm> To <dfn>get the browsing context info</dfn> given |context|,
+|depth| and |max depth|:
+
+ 1. Let |context id| be the [=browsing context id=] for |context|.
+
+ 1. If |context| has a [=parent browsing context=] let |parent id| be the
+    [=browsing context id=] of that parent. Otherwise let |parent id| be null.
+
+ 1. Let |document| be |context|'s [=active document=].
+
+ 1. Let |url| be the result of running the [=URL serializer=], given
+    |document|'s <a spec=dom>URL</a>.
+
+    Note: This includes the fragment component of the URL.
+
+ 1. Let |child info| be the result of [=get the descendent browsing contexts=]
+    given |context id|, |depth| + 1, and |max depth|.
+
+ 1. Let |context info| be a [=map=] matching the
+    <code>BrowsingContextInfo</code> production with the <code>context</code>
+    field set to |context id|, the <code>parent</code> field set to |parent id|
+    if |depth| is 0, or unset otherwise, the <code>url</code> field set to
+    |url|, and the <code>children</code> field set to |child info|.
+
+ 1. Return |context info|.
+
+</div>
+
+<div algorithm>
+  To <dfn>get the descendent browsing contexts</dfn> given |parent id|, |depth|
+  and |max depth|:
+
+  1. If |max depth| is greater than zero, and |depth| is equal to |max depth|,
+     return null.
+
+  1. Let |parent| be the result of [=trying=] to [=get a browsing context=]
+     given |parent id|.
+
+  1. If |parent| is null, let |child contexts| be a list containing all [=top-level
+     browsing contexts=]. Otherwise let |child contexts| be a list containing all
+     [=/browsing contexts=] which are [=child browsing contexts=] of |parent|.
+
+  1. Let |contexts info| be a list.
+
+  1. For each |context| of |child contexts|:
+
+    1. Let |info| be the result of [=get the browsing context info=] given
+       |context|, |depth|, and |max depth|.
+
+    1. Append |info| to |contexts info|
+
+  1. Return |contexts info|
+
+</div>
+
+### Commands ### {#module-browsingContext-commands}
+
+#### The browsingContext.getTree Command ####  {#command-browsingContext-list}
+
+The <dfn export for=commands>browsingContext.getTree</dfn> command returns a
+tree of all browsing contexts that are descendents of the given context, or all
+top-level contexts when no parent is provided.
+
+<dl>
+   <dt>Command Type</dt>
+   <dd>
+      <pre class="cddl remote-cddl">
+      BrowsingContextGetTreeCommand = {
+        method: "browsingContext.getTree",
+        params: BrowsingContextGetTreeParameters
+      }
+
+      BrowsingContextGetTreeParameters = {
+        ?maxDepth: uint,
+        ?parent: BrowsingContext,
+      }
+      </pre>
+   </dd>
+   <dt>Return Type</dt>
+   <dd>
+    <pre class="cddl local-cddl">
+        BrowsingContextGetTreeResult = {
+          contexts: BrowsingContextInfoList
+        }
+    </pre>
+   </dd>
+</dl>
+
+<div algorithm="remote end steps for browsingContext.getTree">
+The [=remote end steps=] with |command parameters| are:
+
+  1. Let the |parent id| be the value of the <code>parent</code> field of
+     |command parameters| if present, or null otherwise.
+
+  1. Let |max depth| be the value of the <code>maxDepth</code> field of |command
+     parameters| if present, or 0 otherwise.
+
+  1. Let |depth| be 0.
+
+  1. Let |contexts| be the result of [=get the descendent browsing contexts=],
+     given |parent id|, |depth|, and |max depth|.
+
+  1. Let |body| be a [=map=] matching the <code>BrowsingContextGetTreeResult</code>
+     production, with the <code>contexts</code> field set to |contexts|.
+
+  1. Return [=success=] with data |body|.
+
+</div>
+
+### Events ### {#module-contexts-events}
+
+#### The browsingContext.contextCreated Event #### {#event-browsingContext-contextCreated}
+
+<dl>
+   <dt>Event Type</dt>
+   <dd>
+      <pre class="cddl local-cddl">
+        BrowsingContextCreatedEvent = {
+         method: "browsingContext.contextCreated",
+         params: BrowsingContextInfo
+       }
+      </pre>
+   </dd>
+</dl>
+The [=remote end event trigger=] is:
+
+<div algorithm="remote end event trigger for browsingContext.contextCreated">
+When the [=create a new browsing context=] algorithm is invoked, after the
+[=active document=] of the browsing context is set, run the following steps:
+
+ 1. Let |context| be the newly created browsing context.
+
+ 1. Let |related contexts| be a set containing the [=parent browsing context=]
+    of |context|, if that is not null, or an empty set otherwise.
+
+ 1. Let |params| be the result of [=get the browsing context info=] given
+    |context|, 0, and 1.
+
+ 1. Let |body| be a [=map=] matching the
+    <code>BrowsingContextCreatedEvent</code> production, with the
+    <code>params</code> field set to |params|.
+
+ 1. [=Emit an event=] with |body| and |related contexts|.
+
+</div>
+
+#### The browsingContext.contextDestroyed Event #### {#event-browsingContext-contextDestroyed}
+
+<dl>
+   <dt>Event Type</dt>
+   <dd>
+      <pre class="cddl local-cddl">
+        BrowsingContextDestroyedEvent = {
+         method: "browsingContext.contextDestroyed",
+         params: BrowsingContextInfo
+       }
+      </pre>
+   </dd>
+</dl>
+The [=remote end event trigger=] is:
+
+<div algorithm="remote end event trigger for browsingContext.contexDestroyed">
+
+Run the following [=browsing context tree discarded=] steps:
+
+ 1. If the [=current session=] is null, return.
+
+ 1. Let |context| be the browsing context being discarded.
+
+ 1. Let |params| be the result of [=get the browsing context info=], given
+    |context|, 0, and 0.
+
+ 1. Let |body| be a [=map=] matching the
+     <code>BrowsingContextDestroyedEvent</code> production, with the
+     <code>params</code> field set to |params|.
+
+ 1. Let |related contexts| be a set containing the [=parent browsing context=]
+    of |context|, if that is not null, or an empty set otherwise.
+
+ 1. [=Emit an event=] with |body| and |related contexts|.
+
+Issue: the way this hooks into HTML feels very fragile. See https://github.com/whatwg/html/issues/6194
+
+Issue: It's unclear if we ought to only fire this event for browsing
+contexts that have active documents; navigation can also cause contexts to
+become inaccessible but not yet get discarded because bfcache.
+</div>
+
+## The script Module ## {#module-script}
+
+The <dfn export for=modules>script</dfn> module contains commands and events
+relating to script realms and execution.
+
+### Definition ### {#module-script-definition}
+
+[=Remote end definition=]
+
+<pre class="cddl remote-cddl">
+
+ScriptCommand = (ScriptGetRealmsCommand)
+</pre>
+
+[=local end definition=]
+
+<pre class="cddl local-cddl">
+
+ScriptResult = (ScriptGetRealmsResult)
+
+ScriptEvent = (
+    ScriptRealmCreatedEvent //
+    ScriptRealmDestroyedEvent
+)
+
+</pre>
+
+
+### Types ### {#module-script-types}
+
+#### The script.Realm type #### {#type-script-Realm}
+
+[=Remote end definition=] and [=local end definition=]
+
+<pre class="cddl local-cddl remote-cddl">
+Realm = text;
+</pre>
+
+Each [=realm=] has an associated <dfn export>realm id</dfn>, which is a string
+uniquely identifying that realm. This is implicitly set when the realm is
+created.
+
+<!-- TEMPORARILY UNUSED
+<div algorithm>
+To <dfn>get a realm</dfn> given |realm id|:
+
+ 1. If |realm id| is null, return [=success=] with data null.
+
+ 1. If there is no [=realm=] with [=realm id|id=] |realm id| return
+    [=error=] with [=error code=] [=no such frame=]
+
+ 1. Let |realm| be the [=realm=] with [=realm id|id=] |realm id|.
+
+ 1. Return [=success=] with data |realm|
+
+Issue: This has the wrong error code
+</div>
+-->
+
+#### The script.RealmInfo type ####  {#type-script-RealmInfo}
+
+[=Local end definition=]
+
+<pre class="cddl local-cddl">
+RealmInfo = {
+  realm: Realm,
+  type: RealmType,
+  origin: text
+}
+
+RealmType = "window" / "dedicated-worker" / "shared-worker" / "service-worker" / "worker" / "paint-worklet" / "audio-worklet" / "worklet" / text
+</pre>
+
+The <code>RealmInfo</code> type represents the properties of a realm.
+
+<div algorithm>
+To <dfn>get the realm info</dfn> given |environment settings|:
+
+ 1. Let |realm| be |environment settings|' [=realm execution context=]'s Realm component.
+
+ 1. Let |realm id| be the [=realm id=] for |realm|.
+
+ 1. Run the steps under the first matching condition:
+
+   <dl>
+     <dt>The [=Realm/global object=] specified by |environment settings| is a [=Window=] object
+     <dd>
+      1. Let |type| be "<code>window</code>".
+
+     <dt>The [=Realm/global object=] specified by |environment settings| is a {{DedicatedWorkerGlobalScope}} object
+     <dd>
+       1. Let |type| be "<code>dedicated-worker</code>".
+     <dt>The [=Realm/global object=] specified by |environment settings| is a {{SharedWorkerGlobalScope}} object
+
+    <dd>
+       1. Let |type| be "<code>shared-worker</code>".
+     <dt>The [=Realm/global object=] specified by |environment settings| is a {{ServiceWorkerGlobalScope}} object
+
+    <dd>
+       1. Let |type| be "<code>service-worker</code>".
+
+    <dt>The [=Realm/global object=] specified by |environment settings| is a {{WorkerGlobalScope}} object
+    <dd>
+       1. Let |type| be "<code>worker</code>".
+
+    <dt>The [=Realm/global object=] specified by |environment settings| is a {{PaintWorkletGlobalScope}} object
+    <dd>
+       1. Let |type| be "<code>paint-worklet</code>".
+
+    <dt>The [=Realm/global object=] specified by |environment settings| is a {{AudioWorkletGlobalScope}} object
+    <dd>
+       1. Let |type| be "<code>audio-worklet</code>".
+
+    <dt>The [=Realm/global object=] specified by |environment settings| is a {{WorkletGlobalScope}} object
+    <dd>
+       1. Let |type| be "<code>worklet</code>".
+
+    <dt>Otherwise:
+    <dd>
+       1. Return null.
+   </dl>
+
+ 1. Let |origin| be the [=serialization of an origin=] given |environment settings|'s |origin|.
+
+ 1. Let |realm info| be a map matching the <code>RealmInfo</code> production,
+    with the <code>realm</code> field set to |realm id|, the <code>type</code>
+    field set to |type| and the <code>origin</code> field set to |origin|.
+
+ 1. Return |realm info|
+
+Issue: We currently don't provide information about realms of unknown
+       types. That might be a problem for e.g. extension-related realms.
+
+
+Note: Future variations of this specification will retain the invariant that
+         the last component of the type name after splitting on "<code>-</code>"
+         will always be "<code>worker</code>" for globals implementing
+         {{WorkerGlobalScope}}, and "<code>worklet</code>" for globals
+         implementing {{WorkletGlobalScope}}.
+
+</div>
+
+### Commands ### {#module-script-commands}
+
+#### The script.getRealms Command ####  {#command-script-getRealms}
+
+The <dfn export for=commands>script.getRealms</dfn> command returns a list of
+all realms, optionally filtered to [=realms=] of a specific type, or to the
+realm associated with the [=document=] currently loaded in a specified
+[=/browsing context=].
+
+<dl>
+   <dt>Command Type</dt>
+   <dd>
+      <pre class="cddl remote-cddl">
+      ScriptGetRealmsCommand = {
+        method: "script.getRealms",
+        params: GetRealmsParameters
+      }
+
+      GetRealmsParameters = {
+        ?context: BrowsingContext,
+        ?type: RealmType,
+      }
+      </pre>
+   </dd>
+   <dt>Return Type</dt>
+   <dd>
+    <pre class="cddl local-cddl">
+      RealmInfoList = [* RealmInfo]
+
+      ScriptGetRealmsResult = {
+        realms: RealmInfoList
+      }
+    </pre>
+   </dd>
+</dl>
+
+<div algorithm="remote end steps for script.getRealms">
+The [=remote end steps=] with |command parameters| are:
+
+  1. Let |environment settings| be a list of all the [=environment settings objects=]
+     that have their [=execution ready flag=] set.
+
+  1. If |command parameters| contains <code>context</code>:
+
+    1. Let |context| be the result of [=trying=] to [=get a browsing context=]
+       with |command parameters|["<code>context</code>"].
+
+    1. Let |document| be |context|'s [=active document=].
+
+    1. Let |context environment settings| be a list.
+
+    1. For each |settings| of |environment settings|:
+
+      1. If any of the following conditions hold:
+
+        * The [=responsible document=] of |settings| is |document|
+
+        * The [=Realm/global object=] specified by |settings| is a
+          {{WorkerGlobalScope}} with |document| in its [=owner set=]
+
+        Append |settings| to |context environment settings|.
+
+    1. Set |environment settings| to |context environment settings|.
+
+  1. Let |realms| be a list.
+
+  1. For each |settings| of |environment settings|:
+
+    1. Let |realm info| be the result of [=get the realm info=] given |settings|
+
+    1. If |command parameters| contains <code>type</code> and |realm
+       info|["<code>type</code>"] is not equal to |command
+       parameters|["<code>type</code>"] then [=continue=].
+
+    1. If |realm info| is not null, append |realm info| to |realms|.
+
+  1. Let |body| be a map matching the <code>GetRealmsResult</code> production,
+     with the <code>realms</code> field set to |realms|.
+
+  1. Return [=success=] with data |body|.
+
+
+Issue: Extend this to also allow realm parents e.g. for nested workers? Or get all ancestor workers.
+
+Issue: We might want to have a more sophisticated filter system than just a
+       literal match.
+
+</div>
+
+### Events ### {#module-script-events}
+
+#### The script.realmCreated Event #### {#event-script-realmCreated}
+
+<dl>
+   <dt>Event Type</dt>
+   <dd>
+      <pre class="cddl local-cddl">
+        ScriptRealmCreatedEvent = {
+         method: "script.realmCreated",
+         params: RealmInfo
+       }
+      </pre>
+   </dd>
+</dl>
+The [=remote end event trigger=] is:
+
+<div algorithm="remote end event trigger for script.realmCreated">
+
+When any of the [=set up a window environment settings object=], [=set up a
+worker environment settings object=] or [=set up a worklet environment settings
+object=] algorithms are invoked, immediately prior to returning the settings
+object:
+
+ 1. Let |environment settings| be the newly created [=environment settings
+    object=].
+
+ 1. Let |realm info| be be the result of [=get the realm info=] given
+    |environment settings|.
+
+ 1. If |realm info| is null, return.
+
+ 1. Let |related contexts| be an empty set.
+
+ 1. If the [=responsible document=] of |settings| is a [=Document=], append the
+    [=responsible document=]'s [=Document/browsing context=] to |related contexts|.
+
+    Otherwise if the [=Realm/global object=] specified by |settings| is a
+    {{WorkerGlobalScope}}, for each |owner| in the [=Realm/global object=]'s
+    [=owner set=], if |owner| is a [=Document=], append |owner|'s
+    [=Document/browsing context=] to |related contexts|.
+
+ 1. Let |body| be a map matching the <code>RealmCreatedEvent</code>
+    production, with the <code>params</code> field set to |realm info|.
+
+ 1. [=Emit an event=] with |body| and |related contexts|.
+
+</div>
+
+#### The script.realmDestroyed Event #### {#event-script-realmDestroyed}
+
+<dl>
+   <dt>Event Type</dt>
+   <dd>
+      <pre class="cddl local-cddl">
+       RealmDestroyedParameters = {
+         realm: Realm
+       }
+
+       ScriptRealmDestroyedEvent = {
+         method: "script.realmDestoyed",
+         params: RealmDestroyedParameters
+       }
+      </pre>
+   </dd>
+</dl>
+The [=remote end event trigger=] is:
+
+<div algorithm="remote end event trigger for script.realmDestroyed">
+Define the following [=unloading document cleanup steps=] with |document|:
+
+ 1. Let |related contexts| be an empty set.
+
+ 1. Append |document|'s [=Document/browsing context=] to |related contexts|.
+
+ 1. For each |worklet global scope| in |document|'s [=worklet global scopes=]:
+
+   1. Let |realm| be |worklet global scope|'s [=relevant Realm=].
+
+   1. Let |realm id| be the [=realm id=] for |realm|.
+
+   1. Let |params| be a map mathcing the <code>RealmDestroyedParameters</code>
+      production, with the <code>realm</code> field set of |realm id|.
+
+   1. Let |body| be a map matching the <code>RealmDestroyedEvent</code>
+      production, with the <code>params</code> field set to |params|.
+
+   1. [=Emit an event=] with |body| and |related contexts|.
+
+ 1. Let |environment settings| be the [=environment settings object=] whose
+    [=responsible document=] is |document|.
+
+ 1. Let |realm| be |environment settings|' [=realm execution context=]'s Realm component.
+
+ 1. Let |realm id| be the [=realm id=] for |realm|.
+
+ 1. Let |params| be a map mathcing the <code>RealmDestroyedParameters</code>
+    production, with the <code>realm</code> field set to |realm id|.
+
+ 1. Let |body| be a map matching the <code>RealmDestroyedEvent</code>
+    production, with the <code>params</code> field set to |params|.
+
+ 1. [=Emit an event=] with |body| and |related contexts|.
+
+Whenever a [=worker event loop=] |event loop| is destroyed, either because the
+worker comes to the end of its lifecycle, or prematurely via the [=terminate a
+worker=] algorithm:
+
+ 1. Let |related contexts| be an empty set.
+
+ 1. Let |environment settings| be the [=environment settings object=] for which
+    |event loop| is the [=responsible event loop=].
+
+ 1. If the [=Realm/global object=] specified by |environment settings| is a
+    {{WorkerGlobalScope}}, for each |owner| in the [=Realm/global object=]'s
+    [=owner set=], if |owner| is a [=Document=], append |owner|'s
+    [=Document/browsing context=] to |related contexts|.
+
+ 1. Let |realm| be |environment settings|'s [=environment settings object's Realm=].
+
+ 1. Let |realm id| be the [=realm id=] for |realm|.
+
+ 1. Let |params| be a map mathcing the <code>RealmDestroyedParameters</code>
+    production, with the <code>realm</code> field set of |realm id|.
+
+ 1. Let |body| be a map matching the <code>RealmDestroyedEvent</code>
+    production, with the <code>params</code> field set to |params|.
+
+</div>
+
+# Patches to Other Specifications # {#patches}
+
+This specification requires some changes to external specifications to provide the necessary
+integration points. It is assumed that these patches will be committed to the other specifications
+as part of the standards process.
+
+## HTML ##  {#patches-html}
+
+The [=a browsing context is discarded=] algorithm is modified to read as follows:
+
+<div algorithm>
+To discard a browsing context |browsingContext|, run these steps:
+
+ 1. If this is not a recursive invocation of this algorithm, call any <dfn export>browsing context
+    tree discarded</dfn> steps defined in external specifications with |browsingContext|.
+
+ 1. Discard all {{Document}} objects for all the entries in |browsingContext|'s [=session
+    history=].
+
+ 1. If |browsingContext| is a [=top-level browsing context=], then [=remove a browsing context=]
+    |browsingContext|.
+
+</div>
+
+Issue: The actual patch might be better to split the algorithm into an outer algorithm that is
+called by external callers and an inner algorithm that's used for recursive calls. That's quite hard
+to express as a patch to the specification since it requires changing multiple parts.

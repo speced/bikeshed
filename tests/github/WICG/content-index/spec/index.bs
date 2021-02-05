@@ -1,0 +1,452 @@
+<pre class='metadata'>
+Title: Content Index
+Shortname: content-index
+Level: 1
+Status: ED
+Group: wicg
+URL: https://wicg.github.io/content-index/spec/
+Editor: Peter Beverloo, Google, beverloo@google.com
+Editor: Rayan Kanso, Google, rayankans@google.com
+Abstract: An API for websites to register their offline enabled content with the browser.
+</pre>
+
+<pre class="link-defaults">
+spec:html; type:dfn; for:/; text:create a new browsing context
+spec:infra; type:dfn; text:string
+spec:promises-guide-1; type:dfn; text:resolve
+</pre>
+
+<pre class="anchors">
+spec: html; urlPrefix: https://html.spec.whatwg.org/multipage/
+    type: dfn
+        urlPrefix: browsers.html
+            text: ancestor origins list; for: Location; url: concept-location-ancestor-origins-list
+
+spec: page-visibility; urlPrefix: https://www.w3.org/TR/page-visibility/
+    type: attribute; text: visibilityState; for: Document; url: dom-document-visibilitystate
+
+spec: service-workers; urlPrefix: https://www.w3.org/TR/service-workers/
+    type: dfn; text: create window client; url: create-windowclient-algorithm
+
+spec: image-resource; urlPrefix: https://w3c.github.io/image-resource/
+    type: dictionary; text: ImageResource; url: dom-imageresource
+    type: dfn; text: image resource; url: image-resource
+    type: dfn; text: src; for:image resource; url: dfn-src
+    type: dfn; text: parsing; url: processing-an-imageresource-from-an-api
+</pre>
+
+<style>
+  .algorithm dl {
+    overflow: hidden;
+  }
+  .algorithm dt {
+    font-weight: normal;
+    float: left;
+    clear: left;
+    line-height: 1.5;
+    margin-right: 0.3em;
+  }
+  .algorithm dt::after {
+    content: '- ';
+  }
+  .algorithm dd {
+    margin-left: 0em;
+  }
+</style>
+
+Introduction {#intro}
+=====================
+
+High quality offline-enabled web content is not easily discoverable by users right now. Users would have to know which
+websites work offline, or they would need to have an installed PWA, to be able to browse through content while offline.
+This is not a great user experience as there no entry points to discover available content. To address this, the spec
+covers a new API which allows developers to tell the browser about their specific content.
+
+The content index allows websites to register their offline enabled content with the browser. The browser can then
+improve the website's offline capabilities and offer content to users to browse through while offline. This data could
+also be used to improve on-device search and augment browsing history.
+
+Using the API can help users more easily discover content for the following example use cases:
+
+* A news website prefetching the latest articles in the background.
+* A content streaming app registering downloaded content with the browser.
+
+## Example ## {#example}
+
+<div class="example">
+  Registering an offline news article in a [=service worker=].
+
+  <pre class="lang-js">
+    function deleteArticleResources(id) {
+      return Promise.all([
+        caches.open('offline-articles')
+            .then(articlesCache => articlesCache.delete(`/article/${id}`)),
+        // This is a no-op if the function was called as a result of the
+        // `contentdelete` event.
+        self.registration.index.delete(id),
+      ]);
+    }
+    
+    self.addEventListener('activate', event => {
+      // When the service worker is activated, remove old content.
+      event.waitUntil(async function() {
+        const descriptions = await self.registration.index.getAll();
+        const oldDescriptions =
+            descriptions.filter(description => shouldRemoveOldArticle(description));
+        await Promise.all(
+            oldDescriptions.map(description => deleteArticleResources(description.id)));
+      }());
+    });
+    
+    self.addEventListener('push', event => {
+      const payload = event.data.json();
+    
+      // Fetch & store the article, then register it.
+      event.waitUntil(async function() {
+        const articlesCache = await caches.open('offline-articles');
+        await articlesCache.add(`/article/${payload.id}`);
+        await self.registration.index.add({
+          id: payload.id,
+          title: payload.title,
+          description: payload.description,
+          category: 'article',
+          icons: payload.icons,
+          url: `/article/${payload.id}`,
+        });
+    
+        // Show a notification if urgent.
+      }());
+    });
+    
+    self.addEventListener('contentdelete', event => {
+      // Clear the underlying content after user-deletion.
+      event.waitUntil(deleteArticleResources(event.id));
+    });    
+  </pre>
+
+  In the above example, <code>shouldRemoveOldArticle</code> is a developer-defined function.
+</div>
+
+Privacy Considerations {#privacy-considerations}
+================================================
+
+Firing the <code>contentdelete</code> event may reveal the user's IP address after the user has left the page. Exploiting
+this can be used for tracking location history. The user agent SHOULD limit tracking by capping the duration of the
+event.
+
+When firing the <code>contentdelete</code> event, the user agent SHOULD prevent the website from adding new content.
+This prevents spammy websites from re-adding the same content, and the users from being shown content they just
+deleted.
+
+[=Displaying=] all registered content can cause malicious websites to spam users with their content to maximize
+exposure. User agents are strongly encouraged to not surface all content, but rather choose the appropriate content
+to [=display=] based on a set of user agent defined signals, aimed at improving the user experience.
+
+Infrastructure {#infrastructure}
+================================
+
+## Extensions to service worker registration ## {#service-worker-registration-concept-extensions}
+
+A [=/service worker registration=] additionally has:
+
+  <div dfn-for="service worker registration">
+    * <dfn>Content index entries</dfn> (a [=map=]), where each key is a DOMString, and each item is a
+        [=content index entry=].
+    * An <dfn>entry edit queue</dfn> (a [=parallel queue=]), initially the result of
+        [=starting a new parallel queue=].
+  </div>
+  
+  ## Content index entry ## {#content-index-entry-concept}
+  
+  A <dfn>content index entry</dfn> consists of:
+  
+  <div dfn-for="content index entry">
+    * A <dfn>description</dfn> (a {{ContentDescription}}).
+    * A <dfn>launch url</dfn> (a [=/URL=]).
+    * A <dfn>service worker registration</dfn> (a [=/service worker registration=]).
+    * <dfn>icons</dfn> (a [=/list=] of [=/responses=] that are image decodable).
+  </div>
+  
+  ### [=Display=] ### {#content-index-entry-display}
+
+  The user agent MAY [=display=] a [=/content index entry=] (|entry|) at any time, as long as |entry| [=map/exists=] in
+  a [=/service worker registration=]'s [=content index entries=].
+
+  Note: User agents should limit surfaced content to avoid showing too many entries to a user.
+  
+  <div algorithm>
+    To <dfn>display</dfn> a [=/content index entry=] (|entry|), the user agent MUST present a user interface that
+    follows these rules:
+  
+    * The UI MUST prominently display the |entry|'s [=content index entry/service worker registration=]'s [=service
+        worker registration/scope url=]'s [=url/origin=].
+    * The UI MUST display |entry|'s [=content index entry/description=]'s {{ContentDescription/title}}.
+    * The UI MAY display |entry|'s [=content index entry/description=]'s {{ContentDescription/description}}.
+    * The UI MAY use |entry|'s [=content index entry/description=]'s {{ContentDescription/category}} in display
+        decisions.
+    * The UI MAY display any of |entry|'s [=content index entry/icons=] as images.
+    * The UI SHOULD provide a way for the user to delete the underlying |entry| exposed by the UI, in which case
+        run [=delete a content index entry=] for |entry|.
+    * The UI MUST provide a way for the user to activate it (for example by clicking), in which case run
+        [=activate a content index entry=] for |entry|.
+  </div>
+
+  ### [=Undisplay=] ### {#content-index-entry-undisplay}
+
+  <div algorithm>
+    To <dfn>undisplay</dfn> a [=/content index entry=] (|entry|), the user agent MUST remove all UI associated with
+    running [=display=] on |entry|.
+  </div>
+
+Algorithms {#algorithms}
+========================
+
+## [=Delete a content index entry=] ## {#delete-a-content-index-entry-algorithm}
+
+  <div algorithm>
+    To <dfn>delete a content index entry</dfn> for |entry| (a [=content index entry=]), run these steps:
+
+    1. Let |id| be |entry|'s [=content index entry/description=]'s {{ContentDescription/id}}.
+    1. Let |contentIndexEntries| be |entry|'s [=content index entry/service worker registration=]'s
+        [=content index entries=].
+    1. [=Enqueue the following steps=] to |entry|'s [=content index entry/service worker registration=]'s
+        [=entry edit queue=]:
+        1. [=Undisplay=] |entry|.
+        1. [=map/Remove=] |contentIndexEntries|[|id|].
+        1. [=Fire a content delete event=] for |entry|.
+  </div>
+
+## [=Activate a content index entry=] ## {#activate-a-content-index-entry-algorithm}
+
+  <div algorithm>
+    To <dfn>activate a content index entry</dfn> for |entry| (a [=content index entry=]), run these steps:
+
+    1. Let |activeWorker| be |entry|'s [=content index entry/service worker registration=]'s [=active worker=].
+    1. If |activeWorker| is null, abort these steps.
+    1. Let |newContext| be a new [=top-level browsing context=].
+    1. [=Queue a task=] to run the following steps on |newContext|'s {{Window}} object's
+        [=environment settings object=]'s [=responsible event loop=] using the [=user interaction task source=]:
+        1. <i>HandleNavigate</i>: [=Navigate=] |newContext| to |entry|'s [=content index entry/launch url=] with
+            [=exceptions enabled flag|exceptions enabled=] and [=replacement enabled=].
+        1. If the algorithm steps invoked in the step labeled <i>HandleNavigate</i> [=throws=] an exception, abort
+            these steps.
+        1. Let |frameType| be "`top-level`".
+        1. Let |visibilityState| be |newContext|'s [=active document=]'s {{Document/visibilityState}} attribute value.
+        1. Let |focusState| be the result of running the [=has focus steps=] with |newContext|'s [=active document=] as
+            the argument.
+        1. Let |ancestorOriginsList| be |newContext|'s [=active document=]'s [=relevant global object=]'s {{Location}}
+            object's [=Location/ancestor origins list=]'s associated list.
+        1. Let |serviceWorkerEventLoop| be |activeWorker|'s [=service worker/global object=]'s [=event loop=].
+        1. [=Queue a task=] to run the following steps on |serviceWorkerEventLoop| using the
+            [=DOM manipulation task source=]:
+            1. If |newContext|'s {{Window}} object's [=environment settings object=]'s [=creation URL=]'s
+                [=environment settings object/origin=] is not the [=same origin|same=] as the |activeWorker|'s
+                [=environment settings object/origin=], abort these steps.
+            1. Run [=Create Window Client=] with |newContext|'s {{Window}} object's [=environment settings object=],
+                |frameType|, |visibilityState|, |focusState|, and |ancestorOriginsList| as the arguments.
+  
+    Issue: Is creating a new Browsing Context the right thing to do here?
+    (<a href="https://github.com/wicg/content-index/issues/15">issue</a>)
+  </div>
+
+## [=Fire a content delete event=] ## {#fire-content-delete-event-algorithm}
+
+  <div algorithm>
+    To <dfn>fire a content delete event</dfn> for |entry| (a [=content index entry=]), [=fire a functional event=] named
+    "<i>contentdelete</i>" using {{ContentIndexEvent}} on |entry|'s [=content index entry/service worker registration=] with
+    the following properties:
+      : {{ContentIndexEvent/id}}
+      :: |entry|'s [=content index entry/description=]'s {{ContentDescription/id}}.
+  </div>
+
+API {#api}
+==========
+
+## Extensions to {{ServiceWorkerGlobalScope}} ## {#extensions-to-service-worker-global}
+
+<script type="idl">
+partial interface ServiceWorkerGlobalScope {
+  attribute EventHandler oncontentdelete;
+};
+</script>
+
+### Events ### {#service-worker-global-events}
+
+The following is the <a>event handler</a> (and its corresponding <a>event handler event type</a>) that must be
+supported, as <a>event handler IDL attributes</a>, by all objects implementing {{ServiceWorker}} interface:
+
+<table class="data">
+  <thead>
+    <tr>
+      <th>[=event handler event type=]</th>
+      <th>[=event handler=]</th>
+      <th>Interface</th>
+    </tr>
+  </thead>
+  <tbody dfn-for="ServiceWorkerGlobalScope" dfn-type="event">
+    <tr>
+      <td><dfn>contentdelete</dfn></td>
+      <td>{{ServiceWorkerGlobalScope/oncontentdelete}}</td>
+      <td>{{ContentIndexEvent}}</td>
+    </tr>
+  </tbody>
+</table>
+
+## Extensions to {{ServiceWorkerRegistration}} ## {#extensions-to-service-worker-registration}
+
+<script type="idl">
+partial interface ServiceWorkerRegistration {
+  [SameObject] readonly attribute ContentIndex index;
+};
+</script>
+
+<div dfn-for="ServiceWorkerRegistration">
+
+  A {{ServiceWorkerRegistration}} has a <dfn>content index</dfn> (a {{ContentIndex}}), initially a
+  new {{ContentIndex}} whose [=ContentIndex/service worker registration=] is the [=context
+  object=]'s [=/service worker registration=].
+
+  The <dfn attribute>index</dfn> attribute's getter must return the [=context object=]'s
+  [=ServiceWorkerRegistration/content index=].
+</div>
+
+## {{ContentIndex}} ## {#content-index}
+
+<script type="idl">
+enum ContentCategory {
+  "",
+  "homepage",
+  "article",
+  "video",
+  "audio",
+};
+
+dictionary ContentDescription {
+  required DOMString id;
+  required DOMString title;
+  required DOMString description;
+  ContentCategory category = "";
+  sequence<ImageResource> icons = [];
+  required USVString url;
+};
+
+[Exposed=(Window,Worker)]
+interface ContentIndex {
+  Promise<void> add(ContentDescription description);
+  Promise<void> delete(DOMString id);
+  Promise<sequence<ContentDescription>> getAll();
+};
+</script>
+
+<div dfn-for="ContentIndex">
+
+  A {{ContentIndex}} has a <dfn>service worker registration</dfn> (a [=/service worker registration=]).
+
+  ### {{ContentIndex/add()}} ### {#content-index-add}
+
+  <div algorithm>
+    The <dfn method>add(|description|)</dfn> method, when invoked, must return [=a new promise=] |promise| and run
+    these steps [=in parallel=]:
+
+    1. Let |registration| be the [=context object=]'s [=ContentIndex/service worker registration=].
+    1. If |registration|'s [=active worker=] is null, [=reject=] |promise| with a {{TypeError}} and abort these steps.
+    1. If any of |description|'s {{ContentDescription/id}}, {{ContentDescription/title}},
+        {{ContentDescription/description}}, or {{ContentDescription/url}} is the empty [=/string=], [=reject=]
+        |promise| with a {{TypeError}} and abort these steps.
+    1. Let |launchURL| be the result of [=URL parser|parsing=] |description|'s {{ContentDescription/url}} with
+        [=context object=]'s [=relevant settings object=]'s [=API base URL=].
+
+        Note: A new [=/service worker registration=] might be introduced later with a narrower scope.   
+    1. Let |matchedRegistration| be the result of running  [=Match Service Worker Registration=] algorithm with
+        |launchURL| as its argument.
+    1. If |matchedRegistration| is not equal to |registration|, [=reject=] |promise| with a {{TypeError}} and abort
+        these steps.
+    1. If |registration|'s [=active worker=]'s [=set of extended events=] does not [=set/contain=] a {{FetchEvent}},
+        [=reject=] |promise| with a {{TypeError}} and abort these steps.
+    1. Let |icons| be an empty [=/list=].
+    1. Optionally, the user agent MAY select icons to use from |description|'s {{ContentDescription/icons}}. In which
+        case run the following steps [=list/for each=] [=image resource=] (|resource|) of |description|'s {{ContentDescription/icons}}'
+        selected icons after successfully [=parsing=] it:
+        1. Let |response| be the result of awaiting a [=/fetch=] using a new [=/request=] with the following
+            properties:
+            : [=request/URL=]
+            :: |resource|'s [=image resource/src=].
+            : [=request/Client=]
+            :: [=context object=]'s [=relevant settings object=].
+            : [=request/Keepalive flag=]
+            :: Set.
+            : [=request/Destination=]
+            :: "`image`".
+            : [=request/Mode=]
+            :: "`no-cors`".
+            : [=request/Credentials mode=]
+            :: "`include`".
+        1. If |response| is a [=network error=], [=reject=] |promise| with a {{TypeError}} and abort these steps.
+        1. If |response| cannot be decoded as an image, [=reject=] |promise| with a {{TypeError}} and abort these
+            steps.
+        1. [=list/Append=] |response| to |icons|.
+
+    1. Let |entry| be a new [=/content index entry=] with:
+        : [=content index entry/description=]
+        :: |description|.
+        : [=content index entry/launch url=]
+        :: |launchURL|
+        : [=content index entry/service worker registration=]
+        :: |registration|.
+        : [=content index entry/icons=]
+        :: |icons|
+    1. Let |id| be |description|'s {{ContentDescription/id}}.
+    1. Let |contentIndexEntries| be |registration|'s [=content index entries=].
+    1. [=Enqueue the following steps=] to |registration|'s [=entry edit queue=]:
+        1. [=map/Set=] |contentIndexEntries|[|id|] to |entry|.
+        1. Optionally, the user agent MAY [=display=] |entry|.
+        1. [=Resolve=] |promise| with undefined.
+
+    Note: Adding a description with an existing ID would overwrite the previous value.
+  </div>
+
+  ### {{ContentIndex/delete()}} ### {#content-index-delete}
+
+  <div algorithm>
+    The <dfn method>delete(|id|)</dfn> method, when invoked, must return [=a new promise=] |promise| and run these
+    steps [=in parallel=]:
+
+    1. Let |registration| be the [=context object=]'s [=ContentIndex/service worker registration=].
+    1. Let |contentIndexEntries| be |registration|'s [=content index entries=].
+    1. [=Enqueue the following steps=] to |registration|'s [=entry edit queue=]:
+        1. [=Undisplay=] |contentIndexEntries|[|id|].
+        1. [=map/Remove=] |contentIndexEntries|[|id|].
+        1. [=Resolve=] |promise| with undefined.
+  </div>
+
+  ### {{ContentIndex/getAll()}} ### {#content-index-getall}
+
+  <div algorithm>
+    The <dfn method>getAll()</dfn> method, when invoked, must return [=a new promise=] |promise| and run these
+    steps [=in parallel=]:
+
+    1. Let |registration| be the [=context object=]'s [=ContentIndex/service worker registration=].
+    1. Let |contentIndexEntries| be |registration|'s [=content index entries=].
+    1. Let |descriptions| be an empty [=/list=].
+    1. [=Enqueue the following steps=] to |registration|'s [=entry edit queue=]:
+        1. [=map/For each=] id → |entry| of |contentIndexEntries|:
+            1. [=list/Append=] |entry|'s [=content index entry/description=] to |descriptions|.
+        1. [=Resolve=] |promise| with |descriptions|.
+  </div>
+
+</div>
+
+</div>
+
+## {{ContentIndexEvent}} ## {#content-index-event}
+
+<script type="idl">
+dictionary ContentIndexEventInit : ExtendableEventInit {
+  required DOMString id;
+};
+
+[Constructor(DOMString type, ContentIndexEventInit init), Exposed=ServiceWorker]
+interface ContentIndexEvent : ExtendableEvent {
+  readonly attribute DOMString id;
+};
+</script>

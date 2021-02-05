@@ -17,6 +17,7 @@ Abstract: An API that allows applications to lock down powerful APIs to only acc
 Markup Shorthands: algorithm yes, biblio yes, css no, dfn yes, markdown yes, markup yes
 Ignored Terms: h1, h2, h3, h4, h5, h6, xmp, EmptyString
 Complain About: missing-example-ids yes
+Boilerplate: idl-index no
 <!-- WPT Path Prefix: /trusted-types/ # Cannot add this, as it requires all the tests to be referenced in the spec -->
 </pre>
 
@@ -125,7 +126,7 @@ monitor and review.
     templating library and enables the enforcement for the [=DOM XSS injection sinks=].
 
 *   An existing web application interacts with the DOM mostly using XSS-safe
-    patterns (i.e. withour using [=DOM XSS injection sinks=]). In a few places,
+    patterns (i.e. without using [=DOM XSS injection sinks=]). In a few places,
     however, it resorts to using risky patterns like loading additional script using
     JSONP, calling into `innerHTML` or `eval`.
 
@@ -259,6 +260,7 @@ wrappers around a string, constructed via a {{TrustedTypePolicy}}'s
 [Exposed=Window, SecureContext]
 interface TrustedHTML {
   stringifier;
+  DOMString toJSON();
 };
 </pre>
 
@@ -266,7 +268,9 @@ TrustedHTML objects have a `[[Data]]` internal slot which holds a
 DOMString. The slot's value is set when the object is created, and
 will never change during its lifetime.
 
-To stringify a TrustedHTML object, return the DOMString from its
+<dfn method for="TrustedHTML">toJSON()</dfn> method steps and the
+<dfn for="TrustedHTML">stringification behavior</dfn> steps of a
+TrustedHTML object are to return the value from its
 `[[Data]]` internal slot.
 
 ### <dfn type>TrustedScript</dfn> ### {#trusted-script}
@@ -282,6 +286,7 @@ around a string, constructed via a {{TrustedTypePolicy}}'s
 [Exposed=Window, SecureContext]
 interface TrustedScript {
   stringifier;
+  DOMString toJSON();
 };
 </pre>
 
@@ -289,7 +294,9 @@ TrustedScript objects have a `[[Data]]` internal slot which holds a
 DOMString. The slot's value is set when the object is created, and
 will never change during its lifetime.
 
-To stringify a TrustedScript object, return the DOMString from its
+<dfn method for="TrustedScript">toJSON()</dfn> method steps and the
+<dfn for="TrustedScript">stringification behavior</dfn> steps of a
+TrustedScript object are to return the value from its
 `[[Data]]` internal slot.
 
 
@@ -306,6 +313,7 @@ string, constructed via a {{TrustedTypePolicy}}'s
 [Exposed=Window, SecureContext]
 interface TrustedScriptURL {
   stringifier;
+  USVString toJSON();
 };
 </pre>
 
@@ -313,7 +321,9 @@ TrustedScriptURL objects have a `[[Data]]` internal slot which holds a
 USVString. The slot's value is set when the object is created, and
 will never change during its lifetime.
 
-To stringify a TrustedScriptURL object, return the USVString from its
+<dfn method for="TrustedScriptURL">toJSON()</dfn> method steps and the
+<dfn for="TrustedScriptURL">stringification behavior</dfn> steps of a
+TrustedScriptURL object are to return the value from its
 `[[Data]]` internal slot.
 
 
@@ -457,7 +467,7 @@ initially empty.
 ::  Creates a policy object that will implement the rules
     passed in the {{TrustedTypePolicyOptions}} |policyOptions| object.
     The allowed policy names may be restricted by [[#content-security-policy-hdr|Content Security Policy]].
-    If the policy name is not on the whitelist defined in the [=trusted-types-directive|trusted-types=] CSP directive,
+    If the policy name is not on the allowlist defined in the [=trusted-types-directive|trusted-types=] CSP directive,
     the policy creation fails with a [[WebIDL-1#idl-Error|TypeError]].
     Also, if unique policy names are enforced (i.e. `'allow-duplicates'` is not used),
     and `createPolicy` is called more than once with any given `policyName`,
@@ -467,7 +477,7 @@ initially empty.
     <xmp highlight=js>
     // HTTP Response header: Content-Security-Policy: trusted-types foo
     trustedTypes.createPolicy("foo", {}); // ok.
-    trustedTypes.createPolicy("bar", {}); // throws - name not on the whitelist.
+    trustedTypes.createPolicy("bar", {}); // throws - name not on the allowlist.
     trustedTypes.createPolicy("foo", {}); // throws - duplicate name.
     </xmp>
     </div>
@@ -556,7 +566,7 @@ initially empty.
     <div class="example" id="get-property-type-example">
     <xmp highlight="js">
     trustedTypes.getPropertyType('div', 'innerHTML'); // "TrustedHTML"
-    trustedTypes.getPropertyType('foo', 'bar'); // undefined
+    trustedTypes.getPropertyType('foo', 'bar'); // null
     </xmp>
     </div>
 
@@ -583,7 +593,7 @@ initially empty.
     <div class="example" id="get-attribute-type-example">
     <xmp highlight="js">
     trustedTypes.getAttributeType('script', 'SRC'); // "TrustedScriptURL"
-    trustedTypes.getAttributeType('foo', 'bar'); // undefined
+    trustedTypes.getAttributeType('foo', 'bar'); // null
     </xmp>
     </div>
 
@@ -760,16 +770,17 @@ the default policy is applied.
 // Content-Security-Policy: trusted-types default; require-trusted-types-for 'script'
 
 trustedTypes.createPolicy('default', {
-  createScriptURL: (s, sink) => {
+  createScriptURL: (s, type, sink) => {
     console.log("Please refactor.");
-    return s + "?default-policy-used&sink=" + encodeURIComponent(sink);
+    return s + '?default-policy-used&type=' + encodeURIComponent(type) +
+          '&sink=' + encodeURIComponent(sink);
   }
 });
 
 aScriptElement.src = "https://cdn.example/script.js";
 // Please refactor.
 console.log(aScriptElement.src);
-// https://cdn.example/script.js?default-policy-used&sink=script.src
+// https://cdn.example/script.js?default-policy-used&type=TrustedScriptURL&sink=HTMLScriptElement%20src
 </xmp>
 </div>
 
@@ -876,6 +887,9 @@ a string |value| and a list |arguments|, execute the following steps:
 1.  Let |trustedObject| be a new instance of an interface with a type
     name |trustedTypeName|, with its `[[Data]]` internal slot value
     set to |dataString|.
+1.  If |trustedObject| is a {{TrustedScript}}, set its `[[HostDefinedCodeLike]]` internal slot value to the value in its `[[Data]]` slot.
+
+    Note: This adds an integration point with [dynamic-code-brand-checks proposal](https://tc39.es/proposal-dynamic-code-brand-checks/).
 1.  Return |trustedObject|.
 
 ## <dfn abstract-op>Get Trusted Type compliant string</dfn> ## {#get-trusted-type-compliant-string-algorithm}
@@ -922,12 +936,12 @@ Given a {{TrustedType}} type (|expectedType|), a [=Realm/global object=] (|globa
     *  |defaultPolicy| as |policy|
     *  |input| as |value|
     *  |expectedType|’s type name as |trustedTypeName|
-    *  &laquo; |sink| &raquo; as |arguments|
+    *  &laquo; |trustedTypeName|, |sink| &raquo; as |arguments|
 1. If the algorithm threw an error, rethrow it. Otherwise, return |convertedInput|.
 
 ## <dfn abstract-op>Prepare the script URL and text</dfn> ## {#prepare-script-url-and-text}
 
-Given a {{script}} (|script|), this algorithm performs the following steps:
+Given an {{HTMLScriptElement}} (|script|), this algorithm performs the following steps:
 
 1.  If |script| does not have a {{script/src}} content attribute, set its {{script/[[ScriptURL]]}} internal slot value to `null`.
 
@@ -1063,7 +1077,7 @@ Issue: Define for workers.
 This document extends the {{Window}} interface defined by [[HTML5|HTML]]:
 
 <pre class="idl">
-partial interface mixin Window {
+partial interface Window {
   [SecureContext] readonly attribute TrustedTypePolicyFactory trustedTypes;
 };
 </pre>
@@ -1081,19 +1095,19 @@ Issue: Remove the note when the API in Chrome is shipped.
 This document modifies the {{Document}} interface defined by [[HTML5|HTML]]:
 
 <pre class="idl">
-partial interface mixin Document {
+partial interface Document {
   [CEReactions] void write(HTMLString... text);
   [CEReactions] void writeln(HTMLString... text);
 };
 </pre>
 
-### Enforcement for scripts ### {#enfocement-in-scripts}
+### Enforcement for scripts ### {#enforcement-in-scripts}
 
 #### Slots with trusted values
 
 Issue: Figure out if we can drop {{script/[[ScriptURL]]}} slot after IDL + DOM changes.
 
-This document modifies {{script}} elements. Each script has:
+This document modifies {{HTMLScriptElement|script}} elements. Each script has:
 
 : <dfn dfn-for="script">`[[ScriptURL]]`</dfn> internal slot.
 ::  A string, containing the URL to execute the script from
@@ -1116,7 +1130,7 @@ Note: Using these IDL attributes is the recommended way of dynamically setting U
 Issue: Figure out what to do with script.setAttribute('src'). See [DOM#789](https://github.com/whatwg/dom/issues/789).
 
 <pre class="idl">
-partial interface mixin HTMLScriptElement : HTMLElement {
+partial interface HTMLScriptElement {
  [CEReactions] attribute [TreatNullAs=EmptyString] ScriptString innerText;
  [CEReactions] attribute ScriptString? textContent;
  [CEReactions] attribute ScriptURLString src;
@@ -1159,7 +1173,7 @@ The [=prepare a script=] algorithm is modified as follows:
     it, it will execute in a non-blocking fashion even if the <code id="script-processing-model:attr-script-async-3"><a href="https://html.spec.whatwg.org/#attr-script-async">async</a></code>
     attribute isn't set.</p>
 
-   </li><li><ins>Execute the [$Prepare the script URL and text$] algorithm upon the {{script}} element. If that algorithm threw an error, then return. The script is not executed.
+   </li><li><ins>Execute the [$Prepare the script URL and text$] algorithm upon the {{HTMLScriptElement}}. If that algorithm threw an error, then return. The script is not executed.
 
    </li><li><p>Let <var>source text</var> be the element's <del><a id="script-processing-model:child-text-content" href="https://dom.spec.whatwg.org/#concept-child-text-content" data-x-internal="child-text-content">child text content</a></del> <ins>`[[ScriptText]]` internal slot value</ins>.</p>
 
@@ -1430,15 +1444,15 @@ The [=prepare a script=] algorithm is modified as follows:
 This document modifies following IDL attributes of various DOM elements:
 
 <pre class="idl">
-partial interface mixin HTMLIFrameElement : HTMLElement {
+partial interface HTMLIFrameElement {
   [CEReactions] attribute HTMLString srcdoc;
 };
 
-partial interface HTMLEmbedElement : HTMLElement {
+partial interface HTMLEmbedElement {
   [CEReactions] attribute ScriptURLString src;
 };
 
-partial interface HTMLObjectElement : HTMLElement {
+partial interface HTMLObjectElement {
   [CEReactions] attribute ScriptURLString data;
   [CEReactions] attribute ScriptURLString codeBase; // obsolete
 };
@@ -1467,7 +1481,7 @@ add this step between 7.1 and 7.2:
     *   |global| set to the [=context object=]'s [=relevant global object=].
     *   |input| set to the first method argument, and
     *   |expectedType| set to {{TrustedScript}}.
-    *   |sink| set to `Window.setInterval` if <var ignore>repeat</var> is true, `Window.setTimeout` otherwise.
+    *   |sink| set to `Window setInterval` if <var ignore>repeat</var> is true, `Window setTimeout` otherwise.
     *   |sinkGroup| set to `'script'`.
 
         Note: This matches the logic that the extended attribute would apply.
@@ -1578,16 +1592,30 @@ partial interface ServiceWorkerContainer : EventTarget {
 
 ## Integration with SVG ## {#integration-with-svg}
 
-This document modifies the {{SVGScriptElement}} interface to enforce Trusted Types:
+This document modifies the {{SVGAnimatedString}} interface to enforce Trusted Types:
 
 <pre class="idl">
-partial interface mixin SVGScriptElement : SVGElement {
- // overwrites the definition in SVGURIReference.
- readonly attribute ScriptURLString href;
+[Exposed=Window]
+partial interface mixin SVGAnimatedString {
+           attribute (DOMString or TrustedScriptURL) baseVal;
 };
 </pre>
 
-Issue: Check the text of the script when preparing it, like with HTML scripts.
+On setting {{SVGAnimatedString/baseVal}}, the following steps are run:
+
+1. <ins>If the relected [=attribute=]'s element is a {{SVGScriptElement}}, set |value| to the result of executing [$Get Trusted Type compliant string$] algorithm, with the following arguments:</ins>
+
+      * <ins>{{TrustedScriptURL}} as |expectedType|,</ins>
+      * <ins>relected attribute's {{Document}}'s [=relevant global object=] as |global|,</ins>
+      * <ins>specified value as |input|,</ins>
+      * <ins>`SVGScriptElement href` as |sink|,</ins>
+      * <ins>'script' as |sinkGroup|.</ins>
+
+    <ins>Otherwise, set |value| to the specified value.</ins>
+
+1. If the reflected attribute is not present, the {{SVGAnimatedString}} object is defined to additionally reflect a second, deprecated attribute, and that deprecated attribute is present, then set that deprecated attribute to <del>the specified value</del> <ins>|value|</ins>. Otherwise, set the reflected attribute to <ins>|value|</ins> <del>the specified value</del>.
+
+Note: SVG does not have a complete script processing model <a href="https://github.com/w3c/svgwg/issues/196">yet</a>. Trusted Types assumes that the attribute and text body modification protections behave similarly to ones for HTML scripts outlined in [[#enforcement-in-scripts]].
 
 ## Integration with DOM ## {#integration-with-dom}
 
@@ -1646,8 +1674,9 @@ partial interface Range {
   [CEReactions, NewObject] DocumentFragment createContextualFragment(HTMLString fragment);
 };
 
-[Constructor, Exposed=Window]
+[Exposed=Window]
 interface DOMParser {
+  constructor();
   [NewObject] Document parseFromString(HTMLString str, SupportedType type);
 };
 </pre>
@@ -1702,7 +1731,7 @@ Note: This algorithm assures that the code to be executed by a navigation to a `
     * {{TrustedScript}} as |expectedType|
     * |request|'s [=request/clients=]'s [=environment settings object/global object=] as |global|
     * |encodedScriptSource| as |input|
-    * `"Location.href"` as |sink|
+    * `"Location href"` as |sink|
 
     If that algorithm threw an error or |convertedScriptSource| is not a {{TrustedScript}} object, return "Blocked" and abort further steps.
 1. Set |urlString| to be the result of prepending `"javascript:"` to stringified |convertedScriptSource|.
@@ -1728,10 +1757,10 @@ directive-value = <a>serialized-tt-configuration</a>
 <dfn>tt-expression</dfn> = <a>tt-policy-name</a>  / <a>tt-keyword</a> / <a>tt-wildcard</a>
 <dfn>tt-wildcard</dfn> = "*"
 <dfn>tt-policy-name</dfn> = 1*( <a href="https://tools.ietf.org/html/rfc5234#appendix-B.1">ALPHA</a> / <a href="https://tools.ietf.org/html/rfc5234#appendix-B.1">DIGIT</a> / "-" / "#" / "=" / "_" / "/" / "@" / "." / "%")
-<dfn>tt-keyword</dfn> = "'allow-duplicates'"
+<dfn>tt-keyword</dfn> = "'allow-duplicates'" / "'none'"
 </pre>
 
-<div class="example" id="whitelist-of-policy-names-in-header">
+<div class="example" id="allowlist-of-policy-names-in-header">
 Types are enforced at sinks, and only two policies may be created: “one” and “two”.
 
 <pre class="http">
@@ -1806,6 +1835,11 @@ strings (|createdPolicyNames|), this algorithm returns `"Blocked"` if the
         which name is `"trusted-types"`, skip to the next |policy|.
     1.  Let |directive| be the |policy|'s |directive set|'s [=directive=] which name
         is `"trusted-types"`
+    1.  If |directive|'s [=directive/value=] only contains a <a>tt-keyword</a> which
+        is a match for a value `'none'`, set |createViolation| to true.
+
+        Note: Like in other CSP directives, 'none' keyword will be ignored if other keywords or policy names are present.
+
     1.  If |createdPolicyNames| contains |policyName| and |directive|'s [=directive/value=] does not contain a <a>tt-keyword</a> which is a match
         for a value `'allow-duplicates'`, set |createViolation| to true.
 
@@ -1832,20 +1866,21 @@ strings (|createdPolicyNames|), this algorithm returns `"Blocked"` if the
 [=violation|Violation=] object [=violation/resource=] also allows `"trusted-types-policy"`
 and `"trusted-types-sink"` as values.
 
-### Support for eval(TrustedScript) ### {#csp-eval}
+### Support for dynamic code compilation ### {#csp-eval}
 
 This document modifies the [[CSP3#can-compile-strings|EnsureCSPDoesNotBlockStringCompilation]]
 which is reproduced in its entirety below with additions and deletions.
 
-Note: See <a href="https://github.com/tc39/ecma262/issues/938">TC39/ecma262 issue #938</a>
-(adding the value to be compiled to algorithm parameters).
+Note: This is based on [dynamic-code-brand-checks](https://tc39.es/proposal-dynamic-code-brand-checks/) and
+assumes additional arguments are passed to this algorithm from ECMAScript.
+See also <a href="https://github.com/tc39/ecma262/issues/938">TC39/ecma262 issue #938</a>.
 
 <div class="note">Note: EcmaScript code may call `Function()` and `eval` cross realm.
 <pre highlight="js">
   let f = new self.top.Function(source);
 </pre>
 In this case, the |callerRealm|'s Window is `self` and the |calleeRealm|'s Window is `self.top`.
-The Trusted Types portion of this algorithm uses |calleeRealm| for consistency with other sinks.
+The Trusted Types portion of this algorithm uses |calleeRealm| and its CSP setting for consistency with other sinks.
 <pre highlight="js">
   // Assigning a string to another Realm's DOM sink uses that Realm's default policy.
   self.top.body.innerHTML = 'Hello, World!';
@@ -1858,22 +1893,26 @@ the |calleeRealm| or |callerRealm|'s Content-Security-Policy rejects string comp
 </div>
 
 Given two [[ECMASCRIPT#realm|realms]] (|callerRealm| and
-|calleeRealm|), and a <del>string</del> <ins>value</ins>
-(|source|), this algorithm returns <del>normally</del>
-<ins>the source string to compile</ins> if compilation is allowed, and
+|calleeRealm|), a string
+(|source|) <ins>, a boolean |wasCodeLike| and a string |compilationSink|</ins>, this algorithm returns <del>normally</del><ins>the
+source string to compile</ins> if compilation is allowed, and
 throws an "`EvalError`" if not:
 
-1.  <ins>Let |sourceString| be the result of executing the
+1.  <ins>If |wasCodeLike| is true, let |sourceToValidate| be a new instance of
+    the {{TrustedScript}} interface, with its `[[Data]]` internal slot value
+    set to |source|. Otherwise, let |sourceToValidate| be |source|.</ins>
+
+1. <ins>Let |sourceString| be the result of executing the
     [$Get Trusted Type compliant string$] algorithm, with:
     *   |calleeRealm| as |global|,
-    *   |source| as |input|,
-    *   `eval` as |sink|,
+    *   |sourceToValidate| as |input|,
+    *   |compilationSink| as |sink|,
     *   `'script'` as |sinkGroup|,
     *   {{TrustedScript}} as |expectedType|.</ins>
 
 2.  <ins>If the algorithm throws an error, throw an {{EvalError}}.</ins>
 
-3.  Let |globals| be a list containing |calleeRealm|'s [=Realm/global object=] and |calleeRealm|'s
+3.  Let |globals| be a list containing |callerRealm|'s [=Realm/global object=] and |calleeRealm|'s
     [=Realm/global object=].
 
 4.  For each |global| in |globals|:
@@ -1915,21 +1954,6 @@ throws an "`EvalError`" if not:
 Note: returning |sourceString| means that the string that gets
 compiled is that returned by any [=default policy=] in the course of
 executing [$Get Trusted Type compliant string$].
-
-Issue: This depends on a solution to
-<a href="https://github.com/w3c/webappsec-trusted-types/issues/144">issue #144</a> like <a
-href="https://github.com/tc39-transfer/dynamic-code-brand-checks#problem-host-callout-does-not-receive-type-information">TC39 HostBeforeCompile</a>
-
-Issue: In some cases, the violation "`'report-sample'`" contain the result of
-applying the default policy to a string argument which differs.
-Specifically when, there is a [=default policy=], |isExempt| is false,
-and |source| there is a CSP policy for either the |callerRealm|
-or |callerRealm| that disallows "`'unsafe-eval'"`.
-Is this a feature or a bug?
-
-Note: The previous algorithm reports violations via both report-uris where
-callerRealm != calleeRealm.  If [$Get Trusted Type compliant string$] reports an
-error, it only reports it via its |calleeRealm|'s report-uri.
 
 # Security Considerations # {#security-considerations}
 

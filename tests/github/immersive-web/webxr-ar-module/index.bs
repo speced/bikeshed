@@ -16,7 +16,7 @@ Mailing List Archives: https://lists.w3.org/Archives/Public/public-immersive-web
 
 Editor: Brandon Jones 87824, Google http://google.com/, bajones@google.com
 Editor: Nell Waliczek 93109, Amazon [Microsoft until 2018] https://amazon.com/, nhw@amazon.com
-Editor: Manish Goregaokar 109489, Mozilla http://mozilla.org/, manish@mozilla.com
+Editor: Manish Goregaokar 109489, Google [Mozilla until 2020], manishearth@google.com
 
 Abstract: The WebXR Augmented Reality module expands the <a href="https://www.w3.org/TR/webxr/">WebXR Device API</a> with the functionality available on AR hardware.
 
@@ -44,6 +44,11 @@ spec: webxr-1;
     type: dfn; text: xr compositor
     type: dfn; text: native origin
     type: dfn; text: viewer reference space
+    type: dfn; text: feature descriptor
+    type: dfn; text: view
+    type: dfn; text: eye; for: view
+    type: dfn; text: secondary view
+    type: dfn; text: secondary-views; for:secondary view
 </pre>
 
 <pre class="anchors">
@@ -165,6 +170,7 @@ navigator.xr.requestSession("immersive-ar").then((session) => {
 </pre>
 </div>
 
+
 XREnvironmentBlendMode {#xrenvironmentblendmode-enum}
 ----------------------
 When drawing XR content, it is often useful to understand how the rendered pixels will be blended by the [=XR Compositor=] with the [=real-world environment=].
@@ -190,6 +196,33 @@ The <dfn attribute for="XRSession">environmentBlendMode</dfn> attribute MUST rep
 
 - A blend mode of <dfn enum-value for="XREnvironmentBlendMode">additive</dfn> MUST be reported if the [=XR Compositor=] is using [=additive environment blending=].
 
+
+
+XRInteractionMode {#xrinteractionmode-enum}
+----------------------
+
+Sometimes the application will wish to draw UI that the user may interact with. WebXR allows for a variety of form factors, including both handheld phone AR and head-worn AR. For different form factors, the UIs will belong in different spaces to facilitate smooth interaction, for example the UI for handheld phone AR will likely be drawn directly on the screen without projection, but the UI for headworn AR will likely be drawn a small distance from the head so that users may use their controllers to interact with it.
+
+<pre class="idl">
+enum XRInteractionMode {
+    "screen-space",
+    "world-space",
+};
+
+partial interface XRSession {
+  // Attributes
+  readonly attribute XRInteractionMode interactionMode;
+};
+</pre>
+
+The <dfn attribute for="XRSession">interactionMode</dfn> attribute describes the best space (according to the user agent) for the application to draw interactive UI for the current session.
+
+ - An {{XRSession/interactionMode}} value of {{XRInteractionMode/"screen-space"}} indicates that the UI should be drawn directly to the screen without projection. Typically in this scenario, {{select!!event}} events are triggered with {{XRInputSourceEvent/inputSource}}s having an {{XRInputSource/targetRayMode}} of {{XRTargetRayMode/"screen"}}.
+
+ - An {{XRSession/interactionMode}} value of {{XRInteractionMode/"world-space"}} indicates that the UI should be drawn in the world, some distance from the user, so that they may interact with it using controllers. Typically in this scenario, {{select!!event}} events are triggered with {{XRInputSourceEvent/inputSource}}s having an {{XRInputSource/targetRayMode}} of {{XRTargetRayMode/"tracked-pointer"}} or {{XRTargetRayMode/"gaze"}}.
+
+Note: The <a href="https://immersive-web.github.io/dom-overlays/">WebXR DOM Overlays module</a>, if supported, can be used in some of these cases instead.
+
 XR Compositor Behaviors {#xr-compositor-behaviors}
 ---------------------
 
@@ -210,6 +243,26 @@ NOTE: Future modules may enable automatic or manual pixel occlusion with the [=r
 The [=XR Compositor=] MUST NOT automatically grant the page access to any additional information such as camera intrinsics, media streams, real-world geometry, etc.
 
 NOTE: Developers may request access to an [=/XR Device=]'s camera, should one be exposed through the existing [[mediacapture-streams|Media Capture and Streams]] specification. However, doing so does not provide a mechanism to query the {{XRRigidTransform}} between the camera's location and the [=native origin=] of the [=viewer reference space=]. It also does not provide a guaranteed way to determine the camera intrinsics necessary to match the view of the [=real-world environment=]. As such, performing effective computer vision algorithms wil be significantly hampered. Future modules or specifications may enable such functionality.
+
+First Person Observer Views {#first-person-observer}
+--------------------------------
+
+Many AR devices have a camera, however the camera is typically not aligned with the eyes. When doing video capture of the session for streaming or saving to a file, it is suboptimal to simply composite this camera feed with one of the rendered eye feeds as there will be an internal offset. Devices may use reprojection or other tricks to fix up the stream, but some may expose a [=secondary view=], the <dfn>first-person observer view</dfn>, which has an [=view/eye=] of {{XREye/"none"}}.
+
+Content MUST explicitly opt-in to receiving a [=first-person observer view=] by enabling the "[=secondary view/secondary-views=]" [=feature descriptor=].
+
+Enabling the "[=secondary view/secondary-views=]" feature for a session that supports  [=first-person observer views=] SHOULD NOT enable the [=first-person observer view=] unconditionally on every frame of the session, rather it will only expose this view in the {{XRViewerPose/views}} array for frames when capture is going on.
+
+While the {{XRSession}} has a [=blend technique=] exposed by the {{XRSession/environmentBlendMode}}, [=first-person observer views=] always use [=alpha-blend environment blending=].
+
+Content may wish to know which view is the [=first-person observer view=] so that it can account for the different [=blend technique=], or choose to render UI elements differently. {{XRView}} objects that correspond to the [=first-person observer view=] have their {{isFirstPersonObserver}} attribute returning <code>true</code>.
+
+<pre class="idl">
+partial interface XRView {
+  readonly attribute boolean isFirstPersonObserver;
+};
+</pre>
+
 
 Privacy & Security Considerations {#privacy-security}
 =================================

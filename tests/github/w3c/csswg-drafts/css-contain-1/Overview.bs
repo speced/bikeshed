@@ -3,10 +3,12 @@ Title: CSS Containment Module Level 1
 Level: 1
 Shortname: css-contain
 Status: ED
+Implementation Report: https://drafts.csswg.org/css-contain-1/implementation-report-2019-09
 Work Status: completed
 Group: csswg
 ED: https://drafts.csswg.org/css-contain-1/
 TR: https://www.w3.org/TR/css-contain-1/
+Previous Version: https://www.w3.org/TR/2019/REC-css-contain-1-20191121/
 Previous Version: https://www.w3.org/TR/2019/PR-css-contain-1-20191015/
 Previous Version: https://www.w3.org/TR/2019/CR-css-contain-1-20190430/
 Previous Version: https://www.w3.org/TR/2018/CR-css-contain-1-20181108/
@@ -17,8 +19,9 @@ Previous Version: https://www.w3.org/TR/2017/WD-css-contain-1-20170221/
 Editor: Tab Atkins, Google, http://xanthir.com/contact/, w3cid 42199
 Editor: Florian Rivoal, On behalf of Bloomberg, https://florian.rivoal.net/, w3cid 43241
 Abstract: This CSS module describes the 'contain' property, which indicates that the element's subtree is independent of the rest of the page. This enables heavy optimizations by user agents when used well.
-Status Text: A <a href="https://drafts.csswg.org/css-contain-1/issues-2019-cr.html">Disposition of Comments</a> and an <a href="https://drafts.csswg.org/css-contain-1/implementation-report-2019-09">Implementation Report</a> are available.
+Status Text: <div class=correction><a href="https://www.w3.org/Consortium/Process/#candidate-correction">Candidate corrections</a> are marked in the document.</div>
 WPT Path Prefix: css/css-contain/
+Include MDN Panels: no
 </pre>
 <pre class="anchors">
 spec: css2; urlPrefix: https://www.w3.org/TR/CSS2/
@@ -38,6 +41,10 @@ spec:css-break-3; type:dfn; text:fragmentation
 spec:css-break-3; type:dfn; text:fragmentation container
 spec:css-break-3; type:dfn; text:fragmentation context
 spec:css-break-3; type:dfn; text:fragmented flow
+spec:css2; type:value; property: height; text:auto
+spec:css-sizing-4; type:property; text:aspect-ratio
+spec:css-sizing-3; type:value; for:width; text:min-content
+spec:css-sizing-3; type:value; for:width; text:max-content
 </pre>
 
 <h2 id='intro'>
@@ -67,11 +74,30 @@ Value Definitions</h3>
 
 	In addition to the property-specific values listed in their definitions,
 	all properties defined in this specification
-	also accept the <a>CSS-wide keywords</a> keywords as their property value.
+	also accept the <a>CSS-wide keywords</a> as their property value.
 	For readability they have not been repeated explicitly.
 
 <h2 id='contain-property'>
 Strong Containment: the 'contain' property</h2>
+
+	<div class=correction id=c1>
+		<span class=marker>Candidate Correction 1:</span>
+		This makes a minor adjustement
+		to the way the computed value of the 'contain' property is determined:
+		the shortcut values (''strict'' and ''content''),
+		instead of computing to themselves,
+		compute to the corresponding keywords.
+		Given that the effect is identical,
+		this allows implementations not to store the precise syntax through which this was achived.
+		Also, thanks to the shortest-serialization princple,
+		this makes this unimportant difference non observable via serialization.
+
+		<details>
+			<summary>This change has tests</summary>
+			<a href="https://github.com/web-platform-tests/wpt/commit/98c4e2d52402156bfafcd1466985b5336f6c7240">Tests for this change</a> have been added to <abbr title="Web Platform Tests">WPT</abbr>.
+			The results can be viewed at <a href="https://wpt.fyi/results/css/css-contain/parsing/contain-computed.html">wpt.fyi</a>
+		</details>
+	</div>
 
 	<pre class='propdef'>
 		Name: contain
@@ -79,7 +105,7 @@ Strong Containment: the 'contain' property</h2>
 		Initial: none
 		Inherited: no
 		Applies to: See <a href="#contain-applies">below</a>
-		Computed value: specified keyword(s)
+		Computed value: <del cite=#c1>specified keyword(s)</del><ins cite=#c1>the keyword ''contain/none'' or one or more of ''size'', ''layout'', ''paint''</ins>
 		Animation type: not animatable
 	</pre>
 
@@ -96,6 +122,8 @@ Strong Containment: the 'contain' property</h2>
 	contain-paint-size-003.html
 
 	contain-chrome-thcrash-001.html
+	contain-crash.html
+	contain-flexbox-outline.html
 	</wpt>
 
 	<p class=all-media>User Agents are expected to support this property on all media, including non-visual ones.</p>
@@ -116,19 +144,23 @@ Strong Containment: the 'contain' property</h2>
 
 		<dt><dfn>strict</dfn>
 		<dd>
-			This value turns on all forms of <a>containment</a> for the element.
-			In other words, it behaves the same as ''contain: size layout paint;''.
+			This value <ins cite=#c1>computes to ''size layout paint'',
+			and thus </ins>turns on all forms of <a>containment</a> for the element.
+			<del cite=#c1>In other words, it behaves the same as ''contain: size layout paint;''.</del>.
 
 			<wpt>
 				contain-strict-001.html
 				contain-strict-002.html
 				contain-strict-003.html
+
+				contain-flexbox-outline.html
 			</wpt>
 
 		<dt><dfn>content</dfn>
 		<dd>
-			This value turns on all forms of <a>containment</a> <em>except</em> <a>size containment</a> for the element.
-			In other words, it behaves the same as ''contain: layout paint;''.
+			This value <ins cite=#c1>computes to ''layout paint'',
+			and thus </ins>turns on all forms of <a>containment</a> <em>except</em> <a>size containment</a> for the element.
+			<del cite=#c1>In other words, it behaves the same as ''contain: layout paint;''.</del>.
 
 			<wpt>
 				contain-content-001.html
@@ -149,7 +181,7 @@ Strong Containment: the 'contain' property</h2>
 		<dt><dfn>size</dfn>
 		<dd>
 			The value turns on <a>size containment</a> for the element.
-			This ensures that the containing box can be laid out
+			This ensures that the [=size containment box|containment box=] can be laid out
 			without needing to examine its descendants.
 
 			<wpt>
@@ -178,6 +210,7 @@ Strong Containment: the 'contain' property</h2>
 				contain-size-056.html
 				contain-size-061.html
 				contain-size-062.html
+				contain-size-063.html
 				contain-size-baseline-001.html
 				contain-size-borders.html
 				contain-size-breaks-001.html
@@ -188,7 +221,10 @@ Strong Containment: the 'contain' property</h2>
 				contain-size-flexbox-002.html
 				contain-size-grid-001.html
 				contain-size-grid-002.html
+				contain-size-grid-003.html
+				contain-size-grid-004.html
 				contain-size-monolithic-001.html
+				contain-size-monolithic-002.html
 				contain-size-multicol-001.html
 				contain-size-multicol-as-flex-item.html
 				contain-size-replaced-001.html
@@ -199,6 +235,7 @@ Strong Containment: the 'contain' property</h2>
 				contain-size-replaced-004.html
 				contain-size-replaced-005.html
 				contain-size-replaced-006.html
+				contain-size-replaced-007.html
 				contain-size-select-001.html
 				contain-size-select-002.html
 				contain-size-scrollbars-001.html
@@ -215,7 +252,7 @@ Strong Containment: the 'contain' property</h2>
 		<dt><dfn>layout</dfn>
 		<dd>
 			This value turns on <a>layout containment</a> for the element.
-			This ensures that the containing box is <em>totally opaque</em> for layout purposes;
+			This ensures that the [=layout containment box|containment box=] is <em>totally opaque</em> for layout purposes;
 			nothing outside can affect its internal layout,
 			and vice versa.
 
@@ -267,7 +304,7 @@ Strong Containment: the 'contain' property</h2>
 		<dt><dfn>paint</dfn>
 		<dd>
 			This value turns on <a>paint containment</a> for the element.
-			This ensures that the descendants of the containing box don't display outside its bounds,
+			This ensures that the descendants of the [=paint containment box|containment box=] don't display outside its bounds,
 			so if an element is off-screen or otherwise not visible,
 			its descendants are also guaranteed to be not visible.
 
@@ -385,9 +422,6 @@ Size Containment</h3>
 	or an <a spec="css-display-3">internal ruby box</a>,
 	or a <a spec="css-display-3" lt="atomic inline">non-atomic</a> <a spec="css-display-3">inline-level</a> box,
 	size containment has no effect.
-	Otherwise, giving an element <dfn export>size containment</dfn>
-	makes its [=principal box=] a <dfn for=size-containment>containing box</dfn> for [=size containment=]
-	and has the following effects:
 
 	<wpt>
 	contain-size-001.html
@@ -424,98 +458,315 @@ Size Containment</h3>
 	contain-size-056.html
 	</wpt>
 
-	1. When calculating the size of the [=size-containment/containing box=],
-		it must be treated as having no contents.
+	Otherwise, giving an element <dfn export>size containment</dfn>
+	makes its [=principal box=] a <dfn>size containment box</dfn>
+	and has the following effects:
 
-		<wpt>
-		contain-size-021.html
-		contain-size-023.html
-		contain-size-025.html
-		contain-size-027.html
-		contain-size-061.html
-		contain-size-062.html
-		contain-size-borders.html
-		contain-size-fieldset-001.html
-		contain-size-fieldset-002.html
-		contain-size-select-001.html
-		contain-size-select-002.html
-		contain-size-scrollbars-001.html
-		contain-size-scrollbars-002.html
-		contain-size-scrollbars-003.html
-		contain-size-scrollbars-004.html
+	<ol>
+		<li>
+			When calculating the size of [=size containment box=],
+			it must be treated as having no contents.
 
-		contain-size-button-001.html
-		contain-size-flexbox-001.html
-		contain-size-flexbox-002.html
-		contain-size-grid-001.html
-		</wpt>
+			<wpt>
+			contain-size-021.html
+			contain-size-023.html
+			contain-size-025.html
+			contain-size-027.html
+			contain-size-061.html
+			contain-size-062.html
+			contain-size-063.html
+			contain-size-borders.html
+			contain-size-fieldset-001.html
+			contain-size-fieldset-002.html
+			contain-size-select-001.html
+			contain-size-select-002.html
+			contain-size-scrollbars-001.html
+			contain-size-scrollbars-002.html
+			contain-size-scrollbars-003.html
+			contain-size-scrollbars-004.html
 
-		Note: Even when the element's [=sizing properties=] are ''height/auto''
-		this does not necessarily make the element zero-sized:
-		properties set on the element itself,
-		such as the 'columns' property or the 'grid' property,
-		continue to be taken into account.
+			contain-size-button-001.html
+			contain-size-flexbox-001.html
+			contain-size-flexbox-002.html
+			contain-size-grid-001.html
+			contain-size-013.html
+			contain-size-041.html
+			contain-size-042.html
+			contain-size-replaced-001.html
+			contain-size-replaced-002.html
+			contain-size-replaced-003a.html
+			contain-size-replaced-003b.html
+			contain-size-replaced-003c.html
+			contain-size-replaced-004.html
+			contain-size-replaced-005.html
+			contain-size-replaced-006.html
+			</wpt>
+			<wpt pathprefix=css/css-sizing/aspect-ratio/>
+			replaced-element-023.html
+			replaced-element-025.html
+			replaced-element-027.html
+			</wpt>
 
-		<wpt>
-		contain-size-grid-002.html
-		contain-size-grid-003.html
-		contain-size-multicol-001.html
-		contain-size-multicol-as-flex-item.html
-		</wpt>
+			Note: Even when the element's [=sizing properties=] specify an intrinsic size,
+			this does not necessarily make the element zero-sized:
+			properties set on the element itself
+			continue to be taken into account,
+			which can cause it to be larger.
 
-		Then,
-		its contents must then be laid out into the [=size-containment/containing box=]'s resolved size.
+			<wpt>
+			contain-size-grid-002.html
+			contain-size-grid-003.html
+			contain-size-multicol-001.html
+			contain-size-multicol-as-flex-item.html
+			</wpt>
 
-		Note: [=size containment=] does not suppress baseline alignment.
-		See [=layout containment=] for that.
+			Then, its contents must then be laid out into the [=size containment box|containment box=]'s resolved size.
 
-		<wpt>
-		contain-size-baseline-001.html
-		</wpt>
+			Note: [=Size containment=] does not suppress baseline alignment.
+			See [=layout containment=] for that.
 
-		<a>Replaced elements</a> must be treated as having an intrinsic width and height of 0.
+			<wpt>
+			contain-size-baseline-001.html
+			</wpt>
 
-		<wpt>
-		contain-size-013.html
-		contain-size-041.html
-		contain-size-042.html
-		contain-size-replaced-001.html
-		contain-size-replaced-002.html
-		contain-size-replaced-003a.html
-		contain-size-replaced-003b.html
-		contain-size-replaced-003c.html
-		contain-size-replaced-004.html
-		contain-size-replaced-005.html
-		contain-size-replaced-006.html
-		</wpt>
-	2. [=size-containment/Containing boxes=] for <a>size containment</a> are <a spec=css-break-3>monolithic</a> (See [[CSS-BREAK-3#possible-breaks]]).
+			<div class=correction id=c2>
+				<span class=marker>Candidate Correction 2:</span>
+				The way the two normative sentences above are written was somewhat ambiguous,
+				causing implementers to have some doubts about the precise intended effects
+				in certain cases.
+				In order to clarify what is meant without changing the intended behavior,
+				The CSSWG suggest replacing this first item in the list with the following two
+				(the existing notes remain the same):
 
-		<wpt>
-		contain-size-breaks-001.html
-		contain-size-monolithic-001.html
-		</wpt>
+				<blockquote>
+					<ol>
+						<li>
+							The [=intrinsic sizes=] of the [=size containment box=]
+							are determined as if the element had no content,
+							following the same logic as when [=sizing as if empty=].
+
+							Note: This affects explicit invocations of the ''min-content'' or ''max-content'' keywords,
+							as well as any calculation that depends on these measurement,
+							such as sizing <span class=informative>[=grid tracks=]</span> into which a size contained item is placed,
+							or if [=fit-content sizing=] the containment box's parent.
+
+							<wpt>
+							contain-size-013.html
+							contain-size-041.html
+							contain-size-042.html
+							contain-size-replaced-001.html
+							contain-size-replaced-002.html
+							contain-size-replaced-003a.html
+							contain-size-replaced-003b.html
+							contain-size-replaced-003c.html
+							contain-size-replaced-004.html
+							contain-size-replaced-005.html
+							contain-size-replaced-006.html
+							</wpt>
+
+						<li>
+							Laying out a [=size containment box=] and its content is conceptually done in two phases:
+							<dl>
+								<dt><dfn>Sizing as if empty</dfn>
+								<dd>
+									The [=used value|used=] 'width' and 'height' of the [=size containment box|containment box=]
+									are determined as if performing a normal layout of the box,
+									except that it is treated as having no content--
+									not even through pseudo elements such as ''::before'', ''::after'', or ''::marker''.
+
+									<wpt>
+									contain-size-021.html
+									contain-size-023.html
+									contain-size-025.html
+									contain-size-027.html
+									contain-size-061.html
+									contain-size-062.html
+									contain-size-063.html
+									contain-size-borders.html
+									contain-size-fieldset-001.html
+									contain-size-fieldset-002.html
+									contain-size-select-001.html
+									contain-size-select-002.html
+									contain-size-scrollbars-001.html
+									contain-size-scrollbars-002.html
+									contain-size-scrollbars-003.html
+									contain-size-scrollbars-004.html
+
+									contain-size-button-001.html
+									contain-size-flexbox-001.html
+									contain-size-flexbox-002.html
+									contain-size-grid-001.html
+									</wpt>
+
+									<a>Replaced elements</a> must be treated as having a [=natural dimensions|natural=] width and height of 0
+									and no [=natural aspect ratio=].
+
+									Note: Size containment only suppresses the [=natural aspect ratio=],
+									so properties like 'aspect-ratio' which affect that [=preferred aspect ratio=] directly
+									are honored.
+
+									<wpt>
+									contain-size-013.html
+									contain-size-041.html
+									contain-size-042.html
+									contain-size-replaced-001.html
+									contain-size-replaced-002.html
+									contain-size-replaced-003a.html
+									contain-size-replaced-003b.html
+									contain-size-replaced-003c.html
+									contain-size-replaced-004.html
+									contain-size-replaced-005.html
+									</wpt>
+									<wpt pathprefix=css/css-sizing/aspect-ratio/>
+									replaced-element-023.html
+									replaced-element-025.html
+									replaced-element-027.html
+									</wpt>
+
+									All CSS properties of the [=size containment box=] are taken into account
+									as they would be when performing layout normally.
+									Other specifications may make specific exemptions.
+
+									<wpt>
+									contain-size-replaced-006.html
+									</wpt>
+
+									Note: Even when the element's [=sizing properties=] specify an intrinsic size,
+									this does not necessarily make the element zero-sized:
+									properties set on the element itself
+									continue to be taken into account,
+									which can cause it to be larger.
+
+									<wpt>
+									contain-size-grid-002.html
+									contain-size-grid-003.html
+									contain-size-multicol-001.html
+									contain-size-multicol-as-flex-item.html
+									</wpt>
+
+								<dt><dfn>Laying out in-place</dfn>
+								<dd>
+									The [=size containment box|containment box=]'s content
+									(including any pseudo-elements)
+									must then be laid out into
+									the now fixed-size [=size containment box|containment box=] normally.
+									<wpt>
+									contain-size-064.html
+									<wpt>
+							</dl>
+
+							Note: [=Size containment=] does not suppress baseline alignment.
+							See [=layout containment=] for that.
+
+							<wpt>
+							contain-size-baseline-001.html
+							</wpt>
+
+					</ol>
+				</blockquote>
+
+				<details>
+					<summary>This change has tests</summary>
+					All statements in this more detailed write-up have tests in <abbr title="Web Platform Tests">WPT</abbr>.
+					The results of these tests can be seen at the <a href="https://wpt.fyi/">Web-Platform-Tests dashboard</a>:
+					<ol>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-013.html">contain-size-013.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-021.html">contain-size-021.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-023.html">contain-size-023.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-025.html">contain-size-025.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-027.html">contain-size-027.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-041.html">contain-size-041.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-042.html">contain-size-042.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-061.html">contain-size-061.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-062.html">contain-size-062.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-063.html">contain-size-063.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-064.html">contain-size-064.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-borders.html">contain-size-borders.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-button-001.html">contain-size-button-001.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-fieldset-001.html">contain-size-fieldset-001.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-fieldset-002.html">contain-size-fieldset-002.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-flexbox-001.html">contain-size-flexbox-001.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-flexbox-002.html">contain-size-flexbox-002.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-grid-001.html">contain-size-grid-001.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-grid-002.html">contain-size-grid-002.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-grid-003.html">contain-size-grid-003.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-multicol-001.html">contain-size-multicol-001.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-multicol-as-flex-item.html">contain-size-multicol-as-flex-item.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-replaced-001.html">contain-size-replaced-001.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-replaced-002.html">contain-size-replaced-002.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-replaced-003a.html">contain-size-replaced-003a.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-replaced-003b.html">contain-size-replaced-003b.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-replaced-003c.html">contain-size-replaced-003c.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-replaced-004.html">contain-size-replaced-004.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-replaced-005.html">contain-size-replaced-005.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-replaced-006.html">contain-size-replaced-006.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-scrollbars-001.html">contain-size-scrollbars-001.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-scrollbars-002.html">contain-size-scrollbars-002.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-scrollbars-003.html">contain-size-scrollbars-003.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-scrollbars-004.html">contain-size-scrollbars-004.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-select-001.html">contain-size-select-001.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-contain/contain-size-select-002.html">contain-size-select-002.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-sizing/aspect-ratio/replaced-element-023.html">replaced-element-023.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-sizing/aspect-ratio/replaced-element-025.html">replaced-element-025.html</a>
+						<li><a href="https://wpt.fyi/results/css/css-sizing/aspect-ratio/replaced-element-027.html">replaced-element-027.html</a>
+					</ol>
+
+				</details>
+
+				Also, note the insertion of a parentetical at the very end of this section,
+				referencing part of this clarified text.
+			</div>
+
+		<li>
+			[=Size containment boxes=] are <a spec=css-break-3>monolithic</a> (See [[CSS-BREAK-3#possible-breaks]]).
+
+			<wpt>
+			contain-size-breaks-001.html
+			contain-size-monolithic-001.html
+			contain-size-monolithic-002.html
+			</wpt>
+	</ol>
+
+	<div class=example>
+		Given the following markup and style, the image would be sized to 100px by 100px,
+		as the aspect ratio set by the 'aspect-ratio' property takes effect.
+		<pre><code class=lang-css>
+		img {
+			width: 100px;
+			aspect-ratio: 1/1;
+			contain: size;
+		}
+		</code><code class=lang-html>
+		&lt;img src="https://www.example.com/300x100.jpg">
+		</code></pre>
+
+		If the 'aspect-ratio' property had not been declared,
+		the image would have been 100px by 0px,
+		as its [=natural aspect ratio=] is suppressed,
+		and its [=natural height=] is treated as 0.
+	</div>
 
 	By itself, <a>size containment</a> does not offer much optimization opportunity.
-	Its primary benefit on its own is that tools which want to lay out the containing box's contents
-	based on the containing box's size
+	Its primary benefit on its own is that tools which want to lay out the [=size containment box|containment box=]'s contents
+	based on the [=size containment box|containment box=]'s size
 	(such as a JS library implementing the "container query" concept)
 	can do so without fear of "infinite loops",
-	where having a child's size respond to the size of the containing box
-	causes the containing box's size to change as well,
+	where having a child's size respond to the size of the [=size containment box|containment box=]
+	causes the [=size containment box|containment box=]'s size to change as well,
 	possibly triggering <em>further</em> changes in how the child sizes itself
-	and possibly thus more changes to the containing box's size,
+	and possibly thus more changes to the [=size containment box|containment box=]'s size,
 	ad infinitum.
 
 	When paired with <a>layout containment</a>, though,
 	possible optimizations that can be enabled include (but are not limited to):
 
-	1. When the style or contents of a descendant of the containing box is changed,
+	1. When the style or contents of a descendant of the [=size containment box|containment box=] is changed,
 		calculating what part of the DOM tree is "dirtied" and might need to be re-laid out
-		can stop at the containing box.
+		can stop at the [=size containment box|containment box=].
 
 	2. When laying out the page,
-		if the containing box is off-screen or obscured,
-		the layout of its contents can be delayed or done at a lower priority.
+		if the [=size containment box|containment box=] is off-screen or obscured,
+		the layout of its contents <ins cite=#c2>(i.e. "[=laying out in-place=]") </ins>can be delayed or done at a lower priority.
 
 <h3 id='containment-layout'>
 Layout Containment</h3>
@@ -526,7 +777,7 @@ Layout Containment</h3>
 	or a <a spec="css-display-3" lt="atomic inline">non-atomic</a> <a spec="css-display-3">inline-level</a> box,
 	layout containment has no effect.
 	Otherwise, giving an element <dfn export>layout containment</dfn>
-	makes its [=principal box=] a <dfn for=layout-containment>containing box</dfn> for [=layout containment=]
+	makes its [=principal box=] a <dfn>layout containment box</dfn>
 	and has the following effects:
 
 	<wpt>
@@ -544,7 +795,7 @@ Layout Containment</h3>
 	contain-layout-independent-formatting-context-003.html
 	</wpt>
 
-	1. The [=layout-containment/containing box=] [=establishes an independent formatting context=].
+	1. The [=layout containment box=] [=establishes an independent formatting context=].
 
 		<wpt>
 		contain-layout-ifc-022.html
@@ -554,10 +805,10 @@ Layout Containment</h3>
 		</wpt>
 
 	2. If at least one [=fragmentation container=] of a [=fragmentation context=] has [=layout containment=],
-		or if at least one [=fragmentation container=] of a [=fragmentation context=] is a descendant of [=layout-containment/containing box=] for layout containment
+		or if at least one [=fragmentation container=] of a [=fragmentation context=] is a descendant of [=layout containment box=]
 		<strong>and</strong> at least one subsequent [=fragmentation container=] of the same [=fragmentation context=]
 		is not a descendant of that same element with layout containment,
-		then the first [=layout-containment/containing box=] for [=layout containment=]
+		then the first [=layout containment box=]
 		which is either a [=fragmentation container=] itself
 		or is an ancestor of a [=fragmentation container=]
 		must “trap” the remainder of the [=fragmented flow=]:
@@ -610,7 +861,7 @@ Layout Containment</h3>
 			In this [[CSS-REGIONS-1]] example,
 			content can flow from <code>#a</code> to <code>#b</code>,
 			from <code>#b</code> to <code>#c</code>.
-			However as <code>#c</code> is the last fragment container in the first containing box for layout containment,
+			However as <code>#c</code> is the last fragment container in the first [=layout containment box=]
 			it traps all the remaining content,
 			and nothing gets flowed into <code>#d</code>, <code>#e</code>, or <code>#f</code>.
 		</div>
@@ -630,7 +881,7 @@ Layout Containment</h3>
 		contain-layout-ink-overflow-020.html
 		</wpt>
 
-	4. The [=layout-containment/containing box=] acts as a containing block for absolutely positioned and fixed positioned descendants.
+	4. The [=layout containment box=] establishes an [=absolute positioning containing block=] and a [=fixed positioning containing block=].
 
 		<wpt>
 		contain-layout-006.html
@@ -639,7 +890,7 @@ Layout Containment</h3>
 		contain-layout-cell-002.html
 		</wpt>
 
-	5. The [=layout-containment/containing box=] creates a <a>stacking context</a>.
+	5. The [=layout containment box=] creates a <a>stacking context</a>.
 
 		<wpt>
 		contain-layout-016.html
@@ -647,7 +898,7 @@ Layout Containment</h3>
 		contain-layout-018.html
 		</wpt>
 
-	6. [=Forced breaks=] are allowed within [=layout-containment/containing boxes=] for [=layout containment=],
+	6. [=Forced breaks=] are allowed within [=layout containment boxes=]
 		but do not propagate to the parent as otherwise described in [[CSS-BREAK-3#break-between]].
 
 		<wpt>
@@ -660,9 +911,9 @@ Layout Containment</h3>
 
 	7. For the purpose of the 'vertical-align' property,
 		or any other property whose effects
-		need to relate the position of the [=layout-containment/containing box=]'s baseline
+		need to relate the position of the [=layout containment box=]'s baseline
 		to something other than its descendants,
-		the [=layout-containment/containing box=] is treated as having no baseline.
+		the [=layout containment box|containment box=] is treated as having no baseline.
 
 		<wpt>
 		contain-layout-baseline-001.html
@@ -678,16 +929,16 @@ Layout Containment</h3>
 	Possible optimizations that can be enabled by <a>layout containment</a> include (but are not limited to):
 
 	1. When laying out the page,
-		the contents of separate containing boxes
+		the contents of separate [=layout containment boxes|containment boxes=]
 		can be laid out in parallel,
 		as they're guaranteed not to affect each other.
 
 	2. When laying out the page,
-		if the containing box is off-screen or obscured
-		and the layout of the visible parts of the screen do not depend on the size of the containing box
-		(for example, if the containing box is near the end of a block container,
+		if the [=layout containment box|containment box=] is off-screen or obscured
+		and the layout of the visible parts of the screen do not depend on the size of the [=layout containment box|containment box=]
+		(for example, if the [=layout containment box|containment box=] is near the end of a block container,
 		and you're viewing the beginning of the block container),
-		the layout of the containing box' contents can be delayed or done at a lower priority.
+		the layout of the [=layout containment box|containment box=]' contents can be delayed or done at a lower priority.
 
 		(When paired with <a>size containment</a>,
 		this optimization can be applied more liberally.)
@@ -701,7 +952,7 @@ Paint Containment</h3>
 	or a <a spec="css-display-3" lt="atomic inline">non-atomic</a> <a spec="css-display-3">inline-level</a> box,
 	paint containment has no effect.
 	Otherwise, giving an element <dfn export>paint containment</dfn>
-	makes its [=principal box=] a <dfn for=paint-containment>containing box</dfn> for [=paint containment=]
+	makes its [=principal box=] a <dfn>paint containment box</dfn>
 	and has the following effects:
 
 	<wpt>
@@ -722,14 +973,26 @@ Paint Containment</h3>
 	</wpt>
 
 	1. The contents of the element
-		including both the paint of the descendants and their geometry
-		must be clipped to the <a>padding edge</a> of the [=paint-containment/containing box=],
+		including any [=ink overflow|ink=] or [=scrollable overflow=]
+		must be clipped to the <a>padding edge</a> of the [=paint containment box=],
 		taking <a>corner clipping</a> into account.
 		This does not include the creation of any mechanism
 		to access or indicate the presence of the clipped content;
 		nor does it inhibit the creation of any such mechanism through other properties,
 		<span class=informative>such as 'overflow', 'resize', or 'text-overflow'</span>.
-		<span class=note>This is as if ''overflow: visible'' was changed to ''overflow: clip'' at used value.</span>
+
+		Note: The next level of this specification [[CSS-CONTAIN-2]] refines this effect
+		to apply to the [=overflow clip edge=] rather than the [=padding edge=],
+		in order to take the new 'overflow-clip-margin' property into account.
+		For implementations that do not support 'overflow-clip-margin',
+		the effect is identical.
+
+		Note: The behavior is described in this paragraph is equivalent to changing
+		''overflow-x: visible'' into ''overflow-x: clip''
+		and
+		''overflow-y: visible'' into ''overflow-y: clip''
+		at used value time,
+		while leaving other values of 'overflow-x' and 'overflow-y' unchanged.
 
 		<wpt>
 		contain-paint-001.html
@@ -750,7 +1013,7 @@ Paint Containment</h3>
 		contain-paint-table-001.html
 		contain-paint-table-002.html
 		</wpt>
-	2. The [=paint-containment/containing box=] acts as a containing block for absolutely positioned and fixed positioned descendants.
+	2. The [=paint containment box=] establishes an [=absolute positioning containing block=] and a [=fixed positioning containing block=].
 
 		<wpt>
 		contain-paint-009.html
@@ -759,7 +1022,7 @@ Paint Containment</h3>
 		contain-paint-023.html
 		contain-paint-024.html
 		</wpt>
-	3. The [=paint-containment/containing box=] creates a <a>stacking context</a>.
+	3. The [=paint containment box=] creates a <a>stacking context</a>.
 
 		<wpt>
 		contain-paint-020.html
@@ -767,7 +1030,7 @@ Paint Containment</h3>
 		contain-paint-025.html
 		contain-subgrid-001.html
 		</wpt>
-	4. The [=paint-containment/containing box=] [=establishes an independent formatting context=].
+	4. The [=paint containment box=] [=establishes an independent formatting context=].
 
 		<wpt>
 		contain-paint-ifc-011.html
@@ -782,7 +1045,7 @@ Paint Containment</h3>
 <div class=informative>
 	Possible optimizations that can be enabled by <a>paint containment</a> include (but are not limited to):
 
-	1. If the containing box is off-screen or obscured,
+	1. If the [=paint containment box|containment box=] is off-screen or obscured,
 		the UA can directly skip trying to paint its contents,
 		as they're guaranteed to be off-screen/obscured as well.
 
@@ -799,7 +1062,7 @@ Paint Containment</h3>
 		scrolling elements can be painted into a single GPU layer.
 </div>
 
-Privacy and Security Considerations {#privsec}
+Privacy and Security Considerations {#priv-sec}
 ==============================================
 
 This specification introduces no new privacy or security considerations.
@@ -870,102 +1133,228 @@ Answers are provided below.
 
 This appendix is <em>informative</em>.
 
+<h3 id="2019-11-21-changes">Changes from the
+<a href="https://www.w3.org/TR/2019/REC-css-contain-1-20191121/">Recommendation of 21 November 2019</a></h3>
+
+	A full <a href="https://drafts.csswg.org/css-contain-1/issues-2020-rec">Disposition of Comments</a> is available.
+
+	<ul>
+		<li>
+			Marked as <a href="#c1">Candidate Correction 1</a>:
+			Changed how the computed values of the contain property are determined for the shortcut values.
+
+		<li>
+			Marked as <a href="#c2">Candidate Correction 2</a>:
+			Rewrote much of the [[#containment-size]] section in more detail
+			to clarify ambiguities about how it is meant to work,
+			and improve the general legibility.
+			The intended behavior is unaltered.
+
+		<li>
+			Editorial tweaks:
+			<ul>
+				<li>
+					Added an example and clarified a note in the [[#containment-size]] section
+
+				<li>
+					phrasing improvement in [[#containment-paint]] to use established terminology rather than ad-hoc wording with the same intended meaning
+
+				<li>
+					phrasing improvement in note in [[#containment-paint]]
+
+				<li>
+					terminology change: replace "containing box" with "containment box"
+			</ul>
+	</ul>
+
 <h3 id="2019-04-30-changes">Changes from the
 <a href="https://www.w3.org/TR/2019/CR-css-contain-1-20190430/">Candidate Recommendation of 30 April 2019</a></h3>
 
-<ul>
-	<li>
-		Editorial tweaks
+	Full Dispositions of Comments <a href="https://drafts.csswg.org/css-contain-1/issues-2019-cr">since CR</a>
+	and <a href="https://drafts.csswg.org/css-contain-1/issues-2019-10-pr">since PR</a> is available.
 
-	<li>
-		<span id=valdef-contain-style></span>
-		<span id=containment-style></span>
-		<span id=style-containment></span>
-		<span id=property-scoped></span>
-		<span id=property-scoped-to-an-element></span>
-		<span id=property-scoped-to-a-sub-tree></span>
-		Drop the at-risk “style containment” feature from this specification, move it <a href="https://drafts.csswg.org/css-contain-2/">Level 2</a>
+	<ul>
+		<li>
+			Editorial tweaks
 
-		<wpt>
-		contain-strict-011.html
-		contain-content-011.html
-		contain-style-baseline-001.html
-		contain-style-breaks-001.html
-		contain-style-breaks-002.html
-		contain-style-breaks-003.html
-		contain-style-breaks-004.html
-		contain-style-breaks-005.html
-		contain-style-counters-001.html
-		contain-style-counters-002.html
-		contain-style-counters-003.html
-		contain-style-counters-004.html
-		counter-scoping-001.html
-		counter-scoping-002.html
-		counter-scoping-003.html
-		quote-scoping-001.html
-		quote-scoping-002.html
-		quote-scoping-003.html
-		quote-scoping-004.html
-		</wpt>
+		<li>
+			<span id=valdef-contain-style></span>
+			<span id=containment-style></span>
+			<span id=style-containment></span>
+			<span id=property-scoped></span>
+			<span id=property-scoped-to-an-element></span>
+			<span id=property-scoped-to-a-sub-tree></span>
+			Drop the at-risk “style containment” feature from this specification, move it <a href="https://drafts.csswg.org/css-contain-2/">Level 2</a>
+
+			<wpt>
+			contain-strict-011.html
+			contain-content-011.html
+			contain-style-baseline-001.html
+			contain-style-breaks-001.html
+			contain-style-breaks-002.html
+			contain-style-breaks-003.html
+			contain-style-breaks-004.html
+			contain-style-breaks-005.html
+			contain-style-counters-001.html
+			contain-style-counters-002.html
+			contain-style-counters-003.html
+			contain-style-counters-004.html
+			counter-scoping-001.html
+			counter-scoping-002.html
+			counter-scoping-003.html
+			quote-scoping-001.html
+			quote-scoping-002.html
+			quote-scoping-003.html
+			quote-scoping-004.html
+			</wpt>
+	</ul>
 
 <h3 id="2018-11-08-changes">Changes from the
 <a href="https://www.w3.org/TR/2018/CR-css-contain-1-20181108/">Candidate Recommendation of 08 November 2018</a></h3>
 
-<p>A full <a href="https://drafts.csswg.org/css-contain-1/issues-2018-11-cr.html">Disposition of Comments</a> is available.
+	A full <a href="https://drafts.csswg.org/css-contain-1/issues-2018-11-cr.html">Disposition of Comments</a> is available.
 
-* Exclude [=style containment=] from ''contain: strict'' and ''contain: content'', and mark it at risk.
+	* Exclude [=style containment=] from ''contain: strict'' and ''contain: content'', and mark it at risk.
 
 <h3 id="2018-05-24-changes">Changes from the
 <a href="https://www.w3.org/TR/2018/CR-css-contain-1-20180524/">Candidate Recommendation of 24 May 2018</a></h3>
 
-<p>A full <a href="https://drafts.csswg.org/css-contain-1/issues-2018-cr.html">Disposition of Comments</a> is available.
+	A full <a href="https://drafts.csswg.org/css-contain-1/issues-2018-cr.html">Disposition of Comments</a> is available.
 
-* Clarify that layout containment causes overflow to be treated as ink overflow only when visible (or clip)
-* Layout containment suppresses baseline alignment, but size containment does not
-* Layout containment causes the element to establish a new stacking context
-* Size containment does not apply to tables
-* Clarify that the columns and grid properties affect the size of size-contained elements
-* Change the animation type of the contain property from discrete to not animatable
-* Define the effect of containment on SVG elements
-* Editorial improvements
-* A comprehensive test suite for the full specification was developed, see <a href="http://test.csswg.org/harness/review/css-contain-1_dev">http://test.csswg.org/harness/review/css-contain-1_dev</a>
+	* Clarify that layout containment causes overflow to be treated as ink overflow only when visible (or clip)
+	* Layout containment suppresses baseline alignment, but size containment does not
+	* Layout containment causes the element to establish a new stacking context
+	* Size containment does not apply to tables
+	* Clarify that the columns and grid properties affect the size of size-contained elements
+	* Change the animation type of the contain property from discrete to not animatable
+	* Define the effect of containment on SVG elements
+	* Editorial improvements
+	* A comprehensive test suite for the full specification was developed, see <a href="http://test.csswg.org/harness/review/css-contain-1_dev">http://test.csswg.org/harness/review/css-contain-1_dev</a>
 
 <h3 id="2017-08-08-changes">Changes from the
 <a href="https://www.w3.org/TR/2017/CR-css-contain-1-20170808/">Candidate Recommendation of 8 August 2017</a></h3>
 
-<p>A full <a href="https://drafts.csswg.org/css-contain-1/issues-2017-cr.html">Disposition of Comments</a> is available.
+	A full <a href="https://drafts.csswg.org/css-contain-1/issues-2017-cr.html">Disposition of Comments</a> is available.
 
-<ul>
-	<li>Clarify to which box paint containment clips (<a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/5b92ee3c170e3be239937a3ae069f37655ff6671">see tests</a>).
-	<li>Move the interaction between containment and the <code>bookmark-*</code> and <code>string-set</code> properties to  [[CSS-CONTENT-3]] (additional tests not needed, no change in behavior).
-	<li>Remove the effects of style containment on the "break-*" properties (<a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/d6a4f606a0501fe6ca526483a7a379ba2e9eaa1c">see tests</a>).
-	<li>Move the description of the effects of containment on regions from this specification to [[CSS-REGIONS-1]] (additional tests not needed, no change in behavior).
-	<li>Clarify the effects of style scoping on counter-set and counter-increment (<a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/d7fbc4794403dfeb55f13310d4c1cb51813e2d6e">see tests</a>)
-	<li>Size layout and paint containment don't apply to internal ruby elements (<a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/ba5a04e3d65f9f39c2d6431a9ece5eb15d22116b">see tests</a>)
-	<li>Layout, Paint, and size containments do not apply to non-atomic inlines (see <a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/402a19bde8981a402d9dba73083f84d96e4aeeb9">tests here</a> and <a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/69b5681ee7aa5a028eb694b2c93bfd48c1ef08e4">one more test here</a>)
-	<li>Align paint containment's behavior with overflow:clip (<a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/e2f844700a4a165f7ab6a0f021bbe1bf4d921cc0">see test</a>)
-	<li>Elements with size containment are monolithic (<a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/536f74e4137196b34d63752f5a9217e23c4fb899#diff-bd8852c889db6d2b471bae58105f9374">see test</a>)
-	<li>Forced breaks area allowed in elements with layout containments, but do not propagate (<a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/536f74e4137196b34d63752f5a9217e23c4fb899">see tests</a>)
-	<li>Clarify the effects of scoping to a subtree (<a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/7aad64ade18bce9db257c34d72c6dad126a9e9cd">see test</a>)
-	<li>Clarify the effects of scoping on open/close quotes (<a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/f6efd2ff775bea39e34b1b260959de618908046b">see tests</a>)
-	<li>Editorial clarification: replace "Becoming a formatting context" (aka "Becoming a formatting context root") with "Establish a FC" (additional tests not needed, no change in behavior)
-</ul>
+	<ul>
+		<li>Clarify to which box paint containment clips (<a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/5b92ee3c170e3be239937a3ae069f37655ff6671">see tests</a>).
+		<li>Move the interaction between containment and the <code>bookmark-*</code> and <code>string-set</code> properties to  [[CSS-CONTENT-3]] (additional tests not needed, no change in behavior).
+		<li>Remove the effects of style containment on the "break-*" properties (<a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/d6a4f606a0501fe6ca526483a7a379ba2e9eaa1c">see tests</a>).
+		<li>Move the description of the effects of containment on regions from this specification to [[CSS-REGIONS-1]] (additional tests not needed, no change in behavior).
+		<li>Clarify the effects of style scoping on counter-set and counter-increment (<a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/d7fbc4794403dfeb55f13310d4c1cb51813e2d6e">see tests</a>)
+		<li>Size layout and paint containment don't apply to internal ruby elements (<a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/ba5a04e3d65f9f39c2d6431a9ece5eb15d22116b">see tests</a>)
+		<li>Layout, Paint, and size containments do not apply to non-atomic inlines (see <a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/402a19bde8981a402d9dba73083f84d96e4aeeb9">tests here</a> and <a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/69b5681ee7aa5a028eb694b2c93bfd48c1ef08e4">one more test here</a>)
+		<li>Align paint containment's behavior with overflow:clip (<a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/e2f844700a4a165f7ab6a0f021bbe1bf4d921cc0">see test</a>)
+		<li>Elements with size containment are monolithic (<a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/536f74e4137196b34d63752f5a9217e23c4fb899#diff-bd8852c889db6d2b471bae58105f9374">see test</a>)
+		<li>Forced breaks area allowed in elements with layout containments, but do not propagate (<a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/536f74e4137196b34d63752f5a9217e23c4fb899">see tests</a>)
+		<li>Clarify the effects of scoping to a subtree (<a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/7aad64ade18bce9db257c34d72c6dad126a9e9cd">see test</a>)
+		<li>Clarify the effects of scoping on open/close quotes (<a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/f6efd2ff775bea39e34b1b260959de618908046b">see tests</a>)
+		<li>Editorial clarification: replace "Becoming a formatting context" (aka "Becoming a formatting context root") with "Establish a FC" (additional tests not needed, no change in behavior)
+	</ul>
 
 <h3 id="2017-04-19-changes">Changes from the
 <a href="https://www.w3.org/TR/2017/WD-css-contain-1-20170419/">Working Draft of 19 April 2017</a></h3>
 
-<p>A <a href="https://drafts.csswg.org/css-contain-1/issues-2017.html">Disposition of Comments</a> covering this draft and the previous one together is available.
+	A <a href="https://drafts.csswg.org/css-contain-1/issues-2017.html">Disposition of Comments</a> covering this draft and the previous one together is available.
 
-<ul>
-	<li>Clarify the interaction with display: contents
-	<li>Clarify how containment works on table parts
-	<li>Move the interaction between containment and fragmentation of overflow from this specification to CSS-OVERFLOW-4
-</ul>
+	<ul>
+		<li>Clarify the interaction with display: contents
+		<li>Clarify how containment works on table parts
+		<li>Move the interaction between containment and fragmentation of overflow from this specification to CSS-OVERFLOW-4
+	</ul>
 
 <h3 id="fpwd-changes">Changes from the
 <a href="https://www.w3.org/TR/2017/WD-css-contain-1-20170221/">First Public Working Draft of 21 February 2017</a></h3>
 
-<ul>
-	<li>Specify handling of replaced elements for size containment
-	<li>Layout containment makes element act as a containing block for absolutely positioned and fixed positioned descendants.
-</ul>
+	<ul>
+		<li>Specify handling of replaced elements for size containment
+		<li>Layout containment makes element act as a containing block for absolutely positioned and fixed positioned descendants.
+	</ul>
+
+<!-- catch all for tests only relevant to the css-contain-2, to stop bikeshed from complaining -->
+<wpt>
+content-visibility/content-visibility-001.html
+content-visibility/content-visibility-002.html
+content-visibility/content-visibility-003.html
+content-visibility/content-visibility-004.html
+content-visibility/content-visibility-005.html
+content-visibility/content-visibility-006.html
+content-visibility/content-visibility-007.html
+content-visibility/content-visibility-008.html
+content-visibility/content-visibility-009.html
+content-visibility/content-visibility-010.html
+content-visibility/content-visibility-011.html
+content-visibility/content-visibility-012.html
+content-visibility/content-visibility-013.html
+content-visibility/content-visibility-014.html
+content-visibility/content-visibility-015.html
+content-visibility/content-visibility-016.html
+content-visibility/content-visibility-017.html
+content-visibility/content-visibility-018.html
+content-visibility/content-visibility-019.sub.https.html
+content-visibility/content-visibility-020.html
+content-visibility/content-visibility-021.html
+content-visibility/content-visibility-022.html
+content-visibility/content-visibility-023.html
+content-visibility/content-visibility-024.html
+content-visibility/content-visibility-025.html
+content-visibility/content-visibility-026.html
+content-visibility/content-visibility-027.html
+content-visibility/content-visibility-028.html
+content-visibility/content-visibility-029.html
+content-visibility/content-visibility-030.html
+content-visibility/content-visibility-031.html
+content-visibility/content-visibility-032.html
+content-visibility/content-visibility-033.sub.https.html
+content-visibility/content-visibility-034.html
+content-visibility/content-visibility-035.html
+content-visibility/content-visibility-036.html
+content-visibility/content-visibility-037.html
+content-visibility/content-visibility-038.html
+content-visibility/content-visibility-039.html
+content-visibility/content-visibility-040.html
+content-visibility/content-visibility-041.html
+content-visibility/content-visibility-042.html
+content-visibility/content-visibility-043.html
+content-visibility/content-visibility-044.html
+content-visibility/content-visibility-045.html
+content-visibility/content-visibility-046.html
+content-visibility/content-visibility-047.html
+content-visibility/content-visibility-048.html
+content-visibility/content-visibility-049.html
+content-visibility/content-visibility-050.html
+content-visibility/content-visibility-051.html
+content-visibility/content-visibility-052.html
+content-visibility/content-visibility-053.html
+content-visibility/content-visibility-054.html
+content-visibility/content-visibility-055.html
+content-visibility/content-visibility-056.html
+content-visibility/content-visibility-057.html
+content-visibility/content-visibility-058.html
+content-visibility/content-visibility-059.html
+content-visibility/content-visibility-060.html
+content-visibility/content-visibility-061.html
+content-visibility/content-visibility-062.html
+content-visibility/content-visibility-063.html
+content-visibility/content-visibility-064.html
+content-visibility/content-visibility-065.html
+content-visibility/content-visibility-066.html
+content-visibility/content-visibility-067.html
+content-visibility/content-visibility-068.html
+content-visibility/content-visibility-069.html
+content-visibility/content-visibility-070.html
+content-visibility/content-visibility-071.html
+content-visibility/content-visibility-072.html
+content-visibility/content-visibility-073.html
+content-visibility/content-visibility-074.html
+content-visibility/content-visibility-075.html
+content-visibility/content-visibility-076.html
+content-visibility/content-visibility-077.html
+content-visibility/content-visibility-078.html
+content-visibility/content-visibility-079.html
+content-visibility/content-visibility-form-controls-crash.html
+content-visibility/inheritance.html
+content-visibility/parsing/content-visibility-computed.html
+content-visibility/parsing/content-visibility-invalid.html
+content-visibility/parsing/content-visibility-valid.html
+</wpt>

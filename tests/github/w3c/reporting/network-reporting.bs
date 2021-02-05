@@ -54,6 +54,7 @@ spec: SECURE-CONTEXTS; urlPrefix: https://w3c.github.io/webappsec-secure-context
     text: potentially trustworthy; url: is-origin-trustworthy
 spec: URL; urlPrefix: https://url.spec.whatwg.org/
   type: dfn
+    text: domain; url: concept-domain
     text: origin of a url; url: concept-url-origin
     text: URL serializer; url: concept-url-serializer
     text: URL parser; url: concept-url-parser
@@ -246,8 +247,8 @@ spec: origin-policy; urlPrefix: https://wicg.github.io/origin-policy/
 
   <h3 id="concept-network-endpoint">Network reporting endpoints</h3>
 
-  A <dfn>network reporting endpoint</dfn> is an <a>endpoint</a>, which is
-  extended with these additional attributes:
+  A <dfn>network reporting endpoint</dfn> is an <a for="/">endpoint</a>, which
+  is extended with these additional attributes:
 
   Each <a>network reporting endpoint</a> has a <dfn
   for="network reporting endpoint" export attribute>priority</dfn>, which is a
@@ -372,7 +373,7 @@ spec: origin-policy; urlPrefix: https://wicg.github.io/origin-policy/
 
   The OPTIONAL <dfn for="network_reporting_endpoints">`include_subdomains`</dfn>
   member is a boolean that enables this <a>endpoint group</a> for all
-  subdomains of the current <a spec="html">origin</a>'s {{URL/host}}.
+  subdomains of the current <a spec="html">origin</a>'s [=origin/host=].
 
   <h4 id="max-age-member">The `max_age` member</h4>
 
@@ -591,36 +592,38 @@ spec: origin-policy; urlPrefix: https://wicg.github.io/origin-policy/
     algorithm</a> used for DNS <a>SRV records</a>.
 
   Given an <a>endpoint group</a> (|group|), this algorithm chooses an arbitrary
-  eligible <a>endpoint</a> from the group, if there is one, taking into account
-  the {{endpoint/priority}} and {{endpoint/weight}} of the <a
+  eligible <a for="/">endpoint</a> from the group, if there is one, taking into
+  account the {{network reporting endpoint/priority}} and
+  {{network reporting endpoint/weight}} of the <a for="/"
   data-lt="endpoint">endpoints</a>.
 
   1.  Let |endpoints| be a copy of |group|'s {{endpoint group/endpoints}} list.
 
   2.  Remove every |endpoint| from |endpoints| that is
-      <a for="endpoint">pending</a>.
+      <a for="network reporting endpoint">pending</a>.
 
   3.  If |endpoints| is empty, return `null`.
 
-  4.  Let |priority| be the minimum {{endpoint/priority}} value of each
-      |endpoint| in |endpoints|.
+  4.  Let |priority| be the minimum {{network reporting endpoint/priority}}
+      value of each |endpoint| in |endpoints|.
 
-  5.  Remove every |endpoint| from |endpoints| whose {{endpoint/priority}} value
-      is not equal to |priority|.
+  5.  Remove every |endpoint| from |endpoints| whose
+      {{network reporting endpoint/priority}} value is not equal to |priority|.
 
   6.  If |endpoints| is empty, return `null`.
 
-  7.  Let |total weight| be the sum of the {{endpoint/weight}} value of each
-      |endpoint| in |endpoints|.
+  7.  Let |total weight| be the sum of the {{network reporting endpoint/weight}}
+      value of each |endpoint| in |endpoints|.
 
   8.  Let |weight| be a random number &ge; 0 and &le; |total weight|.
 
   9.  For each |endpoint| in |endpoints|:
 
-      1.  If |weight| is less than or equal to |endpoint|'s {{endpoint/weight}},
-          return |endpoint|.
+      1.  If |weight| is less than or equal to |endpoint|'s
+          {{network reporting endpoint/weight}}, return |endpoint|.
 
-      2.  Subtract |endpoint|'s {{endpoint/weight}} from |weight|.
+      2.  Subtract |endpoint|'s {{network reporting endpoint/weight}} from
+          |weight|.
 
   10. It should not be possible to fall through to here, since the random number
       chosen earlier will be less than or equal to |total weight|.
@@ -644,9 +647,9 @@ spec: origin-policy; urlPrefix: https://wicg.github.io/origin-policy/
       2.  Let |client| be the entry in the <a>reporting cache</a> for
           |origin|.
 
-      3.  If there exists a <a>endpoint group</a> (|group|) in
+      3.  If there exists an <a>endpoint group</a> (|group|) in
           |client|'s {{client/endpoint-groups}} list whose
-          {{endpoint group/name}} is |report|'s [=report/group=]:
+          {{endpoint group/name}} is |report|'s [=report/destination=]:
 
           1.  Let |endpoint| be the result of executing [[#choose-endpoint]] on
               |group|.
@@ -658,26 +661,38 @@ spec: origin-policy; urlPrefix: https://wicg.github.io/origin-policy/
 
               2.  Skip to the next |report|.
 
-      4.  For each |parent origin| that is a <a>superdomain match</a>
-          for |origin| [[!RFC6797]]:
+      4.  If |origin| is a [=tuple origin=] whose [=origin/host=] is a
+          [=domain=]:
 
-          1.  Let |client| be the entry in the <a>reporting cache</a> for
-              |parent origin|.
+          1.  For each |parent domain| that is a <a>superdomain match</a>
+              for |origin|'s [=origin/host=] [[!RFC6797]], considering longer
+              domains first:
 
-          2.  If there exists a <a>endpoint group</a> (|group|) in
-              |client|'s {{client/endpoint-groups}} list whose
-              {{endpoint group/name}} is |report|'s [=report/group=] <b>and</b>
-              whose {{endpoint group/subdomains}} flag is "`include`":
+              1.  Let |parent origin| be a copy of |origin|, with its
+                  [=origin/host=] replaced with |parent domain|.
 
-              1.  Let |endpoint| be the result of executing [[#choose-endpoint]]
-                  on |group|.
+              2.  Let |client| be the entry in the <a>reporting cache</a> for
+                  |parent origin|.
 
-              2.  If |endpoint| is not `null`:
+              3.  If there exists an <a>endpoint group</a> (|group|) in
+                  |client|'s {{client/endpoint-groups}} list whose {{endpoint
+                  group/name}} is |report|'s [=report/destination=] <b>and</b>
+                  whose {{endpoint group/subdomains}} flag is "`include`":
 
-                  1.  Append |report| to |endpoint map|'s list of reports for
-                      |endpoint|.
+                  1.  Let |endpoint| be the result of executing
+                      [[#choose-endpoint]] on |group|.
 
-                  2.  Skip to the next |report|.
+                  2.  If |endpoint| is not `null`:
+
+                      1.  Append |report| to |endpoint map|'s list of reports
+                          for |endpoint|.
+
+                      2.  Skip to the next |report|.
+
+          Note: This algorithm ensures that more specific {{endpoint
+          group/subdomains}} policies take precendence over less specific ones,
+          and that {{endpoint group/subdomains}} policies are ignored for any
+          non-[=domain=] origins (e.g., for a request to a raw IP address).
 
       5.  If we reach this step, the |report| did not match any <a>network
           reporting endpoint</a> and the user agent MAY remove |report| from the

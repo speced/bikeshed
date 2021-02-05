@@ -1,0 +1,398 @@
+<pre class="metadata">
+Title: HTML Sanitizer API
+Status: CG-DRAFT
+Group: WICG
+URL: https://wicg.github.io/sanitizer-api/
+Repository: WICG/sanitizer-api
+Shortname: sanitizer-api
+Level: 1
+Editor: Frederik Braun 68466, Mozilla, fbraun@mozilla.com, https://frederik-braun.com
+Editor: Mario Heiderich, Cure53, mario@cure53.de, https://cure53.de
+Editor: Daniel Vogelheim, Google LLC, vogelheim@google.com, https://www.google.com
+Abstract:
+  This document specifies a set of APIs which allow developers to take untrusted
+  strings of HTML, and sanitize them for safe insertion into a document's DOM.
+Indent: 2
+Work Status: exploring
+Boilerplate: omit conformance
+Markup Shorthands: css off, markdown on
+</pre>
+<pre class="anchors">
+spec: DOM-PARSING; urlPrefix: https://w3c.github.io/DOM-Parsing/
+  type: attribute
+    text: innerHTML; for: Element; url: #widl-Element-innerHTML
+  type: method
+    text: parseFromString; url: #widl-DOMParser-parseFromString-Document-DOMString-str-SupportedType-type
+text: window.toStaticHTML(); type: method; url: https://msdn.microsoft.com/en-us/library/cc848922(v=vs.85).aspx
+text: createDocumentFragment; type: method; url: https://dom.spec.whatwg.org/#dom-document-createdocumentfragment
+text: Document; type: interface; url: https://dom.spec.whatwg.org/#interface-Document
+text: DocumentFragment; type: interface; url: https://dom.spec.whatwg.org/#documentfragment
+</pre>
+<pre class="link-defaults">
+spec:dom; type:dfn; text:append
+</pre>
+<pre class="biblio">
+{
+  "DOMPURIFY": {
+    "href": "https://github.com/cure53/DOMPurify",
+    "title": "DOMPurify",
+    "publisher": "Cure53"
+  },
+  "HTML":{
+    "authors": [
+      "Anne van Kesteren",
+      "Domenic Denicola",
+      "Ian Hickson",
+      "Philip Jägenstedt",
+      "Simon Pieters"
+    ],
+    "href": "https://html.spec.whatwg.org/multipage/",
+    "title": "HTML Standard",
+    "status": "Living Standard",
+    "publisher": "WHATWG",
+    "repository": "https://github.com/whatwg/html",
+  "id": "HTML"
+  }
+}
+</pre>
+
+Introduction {#intro}
+=====================
+
+<em>This section is not normative.</em>
+
+Web applications often need to work with strings of HTML on the client side,
+perhaps as part of a client-side templating solution, perhaps as part of
+rendering user generated content, etc. It is difficult to do so in a safe way,
+however; the naive approach of joining strings together and stuffing them into
+an {{Element}}'s {{Element/innerHTML}} is fraught with risk, as that can and
+will cause JavaScript execution in a number of unexpected ways.
+
+Libraries like [[DOMPURIFY]] attempt to manage this problem by carefully
+parsing and sanitizing strings before insertion by constructing a DOM and
+walking its members through an allowlist. This has proven to be a fragile
+approach, as the parsing APIs exposed to the web don't always map in
+reasonable ways to the browser's behavior when actually rendering a string as
+HTML in the "real" DOM. Moreover, the libraries need to keep on top of
+browsers' changing behavior over time; things that once were safe may turn
+into time-bombs based on new platform-level features.
+
+The browser, on the other, has an fairly good idea of when it is going to
+execute code. We can improve upon the userspace libraries by teaching the
+browser how to render HTML from an arbitrary string in a safe manner, and do
+so in a way that is much more likely to be maintained and updated along with
+the browser's own changing parser implementation. This document outlines an
+API which aims to do just that.
+
+Goals {#goals}
+--------------
+
+*   Mitigate the risk of DOM-based cross-site scripting attacks by providing
+    developers with mechanisms for handling user-controlled HTML which prevent
+    direct script execution upon injection.
+
+*   Make HTML output safe for use within the current user agent, taking into
+    account its current understanding of HTML.
+
+*   Allow developers to override the defaults set of elements and attributes.
+    Adding certain elements and attributes can prevent
+    <a href="https://github.com/google/security-research-pocs/tree/master/script-gadgets">script gadget</a>
+    attacks.
+
+Examples {#examples}
+--------------------
+
+```js
+let userControlledInput = "&lt;img src=x onerror=alert(1)//&gt;";
+
+// Create a DocumentFragment from unsanitized input:
+let s = new Sanitizer();
+let sanitizedFragment = s.sanitize(userControlledInput);
+
+// Replace an element's content from unsanitized input:
+element.replaceChildren(s.sanitize(userControlledInput));
+```
+
+Framework {#framework}
+======================
+
+## Sanitizer API {#sanitizer-api}
+
+The core API is the `Sanitizer` object and the sanitize method. Sanitizers can
+be instanited using an optional `SanitizerConfig` dictionary for options.
+The most common use-case - preventing XSS - is handled by the built-in default
+lists, so that creating a Sanitizer with a custom config is necessary only to
+handle additional, application-specific use cases.
+
+<pre class="idl">
+  [
+    Exposed=(Window),
+    SecureContext
+  ] interface Sanitizer {
+    constructor(optional SanitizerConfig config = {});
+    DocumentFragment sanitize(SanitizerInput input);
+    DOMString sanitizeToString(SanitizerInput input);
+  };
+</pre>
+
+* The constructor creates a Sanitizer instance.
+  It retains a copy of |config| as its [=configuration=] object.
+* The `sanitize` method runs the [=sanitize=] algorithm on |input|,
+* The `sanitizeToString` method runs the [=sanitizeToString=] algorithm on |input|.
+
+Example:
+```js
+  // Replace an element's content from unsanitized input:
+  element.replaceChildren(new Sanitizer().sanitize(userControlledInput));
+```
+
+## Input Types {#inputs}
+
+The sanitization methods support three input types: `DOMString`, `Document`,
+and `DocumentFragment`. In all cases, the sanitization will work on a
+{{DocumentFragment}} internally, but the work-fragment will be created by
+parsing, cloning, or using the fragment as-is, respectively.
+
+<pre class="idl">
+  typedef (DOMString or DocumentFragment or Document) SanitizerInput;
+</pre>
+
+Note: Sanitizing a string will use the [=HTML Parser=] to parse the input,
+    which will perform some degree of normalization. So even
+    if no sanitization steps are taken on a particular input, it cannot be
+    guaranteed that the output of `sanitizeToString` will be
+    character-for-character identical to the input.
+    Examples would be character regularization (`"&szlig;"` to `"ß"`),
+    or light processing for some elements (`"<image>"` to `"<img>"`);
+
+
+## The Configuration Dictionary {#config}
+
+The <dfn lt="configuration">sanitizer's configuration object</dfn> is a
+dictionary which describes modifications to the sanitze operation.
+
+<pre class="idl">
+  dictionary SanitizerConfig {
+    sequence&lt;DOMString> allowElements;
+    sequence&lt;DOMString> blockElements;
+    sequence&lt;DOMString> dropElements;
+    AttributeMatchList allowAttributes;
+    AttributeMatchList dropAttributes;
+    boolean allowCustomElements;
+  };
+</pre>
+
+: allowElements
+:: The <dfn>element allow list</dfn> is a sequence of strings with
+    elements that the sanitizer should retain in the input.
+: blockElements
+:: The <dfn>element block list</dfn> is a sequence of strings with elements
+   where the sanitizer should remove the elements from the input, but retain
+   their children.
+: dropElements
+:: The <dfn>element drop list</dfn> is a sequence of strings with elements
+   that the sanitizer should remove from the input, including its children.
+: allowAttributes
+:: The <dfn>attribute allow list</dfn> is an [=attribute match list=], which
+   determines whether an attribute (on a given element) should be allowed.
+: dropAttributes
+:: The <dfn>attribute drop list</dfn>  is an [=attribute match list=], which
+   determines whether an attribute (on a given element) should be dropped.
+: allowCustomElements
+:: <dfn>allow custom elements option</dfn> determines whether
+   [=custom elements=] are to be considered. The default is to drop them.
+   If this option is true, custom elements will still be checked against all
+   other built-in or configured configured checks.
+
+Note: `allowElements` creates a sanitizer that defaults to dropping elements,
+  while `blockElements` and `dropElements` defaults to keeping unknown
+  elements. Using both types is possible, but is probably of little practical
+  use. The same applies to `allowAttributes` and `dropAttributes`.
+
+Examples:
+```js
+  const sample = "Some text <b><i>with</i></b> <blink>tags</blink>.";
+
+  // "Some text <b>with</b> text tags."
+  new Sanitizer({allowElements: [ "b" ]).sanitizeToString(sample);
+
+  // "Some text <i>with</i> <blink>tags</blink>."
+  new Sanitizer({blockElements: [ "b" ]).sanitizeToString(sample);
+
+  // "Some text <blink>tags</blink>."
+  new Sanitizer({dropElements: [ "b" ]).sanitizeToString(sample);
+
+  // Note: The default configuration handles XSS-relevant input:
+
+  // Non-scripting input will be passed through:
+  new Sanitizer().sanitizeToString(sample);  // Will output sample unmodified.
+
+  // Scripts will be blocked: "abc alert(1) def"
+  new Sanitizer().sanitizeToString("abc <script>alert(1)</script> def");
+```
+
+### Attribute Match Lists {#attr-match-list}
+
+An <dfn>attribute match list</dfn> is a map of attribute names to element names,
+where the special name "*" stands for all elements. A given |attribute|
+belonging to an |element| matches an [=attribute match list=], if the
+attribute's local name is a key in the match list, and element's local name
+or `"*"` are found in the attribute's value list.
+
+<pre class="idl">
+  typedef record&lt;DOMString, sequence&lt;DOMString>> AttributeMatchList;
+</pre>
+
+Examples for attributes and attribute match lists:
+```js
+  const sample = "<span id='span1' class='theclass' style='font-weight: bold'>hello</span>";
+
+  // Allow only <span style>: "<span style='font-weight: bold'>...</span>"
+  new Sanitizer({allowAttributes: {"style": ["span"]}}).sanitizeToString(sample);
+
+  // Allow style, but not on span: "<span>...</span>"
+  new Sanitizer({allowAttributes: {"style": ["div"]}}).sanitizeToString(sample);
+
+  // Allow style on any elements: "<span style='font-weight: bold'>...</span>"
+  new Sanitizer({allowAttributes: {"style": ["*"]}}).sanitizeToString(sample);
+
+  // Block <span id>: "<span class='theclass' style='font-weight: bold'>...</span>";
+  new Sanitizer({blockAttributes: {"id": ["span"]}}).sanitizeToString(sample);
+
+  // Block id, everywhere: "<span class='theclass' style='font-weight: bold'>...</span>";
+  new Sanitizer({blockAttributes: {"id": ["*"]}}).sanitizeToString(sample);
+```
+
+## Algorithms {#algorithms}
+
+To <dfn lt="sanitize document fragment">sanitize a document fragment</dfn> named |fragment| using |sanitizer| run these steps:
+
+1. let |m| be a map that maps nodes to {'keep', 'block', 'drop'}.
+2. let |nodes| be a list containing the [=inclusive descendants=] of |fragment|, in [=tree order=].
+3. [=list/iterate|for each=] |node| in |nodes|:
+  1. call [=sanitize a node=] and insert |node| and the result value into |m|
+4. [=list/iterate|for each=] |node| in |nodes|:
+  1. if m[node] is 'drop', remove the |node| and all children from |fragment|.
+  2. if m[node] is 'block', replace the |node| with all of its element and text node children from |fragment|.
+  3. if m[node] is undefined or 'keep', do nothing.
+
+To <dfn>sanitize a node</dfn> named |node| run these steps:
+
+1. if |node| is an element node, call [=sanitize an element=] and return its result.
+2. return 'keep'
+
+To <dfn>sanitize an element</dfn> named |element|, run these steps:
+
+1. let |config| be the |sanitizer|'s [=configuration=] dictionary.
+2. let |name| be |element|'s tag name.
+3. if |name| is a [=valid custom element name=] and if |config|'s
+   [=allow custom elements option=] is unset or set to anything other than `true`, return 'drop'.
+4. if |name| is contained in the built-in [=default element drop list=] return 'drop'.
+5. if |name| is in |config|'s [=element drop list=] return 'drop'.
+6. if |name| is contained in the built-in [=default element block list=] return 'block'.
+7. if |name| is in |config|'s [=element block list=] return 'block'.
+8. if |config| has a non-empty [=element allow list=] and |name| is not in |config|'s [=element allow list=] return 'block'
+9. [=list/iterate|for each=] |attr| in |element|'s [=Element/attribute list=]:
+  1. call [=sanitize an attribute=] with |attr|'s name and |element|'s local name.
+  2. if the result is different from 'keep', remove |attr| from |element|.
+10. return 'keep'
+
+Issue: This presently ignores all namespace info, making it impossible to
+    support different actions for like-named elements from different
+    namespaces.
+
+To <dfn>sanitize an attribute</dfn> named |attr| belonging to |element|, run these steps:
+
+1. let |config| be the |sanitizer|'s [=configuration=] dictionary.
+2. if |attr| and |element| [=attribute-match=] the built-in [=default attribute drop list=] return 'drop'.
+3. if |attr| and |element| [=attribute-match=] the |config|'s [=attribute drop list=] return 'drop'.
+4. if |config| has a non-empty [=attribute allow list=] and |attr| and |element| do not [=attribute-match=] the |config|'s [=attribute allow list=] return 'drop'.
+5. return 'keep'.
+
+To determine whether an |attribute| and |element| <dfn>attribute-match</dfn> an [=attribute match list=] |list|, run these steps:
+
+1. let |attr-name| be |attribute|'s local name.
+2. let |elem-name| be |element|'s local name.
+3. if |list| does not contain a key |attr-name|, return false.
+4. let |matches| be the value of |list|[|attr-name|].
+3. if |matches| contains the string |elem-name|, return true.
+4. if |matches| contains the string "*", return true.
+5. return false.
+
+To <dfn>create a document fragment</dfn>
+named |fragment| from a Sanitizer |input|, run these steps:
+
+1. Switch based on |input|'s type:
+  1. if |input| is of type {{DocumentFragment}}, then:
+    1. let |node| refer to |input|.
+  2. if |input| is of type {{Document}}, then:
+    1. let |node| refer to |input|'s `documentElement`.
+  3. if |input| is of type `DOMString`, then:
+    1. let |node| be the result of the {{parseFromString}} algorithm
+        with |input| as first parameter (`string`),
+        and `"text/html"` as second parameter (`type`).
+2. Let |clone| be the result of running [=clone a node=] on |node| with the
+   `clone children flag` set to `true`.
+3. Let `f` be the result of {{createDocumentFragment}}.
+4. [=Append=] the node |clone| to the parent |f|.
+5. Return |f|.
+
+
+Issue(WICG/sanitizer-api#42): It's unclear whether we can assume a generic
+  context for {{parseFromString}}, or if we need to re-work the API to take
+  the insertion context of the created fragment into account.
+
+
+To <dfn>sanitize</dfn> a given |input|, run these steps:
+
+1. run [=create a document fragment=] algorithm on the |input|.
+2. run the [=sanitize document fragment=] algorithm on the resulting fragment,
+3. and return its result.
+
+To <dfn>sanitizeToString</dfn> a given |input|, run these steps:
+
+1. run [=create a document fragment=] algorithm on the |input|.
+2. run the [=sanitize=] algorithm on the resulting fragment,
+3. run the steps of the [=HTML Fragment Serialization Algorithm=] with
+     the fragment root of step 1 as the |node|, and return the result string.
+
+
+## Default Configuration {#defaults}
+
+Issue: The sanitizer defaults need to be carefully vetted, and are still
+    under discussion. The values below are for illustrative purposes only.
+
+The sanitizer has a built-in default configuration, which aims to eliminate
+any script-injection possibility. Note that the [=sanitize document fragment=]
+algorithm
+is defined so that these defaults are handled first and cannot be overriden
+by a custom configuration.
+
+
+: Default Drop Elements
+
+:: The <dfn>default element drop list</dfn> has the following value:
+   ```
+ [ "script", "this is just a placeholder" ]
+   ```
+
+: Default Block Elements
+
+:: The <dfn>default element block list</dfn> has the following value:<br>
+   ```
+[ "noscript", "this is just a placeholder" ]
+   ```
+
+: Default Drop Attributes
+
+:: The <dfn>default attribute drop list</dfn> has the following value:
+   ```
+{}
+   ```
+
+
+Acknowledgements {#ack}
+=======================
+
+Cure53's [[DOMPURIFY]] is a clear inspiration for the API this document
+describes, as is Internet Explorer's {{window.toStaticHTML()}}.

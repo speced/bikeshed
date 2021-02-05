@@ -27,7 +27,7 @@ spec:webxr-1;
     type:event; text:reset
     type:dfn; text:xr device
     type:dfn; for: XRBoundedReferenceSpace; text:native bounds geometry
-    type:dfn; text:native origin
+    type:dfn; for: XRSpace; text:native origin
     type:dfn; text:viewer
     type:dfn; text:view
     type:dfn; text:view offset
@@ -40,17 +40,22 @@ spec:webxr-1;
     type:dfn; text:inline xr device
     type:dfn; text:list of immersive xr devices
     type:dfn; text:primary action
+    type:dfn; text:primary squeeze action
+    type:dfn; text:xr input source
 </pre>
 
 <pre class="anchors">
 spec:webxr-dom-overlays; urlPrefix: https://immersive-web.github.io/dom-overlays#
     type:dfn; text:beforexrselect
+spec:WebXR Anchors Module; urlPrefix: https://immersive-web.github.io/anchors/#
+    for: XRAnchor;
+        type: method; text: delete(); url: dom-xranchor-delete
+        type: dfn; text: native origin; url: xranchor-native-origin
 </pre>
 
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png">
 
-<style>
 <style>
   .unstable::before {
     content: "This section is not stable";
@@ -130,6 +135,8 @@ Interfaces and functionality exposed by this specification SHOULD NOT be exposed
 Simulated devices {#simulated-devices}
 ============
 
+Simulated XR Device {#simulated-devices-xr}
+------------
 This API gives tests the ability to spin up a <dfn>simulated XR device</dfn> which is an [=/XR device=] which from the point of view of the WebXR API behaves like a normal [=/XR device=]. These [=simulated XR device|simulated XR devices=] can be controlled by the associated {{FakeXRDevice}} object.
 
 Every [=simulated XR device=] may have an <dfn for="simulated XR device">native bounds geometry</dfn> which is an array of {{DOMPointReadOnly}}s, used to initialize the [=XRBoundedReferenceSpace/native bounds geometry=] of any {{XRBoundedReferenceSpace}}s created for the device. If <code>null</code>, the device is treated as if it is not currently tracking a bounded reference space.
@@ -146,8 +153,26 @@ Every [=view=] for a [=simulated XR device=] has an associated <dfn for=view>dev
 
 Every [=view=] for a [=simulated XR device=] may have an associated <dfn for=view>field of view</dfn>, which is an instance of {{FakeXRFieldOfViewInit}} used to calculate projection matrices using depth values. If the [=field of view=] is set, projection matrix values are calculated using the [=field of view=] and {{XRRenderState/depthNear}} and {{XRRenderState/depthFar}} values.
 
-The WebXR API never exposes native origins directly, instead exposing transforms between them, so we need to specify a base reference space for {{FakeXRRigidTransformInit}}s so that we can have consistent numerical values across implementations. When used as an origin, {{FakeXRRigidTransformInit}}s are in the base reference space where the [=viewer=]'s [=native origin=] is identity at initialization, unless otherwise specified. In this space, the {{XRReferenceSpaceType/"local"}} reference space has a [=native origin=] of identity. This is an arbitrary choice: changing this reference space doesn't affect the data returned by the WebXR API, but we must make such a choice so that the tests produce the same results across different UAs. When used as an origin it is logically a transform <i>from</i> the origin's space <i>to</i> the underlying base reference space described above.
+Simulated Input Device {#simulated-devices-input}
+------------
 
+This API gives tests the ability to spin up a <dfn>simulated XR input source</dfn> which is an [=/XR input source=] which from the point of view of the WebXR API behaves like a normal [=/XR input source=]. These [=simulated XR input source|simulated XR input sources=] can be controlled by the associated {{FakeXRInputController}} object.
+
+Every [=simulated XR input source=] has a <dfn for="simulated XR input source">handedness</dfn> which is an {{XRHandedness}} value that MUST be returned for the corresponding [=/XR input source|XR input source's=] {{XRInputSource/handedness}} attribute.
+
+Every [=simulated XR input source=] has a <dfn for="simulated XR input source">targetRayMode</dfn> which is an {{XRTargetRayMode}} value that MUST be returned for the corresponding [=/XR input source|XR input source's=] {{XRInputSource/targetRayMode}} attribute.
+
+Every [=simulated XR input source=] has a <dfn for="simulated XR input source">pointerOrigin</dfn> which is an {{XRRigidTransform}} used to note the origin of the {{XRInputSource/targetRaySpace}}.
+
+A [=simulated XR input source=] may have a <dfn for="simulated XR input source">gripOrigin</dfn> which is an {{XRRigidTransform}} used to note the origin of the {{XRInputSource/gripSpace}}. If this is <code>null</code> the [=simulated XR input source=] is not tracked.
+
+Every [=simulated XR input source=] has a <dfn for="simulated XR input source">profiles</dfn> array which is an array of {{DOMString}}s which MUST be returned for the corresponding [=/XR input source|XR input source's=] {{XRInputSource/profiles}} attribute.
+
+Every [=simulated XR input source=] has a <dfn for="simulated XR input source">buttonState</dfn> array which is an array of {{FakeXRButtonStateInit}}s. If a {{FakeXRButtonType/"grip"}} button is specified, it SHOULD drive the [=/primary squeeze action=]. If a UA implements the <a href="https://immersive-web.github.io/webxr-gamepads-module/">WebXR Gamepads Module</a> [=buttonState=] SHOULD be used to set the state for the corresponding [=/XR input source|XR input source's=] {{XRInputSource/gamepad}} object, which SHOULD be of type {{GamepadMappingType/"xr-standard"}} if enough buttons are specified to support it.
+
+Every [=simulated XR input source=] has a <dfn for="simulated XR input source">connectionState</dfn> which is a boolean that is initially <code>true</code> and indicates whether the associated [=/XR input source=] should appear in {{XRSession/inputSources}}. When it is changed the associated changes must be reflected on the XRSession, including triggering the {{XRSession/inputsourceschange}} event if necessary by the [=next animation frame=]. 
+
+Every [=simulated XR input source=] has a <dfn for="simulated XR input source">primaryActionStarted</dfn> which is a boolean, initially set to <code>false</code>, that indicates whether or not the primary action of the XR input source has been started.
 
 Initialization {#initialization}
 ==============
@@ -157,12 +182,12 @@ navigator.xr.test {#xr-test-attribute}
 
 
 <script type="idl">
-partial interface XR {
+partial interface XRSystem {
     [SameObject] readonly attribute XRTest test;
 };
 </script>
 
-The <dfn attribute for="XR">test</dfn> attribute's getter MUST return the {{XRTest}} object that is associated with it. This object MAY be lazily created.
+The <dfn attribute for="XRSystem">test</dfn> attribute's getter MUST return the {{XRTest}} object that is associated with it. This object MAY be lazily created.
 
 
 XRTest {#xrtest-interface}
@@ -190,7 +215,6 @@ When this method is invoked, the user agent MUST run the following steps:
         1. Let |v| be the result of running [=parse a view=] on |view|.
         1. If running [=parse a view=] threw an error, reject |promise| with this error and abort these steps.
         1. [=list/Append=] |v| to |device|'s list of views.
-    1. If |init|'s {{FakeXRDeviceInit/supportedFeatures}} is set, set |device|'s [=capable of supporting|list of features it is capable of supporting=] to |init|'s {{FakeXRDeviceInit/supportedFeatures}}.
     1. If |init|'s {{FakeXRDeviceInit/boundsCoordinates}} is set, perform the following steps:
         1. If |init|'s {{FakeXRDeviceInit/boundsCoordinates}} has less than 3 elements, reject |promise| with {{TypeError}} and abort these steps.
         1. Set |device|'s [=simulated XR device/native bounds geometry=] to |init|'s {{FakeXRDeviceInit/boundsCoordinates}}.
@@ -210,6 +234,11 @@ When this method is invoked, the user agent MUST run the following steps:
             1. If |init|'s {{FakeXRDeviceInit/supportsImmersive}} is <code>true</code>, append <code>"immersive-vr"</code> to |supportedModes|.
         </dd>
         </dl>
+    1. If |init|'s {{FakeXRDeviceInit/supportedFeatures}} is set, for each |mode| in |supportedModes|:
+       1. Associate |init|'s {{FakeXRDeviceInit/supportedFeatures}} to |mode|
+
+NOTE: each |device| stores a [=capable of supporting|list of features it is capable of supporting=] per {{XRSessionMode}}. Most tests only test one mode anyway so there isn't much to be gained by splitting features per mode in {{FakeXRDeviceInit}}. Users wishing different modes supporting different features should create multiple devices instead.
+
     1. Set |device|'s [=list of supported modes=] to |supportedModes|.
     1. Register |device| based on the following:
         1. If |supportedModes| contains <code>"immersive-vr"</code> or <code>"immersive-ar"</code>, append |device| to the {{Navigator/xr}}'s [=list of immersive XR devices=].
@@ -220,7 +249,7 @@ When this method is invoked, the user agent MUST run the following steps:
 
 </div>
 
-When <dfn method for=XRTest>simulateUserActivation(f)</dfn> is called, invoke <code>f</code> as if it was [=triggered by user activation=].
+When <dfn method for=XRTest>simulateUserActivation(f)</dfn> is called, invoke <code>f</code> as if it had [=transient activation=].
 
 
 When <dfn method for=XRTest>disconnectAllDevices()</dfn> is called, remove all [=simulated XR devices=] from the [=context object=]'s {{XR}} object's [=list of immersive XR devices=] as if they were disconnected. If the [=inline XR device=] is a [=simulated XR device=], reset it to the default [=inline XR device=].
@@ -306,10 +335,13 @@ To <dfn>parse a view</dfn> given a {{FakeXRViewInit}} |init|, perform the follow
   1. If |init|'s {{FakeXRViewInit/fieldOfView}} is set, perform the following steps:
     1. Set |view|'s [=view/field of view=] to |init|'s {{FakeXRViewInit/fieldOfView}}.
     1. Set |view|'s [=view/projection matrix=] to the projection matrix corresponding to this field of view, and depth values equal to {{XRRenderState/depthNear}} and {{XRRenderState/depthFar}} of any {{XRSession}} associated with the device. If there currently is none, use the default values of <code>near=0.1, far=1000.0</code>.
-  1. Set |view|'s [=view/projection matrix=] to |init|'s {{FakeXRViewInit/projectionMatrix}}.
   1. Return |view|.
 
 </div>
+
+FakeXRRigidTransformInit {#fakexrrigidtransform-base-space}
+------------
+The WebXR API never exposes native origins directly, instead exposing transforms between them, so we need to specify a <dfn>base reference space</dfn> for {{FakeXRRigidTransformInit}}s so that we can have consistent numerical values across implementations. When used as an origin, {{FakeXRRigidTransformInit}}s are in the [=base reference space=] where the [=viewer=]'s [=native origin=] is identity at initialization, unless otherwise specified. In this space, the {{XRReferenceSpaceType/"local"}} reference space has a [=native origin=] of identity. This is an arbitrary choice: changing this reference space doesn't affect the data returned by the WebXR API, but we must make such a choice so that the tests produce the same results across different UAs. When used as an origin it is logically a transform <i>from</i> the origin's space <i>to</i> the underlying [=base reference space=] described above.
 
 Mocking {#mocking}
 ==============
@@ -318,7 +350,7 @@ FakeXRDevice {#fakexrdevice-interface}
 ------------
 
 <script type="idl">
-interface FakeXRDevice {
+interface FakeXRDevice : EventTarget {
   void setViews(sequence<FakeXRViewInit> views);
 
   Promise<void> disconnect();
@@ -354,17 +386,11 @@ To determine when this frame is, for a given operation, choose a frame based on 
     <dt>If such an operation is triggered within an [=XR animation frame=]:</dt>
     <dd>Choose the next [=XR animation frame=], whenever it may occur</dd>
     <dt>If such an operation is triggered outside of an [=XR animation frame=]:</dt>
-    <dd>Choose a frame based on the following:
-        <dl class=switch>
-            <dt>If there are no callbacks in the [=list of animation frame callbacks=]:</dt>
-            <dd>Choose the next [=XR animation frame=], whenever it may occur</dd>
-            <dt>Otherwise:</dt>
-            <dd>Choose the next-to-next [=XR animation frame=], whenever it may occur</dd>
-        </dl>
+    <dd>Choose either the next or next-to-next [=XR animation frame=]. The precise choice is up to the user agent and may be dependent on the exact timing of these events.
     </dd>
     </dl>
 
-NOTE: The reason we defer an extra frame when there are pending animation frame callbacks is to avoid having to deal with potential race conditions when the device is ready to trigger an animation frame callback, but has not yet. In practice, this means that tests should be written so that they wait until they have performed all such operations <i>before</i> calling the next {{XRSession/requestAnimationFrame()}}
+NOTE: The reason we defer an extra frame when there are pending animation frame callbacks is to avoid having to deal with potential race conditions when the device is ready to trigger an animation frame callback, but has not yet. In practice, this means that tests should be written so that they wait until they have performed all such operations <i>before</i> calling the next {{XRSession/requestAnimationFrame()}}, and in case they are running outside of an [=XR animation frame=], should always wait two frames before expecting any updates to take effect.
 </div>
 
 <div class="algorithm" data-algorithm="set-views">
@@ -428,6 +454,25 @@ The <dfn method for=FakeXRDevice>setBoundsGeometry(|boundsCoordinates|)</dfn> pe
 
 The <dfn method for=FakeXRDevice>simulateResetPose()</dfn> method will, as soon as possible, behave as if the [=FakeXRDevice/device=]'s [=viewer=]'s [=native origin=] had a discontinuity, triggering appropriate {{reset}} events.
 
+<div class="algorithm" data-algorithm="simulate-input-source-connection">
+The <dfn method for=FakeXRDevice>simulateInputSourceConnection(|init|)</dfn> method creates a new [=simulated XR input source=].
+
+When this method is invoked, the user agent MUST run the following steps:
+
+    1. Let |inputSource| be a new [=simulated XR input source=].
+    1. Set |inputSource|'s [=simulated XR input source/handedness=] to |init|'s {{FakeXRInputSourceInit/handedness}}.
+    1. Set |inputSource|'s [=simulated XR input source/targetRayMode=] to |init|'s {{FakeXRInputSourceInit/targetRayMode}}.
+    1. Set |inputSource|'s [=simulated XR input source/profiles=] to |init|'s {{FakeXRInputSourceInit/profiles}}
+    1. If |init|'s {{FakeXRInputSourceInit/gripOrigin}} is set, set |inputSource|'s [=simulated XR input source/gripOrigin=] to the result of running [=parse a rigid transform=] on |init|'s {{FakeXRInputSourceInit/gripOrigin}}
+    1. Set |inputSource|'s [=simulated XR input source/pointerOrigin=] to the result of running [=parse a rigid transform=] on |init|'s {{FakeXRInputSourceInit/pointerOrigin}}
+    1. If |init|'s {{FakeXRInputSourceInit/supportedButtons}} is set, set |inputSource|'s [=simulated XR input source/buttonState=] to the result of running [=parse supported buttons=] on |init|'s {{FakeXRInputSourceInit/supportedButtons}}
+    1. If |init|'s {{FakeXRInputSourceInit/selectionClicked}} is set to <code>true</code>, run [=simulate a full primary action=] on |inputSource|.
+    1. If |init|'s {{FakeXRInputSourceInit/selectionStarted}} is set to <code>true</code>, run [=start a primary action=] on |inputSource|.
+    1. By the [=next animation frame=] notify {{XRSession}} of the new [=/XR input source=].
+    1. Let |c| be a new {{FakeXRInputController}} object with {[=FakeXRInputController/inputSource=] as |inputSource|.
+    1. Return |c|.
+</div>
+
 FakeXRInputController {#fakexrinputcontroller-init}
 ------------
 
@@ -479,6 +524,104 @@ dictionary FakeXRButtonStateInit {
   float yValue = 0.0;
 };
 </script>
+
+Each {{FakeXRInputController}} object has an associated <dfn for="FakeXRInputController">inputSource</dfn>, which is a [=simulated XR input source=] that it is able to control.
+
+Since user agents may opt to send input events on a per-frame basis, the results of all {{FakeXRInputController}} methods and {{FakeXRDevice/simulateInputSourceConnection()}} are not guaranteed to be visible (via, e.g. {{XRSession/inputSources}} or {{XRSession/oninputsourceschange}} events) until the [=next animation frame=].
+
+<div class="algorithm" data-algorithm="start-a-primary-action">
+To <dfn>start a primary action</dfn> on a [=simulated XR input source=] run the following steps:
+    1. If [=simulated XR input source/primaryActionStarted=] is true, abort these steps.
+    1. Set [=simulated XR input source/primaryActionStarted=] to true.
+    1. By the [=next animation frame=] indicate to the {{XRSession}} that the corresponding [=/XR input source|XR input source's=] [=/primary action=] has started.
+</div>
+
+<div class="algorithm" data-algorithm="stop-a-primary-action">
+To <dfn>stop a primary action</dfn> on a [=simulated XR input source=] run the following steps:
+    1. If [=simulated XR input source/primaryActionStarted=] is false, abort these steps.
+    1. Set [=simulated XR input source/primaryActionStarted=] to false.
+    1. By the [=next animation frame=] indicate to the {{XRSession}} that the corresponding [=/XR input source|XR input source's=] [=/primary action=] has stopped.
+</div>
+
+<div class="algorithm" data-algorithm="simulate-a-full-primary-action">
+To <dfn>simulate a full primary action</dfn> on a [=simulated XR input source=] |source|, run the following steps:
+    1. Let |current| be the current value of [=simulated XR input source/primaryActionStarted=].
+    1. Run [=start a primary action=] on |source|
+    1. Run [=stop a primary action=] on |source|
+    1. If |current| is <code>true</code> run [=start a primary action=] on |source|
+</div>
+
+Note: If a gamepad is attached to the [=simulated XR input source=], then running [=start a primary action=] or [=stop a primary action=] should also ensure that the primary input's corresponding gamepad button is updated accordingly.
+
+Note: If both [=start a primary action=] and [=stop a primary action=] are run in the same frame, then by the [=next animation frame=] It is expected that {{XRSession/onselect}} and {{XRSession/onselectend}} events will fire.
+
+<div class="algorithm" data-algorithm="parse-supported-buttons">
+To <dfn>parse supported buttons</dfn> on a sequence of {{FakeXRButtonStateInit}}s, |buttons| run the following steps:
+    1. Let |l| be an empty list of {{FakeXRButtonStateInit}}s
+    1. For each |button| in |buttons|:
+        1. If |l| does not contain a {{FakeXRButtonStateInit}} whose {{FakeXRButtonStateInit/buttonType}} matches |button|'s {{FakeXRButtonStateInit/buttonType}}, append |button| to |l|.
+    1. Return |l|
+</div>
+
+The <dfn method for=FakeXRInputController>setHandedness(|handedness|)</dfn> method will, by the [=next animation frame=], set [=FakeXRInputController/inputSource=]'s [=simulated XR input source/handedness=] to |handedness|.
+
+The <dfn method for=FakeXRInputController>setTargetRayMode(|targetRayMode|)</dfn> method will, by the [=next animation frame=], set [=FakeXRInputController/inputSource=]'s [=simulated XR input source/targetRayMode=] to |targetRayMode|.
+
+The <dfn method for=FakeXRInputController>setProfiles(|profiles|)</dfn> method will, by the [=next animation frame=], set [=FakeXRInputController/inputSource=]'s [=simulated XR input source/profiles=] to |profiles|.
+
+The <dfn method for=FakeXRInputController>setGripOrigin(|gripOrigin|)</dfn> method will, by the [=next animation frame=], set [=FakeXRInputController/inputSource=]'s [=simulated XR input source/gripOrigin=] to the result of running [=parse a rigid transform=] on |gripOrigin|.
+
+The <dfn method for=FakeXRInputController>clearGripOrigin()</dfn> method will, by the [=next animation frame=], set [=FakeXRInputController/inputSource=]'s [=simulated XR input source/gripOrigin=] to <code>null</code>.
+
+The <dfn method for=FakeXRInputController>setPointerOrigin(|pointerOrigin|)</dfn> method will, by the [=next animation frame=], set [=FakeXRInputController/inputSource=]'s [=simulated XR input source/pointerOrigin=] to the result of running [=parse a rigid transform=] on |pointerOrigin|.
+
+<div class="algorithm" data-algorithm="fakexrinputcontroller-disconnect">
+The <dfn method for=FakeXRInputController>disconnect()</dfn> method will run the following steps:
+    1. If [=FakeXRInputController/inputSource=]'s [=simulated XR input source/connectionState=] is <code>false</code>, abort these steps.
+    1. Set [=FakeXRInputController/inputSource=]'s [=simulated XR input source/connectionState=] to <code>false</code>.
+    1. By the [=next animation frame=], notify the {{XRSession}} that this [=/XR input source=] has been removed.
+</div>
+
+<div class="algorithm" data-algorithm="fakexrinputcontroller-reconnect">
+The <dfn method for=FakeXRInputController>reconnect()</dfn> method will run the following steps:
+    1. If [=FakeXRInputController/inputSource=]'s [=simulated XR input source/connectionState=] is <code>true</code>, abort these steps.
+    1. Set [=FakeXRInputController/inputSource=]'s [=simulated XR input source/connectionState=] to <code>true</code>.
+    1. By the [=next animation frame=], notify the {{XRSession}} that this [=/XR input source=] has been added.
+</div>
+
+The <dfn method for=FakeXRInputController>startSelection()</dfn> method will run [=start a primary action=] on [=FakeXRInputController/inputSource=].
+
+The <dfn method for=FakeXRInputController>endSelection()</dfn> method will run [=stop a primary action=] on [=FakeXRInputController/inputSource=].
+
+The <dfn method for=FakeXRInputController>simulateSelect()</dfn> method will run [=simulate a full primary action=] on [=FakeXRInputController/inputSource=].
+
+The <dfn method for=FakeXRInputController>setSupportedButtons(|supportedButtons|)</dfn> will, by the [=next animation frame=], set [=FakeXRInputController/inputSource=]'s [=simulated XR input source/buttonState=] to the result of running [=parse supported buttons=] on |supportedButtons|.
+
+Note: As user agents may recreate the {{XRInputSource}} or {{XRInputSource/gamepad}} objects on buttons being changed, this method SHOULD NOT be used to simulate changes to button state.
+
+<div class="algorithm" data-algorithm="update-button-state">
+The <dfn method for=FakeXRInputController>updateButtonState(|buttonState|)</dfn> will run the following steps:
+    1. Let |validState| equal the results of running [=validate a button state=] on |buttonState|.
+    1. Let |foundState| be <code>null</code>.
+    1. For every |state| in [=FakeXRInputController/inputSource=]'s [=simulated XR input source/buttonState=] array:
+        1. If |state|'s {{FakeXRButtonStateInit/buttonType}} matches |buttonState|'s {{FakeXRButtonStateInit/buttonType}}:
+            1. Set |foundState| to a reference of |state|
+            1. Break out of this loop
+    1. If |foundState| is <code>null</code> throw a {{NotFoundError}}
+    1. Update |foundState|'s attributes in [=FakeXRInputController/inputSource=]'s [=simulated XR input source/buttonState=] to match those of |validState|. Note: If {{FakeXRButtonStateInit/buttonType}} is {{FakeXRButtonType/grip}}, then [=XR input source=]'s [=/primary squeeze action=] should be updated.
+</div>
+
+<div class="algorithm" data-algorithm="validate-a-button-state">
+To <dfn>validate a button state</dfn> on a {{FakeXRButtonStateInit}} |buttonState| run the following steps:
+    1. Let |validState| equal |buttonState|.
+    1. If {{FakeXRButtonStateInit/pressed}} is <code>true</code> and {{FakeXRButtonStateInit/touched}} is <code>false</code>, throw a {{TypeError}}.
+    1. If {{FakeXRButtonStateInit/pressedValue}} is less than <code>0.0</code>, throw a {{TypeError}}.
+    1. If {{FakeXRButtonStateInit/pressedValue}} is greater than <code>0.0</code> and {{FakeXRButtonStateInit/touched}} is <code>false</code> throw a {{TypeError}}.
+    1. If {{FakeXRButtonStateInit/buttonType}} is not one of: {{FakeXRButtonType/"touchpad"}}, {{FakeXRButtonType/"thumbstick"}}, or {{FakeXRButtonType/"optional-thumbstick"}}:
+        1. Set |validState|'s {{FakeXRButtonStateInit/xValue}} to <code>0.0</code>.
+        1. Set |validState|'s {{FakeXRButtonStateInit/yValue}} to <code>0.0</code>.
+    1. Return |validState|.
+</div>
 
 Hit test extensions {#hit-test-extensions}
 ===================
@@ -549,3 +692,77 @@ partial interface FakeXRInputController {
 </script>
 
 When <dfn method for=FakeXRInputController>setOverlayPointerPosition(x, y)</dfn> is called, it sets a position within the DOM overlay in DOM coordinates for the next [=XR animation frame=], and is cleared after that frame. It is intended to be used along with a [=primary action=] for that frame, simulating that the user is interacting with the DOM overlay. The UA will emit a [=beforexrselect=] event at this location before generating XR select events.
+
+Anchors extensions {#anchors-extensions}
+==================
+
+The anchors extensions for test API SHOULD be implemented by all user agents that implement <a href="https://immersive-web.github.io/anchors/">WebXR Anchors</a>.
+
+<script type="idl">
+
+dictionary FakeXRAnchorCreationParameters {
+  FakeXRRigidTransformInit requestedAnchorOrigin;
+  boolean isAttachedToEntity;
+};
+
+callback FakeXRAnchorCreationCallback = Promise<boolean> (FakeXRAnchorCreationParameters parameters, FakeXRAnchorController anchorController);
+
+partial interface FakeXRDevice {
+  void setAnchorCreationCallback(FakeXRAnchorCreationCallback? callback);
+};
+
+</script>
+
+The {{FakeXRAnchorCreationCallback}} callback can be used by the Web Platform Tests to control the result of a call to create an anchor, and to be able to subsequently control the newly created anchor.
+
+The {{FakeXRDevice}} interface is extended with internal <dfn for="FakeXRDevice">anchorCreationCallback</dfn>, initially set to <code>null</code>. When the device receives a request to create an anchor, it MUST run the [=determine if the anchor creation succeeded=] algorithm.
+
+<div class="algorithm" data-algorithm="determine-if-anchor-creation-succeded">
+
+In order to <dfn>determine if the anchor creation succeeded</dfn>, the {{FakeXRDevice}} |device| MUST run the following steps:
+1. If the |device|'s [=FakeXRDevice/anchorCreationCallback=] is <code>null</code>, return <code>false</code> and abort these steps.
+1. Let |promise| be the result of invoking [=FakeXRDevice/anchorCreationCallback=] with parameters set so that they reflect the parameters passed to anchor creation request.
+1. [=React=] to |promise|:
+    - If |promise| was fulfilled with value |v|, then return |v| and abort these steps.
+    - If |promise| was rejected, then return <code>false</code> and abort these steps.
+
+</div>
+
+The WPTs can set the anchor creation callback by calling {{FakeXRDevice/setAnchorCreationCallback(callback)}}.
+
+The {{FakeXRAnchorCreationParameters/requestedAnchorOrigin}} attribute represents a transform expressed relative to [=base reference space=] used by the device.
+
+The {{FakeXRAnchorCreationParameters/isAttachedToEntity}} attribute will be set to <code>true</code> if the created anchor should be treated as attached to some entity. If so, the tests could emulate entity changing location by appropriately controlling the anchor via [=FakeXRAnchorCreationCallback/anchorController=].
+
+The <dfn for=FakeXRAnchorCreationCallback>anchorController</dfn> parameter passed in to {{FakeXRAnchorCreationCallback}} can be used to update the state of the anchor, assuming that the creation request was deemed successful. Tests SHOULD store it and issue commands to it for the entire duration of controlled anchor's lifetime.
+
+<script type="idl">
+
+interface FakeXRAnchorController {
+  readonly attribute boolean deleted;
+
+  // Controlling anchor state:
+  void pauseTracking();
+  void resumeTracking();
+  void stopTracking();
+
+  // Controlling anchor location:
+  void setAnchorOrigin(FakeXRRigidTransformInit anchorOrigin);
+};
+
+</script>
+
+Successfully created anchors can be controlled by the test through the use of {{FakeXRAnchorController}} interface.
+
+The {{FakeXRAnchorController}} has an associated internal <dfn for=FakeXRAnchorController>anchor origin</dfn>, which is a {{FakeXRRigidTransformInit}} describing the current state of the anchor's [=XRAnchor/native origin=].
+
+The {{FakeXRAnchorController/deleted}} attribute will be set to <code>true</code> when the application has invoked an {{XRAnchor/delete()}} method on the anchor - in that case, the changes to the fake anchor controller will be ignored.
+
+The {{FakeXRAnchorController/pauseTracking()}} method can be used by the tests to signal that the controlled anchor is temporarily untracked (i.e. its location will be unknown). Calling this method does not modify [=FakeXRAnchorController/anchor origin=] of the controller.
+
+The {{FakeXRAnchorController/resumeTracking()}} method can be used by the tests to signal that the controlled anchor should have its tracking resumed, if it was temporarily untracked. Calling this method does not modify [=FakeXRAnchorController/anchor origin=] of the controller.
+
+The {{FakeXRAnchorController/stopTracking()}} method can be used by the tests to signal that the controlled anchor is no longer tracked and that anchor tracking will not be resumed. After calling this method, the other calls on anchor controller will be ignored.
+
+The {{FakeXRAnchorController/setAnchorOrigin(anchorOrigin)}} method can be used to set the controller's [=FakeXRAnchorController/anchor origin=]. Tests can use this method to simulate updates in anchor pose.
+

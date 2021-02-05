@@ -1,0 +1,336 @@
+<pre class='metadata'>
+Title: HTMLVideoElement.requestVideoFrameCallback()
+Repository: wicg/video-rvfc
+Status: CG-DRAFT
+ED: https://wicg.github.io/video-rvfc/
+Shortname: video-rvfc
+Level: 1
+Group: wicg
+Editor: Thomas Guilbert, w3cid 120583, Google Inc. https://google.com/
+Abstract: &lt;video&gt;.requestVideoFrameCallback() allows web authors to be notified when a frame has been presented for composition.
+!Participate: <a href="https://github.com/wicg/video-rvfc">Git Repository.</a>
+!Participate: <a href="https://github.com/wicg/video-rvfc/issues/new">File an issue.</a>
+!Version History: <a href="https://github.com/wicg/video-rvfc/commits">https://github.com/wicg/video-rvfc/commits</a>
+Indent: 2
+Markup Shorthands: markdown yes
+</pre>
+
+<pre class='anchors'>
+  spec: hr-timing; urlPrefix: https://w3c.github.io/hr-time/
+    type: dfn
+      for: Clock resolution; text: clock resolution; url: #clock-resolution
+  spec: html; urlPrefix: https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html
+    type: dfn
+      text: run the animation frame callbacks; url: #run-the-animation-frame-callbacks
+    type:attribute; for:CanvasRenderingContext2D; text:canvas
+  spec: css-values; urlPrefix: https://drafts.csswg.org/css-values/
+    type: dfn
+      text: CSS pixels; url: #px
+  spec: media-capabilities; urlPrefix: https://w3c.github.io/media-capabilities
+    type: dictionary
+      text: MediaCapabilitiesInfo; url: #dictdef-mediacapabilitiesinfo
+  spec: media-playback-quality; urlPrefix: https://w3c.github.io/media-playback-quality/
+    type: attribute
+      for: VideoPlaybackQuality; text: droppedVideoFrames; url: #dom-videoplaybackquality-droppedvideoframes
+</pre>
+
+
+# Introduction #    {#introduction}
+
+*This section is non-normative*
+
+This is a proposal to add a {{requestVideoFrameCallback()}} method to the {{HTMLVideoElement}}.
+
+This method allows web authors to register a {{VideoFrameRequestCallback|callback}} which runs in the
+[=update the rendering|rendering steps=], when a new video frame is sent to the compositor. The
+new {{VideoFrameRequestCallback|callbacks}} are executed immediately before existing
+{{AnimationFrameProvider|window.requestAnimationFrame()}} callbacks. Changes made from within both
+callback types within the same [=event loop processing model|turn of the event loop=] will be visible on
+screen at the same time, with the next v-sync.
+
+Drawing operations (e.g. drawing a video frame to a {{canvas}} via {{drawImage()}}) made through this
+API will be synchronized as a *best effort* with the video playing on screen. *Best effort* in this case
+means that, even with a normal work load, a {{VideoFrameRequestCallback|callback}} can occasionally be
+fired one v-sync late, relative to when the new video frame was presented. This means that drawing
+operations might occasionally appear on screen one v-sync after the video frame does. Additionally, if
+there is a heavy load on the main thread, we might not get a callback for every frame (as measured by a
+discontinuity in the {{presentedFrames}}).
+
+Note: A web author could know if a callback is late by checking whether {{expectedDisplayTime}} is equal
+to *now*, as opposed to roughly one v-sync in the future.
+
+The {{VideoFrameRequestCallback}} also provides useful {{VideoFrameMetadata|metadata}} about the video
+frame that was most recently presented for composition, which can be used for automated metrics analysis.
+
+# VideoFrameMetadata #    {#video-frame-metadata}
+
+<pre class='idl'>
+  dictionary VideoFrameMetadata {
+    required DOMHighResTimeStamp presentationTime;
+    required DOMHighResTimeStamp expectedDisplayTime;
+
+    required unsigned long width;
+    required unsigned long height;
+    required double mediaTime;
+
+    required unsigned long presentedFrames;
+    double processingDuration;
+
+    DOMHighResTimeStamp captureTime;
+    DOMHighResTimeStamp receiveTime;
+    unsigned long rtpTimestamp;
+  };
+</pre>
+
+## Definitions ## {#video-frame-metadata-definitions}
+
+<dfn>media pixels</dfn> are defined as a media resource's visible decoded pixels, without pixel aspect
+ratio adjustments. They are different from [=CSS pixels=], which account for pixel aspect ratio
+adjustments.
+
+## Attributes ## {#video-frame-metadata-attributes}
+
+: <dfn for="VideoFrameMetadata" dict-member>presentationTime</dfn>
+:: The time at which the user agent submitted the frame for composition.
+
+: <dfn for="VideoFrameMetadata" dict-member>expectedDisplayTime</dfn>
+:: The time at which the user agent expects the frame to be visible.
+
+: <dfn for="VideoFrameMetadata" dict-member>width</dfn>
+:: The width of the video frame, in [=media pixels=].
+
+: <dfn for="VideoFrameMetadata" dict-member>height</dfn>
+:: The height of the video frame, in [=media pixels=].
+
+Note: {{width}} and {{height}} might differ from {{HTMLVideoElement/videoWidth|videoWidth}} and
+{{HTMLVideoElement/videoHeight|videoHeight}} in certain cases (e.g, an anamorphic video might
+have rectangular pixels). When a calling
+<a href="https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/texImage2D">`texImage2D()`</a>,
+{{width}} and {{height}} are the dimensions used to copy the video's [=media pixels=] to the texture,
+while {{HTMLVideoElement/videoWidth|videoWidth}} and {{HTMLVideoElement/videoHeight|videoHeight}} can
+be used to determine the aspect ratio to use, when using the texture.
+
+: <dfn for="VideoFrameMetadata" dict-member>mediaTime</dfn>
+::  The media presentation timestamp (PTS) in seconds of the frame presented (e.g.
+  its timestamp on the {{HTMLMediaElement/currentTime|video.currentTime}} timeline).
+  MAY have a zero value for live-streams or WebRTC applications.
+
+: <dfn for="VideoFrameMetadata" dict-member>presentedFrames</dfn>
+::  A count of the number of frames submitted for composition. Allows clients
+  to determine if frames were missed between {{VideoFrameRequestCallback}}s. MUST be monotonically
+  increasing.
+
+: <dfn for="VideoFrameMetadata" dict-member>processingDuration</dfn>
+::  The elapsed duration in seconds from submission of the encoded packet with the same
+  presentation timestamp (PTS) as this frame (e.g. same as the {{mediaTime}}) to the decoder
+  until the decoded frame was ready for presentation.
+
+:: In addition to decoding time, may include processing time. E.g., YUV
+  conversion and/or staging into GPU backed memory.
+
+:: SHOULD be present. In some cases, user-agents might not be able to surface this information since
+  portions of the media pipeline might be owned by the OS.
+
+: <dfn for="VideoFrameMetadata" dict-member>captureTime</dfn>
+::  For video frames coming from a local source, this is the time at which
+  the frame was captured by the camera.
+  For video frames coming from remote source, the capture time is based on
+  the RTP timestamp of the frame and estimated using clock synchronization.
+  This is best effort and can use methods like using RTCP SR as specified
+  in RFC 3550 Section 6.4.1, or by other alternative means if use by
+  RTCP SR isn't feasible.
+
+:: SHOULD be present for WebRTC or getUserMedia applications, and absent otherwise.
+
+: <dfn for="VideoFrameMetadata" dict-member>receiveTime</dfn>
+::  For video frames coming from a remote source, this is the
+  time the encoded frame was received by the platform, i.e., the time at
+  which the last packet belonging to this frame was received over the network.
+
+:: SHOULD be present for WebRTC applications that receive data from a remote source,
+  and absent otherwise.
+
+: <dfn for="VideoFrameMetadata" dict-member>rtpTimestamp</dfn>
+::  The RTP timestamp associated with this video frame.
+
+:: SHOULD be present for WebRTC applications that receive data from a remote source,
+  and absent otherwise.
+
+# VideoFrameRequestCallback #    {#video-frame-request-callback}
+
+<pre class='idl'>
+  callback VideoFrameRequestCallback = undefined(DOMHighResTimeStamp now, VideoFrameMetadata metadata);
+</pre>
+
+Each {{VideoFrameRequestCallback}} object has a <dfn>canceled</dfn> boolean initially set to false.
+
+# HTMLVideoElement.requestVideoFrameCallback() #  {#video-rvfc}
+<pre class='idl'>
+  partial interface HTMLVideoElement {
+      unsigned long requestVideoFrameCallback(VideoFrameRequestCallback callback);
+      undefined cancelVideoFrameCallback(unsigned long handle);
+  };
+</pre>
+
+## Methods ## {#video-rvfc-methods}
+
+Each {{HTMLVideoElement}} has a <dfn>list of video frame request callbacks</dfn>, which is initially
+empty. It also has a <dfn>last presented frame indentifier</dfn> and a <dfn>video frame request
+callback identifier</dfn>, which are both numbers which are initially zero.
+
+: <dfn for="HTMLVideoElement" method>requestVideoFrameCallback(|callback|)</dfn>
+:: Registers a callback to be fired the next time a frame is presented to the compositor.
+
+   When `requestVideoFrameCallback` is called, the user agent MUST run the following steps:
+     1. Let |video| be the {{HTMLVideoElement}} on which `requestVideoFrameCallback` is
+        invoked.
+     1. Increment |video|'s {{ownerDocument}}'s [=video frame request callback identifier=] by one.
+     1. Let |callbackId| be |video|'s {{ownerDocument}}'s [=video frame request callback identifier=]
+     1. Append |callback| to |video|'s [=list of video frame request callbacks=], associated with |callbackId|.
+     1. Return |callbackId|.
+
+: <dfn for="HTMLVideoElement" method>cancelVideoFrameCallback(|handle|)</dfn>
+:: Cancels an existing video frame request callback given its handle.
+
+  When `cancelVideoFrameCallback` is called, the user agent MUST run the following steps:
+
+  1. Let |video| be the target {{HTMLVideoElement}} object on which `cancelVideoFrameCallback` is invoked.
+  1. Find the entry in |video|'s [=list of video frame request callbacks=] that is associated with the value |handle|.
+  1. If there is such an entry, set its [=canceled=] boolean to <code>true</code> and remove it from |video|'s [=list of video frame request callbacks=].
+
+## Procedures ## {#video-rvfc-procedures}
+
+An {{HTMLVideoElement}} is considered to be an <dfn>associated video element</dfn> of a {{Document}}
+|doc| if its {{ownerDocument}} attribute is the same as |doc|.
+
+<div algorithm="video-rvfc-rendering-step">
+
+Issue: This spec should eventually be merged into the HTML spec, and we should directly call [=run the
+video frame request callbacks=] from the [=update the rendering=] steps. This procedure describes
+where and how to invoke the algorithm in the meantime.
+
+When the [=update the rendering=] algorithm is invoked, run this new step:
+
++ For each [=fully active=] {{Document}} in |docs|, for each [=associated video element=] for that
+  {{Document}}, [=run the video frame request callbacks=] passing |now| as the timestamp.
+
+immediately before this existing step:
+
++  "<i>For each [=fully active=] {{Document}} in |docs|, [=run the animation frame callbacks=] for that {{Document}}, passing in |now| as the timestamp</i>"
+
+using the definitions for |docs| and |now| described in the [=update the rendering=] algorithm.
+
+</div>
+
+<div algorithm="run the video frame request callbacks">
+
+Note: The effective rate at which {{VideoFrameRequestCallback|callbacks}} are run is the lesser rate
+between the video's rate and the browser's rate. When the video rate is lower than the browser rate,
+the {{VideoFrameRequestCallback|callbacks}}' rate is limited by the frequency at which new frames are
+presented. When the video rate is greater than the browser rate, the
+{{VideoFrameRequestCallback|callbacks}}' rate is limited by the frequency of the [=update the
+rendering=] steps. This means, a 25fps video playing in a browser that paints at 60Hz would fire
+callbacks at 25Hz; a 120fps video in that same 60Hz browser would fire callbacks at 60Hz.
+
+To <dfn>run the video frame request callbacks</dfn> for a {{HTMLVideoElement}} |video| with a timestamp |now|, run the following steps:
+
+1. If |video|'s [=list of video frame request callbacks=] is empty, abort these steps.
+1. Let |metadata| be the {{VideoFrameMetadata}} dictionary built from |video|'s latest presented frame.
+1. Let |presentedFrames| be the value of |metadata|'s {{presentedFrames}} field.
+1. If the [=last presented frame indentifier=] is equal to |presentedFrames|, abort these steps.
+1. Set the [=last presented frame indentifier=] to |presentedFrames|.
+1. Let |callbacks| be the [=list of video frame request callbacks=].
+1. Set |video|'s [=list of video frame request callbacks=] to be empty.
+1. For each entry in |callbacks|
+  1. If the entry's [=canceled=] boolean is <code>true</code>, continue to the next entry.
+  1. [=Invoke=] the callback, passing |now| and |metadata| as arguments
+  1. If an exception is thrown, [=report the exception=].
+
+Note: There are **no strict timing guarantees** when it comes to how soon
+{{VideoFrameRequestCallback|callbacks}} are run after a new video frame has been presented.
+Consider the following scenario: a new frame is presented on the compositor thread, just as the user
+agent aborts the [=run the video frame request callbacks|algorithm=] above, when it confirms that
+there are no new frames. We therefore won't run the {{VideoFrameRequestCallback|callbacks}} in the
+*current* [=update the rendering|rendering steps=], and have to wait until the *next* [=update the
+rendering|rendering steps=], one v-sync later. In that case, visual changes to a web page made from
+within the delayed {{VideoFrameRequestCallback|callbacks}} will appear on-screen one v-sync after the
+video frame does.<br/>
+<br/>
+Offering stricter guarantees would likely force implementers to add cross-thread synchronization, which might be detrimental to video playback performance.
+
+</div>
+
+# Security and Privacy Considerations # {#security-and-privacy}
+
+This specification does not expose any new privacy-sensitive information. However, the location
+correlation opportunities outlined in the Privacy and Security section of [[webrtc-stats]] also hold
+true for this spec: {{captureTime}}, {{receiveTime}}, and {{rtpTimestamp}} expose network-layer
+information which can be correlated to location information. E.g., reusing the same example,
+{{captureTime}} and {{receiveTime}} can be used to estimate network end-to-end travel time, which can
+give indication as to how far the peers are located, and can give some location information about a peer
+if the location of the other peer is known. Since this information is already available via the
+[[webrtc-stats|RTCStats]], this specification doesn't introduce any novel privacy considerations.
+
+This specification might introduce some new GPU fingerprinting opportunities. {{processingDuration}}
+exposes some under-the-hood performance information about the video pipeline, which is otherwise
+inaccessible to web developers. Using this information, one could correlate the performance of various
+codecs and video sizes to a known GPU's profile. We therefore propose a resolution of 100μs, which is
+still useful for automated quality analysis, but doesn't offer any new sources of high resolution
+information. Still, despite a coarse clock, one could exploit the significant performance differences
+between hardware and software decoders to infer information about a GPU's features. For example, this
+would make it easier to fingerprint the newest GPUs, which have hardware decoders for the latest
+codecs, which don't yet have widespread hardware decoding support. However, rather than measuring the
+profiles themselves, one could directly get equivalent information from getting the
+{{MediaCapabilitiesInfo}}.
+
+This specification also introduces some new timing information. {{presentationTime}} and
+{{expectedDisplayTime}} expose compositor timing information; {{captureTime}} and
+{{receiveTime}} expose network timing information. The [=clock resolution=] of these fields should
+therefore be coarse enough not to facilitate timing attacks.
+
+# Examples # {#examples}
+
+## Drawing frames at the video rate ## {#example-drawing}
+
+*This section is non-normative*
+
+Drawing video frames onto a {{canvas}} at the video rate (instead of the browser's animation rate)
+can be done by using {{requestVideoFrameCallback()|video.requestVideoFrameCallback()}} instead of
+{{AnimationFrameProvider|window.requestAnimationFrame()}}.
+
+<pre class="example" highlight="js">
+  &lt;body>
+    &lt;video controls>&lt;/video>
+    &lt;canvas width="640" height="360">&lt;/canvas>
+    &lt;span id="fps_text"/>
+  &lt;/body>
+
+  &lt;script>
+    function startDrawing() {
+      var video = document.querySelector('video');
+      var canvas = document.querySelector('canvas');
+      var ctx = canvas.getContext('2d');
+
+      var paint_count = 0;
+      var start_time = 0.0;
+
+      var updateCanvas = function(now) {
+        if(start_time == 0.0)
+          start_time = now;
+
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        var elapsed = (now - start_time) / 1000.0;
+        var fps = (++paint_count / elapsed).toFixed(3);
+        document.querySelector('#fps_text').innerText = 'video fps: ' + fps;
+
+        video.requestVideoFrameCallback(updateCanvas);
+      }
+
+      video.requestVideoFrameCallback(updateCanvas);
+
+      video.src = "http://example.com/foo.webm"
+      video.play()
+    }
+  &lt;/script>
+</pre>

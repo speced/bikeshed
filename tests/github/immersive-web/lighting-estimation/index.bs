@@ -1,0 +1,251 @@
+<pre class="metadata">
+Shortname: webxrlightingestimation-1
+Title: WebXR Lighting Estimation API Level 1
+Group: immersivewebwg
+Status: w3c/ED
+TR:
+ED:
+Previous Version:
+Repository: immersive-web/lighting-estimation
+Level: 1
+Mailing List Archives: https://lists.w3.org/Archives/Public/public-immersive-web/
+
+Editor: Brandon Jones, Google https://google.com, bajones@google.com
+Editor: Kearwood Gilbert, Mozilla https://mozilla.org/, kgilbert@mozilla.com
+
+Abstract: This specification describes support for exposing estimates of environmental lighting conditions to WebXR sessions.
+</pre>
+
+<pre class="link-defaults">
+spec: webxr-1;
+    type: dfn; text: feature descriptor
+</pre>
+
+<pre class="anchors">
+spec: WebGL; urlPrefix: https://www.khronos.org/registry/webgl/specs/latest/1.0/
+    type: interface; text: WebGLTexture; url: WebGLTexture
+
+urlPrefix: https://www.w3.org/TR/ambient-light/; spec: AMBIENT-LIGHT
+    type: dfn; text: privacy and security risks; url: security-and-privacy
+</pre>
+
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png">
+
+<style>
+  .unstable::before {
+    content: "This section is not stable";
+    display: block;
+    font-weight: bold;
+    text-align: right;
+    color: red;
+  }
+  .unstable {
+    border: thin solid pink;
+    border-radius: .5em;
+    padding: .5em;
+    margin: .5em calc(-0.5em - 1px);
+    background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='290'><text transform='rotate(-45)' text-anchor='middle' font-family='sans-serif' font-weight='bold' font-size='70' y='210' opacity='.1'>Unstable</text></svg>");
+    background-repeat: repeat;
+    background-color: #FFF4F4;
+  }
+  .unstable h3:first-of-type {
+    margin-top: 0.5rem;
+  }
+
+  .unstable.example:not(.no-marker)::before {
+    content: "Example " counter(example) " (Unstable)";
+    float: none;
+  }
+
+  .non-normative::before {
+    content: "This section is non-normative.";
+    font-style: italic;
+  }
+  .tg {
+    border-collapse: collapse;
+    border-spacing: 0;
+  }
+  .tg th {
+    border-style: solid;
+    border-width: 1px;
+    background: #90b8de;
+    color: #fff;
+    font-family: sans-serif;
+    font-weight: bold;
+    border-color: grey;
+  }
+  .tg td {
+    padding: 4px 5px;
+    background-color: rgb(221, 238, 255);
+    font-family: monospace;
+    border-style: solid;
+    border-width: 1px;
+    border-color: grey;
+    overflow: hidden;
+    word-break: normal;
+  }
+</style>
+
+Introduction {#intro}
+============
+
+The WebXR Lighting Estimation module expands the <a href="https://www.w3.org/TR/webxr/">WebXR Device API</a>, the <a href="https://immersive-web.github.io/webxr-ar-module/">WebXR Augmented Reality Module</a>, and the <a href="https://immersive-web.github.io/layers/">WebXR Layers module</a> with the ability to expose estimates of the lighting conditions of the user's environment.
+
+Light Primitives {#light-primitives}
+================
+
+XRLightProbe {#xrlightprobe-interface}
+------------
+
+An {{XRLightProbe}} collects estimated lighting information at a given point in the user's environment.
+
+<pre class="idl">
+[SecureContext, Exposed=Window]
+interface XRLightProbe : EventTarget {
+  readonly attribute XRSpace probeSpace;
+  attribute EventHandler onreflectionchange;
+};
+</pre>
+
+The <dfn attribute for="XRLightProbe">probeSpace</dfn> attribute is an {{XRSpace}} that has a [=native origin=] tracking the position and orientation that the {{XRLightProbe}}'s lighting estimations are being generated relative to.
+
+The <dfn attribute for="XRLightProbe">onreflectionchange</dfn> attribute is an [=Event handler IDL attribute=] for the {{reflectionchange}} event type.
+
+XRReflectionFormat {#xrreflectionformat-interface}
+------------
+<pre class="idl">
+enum XRReflectionFormat {
+  "srgba8",
+  "rgba16f",
+};
+</pre>
+
+Reflection cube maps have an internal reflection format that indicates how the texture data is represented, and may change how applications choose to use the texture. Cube maps MAY be requested with the {{XRReflectionFormat/"srgba8"}} format or the {{XRSession/preferredReflectionFormat}} of the light probe.
+
+<table class='data'>
+    <thead>
+        <tr>
+            <th>{{XRReflectionFormat}}
+            <th>WebGL Format
+            <th>WebGL Internal Format
+            <th>WebGPU Format
+            <th>HDR
+    </thead>
+    <tr>
+        <td>{{XRReflectionFormat/"srgba8"}}
+        <td>RGBA
+        <td>SRGB8_ALPHA8
+        <td>"rgba8unorm-srgb"
+        <td>
+    <tr>
+        <td>{{XRReflectionFormat/"rgba16f"}}
+        <td>RGBA
+        <td>RGBA16F
+        <td>"rgba16float"
+        <td>&checkmark;
+</table>
+
+XRLightEstimate {#xrlightestimate-interface}
+------------
+
+An {{XRLightEstimate}} provides the estimated lighting values for an {{XRLightProbe}} at the time represented by an {{XRFrame}}. {{XRLightEstimate}}s are queried by passing an {{XRLightProbe}} to the {{XRFrame/getLightEstimate()}} method of an {{XRFrame}}.
+
+<pre class="idl">
+[SecureContext, Exposed=Window]
+interface XRLightEstimate {
+  readonly attribute Float32Array sphericalHarmonicsCoefficients;
+  readonly attribute DOMPointReadOnly primaryLightDirection;
+  readonly attribute DOMPointReadOnly primaryLightIntensity;
+};
+</pre>
+
+The <dfn attribute for="XRLightEstimate">sphericalHarmonicsCoefficients</dfn> attribute returns a {{Float32Array}} containing 9 spherical harmonics coefficients. The array MUST be 27 elements in length, with every 3 elements defining the red, green, and blue components respectively of a single coefficient. The first term of the {{XRLightEstimate/sphericalHarmonicsCoefficients}}, meaning the first 3 elements of the array, MUST be representative of a valid lighting estimate. All other terms are optional, and MAY be 0 if a corresponding lighting estimate is not available due to either user privacy settings or the capabilities of the platform.
+
+The order of coefficients in {{XRLightEstimate/sphericalHarmonicsCoefficients}}, is  [<var>C</var><sub>0</sub><sup>0</sup>, <var>C</var><sub>1</sub><sup>-1</sup>, <var>C</var><sub>1</sub><sup>0</sup>, <var>C</var><sub>1</sub><sup>1</sup>, <var>C</var><sub>2</sub><sup>-2</sup>, <var>C</var><sub>2</sub><sup>-1</sup>, <var>C</var><sub>2</sub><sup>0</sup>, <var>C</var><sub>2</sub><sup>1</sup>, <var>C</var><sub>2</sub><sup>2</sup>], where <var>C</var><sub><var>l</var></sub><sup><var>m</sup></var> is the coefficient of spherical harmonic <var ignore>Y</var><sub><var>l</var></sub><sup><var>m</sup></var>.
+
+The <dfn attribute for="XRLightEstimate">primaryLightDirection</dfn> represents the direction to the primary light source from the [=native origin=] of the {{XRLightProbe/probeSpace}} of the {{XRLightProbe}} that produced the {{XRLightEstimate}}. The value MUST be a unit length 3D vector and the {{DOMPointReadOnly/w}} value MUST be <code>0.0</code>. If estimated values from the users's environment are not available the {{XRLightEstimate/primaryLightDirection}} MUST be <code>{ x: 0.0, y: 1.0, z: 0.0, w: 0.0 }</code>, representing a light shining straight down from above.
+
+The <dfn attribute for="XRLightEstimate">primaryLightIntensity</dfn> represents the direction to the primary light source from the origin of the {{XRLightProbe/probeSpace}} of the {{XRLightProbe}} that produced the {{XRLightEstimate}}. The value MUST represent an RGB value mapped to the {{DOMPointReadOnly/x}}, {{DOMPointReadOnly/y}}, and {{DOMPointReadOnly/z}} values respectively where each component is greater than or equal to <code>0.0</code> and the {{DOMPointReadOnly/w}} value MUST be <code>1.0</code>. If estimated values from the users's environment are not available the {{XRLightEstimate/primaryLightIntensity}} MUST be <code>{x: 0.0, y: 0.0, z: 0.0, w: 1.0}</code>, representing no illumination.
+
+WebXR Device API Integration {#webxr-device-api-integration}
+============================
+
+Both the {{XRSession}} and {{XRFrame}} interfaces from the <a href="https://www.w3.org/TR/webxr/">WebXR Device API</a> are expanded by this module.
+
+Session Initialization {#session-initialization}
+----------------------
+
+The string "<dfn for="feature descriptor">light-estimation</dfn>" is introduced by this module as a new valid [=feature descriptor=]. Applications that wish to use light estimation features MUST be requested with an the "[=feature descriptor/light-estimation=]" [=feature descriptor=].
+
+XRSession {#xrsession-interface}
+---------
+
+The {{XRSession}} interface is extended with the ability to create new {{XRLightProbe}} instances.
+
+<pre class="idl">
+dictionary XRLightProbeInit {
+  XRReflectionFormat reflectionFormat = "srgba8";
+};
+
+partial interface XRSession {
+  Promise&lt;XRLightProbe&gt; requestLightProbe(optional XRLightProbeInit options = {});
+  readonly attribute XRReflectionFormat preferredReflectionFormat;
+};
+</pre>
+
+XRFrame {#xrframe-interface}
+-------
+
+The {{XRFrame}} interface is extended with the ability to query the {{XRLightEstimate}} for a given {{XRLightProbe}}.
+
+<pre class="idl">
+partial interface XRFrame {
+  XRLightEstimate? getLightEstimate(XRLightProbe lightProbe);
+};
+</pre>
+
+WebXR Layers Integration {#webxr-layers-integration}
+========================
+
+The {{XRWebGLBinding}} interface from the <a href="https://immersive-web.github.io/layers/">WebXR Layers module</a> is expanded by this module.
+
+XRWebGLBinding {#xrwebglbinding-interface}
+--------------
+
+The {{XRWebGLBinding}} interface is extended with the ability to query a reflection cube map for a given {{XRLightProbe}}.
+
+<pre class="idl">
+partial interface XRWebGLBinding {
+  WebGLTexture? getReflectionCubeMap(XRLightProbe lightProbe);
+};
+</pre>
+
+Events {#events}
+======
+
+The [=task source=] for all [=tasks queued|queue a task=] in this specification is the <dfn>XR task source</dfn>, unless otherwise specified.
+
+Event Types {#event-types}
+-----------
+
+The user agent MUST fire a <dfn event for="XRLightProbe">reflectionchange</dfn> event on an {{XRLightProbe}} object each time the contents of the cube map returned by calling {{XRWebGLBinding/getReflectionCubeMap()}} have changed. The event MUST be of type {{Event}}.
+
+Privacy & Security Considerations {#privacy-security}
+=================================
+
+<section class="non-normative">
+
+The lighting estimation API shares many potential [=privacy and security risks=] with the Ambient Light Sensor API [[!AMBIENT-LIGHT]], including:
+ * Profiling: Lighting Estimation can leak information about user's use patterns and surroundings. This information can be used to enhance user profiling and behavioral analysis.
+ * Cross-device Linking: Two devices can access web sites that include the same third-party script that correlates lighting levels over time.
+ * Cross Device Communication: A simple broadcast communication method can use device screen or camera LED flashes to broadcast messages read out with lighting estimation on a nearby device.
+
+In addition to these, there are a few vectors unique to lighting estimation to
+consider.
+ * The lighting estimation returned by the WebXR API explicitly describes the real world environment in close proximity to the user.
+ * Reflection cube maps of a high enough resolution approach the same level as camera access.
+
+Lighting estimation must be declared when creating an XR Session as a [=feature descriptor=], which will allow the user agent to notify the user of the potential privacy implications of allowing the lighting estimation API to be used by the website. The user agent is encouraged to NOT provide real-time updates to any portion of the lighting estimation API, especially the reflection cube map. By default, only low spaital frequency and low temporal frequency information should be returned by the WebXR API. Reflection cube maps should be kept low resolution, unless the user has also consented to camera permissions for a particular origin.
+
+</section>

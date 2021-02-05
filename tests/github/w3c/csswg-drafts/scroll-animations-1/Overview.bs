@@ -1,15 +1,16 @@
-<link href='web-animations.css' rel='stylesheet' type='text/css'> 
+<link href='web-animations.css' rel='stylesheet' type='text/css'>
 <pre class='metadata'>
 Title: Scroll-linked Animations
 Group: CSSWG
-Status: UD
+Status: ED
 Work Status: exploring
+Level: 1
 Group: CSSWG
 URL: https://drafts.csswg.org/scroll-animations-1/
 ED: https://drafts.csswg.org/scroll-animations-1/
 Shortname: scroll-animations-1
-Abstract: Defines an API and markup for creating animations that are either
-          triggered by or tied to the scroll offset of a scroll container.
+Abstract: Defines an API and markup for creating animations that are tied to
+          the scroll offset of a scroll container.
 Editor: Brian Birtles, Invited Expert, brian@birchill.co.jp, w3cid 43194
 Editor: Botond Ballo, Mozilla, botond@mozilla.com
 Editor: Antoine Quint, Apple, graouts@apple.com, w3cid 51377
@@ -18,6 +19,7 @@ Editor: Olga Gerchikov, Microsoft, gerchiko@microsoft.com
 
 Former editor: Mantaroh Yoshinaga
 Former editor: Stephen McGruer, Google, smcgruer@google.com
+Markup Shorthands: markdown yes
 </pre>
 <pre class=anchors>
 urlPrefix: https://w3c.github.io/web-animations/; type: dfn; spec: web-animations
@@ -29,18 +31,28 @@ urlPrefix: https://w3c.github.io/web-animations/; type: dfn; spec: web-animation
     text: start delay
     text: target effect end
     text: timeline
+    text: phase; url: timeline-phase
+    text: inactive phase; url: timeline-inactive-phase
+    text: before phase; url: timeline-before-phase
+    text: active phase; url: timeline-active-phase
+    text: after phase; url: timeline-after-phase
 urlPrefix: https://drafts.csswg.org/cssom-view/; type: dfn; spec: cssom-view-1
     text: CSS layout box
+    text: overflow direction; url: overflow-directions
 urlPrefix: https://html.spec.whatwg.org/multipage/browsers.html; type: dfn; spec: html
     text: document associated with a window; url: concept-document-window
+urlPrefix: https://drafts.csswg.org/css-animations-1/; type: dfn; spec: css-animations-1
+    text: findRule; url: interface-csskeyframesrule-findrule
+    text: CSSKeyframeRule; url: csskeyframerule
 </pre>
 <pre class=link-defaults>
 spec:html; type:dfn; for:/; text:browsing context
+spec:html; type:method; text:requestAnimationFrame()
 </pre>
 
 # Introduction # {#intro}
 
-This specification defines mechanisms for 
+This specification defines mechanisms for
 [[#scroll-driven-animations|driving the progress of an animation]] based
 on the scroll progress of a scroll container.
 
@@ -64,7 +76,7 @@ provided it behaves as if the underlying programming interfaces were in place.
 
 ## Relationship to asynchronous scrolling ## {#async-scrolling}
 
-Some user agents support scrolling that's asynchronous with respect to layout
+Some user agents support scrolling that is asynchronous with respect to layout
 or script. This specification is intended to be compatible with such an
 architecture.
 
@@ -73,16 +85,19 @@ way that does not require script to run each time the effect is sampled. User
 agents that support asynchronous scrolling are allowed (but not required) to
 sample such effects asynchronously as well.
 
-## Value Definitions {#values}
+## Value Definitions ## {#values}
 
-This specification follows the <a href="https://www.w3.org/TR/CSS2/about.html#property-defs">CSS property definition conventions</a> from [[!CSS2]]
-using the <a href="https://www.w3.org/TR/css-values-3/#value-defs">value definition syntax</a> from [[!CSS-VALUES-3]].
-Value types not defined in this specification are defined in CSS Values &amp; Units [[!CSS-VALUES-3]].
-Combination with other CSS modules may expand the definitions of these value types.
+This specification follows the <a
+href="https://www.w3.org/TR/CSS2/about.html#property-defs">CSS property
+definition conventions</a> from [[!CSS2]] using the <a
+href="https://www.w3.org/TR/css-values-3/#value-defs">value definition
+syntax</a> from [[!CSS-VALUES-3]]. Value types not defined in this specification
+are defined in CSS Values &amp; Units [[!CSS-VALUES-3]]. Combination with other
+CSS modules may expand the definitions of these value types.
 
 In addition to the property-specific values listed in their definitions,
 all properties defined in this specification
-also accept the <a>CSS-wide keywords</a> keywords as their property value.
+also accept the <a>CSS-wide keywords</a> as their property value.
 For readability they have not been repeated explicitly.
 
 # Use cases # {#use-cases}
@@ -90,64 +105,14 @@ For readability they have not been repeated explicitly.
 <em>This section is non-normative</em>
 
 Note: Based on this <a
-href="https://github.com/WICG/scroll-animations/blob/master/Use%20cases.md">curated
+href="https://github.com/w3c/csswg-drafts/blob/master/scroll-animations-1/Use%20cases.md">curated
 list of use cases</a>.
 
-## Scroll-triggered animations ## {#scroll-triggered-animations-usecases}
+Issue(4354): These use cases need updating.
 
-### Navigation bar shrinking effect ### {#navigation-bar-shrinking-effect}
+## Scrollable picture-story show ## {#scrollable-animation-usecase}
 
-It is common to trigger an animation to run when the scroll position
-reaches a certain point. For example, a navigation bar may shrink once
-the user begins to scroll a page.
-
-<figure>
-<img src="img/usecase1-2.svg" width="600"
-alt="Use case: Shrinking navigation bar">
- <figcaption>
-  Shrinking navigation bar<br>
-  The left figure shows the navigation bar before scrolling with
-  a large menu bar.<br>
-  The right figure shows the shrunken navigation bar after scrolling.
- </figcaption>
-</figure>
-
-Advisement: The proposal does not yet define CSS markup or programming
-            interfaces to express this use case.
-
-### Navigation highlight effect ### {#navigation-highlight-effect}
-
-Similarly, it is common to trigger an animation at certain fixed points
-in a element's scroll range. For example, a navigation bar that changes
-highlight based on the reader's position within the document.
-
-<figure>
-<img src="img/usecase1-1.svg" width="600"
-alt="Use case: A navigation highlight effect.">
- <figcaption>
-  A navigation highlight effect<br>
-  On the left, the &ldquo;Abstract&rdquo; section is scrolled into view
-  and hence the abstract menu item is highlighted.<br>
-  After scrolling down to the &ldquo;Background&rdquo; section (right),
-  the background menu item fades in while the abstract menu item fades
-  out.
- </figcaption>
-</figure>
-
-Advisement: The proposal does not yet define CSS markup or programming
-            interfaces to express this use case.
-
-## Scroll-triggered style changes ## {#scroll-triggered-style-changes-usecase}
-
-Advisement: The proposal does not yet define CSS markup or programming
-            interfaces to express this use case.
-
-
-## Scroll-linked animations ## {#scroll-linked-animations-usecase}
-
-### Scrollable picture-story show ### {#scrollable-animation-usecase}
-
-Another pattern is an animation that tells a story where the user
+It is sometimes desired to use an animation to tell a story where the user
 controls the progress of the animation by scrolling or some other
 gesture. This may be because the animation contains a lot of textual
 information which the user may wish to peruse more slowly, it may be for
@@ -177,7 +142,7 @@ Using the CSS markup:
   div.circle {
     animation-duration: 1s;
     animation-timing-function: linear;
-    animation-timeline: scroll(element(#container), vertical, "200px", "300px");
+    animation-timeline: collision-timeline;
   }
   #left-circle {
     animation-name: left-circle;
@@ -188,8 +153,21 @@ Using the CSS markup:
   #union-circle {
     animation-name: union-circle;
     animation-fill-mode: forwards;
-    animation-timeline: scroll(element(#container), vertical, "250px", "300px");
+    animation-timeline: union-timeline;
   }
+
+  @scroll-timeline collision-timeline {
+    source: selector(#container);
+    orientation: block;
+    scroll-offsets: 200px, 300px;
+  }
+
+  @scroll-timeline union-timeline {
+    source: selector(#container);
+    orientation: block;
+    scroll-offsets: 250px, 300px;
+  }
+
   @keyframes left-circle {
     to { transform: translate(300px) }
   }
@@ -206,28 +184,28 @@ Using the programming interface, we might write this as:
 
 <pre class='lang-javascript'>
 if (window.matchMedia('(prefers-reduced-motion: no-preference)').matches) {
-  var circleTimeline = new ScrollTimeline({
-    scrollSource: scrollableElement,
-    scrollOffset: '200px',
-    endScrollOffset: '300px'
+  const scrollableElement = document.querySelector('#container');
+
+  const collisionTimeline = new ScrollTimeline({
+    source: scrollableElement,
+    scrollOffsets: [CSS.px(200), CSS.px(300)]
   });
 
-  var left = leftCircle.animate({ transform: 'translate(300px)' }, 1000);
-  left.timeline = circleTimeline;
+  const left = leftCircle.animate({ transform: 'translate(300px)' }, 1000);
+  left.timeline = collisionTimeline;
 
-  var right = leftCircle.animate({ transform: 'translate(350px)' }, 1000);
-  right.timeline = circleTimeline;
+  const right = leftCircle.animate({ transform: 'translate(350px)' }, 1000);
+  right.timeline = collisionTimeline;
 
-  var union = unionCircle.animate({ opacity: 1 }, { duration: 1000, fill: "forwards" });
+  const union = unionCircle.animate({ opacity: 1 }, { duration: 1000, fill: "forwards" });
   union.timeline = new ScrollTimeline({
-    scrollSource: scrollableElement,
-    startScrollOffset: '250px',
-    endScrollOffset: '300px'
+    source: scrollableElement,
+    scrollOffsets: [CSS.px(250), CSS.px(300)]
   });
 }
 </pre>
 
-### The content progress bar ### {#content-progress-bar-usecase}
+## The content progress bar ## {#content-progress-bar-usecase}
 
 Another common example of an animation that tracks scroll position is a
 progress bar that is used to indicate the reader's position in a long
@@ -248,11 +226,16 @@ Typically, the scroll bar provides this visual indication but
 applications may wish to hide the scroll bar for aesthetic or useability
 reasons.
 
-Using the 'animation-timeline' property, this example could be written
-as follows:
+Using the updated 'animation' shorthand that includes 'animation-timeline',
+this example could be written as follows:
 
 <pre class='lang-css'>
 @media (prefers-reduced-motion: no-preference) {
+  @scroll-timeline progress-timeline {
+    source: selector(#body);
+    scroll-offsets: 0, 100%;
+  }
+
   @keyframes progress {
     to { width: 100%; }
   }
@@ -260,12 +243,11 @@ as follows:
     width: 0px;
     height: 30px;
     background: red;
-    animation: progress 1s linear;
-    animation-fill-mode: forwards;
-    animation-timeline: scroll(element(#body));
+    animation: 1s linear forwards progress progress-timeline;
   }
 }
 </pre>
+
 
 If we use this API for this case, the example code will be as follow:
 
@@ -273,7 +255,9 @@ If we use this API for this case, the example code will be as follow:
 if (window.matchMedia('(prefers-reduced-motion: no-preference)').matches) {
   var animation = div.animate({ width: '100%' }, { duration: 1000, fill: "forwards" });
   animation.timeline = new ScrollTimeline(
-    { startScrollOffset: '0px' }
+    {
+      scrollOffsets: [0, CSS.percent(100)]
+    }
   );
 }
 </pre>
@@ -305,10 +289,9 @@ This content can't build the CSS only.
 if (window.matchMedia('(prefers-reduced-motion: no-preference)').matches) {
   var animation = slideTarget.getAnimation()[0];
   var scrollTimeline = new ScrollTimeline({
-    scrollSource: scrollableElement,
+    source: scrollableElement,
     orientation: "vertical",
-    scrollOffset: '0px',
-    endScrollOffset: '200px'
+    scrollOffsets: [CSS.px(0), CSS.px(250)]
   });
   animation.timeline = scrollTimeline;
 
@@ -344,19 +327,19 @@ enum ScrollDirection {
 The {{ScrollDirection}} enumeration specifies a direction of scroll of a
 scrollable element.
 
-:   <code>block</code>
+:   `block`
 ::  Selects the direction along the [=block axis=], conforming to writing mode
     and directionality.
 
-:   <code>inline</code>
+:   `inline`
 ::  Selects the direction along the [=inline axis=], confirming to writing mode
     and directionality.
 
-:   <code>horizontal</code>
+:   `horizontal`
 ::  Selects the physical horizontal direction (ignoring writing mode and
     directionality).
 
-:   <code>vertical</code>
+:   `vertical`
 ::  Selects the physical vertical direction (ignoring writing mode and
     directionality).
 
@@ -370,27 +353,29 @@ behavior under different directionalities and writing modes.
 <pre class="idl">
 enum ScrollTimelineAutoKeyword { "auto" };
 
+typedef (CSSNumericValue or CSSKeywordish) ContainerBasedOffset;
+typedef (ContainerBasedOffset or ElementBasedOffset) ScrollTimelineOffset;
+
 dictionary ScrollTimelineOptions {
-  Element? scrollSource = null;
+  Element? source;
   ScrollDirection orientation = "block";
-  DOMString startScrollOffset = "auto";
-  DOMString endScrollOffset = "auto";
+  sequence&lt;ScrollTimelineOffset&gt; scrollOffsets = [];
   (double or ScrollTimelineAutoKeyword) timeRange = "auto";
 };
 
 [Exposed=Window]
 interface ScrollTimeline : AnimationTimeline {
   constructor(optional ScrollTimelineOptions options = {});
-  readonly attribute Element scrollSource;
+  readonly attribute Element? source;
   readonly attribute ScrollDirection orientation;
-  readonly attribute DOMString startScrollOffset;
-  readonly attribute DOMString endScrollOffset;
+  readonly attribute FrozenArray&lt;ScrollTimelineOffset&gt; scrollOffsets;
   readonly attribute (double or ScrollTimelineAutoKeyword) timeRange;
 };
 </pre>
 
-A <dfn>scroll timeline</dfn> is an {{AnimationTimeline}} whose time values are determined
-not by wall-clock time, but by the progress of scrolling in a [=scroll container=].
+A <dfn>scroll timeline</dfn> is an {{AnimationTimeline}} whose time values are
+determined not by wall-clock time, but by the progress of scrolling in a
+[=scroll container=].
 
 <div link-for-hint="ScrollTimeline">
 
@@ -399,188 +384,810 @@ not by wall-clock time, but by the progress of scrolling in a [=scroll container
 :   <dfn constructor for=ScrollTimeline lt="ScrollTimeline(options)">ScrollTimeline(options)</dfn>
 ::  Creates a new {{ScrollTimeline}} object using the following procedure:
 
-    1. Let |timeline| be a new {{ScrollTimeline}} object.
+    1.  Let |timeline| be a new {{ScrollTimeline}} object.
 
-    1. Let |source| be the result corresponding to the first matching condition from below.
+    1.  Let |source| be the result corresponding to the first matching condition
+        from the following:
 
-        : If the |scrollSource| value of |options| is non-null,
-        :: Let |source| be |scrollSource|
+        <div class="switch">
 
-        : Otherwise (|scrollSource| is null):
-        :: Let |source| be the {{scrollingElement}} of the {{Document}} <a lt="document associated with a window">associated</a> with the {{Window}} that is the <a>current global object</a>.
+        :   If the `source` member of |options| is missing,
+        ::  The {{scrollingElement}} of the {{Document}} <a lt="document
+            associated with a window">associated</a> with the {{Window}} that is
+            the <a>current global object</a>.
 
-        Note: |source| may still be null after this step, e.g. if the {{Document}} has no {{scrollingElement}}.
+        :   Otherwise,
+        ::  The `source` member of |options|.
 
-    1. Set the {{ScrollTimeline/scrollSource}} of |timeline| to |source|.
+        </div>
 
-    1. Assign the {{ScrollTimeline/orientation}}, {{ScrollTimeline/startScrollOffset}}, {{ScrollTimeline/endScrollOffset}}, and {{ScrollTimeline/timeRange}} properties of |timeline| to the corresponding value from |options|.
+    1.  Set the {{ScrollTimeline/source}} of |timeline| to |source|.
+
+    1.  Assign the {{ScrollTimeline/orientation}}, {{ScrollTimeline/scrollOffsets}}
+        and {{ScrollTimeline/timeRange}} properties of
+        |timeline| to the corresponding value from |options|.
 
 </div>
 
 <div class="attributes">
 
-:   <dfn attribute for=ScrollTimeline>scrollSource</dfn>
-::  The scrollable element whose scrolling triggers the activation and drives the
-    progress of the timeline.
+:   <dfn attribute for=ScrollTimeline>source</dfn>
+::  The scrollable element whose scrolling triggers the activation and drives
+    the progress of the timeline.
 
 :   <dfn attribute for=ScrollTimeline>orientation</dfn>
-::  Determines the direction of scrolling which triggers the activation and drives
-    the progress of the trigger.
+::  Determines the direction of scrolling which triggers the activation and
+    drives the progress of the timeline.
 
-:   <dfn attribute for=ScrollTimeline>startScrollOffset</dfn>
-::  A scroll offset, in the direction specified by {{orientation}}, which constitutes
-    the beginning of the range in which the timeline is active.
+:   <dfn attribute for=ScrollTimeline>scrollOffsets</dfn>
+::  [=scroll timeline offset=]s which determine the [=effective scroll
+    offset=]s in the direction specified by {{orientation}} that constitute the
+    equally-distanced in progress intervals in which the timeline is active.
 
-    Recognized values are defined by the following grammar:
+    The procedure to <dfn>set the offset value</dfn> with |val| as the provided
+    value, |pos| as the position in {{ScrollTimeline/scrollOffsets}} and |size|
+    as the {{ScrollTimeline/scrollOffsets}} array size has the following steps:
 
-    <blockquote>
-      <pre class="prod">auto | <<length>> | <<percentage>></pre>
-    </blockquote>
+    1.  If |val| is a {{DOMString}}, let |val| be the result of
+        <a lt="rectify a keywordish value">rectifying the keywordish value</a>.
 
-    The meaning of each value is as follows:
+    2.  Set the offset value to be the result corresponding to the first
+        matching condition from the following:
 
-    :   auto
-    ::  The beginning of {{scrollSource}}'s scroll range in {{orientation}}.
-    :   <<length>>
-    ::  An absolute distance along {{scrollSource}}'s scroll range in {{orientation}}.
-    :   <<percentage>>
-    ::  A percentage distance along {{scrollSource}}'s scroll range in {{orientation}}.
+        <div class="switch">
 
-:   <dfn attribute for=ScrollTimeline>endScrollOffset</dfn>
-::  A scroll offset, in the direction specified by {{orientation}}, which constitutes 
-    the end of the range in which the trigger is activated.
+        :   If |val| is a {{CSSKeywordValue}} and <a lt="match the grammar">
+            matches the grammar</a> `auto` and |pos| equals to 0 or |size| - 1:
+        ::  Return |val|.
 
-    Recognized values are defined by the following grammar:
+        :   If |val| is a {{CSSNumericValue}} and <a lt="match the grammar">
+            matches the grammar</a> <<length-percentage>>:
+        ::  Return |val|.
 
-    <blockquote>
-      <pre class="prod">auto | <<length>> | <<percentage>></pre>
-    </blockquote>
+        :   If |val| is an {{ElementBasedOffset}}:
+        ::  Return |val|.
 
-    The meaning of each value is as follows:
+        :   Otherwise,
+        ::  Do not set the value and throw a {{DOMException}} with error name
+            {{SyntaxError}}.
 
-    :   auto
-    ::  The end of {{scrollSource}}'s scroll range in {{orientation}}.
-    :   <<length>>
-    ::  An absolute distance along {{scrollSource}}'s scroll range in {{orientation}}.
-    :   <<percentage>>
-    ::  A percentage distance along {{scrollSource}}'s scroll range in {{orientation}}.
+        </div>
 
 :   <dfn attribute for=ScrollTimeline>timeRange</dfn>
 ::  A time duration that allows mapping between a distance scrolled, and
     quantities specified in time units, such as an animation's [=duration=] and
     [=start delay=].
 
-    Conceptually, {{timeRange}} represents the number of milliseconds to map to the 
-    scroll range defined by {{startScrollOffset}} and {{endScrollOffset}}. As a 
-    result, this value does not have a correspondence to wall-clock time.
+    Conceptually, {{timeRange}} represents the number of milliseconds to map to
+    the scroll range defined by {{start}} and {{end}}. As a result, this value
+    does not have a correspondence to wall-clock time.
 
     This value is used to compute the timeline's [=effective time range=], and
-    the mapping is then defined by mapping the scroll distance from 
-    {{startScrollOffset}} to {{endScrollOffset}}, to the [=effective time range=].
+    the mapping is then defined by mapping the scroll distance from
+    {{start}} to {{end}}, to the [=effective time range=].
+
+Issue(4862): We are working to remove the need for {{timeRange}} to be declared.
+The most recent work on this involved introduction of the concept of
+"progress-based animations" to web animations.
 
 </div>
 
-### The effective time range of a {{ScrollTimeline}} ### {#efffective-time-range-algorithm}
+### Scroll Timeline Offset ### {#scroll-timeline-offset-section}
 
-The <dfn>effective time range</dfn> of a {{ScrollTimeline}} is calculated as follows:
+An <dfn>effective scroll offset</dfn> is a scroll position for a given [=scroll
+container=] and on a given scroll direction.
+
+A <dfn>scroll timeline offset</dfn> is provided by authors and determines a
+[=effective scroll offset=] for the {{source}} and in the direction specified by
+{{orientation}}.
+
+There are two types of scroll timeline offset: [=container-based offset=], and
+[=element-based offset=]. To <dfn>resolve a scroll timeline offset</dfn> into an
+[=effective scroll offset=], run the procedure to [=resolve a container-based
+offset=] or to [=resolve an element-based offset=] depending on the offset type.
+It is possible for a [=scroll timeline offset=] to be resolved to null.
+
+The <dfn>effective start offset</dfn> is the value of first offset in
+[=effective scroll offsets=] array or null if the array is empty.
+
+The <dfn>effective end offset</dfn> is the value of last offset in
+[=effective scroll offsets=] array or null if the array is empty.
+
+#### Container-based Offset #### {#container-based-offset-section}
+A <dfn>container-based offset</dfn> is a scroll timeline offset that is declared
+only in relation with the <a>scroll container</a> as specified by {{source}}.
+
+A [=container-based offset=] is provided in the {{CSSNumericValue}} or
+{{CSSKeywordValue}} forms.
+
+The procedure to <dfn>resolve a container-based offset</dfn> given
+|offset| and a flag <var>is first</var> (to indicate if the <var>offset</var>
+is being inserted first into [=effective scroll offsets=]) is as follows:
+
+1.  If <em>any</em> of the following are true:
+
+    * {{source}} is null, or
+    * {{source}} does not currently have a [=CSS layout box=], or
+    * {{source}}'s layout box is not a [=scroll container=].
+
+    The [=effective scroll offset=] is null and abort remaining steps.
+
+1.  The [=effective scroll offset=] is the scroll offset corresponding to the
+    first matching condition from the following:
+    <div class="switch">
+
+    :   If |offset| is a {{CSSKeywordValue}} and
+        <a lt="match the grammar">matches</a> `auto`:
+    ::  The beginning of {{source}}'s scroll range in {{orientation}} if
+        <var>is first</var> is true or the ending of {{source}}'s scroll range in
+        {{orientation}} otherwise.
+
+    :   If |offset| is a {{CSSNumericValue}} and
+        <a lt="match the grammar">matches</a> <<length-percentage>>:
+    ::  The distance indicated by the value along {{source}}'s scroll range in
+        {{orientation}} as expressed by absolute length, a percentage, or a
+        ''calc()'' expression that resolves to a <<length>>.
+
+    :   Otherwise,
+    ::  null.
+
+    </div>
+
+Note: The scroll range of an element is the range defined by its minimum and
+maximum scroll offsets which are determined by it [=scrolling box=], [=padding
+box=], and [=overflow direction=].
+
+Note: Container-based scroll offsets cannot be provided as bare numbers but
+should be {{CSSNumericValue}}. This way the full richness of {{CSSNumericValue}}
+APIs can be used to provide the offset in percentages, various length units or
+'calc()' expressions. For example `CSS.percent(50)`, `CSS.px(200)`, or
+`CSS.vh(10)` are valid and represent `50%`, `200px`, and `10vh`.
+
+
+Note: It is valid to provide a length or percentage based offset such that it is
+outside the source's scroll range and thus not reachable e.g., '120%'.
+
+#### Element-based Offset #### {#element-based-offset-section}
+
+An <dfn>element-based offset</dfn> is a scroll timeline offset that is declared
+in terms of the intersection of the <a>scroll container</a> as specified by
+{{source}} and one of its descendants as specified by {{target}}.
+
+An [=element-based offset=] is provided in the {{ElementBasedOffset}} form.
+
+<pre class="idl">
+enum Edge { "start", "end" };
+
+dictionary ElementBasedOffset {
+  Element target;
+  Edge edge = "start";
+  double threshold = 0.0;
+};
+</pre>
+
+
+<div class=members>
+
+:   <dfn dict-member for=ElementBasedOffset>target</dfn>
+::  The target whose intersection with {{source}}'s [=scrolling box=] determines
+    the concrete scroll offset.
+
+:   <dfn dict-member for=ElementBasedOffset>edge</dfn>
+::  The edge of {{source}}'s [=scrolling box=] in the direction specified by
+    the {{orientation}} which the target should intersect with.
+
+:   <dfn dict-member for=ElementBasedOffset>threshold</dfn>
+::  A double in the range of [0.0, 1.0] that represent the percentage
+    of the target that is expected to be visible in  {{source}}'s [=scrollport=]
+    at the intersection offset.
+
+Issue(5203): The range of the `threshold` member is not currently
+checked anywhere.
+
+</div>
+
+
+The procedure to <dfn>resolve an element-based offset</dfn> given
+|offset| is as follows:
+
+1.  If <em>any</em> of the following are true:
+
+    * {{source}} is null, or
+    * {{source}} does not currently have a [=CSS layout box=], or
+    * {{source}}'s layout box is not a [=scroll container=].
+
+    The [=effective scroll offset=] is null and abort remaining steps.
+
+1.  Let |target| be |offset|'s {{target}}.
+
+1.  If <em>any</em> of the following are true:
+
+    * |target| is null, or
+    * |target| does not currently have a [=CSS layout box=].
+
+    The [=effective scroll offset=] is null and abort remaining steps.
+
+
+1.  If |target| 's nearest [=scroll container=] ancestor
+    is not {{source}}
+    abort remaining steps
+    since the [=effective scroll offset=] is null.
+
+1.  Let |container box| be the {{source}}'s [=scrollport=].
+
+1.  Let |target box| be the result of finding
+    the rectangular bounding box
+    (axis-aligned in {{source}}’s coordinate space)
+    of |target|'s transformed border box.
+
+1.  If |offset|'s {{edge}} is 'start' then
+    let |scroll offset|
+    be the scroll offset at which |container box|'s start edge is flush
+    with the |target box|'s end edge
+    in the axis and direction determined by {{orientation}}.
+
+1.  If |offset|'s {{edge}} is 'end' then
+    let |scroll offset|
+    be the scroll offset at which |container box|'s end edge is flush
+    with the |target box|'s start edge
+    in the axis and direction determined by {{orientation}}.
+
+1.  Let |threshold amount| be the result of evaluating the following
+    expression where |target dimension| is |target box|'s dimension in the axis
+    determined by {{orientation}}.
+    <blockquote>
+      <code>|threshold amount| = {{threshold}} &times; |target dimension|</code>
+    </blockquote>
+
+
+1.  Adjust |scroll offset| by |threshold amount| as follow:
+    <div class="switch">
+
+    :   If |offset|'s {{edge}} is 'start',
+    ::  |scroll offset| = |scroll offset| - |threshold amount|.
+
+    :   Otherwise (|offset|'s {{edge}} is 'end'),
+    ::  |scroll offset| = |scroll offset| + |threshold amount|.
+
+    </div>
+
+1.  Clamp the value of |scroll offset| to be within the {{source}}'s
+     scroll range.
+
+1.  The [=effective scroll offset=] is |scroll offset|
+
+
+<div class="note">
+Note: With threshold 0.0, the algorithm selects the effective scroll offset such
+that the target is adjacent to the [=scrollport=] at the given edge but not yet
+visible.
+The threshold value allows authors
+to control the amount of target that needs to be visible in [=scrollport=].
+In particular threshold value 1.0 ensure that target is fully visible
+(as long as [=scrollport=] is large enough).
+
+<figure>
+<img src="img/example-element-based-threshold.svg" width="600"
+alt="Example usage of element-based offset.">
+ <figcaption>
+  Threshold controls how much of target should be visible in [=scrollport=].
+ </figcaption>
+</figure>
+
+</div>
+
+<div class="example">
+Here is a basic example showing how element-based offsets can be used to declare
+an scroll-linked animation that occurs when an element enters the scroller
+scrollport and ends once it exits the scrollport.
+
+<figure>
+<img src="img/example-element-based.svg" width="600"
+alt="Example usage of element-based offset.">
+ <figcaption>
+  Usage of element-based offsets to create enter/exit triggers.<br>
+  The left figure shows the scroller and target being aligned at 'end' edge.<br>
+  The right figure shows them being aligned at 'start' edge.
+ </figcaption>
+</figure>
+
+
+Note that here we are expecting a typical top to bottom scrolling and thus
+consider the entrance to coincide when target's start edge is flushed with
+scrollport's <strong>end edge</strong> and viceversa for exit.
+
+<pre class='lang-javascript'>
+if (window.matchMedia('(prefers-reduced-motion: no-preference)').matches) {
+  const scrollableElement = document.querySelector('#container');
+  const image = document.querySelector('#image');
+
+  const timeline = new ScrollTimeline({
+    source: scrollableElement,
+    scrollOffsets: [{target: image, edge: 'end'},
+                    {target: image, edge: 'start'}],
+  });
+
+  const slideIn = target.animate({
+      transform: ['translateX(0)', 'translateX(50vw)'],
+      opacity: [0, 1]
+    }, {
+      timeline:timeline,
+      duration: 1000
+    }
+  );
+}
+</pre>
+
+The same logic can be done in CSS markup:
+<pre class="lang-css">
+@media (prefers-reduced-motion: no-preference) {
+
+  @keyframes slide-in {
+    from {
+      transform: translateX(0);
+      opacity: 0;
+    }
+
+    to {
+      transform: translateX(50vw);
+      opacity: 1;
+    }
+  }
+
+  @scroll-timeline image-in-scrollport {
+    source: selector(#container);
+    scroll-offsets: selector(#image) end, selector(#image) start;
+  }
+
+  #target {
+    animation-name: slide-in;
+    animation-duration: 1s;
+    animation-timeline: image-in-scrollport;
+  }
+
+}
+</pre>
+
+
+</div>
+
+### The effective time range of a {{ScrollTimeline}} ### {#effective-time-range-algorithm}
+
+The <dfn>effective time range</dfn> of a {{ScrollTimeline}} is calculated as
+follows:
 
 <div class="switch">
 
-:   If the {{timeRange}} has the value <code>"auto"</code>,
-::  The [=effective time range=] is the maximum value of the 
+:   If the {{timeRange}} has the value `"auto"`,
+::  The [=effective time range=] is the maximum value of the
     [=target effect end=] of all animations
     directly associated with this timeline.
 
-    If any animation directly associated with the timeline has a 
-    [=target effect end=] of infinity, the [=effective time range=] 
+    If any animation directly associated with the timeline has a
+    [=target effect end=] of infinity, the [=effective time range=]
     is zero.
 
 :   Otherwise,
-::  The [=effective time range=] is the {{ScrollTimeline}}'s 
+::  The [=effective time range=] is the {{ScrollTimeline}}'s
     {{timeRange}}.
+
+</div>
+
+### The effective scroll offsets of a {{ScrollTimeline}} ### {#effective-scroll-offsets-algorithm}
+
+The <dfn>effective scroll offsets</dfn> are calculated by the procedure to
+<dfn>resolve scroll timeline offsets</dfn> from {{ScrollTimeline/scrollOffsets}}
+as follows:
+
+1.  Let <var>effective scroll offsets</var> be an empty list of
+    <a>effective scroll offset</a>s.
+1.  Let <var>first offset</var> be true.
+1.  If {{ScrollTimeline/scrollOffsets}} is empty
+    1.  Run the procedure to [=resolve a scroll timeline offset=] for 'auto'
+        with the <var>is first</var> flag set to <var>first offset</var> and
+        add the resulted value into <var>effective scroll offsets</var>.
+    1.  Set <var>first offset</var> to false.
+    1.  Run the procedure to [=resolve a scroll timeline offset=] for 'auto'
+        with the <var>is first</var> flag set to <var>first offset</var> and
+        add the resulted value into <var>effective scroll offsets</var>.
+1.  If {{ScrollTimeline/scrollOffsets}} has exactly one element
+    1.  Run the procedure to [=resolve a scroll timeline offset=] for 'auto'
+        with the <var>is first</var> flag set to <var>first offset</var> and
+        add the resulted value into <var>effective scroll offsets</var>.
+    1.  Set <var>first offset</var> to false.
+1.  For each <var>scroll offset</var> in the list of
+    {{ScrollTimeline/scrollOffsets}}, perform the following steps:
+    1.  Let <var>effective offset</var> be the result of applying the procedure
+        to [=resolve a scroll timeline offset=] for <var>scroll offset</var>
+        with the <var>is first</var> flag set to <var>first offset</var>.
+    1.  If <var>effective offset</var> is null, the
+        [=effective scroll offsets=] is empty and abort the remaining steps.
+    1.  Add <var>effective offset</var> into
+        <var>effective scroll offsets</var>.
+    1.  Set <var>first offset</var> to false.
+1.  Return <var>effective scroll offsets</var>.
+
+### The progress of a {{ScrollTimeline}} ### {#progress-calculation-algorithm}
+The <dfn>scroll timeline progress</dfn> is calculated by applying the procedure
+to <dfn>calculate scroll timeline progress</dfn> given |offset| as follows:
+
+1.  Let <var>scroll offsets</var> be the result of applying the procedure to
+    [=resolve scroll timeline offsets=] for {{scrollOffsets}}.
+1.  Let <var>offset index</var> correspond to the position of the last offset in
+    <var>scroll offsets</var> whose value is less than or equal to
+    <var>offset</var> and the value at the following position greater than
+    <var>offset</var.
+1.  Let <var>start offset</var> be the offset value at position
+    <var>offset index</var> in <var>scroll offsets</var>.
+1.  Let <var>end offset</var> be the value of next offset in <var>scroll
+    offsets</var> after <var>start offset</var>.
+1.  Let <var>size</var> be the number of offsets in <var>scroll offsets</var>.
+1.  Let <var>offset weight</var> be the result of evaluating
+    <code> 1 / (<var>size</var> - 1)</code>.
+1.  Let <var>interval progress</var> be the result of evaluating
+    <code>(<var>offset</var> - <var>start offset</var>) /
+    (<var>end offset</var> - <var>start offset</var>)</code>.
+1.  Return the result of evaluating
+    <code>(<var>offset index</var> + <var>interval progress</var>) &times;
+    <var>offset weight</var></code>.
+
+Note: This procedure guarantees that given <var>offset</var> belongs to
+scroll range within first and last offsets of <var>scroll offsets</var>.
+This is because the case when <var>offset</var> falls outside of the scroll
+range is handled before calling this procedure, as part of [=current time=]
+calculation.
+
+Note: The rationale behind choosing last matching offset in the array is to
+be consistent with [=findRule=] method for finding which [=CSSKeyframeRule=]
+applies in a comma separated list of overlapping keyframes.
+
+### The phase of a {{ScrollTimeline}} ### {#phase-algorithm}
+
+The [=phase=] of a {{ScrollTimeline}} is calculated as follows:
+
+1.  If <em>any</em> of the following are true:
+
+    * {{source}} is null, or
+    * {{source}} does not currently have a [=CSS layout box=], or
+    * {{source}}'s layout box is not a [=scroll container=], or
+    * [=effective scroll offsets=] is empty.
+
+    The [=phase=] is [=inactive phase|inactive=] and abort remaining steps.
+
+1.  Let |current scroll offset| be the current scroll offset of
+    {{source}} in the direction specified by {{orientation}}.
+
+1.  The [=phase=] is the result corresponding to the first matching condition
+    from below:
+
+<div class="switch">
+
+:   If |current scroll offset| is less than [=effective start offset=]:
+::  The [=phase=] is [=before phase|before=]
+
+:   If |current scroll offset| is greater than or equal to [=effective
+    end offset=] <em>and</em> [=effective end offset=] is less than the maximum
+    scroll offset of {{source}} in {{orientation}}:
+
+::  The [=phase=] is [=after phase|after=]
+
+Note: In web animations, in general ranges are normally exclusive of their end
+point. But there is an exception here for the scroll timeline active range as it
+may in some cases be inclusive of its end. In particular if the timeline end
+offset is the maximum scroll offset we include it in active range because it is
+not possible for user to scroll passed this point and not including this value
+in the active range would leave to animations that would not be active at the
+very last scroll position.
+
+:   Otherwise,
+::  The [=phase=] is [=active phase|active=].
 
 </div>
 
 ### The current time of a {{ScrollTimeline}} ### {#current-time-algorithm}
 
-The [=current time=] of a {{ScrollTimeline}} is calculated
-as follows:
+The [=current time=] of a {{ScrollTimeline}} is calculated as follows:
 
-1.  If {{scrollSource}} is null, does not currently have a [=CSS layout box=], or
-    if its layout box is not a [=scroll container=], return an unresolved time value.
+1.  If <em>any</em> of the following are true:
 
-1.  Otherwise, let <var>current scroll offset</var> be the current scroll offset of {{scrollSource}}
-    in the direction specified by {{orientation}}.
+    * {{source}} is null, or
+    * {{source}} does not currently have a [=CSS layout box=], or
+    * {{source}}'s layout box is not a [=scroll container=], or
+    * [=effective scroll offsets=] is empty.
 
-1.  If <var>current scroll offset</var> is less than {{startScrollOffset}}, return 0.
+    The [=current time=] is an unresolved time value and abort remaining steps.
 
-    Note: TODO(<a href="https://github.com/w3c/csswg-drafts/issues/4325#issuecomment-585295758">Issue 4325</a>): Define what the correct timeline state is based on scroll offset.
+1.  Let |current scroll offset| be the current scroll offset of
+    {{source}} in the direction specified by {{orientation}}.
 
-1.  If <var>current scroll offset</var> is greater than or equal to {{endScrollOffset}}, return [=effective time range=].
+1.  The [=current time=] is the result corresponding to the first matching
+    condition from below:
 
-1.  Return the result of evaluating the following expression:
+<div class="switch">
+
+:   If |current scroll offset| is less than [=effective start offset=]:
+::  The [=current time=] is 0.
+
+:   If |current scroll offset| is greater than or equal to [=effective
+    end offset=]:
+::  The [=current time=] is the [=effective time range=].
+
+:   Otherwise,
+::  1.  Let |progress| be a result of applying
+        [=calculate scroll timeline progress=] procedure for <var>current scroll offset</var>.
+    1.  The [=current time=] is the result of evaluating the following expression:
 
     <blockquote>
-      <code>(<var>current scroll offset</var> - {{startScrollOffset}}) / ({{endScrollOffset}} - {{startScrollOffset}}) &times; [=effective time range=]</code>
+      <code>|progress| &times; [=effective time range=]</code>
     </blockquote>
 
-</div>  <!-- link-for-hint="ScrollTimeline" -->
+</div>
+Note: To be considered active a scroll timeline requires its [=effective scroll
+offsets=] to be non-empty. This means that for example if one uses an
+element-based offset whose {{target}} is not a descendant of the scroll timeline
+{{source}}, the timeline remains inactive.
 
+## The '@scroll-timeline' at-rule ## {#scroll-timeline-at-rule}
 
-## The 'animation-timeline' property ## {#animation-timeline}
+[=Scroll Timelines=] are specified in CSS using the <dfn>@scroll-timeline</dfn>
+at-rule, defined as follows:
 
-A {{ScrollTimeline}} may be applied to a CSS Animation [[CSS3-ANIMATIONS]] using
-the 'animation-timeline' property.
+<pre>
+  @scroll-timeline = @scroll-timeline <<timeline-name>> { <<declaration-list>> }
 
-<pre class='propdef'>
-Name: animation-timeline
-Value: <<single-animation-timeline>>#
-Initial: auto
-Applies to: all elements, ::before and ::after pseudo-elements
-Inherited: none
-Animatable: no
-Percentages: N/A
-Media: interactive
-Computed value: As specified
-Canonical order: per grammar
 </pre>
 
-<dfn>&lt;single-animation-timeline></dfn> = auto | scroll([element(<<id-selector>>)[, <<scroll-direction>>[, <<scroll-offset>>[, <<scroll-offset>>[, <<time>>]]]]])
+An ''@scroll-timeline'' rule has a name given by the <<custom-ident>> or <<string>> in
+its prelude. The two syntaxes are equivalent in functionality; the name is the
+value of the ident or string. As normal for <<custom-ident>>s and <<string>>s,
+the names are fully case-sensitive; two names are equal only if they are
+codepoint-by-codepoint equal. The <<custom-ident>> additionally excludes the
+none keyword.
 
-<dfn>&lt;scroll-direction></dfn> = auto | block | inline | horizontal | vertical
+Once specified, a scroll timeline may be associated with a CSS Animation
+[[CSS3-ANIMATIONS]] by using the 'animation-timeline' property.
 
-<dfn>&lt;scroll-offset></dfn> = <<length>> | <<percentage>> | auto
+The <<declaration-list>> inside of ''@scroll-timeline'' rule can only contain the
+descriptors defined in this section.
 
-The 'animation-timeline' property is similar to properties like 'animation-duration' and 
-'animation-timing-function' in that it can have one or more values, each one imparting 
-additional behavior to a corresponding [=animation=] on the 
-element, with the timelines matched up with animations as described 
-[[css-animations-1#animation-name|here]].
+An ''@scroll-timeline'' rule is invalid if it occurs in a stylesheet inside of a
+[=shadow tree=], and must be ignored.
 
-<div link-for-hint="ScrollTimeline">
+Issue(5167): This will likely change in the future.
 
-Each value has type <<single-animation-timeline>>, whose possible values have the
-following effects:
+### Scroll Timeline descriptors ### {#scroll-timeline-descriptors}
 
-:   auto
-::  The animation's [=timeline=] is a {{DocumentTimeline}}, more specifically the
-    <a>default document timeline</a>.
 
-:   scroll([element(<<id-selector>>)[, <<scroll-direction>>[, <<scroll-offset>>[, <<scroll-offset>>[, <<time>>]]]]])
-::  The animation's [=timeline=] is a {{ScrollTimeline}}.
+<pre class='descdef'>
+  Name: source
+  For: @scroll-timeline
+  Value: selector( <<id-selector>> ) | auto | none
+  Initial: auto
+</pre>
 
-    The timeline's {{scrollSource}} is the [=scroll container=] identified
-    by the <<id-selector>>, defaulting to the element's nearest scrollable ancestor.
+'source' descriptor determines the scroll timeline's {{source}}.
 
-    The <<scroll-direction>>, if provided, determines the timeline's {{orientation}}.
+The value of {{source}} is the result corresponding to the first matching
+condition from the following:
 
-    The first <<scroll-offset>>, if provided, determines the timeline's {{startScrollOffset}}.
+<div class="switch">
 
-    The second <<scroll-offset>>, if provided, determines the timeline's {{endScrollOffset}}.
+:   If 'source' is a 'selector()'
+::  The [=scroll container=] identified by the <<id-selector>>.
 
-    The <<time>> value, if specified, determines the timeline's {{timeRange}}.
+:   If 'source' is `auto`
+::  The {{scrollingElement}} of the {{Document}} <a lt="document associated with
+    a window">associated</a> with the {{Window}} that is the
+    <a>current global object</a>.
+
+:   Otherwise ('source' is `none`)
+::  null.
+
+</div>
+
+Issue(4338): Consider choosing animation target's nearest scrollable ancestor
+instead of document's scrolling Element for `auto`.
+
+<pre class='descdef'>
+  Name: orientation
+  For: @scroll-timeline
+  Value: auto | block | inline | horizontal | vertical
+  Initial: auto
+</pre>
+
+'orientation' descriptor determines the scroll timeline's {{orientation}}.
+
+<pre class='descdef'>
+  Name: scroll-offsets
+  For: @scroll-timeline
+  Value: [ none | <<scroll-timeline-offset>> ]#
+  Initial: none
+</pre>
+
+'scroll-offsets' descriptor determines the scroll timeline's {{scrollOffsets}}.
+
+[=Scroll timeline offsets=] in CSS are represented by the
+<<scroll-timeline-offset>> type:
+
+<pre>
+<dfn>&lt;scroll-timeline-offset></dfn> = auto | <<length-percentage>> | <<element-offset>>
+<dfn>&lt;element-offset></dfn> = selector( <<id-selector>> ) [<<element-offset-edge>> || <<number>>]?
+<dfn>&lt;element-offset-edge></dfn> = start | end
+</pre>
+
+The offset type depends on the value of <<scroll-timeline-offset>> per
+following:
+<div class="switch">
+:   If value is "auto" or of type <<length-percentage>>
+::  The [=scroll timeline offset=] is a [=container-based offset=] with the same
+    value.
+
+:   If value is of type <<element-offset>>
+::  The [=scroll timeline offset=] is an [=element-based offset=] with the
+    following member values:
+      *  {{ElementBasedOffset/target}} is the element identified by
+          <<id-selector>>.
+      * {{ElementBasedOffset/edge}} is the optional value of
+        <<element-offset-edge>>. If not provided it defaults to "start".
+      * {{ElementBasedOffset/threshold}} is the optional value <<number>>. If
+        not provided it defaults to 0.
+
+</div>
+
+<pre class='descdef'>
+  Name: time-range
+  For: @scroll-timeline
+  Value: auto | <<time>>
+  Initial: auto
+</pre>
+
+'time-range' descriptor determines the scroll timeline's {{timeRange}}.
 
 </div>  <!-- link-for-hint="ScrollTimeline" -->
+
+### The <dfn interface>CSSScrollTimelineRule</dfn> Interface ### {#the-css-scroll-timeline-rule-interface}
+
+<pre class='idl' export>
+[Exposed=Window]
+interface CSSScrollTimelineRule : CSSRule {
+    readonly attribute CSSOMString name;
+    readonly attribute CSSOMString source;
+    readonly attribute CSSOMString orientation;
+    readonly attribute CSSOMString scrollOffsets;
+    readonly attribute CSSOMString timeRange;
+};
+</pre>
+
+<dl dfn-for=CSSScrollTimelineRule dfn-type=attribute>
+  <dt><dfn>name</dfn></dt>
+  <dd>
+    The name associated with the ''@scroll-timeline'' rule.
+  </dd>
+
+  <dt><dfn>source</dfn></dt>
+  <dd>
+    The 'source' descriptor associated with the ''@scroll-timeline'', or "auto"
+    if not specified.
+  </dd>
+
+  <dt><dfn>orientation</dfn></dt>
+  <dd>
+    The 'orientation' descriptor associated with the ''@scroll-timeline'', or "auto" if not specified.
+  </dd>
+
+  <dt><dfn>scrollOffsets</dfn></dt>
+  <dd>
+    The 'scroll-offsets' descriptor associated with the ''@scroll-timeline'', or "none" if not specified.
+  </dd>
+
+  <dt><dfn>timeRange</dfn></dt>
+  <dd>
+    The 'time-range' descriptor associated with the ''@scroll-timeline'', or "auto" if not specified.
+  </dd>
+</dl>
+
+<div algorithm>
+  To <dfn export>serialize a CSSScrollTimelineRule</dfn>,
+  return the concatenation of the following:
+
+    1. The string <code>"@scroll-timeline"</code> followed by a SPACE (U+0020).
+    1. The result of performing <a>serialize an identifier</a> on the rule's
+        {{CSSScrollTimelineRule/name}}, followed by a SPACE (U+0020).
+    1. A single LEFT CURLY BRACKET (U+007B), followed by a SPACE (U+0020).
+    1. If the 'source' descriptor is missing, the empty string.
+        Otherwise, the concatenation of the following:
+        1. The string <code>"source:"</code>, followed by a SPACE (U+0020).
+        1. One of the following,
+            depending on the value of the 'source' descriptor:
+            <dl class=switch>
+              : an identifier
+              :: The result of performing <a>serialize an identifier</a>
+                  on that identifier.
+              : selector(&lt;id-selector>)
+              :: The result of performing
+                  <a>serialize a selector() function</a>.
+                </dl>
+        1. A single SEMICOLON (U+003B), followed by a SPACE (U+0020).
+    1. If the 'orientation' descriptor is missing, the empty string.
+        Otherwise, the concatenation of the following:
+        1. The string <code>"orientation:"</code>,
+            followed by a SPACE (U+0020).
+        1. The result of performing <a>serialize an identifier</a>
+            on the value of the 'orientation' descriptor,
+            followed by a SEMICOLON (U+003B),
+            followed by a SPACE (U+0020).
+    1. If the 'start' descriptor is missing, the empty string.
+        Otherwise, the concatenation of the following:
+        1. The string <code>"start:"</code>,
+            followed by a SPACE (U+0020).
+        1. The result of performing <a>serialize a scroll timeline offset</a>
+            on the rule's 'start' descriptor,
+            followed by a SEMICOLON (U+003B),
+            followed by a SPACE (U+0020).
+    1. If the 'end' descriptor is missing, the empty string.
+        Otherwise, the concatenation of the following:
+        1. The string <code>"end:"</code>,
+            followed by a SPACE (U+0020).
+        1. The result of performing <a>serialize a scroll timeline offset</a>
+            on the rule's 'end' descriptor,
+            followed by a SEMICOLON (U+003B),
+            followed by a SPACE (U+0020).
+    1. If the 'time-range' descriptor is missing, the empty string.
+        Otherwise, the concatenation of the following:
+        1. The string <code>"time-range:"</code>,
+            followed by a SPACE (U+0020).
+        1. One of the following,
+            depending on the value of the 'time-range' descriptor:
+            <dl class=switch>
+              : an identifier
+              :: The result of performing <a>serialize an identifier</a>
+                 on that identifier.
+              : &lt;time>
+              :: The result of performing <a>serialize a CSS component value</a>
+                 on that value.
+                </dl>
+        1. A single SEMICOLON (U+003B), followed by a SPACE (U+0020).
+    1. A single RIGHT CURLY BRACKET (U+007D).
+</div>
+
+<div algorithm>
+  To <dfn export>serialize a scroll timeline offset</dfn>,
+  return one the following,
+  depending on the value type:
+
+  <dl class=switch>
+    : an identifier
+    : &lt;length-percentage>
+    :: The result of performing <a>serialize a CSS component value</a>
+        on that value.
+    : &lt;element-offset>
+    :: The concatenation of the following:
+         1. The result of performing <a>serialize a selector() function</a>
+             on the selector() function associated with the element offset.
+         2. If the offset has an associated {{ElementBasedOffset/edge}},
+             a single SPACE (U+0020),
+             followed by the result of <a>serialize an identifier</a>
+             on the value of "edge".
+             Otherwise, the empty string.
+         3. If the offset has an associated {{ElementBasedOffset/threshold}},
+             a single SPACE (U+0020),
+             followed by the result of <a>serialize a CSS component value</a>
+             on the value of "threshold".
+             Otherwise, the empty string.
+  </dl>
+
+</div>
+
+<div algorithm>
+  To <dfn export>serialize a selector() function</dfn>,
+  return the concatenation of the following:
+
+    1. The string <code>"selector"</code>,
+        followed by LEFT PARENTHESIS (U+0028).
+    2. The result of performing <a>serialize a selector</a>
+        on the selector() function's argument.
+    3. A single RIGHT PARENTHESIS (U+0029).
+</div>
 
 ## Examples ## {#timeline-examples}
 
@@ -623,6 +1230,13 @@ following effects:
   The same thing with CSS, using 'animation-timeline'
   <pre class="lang-css">
     @media (prefers-reduced-motion: no-preference) {
+
+      @scroll-timeline progress {
+        /* Assume the HTML element has id 'root' */
+        source: selector(#root);
+        orientation: vertical;
+      }
+
       @keyframes progress {
         from {
           width: 0vw;
@@ -631,84 +1245,62 @@ following effects:
           width: 100vw;
         }
       }
+
       #progress {
         position: fixed;
         top: 0;
         width: 0;
         height: 2px;
         background-color: red;
+        /* This name is used to select both the keyframes and the
+           scroll-timeline at-rules. */
         animation-name: progress;
         animation-duration: 1s;
         animation-fill-mode: forwards;
         animation-timing-function: linear;
-        /* Assume the HTML element has id 'root' */
-        animation-timeline: scroll(element(#root), vertical);
       }
+
     }
   </pre>
 </div>
 
 # Avoiding cycles with layout # {#avoiding-cycles}
 
-The ability for scrolling to drive the progress of an animation, gives rise to 
+The ability for scrolling to drive the progress of an animation, gives rise to
 the possibility of <dfn>layout cycles</dfn>, where a change to a scroll offset
 causes an animation's effect to update, which in turn causes a new change to the
 scroll offset.
 
-To avoid such cycles, animations with a {{ScrollTimeline}} are sampled once
-per frame, after scrolling in response to input events has taken place, but
-before {{requestAnimationFrame()}} callbacks are run. If the sampling of such an
-animation causes a change to a scroll offset, the animation will not be
-re-sampled to reflect the new offset until the next frame.
+To avoid such [=layout cycles=], animations with a {{ScrollTimeline}} are
+sampled once per frame, after scrolling in response to input events has taken
+place, but before {{requestAnimationFrame()}} callbacks are run. If the sampling
+of such an animation causes a change to a scroll offset, the animation will not
+be re-sampled to reflect the new offset until the next frame.
 
-The implication of this is that in some situations, in a given frame, the 
-rendered scroll offset of a scroll container may not be consistent with the state 
+The implication of this is that in some situations, in a given frame, the
+rendered scroll offset of a scroll container may not be consistent with the state
 of an animation driven by scrolling that scroll container. However, this will
 only occur in situations where the animation's effect changes the scroll offset
 of that same scroll container (in other words, in situations where the animation's
-author is asking for trouble). In normal situations, including - importantly - 
+author is asking for trouble). In normal situations, including - importantly -
 when scrolling happens in response to input events, the rendered scroll offset
 and the state of scroll-driven animations will be consistent in each frame.
 
 User agents that composite frames asynchronously with respect to layout and/or
-script may, at their discretion, sample scroll-driven animations once per 
-<em>composited</em> frame, rather than (or in addition to) once per full layout 
-cycle. Again, if sampling such an animation causes a change to a scroll offset, 
-the animation will not be re-sampled to reflect the new offset until the next 
+script may, at their discretion, sample scroll-driven animations once per
+<em>composited</em> frame, rather than (or in addition to) once per full layout
+cycle. Again, if sampling such an animation causes a change to a scroll offset,
+the animation will not be re-sampled to reflect the new offset until the next
 frame.
 
 Nothing in this section is intended to require that scrolling block on layout
 or script. If a user agent normally composites frames where scrolling has
 occurred but the consequences of scrolling have not been fully propagated in
-layout or script (for example, <code>scroll</code> event listeners have not yet 
+layout or script (for example, `scroll` event listeners have not yet
 run), the user agent may likewise choose not to sample scroll-driven animations
 for that composited frame. In such cases, the rendered scroll offset and the
 state of a scroll-driven animation may be inconsistent in the composited frame.
 
-# Scroll-triggered (but time-driven) animations # {#scroll-triggered-animations}
-
-An earlier draft of this proposal also provided for animations whose progress
-was driven by time (as with existing animations), but whose activation was 
-triggered by scrolling past a certain scroll offset or into a given scroll range.
-
-The main objective was to allow triggering the animation from the compositor
-thread. (The objective of scroll-linked animations is to make sure that 
-the animation is in sync with the scroll position on each composited frame.
-If the triggering doesn't happen on the compositor thread, then it's possible
-that for a few frames the visual scroll position is such that the animation
-should have started, but it has not in fact started yet because the main thread,
-which is doing the triggering, is lagging behind.)
-
-However, we found that in the vast majority of cases where a web author would
-want to do this, they would want to do it for a CSS transition (as opposed to
-a CSS animation). Unfortunately, it's not possible to trigger CSS transitions from 
-the compositor thread (because triggering a transition requires style resolution, 
-which cannot be performed on the compositor thread). Given the extent to which 
-triggering complicated the API, we decided it wasn't worth it if you can't use 
-it for transitions, so this feature was removed.
-
-The design space for triggering animations is still open. We welcome input
-on this subject.
 
 <h2 id="appendix-a-considerations-for-security-and-privacy">Appendix A. Considerations for Security and Privacy</h2>
 

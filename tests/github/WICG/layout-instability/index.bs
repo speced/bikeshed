@@ -4,9 +4,9 @@ Status: CG-Draft
 Shortname: layout-instability
 Group: WICG
 Level: 1
-Editor: Steve Kobes, Google, https://google.com, skobes@chromium.org
-        Nicolás Peña Moreno, Google, https://google.com, npm@chromium.org
-        Emily Hanley, Google, https://google.com, eyaich@chromium.org
+Editor: Steve Kobes, Google https://google.com, skobes@chromium.org
+        Nicolás Peña Moreno, Google https://google.com, npm@chromium.org
+        Emily Hanley, Google https://google.com, eyaich@chromium.org
 URL: https://wicg.github.io/layout-instability
 Repository: https://github.com/WICG/layout-instability
 Abstract: This document defines an API that provides web page authors with insights into the stability of their pages based on movements of the elements on the page.
@@ -57,14 +57,23 @@ urlPrefix: https://www.w3.org/TR/css-values-4/; spec: CSS-VALUES-4;
     type: dfn; url: #pixel-unit; text: pixel units;
 urlPrefix: https://www.w3.org/TR/CSS2/visudet.html; spec: CSS2;
     type: dfn; url: #containing-block-details; text: initial containing block;
+urlPrefix: https://www.w3.org/TR/CSS2/visufx.html; spec: CSS2;
+    type: dfn; url: #visibility; text: visibility;
 urlPrefix: https://wicg.github.io/visual-viewport/index.html; spec: VISUAL-VIEWPORT;
     type: dfn; url: #dom-visualviewport-width; text: visual viewport width;
     type: dfn; url: #dom-visualviewport-height; text: visual viewport height;
 urlPrefix: https://www.w3.org/TR/css-text-3/; spec: CSS-TEXT-3;
     type: dfn; url: #line-breaking; text: line box;
+urlPrefix: https://www.w3.org/TR/geometry-1/; spec: GEOMETRY-1;
+    type: dfn; url: #domrectreadonly; text: DOMRectReadOnly
+urlPrefix: https://www.w3.org/TR/geometry-1/; spec: GEOMETRY-1;
+    type: dfn; url: #rectangle; text: Rectangle
+urlPrefix: https://wicg.github.io/element-timing/; spec: ELEMENT-TIMING;
+    type: dfn; url: #get-an-element; text: get an element;
+urlPrefix: https://www.w3.org/TR/css-color-3; spec: CSS-COLOR-3;
+    type: dfn; url: #transparency; text: opacity;
 </pre>
 <pre class=link-defaults>
-spec:css-transforms-1; type:dfn; text:local coordinate system
 spec:css-break-4; type:dfn; text:fragment
 </pre>
 
@@ -89,25 +98,62 @@ the severity of layout instability at a particular time.  The method of computin
 it considers both the area of the region impacted by instability and the distance
 by which elements on the page are shifted.
 
-The developer can use the layout shift values that are reported by this API
-to compute a cumulative score (the "cumulative layout shift score").
-
-The cumulative layout shift score is expected to have a general correspondence to
-the severity of layout instability for the lifetime of a page.
-
-End of session signal {#end-of-session}
+Cumulative Layout Shift (CLS) {#cumulative-layout-shift}
 ---------------------------------------
 
 <em>This section is non-normative.</em>
 
-The developer can compute a cumulative layout shift score by summing the layout
-shift values as they are reported to the observer.
+The <a>layout shift value</a> represents a single point in time, but it is also useful
+to have a value to represent the total instability of the page for the period of
+time the user spends on it.
 
-A "final" score for the user's session can be reported by listening to the
-<a href="https://developers.google.com/web/updates/2018/07/page-lifecycle-api#event-visibilitychange">visibilitychange event</a>,
-and taking the value of the cumulative layout shift score at that time.
+To that end we propose two values that a user agent or a developer is able to compute to
+obtain such a representation.  (These definitions are non-normative, because the
+API does not expose these values.)
+
+* The <dfn export>document cumulative layout shift (DCLS) score</dfn> is the
+    sum of every <a>layout shift value</a> that is reported inside a single
+    <a href="https://html.spec.whatwg.org/multipage/browsers.html#browsing-context">browsing context</a>.
+    (The DCLS score does not account for layout instability inside descendant browsing contexts.)
+
+* The <dfn export>cumulative layout shift (CLS) score</dfn> is the sum of every
+    <a>layout shift value</a> that is reported inside a <a>top-level browsing context</a>,
+    plus a fraction (the <a>subframe weighting factor</a>) of each <a>layout shift value</a> that is reported inside any <a href="https://html.spec.whatwg.org/multipage/browsers.html#list-of-the-descendant-browsing-contexts">descendant browsing context</a>.
+
+* The <dfn export>subframe weighting factor</dfn> for a <a>layout shift value</a>
+    in a <a>child browsing context</a> is the fraction of the top-level <a>viewport</a> that is occupied by the <a>viewport</a> of the child browsing context.
+
+The cumulative layout shift score is expected to have a general correspondence to
+the severity of layout instability for the lifetime of a page.
+
+The developer can use this API to compute the DCLS or CLS scores,
+by summing the values as they are reported to the observer,
+and taking the "final" score at the time of the
+<a href="https://w3c.github.io/page-visibility/#dom-document-onvisibilitychange">visibilitychange event</a>.
 
 This strategy is illustrated in the usage example.
+
+Source attribution {#source-attribution}
+----------------------------------------
+
+<em>This section is non-normative.</em>
+
+In addition to the layout shift value, the API reports a sampling of up to five
+DOM elements whose layout shifts most substantially contributed to the layout
+shift value for an animation frame.
+
+It is possible that the true "root cause" of instability will be only
+indirectly related to the DOM element that experiences a layout shift.
+For example, if a newly inserted element shifts content below it, the
+<a href="#dom-layoutshift-sources">sources</a>
+attribute will report only the shifted elements, and not the inserted element.
+
+We do not believe it is feasible for the user agent to understand causes
+of instability at the level of indirection necessary for a meaningful "root
+cause" attribution. However, we expect that the more straightforward
+reporting of shifted elements presented in this API will nevertheless be
+of significant value to developers who are attempting to diagnose an
+occurrence of layout instability.
 
 Usage example {#example}
 ------------------------
@@ -115,36 +161,38 @@ Usage example {#example}
 <em>This section is non-normative.</em>
 
 <pre class="example highlight">
-    // Stores the current layout shift score for the page.
+    let perFrameLayoutShiftData = [];
     let cumulativeLayoutShiftScore = 0;
 
     function updateCLS(entries) {
       for (const entry of entries) {
         // Only count layout shifts without recent user input.
-        if (!entry.hadRecentInput) {
-          cumulativeLayoutShiftScore += entry.value;
-        }
+        if (entry.hadRecentInput)
+          return;
+
+        perFrameLayoutShiftData.push({
+          score: entry.value,
+          timestamp: entry.startTime
+        });
+        cumulativeLayoutShiftScore += entry.value;
       }
     }
 
-    // Detects new layout shift occurrences and updates the
-    // `cumulativeLayoutShiftScore` variable.
+    // Observe all layout shift occurrences.
     const observer = new PerformanceObserver((list) => {
       updateCLS(list.getEntries());
     });
-
     observer.observe({type: 'layout-shift', buffered: true});
 
-    // Sends the final score to your analytics back end once
-    // the page's lifecycle state becomes hidden.
+    // Send final data to an analytics back end once the page is hidden.
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') {
         // Force any pending records to be dispatched.
         updateCLS(observer.takeRecords());
 
-        // Send the final score to your analytics back end
-        // (assumes `sendToAnalytics` is defined elsewhere).
-        sendToAnalytics({cumulativeLayoutShiftScore});
+        // Send data to your analytics back end (assumes `sendToAnalytics` is
+        // defined elsewhere).
+        sendToAnalytics({perFrameLayoutShiftData, cumulativeLayoutShiftScore});
       }
     });
 </pre>
@@ -152,9 +200,11 @@ Usage example {#example}
 The layout shift score is only one signal, which correlates in an approximate
 manner with the user experience of "jumpiness".
 
-Developers are advised to avoid relying on the precise value of the layout shift score,
-as the metric might evolve over time, and user agents might compromise precision
+Developers are advised not to worry about small variations between
+layout shift scores; this metric is not intended to be a
+high-precision value, and user agents might compromise precision
 in the interest of calculation efficiency.
+Moreover, the definition of the metric might evolve over time.
 
 </div>
 
@@ -170,12 +220,20 @@ is defined as follows:
 * If |N| is an {{Element}} which generates one or more <a>boxes</a>, the
     starting point of |N| in |C| is the two-dimensional offset in <a>pixel
     units</a> from the origin of |C| to the <a>flow-relative</a> starting corner
-    of the first <a>fragment</a> of the <a>principal box</a> of |N|.
+    of the first <a>fragment</a> of the <a>principal box</a> of |N|, calculated
+    as if every <a>transformed element</a> had a <a>transformation matrix</a>
+    equal to the identity matrix.
 
 * If |N| is a <a>text node</a>, the starting point of |N| in |C| is the
     two-dimensional offset in <a>pixel units</a> from the origin of C to the
     <a>flow-relative</a> starting corner of the first <a>line box</a> generated
-    by |N|.
+    by |N|, calculated as if every <a>transformed element</a> had a
+    <a>transformation matrix</a> equal to the identity matrix.
+
+NOTE: The CSS transform is ignored for the calculation of the starting point,
+to ensure that a node is not made unstable by a transform change. However, the CSS
+transform is not ignored for the calculation of the visual representation and
+the associated exclusion of points outside of the viewport.
 
 The <dfn export>visual representation</dfn> of a {{Node}} |N| is defined as
 follows:
@@ -218,17 +276,22 @@ A {{Node}} |N| is <dfn export>unstable</dfn> if:
 * |N| is either
     * an {{Element}} which generates one or more <a>boxes</a>, or
     * a <a>text node</a>; and
+* currently and <a>in the previous frame</a>, the <a>computed value</a> of the <a>visibility</a> property for |N| equals "visible"; and
+* currently and <a>in the previous frame</a>, the <a>computed value</a> of the <a>opacity</a> property for |N| is not equal to 0; and
 * |N| <a>has shifted</a> in the coordinate space of the <a>viewport</a>; and
 * |N| <a>has shifted</a> in the coordinate space of the <a>initial containing
     block</a>; and
 * there does not exist an {{Element}} |P| such that
     1. currently and <a>in the previous frame</a>, |P| is in the <a>containing
         block chain</a> of |N|, and
-    1. currently and <a>in the previous frame</a>, |P| has a <a>local coordinate
-        system</a> or a <a>scrollable overflow region</a>, and
+    1. currently and <a>in the previous frame</a>, |P| has a <a>scrollable
+        overflow region</a>, and
     1. |P| is not <a>unstable</a>, and
-    1. |N| <a>has not shifted</a> in the coordinate space of the <a>local
-        coordinate system</a> or <a>scrollable overflow region</a> of |P|.
+    1. |N| <a>has not shifted</a> in the coordinate space of the <a>scrollable
+        overflow region</a> of |P|.
+
+NOTE: The final condition is intended to prevent nodes from being considered
+unstable solely because of a scroll operation.
 
 The <dfn export>unstable node set</dfn> of a {{Document}} |D| is the set
 containing every <a>unstable</a> <a>shadow-including descendant</a> of |D|.
@@ -240,7 +303,7 @@ Layout Shift Value {#sec-layout-shift-value}
 --------------------------------------------
 
 The <dfn export>viewport base distance</dfn> is the greater of the <a>visual
-viewport width</a> or the <a>visual viewport height</a>.
+viewport width</a> and the <a>visual viewport height</a>.
 
 The <dfn export>move vector</dfn> of a {{Node}} |N| is the two-dimensional
 offset in <a>pixel units</a> from
@@ -253,7 +316,7 @@ offset in <a>pixel units</a> from
 The <dfn export>move distance</dfn> of a {{Node}} |N| is the greater of
 
 * the absolute value of the horizontal component of the <a>move vector</a> of
-    |N|, or
+    |N|, and
 * the absolute value of the vertical component of the <a>move vector</a> of |N|.
 
 The <dfn export>maximum move distance</dfn> of a {{Document}} |D| is the
@@ -263,18 +326,28 @@ greatest <a>move distance</a> of any {{Node}} in the <a>unstable node set</a> of
 The <dfn export>distance fraction</dfn> of a {{Document}} |D| is the lesser of
 
 * the <a>maximum move distance</a> of |D| divided by the <a>viewport base
-    distance</a>, or
+    distance</a> (or 0 if the <a>viewport base distance</a> is 0), and
 * 1.0.
 
-The <dfn export>impact region</dfn> of a {{Document}} |D| is the set containing
+The <dfn export>node impact region</dfn> of an <a>unstable</a> {{Node}} |N|
+is the set containing
 
-* every point in the <a>visual representation</a> of any {{Node}} in the
-    <a>unstable node set</a> of |D|, and
-* every point in the <a>previous frame visual representation</a> of any {{Node}}
-    in the <a>unstable node set</a> of |D|.
+* every point in the <a>visual representation</a> of |N|, and
+* every point in the <a>previous frame visual representation</a> of |N|.
+
+The <dfn export>impact region</dfn> of a {{Document}} |D| is the set containing
+every point in the <a>node impact region</a> of any {{Node}} in the
+<a>unstable node set</a> of |D|.
 
 The <dfn export>impact fraction</dfn> of a {{Document}} |D| is the area of the
-<a>impact region</a> divided by the area of the <a>viewport</a>.
+<a>impact region</a> divided by the area of the <a>viewport</a> (or 0 if the
+area of the <a>viewport</a> is 0).
+
+NOTE: Computing the area of the impact region is an instance of the
+<a href="https://en.wikipedia.org/wiki/Klee%27s_measure_problem">Klee measure
+problem</a> in two dimensions. A solution using a sweep line and a segment tree,
+with time complexity <i>O</i>(<i>n</i> lg <i>n</i>) for <i>n</i> unstable nodes,
+is described <a href="http://jeffe.cs.illinois.edu/open/klee.html">here</a>.
 
 The <dfn export>layout shift value</dfn> of a {{Document}} |D| is the <a>impact
 fraction</a> of |D| multiplied by the <a>distance fraction</a> of |D|.
@@ -314,9 +387,10 @@ events are also not excluding inputs.
 <pre class="idl">
   [Exposed=Window]
   interface LayoutShift : PerformanceEntry {
-    readonly attribute long value;
+    readonly attribute double value;
     readonly attribute boolean hadRecentInput;
     readonly attribute DOMHighResTimeStamp lastInputTime;
+    readonly attribute FrozenArray&lt;LayoutShiftAttribution&gt; sources;
     [Default] object toJSON();
   };
 </pre>
@@ -324,10 +398,46 @@ events are also not excluding inputs.
 All attributes have the values which are assigned to them by the steps to
 <a>report the layout shift</a>.
 
-A user agent implementing the Layout Instability API MUST include
+A user agent implementing the Layout Instability API must include
 <code>"layout-shift"</code> in {{PerformanceObserver/supportedEntryTypes}} for
 <a href="https://html.spec.whatwg.org/multipage/window-object.html#the-window-object">Window</a>
 contexts. This allows developers to detect support for the Layout Instability API.
+
+{{LayoutShiftAttribution}} interface {#sec-layout-shift-attribution}
+====================================================================
+
+<pre class="idl">
+  [Exposed=Window]
+  interface LayoutShiftAttribution {
+    readonly attribute Node? node;
+    readonly attribute DOMRectReadOnly previousRect;
+    readonly attribute DOMRectReadOnly currentRect;
+  };
+</pre>
+
+Each {{LayoutShiftAttribution}} is associated with a {{Node}} (its
+<dfn>associated node</dfn>).
+
+The getter of the <a href="#dom-layoutshiftattribution-node">node</a> attribute
+of a {{LayoutShiftAttribution}} instance |A| invokes the <a>get an element</a>
+algorithm with the <a>associated node</a> of |A|, and the <a>node document</a>
+of the <a>associated node</a> of |A|, as inputs, and returns the result of
+that algorithm.
+
+Note: The use of the <a>get an element</a> algorithm ensures that
+the <a href="#dom-layoutshiftattribution-node">node</a> attribute
+is null if the attributed node is no longer connected, or is inside a shadow root.
+
+Issue: The <a>get an element</a> algorithm should be moved out of the
+Element Timing spec and into a place more suitable for reuse here.
+
+Issue: The <a>get an element</a> algorithm should be generalized to accept
+{{Node}} instead of {{Element}}.
+
+The <a href="#dom-layoutshiftattribution-node">previousRect</a>
+and <a href="#dom-layoutshiftattribution-node">currentRect</a>
+attributes have the values which are assigned to them by the steps to
+<a>create the attribution</a>.
 
 Processing model {#sec-processing-model}
 ========================================
@@ -348,13 +458,13 @@ When asked to <dfn export>report the layout shift</dfn> for an active
 {{Document}} |D|, run the following steps:
 
 1. If the current <a>layout shift value</a> of |D| is not 0:
-    1. Create a new {{LayoutShift}} object |newEntry|.
+    1. Create a new {{LayoutShift}} object |newEntry| with |D|'s [=relevant realm=].
     1. Set |newEntry|'s {{PerformanceEntry/name}} attribute to
         <code>"layout-shift"</code>.
     1. Set |newEntry|'s {{PerformanceEntry/entryType}} attribute to
         <code>"layout-shift"</code>.
     1. Set |newEntry|'s {{PerformanceEntry/startTime}} attribute to <a>current
-        high resolution time</a>.
+        high resolution time</a> given |D|'s <a>relevant global object</a>.
     1. Set |newEntry|'s {{PerformanceEntry/duration}} attribute to 0.
     1. Set |newEntry|'s <dfn attribute for=LayoutShift>value</dfn> attribute to
         the current <a>layout shift value</a> of |D|.
@@ -364,14 +474,80 @@ When asked to <dfn export>report the layout shift</dfn> for an active
     1. Set |newEntry|'s <dfn attribute for=LayoutShift>hadRecentInput</dfn>
         attribute to <code>true</code> if {{LayoutShift/lastInputTime}} is less
         than 500 milliseconds in the past, and <code>false</code> otherwise.
+    1. Set |newEntry|'s <dfn attribute for=LayoutShift>sources</dfn> attribute
+        to the result of invoking the algorithm to <a>report the layout shift
+        sources</a> for |D|.
     1. <a href="https://w3c.github.io/performance-timeline/#dfn-queue-a-performanceentry">Queue the PerformanceEntry</a>
         |newEntry| object.
+
+</div>
+
+Report the layout shift sources {#sec-report-layout-shift-sources}
+------------------------------------------------------------------
+
+<div algorithm="report the layout shift sources">
+When asked to <dfn>report the layout shift sources</dfn> for an active
+{{Document}} |D|, run the following steps:
+
+1. Let |C| be an empty <a href="https://infra.spec.whatwg.org/#list">list</a> of {{Node}} objects.
+
+1. For each member |N| of the <a>unstable node set</a> of |D|, run these steps:
+
+    1. If there exists any member |existingNode| of |C| such that the
+        <a>node impact region</a> of |N| is a subset of the
+        <a>node impact region</a> of |existingNode|, then continue.
+    1. Otherwise, if there exists any member |existingNode| of |C| such
+        that the <a>node impact region</a> of |existingNode| is a subset
+        of the <a>node impact region</a> of |N|, then <a href="https://infra.spec.whatwg.org/#list-replace">replace</a>
+        the first such member |existingNode| with |N| in |C|.
+    1. Otherwise, if there are fewer than 5 members of |C|, then
+        <a href="https://infra.spec.whatwg.org/#list-append">append</a> |N| to |C|.
+
+        NOTE: The choice of 5 is arbitrary but it balances providing detailed attribution while not
+        having a prohibitive memory cost or being spammy in the set of nodes exposed.
+
+    1. Otherwise, run these steps:
+
+        1. Let |smallest| be the first member of |C| whose
+            <a>node impact region</a> is not greater in area than
+            the <a>node impact region</a> of any other member of |C|.
+        1. If the area of the <a>node impact region</a> of |N| is
+            greater than the area of the <a>node impact region</a>
+            of |smallest|, then
+            <a href="https://infra.spec.whatwg.org/#list-replace">replace</a>
+            |smallest| with |N| in |C|.
+
+1. Return a {{FrozenArray}} of {{LayoutShiftAttribution}} objects created
+    by running the algorithm to <a>create the attribution</a> once
+    for each member of |C|.
+
+</div>
+
+<div algorithm="create the attribution">
+When asked to <dfn>create the attribution</dfn> for a {{Node}} |N|,
+run the following steps:
+
+1. Create a new {{LayoutShiftAttribution}} object |A| with |N|'s [=relevant realm=].
+1. Set the <a>associated node</a> of |A| to |N|.
+1. Set the <dfn attribute for=LayoutShiftAttribution>previousRect</dfn> attribute
+    of |A| to the smallest <a>Rectangle</a> containing the <a>previous frame visual
+    representation</a> of |N|.
+1. Set the <dfn attribute for=LayoutShiftAttribution>currentRect</dfn> attribute
+    of |A| to the smallest <a>Rectangle</a> containing the <a>visual
+    representation</a> of |N|.
+1. Return |A|.
 
 </div>
 
 Security & privacy considerations {#priv-sec}
 ===============================================
 
-Layout instability bears an indirect relationship to <a href="https://w3c.github.io/resource-timing/">resource timing</a>, as slow resources could cause intermediate layouts that would not otherwise be performed. Resource timing information can be used by malicious websites for <a>statistical fingerprinting</a>.
-The layout instability API only reports instability in the current browsing context. It does not directly provide any aggregation of instability scores across multiple browsing contexts. Developers can implement such aggregation manually, but browsing contexts with different <a href="https://html.spec.whatwg.org/multipage/origin.html#concept-origin">origins</a> would need to cooperate to share instability scores.
-
+Layout instability bears an indirect relationship to
+<a href="https://w3c.github.io/resource-timing/">resource timing</a>, as slow resources could cause
+intermediate layouts that would not otherwise be performed. Resource timing information can be used
+by malicious websites for <a>statistical fingerprinting</a>. The layout instability API only reports
+instability in the current browsing context. It does not directly provide any aggregation of
+instability scores across multiple browsing contexts. Developers can implement such aggregation
+manually, but browsing contexts with different
+<a href="https://html.spec.whatwg.org/multipage/origin.html#concept-origin">origins</a> would need
+to cooperate to share instability scores.

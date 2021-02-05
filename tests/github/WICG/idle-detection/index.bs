@@ -1,0 +1,566 @@
+<pre class="metadata">
+Title: Idle Detection API
+Status: w3c/CG-DRAFT
+ED: https://wicg.github.io/idle-detection/
+Shortname: idle-detection
+Level: 1
+Editor: Reilly Grant 83788, Google LLC https://www.google.com, reillyg@google.com
+Abstract: This document defines a web platform API for observing system-wide user presence signals.
+Group: wicg
+Repository: https://github.com/WICG/idle-detection/
+Favicon: logo-idle.png
+Markup Shorthands: css no, markdown yes
+WPT Display: inline
+WPT Path Prefix: /idle-detection/
+</pre>
+
+<pre class="anchors">
+spec: ECMAScript; urlPrefix: https://tc39.github.io/ecma262/#
+    type: dfn
+        text: internal slot; url: sec-object-internal-methods-and-internal-slots
+spec: page-visibility-2; urlPrefix: https://www.w3.org/TR/page-visibility-2/#
+    for: Document
+        type: attribute
+            text: hidden; url: dom-document-hidden
+            text: onvisibilitychange; url:dom-document-onvisibilitychange
+</pre>
+
+<pre class="link-defaults">
+spec:html; type:event; for:HTMLElement; text:change
+spec:infra; type:dfn; text:user agent
+spec:service-workers; type:dfn; for:/; text:service worker
+spec:webidl; type:dfn; text:resolve
+
+</pre>
+
+<style>
+  table {
+    border-collapse: collapse;
+    border-left-style: hidden;
+    border-right-style: hidden;
+    text-align: left;
+  }
+  table td, table th {
+    border: 1px solid black;
+    padding: 3px;
+  }
+</style>
+
+# Introduction # {#introduction}
+
+*This section is non-normative.*
+
+Using existing capabilities a page is able to determine when it is currently
+visible to the user (using the {{Document/hidden}} property and
+{{Document/onvisibilitychange}} event). It is also possible to know when the
+user has recently interacted with the page by observing
+{{GlobalEventHandlers/onmousemove}}, {{GlobalEventHandlers/onkeypress}}, and
+other events triggered by user input. While sufficiently reflecting user
+engagement with a particular page these events give an incomplete picture of
+whether the user is still present at their device. For example, if
+{{Document/hidden}} is `true`, then the device screensaver may have activated,
+or the user could have switched to a different application. If it is `false` but
+there have been no recent input events, then the user could have left their
+computer to grab a cup of coffee, or they could be editing a document in another
+window side-by-side with the page.
+
+Making these distinctions is important for applications which have the option of
+delivering notifications across multiple devices, such as a desktop and
+smartphone. Users may find it frustrating when notifications are delivered to
+the wrong device or are disruptive. For example, if they switch from a tab
+containing a messaging application to one for a document they are editing, the
+messaging application, not being able to observe that the user is still
+interacting with their device, may assume that they have left to grab a coffee
+and start delivering notifications to their phone, causing it to buzz
+distractingly, instead of displaying notifications on their desktop or
+incrementing a badge count.
+
+## Alternatives Considered ## {#alternatives-considered}
+
+An alternative design would protect this information by allowing a notification
+to be marked as "hide on active" or "hide on idle" and not allowing the page to
+observe whether or not the notification was actually shown. The problem with
+this approach is that the intelligent notification routing described previously
+requires observing these signals of user presence and making centralized
+decisions based on the state of all of the user's devices.
+
+For example, to route notifications to a user's mobile device when they get up
+to grab a coffee the messaging application could detect that it is no longer
+visible and start sending push messages to the mobile device while marking the
+desktop notifications as "hide on active". If the user were still at their desk
+but using a different application then they would start getting the distracting
+notifications from their mobile device this proposal is attempting to avoid
+whether or not the desktop is able to successfully suppress them. Successful
+suppression of duplicate and disruptive notification requires multi-device
+coordination.
+
+Allowing notifications to be hidden also breaks implementor mitigations for the
+[[PUSH-API]] being used to run silent background tasks.
+
+# Observing User Presence # {#api}
+
+## Model ## {#api-model}
+
+This specification defines a model for user presence on two dimensions: idle
+state and screen lock.
+
+### The {{UserIdleState}} enum ### {#api-useridlestate}
+
+<xmp class="idl">
+enum UserIdleState {
+    "active",
+    "idle"
+};
+</xmp>
+
+: {{"active"}}
+
+::  Indicates that the user has interacted with the device in the last
+    {{IdleOptions/threshold}} milliseconds.
+
+: {{"idle"}}
+
+::  Indicates that the user has not interacted with the device in at least
+    {{IdleOptions/threshold}} milliseconds.
+
+### The {{ScreenIdleState}} enum ### {#api-screenidlestate}
+
+<xmp class="idl">
+enum ScreenIdleState {
+    "locked",
+    "unlocked"
+};
+</xmp>
+
+: {{"locked"}}
+
+::  Indicates that the device has engaged a screensaver or lock screen which
+    prevents content from being seen or interacted with.
+
+: {{"unlocked"}}
+
+::  Indicates that the device is able to display content and be interacted with.
+
+## Permissions ## {#api-permissions}
+
+The <dfn for=PermissionName enum-value>"idle-detection"</dfn> [=powerful
+feature=] is a [=boolean feature=].
+
+## Permissions policy ## {#api-permissions-policy}
+
+This specification defines a [=policy-controlled feature=] identified by the
+string `"idle-detection"`. Its [=default allowlist=] is `'self'`.
+
+<div class="note">
+The [=default allowlist=] of `'self'` allows usage of this feature on
+same-origin nested frames by default but prevents access by third-party content.
+
+Third-party usage can be selectively enabled by adding the
+`allow="idle-detection"` attribute to an {{iframe}} element:
+
+<div class="example">
+```html
+<iframe src="https://example.com" allow="idle-detection"></iframe>
+```
+</div>
+
+Alternatively, this feature can be disabled completely in first-party contexts
+by specifying the permissions policy in an HTTP response header:
+
+<div class="example">
+```http
+Permissions-Policy: idle-detection 'none'
+```
+</div>
+
+See [[PERMISSIONS-POLICY]] for more details.
+</div>
+
+## The {{IdleDetector}} interface ## {#api-idledetector}
+
+<xmp class="idl">
+dictionary IdleOptions {
+  [EnforceRange] unsigned long long threshold;
+  AbortSignal signal;
+};
+
+[
+  SecureContext,
+  Exposed=(Window,DedicatedWorker)
+] interface IdleDetector : EventTarget {
+  constructor();
+  readonly attribute UserIdleState? userState;
+  readonly attribute ScreenIdleState? screenState;
+  attribute EventHandler onchange;
+  [Exposed=Window] static Promise<PermissionState> requestPermission();
+  Promise<undefined> start(optional IdleOptions options = {});
+};
+</xmp>
+
+Instances of {{IdleDetector}} are created with the [=internal slots=] described
+in the following table:
+
+<table dfn-for=IdleDetector dfn-type=attribute>
+  <tr>
+    <th>[=Internal slot=]</th>
+    <th>Initial value</th>
+    <th>Description (non-normative)</th>
+  </tr>
+  <tr>
+    <td><dfn>\[[state]]</dfn></th>
+    <td>`"stopped"`</td>
+    <td>Tracks the active state of the {{IdleDetector}}</td>
+  </tr>
+  <tr>
+    <td><dfn>\[[threshold]]</dfn></th>
+    <td>`undefined`</td>
+    <td>The configured idle detection threshold</td>
+  </tr>
+  <tr>
+    <td><dfn>\[[userState]]</dfn></td>
+    <td>`null`</td>
+    <td>The last known user idle state</td>
+  </tr>
+  <tr>
+    <td><dfn>\[[screenState]]</dfn></td>
+    <td>`null`</td>
+    <td>The last known screen idle state</td>
+  </tr>
+</table>
+
+<wpt>
+  idlharness-worker.https.window.js
+  idlharness.https.window.js
+</wpt>
+
+Methods on this interface typically complete asynchronously, queuing work on the
+<dfn>idle detection task source</dfn>.
+
+### {{IdleDetector/userState}} attribute ### {#api-idledetector-userstate}
+
+<div algorithm>
+The <dfn attribute for=IdleDetector>userState</dfn> getter steps are:
+
+1.  Return [=this=].{{[[userState]]}}.
+
+</div>
+
+### {{IdleDetector/screenState}} attribute ### {#api-idledetector-screenstate}
+
+<div algorithm>
+The <dfn attribute for=IdleDetector>screenState</dfn> getter steps are:
+
+1.  Return [=this=].{{[[screenState]]}}.
+
+</div>
+
+### {{IdleDetector/onchange}} attribute ### {#api-idledetector-onchange}
+
+<dfn attribute for="IdleDetector">onchange</dfn> is an <a>Event handler IDL
+attribute</a> for the {{change}} event type.
+
+### {{IdleDetector/requestPermission()}} method ### {#api-idledetector-requestpermission}
+
+<div algorithm>
+The <dfn method for=IdleDetector>requestPermission()</dfn> method steps are:
+
+1.  If the [=relevant global object=] of [=this=] does not have [=transient
+    activation=], return [=a new promise=] [=rejected=] with a "{{NotAllowedError}}"
+    {{DOMException}}.
+1.  Let |result| be [=a new promise=].
+1.  [=In parallel=]:
+    1.  Let |permissionState| be the result of [=requesting permission to use=]
+        the [=powerful feature=] named `"idle-detection"`.
+    1.  [=Queue a global task=] on the [=relevant global object=] of [=this=]
+        using the [=permission task source=] to [=resolve=] |result| with
+        |permissionState|.
+1. Return |result|.
+
+</div>
+
+### {{IdleDetector/start()}} method ### {#api-idledetector-start}
+
+<div algorithm for="IdleDetector">
+
+The <dfn method for=IdleDetector>start(|options|)</dfn> method steps are:
+
+1.  Let |result| be [=a new promise=].
+1.  If the [=relevant global object=]'s [=associated Document=] is not [=allowed
+    to use=] the [=policy-controlled feature=] named `"idle-detection"`
+    [=reject=] |result| with a "{{NotAllowedError}}" {{DOMException}} and return
+    |result|.
+
+    <wpt>
+      idle-detection-allowed-by-feature-policy-attribute-redirect-on-load.https.sub.html
+      idle-detection-allowed-by-feature-policy-attribute.https.sub.html
+      idle-detection-allowed-by-feature-policy.https.sub.html
+      idle-detection-default-feature-policy.https.sub.html
+      idle-detection-disabled-by-feature-policy.https.sub.html
+    </wpt>
+1.  If |this|.{{IdleDetector/[[state]]}} is not `"stopped"`, [=reject=] |result|
+    with an "{{InvalidStateError}}" {{DOMException}} and return |result|.
+    <wpt>
+      interceptor.https.html
+    </wpt>
+1.  Set |this|.{{IdleDetector/[[state]]}} to `"starting"`.
+1.  If |options|[{{"threshold"}}] is less than 60,000 [=reject=] |result| with
+    {{TypeError}} and return |result|.
+    <wpt>
+      basics.tentative.https.window.js
+    </wpt>
+1.  If |options|["{{signal}}"] is present, then perform the following sub-steps:
+    1.  If |options|["{{signal}"}'s [=AbortSignal/aborted flag=] is set, then
+        [=reject=] |result| with an "{{AbortError}}" {{DOMException}} and return
+        |result|.
+    1.  [=AbortSignal/add|Add the following abort steps=] to
+        |options|["{{signal}}"]:
+        1. Set |this|.{{IdleDetector/[[state]]}} to `"stopped"`.
+        1. [=Reject=] |result| with an "{{AbortError}}" {{DOMException}}.
+
+    <wpt>
+      interceptor.https.html
+    </wpt>
+1.  [=Queue a global task=] on the [=relevant global object=] of [=this=] using
+    the [=idle detection task source=] to perform the following steps, but
+    [=abort when=] |this|.{{IdleDetector/[[state]]}} becomes `"stopped"`.
+    1.  Let |permissionState| be the [=permission state=] the [=powerful
+        feature=] named `"idle-detection"`.
+    1.  If |permissionState| is `"denied"`, [=reject=] |result| with a
+        "{{NotAllowedError}}" {{DOMException}}, set
+        |this|.{{IdleDetector/[[state]]}} to `"stopped"` and abort these steps.
+        <wpt>idle-permission.tentative.https.window.js</wpt>
+    1.  Set |this|.{{IdleDetector/[[state]]}} to `"started"`.
+    1.  Set |this|.{{IdleDetector/[[threshold]]}} to |options|["{{threshold}}"].
+    1.  [=Resolve=] |result|.
+1.  Return |result|.
+
+</div>
+
+<div class="example">
+
+The availability of this API can be detected by looking for the {{IdleDetector}}
+constructor in the {{Window}} object.
+
+```js
+if (!('IdleDetector' in window)) {
+  console.log('Idle detection is not available.');
+  return;
+}
+```
+
+Calling {{start()}} will fail if the {{"idle-detection"}} permission has not
+been granted.
+
+```js
+if ((await IdleDetector.requestPermission()) !== 'granted') {
+  console.log('Idle detection permission not granted.');
+  return;
+}
+```
+
+A set of options can be configured to control the threshold the [=user agent=]
+uses to decide when the user has become idle.
+
+```js
+const controller = new AbortController();
+const signal = controller.signal;
+
+const options = {
+  threshold: 60_000,
+  signal,
+};
+```
+
+The {{IdleDetector}} can now be created and started. An listener for the
+{{"change"}} event is added and will be fired if the {{userState}} or
+{{screenState}} attributes change.
+
+```js
+try {
+  const idleDetector = new IdleDetector();
+  idleDetector.addEventListener('change', () => {
+    console.log(\`Idle change: ${idleDetector.userState}, ${idleDetector.screenState}.\`);
+  });
+  await idleDetector.start(options);
+  console.log('IdleDetector is active.');
+} catch (err) {
+  // Deal with initialization errors like permission denied,
+  // running outside of top-level frame, etc.
+  console.error(err.name, err.message);
+}
+```
+
+At a later time the page can cancel its interest in state change events by
+removing its event listeners or using the {{AbortSignal}} that was passed to
+{{start()}}.
+
+```js
+controller.abort();
+console.log('IdleDetector is stopped.');
+```
+</div>
+
+### Reacting to state changes ### {#state-changes}
+
+<div algorithm="state changes">
+
+For each {{IdleDetector}} instance |detector| where |detector|.{{[[state]]}} is
+`"started"` the [=user agent=] MUST continuously monitor the following
+conditions:
+
+*   If |detector|.{{[[userState]]}} is {{"active"}} and the user has not
+    interacted with the device within the last |detector|.{{[[threshold]]}}
+    milliseconds, it MUST [=queue a global task=] on the [=relevant global
+    object=] of |detector| using the [=idle detection task source=] to run the
+    following steps:
+
+    1.  Set |detector|.{{[[userState]]}} to {{"idle"}}.
+    1.  [=Fire an event=] named {{"change"}} at |detector|.
+
+
+*   If |detector|.{{[[userState]]}} is {{"idle"}} and the user interacts with
+    the device, it MUST [=queue a global task=] on the [=relevant global
+    object=] of |detector| using the [=idle detection task source=] to run the
+    following steps:
+
+    1.  Set |detector|.{{[[userState]]}} to {{"active"}}.
+    1.  [=Fire an event=] named {{"change"}} at |detector|.
+
+*   If |detector|.{{[[screenState]]}} is {{"unlocked"}} and the screen is
+    locked, it MUST [=queue a global task=] on the [=relevant global object=] of
+    |detector| using the [=idle detection task source=] to run the following
+    steps:
+
+    1.  Set |detector|.{{[[screenState]]}} to {{"locked"}}.
+    1.  [=Fire an event=] named {{"change"}} at |detector|.
+
+*   If |detector|.{{[[screenState]]}} is {{"locked"}} and the screen is
+    unlocked, it MUST [=queue a global task=] on the [=relevant global object=]
+    of |detector| using the [=idle detection task source=] to run the following
+    steps:
+
+    1.  Set |detector|.{{[[screenState]]}} to {{"unlocked"}}.
+    1.  [=Fire an event=] named {{"change"}} at |detector|.
+
+</div>
+
+<wpt>
+  interceptor.https.html
+</wpt>
+
+# Security and privacy considerations # {#security-and-privacy}
+
+*This section is non-normative.*
+
+## Cross-origin information leakage ## {#privacy-cross-origin-leakage}
+
+This interface exposes the state of global system properties and so care must be
+taken to prevent them from being used as cross-origin communication or
+identification channels. Similar concerns are present in specifications such as
+[[DEVICE-ORIENTATION]] and [[GEOLOCATION-API]], which mitigate them by requiring
+a visible or focused context. This prevents multiple origins from observing the
+global state at the same time. These mitigations are unfortunately inappropriate
+here because the intent of this specification is precisely to allow a limited
+form of tracking in blurred and hidden contexts. A malicious page could notify a
+tracking server whenever the user is detected as idle or active. If multiple
+pages the user was visiting notified the same server it could use the timing of
+the events to guess which sessions corresponded to a single user as they would
+arrive roughly simultaneously.
+
+To reduce the number of independent contexts with access to this interface this
+specification restricts it to top-level and same-origin contexts. Access can be
+delegated to a cross-origin context through [[PERMISSIONS-POLICY]].
+
+To further reduce the number of contexts this specification requires
+a page to obtain the {{"idle-detection"}} permission. User agents should inform
+the user of the capability that this permission grants and encourage them to
+only grant it to trusted sites which have a legitimate purpose for this data.
+
+Implementations that provide a "private browsing" mode should not allow this
+capability in contexts where this mode is enabled. Implementations should be
+careful however to avoid the lack of this capability from being used as a signal
+that this mode is enabled. This can be accomplished by refusing to allow the
+{{"idle-detection"}} permission to be granted but delaying the automatic
+dismissal of the permission request by a random interval so that it appears to
+have been a user action.
+
+## Behavior tracking ## {#privacy-behavior-tracking}
+
+While this interface does not provide details of the user interaction which
+triggered an {{"idle"}} to {{"active"}} transition, with a sufficiently short
+threshold these events could be used to detect behavior such as typing. This
+specification therefore restricts the requested threshold to a minimum of at
+least 60 seconds.
+
+The permission requirement described previously also helps to mitigate the
+general concern that this interface can be used to build a profile of when and
+for how long the user typically interacts with their device.
+
+## User coercion ## {#privacy-user-coercion}
+
+Sites may require the user to grant them the {{"idle-detection"}} permission
+before unlocking some functionality. For example, a testing site could require
+this permission as part of an anti-cheating mechanism to detect the user
+consulting forbidden reference materials in another window. This type of
+"Contract of Adhesion" has been observed with other permissions such as
+notifications, FIDO attestation and DRM identifiers.
+
+A potential mitigation for this concern is to design that interface so that it
+is not possible for a site to determine whether the user has granted or denied
+the permission. An implementation could refuse to acknowledge that the user is
+idle, reducing a site to only the signals currently available. This mitigation
+could be detectable as it is unlikely that a user who has not interacted with a
+page for hours has nevertheless still been continuously interacting with
+something else. Implementations could instead insert fake idle transition events
+which correspond to plausible behavior given the other signals available to the
+page.
+
+This specification does not mandate this type of mitigation as it could create a
+poor user experience when sites take action based on this false data. For
+example, the message application mentioned previously would not deliver
+notifications to the user's mobile device because it believes the signals it has
+been given indicate that they are still at their desktop. As the site cannot
+detect that it is in this state it cannot directly recommend an action for the
+user to take to get themselves out of it.
+
+The harm done by such a site is limited as tracking is only possible while the
+user is visiting that page. Tracking across multiple origins requires permission
+to be requested on each participating site.
+
+# Accessibility considerations # {#accessibility}
+
+*This section is non-normative.*
+
+Users with physical or cognitive impairments may require more time to interact
+with user agents and content. Implementations should not allow distinguishing
+such users, or limiting their ability to interact with content any more than
+existing observation of UI events. For example, implementation should ensure
+that interactions from assistive technologies count towards considering the user
+active.
+
+The use of a permission also requires that user agents provide a user interface
+element to support requesting and managing that permission. Any such user
+interface elements must be designed with accessibility tools in mind. For
+example, a user interface describing the capability being requested should
+provide the same description to tools such as screen readers.
+
+# Internationalization considerations # {#internationalization}
+
+*This section is non-normative.*
+
+The interface described by this specification has limited internationalization
+considerations, however the use of a permission does require that user agents
+provide a user interface element to support requesting and managing that
+permission. Any content displayed by the user agent in this context should be
+translated into the user's native language.
+
+# Acknowledgements # {#acknowledgements}
+
+*This section is non-normative.*
+
+Many thanks to
+Kenneth Christiansen,
+Samuel Goto,
+Ayu Ishii and 
+Thomas Steiner
+for their help in crafting this proposal.

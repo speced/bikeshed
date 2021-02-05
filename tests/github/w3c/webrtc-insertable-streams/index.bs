@@ -1,0 +1,298 @@
+<pre class='metadata'>
+Title: WebRTC Insertable Media using Streams
+Shortname: webrtc-media-streams
+Level: None
+Status: ED
+Group: webrtc
+Repository: w3c/webrtc-insertable-streams
+URL: https://w3c.github.io/webrtc-insertable-streams/
+Editor: Harald Alvestrand, Google https://google.com, hta@google.com
+Editor: Guido Urdaneta, Google https://google.com, guidou@google.com
+Abstract: This API defines an API surface for manipulating the bits on
+Abstract: {{MediaStreamTrack}}s being sent via an {{RTCPeerConnection}}.
+Markup Shorthands: css no, markdown yes
+</pre>
+<pre class=biblio>
+{
+  "WEB-CODECS": {
+     "href":
+     "https://github.com/WICG/web-codecs/blob/master/explainer.md",
+     "title": "Web Codecs explainer"
+   }
+}
+</pre>
+<pre class=link-defaults>
+spec:streams; type:interface; text:ReadableStream
+</pre>
+
+# Introduction # {#introduction}
+
+The [[WEBRTC-NV-USE-CASES]] document describes several functions that
+can only be achieved by access to media (requirements N20-N22),
+including, but not limited to:
+* Funny Hats
+* Machine Learning
+* Virtual Reality Gaming
+
+These use cases further require that processing can be done in worker
+threads (requirement N23-N24).
+
+Furthermore, the "trusted JavaScript cloud conferencing" use case
+requires such processing to be done on encoded media, not just the raw
+media.
+
+This specification gives an interface inspired by [[WEB-CODECS]] to
+provide access to such functionality while retaining the setup flow of
+RTCPeerConnection.
+
+This iteration of the specification provides access to encoded media,
+which is the output of the encoder part of a codec and the input to the
+decoder part of a codec.
+
+# Terminology # {#terminology}
+
+# Specification # {#specification}
+
+The Streams definition doesn't use WebIDL much, but the WebRTC spec does.
+This specification shows the IDL extensions for WebRTC.
+
+It uses an extension to RTCConfiguration in order to notify the
+{{RTCPeerConnection}} that insertable streams will be used, and uses
+an additional API on {{RTCRtpSender}} and {{RTCRtpReceiver}} to
+insert the processing into the pipeline.
+
+<pre class="idl">
+// New dictionary.
+dictionary RTCInsertableStreams {
+    ReadableStream readable;
+    WritableStream writable;
+};
+
+// New enum for video frame types. Will eventually re-use the equivalent defined
+// by WebCodecs.
+enum RTCEncodedVideoFrameType {
+    "empty",
+    "key",
+    "delta",
+};
+
+dictionary RTCEncodedVideoFrameMetadata {
+    long long frameId;
+    sequence&lt;long long&gt; dependencies;
+    unsigned short width;
+    unsigned short height;
+    long spatialIndex;
+    long temporalIndex;
+    long synchronizationSource;
+    sequence&lt;long&gt; contributingSources;
+};
+
+// New interfaces to define encoded video and audio frames. Will eventually
+// re-use or extend the equivalent defined in WebCodecs.
+[Exposed=Window]
+interface RTCEncodedVideoFrame {
+    readonly attribute RTCEncodedVideoFrameType type;
+    readonly attribute unsigned long long timestamp;
+    attribute ArrayBuffer data;
+    RTCEncodedVideoFrameMetadata getMetadata();
+};
+
+dictionary RTCEncodedAudioFrameMetadata {
+    long synchronizationSource;
+    sequence&lt;long&gt; contributingSources;
+};
+
+[Exposed=Window]
+interface RTCEncodedAudioFrame {
+    readonly attribute unsigned long long timestamp;
+    attribute ArrayBuffer data;
+    RTCEncodedAudioFrameMetadata getMetadata();
+};
+
+
+// New fields in RTCConfiguration
+partial dictionary RTCConfiguration {
+    boolean encodedInsertableStreams = false;
+};
+
+typedef (SFrameTransform or RTCRtpScriptTransform) RTCRtpTransform;
+
+// New methods for RTCRtpSender and RTCRtpReceiver
+partial interface RTCRtpSender {
+    RTCInsertableStreams createEncodedStreams();
+    attribute RTCRtpTransform? transform;
+};
+
+partial interface RTCRtpReceiver {
+    RTCInsertableStreams createEncodedStreams();
+    attribute RTCRtpTransform? transform;
+};
+</pre>
+
+## Extension operation ## {#operation}
+
+At the time when a codec is initialized as part of the encoder, and the
+corresponding flag is set in the {{RTCPeerConnection}}'s {{RTCConfiguration}}
+argument, ensure that the codec is disabled and produces no output.
+
+
+### Stream creation ### {#stream-creation}
+
+At construction of each {{RTCRtpSender}} or {{RTCRtpReceiver}}, run the following steps:
+1. Initialize [=this=].`[[Streams]]` to null.
+2. Initialize [=this=].`[[transform]]` to null.
+3. Initialize [=this=].`[[readable]]` to the result of <a dfn for="ReadableStream">creating</a> a {{ReadableStream}}. `[[readable]]` is provided frames using the [=readEncodedData=] algorithm given |this| as parameter.
+4. Set [=this=].`[[readable]]`.`[[owner]]` to |this|.
+5. Initialize [=this=].`[[writable]]` to the result of [=WritableStream/creating=] a {{WritableStream}}, its [=WritableStream/create/writeAlgorithm=] set to [=writeEncodedData=] given |this| as parameter.
+6. Set [=this=].`[[writable]]`.`[[owner]]` to |this|.
+7. Initialize [=this=].`[[pipeToController]]` to null.
+8. Initialize [=this=].`[[lastReceivedFrameTimestamp]]` to zero.
+9. If the {{RTCPeerConnection}}'s configuration does not have {{RTCConfiguration/encodedInsertableStreams}} set to "true", queue a task to run the following steps:
+    1. If [=this=].`[[pipeToController]]` is not null, abort these steps.
+    2. Set [=this=].`[[pipeToController]]` to a new {{AbortController}}.
+    <!-- FIXME: Use pipeTo algorithm when available. -->
+    3. Call <a href="https://streams.spec.whatwg.org/#readable-stream-pipe-to">pipeTo</a> with [=this=].`[[readable]]`, [=this=].`[[writable]]`, preventClose equal to true, preventAbort equal to true, preventCancel equal to true and [=this=].`[[pipeToController]]`.signal.
+
+The <dfn method for="RTCRtpSender">createEncodedStreams()</dfn> method steps are:
+
+1. If the {{RTCPeerConnection}}'s configuration does not have {{RTCConfiguration/encodedInsertableStreams}} set to "true", throw an "{{InvalidAccessError}}" {{DOMException}} and abort these steps.
+2. If the data source does not permit access, throw an "{{InvalidAccessError}}" {{DOMException}} and abort these steps.
+3. If [=this=].`[[Streams]]` is not null, throw an "{{InvalidAccessError}}" {{DOMException}}.
+4. If [=this=].`[[pipeToController]]` is not null, throw an "{{InvalidAccessError}}" {{DOMException}}.
+5. Set [=this=].`[[Streams]]` to an {{RTCInsertableStreams}} object.
+6. Set [=this=].`[[Streams]]`.{{RTCInsertableStreams/readable}} to [=this=].`[[readable]]`.
+7. Set [=this=].`[[Streams]]`.{{RTCInsertableStreams/writable}} to [=this=].`[[writable]]`.
+8. Enable the encoded data source.
+10. Return [=this=].`[[Streams]]`.
+
+### Stream processing ### {#stream-processing}
+
+The <dfn>readEncodedData</dfn> algorithm is given a |rtcObject| as parameter. It is defined by running the following steps:
+1. Wait for a frame to be produced by |rtcObject|'s encoder if it is a {{RTCRtpSender}} or |rtcObject|'s packetizer if it is a {{RTCRtpReceiver}}.
+2. Let |frame| be the newly produced frame.
+3. Set |frame|.`[[owner]]` to |rtcObject|.
+4. [=ReadableStream/enqueue=] |frame| in |rtcObject|.`[[readable]]`.
+
+The <dfn>writeEncodedData</dfn> algorithm is given a |rtcObject| as parameter and a |frame| as input. It is defined by running the following steps:
+1. If |frame|.`[[owner]]` is not equal to |rtcObject|, abort these steps and return [=a promise resolved with=] undefined. A processor cannot create frames, or move frames between streams.
+2. If the |frame|'s {{RTCEncodedVideoFrame/timestamp}} is equal to or larger than |rtcObject|.`[[lastReceivedFrameTimestamp]]`, abort these steps and return [=a promise resolved with=] undefined. A processor cannot reorder frames, although it may delay them or drop them.
+3. Set |rtcObject|.`[[lastReceivedFrameTimestamp]]` to the |frame|'s {{RTCEncodedVideoFrame/timestamp}}.
+4. Enqueue the frame for processing as if it came directly from the encoded data source, by running one of the following steps:
+    * If |rtcObject| is a {{RTCRtpSender}}, enqueue it to |rtcObject|'s packetizer, to be processed [=in parallel=].
+    * If |rtcObject| is a {{RTCRtpReceiver}}, enqueue it to |rtcObject|'s decoder, to be processed [=in parallel=].
+5. Return [=a promise resolved with=] undefined.
+
+## Extension attribute ## {#attribute}
+
+A RTCRtpTransform has two private slots called `[[readable]]` and `[[writable]]`.
+
+The <dfn attribute for="RTCRtpSender,RTCRtpReceiver">transform</dfn> getter steps are:
+1. Return [=this=].`[[transform]]`.
+
+The `transform` setter steps are:
+2. Let |transform| be the argument to the setter.
+3. Let |checkedTransform| set to |transform| if it is not null or to an [=identity transform stream=] otherwise.
+3. Let |reader| be the result of [=ReadableStream/getting a reader=] for |checkedTransform|.`[[readable]]`.
+4. Let |writer| be the result of [=WritableStream/getting a writer=] for |checkedTransform|.`[[writable]]`.
+5. Initialize |newPipeToController| to a new {{AbortController}}.
+6. If [=this=].`[[pipeToController]]` is not null, run the following steps:
+    1. [=AbortSignal/Add=] the [=chain transform algorithm=] to [=this=].`[[pipeToController]]`.signal.
+    2. [=AbortSignal/signal abort=] [=this=].`[[pipeToController]]`.signal.
+7. Else, run the [=chain transform algorithm=] steps.
+8. Set [=this=].`[[pipeToController]]` to |newPipeToController|.
+9. Set [=this=].`[[transform]]` to |transform|.
+
+The <dfn>chain transform algorithm</dfn> steps are defined as:
+1. If |newPipeToController|'s [=AbortSignal/aborted flag=] is true, abort these steps.
+2. [=ReadableStreamDefaultReader/Release=] |reader|.
+3. [=WritableStreamDefaultWriter/Release=] |writer|.
+4. Assert that |newPipeToController| is the same object as |rtcObject|.`[[pipeToController]]`.
+<!-- FIXME: Use pipeTo algorithm when available. -->
+5. Call <a href="https://streams.spec.whatwg.org/#readable-stream-pipe-to">pipeTo</a> with |rtcObject|.`[[readable]]`, |checkedTransform|.`[[writable]]`, preventClose equal to false, preventAbort equal to false, preventCancel equal to true and |newPipeToController|.signal.
+6. Call <a href="https://streams.spec.whatwg.org/#readable-stream-pipe-to">pipeTo</a> with |checkedTransform|.`[[readable]]`, |rtcObject|.`[[writable]]`, preventClose equal to true, preventAbort equal to true, preventCancel equal to false and |newPipeToController|.signal.
+
+This algorithm is defined so that transforms can be updated dynamically.
+There is no guarantee on which frame will happen the switch from the previous transform to the new transform.
+
+If a web application sets the transform synchronously at creation of the {{RTCRtpSender}} (for instance when calling addTrack), the transform will receive the first frame generated by the {{RTCRtpSender}}'s encoder.
+Similarly, if a web application sets the transform synchronously at creation of the {{RTCRtpReceiver}} (for instance when calling addTrack, or at track event handler), the transform will receive the first full frame generated by the {{RTCRtpReceiver}}'s packetizer.
+
+# SFrameTransform # {#sframe}
+
+<pre class="idl">
+enum SFrameTransformRole {
+    "encrypt",
+    "decrypt"
+};
+
+dictionary SFrameTransformOptions {
+    SFrameTransformRole role = "encrypt";
+};
+
+[Exposed=(Window,DedicatedWorker)]
+interface SFrameTransform {
+    constructor(optional SFrameTransformOptions options);
+    // FIXME: add key handling methods.
+};
+SFrameTransform includes GenericTransformStream;
+</pre>
+
+The <dfn constructor for="SFrameTransform" lt="SFrameTransform(options)"><code>new SFrameTransform(<var>options</var>)</code></dfn> constructor steps are:
+1. Let |transformAlgorithm| be an algorithm which takes a |frame| as input and runs the <a href="#sframe-transform-algorithm">SFrame transform algorithm</a> with |this| and |frame|.
+2. Set |this|.`[[transform]]` to the result of [=TransformStream/creating=] a {{TransformStream}}, with [=TransformStream/create/transformAlgorithm=] set to |transformAlgorithm|.
+3. Let |options| be the method's first argument.
+4. Set |this|.`[[role]]` to |options|["{{SFrameTransportOptions/role}}"].
+5. Set |this|.`[[readable]]` to |this|.`[[transform]]`.`[[readable]]`.
+6. Set |this|.`[[writable]]` to |this|.`[[transform]]`.`[[writable]]`.
+
+## SFrame transform algorithm ## {#sframe-transform-algorithm}
+
+The SFrame transform algorithm, given |sframe| as a SFrameTransform object and |frame|, runs these steps:
+1. Let |role| be |sframe|.`[[role]]`.
+2. If |frame|.`[[rtcObject]]` is a {{RTCRtpSender}}, set |role| to 'encrypt'.
+3. If |frame|.`[[rtcObject]]` is a {{RTCRtpReceiver}}, set |role| to 'decrypt'.
+4. Let |data| be undefined.
+5. If |frame| is an ArrayBuffer, set |data| to |frame|. // FIXME Support BufferSource
+6. If |frame| is an {{RTCEncodedAudioFrame}}, set |data| to |frame|.{{RTCEncodedAudioFrame/data}}
+7. If |frame| is an {{RTCEncodedVideoFrame}}, set |data| to |frame|.{{RTCEncodedVideoFrame/data}}
+8. If |data| is undefined, abort these steps.
+9. Let |buffer| be the result of running the SFrame algorithm with |data| and |role| as parameters. This algorithm is defined by the <a href="https://datatracker.ietf.org/doc/draft-omara-sframe/">SFrame specification</a>.
+10. If |frame| is an ArrayBuffer, set |frame| to |buffer|.
+11. If |frame| is an {{RTCEncodedAudioFrame}}, set |frame|.{{RTCEncodedAudioFrame/data}} to |buffer|.
+12. If |frame| is an {{RTCEncodedVideoFrame}}, set |frame|.{{RTCEncodedVideoFrame/data}} to |buffer|.
+13. [=ReadableStream/Enqueue=] |frame| in |sframe|.`[[transform]]`.
+
+# RTCRtpScriptTransform # {#scriptTransform}
+
+<pre class="idl">
+[Exposed=(Window)]
+interface RTCRtpScriptTransform {
+    constructor(Worker worker, optional object options);
+    // FIXME: add messaging methods.
+};
+</pre>
+
+The <dfn constructor for="RTCRtpScriptTransform" lt="RTCRtpScriptTransform(worker, options)"><code>new RTCRtpScriptTransform(<var>worker</var>, <var>options</var>)</code></dfn> constructor steps are:
+1. Set |t1| to an [=identity transform stream=].
+2. Set |t2| to an [=identity transform stream=].
+3. Set |this|.`[[writable]]` to |t1|.`[[writable]]`.
+4. Set |this|.`[[readable]]` to |t2|.`[[readable]]`.
+5. FIXME: transfer |t1|.`[[readable]]` and |t2|.`[[writable]]` to the dedicated worker.
+6. FIXME: Create counterpart of |this| in dedicated worker, for instance expose transfered |t1|.`[[readable]]` and |t2|.`[[writable]]`.
+
+# Privacy and security considerations # {#privacy}
+
+This API gives Javascript access to the content of media streams. This
+is also available from other sources, such as Canvas and WebAudio.
+
+However, streams that are isolated (as specified in
+[[WEBRTC-IDENTITY]]) or tainted with another origin, cannot be
+accessed using this API, since that would break the isolation rule.
+
+The API will allow access to some aspects of timing information that are
+otherwise unavailable, which allows some fingerprinting surface.
+
+
+# Examples # {#examples}
+
+See the [explainer document](https://github.com/w3c/webrtc-insertable-streams/blob/master/explainer.md#code-examples).

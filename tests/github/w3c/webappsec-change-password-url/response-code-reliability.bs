@@ -1,0 +1,82 @@
+<pre class=metadata>
+Title: Detecting the reliability of HTTP status codes
+Shortname: response-code-reliability
+Level: 1
+Status: ED
+Group: WebAppSec
+Repository: w3c/webappsec-change-password-url
+URL: https://w3c.github.io/webappsec-change-password-url/response-code-reliability.html
+Editor: Elaine Knight, w3cid 126366, Apple Inc. https://apple.com, elaine_knight@apple.com
+Editor: Ricky Mondello, w3cid 103933, Apple Inc. https://apple.com/, rmondello@apple.com
+Editor: Theresa O'Connor, w3cid 40614, Apple Inc. https://apple.com/, hober@apple.com
+Abstract: Defines a method for detecting the reliability of an HTTP server's response status codes.
+Complain About: accidental-2119 true
+Markup Shorthands: idl yes, markdown yes
+</pre>
+<pre class=biblio>
+{
+    "WELL-KNOWN": {
+        "aliasOf": "RFC8615"
+    }
+}
+</pre>
+<pre class=anchors>
+text:well-known URI; type:dfn; spec:rfc8615; url:https://tools.ietf.org/html/rfc8615#section-3
+</pre>
+<pre class=link-defaults>
+spec:url; type:interface; text:URL
+</pre>
+
+<div class=non-normative>
+
+<h2 id=intro class=no-num>Introduction</h2>
+
+<em>This section is non-normative.</em>
+
+A number of specifications define [=well-known URIs=]. [[!WELL-KNOWN]]
+
+Clients attempting to detect the presence of [=well-known URIs=] sometimes encounter misconfigured HTTP servers which respond with a 2xx <a for=response>status</a> when the resource actually doesn't exist.
+
+This specification defines a method for discovering if an HTTP server is misconfigured in this way.
+
+</div>
+
+<h2 id=infra>Infrastructure</h2>
+
+This specification depends on the Infra Standard. [[!INFRA]]
+
+<h2 id="semantics">Detecting the reliability of HTTP status codes</h2>
+
+We can see if a web server's [=response/statuses=] are reliable by [=/fetching=] a URL that should never result in an [=ok status=]. If the response status (after following redirects) is an [=ok status=], it's safe to conclude that the server is not configured properly.
+
+To <dfn export>test the reliability of an origin's response status codes</dfn> given |origin|, run the following steps:
+
+1. Let |p| be [=a new promise=].
+1. If |origin| is not a [=tuple origin=], [=reject=] |p| and return it.
+1. Let |status reliability queue| be the result of [=starting a new parallel queue=].
+1. [=Enqueue the following steps=] to |status reliability queue|:
+    1. Let |url| be the result of calling {{URL(url, base)}} with url "/.well-known/resource-that-should-not-exist-whose-status-code-should-not-be-200" and base |origin|.
+    1. Let |request| be a new [=/request=] whose [=request/url=] is |url|, [=request/method=] is `GET`, [=request/synchronous flag=] is set, [=request/origin=] is |origin|, [=request/mode=] is `"same-origin"`, [=request/service-workers mode=] is `"none"`, [=request/credentials mode=] is `"omit"`, [=request/cache mode=] is `"no-store"`, and [=request/redirect mode=] is `"follow"`.
+    1. Let |response| be the result of performing a [=/fetch=] using |request|.
+    1. If |response| is a [=network error=], [=reject=] |p|.
+    1. If |response|'s [=response/status=] is an [=ok status=], [=reject=] |p|. Otherwise, [=/resolve=] |p|.
+1. Return |p|.
+
+<h2 id="iana">IANA considerations</h2>
+
+<h3 id="the-resource-that-should-not-exist-whose-status-code-should-not-be-200-well-known-uri">The `resource-that-should-not-exist-whose-status-code-should-not-be-200` well-known URI</h3>
+
+This document defines the “`.well-known`” URI `resource-that-should-not-exist-whose-status-code-should-not-be-200`.
+This registration will be submitted to the IESG for review, approval, and registration with IANA using the template defined in [[!WELL-KNOWN]] as follows:
+
+: URI suffix
+:: `resource-that-should-not-exist-whose-status-code-should-not-be-200`
+
+: Change controller
+:: W3C
+
+: Specification document(s)
+:: This document is the relevant specification. (See [[#semantics]])
+
+: Related information:
+:: None.

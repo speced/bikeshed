@@ -1,6 +1,6 @@
 <pre class=metadata>
 Title: Web Locks API
-Shortname: WebLocks
+Shortname: Web-Locks
 Abstract: This document defines a web platform API that allows script to asynchronously acquire a lock over a resource, hold it while work is performed, then release it. While held, no other script in the origin can acquire a lock over the same resource. This allows contexts (windows, workers) within a web application to coordinate the usage of resources.
 Status: CG-DRAFT
 ED: https://wicg.github.io/web-locks/
@@ -8,7 +8,7 @@ Level: 1
 Editor: Joshua Bell, Google Inc. https://google.com, jsbell@google.com
 Group: WICG
 Test Suite: https://github.com/web-platform-tests/wpt/tree/master/web-locks
-Favicon: logo-lock.png
+Favicon: logo-lock.svg
 Complain About: accidental-2119 yes, missing-example-ids yes
 Markup Shorthands: css no, markdown yes
 </pre>
@@ -24,26 +24,26 @@ spec: html; urlPrefix: https://html.spec.whatwg.org/multipage/
     urlPrefix: webappapis.html
         type: dfn
             text: agent cluster; url: integration-with-the-javascript-agent-cluster-formalism
-</pre>
-
-<pre class=link-defaults>
-spec:infra; type:dfn; text:list
-spec:html; type:dfn; for:/; text:origin
-spec:html; type:dfn; for:/; text:browsing context
-spec:webidl; type:dfn; text:resolve
+spec: storage; urlPrefix: https://storage.spec.whatwg.org/
+    type: dfn
+        text: storage shelf; url: storage-shelf
 </pre>
 
 <style>
-dl.domintro dt {
+.domintro::before {
+    content: 'For web developers (non-normative)';
+    text-transform: initial;
+}
+.domintro dt {
     font-family: Menlo, Consolas, "DejaVu Sans Mono", Monaco, monospace;
 
     padding-top: 0.5em;
     padding-bottom: 1em;
 }
-dl.domintro dt a {
+.domintro dt a {
     color: inherit; border-bottom-style: none;
 }
-dl.domintro dt code {
+.domintro dt code {
     font-size: inherit;
 }
 </style>
@@ -117,7 +117,7 @@ await navigator.locks.request('my_resource', async lock => {
 
 A web-based document editor stores state in memory for fast access and persists changes (as a series of records) to a storage API such as the [[IndexedDB-2|Indexed Database API]] for resiliency and offline use, and to a server for cross-device use. When the same document is opened for editing in two tabs the work must be coordinated across tabs, such as allowing only one tab to make changes to or synchronize the document at a time. This requires the tabs to coordinate on which will be actively making changes (and synchronizing the in-memory state with the storage API), knowing when the active tab goes away (navigated, closed, crashed) so that another tab can become active.
 
-In a data synchronization service, a "master tab" is designated. This tab is the only one that should be performing some operations (e.g. network sync, cleaning up queued data, etc). It holds a lock and never releases it. Other tabs can attempt to acquire the lock, and such attempts will be queued. If the "master tab" crashes or is closed then one of the other tabs will get the lock and become the new master.
+In a data synchronization service, a "primary tab" is designated. This tab is the only one that should be performing some operations (e.g. network sync, cleaning up queued data, etc). It holds a lock and never releases it. Other tabs can attempt to acquire the lock, and such attempts will be queued. If the "primary tab" crashes or is closed then one of the other tabs will get the lock and become the new primary.
 
 The [[IndexedDB-2|Indexed Database API]] defines a transaction model allowing shared read and exclusive write access across multiple named storage partitions within an origin. Exposing this concept as a primitive allows any Web Platform activity to be scheduled based on resource availability, for example allowing transactions to be composed for other storage types (such as Caches [[Service-Workers]]), across storage types, even across non-storage APIs (e.g. network fetches).
 
@@ -143,7 +143,7 @@ The [=task source=] for [=enqueue steps|steps enqueued=] below is the <dfn expor
 A <dfn>resource name</dfn> is a [=JavaScript string=] chosen by the web application to represent an abstract resource.
 
 A resource name has no external meaning beyond the scheduling algorithm, but is global
-across [=browsing contexts=] within an [=/origin=]. Web applications are free to use any resource naming scheme.
+across [=/browsing contexts=] within an [=/origin=]. Web applications are free to use any resource naming scheme.
 
 <aside class=example id=example-indexeddb-transactions>
 To mimic transaction locking over named stores within a named
@@ -161,14 +161,14 @@ Resource names starting with U+002D HYPHEN-MINUS (-) are reserved; requesting th
 
 A user agent has a <dfn>lock manager</dfn> for each [=/origin=], which encapsulates the state of all [=lock-concept|locks=] and [=lock requests=] for that origin.
 
-Pages and workers ([=/agents=]) on a single [=/origin=] opened in the same user agent share a lock manager even if they are in unrelated [=browsing contexts=].
+Pages and workers ([=/agents=]) on a single [=/origin=] opened in the same user agent share a lock manager even if they are in unrelated [=/browsing contexts=].
 
 <aside class=note>
 
     There is an equivalence between the following:
 
     * Agents that share a [=lock manager=].
-    * Agents that share a [=site storage unit=], i.e. a per-origin [=localStorage|local storage area=] [[HTML]], set of [[IndexedDB-2#database-construct|databases]] [[IndexedDB-2]], or [[Service-Workers#cache-objects|caches]] [[Service-Workers]].
+    * Agents that share a [=/storage shelf=], i.e. a per-origin [=localStorage|local storage area=] [[HTML]], set of [[IndexedDB-2#database-construct|databases]] [[IndexedDB-2]], or [[Service-Workers#cache-objects|caches]] [[Service-Workers]].
 
 </aside>
 
@@ -238,10 +238,14 @@ Further note that if the callback is not `async` and returns a non-promise, the 
 
 Each origin has a <dfn>held lock set</dfn> which is a [=/set=] of [=lock-concept|locks=].
 
+<div algorithm="waiting promise settles">
+
 When [=lock-concept|lock=] |lock|'s [=lock-concept/waiting promise=] settles (fulfills or rejects), [=enqueue the following steps=] on the [=lock task queue=]:
 
 1. [=Release the lock=] |lock|.
-1. [=Resolve=] |lock|'s [=lock-concept/released promise=] with |lock|'s [=lock-concept/waiting promise=].
+1. [=/Resolve=] |lock|'s [=lock-concept/released promise=] with |lock|'s [=lock-concept/waiting promise=].
+
+</div>
 
 </div>
 
@@ -253,11 +257,13 @@ A <dfn>lock request</dfn> represents a pending request for a [=lock-concept|lock
 
 <div dfn-for="lock request">
 
-A [=lock request=] is a tuple of (<dfn>agent</dfn>, <dfn>clientId</dfn>, <dfn>origin</dfn>, <dfn>name</dfn>, <dfn>mode</dfn>, <dfn>promise</dfn>).
+A [=lock request=] is a [=/struct=] with [=struct/items=] <dfn>agent</dfn>, <dfn>clientId</dfn>, <dfn>origin</dfn>, <dfn>name</dfn>, <dfn>mode</dfn>, and <dfn>promise</dfn>.
 
-A <dfn>lock request queue</dfn> is a [=queue=] of [=lock requests=].
+A <dfn>lock request queue</dfn> is a [=/queue=] of [=lock requests=].
 
 Each origin has a <dfn>lock request queue map</dfn>, which is a [=map=] of [=resource names=] to [=lock request queues=].
+
+<div algorithm>
 
 A [=lock request=] |request| is said to be <dfn>grantable</dfn> if the following steps return true:
 
@@ -276,15 +282,17 @@ A [=lock request=] |request| is said to be <dfn>grantable</dfn> if the following
 
 </div>
 
+</div>
+
 <!-- ====================================================================== -->
 ## Agent Integration ## {#agent-integration}
 <!-- ====================================================================== -->
 
-<div class=algorithm>
+<div algorithm="agent termination">
 When an [=/agent=] terminates, [=enqueue the following steps=] on the [=lock task queue=]:
 
 <aside class=issue>
-    Normative reference for <i>terminates</i>.
+    Identify a normative reference for <i>terminates</i>.
 </aside>
 
 
@@ -314,7 +322,7 @@ WorkerNavigator includes NavigatorLocks;
 
 Each [=environment settings object=] has a {{LockManager}} object.
 
-The {{NavigatorLocks/locks}} attribute's getter must return the [=context object=]'s [=relevant settings object=]'s {{LockManager}} object.
+The <dfn attribute for=NavigatorLocks>locks</dfn> getter's steps are to return [=/this=]'s [=relevant settings object=]'s {{LockManager}} object.
 
 <!-- ====================================================================== -->
 ## {{LockManager}} class ## {#api-lock-manager}
@@ -362,23 +370,19 @@ the state of the origin's [=lock manager=].
 ### The {{LockManager/request(name, callback)|request()}} method ### {#api-lock-manager-request}
 <!-- ====================================================================== -->
 
-<div class=note>
-  <dl class=domintro>
-    <dt><var>promise</var> = navigator . locks .
-        {{LockManager/request(name, callback)|request}}(<var>name</var>, <var>callback</var>)</dt>
-    <dt><var>promise</var> = navigator . locks .
-        {{LockManager/request(name, options, callback)|request}}(<var>name</var>, <var>options</var>, <var>callback</var>)</dt>
-    <dd>
+<div class="domintro note">
+    : |promise| = navigator . locks . {{LockManager/request(name, callback)|request}}(|name|, |callback|)
+    : |promise| = navigator . locks . {{LockManager/request(name, options, callback)|request}}(|name|, |options|, |callback|)
 
-    The {{LockManager/request(name, callback)|request()}} method is called to request a lock.
+    ::  The {{LockManager/request(name, callback)|request()}} method is called to request a lock.
 
-    The |name| (initial argument) is a [=resource name=] string.
+        The |name| (initial argument) is a [=resource name=] string.
 
-    The |callback| (final argument) is a [=callback function=] invoked with the {{Lock}} when granted. This is specified by script, and is usually an `async` function. The lock is held until the callback function completes. If a non-async callback function is passed in, then it is automatically wrapped in a promise that resolves immediately, so the lock is only held for the duration of the synchronous callback.
+        The |callback| (final argument) is a [=callback function=] invoked with the {{Lock}} when granted. This is specified by script, and is usually an `async` function. The lock is held until the callback function completes. If a non-async callback function is passed in, then it is automatically wrapped in a promise that resolves immediately, so the lock is only held for the duration of the synchronous callback.
 
-    The returned |promise| resolves (or rejects) with the result of the callback after the lock is released, or rejects if the request is aborted.
+       The returned |promise| resolves (or rejects) with the result of the callback after the lock is released, or rejects if the request is aborted.
 
-    Example:
+       Example:
 ```js
 try {
   const result = await navigator.locks.request('resource', async lock => {
@@ -394,21 +398,18 @@ try {
 }
 ```
 
-    The lock will be released when the callback exits for any reason &mdash; either when the code returns, or if it throws.
+        The lock will be released when the callback exits for any reason &mdash; either when the code returns, or if it throws.
 
-    An |options| dictionary can be specified as a second argument; the |callback| argument is always last.
-    </dd>
+        An |options| dictionary can be specified as a second argument; the |callback| argument is always last.
 
-    <!-- ======================================== -->
 
-    <dt><var>options</var> . mode</dt>
-    <dd>
+    : |options| . mode
 
-    The {{LockOptions/mode}} option can be "{{exclusive}}" (the default if not specified) or "{{shared}}".
-    Multiple tabs/workers can hold a lock for the same resource in "{{shared}}" mode, but only one tab/worker can hold a lock for the resource in "{{exclusive}}" mode.
+    ::  The {{LockOptions/mode}} option can be "{{exclusive}}" (the default if not specified) or "{{shared}}".
+        Multiple tabs/workers can hold a lock for the same resource in "{{shared}}" mode, but only one tab/worker can hold a lock for the resource in "{{exclusive}}" mode.
 
-    The most common use for this is to allow multiple readers to access a resource simultaneously but prevent changes.
-    Once reader locks are released a single exclusive writer can acquire the lock to make changes, followed by another exclusive writer or more shared readers.
+        The most common use for this is to allow multiple readers to access a resource simultaneously but prevent changes.
+        Once reader locks are released a single exclusive writer can acquire the lock to make changes, followed by another exclusive writer or more shared readers.
 
 
 ```js
@@ -417,14 +418,11 @@ await navigator.locks.request('resource', {mode: 'shared'}, async lock => {
   // but no other contexts will hold the lock in exclusive mode.
 });
 ```
-    </dd>
 
-    <!-- ======================================== -->
 
-    <dt><var>options</var> . ifAvailable</dt>
-    <dd>
+    : |options| . ifAvailable
 
-    If the {{LockOptions/ifAvailable}} option is `true`, then the lock is only granted if it can be without additional waiting. Note that this is still not *synchronous*; in many user agents this will require cross-process communication to see if the lock can be granted. If the lock cannot be granted, the callback is invoked with `null`. (Since this is expected, the request is *not* rejected.)
+    ::  If the {{LockOptions/ifAvailable}} option is `true`, then the lock is only granted if it can be without additional waiting. Note that this is still not *synchronous*; in many user agents this will require cross-process communication to see if the lock can be granted. If the lock cannot be granted, the callback is invoked with `null`. (Since this is expected, the request is *not* rejected.)
 
 ```js
 await navigator.locks.request('resource', {ifAvailable: true}, async lock => {
@@ -435,14 +433,10 @@ await navigator.locks.request('resource', {ifAvailable: true}, async lock => {
   // Lock is held here.
 });
 ```
-    </dd>
 
-    <!-- ======================================== -->
+    : |options| . signal
 
-    <dt><var>options</var> . signal</dt>
-    <dd>
-
-    The {{LockOptions/signal}} option can be set to an {{AbortSignal}}. This allows aborting a lock request, for example if the request is not granted in a timely manner:
+    ::  The {{LockOptions/signal}} option can be set to an {{AbortSignal}}. This allows aborting a lock request, for example if the request is not granted in a timely manner:
 
 ```js
 const controller = new AbortController();
@@ -459,20 +453,16 @@ try {
 }
 ```
 
-    If an abort is signalled before the lock is granted, then the request promise will reject with an {{AbortError}}.
-    Once the lock has been granted, the signal is ignored.
-    </dd>
+        If an abort is signalled before the lock is granted, then the request promise will reject with an {{AbortError}}.
+        Once the lock has been granted, the signal is ignored.
 
-    <!-- ======================================== -->
 
-    <dt><var>options</var> . steal</dt>
-    <dd>
-    If the {{LockOptions/steal}} option is `true`, then any held locks for the resource will be released (and the [=released promise=] of such locks will resolve with {{AbortError}}), and the request will be granted, preempting any queued requests for it.
+    : |options| . steal
 
-    If a web application detects an unrecoverable state &mdash; for example, some coordination point like a Service Worker determines that a tab holding a lock is no longer responding &mdash; then it can "steal" a lock using this option.
+    ::  If the {{LockOptions/steal}} option is `true`, then any held locks for the resource will be released (and the [=released promise=] of such locks will resolve with {{AbortError}}), and the request will be granted, preempting any queued requests for it.
 
-    </dd>
-  </dl>
+        If a web application detects an unrecoverable state &mdash; for example, some coordination point like a Service Worker determines that a tab holding a lock is no longer responding &mdash; then it can "steal" a lock using this option.
+
 </div>
 
 <aside class=advisement>
@@ -482,23 +472,23 @@ try {
     It is intended for use by web applications that need to attempt recovery in the face of application and/or user-agent defects, where behavior is already unpredictable.
 </aside>
 
-<div class=algorithm>
+<div algorithm="LockManager request method">
 
 The <dfn method for=LockManager>request(|name|, |callback|)</dfn> and
-<dfn method for=LockManager>request(|name|, |options|, |callback|)</dfn> methods, when invoked, must run these steps:
+<dfn method for=LockManager>request(|name|, |options|, |callback|)</dfn> method steps are:
 
 1. If |options| was not passed, then let |options| be a new {{LockOptions}} dictionary with default members.
-1. Let |environment| be [=context object=]'s [=relevant settings object=].
+1. Let |environment| be [=/this=]'s [=relevant settings object=].
 1. Let |origin| be |environment|'s [=/origin=].
 1. If |origin| is an [=opaque origin=], then return [=a promise rejected with=] a "{{SecurityError}}" {{DOMException}}.
 1. If |name| starts with U+002D HYPHEN-MINUS (-), then return [=a promise rejected with=] a "{{NotSupportedError}}" {{DOMException}}.
-1. If both |options|' |steal| dictionary member and |options|' |ifAvailable| dictionary member are true, then return [=a promise rejected with=] a "{{NotSupportedError}}" {{DOMException}}.
-1. If |options|' |steal| dictionary member is true and |options|' |mode| dictionary member is not "{{exclusive}}", then return [=a promise rejected with=] a "{{NotSupportedError}}" {{DOMException}}.
-1. If |options|' |signal| dictionary member is present, and either of |options|' |steal| dictionary member or |options|' |ifAvailable| dictionary member is true, then return [=a promise rejected with=] a "{{NotSupportedError}}" {{DOMException}}.
-1. If |options|' |signal| dictionary member is present and its [=AbortSignal/aborted flag=] is set, then return [=a promise rejected with=] an "{{AbortError}}" {{DOMException}.
+1. If both |options|' `steal` dictionary member and |options|' `ifAvailable` dictionary member are true, then return [=a promise rejected with=] a "{{NotSupportedError}}" {{DOMException}}.
+1. If |options|' `steal` dictionary member is true and |options|' `mode` dictionary member is not "{{exclusive}}", then return [=a promise rejected with=] a "{{NotSupportedError}}" {{DOMException}}.
+1. If |options|' `signal` dictionary member is present, and either of |options|' `steal` dictionary member or |options|' `ifAvailable` dictionary member is true, then return [=a promise rejected with=] a "{{NotSupportedError}}" {{DOMException}}.
+1. If |options|' `signal` dictionary member is present and its [=AbortSignal/aborted flag=] is set, then return [=a promise rejected with=] an "{{AbortError}}" {{DOMException}.
 1. Let |promise| be [=a new promise=].
-1. Let |request| be the result of running the steps to [=request a lock=] with |promise|, the current [=/agent=], |environment|'s [=environment/id=], |origin|, |callback|, |name|, |options|' |mode| dictionary member, |options|' |ifAvailable| dictionary member, and |options|' |steal| dictionary member.
-1. If |options|' |signal| dictionary member is present, then <a for=AbortSignal lt=add>add the following abort steps</a> to |options|' |signal| dictionary member:
+1. Let |request| be the result of running the steps to [=request a lock=] with |promise|, the current [=/agent=], |environment|'s [=environment/id=], |origin|, |callback|, |name|, |options|' `mode` dictionary member, |options|' `ifAvailable` dictionary member, and |options|' `steal` dictionary member.
+1. If |options|' `signal` dictionary member is present, then <a for=AbortSignal lt=add>add the following abort steps</a> to |options|' `signal` dictionary member:
     1. [=enqueue the following steps|Enqueue the steps=] to [=abort the request=] |request| to the [=lock task queue=].
     1. [=Reject=] |promise| with an "{{AbortError}}" {{DOMException}}.
 1. Return |promise|.
@@ -509,15 +499,13 @@ The <dfn method for=LockManager>request(|name|, |callback|)</dfn> and
 ### The {{LockManager/query()}} method ### {#api-lock-manager-query}
 <!-- ====================================================================== -->
 
-<div class=note>
-  <dl class=domintro>
-    <dt><var>state</var> = await navigator . locks .
-        {{LockManager/query()|query}}()</dt>
-    <dd>
+<div class="domintro note">
 
-    The {{LockManager/query()}} method can be used to produce a snapshot of the [=lock manager=] state for an origin, which allows a web application to introspect its usage of locks, for logging or debugging purposes.
+    : |state| = await navigator . locks . {{LockManager/query()|query}}()
 
-    The returned promise resolves to |state|, a plain-old-data structure (i.e. JSON-like data) with this form:
+    ::  The {{LockManager/query()}} method can be used to produce a snapshot of the [=lock manager=] state for an origin, which allows a web application to introspect its usage of locks, for logging or debugging purposes.
+
+        The returned promise resolves to |state|, a plain-old-data structure (i.e. JSON-like data) with this form:
 
 ```js
 {
@@ -538,10 +526,8 @@ The <dfn method for=LockManager>request(|name|, |callback|)</dfn> and
 }
 ```
 
-    The `clientId` field corresponds to a unique context (frame or worker), and is the same value returned by {{Client}}'s {{Client/id}} attribute.
+        The `clientId` field corresponds to a unique context (frame or worker), and is the same value returned by {{Client}}'s {{Client/id}} attribute.
 
-    </dd>
-  </dl>
 </div>
 
 <aside class=advisement>
@@ -549,11 +535,11 @@ The <dfn method for=LockManager>request(|name|, |callback|)</dfn> and
 </aside>
 
 
-<div class=algorithm>
+<div algorithm>
 
-The <dfn method for=LockManager>query()</dfn> method, when invoked, must run these steps:
+The <dfn method for=LockManager>query()</dfn> method steps are:
 
-1. Let |origin| be [=context object=]'s [=relevant settings object=]'s [=/origin=].
+1. Let |origin| be [=/this=]'s [=relevant settings object=]'s [=/origin=].
 1. If |origin| is an [=opaque origin=], then return [=a promise rejected with=] a "{{SecurityError}}" {{DOMException}}.
 1. Let |promise| be [=a new promise=].
 1. [=enqueue the following steps|Enqueue the steps=] to [=snapshot the lock state=] for |origin| with |promise| to the [=lock task queue=].
@@ -575,9 +561,9 @@ interface Lock {
 
 A {{Lock}} object has an associated [=lock-concept|lock=].
 
-The {{Lock/name}} attribute getter returns the associated [=lock-concept|lock=]'s [=lock-concept/name=].
+The <dfn attribute for=Lock>name</dfn> getter's steps are to return the associated [=lock-concept|lock=]'s [=lock-concept/name=].
 
-The {{Lock/mode}} attribute getter returns the associated [=lock-concept|lock=]'s [=lock-concept/mode=].
+The <dfn attribute for=Lock>mode</dfn> getter's steps are to return the associated [=lock-concept|lock=]'s [=lock-concept/mode=].
 
 <!-- ====================================================================== -->
 # Algorithms # {#algorithms}
@@ -587,8 +573,8 @@ The {{Lock/mode}} attribute getter returns the associated [=lock-concept|lock=]'
 ## Request a lock ## {#algorithm-request-lock}
 <!-- ====================================================================== -->
 
-<div class=algorithm>
-To <dfn>request a lock</dfn> with |promise|, |agent|, |clientId|, |origin|, |callback|, |name|, |mode|, |ifAvailable|, |steal|, and optional |signal|:
+<div algorithm>
+To <dfn>request a lock</dfn> with |promise|, |agent|, |clientId|, |origin|, |callback|, |name|, |mode|, |ifAvailable| and |steal|:
 
 1. Let |request| be a new [=lock request=] (|agent|, |clientId|, |origin|, |name|, |mode|, |promise|).
 1. [=Enqueue the following steps=] to the [=lock task queue=]:
@@ -605,7 +591,7 @@ To <dfn>request a lock</dfn> with |promise|, |agent|, |clientId|, |origin|, |cal
         1. If |ifAvailable| is true and |request| is not [=grantable=],
              then [=enqueue the following steps=] on |callback|'s [=relevant settings object=]'s [=responsible event loop=]:
             1. Let |r| be the result of [=invoking=] |callback| with `null` as the only argument.
-            1. [=Resolve=] |promise| with |r| and abort these steps.
+            1. [=/Resolve=] |promise| with |r| and abort these steps.
         1. [=queue/Enqueue=] |request| in |queue|.
     1. [=Process the lock request queue=] |queue|.
 1. Return |request|.
@@ -616,7 +602,7 @@ To <dfn>request a lock</dfn> with |promise|, |agent|, |clientId|, |origin|, |cal
 ## Release a lock ## {#algorithm-release-lock}
 <!-- ====================================================================== -->
 
-<div class=algorithm>
+<div algorithm>
 To <dfn>release the lock</dfn> |lock|:
 
 1. [=Assert=]: these steps are running on the [=lock task queue=].
@@ -633,12 +619,12 @@ To <dfn>release the lock</dfn> |lock|:
 ## Abort a request ## {#algorithm-abort-request}
 <!-- ====================================================================== -->
 
-<div class=algorithm>
+<div algorithm>
 To <dfn>abort the request</dfn> |request|:
 
 1. [=Assert=]: these steps are running on the [=lock task queue=].
 1. Let |origin| be |request|'s [=lock request/origin=].
-1. Let |name| be |lock|'s [=resource name=].
+1. Let |name| be |request|'s [=lock request/name=].
 1. Let |queueMap| be |origin|'s [=lock request queue map=].
 1. Let |queue| be |queueMap|[|name|].
 1. [=list/Remove=] |request| from |queue|.
@@ -650,7 +636,7 @@ To <dfn>abort the request</dfn> |request|:
 ## Process a lock request queue for a given resource name ## {#algorithm-process-request}
 <!-- ====================================================================== -->
 
-<div class=algorithm>
+<div algorithm>
 To <dfn>process the lock request queue</dfn> |queue|:
 
 1. [=Assert=]: these steps are running on the [=lock task queue=].
@@ -667,7 +653,7 @@ To <dfn>process the lock request queue</dfn> |queue|:
         1. [=set/Append=] |lock| to |origin|'s [=held lock set=].
         1. [=Enqueue the following steps=] on |callback|'s [=relevant settings object=]'s [=responsible event loop=]:
             1. Let |r| be the result of [=invoking=] |callback| with a new {{Lock}} object associated with |lock| as the only argument.
-            1. [=Resolve=] |waiting| with |r|.
+            1. [=/Resolve=] |waiting| with |r|.
 
 </div>
 
@@ -675,18 +661,18 @@ To <dfn>process the lock request queue</dfn> |queue|:
 ## Snapshot the lock state ## {#algorithm-snapshot-state}
 <!-- ====================================================================== -->
 
-<div class=algorithm>
+<div algorithm>
 To <dfn>snapshot the lock state</dfn> for |origin| with |promise|:
 
 1. [=Assert=]: these steps are running on the [=lock task queue=].
-1. Let |pending| be a new [=list=].
-1. [=map/For each=] |name| &rarr; |queue| of |origin|'s [=lock request queue map=]:
+1. Let |pending| be a new [=/list=].
+1. [=map/For each=] |queue| of |origin|'s [=lock request queue map=]'s [=map/values=]:
     1. [=list/For each=] |request| of |queue|:
         1. [=list/Append=] «[ "name" → |request|'s [=lock request/name=], "mode" → |request|'s [=lock request/mode=], "clientId" → |request|'s [=lock request/clientId=] ]» to |pending|.
-1. Let |held| be a new [=list=].
+1. Let |held| be a new [=/list=].
 1. [=list/For each=] |lock| of |origin|'s [=held lock set=]:
     1. [=list/Append=] «[ "name" → |lock|'s [=lock-concept/name=], "mode" → |lock|'s [=lock-concept/mode=], "clientId" → |lock|'s [=lock-concept/clientId=] ]» to |held|.
-1. [=Resolve=] |promise| with «[ "held" → |held|, "pending" → |pending| ]».
+1. [=/Resolve=] |promise| with «[ "held" → |held|, "pending" → |pending| ]».
 
 </div>
 

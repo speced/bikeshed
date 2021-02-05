@@ -1,8 +1,9 @@
-<pre class='metadata'>
+<pre class=metadata>
 Group: WHATWG
 H1: DOM
 Shortname: dom
 Text Macro: TWITTER thedomstandard
+Text Macro: LATESTRD 2020-12
 Abstract: DOM defines a platform-neutral model for events, aborting activities, and node trees.
 Translation: ja https://triple-underscore.github.io/DOM4-ja.html
 Translate IDs: slottable slotable
@@ -44,43 +45,8 @@ urlPrefix: https://w3c.github.io/hr-time/#; spec: HR-TIME
 spec:html; type:element
  text: title
  text: script
-spec:infra; type:dfn; text:list
 </pre>
 
-<h2 id=goals class=no-num>Goals</h2>
-
-This specification standardizes the DOM. It does so as follows:
-
-<ol>
- <li>
-  <p>By consolidating <cite>DOM Level 3 Core</cite> [[DOM-Level-3-Core]],
-  <cite>Element Traversal</cite> [[ELEMENTTRAVERSAL]],
-  <cite>Selectors API Level 2</cite> [[SELECTORS-API2]], the
-  "DOM Event Architecture" and "Basic Event Interfaces" chapters of
-  <cite>DOM Level 3 Events</cite> [[uievents-20031107]] (specific types of events do not
-  belong in the DOM Standard), and <cite>DOM Level 2 Traversal and Range</cite>
-  [[DOM-Level-2-Traversal-Range]], and:
-
-  <ul class=brief>
-   <li>Aligning them with the JavaScript ecosystem where possible.
-   <li>Aligning them with existing implementations.
-   <li>Simplifying them as much as possible.
-  </ul>
-
- <li><p>By moving features from the HTML Standard [[!HTML]] that make more sense to be
- specified as part of the DOM Standard.
-
- <li>
-  <p>By defining a replacement for the "Mutation Events" and
-  "Mutation Name Event Types" chapters of <cite>DOM Level 3 Events</cite>
-  [[uievents-20031107]] as the old model
-  was problematic.
-
-  <p class="note no-backref">The old model is expected to be removed from implementations
-  in due course.
-
- <li><p>By defining new features that simplify common DOM operations.
-</ol>
 
 
 <h2 id=infrastructure oldids=terminology,dependencies>Infrastructure</h2>
@@ -253,7 +219,7 @@ added.
 
 <p>To <dfn export>validate</dfn> a <var>qualifiedName</var>, <a>throw</a> an
 "{{InvalidCharacterError!!exception}}" {{DOMException}} if <var>qualifiedName</var> does not match
-the <code><a type>Name</a></code> or <code><a type>QName</a></code> production.
+the <code><a type>QName</a></code> production.
 
 To <dfn export>validate and extract</dfn> a <var>namespace</var> and <var>qualifiedName</var>,
 run these steps:
@@ -312,7 +278,11 @@ function imgFetched(ev) {
 <a>Event listeners</a> can be removed
 by utilizing the
 {{EventTarget/removeEventListener()}}
-method, passing the same arguments.
+method passing the same arguments.
+
+Alternatively, <a>event listeners</a> can be removed by passing an {{AbortSignal}} to
+{{EventTarget/addEventListener()}} and calling {{AbortController/abort()}} on the controller
+owning the signal.
 
 <a>Events</a> are objects too and implement the
 {{Event}} interface (or a derived interface). In the example above
@@ -358,34 +328,24 @@ use of this functionality through <a>events</a>
 (synthetic events) can make use of the return value of the
 {{EventTarget/dispatchEvent()}} method:
 
-<pre class='lang-javascript'>
+<pre class=lang-javascript>
 if(obj.dispatchEvent(event)) {
   // event was not canceled, time for some magic
   &hellip;
 }
 </pre>
 
-When an <a>event</a> is
-<a>dispatched</a> to an object that
-<a>participates</a> in a
-<a>tree</a> (e.g. an
-<a for="/">element</a>), it can reach
-<a>event listeners</a> on that object's
-<a>ancestors</a> too. First all object's
-<a>ancestor</a>
-<a>event listeners</a> whose
-<a for="event listener">capture</a> variable is set to true are invoked, in
-<a>tree order</a>. Second, object's own
-<a>event listeners</a> are invoked. And
-finally, and only if <a>event</a>'s
-{{Event/bubbles}} attribute value is true,
-object's  <a>ancestor</a>
-<a>event listeners</a> are invoked again,
-but now in reverse <a>tree order</a>.
+<p>When an <a>event</a> is <a>dispatched</a> to an object that <a>participates</a> in a <a>tree</a>
+(e.g., an <a for=/>element</a>), it can reach <a>event listeners</a> on that object's
+<a>ancestors</a> too. Effectively, all the object's <a>inclusive ancestor</a> <a>event listeners</a>
+whose <a for="event listener">capture</a> is true are invoked, in <a>tree order</a>. And then, if
+<a>event</a>'s {{Event/bubbles}} is true, all the object's <a>inclusive ancestor</a>
+<a>event listeners</a> whose <a for="event listener">capture</a> is false are invoked, now in
+reverse <a>tree order</a>.
 
-Let's look at an example of how <a>events</a> work in a <a>tree</a>:
+<p>Let's look at an example of how <a>events</a> work in a <a>tree</a>:
 
-<pre class='lang-markup'>
+<pre class=lang-markup>
 &lt;!doctype html>
 &lt;html>
  &lt;head>
@@ -406,19 +366,13 @@ Let's look at an example of how <a>events</a> work in a <a>tree</a>:
 &lt;/html>
 </pre>
 
-The <code>debug</code> function will be invoked twice. Each time the <a>event</a>'s
-{{Event/target}} attribute value will be the
-<code>span</code> <a for="/">element</a>. The
-first time {{Event/currentTarget}} attribute's
-value will be the <a>document</a>, the second
-time the <code>body</code> <a for="/">element</a>.
-{{Event/eventPhase}} attribute's value
-switches from {{Event/CAPTURING_PHASE}}
-to {{Event/BUBBLING_PHASE}}. If an
-<a>event listener</a> was registered for
-the <code>span</code> <a for="/">element</a>,
-{{Event/eventPhase}} attribute's value
-would have been {{Event/AT_TARGET}}.
+<p>The <code>debug</code> function will be invoked twice. Each time the <a>event</a>'s
+{{Event/target}} attribute value will be the <code>span</code> <a for=/>element</a>. The first time
+{{Event/currentTarget}} attribute's value will be the <a>document</a>, the second time the
+<code>body</code> <a for=/>element</a>. {{Event/eventPhase}} attribute's value switches from
+{{Event/CAPTURING_PHASE}} to {{Event/BUBBLING_PHASE}}. If an <a>event listener</a> was registered
+for the <code>span</code> <a for=/>element</a>, {{Event/eventPhase}} attribute's value would have
+been {{Event/AT_TARGET}}.
 
 
 <h3 id=interface-event>Interface {{Event}}</h3>
@@ -430,7 +384,7 @@ interface Event {
 
   readonly attribute DOMString type;
   readonly attribute EventTarget? target;
-  readonly attribute EventTarget? srcElement; // historical
+  readonly attribute EventTarget? srcElement; // legacy
   readonly attribute EventTarget? currentTarget;
   sequence&lt;EventTarget> composedPath();
 
@@ -440,21 +394,21 @@ interface Event {
   const unsigned short BUBBLING_PHASE = 3;
   readonly attribute unsigned short eventPhase;
 
-  void stopPropagation();
-           attribute boolean cancelBubble; // historical alias of .stopPropagation
-  void stopImmediatePropagation();
+  undefined stopPropagation();
+           attribute boolean cancelBubble; // legacy alias of .stopPropagation()
+  undefined stopImmediatePropagation();
 
   readonly attribute boolean bubbles;
   readonly attribute boolean cancelable;
-           attribute boolean returnValue;  // historical
-  void preventDefault();
+           attribute boolean returnValue;  // legacy
+  undefined preventDefault();
   readonly attribute boolean defaultPrevented;
   readonly attribute boolean composed;
 
-  [Unforgeable] readonly attribute boolean isTrusted;
+  [LegacyUnforgeable] readonly attribute boolean isTrusted;
   readonly attribute DOMHighResTimeStamp timeStamp;
 
-  void initEvent(DOMString type, optional boolean bubbles = false, optional boolean cancelable = false); // historical
+  undefined initEvent(DOMString type, optional boolean bubbles = false, optional boolean cancelable = false); // legacy
 };
 
 dictionary EventInit {
@@ -814,7 +768,7 @@ method, when invoked, must run these steps:</p>
  <var>cancelable</var>.
 </ol>
 
-<p class="note no-backref">As <a>events</a> have constructors {{Event/initEvent()}} is redundant and
+<p class="note no-backref">{{Event/initEvent()}} is redundant with <a>event</a> constructors and
 incapable of setting {{Event/composed}}. It has to be supported for legacy content.
 
 
@@ -822,7 +776,7 @@ incapable of setting {{Event/composed}}. It has to be supported for legacy conte
 
 <pre class=idl>
 partial interface Window {
-  [Replaceable] readonly attribute any event; // historical
+  [Replaceable] readonly attribute (Event or undefined) event; // legacy
 };
 </pre>
 
@@ -846,7 +800,7 @@ interface CustomEvent : Event {
 
   readonly attribute any detail;
 
-  void initCustomEvent(DOMString type, optional boolean bubbles = false, optional boolean cancelable = false, optional any detail = null); // historical
+  undefined initCustomEvent(DOMString type, optional boolean bubbles = false, optional boolean cancelable = false, optional any detail = null); // legacy
 };
 
 dictionary CustomEventInit : EventInit {
@@ -996,13 +950,13 @@ for historical reasons.
 interface EventTarget {
   constructor();
 
-  void addEventListener(DOMString type, EventListener? callback, optional (AddEventListenerOptions or boolean) options = {});
-  void removeEventListener(DOMString type, EventListener? callback, optional (EventListenerOptions or boolean) options = {});
+  undefined addEventListener(DOMString type, EventListener? callback, optional (AddEventListenerOptions or boolean) options = {});
+  undefined removeEventListener(DOMString type, EventListener? callback, optional (EventListenerOptions or boolean) options = {});
   boolean dispatchEvent(Event event);
 };
 
 callback interface EventListener {
-  void handleEvent(Event event);
+  undefined handleEvent(Event event);
 };
 
 dictionary EventListenerOptions {
@@ -1012,6 +966,7 @@ dictionary EventListenerOptions {
 dictionary AddEventListenerOptions : EventListenerOptions {
   boolean passive = false;
   boolean once = false;
+  AbortSignal signal;
 };
 </pre>
 
@@ -1031,6 +986,7 @@ when something has occurred.
  <li><dfn for="event listener">capture</dfn> (a boolean, initially false)
  <li><dfn for="event listener">passive</dfn> (a boolean, initially false)
  <li><dfn for="event listener">once</dfn> (a boolean, initially false)
+ <li><dfn for="event listener">signal</dfn> (null or an {{AbortSignal}} object)
  <li><dfn for="event listener">removed</dfn> (a boolean for bookkeeping purposes, initially false)
 </ul>
 
@@ -1092,6 +1048,9 @@ are not to be used for anything else. [[!HTML]]
   <a for="event listener">callback</a> will only be invoked once after which the event listener will
   be removed.
 
+  <p>If an {{AbortSignal}} is passed for <var>options</var>'s {{AddEventListenerOptions/signal}},
+  then the event listener will be removed when signal is aborted.
+
   <p>The <a>event listener</a> is appended to <var>target</var>'s
   <a for=EventTarget>event listener list</a> and is not appended if it has the same
   <a for="event listener">type</a>, <a for="event listener">callback</a>, and
@@ -1114,7 +1073,7 @@ steps:
 <ol>
  <li><p>If <var>options</var> is a boolean, then return <var>options</var>.
 
- <li><p>Return <var>options</var>'s <code>{{EventListenerOptions/capture}}</code>.
+ <li><p>Return |options|["{{EventListenerOptions/capture}}"].
 </ol>
 
 <p>To <dfn export for=Event>flatten more</dfn><!-- sorry --> <var>options</var>, run these
@@ -1125,11 +1084,20 @@ steps:
 
  <li><p>Let <var>once</var> and <var>passive</var> be false.
 
- <li><p>If <var>options</var> is a dictionary, then set <var>passive</var> to <var>options</var>'s
- <code>{{AddEventListenerOptions/passive}}</code> and <var>once</var> to <var>options</var>'s
- <code>{{AddEventListenerOptions/once}}</code>.
+ <li><p>Let |signal| be null.
 
- <li><p>Return <var>capture</var>, <var>passive</var>, and <var>once</var>.
+ <li>
+  <p>If |options| is a dictionary, then:
+
+  <ol>
+   <li><p>Set |passive| to |options|["{{AddEventListenerOptions/passive}}"] and |once| to
+   |options|["{{AddEventListenerOptions/once}}"].
+
+   <li><p>If |options|["{{AddEventListenerOptions/signal}}"] [=map/exists=], then set |signal| to
+   |options|["{{AddEventListenerOptions/signal}}"].
+  </ol>
+
+ <li><p>Return <var>capture</var>, <var>passive</var>, <var>once</var>, and <var>signal</var>.
 </ol>
 
 <p>The <dfn constructor for=EventTarget><code>EventTarget()</code></dfn> constructor, when invoked,
@@ -1155,6 +1123,9 @@ participate in a tree structure.</p>
  <a>service worker events</a>, then <a>report a warning to the console</a> that this might not give
  the expected results. [[!SERVICE-WORKERS]]
 
+ <li><p>If <a for="event listener">signal</a> is not null and its [=AbortSignal/aborted flag=] is
+ set, then return.
+
  <li><p>If <var>listener</var>'s <a for="event listener">callback</a> is null, then return.
 
  <li><p>If <var>eventTarget</var>'s <a>event listener list</a> does not <a for=list>contain</a> an
@@ -1163,6 +1134,14 @@ participate in a tree structure.</p>
  <a for="event listener">callback</a>, and <a for="event listener">capture</a> is
  <var>listener</var>'s <a for="event listener">capture</a>, then <a for=list>append</a>
  <var>listener</var> to <var>eventTarget</var>'s <a>event listener list</a>.
+
+ <li>
+  <p>If <var>listener</var>'s <a for="event listener">signal</a> is not null, then
+  <a for=AbortSignal lt=add>add the following</a> abort steps to it:
+
+  <ol>
+   <li><a>Remove an event listener</a> with <var>eventTarget</var> and <var>listener</var>.
+  </ol>
 </ol>
 
 <p class=note>The <a>add an event listener</a> concept exists to ensure <a>event handlers</a> use
@@ -1179,8 +1158,8 @@ method, when invoked, must run these steps:
  <li><p><a>Add an event listener</a> with <a>this</a> and an <a>event listener</a> whose
  <a for="event listener">type</a> is <var>type</var>, <a for="event listener">callback</a> is
  <var>callback</var>, <a for="event listener">capture</a> is <var>capture</var>,
- <a for="event listener">passive</a> is <var>passive</var>, and <a for="event listener">once</a> is
- <var>once</var>.
+ <a for="event listener">passive</a> is <var>passive</var>, <a for="event listener">once</a> is
+ <var>once</var>, and <a for="event listener">signal</a> is <var>signal</var>.
 </ol>
 
 <p>To <dfn export>remove an event listener</dfn>, given an {{EventTarget}} object
@@ -1518,8 +1497,12 @@ run these steps:
   <p class="note no-backref">This avoids <a>event listeners</a> added after this point from being
   run. Note that removal still has an effect due to the <a for="event listener">removed</a> field.
 
+ <li><p>Let <var>invocationTargetInShadowTree</var> be <var>struct</var>'s
+ <a for=Event/path>invocation-target-in-shadow-tree</a>.
+
  <li><p>Let <var>found</var> be the result of running <a>inner invoke</a> with <var>event</var>,
- <var>listeners</var>, <var>phase</var>, and <var>legacyOutputDidListenersThrowFlag</var> if given.
+ <var>listeners</var>, <var>phase</var>, <var>invocationTargetInShadowTree</var>, and
+ <var>legacyOutputDidListenersThrowFlag</var> if given.
 
  <li>
   <p>If <var>found</var> is false and <var>event</var>'s {{Event/isTrusted}} attribute is true,
@@ -1543,16 +1526,17 @@ run these steps:
       <tr><td>"<code>transitionend</code>"<td>"<code>webkitTransitionEnd</code>"
     </table>
 
-   <li><p><a>Inner invoke</a> with <var>event</var>, <var>listeners</var>, <var>phase</var>, and
-   <var>legacyOutputDidListenersThrowFlag</var> if given.
+   <li><p><a>Inner invoke</a> with <var>event</var>, <var>listeners</var>, <var>phase</var>,
+   <var>invocationTargetInShadowTree</var>, and <var>legacyOutputDidListenersThrowFlag</var>
+   if given.
 
    <li><p>Set <var>event</var>'s {{Event/type}} attribute value to <var>originalEventType</var>.
   </ol>
 </ol>
 
 <p>To <dfn noexport id=concept-event-listener-inner-invoke>inner invoke</dfn>, given an
-<var>event</var>, <var>listeners</var>, <var>phase</var>, and an optional
-<var>legacyOutputDidListenersThrowFlag</var>, run these steps:
+<var>event</var>, <var>listeners</var>, <var>phase</var>, <var>invocationTargetInShadowTree</var>,
+and an optional <var>legacyOutputDidListenersThrowFlag</var>, run these steps:
 
 <ol>
  <li><p>Let <var>found</var> be false.
@@ -1590,8 +1574,8 @@ run these steps:
     <ol>
      <li><p>Set <var>currentEvent</var> to <var>global</var>'s <a for=Window>current event</a>.
 
-     <li><p>If <var>struct</var>'s <a for=Event/path>invocation-target-in-shadow-tree</a> is false,
-     then set <var>global</var>'s <a for=Window>current event</a> to <var>event</var>.
+     <li><p>If <var>invocationTargetInShadowTree</var> is false, then set <var>global</var>'s
+     <a for=Window>current event</a> to <var>event</var>.
     </ol>
 
    <li><p>If <var>listener</var>'s <a for="event listener">passive</a> is true, then set
@@ -1754,7 +1738,7 @@ interface AbortController {
 
   [SameObject] readonly attribute AbortSignal signal;
 
-  void abort();
+  undefined abort();
 };
 </pre>
 
@@ -1774,22 +1758,20 @@ interface AbortController {
 <p>An {{AbortController}} object has an associated <dfn for=AbortController>signal</dfn> (an
 {{AbortSignal}} object).
 
-<p>The <dfn constructor for=AbortController><code>AbortController()</code></dfn> constructor, when
-invoked, must run these steps:
+<p>The
+<dfn constructor for=AbortController lt="AbortController()"><code>new AbortController()</code></dfn>
+constructor steps are:
 
 <ol>
  <li><p>Let <var>signal</var> be a new {{AbortSignal}} object.
 
- <li><p>Let <var>controller</var> be a new {{AbortController}} object whose
- <a for=AbortController>signal</a> is <var>signal</var>.
-
- <li><p>Return <var>controller</var>.
+ <li><p>Set <a>this</a>'s <a for=AbortController>signal</a> to <var>signal</var>.
 </ol>
 
-<p>The <dfn attribute for=AbortController><code>signal</code></dfn> attribute's getter, when
-invoked, must return <a>this</a>'s <a for=AbortController>signal</a>.
+<p>The <dfn attribute for=AbortController><code>signal</code></dfn> getter steps are to return
+<a>this</a>'s <a for=AbortController>signal</a>.
 
-<p>The <dfn method for=AbortController><code>abort()</code></dfn> method, when invoked, must
+<p>The <dfn method for=AbortController><code>abort()</code></dfn> method steps are to
 <a for=AbortSignal>signal abort</a> on <a>this</a>'s <a for=AbortController>signal</a>.
 
 
@@ -1835,8 +1817,8 @@ requirements to react in a reasonable way to {{AbortController/abort()}}. For ex
 [=AbortSignal/aborted flag=] might need to be propagated to a cross-thread environment, such as a
 service worker.
 
-<p>The <dfn attribute for=AbortSignal>aborted</dfn> attribute's getter, when invoked, must return
-true if <a>this</a>'s [=AbortSignal/aborted flag=] is set, and false otherwise.
+<p>The <dfn attribute for=AbortSignal>aborted</dfn> getter steps are to return true if <a>this</a>'s
+[=AbortSignal/aborted flag=] is set; otherwise false.
 
 <p>The <dfn attribute for=AbortSignal><code>onabort</code></dfn> attribute is an
 <a>event handler IDL attribute</a> for the <dfn export for=AbortSignal><code>onabort</code></dfn>
@@ -1956,7 +1938,7 @@ applications.
 
 To illustrate, consider this HTML document:
 
-<pre class='lang-markup'>
+<pre class=lang-markup>
 &lt;!DOCTYPE html>
 &lt;html class=e>
  &lt;head>&lt;title>Aliens?&lt;/title>&lt;/head>
@@ -2795,8 +2777,9 @@ interface mixin ParentNode {
   readonly attribute Element? lastElementChild;
   readonly attribute unsigned long childElementCount;
 
-  [CEReactions, Unscopable] void prepend((Node or DOMString)... nodes);
-  [CEReactions, Unscopable] void append((Node or DOMString)... nodes);
+  [CEReactions, Unscopable] undefined prepend((Node or DOMString)... nodes);
+  [CEReactions, Unscopable] undefined append((Node or DOMString)... nodes);
+  [CEReactions, Unscopable] undefined replaceChildren((Node or DOMString)... nodes);
 
   Element? querySelector(DOMString selectors);
   [NewObject] NodeList querySelectorAll(DOMString selectors);
@@ -2831,6 +2814,15 @@ Element includes ParentNode;
  <dd>
   <p>Inserts <var>nodes</var> after the <a>last child</a> of <var>node</var>, while replacing
   strings in <var>nodes</var> with equivalent {{Text}} <a for=/>nodes</a>.
+
+  <p><a>Throws</a> a "{{HierarchyRequestError!!exception}}" {{DOMException}} if the constraints of
+  the <a>node tree</a> are violated.
+  <!-- "NotFoundError" is impossible -->
+
+ <dt><code><var>node</var> . <a method for=ParentNode lt="replaceChildren()">replaceChildren</a>(<var>nodes</var>)</code>
+ <dd>
+  <p>Replace all <a>children</a> of <var>node</var> with <var>nodes</var>,
+  while replacing strings in <var>nodes</var> with equivalent {{Text}} <a for=/>nodes</a>.
 
   <p><a>Throws</a> a "{{HierarchyRequestError!!exception}}" {{DOMException}} if the constraints of
   the <a>node tree</a> are violated.
@@ -2881,6 +2873,19 @@ must run these steps:
  <var>nodes</var> and <a>this</a>'s <a for=Node>node document</a>.
 
  <li><p><a>Append</a> <var>node</var> to <a>this</a>.
+</ol>
+
+<p>The <dfn method for=ParentNode><code>replaceChildren(<var>nodes</var>)</code></dfn> method, when invoked,
+must run these steps:
+
+<ol>
+ <li><p>Let <var>node</var> be the result of <a>converting nodes into a node</a> given
+ <var>nodes</var> and <a>this</a>'s <a for=Node>node document</a>.
+
+ <li><p><a>Ensure pre-insertion validity</a> of <var>node</var> into <a>this</a> before
+ null.
+
+ <li><p><a for=Node>Replace all</a> with <var>node</var> within <a>this</a>.
 </ol>
 
 <p>The <dfn method for=ParentNode><code>querySelector(<var>selectors</var>)</code></dfn> method,
@@ -2934,10 +2939,10 @@ getter must return the first <a>following</a> <a for=tree>sibling</a> that is an
 
 <pre class=idl>
 interface mixin ChildNode {
-  [CEReactions, Unscopable] void before((Node or DOMString)... nodes);
-  [CEReactions, Unscopable] void after((Node or DOMString)... nodes);
-  [CEReactions, Unscopable] void replaceWith((Node or DOMString)... nodes);
-  [CEReactions, Unscopable] void remove();
+  [CEReactions, Unscopable] undefined before((Node or DOMString)... nodes);
+  [CEReactions, Unscopable] undefined after((Node or DOMString)... nodes);
+  [CEReactions, Unscopable] undefined replaceWith((Node or DOMString)... nodes);
+  [CEReactions, Unscopable] undefined remove();
 };
 DocumentType includes ChildNode;
 Element includes ChildNode;
@@ -3271,7 +3276,7 @@ run these steps:
 
    <li><p>If <var>records</var> <a for=queue>is not empty</a>, then <a spec=webidl>invoke</a>
    <var>mo</var>'s <a for=MutationObserver>callback</a> with « <var>records</var>, <var>mo</var> »,
-   and <var>mo</var>. If this throws an exception, then <a>report the exception</a>.
+   and <var>mo</var>. If this throws an exception, catch it, and <a>report the exception</a>.
   </ol>
 
  <li><p><a for=set>For each</a> <var>slot</var> of <var>signalSet</var>, <a>fire an event</a>
@@ -3305,12 +3310,12 @@ they do not get lost when {{MutationObserverInit/subtree}} is set to true on <a 
 interface MutationObserver {
   constructor(MutationCallback callback);
 
-  void observe(Node target, optional MutationObserverInit options = {});
-  void disconnect();
+  undefined observe(Node target, optional MutationObserverInit options = {});
+  undefined disconnect();
   sequence&lt;MutationRecord> takeRecords();
 };
 
-callback MutationCallback = void (sequence&lt;MutationRecord> mutations, MutationObserver observer);
+callback MutationCallback = undefined (sequence&lt;MutationRecord> mutations, MutationObserver observer);
 
 dictionary MutationObserverInit {
   boolean childList = false;
@@ -3698,14 +3703,14 @@ interface Node : EventTarget {
   const unsigned short ATTRIBUTE_NODE = 2;
   const unsigned short TEXT_NODE = 3;
   const unsigned short CDATA_SECTION_NODE = 4;
-  const unsigned short ENTITY_REFERENCE_NODE = 5; // historical
-  const unsigned short ENTITY_NODE = 6; // historical
+  const unsigned short ENTITY_REFERENCE_NODE = 5; // legacy
+  const unsigned short ENTITY_NODE = 6; // legacy
   const unsigned short PROCESSING_INSTRUCTION_NODE = 7;
   const unsigned short COMMENT_NODE = 8;
   const unsigned short DOCUMENT_NODE = 9;
   const unsigned short DOCUMENT_TYPE_NODE = 10;
   const unsigned short DOCUMENT_FRAGMENT_NODE = 11;
-  const unsigned short NOTATION_NODE = 12; // historical
+  const unsigned short NOTATION_NODE = 12; // legacy
   readonly attribute unsigned short nodeType;
   readonly attribute DOMString nodeName;
 
@@ -3725,11 +3730,11 @@ interface Node : EventTarget {
 
   [CEReactions] attribute DOMString? nodeValue;
   [CEReactions] attribute DOMString? textContent;
-  [CEReactions] void normalize();
+  [CEReactions] undefined normalize();
 
   [CEReactions, NewObject] Node cloneNode(optional boolean deep = false);
   boolean isEqualNode(Node? otherNode);
-  boolean isSameNode(Node? otherNode); // historical alias of ===
+  boolean isSameNode(Node? otherNode); // legacy alias of ===
 
   const unsigned short DOCUMENT_POSITION_DISCONNECTED = 0x01;
   const unsigned short DOCUMENT_POSITION_PRECEDING = 0x02;
@@ -4454,7 +4459,7 @@ when invoked, must run these steps:
 
   <p class="note no-backref">Whether to return {{Node/DOCUMENT_POSITION_PRECEDING}} or
   {{Node/DOCUMENT_POSITION_FOLLOWING}} is typically implemented via pointer comparison. In
-  JavaScript implementations a cached <code class='lang-javascript'>Math.random()</code> value can
+  JavaScript implementations a cached <code class=lang-javascript>Math.random()</code> value can
   be used.
 
  <li><p>If <var>node1</var> is an <a>ancestor</a> of <var>node2</var> and <var>attr1</var> is null,
@@ -4736,7 +4741,7 @@ for a <a>node</a> <var>root</var> is the
 
   <p>The comparisons for the <a for=Element>classes</a> must be done in an
   <a>ASCII case-insensitive</a> manner if <var>root</var>'s <a for=Node>node document</a>'s
-  <a for=Document>mode</a> is "<code>quirks</code>", and in a <a>case-sensitive</a> manner
+  <a for=Document>mode</a> is "<code>quirks</code>", and in an <a for=string>identical to</a> manner
   otherwise.
 </ol>
 
@@ -4756,8 +4761,8 @@ interface Document : Node {
   readonly attribute USVString documentURI;
   readonly attribute DOMString compatMode;
   readonly attribute DOMString characterSet;
-  readonly attribute DOMString charset; // historical alias of .characterSet
-  readonly attribute DOMString inputEncoding; // historical alias of .characterSet
+  readonly attribute DOMString charset; // legacy alias of .characterSet
+  readonly attribute DOMString inputEncoding; // legacy alias of .characterSet
   readonly attribute DOMString contentType;
 
   readonly attribute DocumentType? doctype;
@@ -4780,7 +4785,7 @@ interface Document : Node {
   [NewObject] Attr createAttribute(DOMString localName);
   [NewObject] Attr createAttributeNS(DOMString? namespace, DOMString qualifiedName);
 
-  [NewObject] Event createEvent(DOMString interface); // historical
+  [NewObject] Event createEvent(DOMString interface); // legacy
 
   [NewObject] Range createRange();
 
@@ -4975,7 +4980,7 @@ method, when invoked, must return the
 <a>list of elements with qualified name <var>qualifiedName</var></a> for <a>this</a>.
 
 <p class="note no-backref">Thus, in an <a>HTML document</a>,
-<code class='lang-javascript'>document.getElementsByTagName("FOO")</code> will match
+<code class=lang-javascript>document.getElementsByTagName("FOO")</code> will match
 <code>&lt;FOO></code> elements that are not in the
 <a>HTML namespace</a>, and <code>&lt;foo></code> elements that are in
 the <a>HTML namespace</a>, but not <code>&lt;FOO></code> elements
@@ -5044,15 +5049,13 @@ for <a>this</a>.
   <var>qualifiedName</var> or null. Its <a for=Element>local name</a> will be everything after
   "<code>:</code>" (U+003E) in <var>qualifiedName</var> or <var>qualifiedName</var>.
 
-  <p>If <var>localName</var> does not match the <code><a type>Name</a></code> production an
+  <p>If <var>qualifiedName</var> does not match the <code><a type>QName</a></code> production an
   "{{InvalidCharacterError!!exception}}" {{DOMException}} will be thrown.
 
   <p>If one of the following conditions is true a "{{NamespaceError!!exception}}" {{DOMException}}
   will be thrown:
 
   <ul>
-   <li><var>localName</var> does not match the
-   <code><a type>QName</a></code> production.
    <li><a for=Element>Namespace prefix</a>
    is not null and <var>namespace</var> is the empty string.
    <li><a for=Element>Namespace prefix</a>
@@ -5464,7 +5467,7 @@ with that <a>document</a>.
 [Exposed=Window]
 interface DOMImplementation {
   [NewObject] DocumentType createDocumentType(DOMString qualifiedName, DOMString publicId, DOMString systemId);
-  [NewObject] XMLDocument createDocument(DOMString? namespace, [TreatNullAs=EmptyString] DOMString qualifiedName, optional DocumentType? doctype = null);
+  [NewObject] XMLDocument createDocument(DOMString? namespace, [LegacyNullToEmptyString] DOMString qualifiedName, optional DocumentType? doctype = null);
   [NewObject] Document createHTMLDocument(optional DOMString title);
 
   boolean hasFeature(); // useless; always returns true
@@ -5704,6 +5707,9 @@ or "<code>closed</code>").</p>
 <p><a for=/>Shadow roots</a> have an associated <dfn export for=ShadowRoot>delegates focus</dfn>.
 It is initially set to false.</p>
 
+<p><a for=/>Shadow roots</a> have an associated
+<dfn export for=ShadowRoot>available to element internals</dfn>. It is initially set to false.</p>
+
 <p><a for=/>Shadow roots</a>'s associated <a for=DocumentFragment>host</a> is never null.</p>
 <!-- If we ever change this, e.g., add a ShadowRoot object constructor, that would have serious
      consequences for innerHTML. -->
@@ -5816,10 +5822,10 @@ interface Element : Node {
   sequence&lt;DOMString> getAttributeNames();
   DOMString? getAttribute(DOMString qualifiedName);
   DOMString? getAttributeNS(DOMString? namespace, DOMString localName);
-  [CEReactions] void setAttribute(DOMString qualifiedName, DOMString value);
-  [CEReactions] void setAttributeNS(DOMString? namespace, DOMString qualifiedName, DOMString value);
-  [CEReactions] void removeAttribute(DOMString qualifiedName);
-  [CEReactions] void removeAttributeNS(DOMString? namespace, DOMString localName);
+  [CEReactions] undefined setAttribute(DOMString qualifiedName, DOMString value);
+  [CEReactions] undefined setAttributeNS(DOMString? namespace, DOMString qualifiedName, DOMString value);
+  [CEReactions] undefined removeAttribute(DOMString qualifiedName);
+  [CEReactions] undefined removeAttributeNS(DOMString? namespace, DOMString localName);
   [CEReactions] boolean toggleAttribute(DOMString qualifiedName, optional boolean force);
   boolean hasAttribute(DOMString qualifiedName);
   boolean hasAttributeNS(DOMString? namespace, DOMString localName);
@@ -5835,14 +5841,14 @@ interface Element : Node {
 
   Element? closest(DOMString selectors);
   boolean matches(DOMString selectors);
-  boolean webkitMatchesSelector(DOMString selectors); // historical alias of .matches
+  boolean webkitMatchesSelector(DOMString selectors); // legacy alias of .matches
 
   HTMLCollection getElementsByTagName(DOMString qualifiedName);
   HTMLCollection getElementsByTagNameNS(DOMString? namespace, DOMString localName);
   HTMLCollection getElementsByClassName(DOMString classNames);
 
-  [CEReactions] Element? insertAdjacentElement(DOMString where, Element element); // historical
-  void insertAdjacentText(DOMString where, DOMString data); // historical
+  [CEReactions] Element? insertAdjacentElement(DOMString where, Element element); // legacy
+  undefined insertAdjacentText(DOMString where, DOMString data); // legacy
 };
 
 dictionary ShadowRootInit {
@@ -5865,19 +5871,19 @@ dictionary ShadowRootInit {
 initialized.
 
 <p>An <a for=/>element</a>'s <a for=Element>custom element state</a> is one of
-"<code>undefined</code>", "<code>failed</code>", "<code>uncustomized</code>", or
-"<code>custom</code>". An <a for=/>element</a> whose <a for=Element>custom element state</a> is
-"<code>uncustomized</code>" or "<code>custom</code>" is said to be
-<dfn export id=concept-element-defined for=Element>defined</dfn>. An <a for=/>element</a> whose
-<a for=Element>custom element state</a> is "<code>custom</code>" is said to be
+"<code>undefined</code>", "<code>failed</code>", "<code>uncustomized</code>",
+"<code>precustomized</code>", or "<code>custom</code>". An <a for=/>element</a> whose
+<a for=Element>custom element state</a> is "<code>uncustomized</code>" or "<code>custom</code>" is
+said to be <dfn export id=concept-element-defined for=Element>defined</dfn>. An <a for=/>element</a>
+whose <a for=Element>custom element state</a> is "<code>custom</code>" is said to be
 <dfn export id=concept-element-custom for=Element>custom</dfn>.
 
 <p class=note>Whether or not an element is <a for=Element>defined</a> is used to determine the
 behavior of the '':defined'' pseudo-class. Whether or not an element is <a for=Element>custom</a> is
 used to determine the behavior of the <a href=#mutation-algorithms>mutation algorithms</a>. The
-"<code>failed</code>" state is used to ensure that if a <a>custom element constructor</a> fails to
-execute correctly the first time, it is not executed again by an
-<a lt="upgrade an element">upgrade</a>.</p>
+"<code>failed</code>" and "<code>precustomized</code>" states are used to ensure that if a
+<a>custom element constructor</a> fails to execute correctly the first time, it is not executed
+again by an <a lt="upgrade an element">upgrade</a>.</p>
 
 <div class=example id=example-c5b21302>
  <p>The following code illustrates elements in each of these four states:</p>
@@ -5973,8 +5979,23 @@ given a <var>document</var>, <var>localName</var>, <var>namespace</var>, and opt
    <a for=Element><code>is</code> value</a> set to <var>is</var>, and <a for=Node>node document</a> set to
    <var>document</var>.
 
-   <li><p>If the <var>synchronous custom elements flag</var> is set,
-   <a lt="upgrade an element">upgrade</a> <var>element</var> using <var>definition</var>.
+   <li>
+    <p>If the <var>synchronous custom elements flag</var> is set, then run this step while
+    catching any exceptions:
+
+    <ol>
+     <li><p><a lt="upgrade an element">Upgrade</a> <var>element</var> using <var>definition</var>.
+    </ol>
+
+    <p>If this step threw an exception, then:</p>
+
+    <ol>
+     <li><p><a>Report the exception</a>.
+
+     <li><p>Set <var>result</var>'s <a for=Element>custom element state</a> to
+     "<code>failed</code>".
+    </ol>
+   </li>
 
    <li><p>Otherwise, <a>enqueue a custom element upgrade reaction</a> given <var>result</var> and
    <var>definition</var>.
@@ -6085,9 +6106,9 @@ given a <var>document</var>, <var>localName</var>, <var>namespace</var>, and opt
 </ol>
 
 <p><a for=/>Elements</a> also have an
-<dfn export id=concept-element-attribute for=Element>attribute list</dfn>, which is a <a>list</a>
-exposed through a {{NamedNodeMap}}. Unless explicitly given when an <a for=/>element</a> is created,
-its <a for=Element>attribute list</a> <a for=list>is empty</a>.
+<dfn export id=concept-element-attribute for=Element>attribute list</dfn>, which is a
+<a for=/>list</a> exposed through a {{NamedNodeMap}}. Unless explicitly given when an
+<a for=/>element</a> is created, its <a for=Element>attribute list</a> <a for=list>is empty</a>.
 
 <p>An <a for="/">element</a>
 <dfn export id=concept-element-attribute-has lt="has an attribute">has</dfn> an <a>attribute</a>
@@ -6468,7 +6489,7 @@ associated {{NamedNodeMap}}.
 
 <p>The <dfn method for=Element><code>getAttributeNames()</code></dfn> method, when invoked, must
 return the <a for=Attr>qualified names</a> of the <a>attributes</a> in <a>this</a>'s
-<a for=Element>attribute list</a>, in order, and a new <a>list</a> otherwise.
+<a for=Element>attribute list</a>, in order, and a new <a for=/>list</a> otherwise.
 
 <p class=note>These are not guaranteed to be unique.<!-- A theoretical getAttributeNamesNS() could
 return an array of unique two-value-arrays. -->
@@ -6656,29 +6677,36 @@ when invoked, must run these steps:
 invoked, must run these steps:
 
 <ol>
- <li><p>If <a>this</a>'s <a for=Element>namespace</a> is <em>not</em> the <a>HTML namespace</a>,
+ <li><p>If <a>this</a>'s <a for=Element>namespace</a> is not the <a>HTML namespace</a>,
  then <a>throw</a> a "{{NotSupportedError!!exception}}" {{DOMException}}.
 
- <li><p>If <a>this</a>'s <a for=Element>local name</a> is <em>not</em> a
-<a>valid custom element name</a>,
- "<code>article</code>",
- "<code>aside</code>",
- "<code>blockquote</code>",
- "<code>body</code>",
- "<code>div</code>",
- "<code>footer</code>",
- "<code>h1</code>",
- "<code>h2</code>",
- "<code>h3</code>",
- "<code>h4</code>",
- "<code>h5</code>",
- "<code>h6</code>",
- "<code>header</code>",
- "<code>main</code>",
- "<code>nav</code>",
- "<code>p</code>",
- "<code>section</code>", or
- "<code>span</code>", then <a>throw</a> a "{{NotSupportedError!!exception}}" {{DOMException}}.
+ <li>
+  <p>If <a>this</a>'s <a for=Element>local name</a> is not one of the following:
+
+  <ul class=brief>
+   <li>a <a>valid custom element name</a>
+   <li>"<code>article</code>",
+   "<code>aside</code>",
+   "<code>blockquote</code>",
+   "<code>body</code>",
+   "<code>div</code>",
+   "<code>footer</code>",
+   "<code>h1</code>",
+   "<code>h2</code>",
+   "<code>h3</code>",
+   "<code>h4</code>",
+   "<code>h5</code>",
+   "<code>h6</code>",
+   "<code>header</code>",
+   "<code>main</code>",
+   "<code>nav</code>",
+   "<code>p</code>",
+   "<code>section</code>", or
+   "<code>span</code>"
+  </ul>
+
+  <p>then <a>throw</a> a "{{NotSupportedError!!exception}}" {{DOMException}}.
+ </li>
 
  <li>
   <p>If <a>this</a>'s <a for=Element>local name</a> is a <a>valid custom element name</a>, or
@@ -6705,6 +6733,10 @@ invoked, must run these steps:
 
  <li><p>Set <var>shadow</var>'s <a for=ShadowRoot>delegates focus</a> to <var>init</var>'s
  {{ShadowRootInit/delegatesFocus}}.
+
+ <li><p>If <a>this</a>'s <a for=Element>custom element state</a> is "<code>precustomized</code>" or
+ "<code>custom</code>", then set <var>shadow</var>'s
+ <a for=ShadowRoot>available to element internals</a> to true.
 
  <li><p>Set <a>this</a>'s <a for=Element>shadow root</a> to <var>shadow</var>.
 
@@ -6762,23 +6794,20 @@ method, when invoked, must run these steps:
  <li>Return null.
 </ol>
 
-The <dfn method for=Element><code>matches(<var>selectors</var>)</code></dfn> and
-<dfn method for=Element><code>webkitMatchesSelector(<var>selectors</var>)</code></dfn> methods, when
-invoked, must run these steps:
+<p>The <dfn method for=Element><code>matches(<var>selectors</var>)</code></dfn> and
+<dfn method for=Element><code>webkitMatchesSelector(<var>selectors</var>)</code></dfn> method steps
+are:
 
 <ol>
- <li>Let <var>s</var> be the result of
- <a>parse a selector</a> from <var>selectors</var>.
+ <li><p>Let <var>s</var> be the result of <a>parse a selector</a> from <var>selectors</var>.
  [[!SELECTORS4]]
 
- <li>If <var>s</var> is failure, <a>throw</a> a
- "{{SyntaxError!!exception}}" {{DOMException}}.
+ <li><p>If <var>s</var> is failure, then <a>throw</a> a "{{SyntaxError!!exception}}"
+ {{DOMException}}.
 
- <li>Return true if the result of
- <a>match a selector against an element</a>, using
- <var>s</var>, <var>element</var>, and
- <a>:scope element</a> <a>this</a>,
- returns success, and false otherwise. [[!SELECTORS4]]
+ <li><p>If the result of <a>match a selector against an element</a>, using <var>s</var>,
+ <a>this</a>, and <a>:scope element</a> <a>this</a>, returns success, then return true; otherwise,
+ return false. [[!SELECTORS4]]
 </ol>
 
 <hr>
@@ -7068,13 +7097,13 @@ string <var>value</var>, run these steps:
 <pre class=idl>
 [Exposed=Window]
 interface CharacterData : Node {
-  attribute [TreatNullAs=EmptyString] DOMString data;
+  attribute [LegacyNullToEmptyString] DOMString data;
   readonly attribute unsigned long length;
   DOMString substringData(unsigned long offset, unsigned long count);
-  void appendData(DOMString data);
-  void insertData(unsigned long offset, DOMString data);
-  void deleteData(unsigned long offset, unsigned long count);
-  void replaceData(unsigned long offset, unsigned long count, DOMString data);
+  undefined appendData(DOMString data);
+  undefined insertData(unsigned long offset, DOMString data);
+  undefined deleteData(unsigned long offset, unsigned long count);
+  undefined replaceData(unsigned long offset, unsigned long count, DOMString data);
 };
 </pre>
 
@@ -7399,7 +7428,6 @@ invoked, must return a new {{Comment}} <a>node</a> whose <a for=CharacterData>da
 
 
 
-
 <h2 id=ranges>Ranges</h2>
 
 <h3 id=introduction-to-dom-ranges>Introduction to "DOM Ranges"</h3>
@@ -7416,9 +7444,9 @@ are <a>boundary points</a>. A <a>boundary point</a> is a <a for=/>tuple</a> cons
 <ul class="domTree">
  <li class="t1">{{Element}}: <code>p</code>
   <ul>
-   <li class="t1">{{Element}}: <code class='lang-markup'>&lt;img src="insanity-wolf" alt="Little-endian BOM; decode as big-endian!"></code>
+   <li class="t1">{{Element}}: <code class=lang-markup>&lt;img src="insanity-wolf" alt="Little-endian BOM; decode as big-endian!"></code>
    <li class="t3">{{Text}}: <span>&nbsp;CSS 2.1 syndata is&nbsp;</span>
-   <li class="t1">{{Element}}: <code class='lang-markup'>&lt;em></code>
+   <li class="t1">{{Element}}: <code class=lang-markup>&lt;em></code>
     <ul>
      <li class="t3">{{Text}}: <span>awesome</span>
     </ul>
@@ -7434,7 +7462,7 @@ are <a>boundary points</a>. A <a>boundary point</a> is a <a for=/>tuple</a> cons
 <var ignore>em</var> to the <code>em</code>
 <a for="/">element</a>, this would be done as follows:
 
-<pre class='lang-javascript'><code>
+<pre class=lang-javascript><code>
 var range = new Range(),
     firstText = p.childNodes[1],
     secondText = em.firstChild
@@ -7632,15 +7660,15 @@ interface Range : AbstractRange {
 
   readonly attribute Node commonAncestorContainer;
 
-  void setStart(Node node, unsigned long offset);
-  void setEnd(Node node, unsigned long offset);
-  void setStartBefore(Node node);
-  void setStartAfter(Node node);
-  void setEndBefore(Node node);
-  void setEndAfter(Node node);
-  void collapse(optional boolean toStart = false);
-  void selectNode(Node node);
-  void selectNodeContents(Node node);
+  undefined setStart(Node node, unsigned long offset);
+  undefined setEnd(Node node, unsigned long offset);
+  undefined setStartBefore(Node node);
+  undefined setStartAfter(Node node);
+  undefined setEndBefore(Node node);
+  undefined setEndAfter(Node node);
+  undefined collapse(optional boolean toStart = false);
+  undefined selectNode(Node node);
+  undefined selectNodeContents(Node node);
 
   const unsigned short START_TO_START = 0;
   const unsigned short START_TO_END = 1;
@@ -7648,14 +7676,14 @@ interface Range : AbstractRange {
   const unsigned short END_TO_START = 3;
   short compareBoundaryPoints(unsigned short how, Range sourceRange);
 
-  [CEReactions] void deleteContents();
+  [CEReactions] undefined deleteContents();
   [CEReactions, NewObject] DocumentFragment extractContents();
   [CEReactions, NewObject] DocumentFragment cloneContents();
-  [CEReactions] void insertNode(Node node);
-  [CEReactions] void surroundContents(Node newParent);
+  [CEReactions] undefined insertNode(Node node);
+  [CEReactions] undefined surroundContents(Node newParent);
 
   [NewObject] Range cloneRange();
-  void detach();
+  undefined detach();
 
   boolean isPointInRange(Node node, unsigned long offset);
   short comparePoint(Node node, unsigned long offset);
@@ -7799,14 +7827,14 @@ steps:
    <dt>If these steps were invoked as "set the start"
    <dd>
     <ol>
-     <li>If <var>bp</var> is
-     <a for="boundary point">after</a> the
-     <var>range</var>'s <a for=range>end</a>, or
-     if <var>range</var>'s
+     <li>If <var>range</var>'s
      <a for="live range">root</a> is not equal to
-     <var>node</var>'s <a for=tree>root</a>, set
-     <var>range</var>'s <a for=range>end</a> to
-     <var>bp</var>.
+     <var>node</var>'s <a for=tree>root</a>,
+     or if <var>bp</var> is
+     <a for="boundary point">after</a> the
+     <var>range</var>'s <a for=range>end</a>, set
+     <var>range</var>'s <a for=range>end</a>
+     to <var>bp</var>.
 
      <li>Set <var>range</var>'s
      <a for=range>start</a> to <var>bp</var>.
@@ -7814,12 +7842,12 @@ steps:
    <dt>If these steps were invoked as "set the end"
    <dd>
     <ol>
-     <li>If <var>bp</var> is
-     <a for="boundary point">before</a> the
-     <var>range</var>'s <a for=range>start</a>,
-     or if <var>range</var>'s
+     <li>If <var>range</var>'s
      <a for="live range">root</a> is not equal to
-     <var>node</var>'s <a for=tree>root</a>, set
+     <var>node</var>'s <a for=tree>root</a>,
+     or if <var>bp</var> is
+     <a for="boundary point">before</a> the
+     <var>range</var>'s <a for=range>start</a>, set
      <var>range</var>'s <a for=range>start</a>
      to <var>bp</var>.
 
@@ -8985,7 +9013,7 @@ interface NodeIterator {
   Node? nextNode();
   Node? previousNode();
 
-  void detach();
+  undefined detach();
 };
 </pre>
 
@@ -9414,14 +9442,14 @@ callback interface NodeFilter {
   const unsigned long SHOW_ATTRIBUTE = 0x2;
   const unsigned long SHOW_TEXT = 0x4;
   const unsigned long SHOW_CDATA_SECTION = 0x8;
-  const unsigned long SHOW_ENTITY_REFERENCE = 0x10; // historical
-  const unsigned long SHOW_ENTITY = 0x20; // historical
+  const unsigned long SHOW_ENTITY_REFERENCE = 0x10; // legacy
+  const unsigned long SHOW_ENTITY = 0x20; // legacy
   const unsigned long SHOW_PROCESSING_INSTRUCTION = 0x40;
   const unsigned long SHOW_COMMENT = 0x80;
   const unsigned long SHOW_DOCUMENT = 0x100;
   const unsigned long SHOW_DOCUMENT_TYPE = 0x200;
   const unsigned long SHOW_DOCUMENT_FRAGMENT = 0x400;
-  const unsigned long SHOW_NOTATION = 0x800; // historical
+  const unsigned long SHOW_NOTATION = 0x800; // legacy
 
   unsigned short acceptNode(Node node);
 };
@@ -9469,8 +9497,8 @@ interface DOMTokenList {
   readonly attribute unsigned long length;
   getter DOMString? item(unsigned long index);
   boolean contains(DOMString token);
-  [CEReactions] void add(DOMString... tokens);
-  [CEReactions] void remove(DOMString... tokens);
+  [CEReactions] undefined add(DOMString... tokens);
+  [CEReactions] undefined remove(DOMString... tokens);
   [CEReactions] boolean toggle(DOMString token, optional boolean force);
   [CEReactions] boolean replace(DOMString token, DOMString newToken);
   boolean supports(DOMString token);
@@ -9836,47 +9864,9 @@ methods on {{Document}}.
 
 <h2 id=historical>Historical</h2>
 
-<p>As explained in <a href="#goals">goals</a> this standard is a significant revision of various
-obsolete DOM specifications. This section enumerates the incompatible changes.
+<p>This standard used to contain several interfaces and interface members that have been removed.
 
-
-<h3 id=dom-events-changes>DOM Events</h3>
-
-<p>These are the changes made to the features described in the "DOM Event Architecture",
-"Basic Event Interfaces", "Mutation Events", and "Mutation Name Event Types" chapters of
-<cite>DOM Level 3 Events</cite>. The other chapters are defined by the <cite>UI Events</cite>
-specification. [[!UIEVENTS]]
-
-<ul class=brief>
- <li>Removes <dfn interface>MutationEvent</dfn> and <dfn interface>MutationNameEvent</dfn>.
- <li>Fire is no longer synonymous with dispatch, but includes initializing an event.
- <li>The propagation and canceled flags are unset when invoking {{Event/initEvent()}} rather than
- after dispatch.
- <li>{{Event}}'s {{Event/timeStamp}} attribute is a {{DOMHighResTimeStamp}} rather than a
- {{DOMTimeStamp}}.
-</ul>
-
-
-<h3 id=dom-core-changes>DOM Core</h3>
-
-<p>These are the changes made to the features described in <cite>DOM Level 3 Core</cite>.
-
-<p>{{DOMString}}, {{DOMException}}, and {{DOMTimeStamp}} are now defined in Web IDL.
-
-<p id=domstringlist>{{DOMStringList}} is now defined in HTML.
-
-<p><dfn method for=Node><code>hasAttributes()</code></dfn> and
-<dfn attribute for=Node><code>attributes</code></dfn> moved from {{Node}} to {{Element}}.
-
-<p><dfn attribute for=Node><code>namespaceURI</code></dfn>,
-<dfn attribute for=Node><code>prefix</code></dfn>, and
-<dfn attribute for=Node><code>localName</code></dfn> moved from {{Node}} to {{Element}} and
-{{Attr}}.
-
-<p>The remainder of interfaces and interface members listed in this section were removed to simplify
-the web platform. Implementations conforming to this specification will not support them.
-
-<p>Interfaces:
+<p>These interfaces have been removed:
 
 <ul class=brief dfn-type="interface">
  <li><dfn><code>DOMConfiguration</code></dfn>
@@ -9889,22 +9879,23 @@ the web platform. Implementations conforming to this specification will not supp
  <li><dfn><code>DOMUserData</code></dfn>
  <li><dfn><code>Entity</code></dfn>
  <li><dfn><code>EntityReference</code></dfn>
+ <li><dfn><code>MutationEvent</code></dfn>
+ <li><dfn><code>MutationNameEvent</code></dfn>
  <li><dfn><code>NameList</code></dfn>
  <li><dfn><code>Notation</code></dfn>
+ <li><dfn><code>RangeException</code></dfn>
  <li><dfn><code>TypeInfo</code></dfn>
  <li><dfn><code>UserDataHandler</code></dfn>
 </ul>
 
-<p>Interface members:
+<p>And these interface members have been removed:
 
 <dl>
- <dt>{{Node}}
+ <dt>{{Attr}}
  <dd>
   <ul class=brief>
-   <li><dfn attribute for=Node><code>isSupported</code></dfn>
-   <li><dfn method for=Node><code>getFeature()</code></dfn>
-   <li><dfn method for=Node><code>getUserData()</code></dfn>
-   <li><dfn method for=Node><code>setUserData()</code></dfn>
+   <li><dfn attribute for=Attr><code>schemaTypeInfo</code></dfn>
+   <li><dfn attribute for=Attr><code>isId</code></dfn>
   </ul>
 
  <dt>{{Document}}
@@ -9920,17 +9911,18 @@ the web platform. Implementations conforming to this specification will not supp
    <li><dfn method for=Document><code>renameNode()</code></dfn>
   </ul>
 
+ <dt>{{DocumentType}}
+ <dd>
+  <ul class=brief>
+   <li><dfn attribute for=DocumentType><code>entities</code></dfn>
+   <li><dfn attribute for=DocumentType><code>notations</code></dfn>
+   <li><dfn attribute for=DocumentType><code>internalSubset</code></dfn>
+  </ul>
+
  <dt>{{DOMImplementation}}
  <dd>
   <ul class=brief>
    <li><dfn method for=DOMImplementation><code>getFeature()</code></dfn>
-  </ul>
-
- <dt>{{Attr}}
- <dd>
-  <ul class=brief>
-   <li><dfn attribute for=Attr><code>schemaTypeInfo</code></dfn>
-   <li><dfn attribute for=Attr><code>isId</code></dfn>
   </ul>
 
  <dt>{{Element}}
@@ -9942,12 +9934,19 @@ the web platform. Implementations conforming to this specification will not supp
    <li><dfn method for=Element><code>setIdAttributeNode()</code></dfn>
   </ul>
 
- <dt>{{DocumentType}}
+ <dt>{{Node}}
  <dd>
   <ul class=brief>
-   <li><dfn attribute for=DocumentType><code>entities</code></dfn>
-   <li><dfn attribute for=DocumentType><code>notations</code></dfn>
-   <li><dfn attribute for=DocumentType><code>internalSubset</code></dfn>
+   <li><dfn attribute for=Node><code>isSupported</code></dfn>
+   <li><dfn method for=Node><code>getFeature()</code></dfn>
+   <li><dfn method for=Node><code>getUserData()</code></dfn>
+   <li><dfn method for=Node><code>setUserData()</code></dfn>
+  </ul>
+
+ <dt>{{NodeIterator}}
+ <dd>
+  <ul class=brief>
+   <li><dfn for=NodeIterator attribute>expandEntityReferences</dfn>
   </ul>
 
  <dt>{{Text}}
@@ -9956,34 +9955,14 @@ the web platform. Implementations conforming to this specification will not supp
    <li><dfn attribute for=Text><code>isElementContentWhitespace</code></dfn>
    <li><dfn method for=Text><code>replaceWholeText()</code></dfn>
   </ul>
+
+ <dt>{{TreeWalker}}
+ <dd>
+  <ul class=brief>
+   <li><dfn for=TreeWalker attribute>expandEntityReferences</dfn>
+  </ul>
 </dl>
 
-
-<h3 id=dom-ranges-changes>DOM Ranges</h3>
-
-<p>These are the changes made to the features described in the "Document Object Model Range" chapter
-of <cite>DOM Level 2 Traversal and Range</cite>.
-
-<ul class=brief>
- <li><dfn interface>RangeException</dfn> has been removed.
- <li>{{Range/detach()}} is now a no-op.
-</ul>
-
-
-<h3 id=dom-traversal-changes>DOM Traversal</h3>
-
-<p>These are the changes made to the features described in the "Document Object Model Traversal"
-chapter of <cite>DOM Level 2 Traversal and Range</cite>.
-
-<ul class=brief>
- <li>{{createNodeIterator()}} and {{createTreeWalker()}} now have optional arguments and lack a
- fourth argument which is no longer relevant given entity references never made it into the DOM.
- <li>The <dfn for="NodeIterator, TreeWalker" attribute>expandEntityReferences</dfn> attribute has
- been removed from the {{NodeIterator}} and {{TreeWalker}} interfaces for the aforementioned reason.
- <li>{{NodeIterator/nextNode()}} and {{NodeIterator/previousNode()}} now throw when invoked from a
- {{NodeFilter}} to align with user agents.
- <li>{{NodeIterator/detach()}} is now a no-op.
-</ul>
 
 
 <h2 class=no-num id="acks">Acknowledgments</h2>
@@ -10004,17 +9983,20 @@ Anthony Ramine,
 Arkadiusz Michalski,
 Arnaud Le Hors,
 Arun Ranganathan,
+Benjamin Gruenbaum,
 Björn Höhrmann,
 Boris Zbarsky,
 Brandon Payton,
 Brandon Slade,
 Brandon Wallace,
 Brian Kardell,
+C. Scott Ananian,
 Cameron McCormack,
 Chris Dumez,
 Chris Paris,
 Chris Rebert,
 Cyrille Tuzi,
+Dan Burzo,
 Daniel Glazman,
 Darin Fisher,
 David Bruant,
@@ -10071,8 +10053,10 @@ Joshua Bell,
 J. S. Choi,
 Jungkee Song,
 Justin Summerlin,
+Kagami Sascha Rosylight,
 呂康豪 (Kang-Hao Lu),
 田村健人 (Kent TAMURA),
+Kevin J. Sung,
 Kevin Sweeney,
 Kirill Topolyan,
 Koji Ishii,
@@ -10145,10 +10129,12 @@ Veli Şenol,
 Vidur Apparao,
 Warren He,
 Xidorn Quan,
+Yash Handa,
 Yehuda Katz,
 Yoav Weiss,
 Yoichi Osato,
-Yoshinori Sano, and
+Yoshinori Sano,
+Yusuke Abe, and
 Zack Weinberg
 for being awesome!
 
@@ -10157,10 +10143,8 @@ for being awesome!
 with substantial contributions from Aryeh Gregor (<a href=mailto:ayg@aryeh.name>ayg@aryeh.name</a>)
 and Ms2ger (<a href="mailto:ms2ger@gmail.com">ms2ger@gmail.com</a>).
 
-<p>Part of the revision history of the integration points related to <a for=Element>custom</a>
-elements can be found in
+<p boilerplate=ipr>Part of the revision history of the integration points related to
+<a for=Element>custom</a> elements can be found in
 <a href="https://github.com/w3c/webcomponents">the w3c/webcomponents repository</a>, which is
 available under the
-<a href="https://www.w3.org/Consortium/Legal/2015/copyright-software-and-document">W3C Permissive Document License</a>.
-
-<!-- vim: set expandtab shiftwidth=1 tabstop=1 textwidth=100 -->
+<a href="https://www.w3.org/Consortium/Legal/2015/copyright-software-and-document">W3C Software and Document License</a>.

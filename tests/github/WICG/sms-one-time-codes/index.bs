@@ -1,0 +1,175 @@
+<pre class="metadata">
+Title: Origin-bound one-time codes delivered via SMS
+Shortname: sms-one-time-codes
+Repository: wicg/sms-one-time-codes
+URL: https://wicg.github.io/sms-one-time-codes/
+Group: WICG
+Status: CG-DRAFT
+Level: None
+Editor: Theresa O’Connor, w3cid 40614, Apple https://apple.com, hober@apple.com
+Editor: Sam Goto, Google https://google.com, goto@google.com
+Abstract: This specification defines a way to format SMS messages for use with browser autofill features such as HTML's autocomplete=one-time-code.
+Markup Shorthands: markdown yes, css no
+Complain About: accidental-2119 true
+</pre>
+
+<pre class="link-defaults">
+spec:infra; type:dfn; text:size;  for:list
+spec:infra; type:dfn; text:string
+spec:url;   type:dfn; text:origin
+spec:url;   type:dfn; text:scheme
+</pre>
+
+<div class="non-normative">
+
+<h2 id="intro" class=no-num>Introduction</h2>
+
+<em>This section is non-normative.</em>
+
+Many websites deliver one-time codes over SMS. [[GSM-SMS]]
+
+Without a standard format for such messages, programmatic extraction of codes from them has to rely on heuristics, which are often unreliable and error-prone. Additionally, without a mechanism for associating such codes with specific websites, users might be tricked into providing the code to malicious sites.
+
+This specification defines a format for the delivery of one-time codes over SMS. This format associates the one-time code with a specific [=origin=].
+
+</div>
+
+<h2 id="infra">Infrastructure</h2>
+
+This specification depends on the Infra Standard. [[!INFRA]]
+
+<h2 id="origin-bound-one-time-codes">Origin-bound one-time codes</h2>
+
+An <dfn export>origin-bound one-time code</dfn> is a [=tuple=] consisting of an [=origin=] and a code (a [=string=]).
+
+<div class=example>
+
+((`"https"`, `"example.com"`, `null`, `null`), `"747723"`) is an [=origin-bound one-time code=] whose origin is (`"https"`, `"example.com"`, `null`, `null`) and whose code is `"747723"`.
+
+</div>
+
+<h3 id="usage">Usage</h3>
+
+Many User Agents help users fill out forms on websites. Sites can use features like <a href="https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#attr-fe-autocomplete-one-time-code">`autocomplete=one-time-code`</a> to hint to User Agents that they could assist the user with providing a one-time code to the website. [[HTML]]
+
+<!-- We should be able to reference autocomplete=one-time-code with Bikeshed syntax along the lines of <{html/autocomplete/one-time-code}>. See whatwg/html#5418. -->
+
+In this section, an <dfn>active origin</dfn> is an [=origin=] of a [=top-level browsing context=]'s [=active document=].
+
+When a User Agent is in possession of an [=origin-bound one-time code=] and an [=active origin=] is <strong>[=same origin=]</strong> with the [=origin-bound one-time code=]'s origin, the User Agent may assist the user with providing the [=origin-bound one-time code=]'s code to the website.
+
+When a User Agent is in possession of an [=origin-bound one-time code=] and an [=active origin=] is <strong>[=same site=] but not [=same origin=]</strong> with the [=origin-bound one-time code=]'s origin, the User Agent may assist the user with providing the [=origin-bound one-time code=]'s code to the website, and should indicate the [=origin-bound one-time code=]'s origin to the user.
+
+When a User Agent is in possession of an [=origin-bound one-time code=] and an [=active origin=] is <strong>neither [=same site=] nor [=same origin=]</strong> with the [=origin-bound one-time code=]'s origin, the User Agent should not assist the user with providing the [=origin-bound one-time code=]'s code to the website.
+
+Note: because the [=scheme=] of an [=origin-bound one-time code=]'s origin is always `"https"`, assisting the user with providing [=origin-bound one-time codes=] is only available in [=secure contexts=].
+
+This specification does not impose any requirements or restrictions on the use of one-time codes which are not  [=origin-bound one-time codes=].
+
+<h2 id="format">Message format</h2>
+
+An <dfn export>origin-bound one-time code message</dfn> is a [=string=] for which
+<a lt="parse an origin-bound one-time code message">parsing an origin-bound one-time code message</a> successfully returns an [=origin-bound one-time code=].
+
+<div class="non-normative">
+
+<h3 id="authoring">Authoring</h3>
+
+<em>This section is non-normative. [[#parsing]] is the normative text.</em>
+
+[=Origin-bound one-time code messages=] can optionally begin with human-readable <dfn for="origin-bound one-time code message">explanatory text</dfn>. This consists of all but the last line of the message. The last line of the message contains both a <dfn for="origin-bound one-time code message">host</dfn> and a <dfn for="origin-bound one-time code message">code</dfn>, each prefixed with a sigil: U+0040 (@) before the <a for="origin-bound one-time code message">host</a>, and U+0023 (#) before the [=code=].
+
+<div class="example">
+
+In the following [=origin-bound one-time code message=], the <a for="origin-bound one-time code message">host</a> is `"example.com"`, the [=code=] is `"747723"`, and the [=explanatory text=] is `"747723 is your ExampleCo authentication code.\n\n"`.
+
+```
+"747723 is your ExampleCo authentication code.
+
+@example.com #747723"
+```
+
+</div>
+
+The last line has to begin with U+0040 (@). (Which is to say, the <a for="origin-bound one-time code message">host</a> always comes before the [=code=] in the message.)
+
+<div class="example">
+
+The message `"something @example.com #747723"` is not an [=origin-bound one-time code message=], because its last line does not begin with U+0040 (@).
+
+</div>
+
+<div class="example">
+
+The message `"#747723 @example.com"` is not an [=origin-bound one-time code message=], because its last line does not begin with U+0040 (@).
+
+</div>
+
+Exactly one U+0020 (SPACE) separates the two values in the last line of the message.
+
+<div class="example">
+
+The message `"@example.com code #747723"` is not an [=origin-bound one-time code message=], because several characters appear between the two values on the last line of the message.
+
+</div>
+
+Trailing text in the last line is ignored. This is because we might identify additional information to include in [=origin-bound one-time code messages=] in the future. If we do, new syntax could be introduced after the existing syntax in the last line.
+
+<div class="example">
+
+In the [=origin-bound one-time code message=] `"@example.com #747723 %future"`, the <a for="origin-bound one-time code message">host</a> is `"example.com"`, the [=code=] is `"747723"`, and the [=explanatory text=] is `""`. The trailing text `" %future"` is ignored.
+
+</div>
+
+</div>
+
+<h3 id="parsing">Parsing</h3>
+
+To <dfn export type="abstract-op">parse an origin-bound one-time code message</dfn> from |message|, run these steps:
+
+1. Let |line| be the [=last line=] of |message|, and |position| be 0.
+1. If the code point at |position| within |line| is not U+0040 (@), return failure.
+1. Advance |position| by 1.
+1. Let |host| be the result of [=collecting a sequence of code points=] which are not [=ASCII whitespace=] from |line| with |position|.
+1. If |host| is the empty string, return failure.
+1. If |host| is not a [=valid domain string=], a [=valid IPv4-address string=], or a [=valid IPv6-address string=], return failure.
+1. If the code point at |position| within |line| is not U+0020 (SPACE), return failure.
+1. Advance |position| by 1.
+1. If the code point at |position| within |line| is not U+0023 (#), return failure.
+1. Advance |position| by 1.
+1. Let |code| be the result of [=collecting a sequence of code points=] which are not [=ASCII whitespace=] from |line| with |position|.
+1. If |code| is the empty string, return failure.
+1. Return the [=origin-bound one-time code=] ((`"https"`, |host|, `null`, `null`), |code|).
+
+The <dfn type=abstract-op>last line</dfn> of |string| is the result of running these steps:
+
+1. [=Normalize newlines=] in |string|.
+1. Let |lines| be the result of <a lt="strictly split a string">strictly splitting</a> |string| on U+000A (LF).
+1. Return the last item of |lines|.
+
+<h2 id="security-considerations">Security considerations</h2>
+
+This specification attempts to mitigate the phishing risk associated with the delivery of one-time codes over SMS by enabling User Agents to know what website the one-time code is intended for.
+
+This specification does not attempt to mitigate other risks associated with the delivery of one-time codes over SMS, such as SMS spoofing, SIM swapping, SIM cloning, ISMI-catchers, or interception of the message by an untrusted party.
+
+Sites would do well to consider using non-SMS technologies such as [[WEBAUTHN]] for authentication or verification.
+
+<h2 id="privacy-considerations">Privacy considerations</h2>
+
+Any party which has access to a user's SMS messages (such as the user's cellular carrier, mobile operating system, or anyone who intercepted the message) can learn that the user has an account on the service identified in an [=origin-bound one-time code message=] delivered over SMS.
+
+On some platforms, User Agents might need access to all incoming SMS messages—even messages which are not [=origin-bound one-time code messages=]—in order to support the autofilling of [=origin-bound one-time codes=] delivered over SMS in [=origin-bound one-time code messages=].
+
+<h2 id="acknowedgements" class="no-num">Acknowledgements</h2>
+
+Many thanks to
+Aaron Parecki,
+Elaine Knight,
+Eric Shepherd,
+Eryn Wells,
+Jay Mulani,
+Ricky Mondello,
+and
+Steven Soneff
+for their valuable feedback on this proposal.

@@ -10,6 +10,7 @@ Editor: Lucas Gadani, Google, lfg@chromium.org
 Abstract: This specification defines a mechanism that allows for rendering of, and seamless navigation to, embedded content.
 Repository: https://github.com/WICG/portals/
 Markup Shorthands: css no, markdown yes
+Assume Explicit For: yes
 WPT Path Prefix: /portals/
 WPT Display: inline
 </pre>
@@ -23,21 +24,20 @@ spec: html; urlPrefix: https://html.spec.whatwg.org/multipage/
             text: data; for: MessageEvent; url: dom-messageevent-data
     type: dfn
         urlPrefix: browsers.html
-            text: browsing context; url: browsing-context
             text: browsing context group; url: browsing-context-group
             text: create a new top-level browsing context; url: creating-a-new-top-level-browsing-context
-            text: document browsing context; url: concept-document-bc
         urlPrefix: browsing-the-web.html
             text: prompt to unload; url: prompt-to-unload-a-document
+            text: unload; url: unload-a-document
+            text: reserved environment; for: navigation params; url: navigation-params-reserved-environment
+            text: request; for: navigation params; url: navigation-params-request
         urlPrefix: common-dom-interfaces.html
             text: limited to only known values; url: limited-to-only-known-values
+            text: reflect; url: reflect
         urlPrefix: history.html
             text: session history; url: session-history
-        urlPrefix: infrastructure.html
-            text: becomes browsing-context connected; url: becomes-browsing-context-connected
-            text: becomes browsing-context disconnected; url: becomes-browsing-context-disconnected
-        urlPrefix: origin.html
-            text: origin; url: concept-origin
+        urlPrefix: parsing.html
+            text: completely loaded; url: completely-loaded
         urlPrefix: urls-and-fetching.html
             text: parse a URL; url: parse-a-url
             text: resulting URL record; url: resulting-url-record
@@ -49,16 +49,16 @@ spec: ecma-262; urlPrefix: http://tc39.github.io/ecma262/
     type: dfn
         text: agent; url: sec-agents
         text: promise; url: sec-promise-objects
-spec: fetch; urlPrefix: https://fetch.spec.whatwg.org/
-    type: dfn
-        text: request referrer policy; url: concept-request-referrer-policy
-        text: request; url: concept-request
-        text: request URL; url: concept-request-url
 </pre>
-<pre class="link-defaults">
-spec:url; type:dfn; for:/; text:url
-spec:url; type:dfn; text:scheme
-</pre>
+
+<details class="annoying-warning">
+  <summary>This spec is behind the explainer</summary>
+
+  <p>This specification document has not yet been updated to reflect the 2020-04 updates to
+  <a href="https://github.com/WICG/portals#readme">the explainer</a>. We'll fix that as soon as we
+  can, but please be aware that there are probably contradictions, and the explainer should be taken
+  as more authoritative for the time being.</p>
+</details>
 
 <section class="non-normative">
   Introduction {#intro}
@@ -69,11 +69,20 @@ spec:url; type:dfn; text:scheme
   This specification extends [[HTML]] to define a new kind of [=top-level browsing context=],
   which can be embedded in another document, and a mechanism for replacing the contents of another
   top-level browsing context with the previously embedded context.
+
+  It is structured as a series of patches to HTML and other specifications, with each major section
+  indicating where each it would be placed in the event of eventual graduation from incubation.
+
+  See also the <a href="https://github.com/WICG/portals">explainer</a> for more background and
+  motivation.
 </section>
 
 <section>
-  Concepts {#concepts}
-  ====================
+  Portal browsing contexts {#concepts}
+  ====================================
+
+  <em>The following section would be added as a new sub-section of [[HTML]]'s
+  <a href="https://html.spec.whatwg.org/#windows">Browsing contexts</a> section.</em>
 
   Every [=browsing context=] has a <dfn>portal state</dfn>, which may be "`none`" (the default), "`portal`" or "`orphaned`".
   A [=nested browsing context=] always has the [=portal state=] "`none`".
@@ -111,17 +120,33 @@ spec:url; type:dfn; text:scheme
   </div>
 
   The <dfn>host browsing context</dfn> of a [=portal browsing context=] is its
-  [=host element=]'s [=node document|document=]'s [=browsing context=].
+  [=host element=]'s [=Node/node document=]'s [=browsing context=].
 
   The <dfn>portal task source</dfn> is a [=task source=] used for tasks related to the
   portal lifecycle and communication between a [=portal browsing context=] and its [=host browsing context=].
 
   <section algorithm="portal-browsing-context-activate">
     To <dfn>activate a portal browsing context</dfn> |successorBrowsingContext| in
-    place of |predecessorBrowsingContext| with data |serializeWithTransferResult|
-    and promise |promise|, run the following steps [=in parallel=]:
+    place of |predecessorBrowsingContext| with [=origin=] |sourceOrigin|, optional data
+    |serializeWithTransferResult|, and optional promise |promise|, run the following steps [=in parallel=]:
 
     1. [=Assert=]: The [=portal state=] of |predecessorBrowsingContext| is "`none`".
+
+    1. If |successorBrowsingContext|'s only entry in its [=session history=] is the initial
+        `about:blank` {{Document}}, then wait until either this is no longer true, or
+        |successorBrowsingContext|'s [=host element=] becomes null.
+
+        <p class="note">This means that the initial load is still happening in
+        |successorBrowsingContext|. We wait for it to complete, either successfully or
+        unsuccessfully, before continuing.</p>
+
+    1. If |successorBrowsingContext|'s [=host element=] is null, then:
+
+        1. [=Queue a global task=] on the [=portal task source=] given
+            |predecessorBrowsingContext|'s [=browsing context/active window=] to [=reject=]
+            |promise| with an "{{InvalidStateError}}" {{DOMException}}.
+
+        1. Return.
 
     1. Set the [=host element=] of |successorBrowsingContext| to null.
 
@@ -139,8 +164,8 @@ spec:url; type:dfn; text:scheme
 
     1. Let |successorWindow| be |successorBrowsingContext|'s associated {{WindowProxy}}'s \[[Window]] internal slot value.
 
-    1. [=Queue a task=] from the [=portal task source=]
-        to the [=event loop=] associated with |successorWindow| to run the following steps:
+    1. [=Queue a global task=] on the [=portal task source=] given |successorWindow| to run the
+        following steps:
 
         1. [=Assert=]: The [=portal state=] of |successorBrowsingContext| is "`portal`".
 
@@ -148,10 +173,16 @@ spec:url; type:dfn; text:scheme
 
         1. Let |targetRealm| be |successorWindow|'s [=global object/realm=].
 
-        1. Let |deserializeRecord| be [$StructuredDeserializeWithTransfer$](|serializeWithTransferResult|, |targetRealm|),
-            and let |dataClone| be |deserializeRecord|.\[[Deserialized]].
+        1. Let |dataClone| be null.
 
-            If this throws an exception, catch it, and let |dataClone| be null instead.
+        1. If |serializeWithTransferResult| is given and |successorBrowsingContext|'s [=active document=]'s
+            [=Document/origin=] is [=same origin=] with |sourceOrigin|, then:
+
+            1. Let |deserializeRecord| be
+                [$StructuredDeserializeWithTransfer$](|serializeWithTransferResult|, |targetRealm|),
+                and set |dataClone| to |deserializeRecord|.\[[Deserialized]].
+
+                If this throws an exception, catch it and do nothing.
 
         1. Let |event| be the result of [=creating an event=] using {{PortalActivateEvent}} and |targetRealm|.
 
@@ -163,7 +194,7 @@ spec:url; type:dfn; text:scheme
 
         1. Set |event|'s [=PortalActivateEvent/successor window=] to |successorWindow|.
 
-        1. Set |event|'s [=PortalActivateEvent/activation promise=] to |promise|.
+        1. Set |event|'s [=PortalActivateEvent/activation promise=] to |promise|, if it is given, and null otherwise.
 
         1. [=Dispatch=] |event| to |successorWindow|.
 
@@ -171,10 +202,10 @@ spec:url; type:dfn; text:scheme
 
         1. If |adoptedPredecessorElement| is not null, then:
 
-            1. Set |adoptedPredecessorElement|'s [=just-adopted flag=] to false.
+            1. Set |adoptedPredecessorElement|'s [=HTMLPortalElement/just-adopted flag=] to false.
 
             1. If |adoptedPredecessorElement| [=may have a guest browsing context|may not have a guest browsing context=] and
-                its [=guest browsing context=] is not null, then [=discard a browsing context|discard=] it.
+                its [=HTMLPortalElement/guest browsing context=] is not null, then [=discard a browsing context|discard=] it.
 
                 <div class="note">
                   This unceremoniously [=discard a browsing context|discards=]
@@ -182,26 +213,41 @@ spec:url; type:dfn; text:scheme
                   the document after previously being attached. This is
                   distinct from the case where the predecessor was never
                   adopted, below, which [=close a browsing context|closes=] the
-                  browsing context, which dispatches the
-                  {{Window/unload!!event}} event, somewhat similarly to if it
-                  had performed an ordinary navigation.
+                  browsing context. Closing [=unload|unloads=] the predecessor's
+                  document, somewhat similarly to if it had performed an ordinary
+                  navigation.
 
                   Typically authors would not call
                   {{PortalActivateEvent/adoptPredecessor()}} unless they intend
-                  to insert it into the document before the [=just-adopted flag=]
+                  to insert it into the document before the [=HTMLPortalElement/just-adopted flag=]
                   becomes false.
                 </div>
 
         1. Otherwise:
 
-            1. [=Queue a task=] from the [=portal task source=] to the [=event loop=]
-                associated with |predecessorBrowsingContext| to resolve |promise| with undefined.
+            1. If |promise| is given, [=queue a global task=] on the [=portal task source=] given
+                |predecessorBrowsingContext|'s [=browsing context/active window=] to resolve
+                |promise| with undefined.
 
             1. [=Close a browsing context|Close=] |predecessorBrowsingContext|.
 
                 The user agent *should not* ask the user for confirmation during the
                 [=prompt to unload=] step (and so the browsing context should be
                 [=discard a browsing context|discarded=]).
+
+                <div class="note">
+                  Authors should not expect the {{Window/unload!!event}} event
+                  to be dispatched consistently following portal activation. In
+                  addition to adoption of the predecessor, where the predecessor
+                  would not be [=unload|unloaded=] at all, the predecessor could
+                  also enter bfcache (back forward cache) where the unload event
+                  would not be dispatched.
+                </div>
+                <div class="issue">
+                  Determine how to treat unload/beforeunload handlers. See
+                  <a href="https://github.com/WICG/portals/issues/225">issue #225</a>
+                  for discussion.
+                </div>
   </section>
 
   <wpt>
@@ -227,13 +273,12 @@ spec:url; type:dfn; text:scheme
 
     1. Let |portalElement| be the result of [=creating an element=] given |document|, `portal`, and the [=HTML namespace=].
 
-    1. Set |portalElement|'s [=just-adopted flag=] to true.
+    1. Set |portalElement|'s [=HTMLPortalElement/just-adopted flag=] to true.
 
     1. [=Assert=]: |portalElement| is an {{HTMLPortalElement}}.
 
-    1. [=Queue a task=] from the [=portal task source=]
-        to the [=event loop=] associated with |predecessorBrowsingContext|
-        to run the following steps:
+    1. [=Queue a global task=] on the [=portal task source=] given |predecessorBrowsingContext|'s
+        [=browsing context/active window=] to run the following steps:
 
         1. [=Assert=]: The [=portal state=] of |predecessorBrowsingContext| is "`orphaned`".
 
@@ -267,11 +312,11 @@ spec:url; type:dfn; text:scheme
 </section>
 
 <section>
-  API {#api}
-  ==========
-
   The `portal` element {#the-portal-element}
-  ------------------------------------------
+  ==========================================
+
+  <em>The following section would be added as a new subsection of [[HTML]]'s
+  <a href="https://html.spec.whatwg.org/#embedded-content">Embedded content</a> section.</em>
 
   A <dfn element>portal</dfn> element allows for a [=portal browsing context=] to be embedded in an HTML document.
 
@@ -288,19 +333,19 @@ spec:url; type:dfn; text:scheme
   dispatch of the {{Window/portalactivate!!event}} event.
 
   The <dfn element-attr for="portal">src</dfn> attribute gives the [=URL=] of a
-  page that the [=guest browsing context=] is to contain. The attribute, if
+  page that the [=HTMLPortalElement/guest browsing context=] is to contain. The attribute, if
   present, must be a [=valid non-empty URL potentially surrounded by spaces=].
 
   The <dfn element-attr for="portal">referrerpolicy</dfn> attribute is a [=referrer policy attribute=].
-  Its purpose is to set the [=/referrer policy=] used when
+  Its purpose is to set the [=referrer policy=] used when
   [=set the source URL of a portal element|setting the source URL of a portal element=]. [[REFERRER-POLICY]]
 
   <p class="note">
     A <{portal}> is similar to an <{iframe}>, in that it allows another
     browsing context to be embedded.  However, the [=portal browsing context=]
     hosted by a <{portal}> is part of a separate [=browsing context group=],
-    and thus a separate [=agent=].  The user agent is therefore free to use a
-    separate [=event loop=] for the browsing contexts, even if they are [=same
+    and thus a separate [=agent=].  The user agent therefore uses a
+    separate [=agent/event loop=] for the browsing contexts, even if they are [=same
     origin-domain=].
   </p>
 
@@ -310,19 +355,21 @@ spec:url; type:dfn; text:scheme
           [CEReactions] attribute USVString src;
           [CEReactions] attribute DOMString referrerPolicy;
 
-          [NewObject] Promise<void> activate(optional PortalActivateOptions options);
-          void postMessage(any message, DOMString targetOrigin, optional sequence<object> transfer = []);
-          void postMessage(any message, optional WindowPostMessageOptions options);
+          [NewObject] Promise<undefined> activate(optional PortalActivateOptions options = {});
+          undefined postMessage(any message, optional PostMessageOptions options = {});
 
           attribute EventHandler onmessage;
           attribute EventHandler onmessageerror;
       };
 
-      dictionary PortalActivateOptions {
-          any data = null;
-          sequence<object> transfer = [];
+      dictionary PortalActivateOptions : PostMessageOptions {
+          any data;
       };
   </xmp>
+
+  <wpt>
+    portals-api.html
+  </wpt>
 
   The <dfn attribute for="HTMLPortalElement">src</dfn> IDL attribute must [=reflect=] the <{portal/src}> content attribute.
 
@@ -331,7 +378,7 @@ spec:url; type:dfn; text:scheme
   <section algorithm="htmlportalelement-activate">
     The <dfn method for="HTMLPortalElement"><code>activate(|options|)</code></dfn> method *must* run these steps:
 
-    1. Let |portalBrowsingContext| be the [=guest browsing context=] of [=this=].
+    1. Let |portalBrowsingContext| be the [=HTMLPortalElement/guest browsing context=] of [=this=].
 
     1. If |portalBrowsingContext| is null, throw an "{{InvalidStateError}}" {{DOMException}}.
 
@@ -339,8 +386,8 @@ spec:url; type:dfn; text:scheme
           portals-activate-no-browsing-context.html
         </wpt>
 
-    1. Let |predecessorBrowsingContext| be the [=document browsing context|browsing context=] of
-        [=this=]'s [=node document|document=].
+    1. Let |predecessorBrowsingContext| be the [=Document/browsing context=] of
+        [=this=]'s [=Node/node document=].
 
     1. If |predecessorBrowsingContext| is null, throw an "{{InvalidStateError}}" {{DOMException}}.
 
@@ -352,14 +399,17 @@ spec:url; type:dfn; text:scheme
 
     1. Let |serializeWithTransferResult| be
         [$StructuredSerializeWithTransfer$](|options|["{{PortalActivateOptions/data}}"],
-        |options|["{{PortalActivateOptions/transfer}}"]).
+        |options|["{{PostMessageOptions/transfer}}"]).
         Rethrow any exceptions.
 
     1. Let |promise| be a new [=promise=].
 
+    1. Let |sourceOrigin| be [=this=]'s [=relevant settings object=]'s
+        [=environment settings object/origin=].
+
     1. Run the steps to [=activate a portal browsing context|activate=] |portalBrowsingContext|
-        in place of |predecessorBrowsingContext| with data |serializeWithTransferResult| and
-        promise |promise|.
+        in place of |predecessorBrowsingContext| with |sourceOrigin|, |serializeWithTransferResult|,
+        and |promise|.
 
     1. Return |promise|.
 
@@ -373,45 +423,25 @@ spec:url; type:dfn; text:scheme
   </section>
 
   <section algorithm="htmlportalelement-postmessage">
-    The <dfn method for="HTMLPortalElement"><code>postMessage(|message|, |targetOrigin|, |transfer|)</code></dfn> method *must* run these steps:
-
-    1. Let |options| be « "{{WindowPostMessageOptions|targetOrigin}}" → |targetOrigin|, "{{PostMessageOptions|transfer}}" → |transfer| ».
-
-    1. Run the steps for {{HTMLPortalElement/postMessage(message, options)|postMessage}}(|message|, |options|).
-
     The <dfn method for="HTMLPortalElement"><code>postMessage(|message|, |options|)</code></dfn> method *must* run these steps:
 
-    1. Let |portalBrowsingContext| be the [=guest browsing context=] of [=this=].
+    1. Let |portalBrowsingContext| be the [=HTMLPortalElement/guest browsing context=] of [=this=].
 
     1. If |portalBrowsingContext| is null, throw an "{{InvalidStateError}}" {{DOMException}}.
 
-    1. Let |settings| be the [=relevant settings object=] of [=this=].
+    1. Let |sourceOrigin| be [=this=]'s [=relevant settings object=]'s [=environment settings object/origin=].
 
-    1. Let |origin| be the [=serialization of an origin|serialization=] of |settings|'s [=environment settings object/origin=].
-
-    1. Let |targetOrigin| be |options|["{{WindowPostMessageOptions|targetOrigin}}"].
-
-    1. If |targetOrigin| is a single U+002F SOLIDUS character (/), then set |targetOrigin| to the
-        [=environment settings object/origin=] of |settings|.
-
-    1. Otherwise, if |targetOrigin| is not a single U+002A ASTERISK character (*), then:
-
-        1. Let |parsedURL| be the result of running the [=URL parser=] on |targetOrigin|.
-
-        1. If |parsedURL| is failure, then throw a "{{SyntaxError}}" {{DOMException}}.
-
-        1. Set |targetOrigin| to |parsedURL|'s [=url/origin=].
-
-    1. Let |transfer| be |options|["{{WindowPostMessageOptions|transfer}}"].
+    1. Let |transfer| be |options|["{{PostMessageOptions/transfer}}"].
 
     1. Let |serializeWithTransferResult| be [$StructuredSerializeWithTransfer$](|message|, |transfer|). Rethrow any exceptions.
 
-    1. [=Queue a task=] from the [=portal task source=] to the [=event loop=] of |portalBrowsingContext| to run the following steps:
+    1. [=Queue a global task=] on the [=portal task source=] given |portalBrowsingContext|'s [=browsing context/active
+        window=] to run the following steps:
 
-        1. If |targetOrigin| is not a single literal U+002A ASTERISK character
-            (*) and the [=origin=] of |portalBrowsingContext|'s
-            [=active document=] is not [=same origin=] with |targetOrigin|, then
-            abort these steps.
+        1. If |portalBrowsingContext|'s [=active document=]'s [=Document/origin=] is not
+            [=same origin=] with |sourceOrigin|, then abort these steps.
+
+        1. Let |origin| be the [=serialization of an origin|serialization=] of |sourceOrigin|.
 
         1. Let |targetWindow| be |portalBrowsingContext|'s associated {{WindowProxy}}'s \[[Window]] internal slot value.
 
@@ -440,9 +470,9 @@ spec:url; type:dfn; text:scheme
   </section>
 
   <section algorithm="htmlportalelement-may-have-guest-browsing-context">
-    To determine whether a <{portal}> element <dfn for="HTMLPortalElement">may have a guest browsing context</dfn>, run the following steps:
+    To determine whether a <{portal}> element <dfn>may have a guest browsing context</dfn>, run the following steps:
 
-    1. If |element|'s [=node document|document=]'s [=browsing context=] is not a [=top-level browsing context=], then return false.
+    1. If |element|'s [=Node/node document=]'s [=browsing context=] is not a [=top-level browsing context=], then return false.
 
         <wpt>
           portals-nested.html
@@ -454,17 +484,50 @@ spec:url; type:dfn; text:scheme
           supported.
         </p>
 
+    1. If |element|'s [=Node/node document=]'s [=Document/URL=]'s [=url/scheme=] is not an
+        [=HTTP(S) scheme=], then return false.
+
+        <wpt>
+          about-blank-cannot-host.html
+        </wpt>
+
+        <p class="note">
+          This is to prevent problems later, if the portaled content attempts to
+          [=adopt the predecessor browsing context|adopt its predecessor=]. Since portaled content
+          can only have a [=HTTP(S) scheme=], adoption would fail, and so its simpler to restrict
+          things at this stage.
+        </p>
+
+    1. If |element|'s [=Node/node document=]'s [=Document/active sandboxing flag set=] is not empty,
+        then return false.
+
+        <wpt>
+          no-portal-in-sandboxed-popup.html
+        </wpt>
+
+        <p class="note">
+          Since portals cannot be created in [=child browsing contexts=] anyway, this step is about
+          preventing portal uses in [=auxiliary browsing contexts=] spawned by sandboxed
+          <{iframe}>s, or pages using CSP's [=sandbox=] directive.
+        </p>
+
+        <p class="note">
+          This restriction is largely added for simplicity. If there are use cases for portals
+          inside sandboxed documents, we can enable them in the future, with appropriate opt-in. See
+          <a href="https://github.com/WICG/portals/issues/207">issue #207</a> for discussion.
+        </p>
+
     1. If |element| is [=browsing-context connected=], then return true.
 
-    1. If |element|'s [=just-adopted flag=] is true, then return true.
+    1. If |element|'s [=HTMLPortalElement/just-adopted flag=] is true, then return true.
 
     1. Return false.
   </section>
 
   <section algorithm="htmlportalelement-close">
-    To <dfn for="HTMLPortalElement">close a <{portal}> element</dfn> |element|, run the following steps:
+    To <dfn>close a <{portal}> element</dfn> |element|, run the following steps:
 
-    1. If |element|'s [=guest browsing context=] is not null, then [=close a browsing context|close=] it.
+    1. If |element|'s [=HTMLPortalElement/guest browsing context=] is not null, then [=close a browsing context|close=] it.
 
         The user agent *should not* ask the user for confirmation during the
         [=prompt to unload=] step (and so the browsing context should be
@@ -472,57 +535,52 @@ spec:url; type:dfn; text:scheme
   </section>
 
   <section algorithm="htmlportalelement-setsourceurl">
-    To <dfn for="HTMLPortalElement">set the source URL of a <{portal}> element</dfn> |element|, run the following steps:
+    To <dfn>set the source URL of a <{portal}> element</dfn> |element|, run the following steps:
 
     1. [=Assert=]: |element| [=may have a guest browsing context=].
 
-    1. Let |hostBrowsingContext| be |element|'s [=node document|document=]'s [=browsing context=].
+    1. Let |hostBrowsingContext| be |element|'s [=Node/node document=]'s [=browsing context=].
 
     1. [=Assert=]: |hostBrowsingContext| is a [=top-level browsing context=].
 
+    1. [=close a portal element|Close=] |element|.
+
     1. If |element| has no <{portal/src}> attribute specified, or its value is the empty string,
-        then [=close a portal element|close=] |element| and return.
+        then return.
 
     1. [=Parse a URL|Parse=] the value of the <{portal/src}> attribute. If that is not successful,
-        then [=close a portal element|close=] |element| and return.
+        then return.
 
         Otherwise, let |url| be the [=resulting URL record=].
 
-    1. If the [=scheme=] of |url| is not an [=HTTP(S) scheme=], then [=close a portal element|close=]
-        |element| and return.
+    1. Assert: |element|'s [=HTMLPortalElement/guest browsing context=] is null.
 
-    1. If |element|'s [=guest browsing context=] is null, then run the following steps:
+    1. Let |guestBrowsingContext| be the result of
+        [=create a new top-level browsing context|creating a new top-level browsing context=].
 
-        1. Let |newBrowsingContext| be the result of
-            [=create a new top-level browsing context|creating a new top-level browsing context=].
+    1. Set the [=portal state=] of |guestBrowsingContext| to "`portal`", and set the [=host element=]
+        of |guestBrowsingContext| to |element|.
 
-        1. Set the [=portal state=] of |newBrowsingContext| to "`portal`", and set
-            the [=host element=] of |newBrowsingContext| to |element|.
-
-    1. Let |guestBrowsingContext| be |element|'s [=guest browsing context=].
-
-    1. [=Assert=]: |guestBrowsingContext| is not null.
-
-    1. Let |resource| be a new [=request=] whose [=request URL|URL=] is |url|
-        and whose [=request referrer policy|referrer policy=] is the current state of
+    1. Let |resource| be a new [=request=] whose [=request/url=] is |url|
+        and whose [=request/referrer policy=] is the current state of
         |element|'s <{portal/referrerpolicy}> content attribute.
 
     1. [=Navigate=] |guestBrowsingContext| to |resource|.
 
     <div class="note">
-      Unlike an <{iframe}> element, a <{portal}> element supports a state where
-      it has no associated browsing context. This is the initial state of a
-      <{portal}> element (i.e., it has no initial `about:blank` document;
-      instead it navigates directly to the first parsable URL assigned to it).
+      Unlike an <{iframe}> element, a <{portal}> element supports a state where it has no associated
+      browsing context. This is the initial state of a <{portal}> element. That is, the [=portal
+      browsing context=] has no web-developer-visible initial `about:blank` {{Document}}; instead it
+      [=navigates=] directly to the first parsable URL assigned to it, and if the navigation cannot
+      finish successfully, it [=close a browsing context|closes=] the browsing context before the
+      navigation algorithm finishes.
 
-      Similarly, a <{portal}> element responds to an unparsable <{portal/src}>
-      URL by [=close a browsing context|closing=] its browsing context, rather
-      than by navigating to `about:blank`.
+      Similarly, a <{portal}> element responds to an unparsable <{portal/src}> URL by [=close a
+      browsing context|closing=] its browsing context, rather than by navigating to `about:blank`.
     </div>
   </section>
 
   <wpt>
-    portal-non-http-navigation.html
     portals-cross-origin-load.sub.html
     portals-referrer.html
     portals-referrer-inherit-header.html
@@ -534,11 +592,12 @@ spec:url; type:dfn; text:scheme
 
   1. If |element| [=may have a guest browsing context=], then [=set the source URL of a portal element|set the source URL=] of |element|.
 
-  Whenever a <{portal}> element |element| [=becomes browsing-context connected=], run the following steps:
+  Whenever a <{portal}> element |element| [=become browsing-context connected|becomes
+  browsing-context connected=], run the following steps:
 
   1. If |element| [=may have a guest browsing context|may not have a guest browsing context=], then abort these steps.
 
-  1. If |element|'s [=guest browsing context=] is not null, then abort these steps.
+  1. If |element|'s [=HTMLPortalElement/guest browsing context=] is not null, then abort these steps.
 
       <div class="note">
         This ensures that a newly [=adopt the predecessor browsing context|adopted=]
@@ -548,9 +607,10 @@ spec:url; type:dfn; text:scheme
 
   1. [=set the source URL of a portal element|Set the source URL=] of |element|.
 
-  Whenever a <{portal}> element |element| [=becomes browsing-context disconnected=], run the following steps:
+  Whenever a <{portal}> element |element| [=become browsing-context disconnected|becomes
+  browsing-context connected=], run the following steps:
 
-  1. If |element| [=may have a guest browsing context|may not have a guest browsing context=] and its [=guest browsing context=] is not null, then [=discard a browsing context|discard=] it.
+  1. If |element| [=may have a guest browsing context|may not have a guest browsing context=] and its [=HTMLPortalElement/guest browsing context=] is not null, then [=discard a browsing context|discard=] it.
 
   <div class="issue">
     It might be convenient to not immediately detach the portal element, but instead to do so
@@ -560,25 +620,65 @@ spec:url; type:dfn; text:scheme
 
   Whenever a <{portal}> element |element| is [=adopting steps|adopted=], run the following steps:
 
-  1. Let |guestBrowsingContext| be |element|'s [=guest browsing context=].
+  1. Let |guestBrowsingContext| be |element|'s [=HTMLPortalElement/guest browsing context=].
 
   1. If |guestBrowsingContext| is null, then abort these steps.
 
   1. [=discard a browsing context|Discard=] |guestBrowsingContext|.
 
   <div class="note">
-    In particular, this means a <{portal}> element loses its [=guest browsing
+    In particular, this means a <{portal}> element loses its [=HTMLPortalElement/guest browsing
     context=] if it is moved to the [=active document=] of a [=nested browsing
     context=].
 
     Similarly, the steps when a <{portal}> element's
     [=set the source URL of a portal element|source URL is set=] prevent
-    elements from creating a new [=guest browsing context=] while inside such
+    elements from creating a new [=HTMLPortalElement/guest browsing context=] while inside such
     documents.
 
     It is therefore impossible to embed a [=portal browsing context=] in a
     [=nested browsing context=].
   </div>
+
+  Whenever a {{Document}} object |document| whose [=Document/browsing context=] is a
+  [=portal browsing context=] is marked as [=completely loaded=], run the following steps as part of
+  the queued task:
+
+  1. Let |element| be |document|'s [=Document/browsing context=]'s [=host element=].
+
+  1. [=Fire an event=] named {{HTMLElement/load!!event}} at |element|.
+
+  <wpt>
+    portal-onload-event.html
+    portals-cross-origin-load.sub.html
+  </wpt>
+
+  <section algorithm="htmlportalelement-activation-behavior">
+    A <{portal}> element |el|'s [=EventTarget/activation behavior=] is to run the following steps:
+
+    1. Let |portalBrowsingContext| be the [=HTMLPortalElement/guest browsing context=] of |el|.
+
+    1. If |portalBrowsingContext| is null, return.
+
+    1. Let |predecessorBrowsingContext| be the [=Document/browsing context=] of |el|'s [=Node/node
+        document=].
+
+    1. If |predecessorBrowsingContext| is null, return.
+
+    1. If the [=portal state=] of |predecessorBrowsingContext| is not "`none`", return.
+
+    1. Let |sourceOrigin| be |el|'s [=relevant settings object=]'s
+        [=environment settings object/origin=].
+
+    1. Run the steps to [=activate a portal browsing context|activate=] |portalBrowsingContext|
+        in place of |predecessorBrowsingContext| with |sourceOrigin|.
+
+    <div class="note">
+      This is substantially similar to the steps in {{HTMLPortalElement/activate(options)}}, with default options.
+      User agents might wish to display suitable console messages under the same conditions that would
+      result in promise rejection in those steps.
+    </div>
+  </section>
 
   The following events are dispatched on {{HTMLPortalElement}} objects:
 
@@ -611,22 +711,49 @@ spec:url; type:dfn; text:scheme
     htmlportalelement-event-handler-content-attributes.html
   </wpt>
 
-  The `PortalHost` interface {#the-portalhost-interface}
+  Portal hosts {#the-portalhost-interface}
   ------------------------------------------------------
 
-  The <dfn>portal host object</dfn> of a {{Window}} is a {{PortalHost}}.
+  Every {{Window}} has a <dfn>portal host object</dfn>, which is a {{PortalHost}}. It is exposed
+  through the {{Window/portalHost}} attribute getter at times when the window may be in a
+  [=portal browsing context=].
 
   <div class="note">
-    The [=portal host object=] can be used to communicate with the [=host browsing context=].
-    Its operations throw if used while its context is not a [=portal browsing context=] (i.e. there is no host).
-    It is not accessible via {{Window/portalHost|window.portalHost}} at such times.
+    The [=portal host object=] can be used to communicate with the [=host browsing context=]. Its
+    operations throw if used while its context is not a [=portal browsing context=] (i.e. there is
+    no host), in the event that JavaScript code has saved a reference to it. At such times, the
+    {{Window/portalHost|window.portalHost}} getter will return null.
   </div>
+
+  <xmp class="idl">
+      partial interface Window {
+          readonly attribute PortalHost? portalHost;
+      };
+  </xmp>
+
+  <section algorithm="window-portalhost">
+    The <dfn attribute for="Window">portalHost</dfn> attribute's getter *must* run the following steps:
+
+    1. Let |context| be [=this=]'s [=Window/browsing context=].
+
+    1. If |context| is null or the [=portal state=] of |context| is not "`portal`", then return null.
+
+    1. Return [=this=]'s [=portal host object=].
+  </section>
+
+  <wpt>
+    portals-host-exposure.sub.html
+    portals-host-null.html
+  </wpt>
+
+  <hr>
+
+  The {{PortalHost}} interface definition is as follows:
 
   <xmp class="idl">
       [Exposed=Window]
       interface PortalHost : EventTarget {
-          void postMessage(any message, DOMString targetOrigin, optional sequence<object> transfer = []);
-          void postMessage(any message, optional WindowPostMessageOptions options);
+          undefined postMessage(any message, optional PostMessageOptions options = {});
 
           attribute EventHandler onmessage;
           attribute EventHandler onmessageerror;
@@ -634,17 +761,9 @@ spec:url; type:dfn; text:scheme
   </xmp>
 
   <section algorithm="portalhost-postmessage">
-    The <dfn method for="PortalHost"><code>postMessage(|message|, |targetOrigin|, |transfer|)</code></dfn> method *must* run these steps:
-
-    1. Let |options| be « "{{WindowPostMessageOptions|targetOrigin}}" → |targetOrigin|, "{{PostMessageOptions|transfer}}" → |transfer| ».
-
-    1. Run the steps for {{PortalHost/postMessage(message, options)|postMessage}}(|message|, |options|).
-
     The <dfn method for="PortalHost"><code>postMessage(|message|, |options|)</code></dfn> method *must* run these steps:
 
-    1. Let |settings| be the [=relevant settings object=] of [=this=].
-
-    1. Let |browsingContext| be the [=responsible browsing context=] of |settings|.
+    1. Let |browsingContext| be [=this=]'s [=relevant global object=]'s [=Window/browsing context=].
 
     1. If |browsingContext| has a [=portal state=] other than "`portal`", throw an "{{InvalidStateError}}" {{DOMException}}.
 
@@ -652,33 +771,17 @@ spec:url; type:dfn; text:scheme
         It is possible that this browsing context will be [=activate a portal browsing context|activated=] in parallel
         to this message being sent; in such cases, messages may not be delivered.
 
-    1. Let |origin| be the [=serialization of an origin|serialization=] of |settings|'s [=environment settings object/origin=].
+    1. Let |sourceOrigin| be [=this=]'s [=relevant settings object=]'s [=environment settings object/origin=].
 
-    1. Let |targetOrigin| be |options|["{{WindowPostMessageOptions|targetOrigin}}"].
-
-    1. If |targetOrigin| is a single U+002F SOLIDUS character (/), then set |targetOrigin| to the
-        [=environment settings object/origin=] of |settings|.
-
-    1. Otherwise, if |targetOrigin| is not a single U+002A ASTERISK character (*), then:
-
-        1. Let |parsedURL| be the result of running the [=URL parser=] on |targetOrigin|.
-
-        1. If |parsedURL| is failure, then throw a "{{SyntaxError}}" {{DOMException}}.
-
-        1. Set |targetOrigin| to |parsedURL|'s [=url/origin=].
-
-    1. Let |transfer| be |options|["{{WindowPostMessageOptions|transfer}}"].
+    1. Let |transfer| be |options|["{{PostMessageOptions/transfer}}"].
 
     1. Let |serializeWithTransferResult| be [$StructuredSerializeWithTransfer$](|message|, |transfer|). Rethrow any exceptions.
 
     1. Let |hostElement| be the [=host element=] of |browsingContext|.
 
-    1. Let |hostBrowsingContext| be the [=host browsing context=] of |browsingContext|.
+    1. [=Queue an element task=] on the [=portal task source=] given |hostElement| to run the following steps:
 
-    1. [=Queue a task=] from the [=portal task source=] to the [=event loop=]
-        associated with |hostBrowsingContext| to run the following steps:
-
-        1. If |browsingContext| is not the [=guest browsing context=] of |hostElement|, then abort these steps.
+        1. If |browsingContext| is not the [=HTMLPortalElement/guest browsing context=] of |hostElement|, then abort these steps.
 
             Note: This might happen if this [=event loop=] had a queued task to deliver a message, but
             it was not executed before the portal was [=activate a portal browsing context|activated=].
@@ -686,9 +789,10 @@ spec:url; type:dfn; text:scheme
 
         1. Let |targetSettings| be the [=relevant settings object=] of |hostElement|.
 
-        1. If |targetOrigin| is not a single literal U+002A ASTERISK character
-            (*) and |targetSettings|'s [=environment settings object/origin=]
-            is not [=same origin=] with |targetOrigin|, then abort these steps.
+        1. If |targetSettings|'s [=environment settings object/origin=] is not [=same origin=] with
+            |sourceOrigin|, then abort these steps.
+
+        1. Let |origin| be the [=serialization of an origin|serialization=] of |sourceOrigin|.
 
         1. Let |targetRealm| be |targetSettings|'s [=environment settings object/realm=].
 
@@ -739,8 +843,10 @@ spec:url; type:dfn; text:scheme
   ------------------------------------------------------------------------
 
   <xmp class="idl">
-      [Constructor(DOMString type, optional PortalActivateEventInit eventInitDict), Exposed=Window]
+      [Exposed=Window]
       interface PortalActivateEvent : Event {
+          constructor(DOMString type, optional PortalActivateEventInit eventInitDict = {});
+
           readonly attribute any data;
           HTMLPortalElement adoptPredecessor();
       };
@@ -750,9 +856,17 @@ spec:url; type:dfn; text:scheme
       };
   </xmp>
 
+  <div class="note">
+    For now, there is no <code>ports</code> attribute on {{PortalActivateEvent}}, despite it being
+    used for data transfer in a similar way to {{MessageEvent}}. This omission is for simplicity,
+    and could be reconsidered if a use case is found. (See also
+    <a href="https://github.com/whatwg/html/issues/4521">whatwg/html#4521</a> for a potential
+    expansion.)
+  </div>
+
   A {{PortalActivateEvent}} has an associated <dfn for="PortalActivateEvent">predecessor browsing context</dfn>,
   which is a [=top-level browsing context=] or null, a <dfn for="PortalActivateEvent">successor window</dfn>, which is
-  a {{Window}}, an <dfn for="PortalActivateEvent">activation promise</dfn>, which is a [=promise=], and a
+  a {{Window}}, an <dfn for="PortalActivateEvent">activation promise</dfn>, which is a [=promise=] or null, and a
   <dfn for="PortalActivateEvent">adopted predecessor element</dfn>, which is a <{portal}> element or null.
 
   <section algorithm="portalactivateevent-event-constructing-steps">
@@ -783,8 +897,8 @@ spec:url; type:dfn; text:scheme
 
     1. Set [=this=]'s [=PortalActivateEvent/adopted predecessor element=] to |adoptedPredecessorElement|.
 
-    1. [=Queue a task=] from the [=portal task source=] to the [=event loop=] associated with
-        |predecessorBrowsingContext| to resolve [=this=]'s [=activation promise=] with undefined.
+    1. If [=this=]'s [=PortalActivateEvent/activation promise=] is not null, [=queue a global task=] on the [=portal task source=]
+        given |predecessorBrowsingContext|'s [=browsing context/active window=] to resolve it with undefined.
 
         Note: Queuing this immediately makes it possible to send messages to the adopted
         portal during dispatch of the {{Window/portalactivate!!event}} event without
@@ -797,8 +911,15 @@ spec:url; type:dfn; text:scheme
       portals-adopt-predecessor.html
     </wpt>
   </section>
+</section>
 
-  Miscellaneous extensions {#miscellaneous-extensions}
+<section>
+  Miscellaneous HTML updates {#miscellaneous-extensions}
+  ====================================================
+
+  <em>This section contains various small patches to miscellaneous areas of the HTML Standard.</em>
+
+  The {{MessageEvent}} interface {#patch-messageevent}
   ----------------------------------------------------
 
   The {{MessageEventSource}} union is extended to include the new interfaces
@@ -808,55 +929,256 @@ spec:url; type:dfn; text:scheme
   typedef (WindowProxy or MessagePort or ServiceWorker or HTMLPortalElement or PortalHost) MessageEventSource;
   </xmp>
 
-  A {{PortalHost}} is exposed at times when the window may be in a [=portal browsing context=].
+  Event handlers {#patch-event-handlers}
+  --------------------------------------
+
+  The table of [=event handlers=] which must be supported by {{Window}} objects, as [=event handler
+  IDL attributes=] on the {{Window}} objects themselves (i.e. the table containing `onafterprint`),
+  gets extended with the following row:
+
+  <table class="data" dfn-for="Window">
+    <thead>
+      <tr>
+        <th>[=Event handler=]</th>
+        <th>[=Event handler event type=]</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><dfn attribute for="Window"><code>onportalactivate</code></dfn></td>
+        <td>{{Window/portalactivate}}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  The corresponding {{WindowEventHandlers}} mixin gets extended as follows:
 
   <xmp class="idl">
-      partial interface Window {
-          readonly attribute PortalHost? portalHost;
-      };
-
       partial interface mixin WindowEventHandlers {
           attribute EventHandler onportalactivate;
       };
   </xmp>
 
-  <section algorithm="window-portalhost">
-    The <dfn attribute for="Window">portalHost</dfn> attribute's getter *must* run the following steps:
-
-    1. Let |context| be [=this=]'s [=Window/browsing context=].
-
-    1. If |context| is null or the [=portal state=] of |context| is not "`portal`", then return null.
-
-    1. Return [=this=]'s [=portal host object=].
-  </section>
-
-  <wpt>
-    portals-host-exposure.sub.html
-    portals-host-null.html
-  </wpt>
-
-  The following events are dispatched on {{Window}} objects:
+  The <a href="https://html.spec.whatwg.org/#events-2">Events index</a> is also updated with the
+  following additional row:
 
   <table class="data" dfn-for="Window">
     <thead>
       <tr>
-        <th>Event name</th>
+        <th>Event</th>
         <th>Interface</th>
-        <th>Dispatched when</th>
+        <th>Interesting targets</th>
+        <th>Description</th>
       </tr>
     </thead>
     <tbody>
       <tr>
         <td><dfn event for="Window"><code>portalactivate</code></dfn></td>
         <td>{{PortalActivateEvent}}</td>
-        <td>The window is associated with a new [=top-level browsing context=] due to activation of its [=portal browsing context=].</td>
+        <td>{{Window}}</td>
+        <td>Fired at the {{Window}} of a [=portal browsing context=] when that [=portal browsing
+        context=] is activated.</td>
       </tr>
     </tbody>
   </table>
 
-  Like other [=event handler IDL attributes=] in the {{WindowEventHandlers}} interface mixin,
-  {{WindowEventHandlers/onportalactivate}} is exposed on all <{body}> and <{frameset}> elements
-  as a [=event handler content attribute=].
+  APIs for creating and navigating browsing contexts by name {#patch-window-apis}
+  -------------------------------------------------------------------------------
+
+  Modify the definition of <a spec=HTML>script-closable</a> to prevent window closing while in a
+  [=portal browsing context=]:
+
+  A [=browsing context=] is <dfn noexport>script-closable</dfn> if either of the following is true:
+
+  * it is an [=auxiliary browsing context=] that was created by script (as opposed to by an action
+    of the user); or
+  * it is a [=top-level browsing context=] <ins>whose [=portal state=] is "`none`"</ins> and whose
+    [=session history=] contains only one {{Document}}.
+
+  <wpt>
+    portals-close-window.html
+  </wpt>
+
+  Navigation {#patch-navigation}
+  ------------------------------
+
+  Patch the <a spec=HTML>navigate</a> algorithm to prevent certain navigations in a
+  portal as follows:
+
+  <div algorithm="process a navigate response patch">
+    In <a spec=HTML>process a navigate response</a>, append the following after the step which
+    establishes the value of |failure|, but before the step which uses it to display an error page:
+
+    1. If |browsingContext|'s [=portal state=] is not "`none`", and any of the following hold:
+
+          * |failure| is true;
+          * |navigationParams|'s [=navigation params/request=] is null;
+          * |navigationParams|'s [=navigation params/request=]'s [=request/current URL=]'s
+            [=url/scheme=] is not a [=HTTP(S) scheme=];
+          * |response| has a \``Content-Disposition`\` header specifying the `attachment`
+              disposition type; or
+          * |response|'s [=response/status=] is 204 or 205,
+
+        then:
+
+        1. If |browsingContext|'s only entry in its [=session history=] is the initial `about:blank`
+            {{Document}}, then:
+            1. [=Close a portal element|Close=] |browsingContext|'s [=host element=].
+            1. Run the [=environment discarding steps=] for <var ignore>navigationParam</var>'s
+                [=navigation params/reserved environment=].
+        1. Return.
+  </div>
+
+  <div algorithm="process a navigate URL scheme patch">
+    In <a spec=HTML>process a navigate URL scheme</a>, insert the following step before the step
+    which displays inline content:
+
+    1. Otherwise, if |browsingContext|'s [=portal state=] is not "`none`", then [=close a portal
+        element|close=] |browsingContext|'s [=host element=].
+  </div>
+
+  <wpt>
+    portal-non-http-navigation.html
+  </wpt>
+
+  Downloading resources {#patch-downloading}
+  ------------------------------------------
+
+  Modify the <a spec=HTML>allowed to download</a> algorithm to ensure that portaled content never
+  performs downloads, by prepending the following steps:
+
+  <div algorithm="allowed to download patch">
+    1. If <var ignore>initiator browsing context</var>'s [=portal state=] is not "`none`", then
+        return false.
+
+    1. If <var ignore>instantiator browsing context</var>'s [=portal state=] is not "`none`", then
+        return false.
+  </div>
+
+</section>
+
+<section>
+  Updates to other specifications {#other-spec-updates}
+  =====================================================
+
+  Content Security Policy {#csp}
+  ------------------------------
+
+  This specification integrates with [[CSP]] as follows.
+
+  <p class="issue">Although `navigate-to` works as expected while the content is portaled, we also
+  need to apply it to prevent activation (which is basically a navigation). This is not yet specced,
+  pending spec updates to the navigation and session history handling.</p>
+
+  The following new subsection of [[CSP#directives-fetch]] is added:
+
+  ### `portal-src` ### {#portal-src-directive}
+
+  The <dfn export>portal-src</dfn> directive restricts the URLs which may be loaded into [=portal
+  browsing contexts=]. The syntax for the directive's name and value is described by the following
+  ABNF:
+
+  <pre highlight="abnf">
+  directive-name  = "portal-src"
+  directive-value = <a grammar>serialized-source-list</a>
+  </pre>
+
+  <div class="example" id="example-portal-src">
+    Given a page with the following Content Security Policy:
+
+    <pre>
+      <a http-header>Content-Security-Policy</a>: <a>portal-src</a> https://example.com/
+    </pre>
+
+    Fetches for the following code will return a network errors, and thus result in [=close a portal
+    element|closing=] the portal, as the URL provided does not match `portal-src`'s [=source list=]:
+
+    <xmp highlight="html">
+      <portal src="https://example.org/"></portal>
+    </xmp>
+  </div>
+
+  #### `portal-src` Pre-request check #### {#portal-src-pre-request}
+
+  This directive's [=directive/pre-request check=] is as follows:
+
+  <div algorithm="portal-src pre-request check">
+    Given a [=request=] |request| and a policy |policy|:
+
+    1. Let |name| be the result of executing [[CSP#effective-directive-for-a-request]] on |request|.
+
+    1. If the result of executing [[CSP#should-directive-execute]] on |name|, `portal-src` and
+        |policy| is "`No`", return "`Allowed`".
+
+    1. If the result of executing [[CSP#match-request-to-source-list]] on |request|, this directive's
+        [=directive/value=], and |policy| is "`Does Not Match`", return "`Blocked`".
+
+    1.  Return "`Allowed`".
+  </div>
+
+  #### `portal-src` Post-request check #### {#portal-src-post-request}
+
+  This directive's [=directive/post-request check=] is as follows:
+
+  <div algorithm="portal-src post-request check">
+    Given a [=request=] |request|, a [=response=] |response|, and a policy |policy|:
+
+    1. Let |name| be the result of executing [[CSP#effective-directive-for-a-request]] on |request|.
+
+    1. If the result of executing [[CSP#should-directive-execute]] on |name|, `portal-src` and
+        |policy| is "`No`", return "`Allowed`".
+
+    1. If the result of executing [[CSP#match-response-to-source-list]] on |response|, |request|,
+        this directive's [=directive/value=], and |policy| is "`Does Not Match`", return
+        "`Blocked`".
+
+    4.  Return "`Allowed`".
+  </div>
+
+  ### `default-src` ### {#default-src-patch}
+
+  The informative example text which expands it into all other fetch directives in
+  [[CSP#directive-default-src]] will need updating to include [=portal-src=].
+
+  ### Get fetch directive fallback list ### {#directive-fallback-list-patch}
+
+  The algorithm in [[CSP#directive-fallback-list]] needs updating to account for the new
+  [=portal-src=] fetch directive. Add a new case to step 1:
+
+  <dl class="switch">
+    : "`portal-src`"
+    ::
+        1. Return « "`portal-src`", "`prefetch-src`", "`default-src`" ».
+  </dl>
+
+  Fetch Metadata Request Headers {#fetch-metadata}
+  ------------------------------------------------
+
+  This specification integrates with [[FETCH-METADATA]] as follows.
+
+  <section algorithm="fetch-metadata-set-mode">
+    The algorithm to [[FETCH-METADATA#abstract-opdef-set-mode|set the Sec-Fetch-Mode header]] for a request |r|
+    is modified as follows:
+
+    1. Where the algorithm checks whether |r|'s [=request/reserved client=]'s [=environment/target
+        browsing context=] is a [=nested browsing context=], check instead whether it is a [=nested
+        browsing context=] or a [=portal browsing context=].
+  </section>
+
+  <div class="note">
+    The effect of this is that the request for a document in a [=portal browsing context=]
+    will contain the following HTTP header, as though it were in a [=nested browsing context=].
+
+    ```
+    Sec-Fetch-Mode: nested-navigate
+    ```
+  </div>
+
+  <div class="note">
+    Per the existing processing model, the other fetch metadata headers will automatically have the
+    same values as they would would if the load were occurring in an <{iframe}> element, with no
+    spec updates needed.
+  </div>
 </section>
 
 <section>
@@ -864,7 +1186,9 @@ spec:url; type:dfn; text:scheme
   ==================================================
 
   <div class="issue">
-    We should expand this section further.
+    We should expand this section further. Much of what was formerly there is in
+    [[#other-spec-updates]] now. Once we have a more comprehensive view of all the security-related
+    spec updates, we should summarize them in a non-normative fashion here.
   </div>
 
   Overview {#security-overview}
@@ -875,75 +1199,36 @@ spec:url; type:dfn; text:scheme
   In general, a [=portal browsing context=] should respect policies that would apply to
   a [=nested browsing context=], e.g. that would restrict whether a document can be embedded
   in a document from another [=origin=].
+</section>
 
-  Integration with Content Security Policy {#csp}
-  -----------------------------------------------
+<section>
+  Untriaged tests {#untriaged-tests}
+  ==================================
 
-  This specification integrates with [[CSP]] as follows.
+  In order to get this spec to build without warnings, we need to include all the web platform tests
+  explicitly. This section contains all the tests which we haven't yet written spec text for, or
+  haven't triaged into the appropriate sections.
 
-  <section algorithm="csp-effective-directive-for-a-request">
-    The algorithm for determining the [[CSP#effective-directive-for-a-request|effective directive for a request]]
-    is modified by prepending the following:
+  <wpt>
+    history/history-manipulation-inside-portal-with-subframes.html
+    history/history-manipulation-inside-portal.html
+    portal-activate-default.html
+    portals-activate-empty-browsing-context.html
+    portals-activate-network-error.html
+    portals-activate-while-unloading.html
+    portals-focus.sub.html
+    portals-navigate-after-adoption.html
+    portals-repeated-activate.html
+    portals-set-src-after-activate.html
+    predecessor-fires-unload.html
+  </wpt>
 
-    1. If |request|'s [=initiator=] is "", its [=destination=] is "`document`", and
-        its [=target browsing context=] is a [=portal browsing context=], return `frame-src`.
-  </section>
+  The following tests are actively incorrect and need to get updated:
 
-  <section algorithm="csp-frame-ancestors-navigation-response">
-    The [[CSP#frame-ancestors-navigation-response|frame-ancestors Navigation Response Check]]
-    is modified as follows:
-
-    1. Replace all references to "[=nested browsing context=]" with "[=nested browsing context=] or [=portal browsing context=]".
-
-    1. Replace all references to "[=parent browsing context=]" with "[=parent browsing context=] or [=host browsing context=]".
-  </section>
-
-  <div class="issue">
-    {{HTMLPortalElement/activate(options)}} should also respect the CSP [=navigate-to=] directive.
-  </div>
-
-  Integration with RFC 7034 {#rfc7034}
-  ------------------------------------
-
-  This specification integrates with [[RFC7034]], which defines the `X-Frame-Options` HTTP header, as follows.
-
-  If a browser receives content with this header field in response to a navigation request whose
-  [=target browsing context=] is a [=portal browsing context=], then the browser must apply the rules
-  in [[RFC7034]] as though it were to be displayed in a frame in the [=host browsing context=] instead
-  and as though the origin of the top-level browsing context |topLevelBrowsingContext| were the origin of
-  the result of the following algorithm:
-
-  1. While |topLevelBrowsingContext| is a [=portal browsing context=]:
-
-    1. Set |topLevelBrowsingContext| to its [=host browsing context=].
-
-  1. Return |topLevelBrowsingContext|.
-
-  Integration with Fetch Metadata Request Headers {#fetch-metadata}
-  -----------------------------------------------------------------
-
-  This specification integrates with [[FETCH-METADATA]] as follows.
-
-  <div class="note">
-    The effect of this is that the request for a document in a [=portal browsing context=]
-    will contain the following HTTP header, as though it were in a [=nested browsing context=].
-
-    ```
-    Sec-Fetch-Mode: nested-navigate
-    ```
-
-    Even though no spec patches are required to do so, implementations must also send
-    the appropriate fetch metadata headers as it would if the load were occurring in
-    an <{iframe}> element.
-  </div>
-
-  <section algorithm="fetch-metadata-set-mode">
-    The algorithm to [[FETCH-METADATA#abstract-opdef-set-mode|set the Sec-Fetch-Mode header]] for a request |r|
-    is modified as follows:
-
-    1. Where the algorithm checks whether |r|'s [=reserved client=]'s [=target browsing context=] is
-        a [=nested browsing context=], check instead whether it is a [=nested browsing context=] or
-        a [=portal browsing context=].
-  </section>
-
+  <wpt>
+    csp/frame-ancestors.sub.html
+    xfo/portals-xfo-deny.sub.html
+    xfo/portals-xfo-sameorigin.html
+    csp/frame-src.sub.html
+  </wpt>
 </section>

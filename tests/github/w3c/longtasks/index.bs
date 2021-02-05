@@ -40,7 +40,8 @@ urlPrefix: https://w3c.github.io/hr-time/; spec: HR-TIME-2;
         text: now(); url: #dom-performance-now
     type: dfn; text: current high resolution time; url: #dfn-current-high-resolution-time;
 urlPrefix: https://html.spec.whatwg.org/multipage/; spec: HTML;
-    type: dfn; url: #definitions-3; text: event loop definitions;
+    type: dfn; url: #event-loop; text: event loop;
+    type: dfn; url: #browsing-context; text: browsing context;
     type: dfn; url: #calling-scripts; text: calling scripts;
     type: dfn; url: #list-of-the-descendant-browsing-contexts; text: list of the descendant browsing contexts;
     type: dfn; url: #ancestor-browsing-context; text: ancestor;
@@ -134,7 +135,7 @@ The values of the attributes of a {{PerformanceLongTaskTiming}} are set in the p
 The {{PerformanceEntry/name}} attribute's getter will return one of the following strings:
 
 : "<code><dfn>unknown</dfn></code>"
-:: The long task originated from an <a>update the rendering</a> step within the <a>event loop processing model</a> or work the user agent performed outside of the <a>event loop</a>.
+:: The long task originated from work that the user agent performed outside of the <a>event loop</a>.
 : "<code><dfn>self</dfn></code>"
 :: The long task originated from an event loop <a>task</a> within this <a>browsing context</a>.
 : "<code><dfn>same-origin-ancestor</dfn></code>"
@@ -156,7 +157,7 @@ The {{PerformanceEntry/entryType}} attribute's getter will return <code>"longtas
 
 The {{PerformanceEntry/startTime}} attribute's getter will return a {{DOMHighResTimeStamp}} of when the task started.
 
-The {{PerformanceEntry/duration}} attribute's getter will return a {{DOMHighResTimeStamp}} equal to the elapsed time between the start and end of task.
+The {{PerformanceEntry/duration}} attribute's getter will return a {{DOMHighResTimeStamp}} equal to the elapsed time between the start and end of task, with a 1 ms granularity.
 
 The <dfn attribute for=PerformanceLongTaskTiming>attribution</dfn> attribute's getter will return a frozen array of {{TaskAttributionTiming}} entries.
 
@@ -259,50 +260,58 @@ Report long tasks {#report-long-tasks}
 --------------------------------------------------------
 
 <div algorithm="Report long tasks">
-    Given |start time|, |end time|, |top-level browsing contexts|, and optionally |task|, perform the following algorithm:
+    Given |start time|, |end time|, |top-level browsing contexts|, and |task|, perform the following algorithm:
 
     1. If |end time| minus |start time| is less than the long tasks threshold of 50 ms, abort these steps.
 
     1. Let |destinationRealms| be an empty set.
 
-    1. Determine the set of <a>JavaScript Realms</a> to which reports will be delivered:
+    1. Determine the set of [=JavaScript Realms=] to which reports will be delivered:
 
-        For each <a>top-level browsing context</a> |topmostBC| in |top-level browsing contexts|:
+        For each [=top-level browsing context=] |topmostBC| in |top-level browsing contexts|:
 
-        1. Add |topmostBC|'s Window's <a>relevant Realm</a> to |destinationRealms|.
-        1. Let |descendantBCs| be |topmostBC|'s <a>active document</a>'s <a>list of the descendant browsing contexts</a>.
-        1. For each |descendantBC| in |descendantBCs|, add |descendantBC|'s Window's <a>relevant Realm</a> to |destinationRealms|.
+        1. Add |topmostBC|'s [=active document=]'s [=relevant Realm=] to |destinationRealms|.
+        1. Let |descendantBCs| be |topmostBC|'s [=active document=]'s [=list of the descendant browsing contexts=].
+        1. For each |descendantBC| in |descendantBCs|, add |descendantBC|'s [=active document=]'s [=relevant Realm=] to |destinationRealms|.
+
+    1. A user agent may remove some [=JavaScript Realms=] from |destinationRealms|.
+
+    Note: this removal could be used to avoid reporting long tasks for [=JavaScript Realms=] that the user agent handles in a separate process. However, this concept is not specified precisely.
+
+    Issue(75): there is some ongoing discussion regarding the scope of which {{Document|Documents}} gain visibility over which long tasks, so this logic could change in the future.
 
     1. For each |destinationRealm| in |destinationRealms|:
 
-        1. Let |name| be the empty string. This will be used to report <a>minimal culprit attribution</a>, below.
+        1. Let |name| be the empty string. This will be used to report [=minimal culprit attribution=], below.
         1. Let |culpritSettings| be <code>null</code>.
-        1. If the |task| argument was not provided, set |name| to "<code><a>unknown</a></code>".
-        1. Otherwise: process |task|'s <a>script evaluation environment settings object set</a> to determine |name| and |culpritSettings| as follows:
+        1. Process |task|'s [=script evaluation environment settings object set=] to determine |name| and |culpritSettings| as follows:
 
-            1. If |task|'s <a>script evaluation environment settings object set</a> is empty: set |name| to "<code><a>unknown</a></code>" and |culpritSettings| to <code>null</code>.
-            1. If |task|'s <a>script evaluation environment settings object set</a>'s length is greater than one: set |name| to "<code><a>multiple-contexts</a></code>" and |culpritSettings| to <code>null</code>.
-            1. If |task|'s <a>script evaluation environment settings object set</a>'s length is one:
-                1. Set |culpritSettings| to the single item in |task|'s <a>script evaluation environment settings object set</a>.
-                1. Let |destinationSettings| be |destinationRealm|'s <a>relevant settings object</a>.
+            1. If |task|'s [=script evaluation environment settings object set=] is empty: set |name| to "<code>[=unknown=]</code>" and |culpritSettings| to <code>null</code>.
+            1. Otherwise, if |task|'s [=script evaluation environment settings object set=]'s length is greater than one: set |name| to "<code>[=multiple-contexts=]</code>" and |culpritSettings| to <code>null</code>.
+            1. Otherwise, i.e. if |task|'s [=script evaluation environment settings object set=]'s length is one:
+                1. Set |culpritSettings| to the single item in |task|'s [=script evaluation environment settings object set=].
+                1. Let |destinationSettings| be |destinationRealm|'s [=Realm/settings object=].
                 1. Let |destinationOrigin| be |destinationSettings|'s [=environment settings object/origin=].
-                1. Let |destinationBC| be |destinationSettings|'s <a>responsible browsing context</a>.
-                1. If |culpritSettings| is the same as |destinationSettings|, set |name| to "<code><a>self</a></code>".
-                1. If |culpritSettings|'s [=environment settings object/origin=] and |destinationOrigin| are <a>same origin</a>:
-                    1. If |culpritSettings|'s <a>responsible browsing context</a> is an <a>ancestor</a> of |destinationBC|, set |name| to "<code><a>same-origin-ancestor</a></code>".
-                    1. Otherwise, if |culpritSettings|'s <a>responsible browsing context</a> is a <a lt="list of the descendant browsing contexts">descendant</a> of |destinationBC|, set |name| to "<code><a>same-origin-descendant</a></code>".
-                    1. Otherwise, set |name| to "<code><a>same-origin</a></code>".
+                1. Let |destinationBC| be |destinationSettings|'s [=environment settings object/global object=]'s [=Window/browsing context=].
+                1. Let |culpritBC| be |culpritSettings|'s [=environment settings object/global object=]'s [=Window/browsing context=].
+                1. Assert: |culpritBC| is not <code>null</code>.
+                1. If |culpritSettings| is the same as |destinationSettings|, set |name| to "<code>[=self=]</code>".
+                1. Otherwise, if |culpritSettings|'s [=environment settings object/origin=] and |destinationOrigin| are [=same origin=]:
+                    1. If |destinationBC| is <code>null</code>, set |name| to "<code>[=same-origin=]</code>".
+                    1. Otherwise, if |culpritBC| is an [=ancestor=] of |destinationBC|, set |name| to "<code>[=same-origin-ancestor=]</code>".
+                    1. Otherwise, if |destinationBC| is an [=ancestor=] of |culpritBC|, set |name| to "<code>[=same-origin-descendant=]</code>".
+                    1. Otherwise, set |name| to "<code>[=same-origin=]</code>".
                 1. Otherwise:
-                    1. If |culpritSettings|'s <a>responsible browsing context</a> is an <a>ancestor</a> of |destinationBC|, set |name| to "<code><a>cross-origin-ancestor</a></code>" and set |culpritSettings| to <code>null</code>.
+                    1. If |destinationBC| is <code>null</code>, set |name| to "<code>[=cross-origin-unreachable=]</code>".
+                    1. Otherwise, if |culpritBC| is an [=ancestor=] of |destinationBC|, set |name| to "<code>[=cross-origin-ancestor=]</code>" and set |culpritSettings| to <code>null</code>.
 
                         NOTE: this is not reported because of security. Developers should look this up themselves.
 
-                    1. Otherwise, if |culpritSettings|'s <a>responsible browsing context</a> is a <a lt="list of the descendant browsing contexts">descendant</a> of |destinationBC|, set |name| to "<code><a>cross-origin-descendant</a></code>".
-                    1. Otherwise, set |name| to "<code><a>cross-origin-unreachable</a></code>".
+                    1. Otherwise, if |destinationBC| is an [=ancestor=] of |culpritBC|, set |name| to "<code>[=cross-origin-descendant=]</code>".
+                    1. Otherwise, set |name| to "<code>[=cross-origin-unreachable=]</code>".
 
-        1. If |task| was not provided, let |attribution| be <code>null</code>.
-        1. Otherwise, let |attribution| be a new {{TaskAttributionTiming}} object and set its attributes as follows:
-            1. Set |attribution|'s {{PerformanceEntry/name}} attribute to "<code><a>unknown</a></code>".
+        1. Let |attribution| be a new {{TaskAttributionTiming}} object with |destinationRealm| and set its attributes as follows:
+            1. Set |attribution|'s {{PerformanceEntry/name}} attribute to "<code>[=unknown=]</code>".
 
                 NOTE: future iterations of this API will add more values to the {{PerformanceEntry/name}} attribute of a {{TaskAttributionTiming}} object, but for now it can only be a single value.
 
@@ -311,7 +320,9 @@ Report long tasks {#report-long-tasks}
             1. Set |attribution|'s {{containerType}} attribute to <code>"window"</code>.
             1. Set |attribution|'s {{containerName}} and {{containerSrc}} attributes to the empty string.
             1. If |culpritSettings| is not <code>null</code>:
-                1. Let |container| be |culpritSettings|'s <a>responsible browsing context</a>'s <a>browsing context container</a>.
+                1. Let |culpritBC| be |culpritSettings|'s [=environment settings object/global object=]'s [=Window/browsing context=].
+                1. Assert: |culpritBC| is not <code>null</code>.
+                1. Let |container| be |culpritBC|'s [=browsing context container=].
                 1. Assert: |container| is not <code>null</code>.
                 1. Set |attribution|'s {{containerId}} attribute to the value of |container|'s [=Element/ID=], or the empty string if the ID is unset.
                 1. If |container| is an <{iframe}> element:
@@ -327,30 +338,86 @@ Report long tasks {#report-long-tasks}
                     1. Set |attribution|'s {{containerSrc}} attribute to the value of |container|'s <code>src</code> content attribute, or the empty string if the attribute is absent.
                 1. If |container| is an <{object}> element:
                     1. Set |attribution|'s {{containerType}} attribute to "<code>object</code>".
-                    1. Set |attribution|'s {{containerName}} attribute to the value of  |container|'s <{object/name}> content attribute, or the empty string if the attribute is absent.
+                    1. Set |attribution|'s {{containerName}} attribute to the value of  |container|'s <a href="https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-object-name">name</a> content attribute, or the empty string if the attribute is absent.
                     1. Set |attribution|'s {{containerSrc}} attribute to the value of |container|'s <{object/data}> content attribute, or the empty string if the attribute is absent.
                 1. If |container| is an <{embed}> element:
                     1. Set |attribution|'s {{containerType}} attribute to "<code>embed</code>".
                     1. Set |attribution|'s {{containerName}} attribute to the empty string.
                     1. Set |attribution|'s {{containerSrc}} attribute to the value of |container|'s <{embed/src}> content attribute, or the empty string if the attribute is absent.
 
-        1. Create a new {{PerformanceLongTaskTiming}} object |newEntry| and set its attributes as follows:
+        1. Create a new {{PerformanceLongTaskTiming}} object |newEntry| with |destinationRealm| and set its attributes as follows:
 
             1. Set |newEntry|'s {{PerformanceEntry/name}} attribute to |name|.
             1. Set |newEntry|'s {{PerformanceEntry/entryType}} attribute to "<code>longtask</code>".
             1. Set |newEntry|'s {{PerformanceEntry/startTime}} attribute to |start time|.
-            1. Set |newEntry|'s {{PerformanceEntry/duration}} attribute to |end time| minus |start time|.
+            1. Let |dur| be |end time| minus |start time|.
+            1. Set |newEntry|'s {{PerformanceEntry/duration}} attribute to the integer part of |dur|.
             1. If |attribution| is not <code>null</code>, set |newEntry|'s {{PerformanceLongTaskTiming/attribution}} attribute to a new frozen array containing the single value |attribution|.
 
                 NOTE: future iterations of this API will add more values to the {{PerformanceLongTaskTiming/attribution}} attribute, but for now it only contains a single value.
 
-        1. <a>Queue the PerformanceEntry</a> |newEntry| on |destinationRealm|.
+        1. [=Queue the PerformanceEntry=] |newEntry|.
 </div>
 
 Security & privacy considerations {#priv-sec}
 ===============================================
 
-Long Tasks API adheres to the same-origin policy by including origin-safe attribution information about the source of the long task.
-There is a 50ms threshold for long tasks. Together this provides adequate protection against security attacks against browser.
+Long Tasks API adheres to the same-origin policy by including origin-safe attribution information about
+the source of the long task. There is a 50ms threshold for long tasks. Durations are only provided in 1 ms
+granularity. Together this provides adequate protection against cross-origin leaks.
 
-However, privacy related attacks are possible, while the API doesn’t introduce any new privacy attacks, it could make existing privacy attacks faster. Mitigations for this are possible and discussed in the security review <a href="https://docs.google.com/document/d/1tIMI1gau_q6X5EBnjDNiFS5NWV9cpYJ5KKA7xPd3VB8/edit">in this document</a>.
+The Long Tasks API provides timing information about the duration and type of tasks executed by the user,
+as well as attribution such as the browsing context causing the function calls. This could enable an attacker
+to perform side-channel timing attacks to guess the user’s action, or identify the user. For example, a pattern of
+long script followed by a long render could be put together to guess user’s interaction with a social
+widget. Detailed function call attribution would be used to determine the user’s action.
+
+While the API doesn’t introduce any new privacy attacks, it could make existing privacy attacks faster.
+Mitigations for this are possible and can be implemented as needed:
+
+* Further clamp or add random jitter to the long task duration provided by the API to make attacks harder to
+    exploit.
+* Limit the number of origins for which longtasks are exposed by the API, and obfuscate the attribution of
+    any tasks afterwards. For instance, a page with 5 iframes could receive only attribution for tasks from 3
+    of those iframes, and would receive no attribution ({{PerformanceEntry/name}} set to <code>unknown</code>")
+    for tasks from the other 2.
+* Allow dropping the culprit/attribution information after a certain threshold. For instance, after 10 longtasks
+    all entries would receive no attribution and their {{PerformanceEntry/name}} would be "<code>unknown</code>".
+* Add a built-in delay to the timing information exposed to make attacks dependent on longtask volume harder
+    to execute.
+
+What is Exposed to Observers? {#what-is-exposed}
+--------------------------------------------------------
+
+All observers within the top level page (i.e. all iframes in the page and the main frame) will receive
+notifications about presence of long tasks. We expose the start time of the task, its duration (with 1 ms
+granularity), and a pointer to the culprit frame. This information can already be observed today, and with
+higher resolution, using setTimeout. An attacker can do this by clearing everything else on the page and adding
+the vulnerable cross-origin resource to ensure that delays from the setTimeout are caused by that resource.
+Observers in other different pages (tabs or windows) should not receive notifications, regardless of the
+architecture of the user agent.
+
+Cross origin rules for what is exposed:
+* Cross-origin observers may see the direction of the culprit e.g if the culprit is a deeply nested iframe,
+    then the host page can see the first cross-origin between itself and the culprit.
+* Conversely, if the culprit is the top level page, then a deeply embedded iframe can see that a longtask
+    occurrred in its cross-origin ancestor but does not receive any information about it.
+
+Attack Scenarios Considered {#attack-scenarios}
+--------------------------------------------------------
+
+The following are the timing attacks considered:
+
+1. <b>Traditional timing attacks</b>: using external resource load time to reveal the size of
+    private data. For instance the number of hidden pictures in a gallery, whether username is
+    valid, etc. See an <a href="http://crypto.stanford.edu/~dabo/papers/webtiming.pdf">example</a>.
+
+1. <b>Side-channel timing attacks</b>: using time for video parsing, script parsing, App Cache reads
+    or Cache API (service workers) usage to uniquely identify a user, or to create a profile of the
+    user’s age, gender, location, and interests etc. For
+    <a href="https://tom.vg/papers/timing-attacks_ccs2015.pdf">instance</a>, status updates from
+    a social network can be limited to certain demographic (eg. females of age 20-30) the file size of
+    the permalink page can be used to determine whether the user is in the target demographic.
+
+These scenarios are addressed by the 50ms threshold AND respecting cross-origin boundary i.e. not
+showing task type or additional attribution to untrusted cross origin observers.

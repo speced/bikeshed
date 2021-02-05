@@ -1,0 +1,157 @@
+<pre class='metadata'>
+Title: CSS Parser API
+Shortname: css-parser-api
+Level: 1
+Status: UD
+Group: HOUDINI
+URL: https://drafts.css-houdini.org/css-parser-api/
+Editor: Tab Atkins-Bittner
+Editor: Greg Whitworth
+Abstract: An API exposing the CSS parser more directly,
+Abstract: for parsing arbitrary CSS-like languages into a mildly typed representation.
+Repository: WICG/CSS-Parser-API
+</pre>
+
+Introduction {#intro}
+=====================
+
+Common data-interchange / parsing formats are very valuable
+for reducing the learning curve of new languages,
+as users get to lean on their existing knowledge of the format when authoring
+and only have to newly learn the specifics of the language.
+This is why generic parsing formats like XML or JSON have become so popular.
+
+The CSS language could benefit from this same treatment;
+a number of languages and tools rely on CSS-like syntax to express themselves,
+but they usually rely on ad-hoc parsing
+(often regex-based)
+which can be relatively fragile,
+and might break with CSS practices in interesting syntax corner cases.
+Similarly, CSS syntax is increasingly used in places like attribute values
+(such as the <{img/sizes}> attribute,
+or most of the SVG presentation attributes),
+and custom elements wanting to do the same thing
+similarly have to rely on ad-hoc parsing right now.
+
+To help with these sorts of cases,
+this spec exposes the [[!css-syntax-3]] parsing algorithms,
+and represents their results in a mildly-typed representation,
+simpler and more abstract than what [[css-typed-om-1]] does for CSS properties.
+
+Parsing API {#parsing-api}
+==========================
+
+<pre class=idl>
+typedef (DOMString or ReadableStream) CSSStringSource;
+typedef (DOMString or CSSStyleValue or CSSParserValue) CSSToken;
+
+partial namespace CSS {
+	Promise&lt;sequence&lt;CSSParserRule>> parseStylesheet(CSSStringSource css, optional CSSParserOptions options = {});
+	Promise&lt;sequence&lt;CSSParserRule>> parseRuleList(CSSStringSource css, optional CSSParserOptions options = {});
+	Promise&lt;CSSParserRule> parseRule(CSSStringSource css, optional CSSParserOptions options = {});
+	Promise&lt;sequence&lt;CSSParserRule>> parseDeclarationList(CSSStringSource css, optional CSSParserOptions options = {});
+	CSSParserDeclaration parseDeclaration(DOMString css, optional CSSParserOptions options = {});
+	CSSToken parseValue(DOMString css);
+	sequence&lt;CSSToken> parseValueList(DOMString css);
+	sequence&lt;sequence&lt;CSSToken>> parseCommaValueList(DOMString css);
+};
+
+dictionary CSSParserOptions {
+	object atRules;
+	/* dict of at-rule name => at-rule type
+	   (contains decls or contains qualified rules) */
+};
+</pre>
+
+Issue: {{parseCommaValueList()}} is in Syntax, and thus here,
+because it's actually a very common operation.
+It's trivial to do yourself
+(just call {{parseValueList()}} and then split into an array on top-level commas),
+but comma-separated lists are so common
+that it was worthwhile to improve spec ergonomics
+by providing a shortcut for that functionality.
+Is it worth it to provide this to JS as well?
+
+Issue: Do we handle comments?
+Currently I don't;
+Syntax by default just drops comments,
+but allows an impl to preserve information about them if they want.
+Maybe add an option to preserve comments?
+If so, they can appear *anywhere*,
+in any API that returns a sequence.
+
+Issue: What do we do if an unknown at-rule
+(not appearing in the {{atRules}} option)
+shows up in the results?
+Default to decls or rules?
+Or treat it more simply as just a token sequence?
+
+Issue: Parsing stylesheets/rule lists should definitely be async,
+because stylesheets can be quite large.
+Parsing individual properties/value lists should definitely be sync,
+because they're small and it would be really annoying.
+Parsing a single rule, tho, is unclear--
+is it large enough to be worth making async,
+or is it too annoying to be worth it?
+
+Parser Values {#parser-values}
+==============================
+
+<pre class=idl>
+[Exposed=Window]
+interface CSSParserRule {
+	/* Just a superclass. */
+};
+
+[Exposed=Window]
+interface CSSParserAtRule : CSSParserRule {
+	constructor(DOMString name, sequence&lt;CSSToken> prelude, optional sequence&lt;CSSParserRule>? body);
+	readonly attribute DOMString name;
+	readonly attribute FrozenArray&lt;CSSParserValue> prelude;
+	readonly attribute FrozenArray&lt;CSSParserRule>? body;
+	/* nullable to handle at-statements */
+	stringifier;
+};
+
+[Exposed=Window]
+interface CSSParserQualifiedRule : CSSParserRule {
+	constructor(sequence&lt;CSSToken> prelude, optional sequence&lt;CSSParserRule>? body);
+	readonly attribute FrozenArray&lt;CSSParserValue> prelude;
+	readonly attribute FrozenArray&lt;CSSParserRule> body;
+	stringifier;
+};
+
+[Exposed=Window]
+interface CSSParserDeclaration : CSSParserRule {
+	constructor(DOMString name, optional sequence&lt;CSSParserRule> body);
+	readonly attribute DOMString name;
+	readonly attribute FrozenArray&lt;CSSParserValue> body;
+	stringifier;
+};
+
+[Exposed=Window]
+interface CSSParserValue {
+	/* Just a superclass. */
+};
+
+[Exposed=Window]
+interface CSSParserBlock : CSSParserValue {
+	constructor(DOMString name, sequence&lt;CSSParserValue> body);
+	readonly attribute DOMString name; /* "[]", "{}", or "()" */
+	readonly attribute FrozenArray&lt;CSSParserValue> body;
+	stringifier;
+};
+
+[Exposed=Window]
+interface CSSParserFunction : CSSParserValue {
+	constructor(DOMString name, sequence&lt;sequence&lt;CSSParserValue>> args);
+	readonly attribute DOMString name;
+	readonly attribute FrozenArray&lt;FrozenArray&lt;CSSParserValue>> args;
+	stringifier;
+};
+</pre>
+
+Issue: Trying to be as useful as possible,
+without exposing so many details that we're unable to change tokenization in the future.
+In particular, whitespace and delims all get parsed into DOMStrings.
+Am I succeeding at this goal?

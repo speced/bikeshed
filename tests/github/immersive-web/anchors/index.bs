@@ -29,6 +29,7 @@ spec: WebXR Device API - Level 1; urlPrefix: https://www.w3.org/TR/webxr/#
         type: dfn; text: session; url: dom-xrframe-session
         type: dfn; text: time; url: xrframe-time
     for: XRSession;
+        type: dfn; text: list of frame updates; url: xrsession-list-of-frame-updates
         type: dfn; text: mode; url: xrsession-mode
         type: dfn; text: XR device; url: xrsession-xr-device
     for: XRSpace;
@@ -141,13 +142,13 @@ XRAnchor {#xr-anchor}
 interface XRAnchor {
   readonly attribute XRSpace anchorSpace;
 
-  void detach();
+  void delete();
 };
 </script>
 
-An {{XRAnchor}} contains {{XRAnchor/anchorSpace}} that can be used to locate the anchor relative to other {{XRSpace|XRSpaces}}. If this attribute is accessed when [=XRAnchor/detached=] is set to <code>true</code>, the user agent MUST throw an {{InvalidStateError}}.
+An {{XRAnchor}} contains {{XRAnchor/anchorSpace}} that can be used to locate the anchor relative to other {{XRSpace|XRSpaces}}. If this attribute is accessed when [=XRAnchor/deleted=] is set to <code>true</code>, the user agent MUST throw an {{InvalidStateError}}.
 
-Each {{XRAnchor}} has an associated <dfn for=XRAnchor>detached</dfn> boolean value that is initially set to <code>false</code>.
+Each {{XRAnchor}} has an associated <dfn for=XRAnchor>deleted</dfn> boolean value that is initially set to <code>false</code>.
 
 Each {{XRAnchor}} has an associated <dfn for=XRAnchor>native origin</dfn>.
 
@@ -158,7 +159,7 @@ In order to <dfn>create new anchor object</dfn> from |native origin| and |sessio
     1. Let |anchor| be a new {{XRAnchor}}.
     1. Set |anchor|'s [=XRAnchor/native origin=] to |native origin|.
     1. Set |anchor|'s [=XRAnchor/session=] to |session|.
-    1. Set |anchor|'s [=XRAnchor/detached=] to <code>false</code>.
+    1. Set |anchor|'s [=XRAnchor/deleted=] to <code>false</code>.
     1. Set |anchor|'s {{XRAnchor/anchorSpace}} to a new {{XRSpace}} object created with [=XRSpace/session=] set to |anchor|'s [=XRAnchor/session=] and [=XRSpace/native origin=] set to [=XRAnchor/native origin=].
     1. Return |anchor|.
 </div>
@@ -176,7 +177,7 @@ partial interface XRFrame {
 };
 
 partial interface XRHitTestResult {
-  Promise<XRAnchor> createAnchor(XRRigidTransform pose);
+  Promise<XRAnchor> createAnchor();
 };
 </script>
 
@@ -191,33 +192,39 @@ In order to <dfn>create an anchor from frame</dfn>, the application can call {{X
 <div class="algorithm" data-algorithm="create-anchor-from-frame">
 The {{XRFrame/createAnchor(pose, space)}} method, when invoked on an {{XRFrame}} |frame| with |pose| and |space|, MUST run the following steps:
     1. Let |promise| be [=a new Promise=].
-    1. If |frame|'s [=XRFrame/active=] boolean is <code>false</code>, [=/reject=] |promise| with {{InvalidStateError}} and abort these steps.
-    1. Add [=update anchors=] algorithm to session’s list of frame updates if it is not already present there.
+    1. If |frame|'s [=XRFrame/active=] boolean is <code>false</code>, [=/reject=] |promise| with {{InvalidStateError}}, return |promise|, and abort these steps.
     1. Let |session| be |frame|'s [=XRFrame/session=].
+    1. Add [=update anchors=] algorithm to |session|’s [=XRSession/list of frame updates=] if it is not already present there.
     1. Let |device| be |session|'s [=XRSession/XR device=].
-    1. Let |native origin| be |space|'s [=XRSpace/native origin=].
-    1. Let |anchor native origin| be a new native origin returned from the |device|'s call to create a new anchor using |pose|, interpreted as if expressed relative to |native origin|.
+    1. Let |effective origin| be |space|'s [=XRSpace/effective origin=].
+    1. Let |anchor native origin| be a new native origin returned from the |device|'s call to create a new anchor using |pose|, interpreted as if expressed relative to |effective origin| at the |frame|'s [=XRFrame/time=].
     1. [=Create new anchor object=] |anchor| using |anchor native origin| and |session|.
     1. Add |anchor| to |session|'s [=XRSession/set of tracked anchors=].
     1. Add a mapping from |anchor| to |promise| to |session|'s [=XRSession/map of new anchors=].
+    1. Return |promise|.
 </div>
 
-In order to <dfn>create an anchor from hit test result</dfn>, the application can call {{XRHitTestResult}}'s {{XRHitTestResult/createAnchor(pose)}} method.
+Note: It is the responsibility of user agents to ensure that the physical origin tracked by the anchor returned by each {{XRFrame/createAnchor(pose, space)}} call aligns as closely as possible with the physical location of |pose| within |space| at the time represented by the frame on which the method is called. Specifically, this means that for spaces that are dynamically changing, user agents should attempt to capture the native origin of such spaces at the app's specified time. This text is non-normative, but expresses the intent of the specification author(s) and contributors and thus it is highly recommended that it is followed by the implementations to ensure consistent behavior across different vendors.
+
+In order to <dfn>create an anchor from hit test result</dfn>, the application can call {{XRHitTestResult}}'s {{XRHitTestResult/createAnchor()}} method.
 
 <div class="algorithm" data-algorithm="create-anchor-from-hit-test-result">
-The {{XRHitTestResult/createAnchor(pose)}} method, when invoked on an {{XRHitTestResult}} |hitTestResult| with |pose|, MUST run the following steps:
+The {{XRHitTestResult/createAnchor()}} method, when invoked on an {{XRHitTestResult}} |hitTestResult|, MUST run the following steps:
     1. Let |promise| be [=a new Promise=].
     1. Let |frame| be |hitTestResult|'s [=XRHitTestResult/frame=].
-    1. If |frame|'s [=XRFrame/active=] boolean is <code>false</code>, [=/reject=] |promise| with {{InvalidStateError}} and abort these steps.
-    1. Add [=update anchors=] algorithm to session’s list of frame updates if it is not already present there.
+    1. If |frame|'s [=XRFrame/active=] boolean is <code>false</code>, [=/reject=] |promise| with {{InvalidStateError}}, return |promise|, and abort these steps.
     1. Let |session| be |frame|'s [=XRFrame/session=].
+    1. Add [=update anchors=] algorithm to |session|’s [=XRSession/list of frame updates=] if it is not already present there.
     1. Let |device| be |session|'s [=XRSession/XR device=].
     1. Let |nativeEntity| be the |hitTestResult|'s [=XRHitTestResult/native entity=].
-    1. Let |anchor native origin| be a new native origin returned from the |device|'s call to create a new anchor using |pose|, interpreted as if expressed relative to |hitTestResult|'s [=XRHitTestResult/native origin=] and [=attached=] to |nativeEntity|.
+    1. Let |anchor native origin| be a new native origin returned from the |device|'s call to create a new anchor located at |hitTestResult|'s [=XRHitTestResult/native origin=] and [=attached=] to |nativeEntity|, at the |frame|'s [=XRFrame/time=].
     1. [=Create new anchor object=] |anchor| using |anchor native origin| and |session|.
     1. Add |anchor| to |session|'s [=XRSession/set of tracked anchors=].
     1. Add a mapping from |anchor| to |promise| to |session|'s [=XRSession/map of new anchors=].
+    1. Return |promise|.
 </div>
+
+Note: The same remark that is present on {{XRFrame/createAnchor(pose, space)}} method applies here as well.
 
 Issue: Session's "list of frame updates" might need to have a way of specifying ordering - some algorithms may depend on others.
 
@@ -255,13 +262,13 @@ In order to <dfn>update anchors</dfn> for |frame|, the user agent MUST run the f
 Anchor removal {#anchor-removal}
 ==============
 
-When an application is no longer interested in receiving updates to an anchor, it can [=detach an anchor=] by calling {{XRAnchor/detach()}}.
+When an application is no longer interested in receiving updates to an anchor, it can [=delete an anchor=] by calling {{XRAnchor/delete()}}.
 
 <div class="algorithm" data-algorithm="detach-anchor">
-The {{XRAnchor/detach()}} method, when invoked on an {{XRAnchor}} |anchor|, MUST <dfn>detach an anchor</dfn> by running the following steps:
-    1. If |anchor|'s [=XRAnchor/detached=] is <code>true</code>, abort these steps.
+The {{XRAnchor/delete()}} method, when invoked on an {{XRAnchor}} |anchor|, MUST <dfn>delete an anchor</dfn> by running the following steps:
+    1. If |anchor|'s [=XRAnchor/deleted=] is <code>true</code>, abort these steps.
     1. Set |anchor|'s {{XRAnchor/anchorSpace}} to <code>null</code>.
-    1. Set |anchor|'s [=XRAnchor/detached=] to <code>true</code>.
+    1. Set |anchor|'s [=XRAnchor/deleted=] to <code>true</code>.
     1. Let |session| be an |anchor|'s [=XRFrame/session=].
     1. Let |device| be a |session|'s [=XRSession/XR device=].
     1. Let |native origin| be an |anchor|'s [=XRAnchor/native origin=].
