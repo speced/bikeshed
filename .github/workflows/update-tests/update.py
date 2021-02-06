@@ -37,13 +37,13 @@ def getData():
             match = re.match(r"(\+|-)(org|repo|file):\s*([^\s].*)", line)
             if not match:
                 raise Exception(
-                    "Line {0} of the specs.data file has bad syntax.".format(i))
+                    f"Line {i} of the specs.data file has bad syntax.")
             [plusMinus, type, path] = match.groups()
             if type == "org":
-                if plusMinus == "-":
-                    raise Exception(
-                        "Line {0} has a -org, which makes no sense.".format(i))
-                data['orgs'].append(path)
+                if plusMinus == "+":
+                    data['orgs'].append(path)
+                else:
+                    raise Exception(f"Line {i} has a -org, which makes no sense.")
             elif type == "repo":
                 if plusMinus == "+":
                     storage = data['moreRepos']
@@ -52,9 +52,7 @@ def getData():
                 storage.append(path)
             elif type == "file":
                 if plusMinus == "+":
-                    #storage = data['moreFiles']
-                    raise Exception(
-                        "Line {0} has a +file, which isn't currently supported.".format(i))
+                    raise Exception(f"Line {i} has a +file, which isn't currently supported.")
                 else:
                     storage = data['skipFiles']
                 storage.append(path)
@@ -115,7 +113,10 @@ def processFile(file):
 
 
 def main():
-    token = os.environ['GITHUB_TOKEN']
+    try:
+        token = os.environ['GITHUB_TOKEN']
+    except KeyError:
+        print("Set the GITHUB_TOKEN environment variable and try again.")
     g = Github(token)
     start_secs = time.monotonic()
     initial_rate_limit = g.rate_limiting
