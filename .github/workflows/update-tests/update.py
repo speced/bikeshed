@@ -1,14 +1,12 @@
 import base64
 import fnmatch
-import io
-import math
 import os
 import re
 import time
+from datetime import datetime
 
 from github import Github
 from github.GithubException import GithubException
-
 
 this_dir = os.path.dirname(__file__)
 root_dir = os.path.join(
@@ -30,7 +28,7 @@ def getData():
         "moreFiles": [],
         "skipFiles": [],
     }
-    with io.open(os.path.join(this_dir, "specs.data"), "r", encoding="utf-8") as fh:
+    with open(os.path.join(this_dir, "specs.data"), encoding="utf-8") as fh:
         for i, line in enumerate(fh.readlines(), 1):
             line = line.strip()
             if line == "":
@@ -70,15 +68,15 @@ def reposFromOrg(org, skipRepos=None):
         skipRepos = set()
     else:
         skipRepos = set(skipRepos)
-    print("Searching {0} org for repositories...".format(org.login))
+    print(f"Searching {org.login} org for repositories...")
     for repo in org.get_repos():
         if repo.archived:
-            print("  * Skipping archived repo {0}".format(repo.full_name))
+            print(f"  * Skipping archived repo {repo.full_name}")
             continue
         if repo.full_name in skipRepos:
-            print("  * Skipping repo {0}".format(repo.full_name))
+            print(f"  * Skipping repo {repo.full_name}")
             continue
-        print("  * Found repo {0}".format(repo.full_name))
+        print(f"  * Found repo {repo.full_name}")
         yield repo
 
 
@@ -87,7 +85,7 @@ def filesFromRepo(repo, skipFiles=None):
         skipFiles = set()
     else:
         skipFiles = set(skipFiles)
-    print("Searching {0} repo for Bikeshed files...".format(repo.full_name))
+    print(f"Searching {repo.full_name} repo for Bikeshed files...")
 
     try:
         tree = repo.get_git_tree(repo.default_branch, recursive=True)
@@ -98,10 +96,10 @@ def filesFromRepo(repo, skipFiles=None):
     for entry in tree.tree:
         path = repo.full_name + "/" + entry.path
         if any(fnmatch.fnmatch(path, pattern) for pattern in skipFiles):
-            print("  * Skipping file {0}".format(entry.path))
+            print(f"  * Skipping file {entry.path}")
             continue
         if entry.type == "blob" and entry.path.endswith(".bs"):
-            print("  * Found file {0}".format(entry.path))
+            print(f"  * Found file {entry.path}")
             blob = repo.get_git_blob(entry.sha)
             assert blob.encoding == "base64"
             text = base64.b64decode(blob.content).decode("utf-8")
@@ -110,11 +108,11 @@ def filesFromRepo(repo, skipFiles=None):
 
 def processFile(file):
     path = os.path.join(root_dir, "tests", "github", file["path"])
-    print("Saving file {0}".format(os.path.relpath(path, start=root_dir)))
+    print("Saving file {}".format(os.path.relpath(path, start=root_dir)))
     dirname = os.path.dirname(path)
     if not os.path.exists(dirname):
         os.makedirs(dirname)
-    with io.open(path, "w+", encoding="utf-8") as f:
+    with open(path, "w+", encoding="utf-8") as f:
         f.write(file["text"])
 
 
@@ -124,7 +122,6 @@ def main():
     except KeyError:
         print("Set the GITHUB_TOKEN environment variable and try again.")
     g = Github(token)
-    start_secs = time.monotonic()
     initial_rate_limit = g.rate_limiting
     print(
         "Initial rate limit is {0[1]} requests per hour ({0[0]} remaining)".format(
