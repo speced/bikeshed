@@ -130,9 +130,9 @@ def main():
     )
 
     def throttle():
-        if g.get_rate_limit().search.remaining == 1:
+        if g.get_rate_limit().core.remaining == 1:
             sleep_time = (
-                g.get_rate_limit().search.reset - datetime.utcnow()
+                g.get_rate_limit().core.reset - datetime.utcnow()
             ).total_seconds() + 1
             print(f"Sleeping {sleep_time}s to stay under rate limit.")
             time.sleep(sleep_time)
