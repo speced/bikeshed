@@ -122,14 +122,12 @@ def main():
     initial_rate_limit = g.rate_limiting
     print('Initial rate limit is {0[1]} requests per hour ({0[0]} remaining)'.format(initial_rate_limit))
     def throttle():
-        elapsed_secs = time.monotonic() - start_secs
-        current_rate_limit = g.rate_limiting
-        requests_used = initial_rate_limit[0] - current_rate_limit[0]
-        ideal_elapsed_secs = 3600 * (requests_used / current_rate_limit[1])
-        sleep_secs = math.ceil(ideal_elapsed_secs - elapsed_secs)
-        if (sleep_secs > 0):
-            print('Sleeping {}s to stay under rate limit ({} requests so far)'.format(sleep_secs, requests_used))
-            time.sleep(sleep_secs)
+        if g.get_rate_limit().search.remaining == 1:
+            sleep_time = (
+                g.get_rate_limit().search.reset - datetime.utcnow()
+            ).total_seconds() + 1
+            print(f'Sleeping {sleep_time}s to stay under rate limit.')
+            time.sleep(sleep_time)
     data = getData()
     repos = []
     for orgName in sorted(data['orgs']):
