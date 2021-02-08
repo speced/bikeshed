@@ -119,9 +119,11 @@ def processFile(file):
 def main():
     try:
         token = os.environ["GITHUB_TOKEN"]
+        g = Github(token)
     except KeyError:
-        print("Set the GITHUB_TOKEN environment variable and try again.")
-    g = Github(token)
+        print("Set the GITHUB_TOKEN environment variable for higher rate limit.")
+        g = Github()
+
     initial_rate_limit = g.rate_limiting
     print(
         "Initial rate limit is {0[1]} requests per hour ({0[0]} remaining)".format(
