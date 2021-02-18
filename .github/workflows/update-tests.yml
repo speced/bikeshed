@@ -1,10 +1,11 @@
-name: tests
+name: Daily test sync
 on:
   schedule:
   - cron: '20 20 * * *'
 jobs:
   update:
     runs-on: ubuntu-latest
+    if: github.repository_owner == 'tabatkins'
     steps:
     - uses: actions/checkout@v2
     - uses: actions/setup-python@v2
@@ -23,15 +24,9 @@ jobs:
         python .github/workflows/update-tests/update.py
         # paths need to be relative to tests/
         (cd tests; find github -type f) | xargs bikeshed test --rebase
-    - name: push branch
-      run: |
-        git checkout -b auto-test-update
-        git add -A
-        git commit -m "Automatic test update"
-        #git push -f origin auto-test-update
-        git log -1
-      working-directory: ../bikeshed
-    - name: update PR
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: python .github/workflows/update-tests/update_pr.py
+    - name: Create/Update PR
+      uses: peter-evans/create-pull-request@v3
+      with:
+        branch: daily-test-sync
+        commit-message: 'chore: Sync Bikeshed files from specs.data list'
+        title: 'Daily sync of Bikeshed files from specs.data'
