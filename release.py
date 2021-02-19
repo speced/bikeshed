@@ -45,7 +45,7 @@ def createRelease():
         action="store_true",
         help="Upload to test.pypi.org instead.",
     )
-    options, extras = args.parse_known_args()
+    options, _ = args.parse_known_args()
 
     # Bump the semver
     if options.bump == "break":
@@ -132,7 +132,7 @@ def inBikeshedRoot():
             return os.path.isdir(".git")
         else:
             return False
-    except:
+    except subprocess.CalledProcessError:
         return False
 
 

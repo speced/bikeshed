@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import bikeshed
+from bikeshed import cli
 
 if __name__ == "__main__":
-    bikeshed.main()
+    cli.main()
