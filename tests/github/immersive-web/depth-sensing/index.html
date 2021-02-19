@@ -649,7 +649,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   </div>
   <div class="p-summary" data-fill-with="abstract">
    <h2 class="no-num no-toc no-ref heading settled" id="abstract"><span class="content">Abstract</span></h2>
-   <p>Depth Sensing API is a module extending the capabilities of WebXR Device API. It enables apps to obtain depth information computed by supported XR devices in order to provide more immersive experiences. The example use cases of depth sensing API include (but are not limited to) simulating physical interactions of virtual objects with the users' environment, and occlusion.</p>
+   <p>Depth Sensing API is a module extending the capabilities of WebXR Device API. It enables apps to obtain depth information computed by supported XR devices in order to provide more immersive experiences. The example use cases of depth sensing API include (but are not limited to) simulating physical interactions of virtual objects with the real world, occlusion, and non-visual applications that can make use of increased awareness of users' environment.</p>
   </div>
   <h2 class="no-num no-toc no-ref heading settled" id="sotd"><span class="content">Status of this document</span></h2>
   <div data-fill-with="status">
@@ -668,14 +668,22 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <a href="#initialization"><span class="secno">2</span> <span class="content">Initialization</span></a>
      <ol class="toc">
       <li><a href="#feature-descriptor"><span class="secno">2.1</span> <span class="content">Feature descriptor</span></a>
+      <li><a href="#usage-and-formats"><span class="secno">2.2</span> <span class="content">Intended data usage and data formats</span></a>
+      <li><a href="#session-configuration"><span class="secno">2.3</span> <span class="content">Session configuration</span></a>
      </ol>
     <li>
      <a href="#obtaining-data"><span class="secno">3</span> <span class="content">Obtaining depth data</span></a>
      <ol class="toc">
       <li><a href="#xr-depth-info-section"><span class="secno">3.1</span> <span class="content">XRDepthInformation</span></a>
+      <li><a href="#xr-cpu-depth-info-section"><span class="secno">3.2</span> <span class="content">XRCPUDepthInformation</span></a>
+      <li><a href="#xr-gpu-depth-info-section"><span class="secno">3.3</span> <span class="content">XRWebGLDepthInformation</span></a>
      </ol>
     <li><a href="#results-interpretation"><span class="secno">4</span> <span class="content">Interpreting the results</span></a>
-    <li><a href="#native-device-concepts"><span class="secno">5</span> <span class="content">Native device concepts</span></a>
+    <li>
+     <a href="#native-device-concepts"><span class="secno">5</span> <span class="content">Native device concepts</span></a>
+     <ol class="toc">
+      <li><a href="#native-depth-sensing-section"><span class="secno">5.1</span> <span class="content">Native depth sensing</span></a>
+     </ol>
     <li><a href="#privacy-security"><span class="secno">6</span> <span class="content">Privacy &amp; Security Considerations</span></a>
     <li><a href="#ack"><span class="secno">7</span> <span class="content">Acknowledgements</span></a>
     <li>
@@ -694,117 +702,464 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <a href="#references"><span class="secno"></span> <span class="content">References</span></a>
      <ol class="toc">
       <li><a href="#normative"><span class="secno"></span> <span class="content">Normative References</span></a>
+      <li><a href="#informative"><span class="secno"></span> <span class="content">Informative References</span></a>
      </ol>
     <li><a href="#idl-index"><span class="secno"></span> <span class="content">IDL Index</span></a>
-    <li><a href="#issues-index"><span class="secno"></span> <span class="content">Issues Index</span></a>
    </ol>
   </nav>
   <main>
    <h2 class="heading settled" data-level="1" id="intro"><span class="secno">1. </span><span class="content">Introduction</span><a class="self-link" href="#intro"></a></h2>
    <section class="non-normative">
-    <p>As Augmented Reality becomes more prevalent, new features are being introduced by the native APIs that enable accessing more detailed information about the environment in which the user is located. Depth Sensing API brings one such capability to WebXR Device API, allowing authors of WebXR-powered experiences to obtain information about the distance from the user’s device to the real world geometry in the user’s environment.</p>
+    <p>As Virtual Reality and Augmented Reality becomes more prevalent, new features are being introduced by the native APIs that enable accessing more detailed information about the environment in which the user is located. Depth Sensing API brings one such capability to WebXR Device API, allowing authors of WebXR-powered experiences to obtain information about the distance from the user’s device to the real world geometry in the user’s environment.</p>
+    <p>This document assumes readers' familiarity with <a data-link-type="biblio" href="#biblio-webxr">WebXR Device API</a> and <a data-link-type="biblio" href="#biblio-webxr-ar-module-1">WebXR Augmented Reality Module</a> specifications, as it builds on top of them to provide additional features to <code class="idl"><a data-link-type="idl" href="https://www.w3.org/TR/webxr/#xrsession-interface" id="ref-for-xrsession-interface">XRSessions</a></code>.</p>
    </section>
    <h3 class="heading settled" data-level="1.1" id="terminology"><span class="secno">1.1. </span><span class="content">Terminology</span><a class="self-link" href="#terminology"></a></h3>
+   <p>This document uses the acronyms AR to signify Augmented Reality, and VR to signify Virtual Reality.</p>
+   <p>This document uses terms like "depth buffer", "depth buffer data" and "depth data" interchangably when referring to an array of bytes containing depth information, either returned by the XR device, or returned by the API itself. More information about the specific contents of the depth buffer can be found in <code class="idl"><a data-link-type="idl" href="#dom-xrcpudepthinformation-data" id="ref-for-dom-xrcpudepthinformation-data">data</a></code> and <code class="idl"><a data-link-type="idl" href="#dom-xrwebgldepthinformation-texture" id="ref-for-dom-xrwebgldepthinformation-texture">texture</a></code> entries of the specification.</p>
+   <p>This document uses the term <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="normalized-view-coordinates">normalized view coordinates</dfn> when referring to a coordinate system that has an origin in the top left corner of the view, with X axis growing to the right, and Y axis growing downward.</p>
    <h2 class="heading settled" data-level="2" id="initialization"><span class="secno">2. </span><span class="content">Initialization</span><a class="self-link" href="#initialization"></a></h2>
    <h3 class="heading settled" data-level="2.1" id="feature-descriptor"><span class="secno">2.1. </span><span class="content">Feature descriptor</span><a class="self-link" href="#feature-descriptor"></a></h3>
    <p>The applications can request that depth sensing be enabled on an XRSession by passing an appropriate <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#feature-descriptor" id="ref-for-feature-descriptor">feature descriptor</a>. This module introduces new string - <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="depth-sensing">depth-sensing</dfn>, as a new valid feature descriptor for depth sensing feature.</p>
-   <p>A device is <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#capable-of-supporting" id="ref-for-capable-of-supporting">capable of supporting</a> the depth sensing feature if the device exposes <a data-link-type="dfn">native depth sensing</a> capability. The <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#inline-xr-device" id="ref-for-inline-xr-device">inline XR device</a> MUST NOT be treated as <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#capable-of-supporting" id="ref-for-capable-of-supporting①">capable of supporting</a> the depth sensing feature.</p>
+   <p>A device is <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#capable-of-supporting" id="ref-for-capable-of-supporting">capable of supporting</a> the depth sensing feature if the device exposes <a data-link-type="dfn" href="#native-depth-sensing" id="ref-for-native-depth-sensing">native depth sensing</a> capability. The <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#inline-xr-device" id="ref-for-inline-xr-device">inline XR device</a> MUST NOT be treated as <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#capable-of-supporting" id="ref-for-capable-of-supporting①">capable of supporting</a> the depth sensing feature.</p>
    <p>The depth sensing feature is subject to <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#feature-policy" id="ref-for-feature-policy">feature policy</a> and requires <code>"xr-spatial-tracking"</code> policy to be allowed on the requesting document’s origin.</p>
+   <h3 class="heading settled" data-level="2.2" id="usage-and-formats"><span class="secno">2.2. </span><span class="content">Intended data usage and data formats</span><a class="self-link" href="#usage-and-formats"></a></h3>
+<pre class="idl highlight def"><c- b>enum</c-> <dfn class="dfn-paneled idl-code" data-dfn-type="enum" data-export id="enumdef-xrdepthusage"><code><c- g>XRDepthUsage</c-></code></dfn> {
+  <a class="idl-code" data-link-type="enum-value" href="#dom-xrdepthusage-cpu-optimized" id="ref-for-dom-xrdepthusage-cpu-optimized"><c- s>"cpu-optimized"</c-></a>,
+  <a class="idl-code" data-link-type="enum-value" href="#dom-xrdepthusage-gpu-optimized" id="ref-for-dom-xrdepthusage-gpu-optimized"><c- s>"gpu-optimized"</c-></a>,
+};
+</pre>
+   <ul>
+    <li data-md>
+     <p>An usage of <dfn class="dfn-paneled idl-code" data-dfn-for="XRDepthUsage" data-dfn-type="enum-value" data-export id="dom-xrdepthusage-cpu-optimized"><code>"cpu-optimized"</code></dfn> indicates that the depth data is intended to be used on the CPU, by interacting with <code class="idl"><a data-link-type="idl" href="#xrcpudepthinformation" id="ref-for-xrcpudepthinformation">XRCPUDepthInformation</a></code> interface.</p>
+    <li data-md>
+     <p>An usage of <dfn class="dfn-paneled idl-code" data-dfn-for="XRDepthUsage" data-dfn-type="enum-value" data-export id="dom-xrdepthusage-gpu-optimized"><code>"gpu-optimized"</code></dfn> indicates that the depth data is intended to be used on the GPU, by interacting with <code class="idl"><a data-link-type="idl" href="#xrwebgldepthinformation" id="ref-for-xrwebgldepthinformation">XRWebGLDepthInformation</a></code> interface.</p>
+   </ul>
+<pre class="idl highlight def"><c- b>enum</c-> <dfn class="dfn-paneled idl-code" data-dfn-type="enum" data-export id="enumdef-xrdepthdataformat"><code><c- g>XRDepthDataFormat</c-></code></dfn> {
+  <a class="idl-code" data-link-type="enum-value" href="#dom-xrdepthdataformat-luminance-alpha" id="ref-for-dom-xrdepthdataformat-luminance-alpha"><c- s>"luminance-alpha"</c-></a>,
+  <a class="idl-code" data-link-type="enum-value" href="#dom-xrdepthdataformat-float32" id="ref-for-dom-xrdepthdataformat-float32"><c- s>"float32"</c-></a>
+};
+</pre>
+   <ul>
+    <li data-md>
+     <p>A data format of <dfn class="dfn-paneled idl-code" data-dfn-for="XRDepthDataFormat" data-dfn-type="enum-value" data-export id="dom-xrdepthdataformat-luminance-alpha"><code>"luminance-alpha"</code></dfn> indicates that items in the depth data buffers obtained from the API are 2-byte unsigned integer values.</p>
+    <li data-md>
+     <p>A data format <dfn class="dfn-paneled idl-code" data-dfn-for="XRDepthDataFormat" data-dfn-type="enum-value" data-export id="dom-xrdepthdataformat-float32"><code>"float32"</code></dfn> indicates that items in the depth data buffers obtained from the API are 4-byte floating point values.</p>
+   </ul>
+   <p>The following table summarizes the ways various data formats can be consumed:</p>
+   <table class="tg">
+    <thead>
+     <tr>
+      <th>Data format
+      <th><code class="idl"><a data-link-type="idl" href="https://www.khronos.org/registry/webgl/specs/latest/1.0/#5.1" id="ref-for-5.1">GLenum</a></code> value equivalent
+      <th>Size of depth buffer entry
+      <th>Usage on CPU
+      <th>Usage on GPU
+    <tbody>
+     <tr>
+      <td><code class="idl"><a data-link-type="idl" href="#dom-xrdepthdataformat-luminance-alpha" id="ref-for-dom-xrdepthdataformat-luminance-alpha①">"luminance-alpha"</a></code>
+      <td><a data-link-type="dfn" href="https://www.khronos.org/registry/webgl/specs/latest/1.0/#5.14" id="ref-for-5.14">LUMINANCE_ALPHA</a>
+      <td>2 bytes 
+      <td>Interpret <code class="idl"><a data-link-type="idl" href="#dom-xrcpudepthinformation-data" id="ref-for-dom-xrcpudepthinformation-data①">data</a></code> as <code class="idl"><a data-link-type="idl" href="https://heycam.github.io/webidl/#idl-Uint16Array" id="ref-for-idl-Uint16Array">Uint16Array</a></code>
+      <td>Inspect Luminance and Alpha channels to reassemble single value.
+     <tr>
+      <td><code class="idl"><a data-link-type="idl" href="#dom-xrdepthdataformat-float32" id="ref-for-dom-xrdepthdataformat-float32①">"float32"</a></code>
+      <td><a data-link-type="dfn" href="https://www.khronos.org/registry/webgl/specs/latest/2.0/#3.7" id="ref-for-3.7">R32F</a>
+      <td>4 bytes 
+      <td>Interpret <code class="idl"><a data-link-type="idl" href="#dom-xrcpudepthinformation-data" id="ref-for-dom-xrcpudepthinformation-data②">data</a></code> as <code class="idl"><a data-link-type="idl" href="https://heycam.github.io/webidl/#idl-Float32Array" id="ref-for-idl-Float32Array">Float32Array</a></code>
+      <td>Inspect Red channel and use the value.
+   </table>
+   <h3 class="heading settled" data-level="2.3" id="session-configuration"><span class="secno">2.3. </span><span class="content">Session configuration</span><a class="self-link" href="#session-configuration"></a></h3>
+<pre class="idl highlight def"><c- b>dictionary</c-> <dfn class="dfn-paneled idl-code" data-dfn-type="dictionary" data-export id="dictdef-xrdepthstateinit"><code><c- g>XRDepthStateInit</c-></code></dfn> {
+  <c- b>required</c-> <a data-link-type="dfn" href="https://heycam.github.io/webidl/#idl-sequence" id="ref-for-idl-sequence"><c- b>sequence</c-></a>&lt;<a data-link-type="idl-name" href="#enumdef-xrdepthusage" id="ref-for-enumdef-xrdepthusage"><c- n>XRDepthUsage</c-></a>> <dfn class="dfn-paneled idl-code" data-dfn-for="XRDepthStateInit" data-dfn-type="dict-member" data-export data-type="sequence<XRDepthUsage> " id="dom-xrdepthstateinit-usagepreference"><code><c- g>usagePreference</c-></code></dfn>;
+  <c- b>required</c-> <a data-link-type="dfn" href="https://heycam.github.io/webidl/#idl-sequence" id="ref-for-idl-sequence①"><c- b>sequence</c-></a>&lt;<a data-link-type="idl-name" href="#enumdef-xrdepthdataformat" id="ref-for-enumdef-xrdepthdataformat"><c- n>XRDepthDataFormat</c-></a>> <dfn class="dfn-paneled idl-code" data-dfn-for="XRDepthStateInit" data-dfn-type="dict-member" data-export data-type="sequence<XRDepthDataFormat> " id="dom-xrdepthstateinit-dataformatpreference"><code><c- g>dataFormatPreference</c-></code></dfn>;
+};
+</pre>
+   <p>The <code class="idl"><a data-link-type="idl" href="#dom-xrdepthstateinit-usagepreference" id="ref-for-dom-xrdepthstateinit-usagepreference">usagePreference</a></code> is an ordered sequence of <code class="idl"><a data-link-type="idl" href="#enumdef-xrdepthusage" id="ref-for-enumdef-xrdepthusage①">XRDepthUsage</a></code>s, used to describe the desired depth sensing usage for the session.</p>
+   <p>The <code class="idl"><a data-link-type="idl" href="#dom-xrdepthstateinit-dataformatpreference" id="ref-for-dom-xrdepthstateinit-dataformatpreference">dataFormatPreference</a></code> is an ordered sequence of <code class="idl"><a data-link-type="idl" href="#enumdef-xrdepthdataformat" id="ref-for-enumdef-xrdepthdataformat①">XRDepthDataFormat</a></code>s, used to describe the desired depth sensing data format for the session.</p>
+   <p>The <code class="idl"><a data-link-type="idl" href="https://immersive-web.github.io/webxr/#dictdef-xrsessioninit" id="ref-for-dictdef-xrsessioninit">XRSessionInit</a></code> dictionary is expanded by adding new <code class="idl"><a data-link-type="idl" href="#dom-xrsessioninit-depthsensing" id="ref-for-dom-xrsessioninit-depthsensing">depthSensing</a></code> key. The key is optional in <code class="idl"><a data-link-type="idl" href="https://immersive-web.github.io/webxr/#dictdef-xrsessioninit" id="ref-for-dictdef-xrsessioninit①">XRSessionInit</a></code>, but it MUST be provided when <a data-link-type="dfn" href="#depth-sensing" id="ref-for-depth-sensing">depth-sensing</a> is included in either <code class="idl"><a data-link-type="idl" href="https://immersive-web.github.io/webxr/#dom-xrsessioninit-requiredfeatures" id="ref-for-dom-xrsessioninit-requiredfeatures">requiredFeatures</a></code> or <code class="idl"><a data-link-type="idl" href="https://immersive-web.github.io/webxr/#dom-xrsessioninit-optionalfeatures" id="ref-for-dom-xrsessioninit-optionalfeatures">optionalFeatures</a></code>.</p>
+<pre class="idl highlight def"><c- b>partial</c-> <c- b>dictionary</c-> <a class="idl-code" data-link-type="dictionary" href="https://immersive-web.github.io/webxr/#dictdef-xrsessioninit" id="ref-for-dictdef-xrsessioninit②"><c- g>XRSessionInit</c-></a> {
+  <a data-link-type="idl-name" href="#dictdef-xrdepthstateinit" id="ref-for-dictdef-xrdepthstateinit"><c- n>XRDepthStateInit</c-></a> <dfn class="dfn-paneled idl-code" data-dfn-for="XRSessionInit" data-dfn-type="dict-member" data-export data-type="XRDepthStateInit " id="dom-xrsessioninit-depthsensing"><code><c- g>depthSensing</c-></code></dfn>;
+};
+</pre>
+   <p>If the depth sensing feature is a required feature but the application did not supply a <code class="idl"><a data-link-type="idl" href="#dom-xrsessioninit-depthsensing" id="ref-for-dom-xrsessioninit-depthsensing①">depthSensing</a></code> key, the user agent MUST treat this as an unresolved required feature and reject the <code class="idl"><a data-link-type="idl" href="https://immersive-web.github.io/webxr/#dom-xrsystem-requestsession" id="ref-for-dom-xrsystem-requestsession">requestSession(mode, options)</a></code> promise with a <code class="idl"><a data-link-type="idl" href="https://heycam.github.io/webidl/#notsupportederror" id="ref-for-notsupportederror">NotSupportedError</a></code>. If it was requested as an optional feature, the user agent MUST ignore the feature request and not enable depth sensing on the newly created session.</p>
+   <p>if the depth sensing feature is a required feature but the result of <a data-link-type="dfn" href="#find-supported-configuration-combination" id="ref-for-find-supported-configuration-combination">finding supported configuration combination</a> algorithm invoked with <code class="idl"><a data-link-type="idl" href="#dom-xrdepthstateinit-usagepreference" id="ref-for-dom-xrdepthstateinit-usagepreference①">usagePreference</a></code> and <code class="idl"><a data-link-type="idl" href="#dom-xrdepthstateinit-dataformatpreference" id="ref-for-dom-xrdepthstateinit-dataformatpreference①">dataFormatPreference</a></code> is <code>null</code>, the user agent MUST treat this as an unresolved required feature and reject the <code class="idl"><a data-link-type="idl" href="https://immersive-web.github.io/webxr/#dom-xrsystem-requestsession" id="ref-for-dom-xrsystem-requestsession①">requestSession(mode, options)</a></code> promise with a <code class="idl"><a data-link-type="idl" href="https://heycam.github.io/webidl/#notsupportederror" id="ref-for-notsupportederror①">NotSupportedError</a></code>. If it was requested as an optional feature, the user agent MUST ignore the feature request and not enable depth sensing on the newly created session.</p>
+   <p>When an <code class="idl"><a data-link-type="idl" href="https://www.w3.org/TR/webxr/#xrsession-interface" id="ref-for-xrsession-interface①">XRSession</a></code> is created with depth sensing enabled, the <code class="idl"><a data-link-type="idl" href="#dom-xrsession-depthusage" id="ref-for-dom-xrsession-depthusage">depthUsage</a></code> and <code class="idl"><a data-link-type="idl" href="#dom-xrsession-depthdataformat" id="ref-for-dom-xrsession-depthdataformat">depthDataFormat</a></code> attributes MUST be set to the result of <a data-link-type="dfn" href="#find-supported-configuration-combination" id="ref-for-find-supported-configuration-combination①">finding supported configuration combination</a> algorithm invoked with <code class="idl"><a data-link-type="idl" href="#dom-xrdepthstateinit-usagepreference" id="ref-for-dom-xrdepthstateinit-usagepreference②">usagePreference</a></code> and <code class="idl"><a data-link-type="idl" href="#dom-xrdepthstateinit-dataformatpreference" id="ref-for-dom-xrdepthstateinit-dataformatpreference②">dataFormatPreference</a></code>.</p>
+   <div class="algorithm" data-algorithm="find-supported-configuration">
+     In order to <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="find-supported-configuration-combination">find supported configuration combination</dfn> for depth sensing API given <var>usagePreference</var> and <var>dataFormatPreference</var> sequences, the user agent MUST run the following algorithm: 
+    <ol>
+     <li data-md>
+      <p>Let <var>selectedUsage</var> be <code>null</code>.</p>
+     <li data-md>
+      <p>For each <var>usage</var> in <var>usagePreference</var> sequence, perform the following steps:</p>
+      <ol>
+       <li data-md>
+        <p>If <var>usage</var> is not considered a <a data-link-type="dfn" href="#support-depth-sensing-usage" id="ref-for-support-depth-sensing-usage">supported depth sensing usage</a> by the <a data-link-type="dfn" href="#native-depth-sensing" id="ref-for-native-depth-sensing①">native depth sensing</a> capabilities of the device, continue to the next entry.</p>
+       <li data-md>
+        <p>Set <var>selectedUsage</var> to <var>usage</var> and abort these nested steps.</p>
+      </ol>
+     <li data-md>
+      <p>If <var>selectedUsage</var> is <code>null</code>, return <code>null</code> and abort these steps.</p>
+     <li data-md>
+      <p>Let <var>selectedDataFormat</var> be <code>null</code>.</p>
+     <li data-md>
+      <p>For each <var>dataFormat</var> in <var>dataFormatPreference</var>, perform the following steps:</p>
+      <ol>
+       <li data-md>
+        <p>If <var>selectedUsage</var>,<var>dataFormat</var> is not considered a <a data-link-type="dfn" href="#support-depth-sensing-usage-and-data-format-combination" id="ref-for-support-depth-sensing-usage-and-data-format-combination">supported depth sensng usage and data format combination</a> by the <a data-link-type="dfn" href="#native-depth-sensing" id="ref-for-native-depth-sensing②">native depth sensing</a> capabilities of the device, continue to the next entry.</p>
+       <li data-md>
+        <p>Set <var>selectedDataFormat</var> to <var>dataFormat</var> and abort these nested steps.</p>
+      </ol>
+     <li data-md>
+      <p>If <var>selectedDataFormat</var> is <code>null</code>, return <code>null</code> and abort these steps.</p>
+     <li data-md>
+      <p>Return <var>selectedUsage</var>,<var>selectedDataFormat</var>.</p>
+    </ol>
+   </div>
+   <p class="note" role="note"><span>Note:</span> user agents are not required to support all existing combinations of usages and data formats. This is intended to allow them to provide data in an efficient way, and depends on the underlying platforms. This decision places additional burden on the application developers - it could be mitigated by creation of libraries hiding the API complexity, possibly sacrificing performance.</p>
+   <p>The user agent that is <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#capable-of-supporting" id="ref-for-capable-of-supporting②">capable of supporting</a> the depth sensing API MUST support at least one <code class="idl"><a data-link-type="idl" href="#enumdef-xrdepthusage" id="ref-for-enumdef-xrdepthusage②">XRDepthUsage</a></code> mode. The user agent that is capable of supporting the depth sensing API MUST support <code class="idl"><a data-link-type="idl" href="#dom-xrdepthdataformat-luminance-alpha" id="ref-for-dom-xrdepthdataformat-luminance-alpha②">"luminance-alpha"</a></code> data format, and MAY support other formats.</p>
+   <div class="example" id="example-25d78c0a">
+    <a class="self-link" href="#example-25d78c0a"></a> The following code demonstrates how a session that requires depth sensing API could be requested. The example assumes that the caller is able to handle both CPU- and GPU-optimized usage, as well as both "luminance-alpha" and "float32" formats, preferring CPU and "luminance-alpha": 
+<pre class="highlight"><c- a>const</c-> session <c- o>=</c-> <c- k>await</c-> navigator<c- p>.</c->xr<c- p>.</c->requestSession<c- p>(</c-><c- u>"immersive-ar"</c-><c- p>,</c-> <c- p>{</c->
+  requiredFeatures<c- o>:</c-> <c- p>[</c-><c- u>"depth-sensing"</c-><c- p>],</c->
+  depthSensing<c- o>:</c-> <c- p>{</c->
+    usagePreference<c- o>:</c-> <c- p>[</c-><c- u>"cpu-optimized"</c-><c- p>,</c-> <c- u>"gpu-optimized"</c-><c- p>],</c->
+    dataFormatPreference<c- o>:</c-> <c- p>[</c-><c- u>"luminance-alpha"</c-><c- p>,</c-> <c- u>"float32"</c-><c- p>],</c->
+  <c- p>},</c->
+<c- p>});</c->
+</pre>
+   </div>
+<pre class="idl highlight def"><c- b>partial</c-> <c- b>interface</c-> <a class="idl-code" data-link-type="interface" href="https://www.w3.org/TR/webxr/#xrsession-interface" id="ref-for-xrsession-interface②"><c- g>XRSession</c-></a> {
+  <c- b>readonly</c-> <c- b>attribute</c-> <a data-link-type="idl-name" href="#enumdef-xrdepthusage" id="ref-for-enumdef-xrdepthusage③"><c- n>XRDepthUsage</c-></a> <dfn class="dfn-paneled idl-code" data-dfn-for="XRSession" data-dfn-type="attribute" data-export data-readonly data-type="XRDepthUsage" id="dom-xrsession-depthusage"><code><c- g>depthUsage</c-></code></dfn>;
+  <c- b>readonly</c-> <c- b>attribute</c-> <a data-link-type="idl-name" href="#enumdef-xrdepthdataformat" id="ref-for-enumdef-xrdepthdataformat②"><c- n>XRDepthDataFormat</c-></a> <dfn class="dfn-paneled idl-code" data-dfn-for="XRSession" data-dfn-type="attribute" data-export data-readonly data-type="XRDepthDataFormat" id="dom-xrsession-depthdataformat"><code><c- g>depthDataFormat</c-></code></dfn>;
+};
+</pre>
+   <p>The <code class="idl"><a data-link-type="idl" href="#dom-xrsession-depthusage" id="ref-for-dom-xrsession-depthusage①">depthUsage</a></code> describes depth sensing usage with which the session was configured. If this attribute is accessed on a session that does not have depth sensing enabled, the user agent MUST throw an <code class="idl"><a data-link-type="idl" href="https://heycam.github.io/webidl/#invalidstateerror" id="ref-for-invalidstateerror">InvalidStateError</a></code>.</p>
+   <p>The <code class="idl"><a data-link-type="idl" href="#dom-xrsession-depthdataformat" id="ref-for-dom-xrsession-depthdataformat①">depthDataFormat</a></code> describes depth sensing data format with which the session was configured. If this attribute is accessed on a session that does not have depth sensing enabled, the user agent MUST throw an <code class="idl"><a data-link-type="idl" href="https://heycam.github.io/webidl/#invalidstateerror" id="ref-for-invalidstateerror①">InvalidStateError</a></code>.</p>
    <h2 class="heading settled" data-level="3" id="obtaining-data"><span class="secno">3. </span><span class="content">Obtaining depth data</span><a class="self-link" href="#obtaining-data"></a></h2>
    <h3 class="heading settled" data-level="3.1" id="xr-depth-info-section"><span class="secno">3.1. </span><span class="content">XRDepthInformation</span><a class="self-link" href="#xr-depth-info-section"></a></h3>
 <pre class="idl highlight def">[<a class="idl-code" data-link-type="extended-attribute" href="https://heycam.github.io/webidl/#SecureContext" id="ref-for-SecureContext"><c- g>SecureContext</c-></a>, <a class="idl-code" data-link-type="extended-attribute" href="https://heycam.github.io/webidl/#Exposed" id="ref-for-Exposed"><c- g>Exposed</c-></a>=<c- n>Window</c->]
 <c- b>interface</c-> <dfn class="dfn-paneled idl-code" data-dfn-type="interface" data-export id="xrdepthinformation"><code><c- g>XRDepthInformation</c-></code></dfn> {
-  [<a class="idl-code" data-link-type="extended-attribute" href="https://heycam.github.io/webidl/#SameObject" id="ref-for-SameObject"><c- g>SameObject</c-></a>] <c- b>readonly</c-> <c- b>attribute</c-> <a class="idl-code" data-link-type="interface" href="https://heycam.github.io/webidl/#idl-Uint16Array" id="ref-for-idl-Uint16Array"><c- b>Uint16Array</c-></a> <dfn class="dfn-paneled idl-code" data-dfn-for="XRDepthInformation" data-dfn-type="attribute" data-export data-readonly data-type="Uint16Array" id="dom-xrdepthinformation-data"><code><c- g>data</c-></code></dfn>;
-
   <c- b>readonly</c-> <c- b>attribute</c-> <a class="idl-code" data-link-type="interface" href="https://heycam.github.io/webidl/#idl-unsigned-long" id="ref-for-idl-unsigned-long"><c- b>unsigned</c-> <c- b>long</c-></a> <dfn class="dfn-paneled idl-code" data-dfn-for="XRDepthInformation" data-dfn-type="attribute" data-export data-readonly data-type="unsigned long" id="dom-xrdepthinformation-width"><code><c- g>width</c-></code></dfn>;
   <c- b>readonly</c-> <c- b>attribute</c-> <a class="idl-code" data-link-type="interface" href="https://heycam.github.io/webidl/#idl-unsigned-long" id="ref-for-idl-unsigned-long①"><c- b>unsigned</c-> <c- b>long</c-></a> <dfn class="dfn-paneled idl-code" data-dfn-for="XRDepthInformation" data-dfn-type="attribute" data-export data-readonly data-type="unsigned long" id="dom-xrdepthinformation-height"><code><c- g>height</c-></code></dfn>;
 
-  [<a class="idl-code" data-link-type="extended-attribute" href="https://heycam.github.io/webidl/#SameObject" id="ref-for-SameObject①"><c- g>SameObject</c-></a>] <c- b>readonly</c-> <c- b>attribute</c-> <a data-link-type="idl-name" href="https://immersive-web.github.io/webxr/#xrrigidtransform" id="ref-for-xrrigidtransform"><c- n>XRRigidTransform</c-></a> <dfn class="dfn-paneled idl-code" data-dfn-for="XRDepthInformation" data-dfn-type="attribute" data-export data-readonly data-type="XRRigidTransform" id="dom-xrdepthinformation-normtexturefromnormview"><code><c- g>normTextureFromNormView</c-></code></dfn>;
-
-  <a class="idl-code" data-link-type="interface" href="https://heycam.github.io/webidl/#idl-float" id="ref-for-idl-float"><c- b>float</c-></a> <dfn class="dfn-paneled idl-code" data-dfn-for="XRDepthInformation" data-dfn-type="method" data-export data-lt="getDepth(column, row)" id="dom-xrdepthinformation-getdepth"><code><c- g>getDepth</c-></code></dfn>(<a class="idl-code" data-link-type="interface" href="https://heycam.github.io/webidl/#idl-unsigned-long" id="ref-for-idl-unsigned-long②"><c- b>unsigned</c-> <c- b>long</c-></a> <dfn class="idl-code" data-dfn-for="XRDepthInformation/getDepth(column, row)" data-dfn-type="argument" data-export id="dom-xrdepthinformation-getdepth-column-row-column"><code><c- g>column</c-></code><a class="self-link" href="#dom-xrdepthinformation-getdepth-column-row-column"></a></dfn>, <a class="idl-code" data-link-type="interface" href="https://heycam.github.io/webidl/#idl-unsigned-long" id="ref-for-idl-unsigned-long③"><c- b>unsigned</c-> <c- b>long</c-></a> <dfn class="idl-code" data-dfn-for="XRDepthInformation/getDepth(column, row)" data-dfn-type="argument" data-export id="dom-xrdepthinformation-getdepth-column-row-row"><code><c- g>row</c-></code><a class="self-link" href="#dom-xrdepthinformation-getdepth-column-row-row"></a></dfn>);
+  [<a class="idl-code" data-link-type="extended-attribute" href="https://heycam.github.io/webidl/#SameObject" id="ref-for-SameObject"><c- g>SameObject</c-></a>] <c- b>readonly</c-> <c- b>attribute</c-> <a data-link-type="idl-name" href="https://immersive-web.github.io/webxr/#xrrigidtransform" id="ref-for-xrrigidtransform"><c- n>XRRigidTransform</c-></a> <dfn class="dfn-paneled idl-code" data-dfn-for="XRDepthInformation" data-dfn-type="attribute" data-export data-readonly data-type="XRRigidTransform" id="dom-xrdepthinformation-normdepthbufferfromnormview"><code><c- g>normDepthBufferFromNormView</c-></code></dfn>;
+  <c- b>readonly</c-> <c- b>attribute</c-> <a class="idl-code" data-link-type="interface" href="https://heycam.github.io/webidl/#idl-float" id="ref-for-idl-float"><c- b>float</c-></a> <dfn class="dfn-paneled idl-code" data-dfn-for="XRDepthInformation" data-dfn-type="attribute" data-export data-readonly data-type="float" id="dom-xrdepthinformation-rawvaluetometers"><code><c- g>rawValueToMeters</c-></code></dfn>;
 };
-
 </pre>
-   <p>The <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-data" id="ref-for-dom-xrdepthinformation-data">data</a></code> attribute contains depth buffer information in raw format, suitable for uploading to a WebGL texture. The data is stored in column-major format, with each 2-byte entry containing unsigned integer corresponding to distance from the <a data-link-type="dfn" href="#xrdepthinformation-view" id="ref-for-xrdepthinformation-view">view</a>'s near plane, in millimeters.</p>
-   <p class="issue" id="issue-ee6e7d97"><a class="self-link" href="#issue-ee6e7d97"></a> Accessing raw data could potentially need to have a way of knowing what is the underlying data type and how to convert from the numeric value to a value expressed in meters. This is to ensure that we do not force the implementers to convert the data they are able to obtain from the underlying XR devices. <a href="https://github.com/immersive-web/depth-sensing/issues/6">&lt;https://github.com/immersive-web/depth-sensing/issues/6></a></p>
-   <p class="note" role="note"><span>Note:</span> Applications SHOULD NOT attempt to change the contents of <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-data" id="ref-for-dom-xrdepthinformation-data①">data</a></code> array as this can lead to incorrect results returned by the <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-getdepth" id="ref-for-dom-xrdepthinformation-getdepth">getDepth(column, row)</a></code> method.</p>
-   <p>The <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-width" id="ref-for-dom-xrdepthinformation-width">width</a></code> attribute contains width of the <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-data" id="ref-for-dom-xrdepthinformation-data②">data</a></code> buffer (i.e. number of columns).</p>
-   <p>The <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-height" id="ref-for-dom-xrdepthinformation-height">height</a></code> attribute contains height of the <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-data" id="ref-for-dom-xrdepthinformation-data③">data</a></code> buffer (i.e. number of rows).</p>
-   <p>The <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-normtexturefromnormview" id="ref-for-dom-xrdepthinformation-normtexturefromnormview">normTextureFromNormView</a></code> attribute contains a <code class="idl"><a data-link-type="idl" href="https://immersive-web.github.io/webxr/#xrrigidtransform" id="ref-for-xrrigidtransform①">XRRigidTransform</a></code> that needs to be used when indexing into <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-data" id="ref-for-dom-xrdepthinformation-data④">data</a></code>. The transformation that the matrix represents changes the coordinate system from normalized view coordinates to normalized texture coordinates.</p>
-   <p>The <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-getdepth" id="ref-for-dom-xrdepthinformation-getdepth①">getDepth(column, row)</a></code> method can be used to <a data-link-type="dfn" href="#obtain-depth-at-coordinates" id="ref-for-obtain-depth-at-coordinates">obtain depth at coordinates</a>.</p>
+   <p>The <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-width" id="ref-for-dom-xrdepthinformation-width">width</a></code> attribute contains width of the <a data-link-type="dfn" href="#xrdepthinformation-depth-buffer" id="ref-for-xrdepthinformation-depth-buffer">depth buffer</a> (i.e. number of columns).</p>
+   <p>The <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-height" id="ref-for-dom-xrdepthinformation-height">height</a></code> attribute contains height of the <a data-link-type="dfn" href="#xrdepthinformation-depth-buffer" id="ref-for-xrdepthinformation-depth-buffer①">depth buffer</a> (i.e. number of rows).</p>
+   <p>The <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-normdepthbufferfromnormview" id="ref-for-dom-xrdepthinformation-normdepthbufferfromnormview">normDepthBufferFromNormView</a></code> attribute contains a <code class="idl"><a data-link-type="idl" href="https://immersive-web.github.io/webxr/#xrrigidtransform" id="ref-for-xrrigidtransform①">XRRigidTransform</a></code> that needs to be applied when indexing into the <a data-link-type="dfn" href="#xrdepthinformation-depth-buffer" id="ref-for-xrdepthinformation-depth-buffer②">depth buffer</a>. The transformation that the matrix represents changes the coordinate system from normalized view coordinates to normalized depth buffer coordinates that can then be scaled by depth buffer’s <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-width" id="ref-for-dom-xrdepthinformation-width①">width</a></code> and <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-height" id="ref-for-dom-xrdepthinformation-height①">height</a></code> to obtain the absolute depth buffer coordinates.</p>
+   <p class="note" role="note"><span>Note:</span> if the applications intend to use the resulting depth buffer for texturing a mesh, care must be taken to ensure that the texture coordinates of the mesh vertices are expressed in <a data-link-type="dfn" href="#normalized-view-coordinates" id="ref-for-normalized-view-coordinates">normalized view coordinates</a>, or that the appropriate coordniate system change is peformed in a shader.</p>
+   <p>The <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-rawvaluetometers" id="ref-for-dom-xrdepthinformation-rawvaluetometers">rawValueToMeters</a></code> attribute contains the scale factor by which the raw depth values from a <a data-link-type="dfn" href="#xrdepthinformation-depth-buffer" id="ref-for-xrdepthinformation-depth-buffer③">depth buffer</a> must be multiplied in order to get the depth in meters.</p>
    <p>Each <code class="idl"><a data-link-type="idl" href="#xrdepthinformation" id="ref-for-xrdepthinformation">XRDepthInformation</a></code> has an associated <dfn class="dfn-paneled" data-dfn-for="XRDepthInformation" data-dfn-type="dfn" data-noexport id="xrdepthinformation-view">view</dfn> that stores <code class="idl"><a data-link-type="idl" href="https://immersive-web.github.io/webxr/#xrview" id="ref-for-xrview">XRView</a></code> from which the depth information instance was created.</p>
-   <div class="algorithm" data-algorithm="create-depth-information">
-    <p>In order to <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="create-a-depth-information-instance">create a depth information instance</dfn> given <code class="idl"><a data-link-type="idl" href="https://www.w3.org/TR/webxr/#xrframe-interface" id="ref-for-xrframe-interface">XRFrame</a></code> <var>frame</var> and <code class="idl"><a data-link-type="idl" href="https://immersive-web.github.io/webxr/#xrview" id="ref-for-xrview①">XRView</a></code> <var>view</var>, the user agent MUST run the following steps:</p>
+   <p>Each <code class="idl"><a data-link-type="idl" href="#xrdepthinformation" id="ref-for-xrdepthinformation①">XRDepthInformation</a></code> has an associated <dfn class="dfn-paneled" data-dfn-for="XRDepthInformation" data-dfn-type="dfn" data-noexport id="xrdepthinformation-depth-buffer">depth buffer</dfn> that contains depth buffer data. Different <code class="idl"><a data-link-type="idl" href="#xrdepthinformation" id="ref-for-xrdepthinformation②">XRDepthInformation</a></code>s may store objects of different concrete types in the depth buffer.</p>
+   <div class="algorithm" data-algorithm="accessing-depth-buffer-members">
+    <p>When <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="attempting-to-access-the-depth-buffer">attempting to access the depth buffer</dfn> of <code class="idl"><a data-link-type="idl" href="#xrdepthinformation" id="ref-for-xrdepthinformation③">XRDepthInformation</a></code> or any interface that inherits from it, the user agent MUST run the following steps:</p>
     <ol>
      <li data-md>
-      <p>Let <var>result</var> be a new instance of <code class="idl"><a data-link-type="idl" href="#xrdepthinformation" id="ref-for-xrdepthinformation①">XRDepthInformation</a></code>.</p>
+      <p>Let <var>depthInformation</var> be the instance whose member is accessed.</p>
      <li data-md>
-      <p>Let <var>time</var> be <var>frame</var>’s <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#xrframe-time" id="ref-for-xrframe-time">time</a>.</p>
+      <p>Let <var>view</var> be the <var>depthInformation</var>’s <a data-link-type="dfn" href="#xrdepthinformation-view" id="ref-for-xrdepthinformation-view">view</a>.</p>
      <li data-md>
-      <p>Let <var>device</var> be the <var>session</var>’s <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#xrsession-xr-device" id="ref-for-xrsession-xr-device">XR device</a>.</p>
+      <p>Let <var>frame</var> be the <var>view</var>’s <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#xrview-frame" id="ref-for-xrview-frame">frame</a>.</p>
      <li data-md>
-      <p>Let <var>nativeDepthInformation</var> be a result of querying <var>device</var> for the depth information valid as of <var>time</var>, for specified <var>view</var>.</p>
+      <p>If <var>frame</var> is not <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#xrframe-active" id="ref-for-xrframe-active">active</a>, throw <code class="idl"><a data-link-type="idl" href="https://heycam.github.io/webidl/#invalidstateerror" id="ref-for-invalidstateerror②">InvalidStateError</a></code> and abort these steps.</p>
      <li data-md>
-      <p>Initialize <var>result</var>’s <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-width" id="ref-for-dom-xrdepthinformation-width①">width</a></code> to the width of the depth buffer returned in <var>nativeDepthInformation</var>.</p>
+      <p>If <var>frame</var> is not an <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#xrframe-animationframe" id="ref-for-xrframe-animationframe">animationFrame</a>, throw <code class="idl"><a data-link-type="idl" href="https://heycam.github.io/webidl/#invalidstateerror" id="ref-for-invalidstateerror③">InvalidStateError</a></code> and abort these steps.</p>
      <li data-md>
-      <p>Initialize <var>result</var>’s <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-height" id="ref-for-dom-xrdepthinformation-height①">height</a></code> to the height of the depth buffer returned in <var>nativeDepthInformation</var>.</p>
-     <li data-md>
-      <p>Initialize <var>result</var>’s <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-normtexturefromnormview" id="ref-for-dom-xrdepthinformation-normtexturefromnormview①">normTextureFromNormView</a></code> to a new <code class="idl"><a data-link-type="idl" href="https://immersive-web.github.io/webxr/#xrrigidtransform" id="ref-for-xrrigidtransform②">XRRigidTransform</a></code> that performs a coordinate system change from normalized view coordinates to normalized texture coordinates. This transform should <code>z</code> coordinate of the transformed 3D vector unaffected.</p>
-     <li data-md>
-      <p>Initialize <var>result</var>’s <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-data" id="ref-for-dom-xrdepthinformation-data⑤">data</a></code> to the raw depth buffer returned in <var>nativeDepthInformation</var>.</p>
-     <li data-md>
-      <p>Initialize <var>result</var>’s <a data-link-type="dfn" href="#xrdepthinformation-view" id="ref-for-xrdepthinformation-view①">view</a> to <var>view</var>.</p>
-     <li data-md>
-      <p>Return <var>result</var>.</p>
+      <p>Proceed with normal steps required to access the member of <var>depthInformation</var>.</p>
     </ol>
    </div>
+   <h3 class="heading settled" data-level="3.2" id="xr-cpu-depth-info-section"><span class="secno">3.2. </span><span class="content">XRCPUDepthInformation</span><a class="self-link" href="#xr-cpu-depth-info-section"></a></h3>
+<pre class="idl highlight def"><c- b>interface</c-> <dfn class="dfn-paneled idl-code" data-dfn-type="interface" data-export id="xrcpudepthinformation"><code><c- g>XRCPUDepthInformation</c-></code></dfn> : <a data-link-type="idl-name" href="#xrdepthinformation" id="ref-for-xrdepthinformation④"><c- n>XRDepthInformation</c-></a> {
+  [<a class="idl-code" data-link-type="extended-attribute" href="https://heycam.github.io/webidl/#SameObject" id="ref-for-SameObject①"><c- g>SameObject</c-></a>] <c- b>readonly</c-> <c- b>attribute</c-> <a class="idl-code" data-link-type="interface" href="https://heycam.github.io/webidl/#idl-ArrayBuffer" id="ref-for-idl-ArrayBuffer"><c- b>ArrayBuffer</c-></a> <dfn class="dfn-paneled idl-code" data-dfn-for="XRCPUDepthInformation" data-dfn-type="attribute" data-export data-readonly data-type="ArrayBuffer" id="dom-xrcpudepthinformation-data"><code><c- g>data</c-></code></dfn>;
+
+  <a class="idl-code" data-link-type="interface" href="https://heycam.github.io/webidl/#idl-float" id="ref-for-idl-float①"><c- b>float</c-></a> <dfn class="dfn-paneled idl-code" data-dfn-for="XRCPUDepthInformation" data-dfn-type="method" data-export data-lt="getDepthInMeters(x, y)" id="dom-xrcpudepthinformation-getdepthinmeters"><code><c- g>getDepthInMeters</c-></code></dfn>(<a class="idl-code" data-link-type="interface" href="https://heycam.github.io/webidl/#idl-float" id="ref-for-idl-float②"><c- b>float</c-></a> <dfn class="idl-code" data-dfn-for="XRCPUDepthInformation/getDepthInMeters(x, y)" data-dfn-type="argument" data-export id="dom-xrcpudepthinformation-getdepthinmeters-x-y-x"><code><c- g>x</c-></code><a class="self-link" href="#dom-xrcpudepthinformation-getdepthinmeters-x-y-x"></a></dfn>, <a class="idl-code" data-link-type="interface" href="https://heycam.github.io/webidl/#idl-float" id="ref-for-idl-float③"><c- b>float</c-></a> <dfn class="idl-code" data-dfn-for="XRCPUDepthInformation/getDepthInMeters(x, y)" data-dfn-type="argument" data-export id="dom-xrcpudepthinformation-getdepthinmeters-x-y-y"><code><c- g>y</c-></code><a class="self-link" href="#dom-xrcpudepthinformation-getdepthinmeters-x-y-y"></a></dfn>);
+};
+</pre>
+   <p>The <code class="idl"><a data-link-type="idl" href="#dom-xrcpudepthinformation-data" id="ref-for-dom-xrcpudepthinformation-data③">data</a></code> attribute contains depth buffer information in raw format, suitable for uploading to a WebGL texture if needed. The data is stored in row-major format, without padding, with each entry corresponding to distance from the <a data-link-type="dfn" href="#xrdepthinformation-view" id="ref-for-xrdepthinformation-view①">view</a>'s near plane to the users' environment, in unspecified units. The size of each data entry and the type is determined by <code class="idl"><a data-link-type="idl" href="#dom-xrsession-depthdataformat" id="ref-for-dom-xrsession-depthdataformat②">depthDataFormat</a></code>. The values can be converted from unspecified units to meters by multiplying them by <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-rawvaluetometers" id="ref-for-dom-xrdepthinformation-rawvaluetometers①">rawValueToMeters</a></code>. The <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-normdepthbufferfromnormview" id="ref-for-dom-xrdepthinformation-normdepthbufferfromnormview①">normDepthBufferFromNormView</a></code> can be used to transform from <a data-link-type="dfn" href="#normalized-view-coordinates" id="ref-for-normalized-view-coordinates①">normalized view coordinates</a> into depth buffer’s coordinate system. When accessed, the algorithm to <a data-link-type="dfn" href="#attempting-to-access-the-depth-buffer" id="ref-for-attempting-to-access-the-depth-buffer">access the depth buffer</a> MUST be run.</p>
+   <p class="note" role="note"><span>Note:</span> Applications SHOULD NOT attempt to change the contents of <code class="idl"><a data-link-type="idl" href="#dom-xrcpudepthinformation-data" id="ref-for-dom-xrcpudepthinformation-data④">data</a></code> array as this can lead to incorrect results returned by the <code class="idl"><a data-link-type="idl" href="#dom-xrcpudepthinformation-getdepthinmeters" id="ref-for-dom-xrcpudepthinformation-getdepthinmeters">getDepthInMeters(x, y)</a></code> method.</p>
+   <p>The <code class="idl"><a data-link-type="idl" href="#dom-xrcpudepthinformation-getdepthinmeters" id="ref-for-dom-xrcpudepthinformation-getdepthinmeters①">getDepthInMeters(x, y)</a></code> method can be used to <a data-link-type="dfn" href="#obtain-depth-at-coordinates" id="ref-for-obtain-depth-at-coordinates">obtain depth at coordinates</a>. When invoked, the algorithm to <a data-link-type="dfn" href="#attempting-to-access-the-depth-buffer" id="ref-for-attempting-to-access-the-depth-buffer①">access the depth buffer</a> MUST be run.</p>
    <div class="algorithm" data-algorithm="obtain-depth-at-coordinates">
-    <p>When <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-getdepth" id="ref-for-dom-xrdepthinformation-getdepth②">getDepth(column, row)</a></code> method is invoked on an <code class="idl"><a data-link-type="idl" href="#xrdepthinformation" id="ref-for-xrdepthinformation②">XRDepthInformation</a></code> <var>depthInformation</var> with <var>column</var>, <var>row</var>, the user agent MUST <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="obtain-depth-at-coordinates">obtain depth at coordinates</dfn> by running the following steps:</p>
+    <p>When <code class="idl"><a data-link-type="idl" href="#dom-xrcpudepthinformation-getdepthinmeters" id="ref-for-dom-xrcpudepthinformation-getdepthinmeters②">getDepthInMeters(x, y)</a></code> method is invoked on an <code class="idl"><a data-link-type="idl" href="#xrcpudepthinformation" id="ref-for-xrcpudepthinformation①">XRCPUDepthInformation</a></code> <var>depthInformation</var> with <var>x</var>, <var>y</var>, the user agent MUST <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="obtain-depth-at-coordinates">obtain depth at coordinates</dfn> by running the following steps:</p>
     <ol>
      <li data-md>
-      <p>If <var>column</var> is greater than or equal to <var>depthInformation</var>’s <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-width" id="ref-for-dom-xrdepthinformation-width②">width</a></code>, <a data-link-type="dfn" href="https://heycam.github.io/webidl/#dfn-throw" id="ref-for-dfn-throw">throw</a> <code class="idl"><a data-link-type="idl" href="https://heycam.github.io/webidl/#notallowederror" id="ref-for-notallowederror">NotAllowedError</a></code> and abort these steps.</p>
+      <p>Let <var>view</var> be the <var>depthInformation</var>’s <a data-link-type="dfn" href="#xrdepthinformation-view" id="ref-for-xrdepthinformation-view②">view</a>, <var>frame</var> be <var>view</var>’s <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#xrview-frame" id="ref-for-xrview-frame①">frame</a>, and <var>session</var> be the <var>frame</var>’s <code class="idl"><a data-link-type="idl" href="https://immersive-web.github.io/webxr/#dom-xrframe-session" id="ref-for-dom-xrframe-session">session</a></code>.</p>
      <li data-md>
-      <p>If <var>row</var> is greater than or equal to <var>depthInformation</var>’s <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-height" id="ref-for-dom-xrdepthinformation-height②">height</a></code>, <a data-link-type="dfn" href="https://heycam.github.io/webidl/#dfn-throw" id="ref-for-dfn-throw①">throw</a> <code class="idl"><a data-link-type="idl" href="https://heycam.github.io/webidl/#notallowederror" id="ref-for-notallowederror①">NotAllowedError</a></code> and abort these steps.</p>
+      <p>If <var>x</var> is greater than <code>1.0</code> or less than <code>0.0</code>, <a data-link-type="dfn" href="https://heycam.github.io/webidl/#dfn-throw" id="ref-for-dfn-throw">throw</a> <code class="idl"><a data-link-type="idl" href="https://heycam.github.io/webidl/#exceptiondef-rangeerror" id="ref-for-exceptiondef-rangeerror">RangeError</a></code> and abort these steps.</p>
+     <li data-md>
+      <p>If <var>y</var> is greater than <code>1.0</code> or less than <code>0.0</code>, <a data-link-type="dfn" href="https://heycam.github.io/webidl/#dfn-throw" id="ref-for-dfn-throw①">throw</a> <code class="idl"><a data-link-type="idl" href="https://heycam.github.io/webidl/#exceptiondef-rangeerror" id="ref-for-exceptiondef-rangeerror①">RangeError</a></code> and abort these steps.</p>
+     <li data-md>
+      <p>Let <var>normalizedViewCoordinates</var> be a vector representing 3-dimensional point in space, with <code>x</code> coordinate set to <var>x</var>, <code>y</code> coordinate set to <var>y</var>, <code>z</code> coordinate set to <code>0.0</code>, and <code>w</code> coordinate set to <code>1.0</code>.</p>
+     <li data-md>
+      <p>Let <var>normalizedDepthCoordinates</var> be a result of premultiplying <var>normalizedViewCoordinates</var> vector from the left by <var>depthInformation</var>’s <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-normdepthbufferfromnormview" id="ref-for-dom-xrdepthinformation-normdepthbufferfromnormview②">normDepthBufferFromNormView</a></code>.</p>
+     <li data-md>
+      <p>Let <var>depthCoordinates</var> be a result of scaling <var>normalizedDepthCoordinates</var>, with <code>x</code> coordinate multiplied by <var>depthInformation</var>’s <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-width" id="ref-for-dom-xrdepthinformation-width②">width</a></code> and <code>y</code> coordinate multiplied by <var>depthInformation</var>’s <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-height" id="ref-for-dom-xrdepthinformation-height②">height</a></code>.</p>
+     <li data-md>
+      <p>Let <var>column</var> be the value of <var>depthCoordinates</var>’ <code>x</code> coordinate, truncated to an integer, and clamped to <code>[0, width-1]</code> integer range.</p>
+     <li data-md>
+      <p>Let <var>row</var> be the value of <var>depthCoordinates</var>’ <code>y</code> coordinate, truncated to an integer, and clamped to <code>[0, height-1]</code> integer range.</p>
      <li data-md>
       <p>Let <var>index</var> be equal to <var>row</var> multiplied by <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-width" id="ref-for-dom-xrdepthinformation-width③">width</a></code> &amp; added to <var>column</var>.</p>
      <li data-md>
-      <p>Let <var>depthInMillimeters</var> be equal to a value found at index <var>index</var> in <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-data" id="ref-for-dom-xrdepthinformation-data⑥">data</a></code>.</p>
+      <p>Let <var>byteIndex</var> be equal to <var>index</var> multiplied by the size of the depth data format.</p>
      <li data-md>
-      <p>Return <var>depthInMillimeters</var> divided by <code>1000.0</code>.</p>
+      <p>Let <var>rawDepth</var> be equal to a value found at index <var>byteIndex</var> in <code class="idl"><a data-link-type="idl" href="#dom-xrcpudepthinformation-data" id="ref-for-dom-xrcpudepthinformation-data⑤">data</a></code>, interpreted as a number accordingly to <var>session</var>’s <code class="idl"><a data-link-type="idl" href="#dom-xrsession-depthdataformat" id="ref-for-dom-xrsession-depthdataformat③">depthDataFormat</a></code>.</p>
+     <li data-md>
+      <p>Let <var>rawValueToMeters</var> be equal to <var>depthInformation</var>’s <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-rawvaluetometers" id="ref-for-dom-xrdepthinformation-rawvaluetometers②">rawValueToMeters</a></code>.</p>
+     <li data-md>
+      <p>Return <var>rawDepth</var> multiplied by <var>rawValueToMeters</var>.</p>
     </ol>
    </div>
-<pre class="idl highlight def"><c- b>partial</c-> <c- b>interface</c-> <a class="idl-code" data-link-type="interface" href="https://www.w3.org/TR/webxr/#xrframe-interface" id="ref-for-xrframe-interface①"><c- g>XRFrame</c-></a> {
-  <a data-link-type="idl-name" href="#xrdepthinformation" id="ref-for-xrdepthinformation③"><c- n>XRDepthInformation</c-></a> <a class="idl-code" data-link-type="method" href="#dom-xrframe-getdepthinformation" id="ref-for-dom-xrframe-getdepthinformation"><c- g>getDepthInformation</c-></a>(<a data-link-type="idl-name" href="https://immersive-web.github.io/webxr/#xrview" id="ref-for-xrview②"><c- n>XRView</c-></a> <dfn class="idl-code" data-dfn-for="XRFrame/getDepthInformation(view)" data-dfn-type="argument" data-export id="dom-xrframe-getdepthinformation-view-view"><code><c- g>view</c-></code><a class="self-link" href="#dom-xrframe-getdepthinformation-view-view"></a></dfn>);
+<pre class="idl highlight def"><c- b>partial</c-> <c- b>interface</c-> <a class="idl-code" data-link-type="interface" href="https://www.w3.org/TR/webxr/#xrframe-interface" id="ref-for-xrframe-interface"><c- g>XRFrame</c-></a> {
+  <a data-link-type="idl-name" href="#xrcpudepthinformation" id="ref-for-xrcpudepthinformation②"><c- n>XRCPUDepthInformation</c-></a>? <a class="idl-code" data-link-type="method" href="#dom-xrframe-getdepthinformation" id="ref-for-dom-xrframe-getdepthinformation"><c- g>getDepthInformation</c-></a>(<a data-link-type="idl-name" href="https://immersive-web.github.io/webxr/#xrview" id="ref-for-xrview①"><c- n>XRView</c-></a> <dfn class="idl-code" data-dfn-for="XRFrame/getDepthInformation(view)" data-dfn-type="argument" data-export id="dom-xrframe-getdepthinformation-view-view"><code><c- g>view</c-></code><a class="self-link" href="#dom-xrframe-getdepthinformation-view-view"></a></dfn>);
 };
-
 </pre>
-   <p>The <dfn class="dfn-paneled idl-code" data-dfn-for="XRFrame" data-dfn-type="method" data-export id="dom-xrframe-getdepthinformation"><code>getDepthInformation(view)</code></dfn> method, when invoked on an <code class="idl"><a data-link-type="idl" href="https://www.w3.org/TR/webxr/#xrframe-interface" id="ref-for-xrframe-interface②">XRFrame</a></code>, signals that the application wants to <a data-link-type="dfn" href="#obtain-depth-information" id="ref-for-obtain-depth-information">obtain depth information</a> relevant for the frame.</p>
+   <p>The <dfn class="dfn-paneled idl-code" data-dfn-for="XRFrame" data-dfn-type="method" data-export id="dom-xrframe-getdepthinformation"><code>getDepthInformation(view)</code></dfn> method, when invoked on an <code class="idl"><a data-link-type="idl" href="https://www.w3.org/TR/webxr/#xrframe-interface" id="ref-for-xrframe-interface①">XRFrame</a></code>, signals that the application wants to <a data-link-type="dfn" href="#obtain-cpu-depth-information" id="ref-for-obtain-cpu-depth-information">obtain CPU depth information</a> relevant for the frame.</p>
    <div class="algorithm" data-algorithm="obtain-depth-information">
-    <p>When <code class="idl"><a data-link-type="idl" href="#dom-xrframe-getdepthinformation" id="ref-for-dom-xrframe-getdepthinformation①">getDepthInformation(view)</a></code> method is invoked on an <code class="idl"><a data-link-type="idl" href="https://www.w3.org/TR/webxr/#xrframe-interface" id="ref-for-xrframe-interface③">XRFrame</a></code> <var>frame</var> with an <code class="idl"><a data-link-type="idl" href="https://immersive-web.github.io/webxr/#xrview" id="ref-for-xrview③">XRView</a></code> <var>view</var>, the user agent MUST <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="obtain-depth-information">obtain depth information</dfn> by running the following steps:</p>
+    <p>When <code class="idl"><a data-link-type="idl" href="#dom-xrframe-getdepthinformation" id="ref-for-dom-xrframe-getdepthinformation①">getDepthInformation(view)</a></code> method is invoked on an <code class="idl"><a data-link-type="idl" href="https://www.w3.org/TR/webxr/#xrframe-interface" id="ref-for-xrframe-interface②">XRFrame</a></code> <var>frame</var> with an <code class="idl"><a data-link-type="idl" href="https://immersive-web.github.io/webxr/#xrview" id="ref-for-xrview②">XRView</a></code> <var>view</var>, the user agent MUST <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="obtain-cpu-depth-information">obtain CPU depth information</dfn> by running the following steps:</p>
     <ol>
      <li data-md>
-      <p>Let <var>session</var> be <var>frame</var>’s <code class="idl"><a data-link-type="idl" href="https://immersive-web.github.io/webxr/#dom-xrframe-session" id="ref-for-dom-xrframe-session">session</a></code>.</p>
+      <p>Let <var>session</var> be <var>frame</var>’s <code class="idl"><a data-link-type="idl" href="https://immersive-web.github.io/webxr/#dom-xrframe-session" id="ref-for-dom-xrframe-session①">session</a></code>.</p>
      <li data-md>
-      <p>If <a data-link-type="dfn" href="#depth-sensing" id="ref-for-depth-sensing">depth-sensing</a> feature descriptor is not <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#list-contain" id="ref-for-list-contain">contained</a> in the <var>session</var>’s <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#xrsession-xr-device" id="ref-for-xrsession-xr-device①">XR device</a>'s <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#xr-device-list-of-enabled-features" id="ref-for-xr-device-list-of-enabled-features">list of enabled features</a> for <var>session</var>’s <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#xrsession-mode" id="ref-for-xrsession-mode">mode</a>, <a data-link-type="dfn" href="https://heycam.github.io/webidl/#dfn-throw" id="ref-for-dfn-throw②">throw</a> a <code class="idl"><a data-link-type="idl" href="https://heycam.github.io/webidl/#notsupportederror" id="ref-for-notsupportederror">NotSupportedError</a></code> and abort these steps.</p>
+      <p>If <a data-link-type="dfn" href="#depth-sensing" id="ref-for-depth-sensing①">depth-sensing</a> feature descriptor is not <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#list-contain" id="ref-for-list-contain">contained</a> in the <var>session</var>’s <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#xrsession-xr-device" id="ref-for-xrsession-xr-device">XR device</a>'s <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#xr-device-list-of-enabled-features" id="ref-for-xr-device-list-of-enabled-features">list of enabled features</a> for <var>session</var>’s <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#xrsession-mode" id="ref-for-xrsession-mode">mode</a>, <a data-link-type="dfn" href="https://heycam.github.io/webidl/#dfn-throw" id="ref-for-dfn-throw②">throw</a> a <code class="idl"><a data-link-type="idl" href="https://heycam.github.io/webidl/#notsupportederror" id="ref-for-notsupportederror②">NotSupportedError</a></code> and abort these steps.</p>
      <li data-md>
-      <p>If <var>frame</var>’s <a data-link-type="dfn">active</a> boolean is <code>false</code>, throw an <code class="idl"><a data-link-type="idl" href="https://heycam.github.io/webidl/#invalidstateerror" id="ref-for-invalidstateerror">InvalidStateError</a></code> and abort these steps.</p>
+      <p>If <var>frame</var>’s <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#xrframe-active" id="ref-for-xrframe-active①">active</a> boolean is <code>false</code>, throw an <code class="idl"><a data-link-type="idl" href="https://heycam.github.io/webidl/#invalidstateerror" id="ref-for-invalidstateerror④">InvalidStateError</a></code> and abort these steps.</p>
      <li data-md>
-      <p>If <var>frame</var>’s <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#xrframe-time" id="ref-for-xrframe-time①">time</a> does not match <var>view</var>’s <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#xrview-frame-time" id="ref-for-xrview-frame-time">frame time</a>, <a data-link-type="dfn" href="https://heycam.github.io/webidl/#dfn-throw" id="ref-for-dfn-throw③">throw</a> an <code class="idl"><a data-link-type="idl" href="https://heycam.github.io/webidl/#invalidstateerror" id="ref-for-invalidstateerror①">InvalidStateError</a></code> and abort these steps.</p>
+      <p>If <var>frame</var>’s <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#xrframe-animationframe" id="ref-for-xrframe-animationframe①">animationFrame</a> boolean is <code>false</code>, throw an <code class="idl"><a data-link-type="idl" href="https://heycam.github.io/webidl/#invalidstateerror" id="ref-for-invalidstateerror⑤">InvalidStateError</a></code> and abort these steps.</p>
      <li data-md>
-      <p>Let <var>depthInformation</var> be a result of <a data-link-type="dfn" href="#create-a-depth-information-instance" id="ref-for-create-a-depth-information-instance">creating a depth information instance</a> given <var>frame</var> and <var>view</var>.</p>
+      <p>If <var>frame</var> does not match <var>view</var>’s <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#xrview-frame" id="ref-for-xrview-frame②">frame</a>, <a data-link-type="dfn" href="https://heycam.github.io/webidl/#dfn-throw" id="ref-for-dfn-throw③">throw</a> an <code class="idl"><a data-link-type="idl" href="https://heycam.github.io/webidl/#invalidstateerror" id="ref-for-invalidstateerror⑥">InvalidStateError</a></code> and abort these steps.</p>
+     <li data-md>
+      <p>If the <var>session</var>’s <code class="idl"><a data-link-type="idl" href="#dom-xrsession-depthusage" id="ref-for-dom-xrsession-depthusage②">depthUsage</a></code> is not <code class="idl"><a data-link-type="idl" href="#dom-xrdepthusage-cpu-optimized" id="ref-for-dom-xrdepthusage-cpu-optimized①">"cpu-optimized"</a></code>, throw an <code class="idl"><a data-link-type="idl" href="https://heycam.github.io/webidl/#invalidstateerror" id="ref-for-invalidstateerror⑦">InvalidStateError</a></code> and abort these steps.</p>
+     <li data-md>
+      <p>Let <var>depthInformation</var> be a result of <a data-link-type="dfn" href="#create-a-cpu-depth-information-instance" id="ref-for-create-a-cpu-depth-information-instance">creating a CPU depth information instance</a> given <var>frame</var> and <var>view</var>.</p>
      <li data-md>
       <p>Return <var>depthInformation</var>.</p>
     </ol>
    </div>
+   <div class="algorithm" data-algorithm="create-cpu-depth-information">
+    <p>In order to <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="create-a-cpu-depth-information-instance">create a CPU depth information instance</dfn> given <code class="idl"><a data-link-type="idl" href="https://www.w3.org/TR/webxr/#xrframe-interface" id="ref-for-xrframe-interface③">XRFrame</a></code> <var>frame</var> and <code class="idl"><a data-link-type="idl" href="https://immersive-web.github.io/webxr/#xrview" id="ref-for-xrview③">XRView</a></code> <var>view</var>, the user agent MUST run the following steps:</p>
+    <ol>
+     <li data-md>
+      <p>Let <var>result</var> be a new instance of <code class="idl"><a data-link-type="idl" href="#xrcpudepthinformation" id="ref-for-xrcpudepthinformation③">XRCPUDepthInformation</a></code>.</p>
+     <li data-md>
+      <p>Let <var>time</var> be <var>frame</var>’s <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#xrframe-time" id="ref-for-xrframe-time">time</a>.</p>
+     <li data-md>
+      <p>Let <var>session</var> be <var>frame</var>’s <code class="idl"><a data-link-type="idl" href="https://immersive-web.github.io/webxr/#dom-xrframe-session" id="ref-for-dom-xrframe-session②">session</a></code>.</p>
+     <li data-md>
+      <p>Let <var>device</var> be the <var>session</var>’s <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#xrsession-xr-device" id="ref-for-xrsession-xr-device①">XR device</a>.</p>
+     <li data-md>
+      <p>Let <var>nativeDepthInformation</var> be a result of querying <var>device</var> for the depth information valid as of <var>time</var>, for specified <var>view</var>, taking into account <var>session</var>’s <code class="idl"><a data-link-type="idl" href="#dom-xrsession-depthusage" id="ref-for-dom-xrsession-depthusage③">depthUsage</a></code> and <code class="idl"><a data-link-type="idl" href="#dom-xrsession-depthdataformat" id="ref-for-dom-xrsession-depthdataformat④">depthDataFormat</a></code>.</p>
+     <li data-md>
+      <p>If <var>nativeDepthInformation</var> is <code>null</code>, return <code>null</code> and abort these steps.</p>
+     <li data-md>
+      <p>If the depth buffer present in <var>nativeDepthInformation</var> meets user agent’s criteria to <a data-link-type="dfn" href="#block-access" id="ref-for-block-access">block access</a> to the depth data, return <code>null</code> and abort these steps.</p>
+     <li data-md>
+      <p>If the depth buffer present in <var>nativeDepthInformation</var> meets user agent’s criteria to <a data-link-type="dfn" href="#limit-the-amount-of-information" id="ref-for-limit-the-amount-of-information">limit the amount of information</a> available in depth buffer, adjust the depth buffer accordingly.</p>
+     <li data-md>
+      <p>Initialize <var>result</var>’s <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-width" id="ref-for-dom-xrdepthinformation-width④">width</a></code> to the width of the depth buffer returned in <var>nativeDepthInformation</var>.</p>
+     <li data-md>
+      <p>Initialize <var>result</var>’s <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-height" id="ref-for-dom-xrdepthinformation-height③">height</a></code> to the height of the depth buffer returned in <var>nativeDepthInformation</var>.</p>
+     <li data-md>
+      <p>Initialize <var>result</var>’s <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-normdepthbufferfromnormview" id="ref-for-dom-xrdepthinformation-normdepthbufferfromnormview③">normDepthBufferFromNormView</a></code> to a new <code class="idl"><a data-link-type="idl" href="https://immersive-web.github.io/webxr/#xrrigidtransform" id="ref-for-xrrigidtransform②">XRRigidTransform</a></code>, based on <var>nativeDepthInformation</var>’s <a data-link-type="dfn" href="#depth-coordinates-transformation-matrix" id="ref-for-depth-coordinates-transformation-matrix">depth coordinates transformation matrix</a>.</p>
+     <li data-md>
+      <p>Initialize <var>result</var>’s <code class="idl"><a data-link-type="idl" href="#dom-xrcpudepthinformation-data" id="ref-for-dom-xrcpudepthinformation-data⑥">data</a></code> to the raw depth buffer returned in <var>nativeDepthInformation</var>.</p>
+     <li data-md>
+      <p>Initialize <var>result</var>’s <a data-link-type="dfn" href="#xrdepthinformation-view" id="ref-for-xrdepthinformation-view③">view</a> to <var>view</var>.</p>
+     <li data-md>
+      <p>Return <var>result</var>.</p>
+    </ol>
+   </div>
+   <div class="example" id="example-96300c35">
+    <a class="self-link" href="#example-96300c35"></a> The following code demonstrates how depth data can be obtained within <code class="idl"><a data-link-type="idl" href="https://immersive-web.github.io/webxr/#callbackdef-xrframerequestcallback" id="ref-for-callbackdef-xrframerequestcallback">XRFrameRequestCallback</a></code>. It is assumed that the session that has depth sensing enabled, with usage set to "cpu-optimized" and data format set to "luminance-alpha": 
+<pre class="highlight"><c- a>const</c-> session <c- o>=</c-> <c- p>...;</c->          <c- c1>// Session created with depth sensing enabled.</c->
+<c- a>const</c-> referenceSpace <c- o>=</c-> <c- p>...;</c->   <c- c1>// Reference space created from the session.</c->
+
+<c- a>function</c-> requestAnimationFrameCallback<c- p>(</c->t<c- p>,</c-> frame<c- p>)</c-> <c- p>{</c->
+  session<c- p>.</c->requestAnimationFrame<c- p>(</c->requestAnimationFrameCallback<c- p>);</c->
+
+  <c- a>const</c-> pose <c- o>=</c-> frame<c- p>.</c->getViewerPose<c- p>(</c->referenceSpace<c- p>);</c->
+  <c- k>if</c-><c- p>(</c->pose<c- p>)</c-> <c- p>{</c->
+    <c- k>for</c-><c- p>(</c-><c- a>const</c-> view <c- k>of</c-> pose<c- p>.</c->views<c- p>)</c-> <c- p>{</c->
+      <c- a>const</c-> depthInformation <c- o>=</c-> frame<c- p>.</c->getDepthInformation<c- p>(</c->view<c- p>);</c->
+      <c- k>if</c-><c- p>(</c->depthInformation<c- p>)</c-> <c- p>{</c->
+        useCpuDepthInformation<c- p>(</c->view<c- p>,</c-> depthInformation<c- p>);</c->
+      <c- p>}</c->
+    <c- p>}</c->
+  <c- p>}</c->
+<c- p>}</c->
+</pre>
+    <p>Once the <code class="idl"><a data-link-type="idl" href="#xrcpudepthinformation" id="ref-for-xrcpudepthinformation④">XRCPUDepthInformation</a></code> is obtained, it can be used to discover a distance from the view plane to user’s environment (see <a href="#results-interpretation">§ 4 Interpreting the results</a> section for details). The below code demonstrates obtaining the depth at normalized view coordinates of (0.25, 0.75):</p>
+<pre class="highlight"><c- a>function</c-> useCpuDepthInformation<c- p>(</c->view<c- p>,</c-> depthInformation<c- p>)</c-> <c- p>{</c->
+  <c- a>const</c-> depthInMeters <c- o>=</c-> depthInformation<c- p>.</c->getDepthInMeters<c- p>(</c-><c- mf>0.25</c-><c- p>,</c-> <c- mf>0.75</c-><c- p>);</c->
+  console<c- p>.</c->log<c- p>(</c-><c- u>"Depth at normalized view coordinates (0.25, 0.75) is:"</c-><c- p>,</c->
+    depthInMeters<c- p>);</c->
+<c- p>}</c->
+</pre>
+   </div>
+   <h3 class="heading settled" data-level="3.3" id="xr-gpu-depth-info-section"><span class="secno">3.3. </span><span class="content">XRWebGLDepthInformation</span><a class="self-link" href="#xr-gpu-depth-info-section"></a></h3>
+<pre class="idl highlight def"><c- b>interface</c-> <dfn class="dfn-paneled idl-code" data-dfn-type="interface" data-export id="xrwebgldepthinformation"><code><c- g>XRWebGLDepthInformation</c-></code></dfn> : <a data-link-type="idl-name" href="#xrdepthinformation" id="ref-for-xrdepthinformation⑤"><c- n>XRDepthInformation</c-></a> {
+  [<a class="idl-code" data-link-type="extended-attribute" href="https://heycam.github.io/webidl/#SameObject" id="ref-for-SameObject②"><c- g>SameObject</c-></a>] <c- b>readonly</c-> <c- b>attribute</c-> <a data-link-type="idl-name" href="https://www.khronos.org/registry/webgl/specs/latest/1.0/#5.9" id="ref-for-5.9"><c- n>WebGLTexture</c-></a> <dfn class="dfn-paneled idl-code" data-dfn-for="XRWebGLDepthInformation" data-dfn-type="attribute" data-export data-readonly data-type="WebGLTexture" id="dom-xrwebgldepthinformation-texture"><code><c- g>texture</c-></code></dfn>;
+};
+</pre>
+   <p>The <code class="idl"><a data-link-type="idl" href="#dom-xrwebgldepthinformation-texture" id="ref-for-dom-xrwebgldepthinformation-texture①">texture</a></code> attribute contains depth buffer information as an <a data-link-type="dfn" href="https://immersive-web.github.io/layers/#opaque-texture" id="ref-for-opaque-texture">opaque texture</a>. Each texel corresponds to distance from the <a data-link-type="dfn" href="#xrdepthinformation-view" id="ref-for-xrdepthinformation-view④">view</a>'s near plane to the users' environment, in unspecified units. The size of each data entry and the type is determined by <code class="idl"><a data-link-type="idl" href="#dom-xrsession-depthdataformat" id="ref-for-dom-xrsession-depthdataformat⑤">depthDataFormat</a></code>. The values can be converted from unspecified units to meters by multiplying them by <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-rawvaluetometers" id="ref-for-dom-xrdepthinformation-rawvaluetometers③">rawValueToMeters</a></code>. The <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-normdepthbufferfromnormview" id="ref-for-dom-xrdepthinformation-normdepthbufferfromnormview④">normDepthBufferFromNormView</a></code> can be used to transform from <a data-link-type="dfn" href="#normalized-view-coordinates" id="ref-for-normalized-view-coordinates②">normalized view coordinates</a> into depth buffer’s coordinate system. When accessed, the algorithm to <a data-link-type="dfn" href="#attempting-to-access-the-depth-buffer" id="ref-for-attempting-to-access-the-depth-buffer②">access the depth buffer</a> of <code class="idl"><a data-link-type="idl" href="#xrdepthinformation" id="ref-for-xrdepthinformation⑥">XRDepthInformation</a></code> MUST be run.</p>
+<pre class="idl highlight def"><c- b>partial</c-> <c- b>interface</c-> <a class="idl-code" data-link-type="interface" href="https://immersive-web.github.io/layers/#xrwebglbinding" id="ref-for-xrwebglbinding"><c- g>XRWebGLBinding</c-></a> {
+  <a data-link-type="idl-name" href="#xrwebgldepthinformation" id="ref-for-xrwebgldepthinformation①"><c- n>XRWebGLDepthInformation</c-></a>? <dfn class="dfn-paneled idl-code" data-dfn-for="XRWebGLBinding" data-dfn-type="method" data-export data-lt="getDepthInformation(view)" id="dom-xrwebglbinding-getdepthinformation"><code><c- g>getDepthInformation</c-></code></dfn>(<a data-link-type="idl-name" href="https://immersive-web.github.io/webxr/#xrview" id="ref-for-xrview④"><c- n>XRView</c-></a> <dfn class="idl-code" data-dfn-for="XRWebGLBinding/getDepthInformation(view)" data-dfn-type="argument" data-export id="dom-xrwebglbinding-getdepthinformation-view-view"><code><c- g>view</c-></code><a class="self-link" href="#dom-xrwebglbinding-getdepthinformation-view-view"></a></dfn>);
+};
+</pre>
+   <p>The <dfn class="idl-code" data-dfn-for="XRWebGLDepthInformation" data-dfn-type="method" data-export id="dom-xrwebgldepthinformation-getdepthinformation"><code>getDepthInformation(view)</code><a class="self-link" href="#dom-xrwebgldepthinformation-getdepthinformation"></a></dfn> method, when invoked on an <code class="idl"><a data-link-type="idl" href="https://immersive-web.github.io/layers/#xrwebglbinding" id="ref-for-xrwebglbinding①">XRWebGLBinding</a></code>, signals that the application wants to <a data-link-type="dfn" href="#obtain-webgl-depth-information" id="ref-for-obtain-webgl-depth-information">obtain WebGL depth information</a> relevant for the frame.</p>
+   <div class="algorithm" data-algorithm="obtain-webgl-depth-information">
+    <p>When <code class="idl"><a data-link-type="idl" href="#dom-xrwebglbinding-getdepthinformation" id="ref-for-dom-xrwebglbinding-getdepthinformation">getDepthInformation(view)</a></code> method is invoked on an <code class="idl"><a data-link-type="idl" href="https://www.w3.org/TR/webxr/#xrframe-interface" id="ref-for-xrframe-interface④">XRFrame</a></code> <var>frame</var> with an <code class="idl"><a data-link-type="idl" href="https://immersive-web.github.io/webxr/#xrview" id="ref-for-xrview⑤">XRView</a></code> <var>view</var>, the user agent MUST <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="obtain-webgl-depth-information">obtain WebGL depth information</dfn> by running the following steps:</p>
+    <ol>
+     <li data-md>
+      <p>Let <var>frame</var> be <var>view</var>’s <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#xrview-frame" id="ref-for-xrview-frame③">frame</a>.</p>
+     <li data-md>
+      <p>Let <var>session</var> be <var>frame</var>’s <code class="idl"><a data-link-type="idl" href="https://immersive-web.github.io/webxr/#dom-xrframe-session" id="ref-for-dom-xrframe-session③">session</a></code>.</p>
+     <li data-md>
+      <p>If <a data-link-type="dfn" href="#depth-sensing" id="ref-for-depth-sensing②">depth-sensing</a> feature descriptor is not <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#list-contain" id="ref-for-list-contain①">contained</a> in the <var>session</var>’s <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#xrsession-xr-device" id="ref-for-xrsession-xr-device②">XR device</a>'s <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#xr-device-list-of-enabled-features" id="ref-for-xr-device-list-of-enabled-features①">list of enabled features</a> for <var>session</var>’s <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#xrsession-mode" id="ref-for-xrsession-mode①">mode</a>, <a data-link-type="dfn" href="https://heycam.github.io/webidl/#dfn-throw" id="ref-for-dfn-throw④">throw</a> a <code class="idl"><a data-link-type="idl" href="https://heycam.github.io/webidl/#notsupportederror" id="ref-for-notsupportederror③">NotSupportedError</a></code> and abort these steps.</p>
+     <li data-md>
+      <p>If the <var>session</var>’s <code class="idl"><a data-link-type="idl" href="#dom-xrsession-depthusage" id="ref-for-dom-xrsession-depthusage④">depthUsage</a></code> is not <code class="idl"><a data-link-type="idl" href="#dom-xrdepthusage-gpu-optimized" id="ref-for-dom-xrdepthusage-gpu-optimized①">"gpu-optimized"</a></code>, throw an <code class="idl"><a data-link-type="idl" href="https://heycam.github.io/webidl/#invalidstateerror" id="ref-for-invalidstateerror⑧">InvalidStateError</a></code> and abort these steps.</p>
+     <li data-md>
+      <p>If <var>frame</var>’s <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#xrframe-active" id="ref-for-xrframe-active②">active</a> boolean is <code>false</code>, throw an <code class="idl"><a data-link-type="idl" href="https://heycam.github.io/webidl/#invalidstateerror" id="ref-for-invalidstateerror⑨">InvalidStateError</a></code> and abort these steps.</p>
+     <li data-md>
+      <p>If <var>frame</var>’s <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#xrframe-animationframe" id="ref-for-xrframe-animationframe②">animationFrame</a> boolean is <code>false</code>, throw an <code class="idl"><a data-link-type="idl" href="https://heycam.github.io/webidl/#invalidstateerror" id="ref-for-invalidstateerror①⓪">InvalidStateError</a></code> and abort these steps.</p>
+     <li data-md>
+      <p>Let <var>depthInformation</var> be a result of <a data-link-type="dfn" href="#create-a-webgl-depth-information-instance" id="ref-for-create-a-webgl-depth-information-instance">creating a WebGL depth information instance</a> given <var>frame</var> and <var>view</var>.</p>
+     <li data-md>
+      <p>Return <var>depthInformation</var>.</p>
+    </ol>
+   </div>
+   <div class="algorithm" data-algorithm="create-webgl-depth-information">
+    <p>In order to <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="create-a-webgl-depth-information-instance">create a WebGL depth information instance</dfn> given <code class="idl"><a data-link-type="idl" href="https://www.w3.org/TR/webxr/#xrframe-interface" id="ref-for-xrframe-interface⑤">XRFrame</a></code> <var>frame</var> and <code class="idl"><a data-link-type="idl" href="https://immersive-web.github.io/webxr/#xrview" id="ref-for-xrview⑥">XRView</a></code> <var>view</var>, the user agent MUST run the following steps:</p>
+    <ol>
+     <li data-md>
+      <p>Let <var>result</var> be a new instance of <code class="idl"><a data-link-type="idl" href="#xrwebgldepthinformation" id="ref-for-xrwebgldepthinformation②">XRWebGLDepthInformation</a></code>.</p>
+     <li data-md>
+      <p>Let <var>time</var> be <var>frame</var>’s <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#xrframe-time" id="ref-for-xrframe-time①">time</a>.</p>
+     <li data-md>
+      <p>Let <var>session</var> be <var>frame</var>’s <code class="idl"><a data-link-type="idl" href="https://immersive-web.github.io/webxr/#dom-xrframe-session" id="ref-for-dom-xrframe-session④">session</a></code>.</p>
+     <li data-md>
+      <p>Let <var>device</var> be the <var>session</var>’s <a data-link-type="dfn" href="https://www.w3.org/TR/webxr/#xrsession-xr-device" id="ref-for-xrsession-xr-device③">XR device</a>.</p>
+     <li data-md>
+      <p>Let <var>nativeDepthInformation</var> be a result of querying <var>device</var>’s <a data-link-type="dfn" href="#native-depth-sensing" id="ref-for-native-depth-sensing③">native depth sensing</a> for the depth information valid as of <var>time</var>, for specified <var>view</var>, taking into account <var>session</var>’s <code class="idl"><a data-link-type="idl" href="#dom-xrsession-depthusage" id="ref-for-dom-xrsession-depthusage⑤">depthUsage</a></code> and <code class="idl"><a data-link-type="idl" href="#dom-xrsession-depthdataformat" id="ref-for-dom-xrsession-depthdataformat⑥">depthDataFormat</a></code>.</p>
+     <li data-md>
+      <p>If <var>nativeDepthInformation</var> is <code>null</code>, return <code>null</code> and abort these steps.</p>
+     <li data-md>
+      <p>If the depth buffer present in <var>nativeDepthInformation</var> meets user agent’s criteria to <a data-link-type="dfn" href="#block-access" id="ref-for-block-access①">block access</a> to the depth data, return <code>null</code> and abort these steps.</p>
+     <li data-md>
+      <p>If the depth buffer present in <var>nativeDepthInformation</var> meets user agent’s criteria to <a data-link-type="dfn" href="#limit-the-amount-of-information" id="ref-for-limit-the-amount-of-information①">limit the amount of information</a> available in depth buffer, adjust the depth buffer accordingly.</p>
+     <li data-md>
+      <p>Initialize <var>result</var>’s <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-width" id="ref-for-dom-xrdepthinformation-width⑤">width</a></code> to the width of the depth buffer returned in <var>nativeDepthInformation</var>.</p>
+     <li data-md>
+      <p>Initialize <var>result</var>’s <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-height" id="ref-for-dom-xrdepthinformation-height④">height</a></code> to the height of the depth buffer returned in <var>nativeDepthInformation</var>.</p>
+     <li data-md>
+      <p>Initialize <var>result</var>’s <code class="idl"><a data-link-type="idl" href="#dom-xrdepthinformation-normdepthbufferfromnormview" id="ref-for-dom-xrdepthinformation-normdepthbufferfromnormview⑤">normDepthBufferFromNormView</a></code> to a new <code class="idl"><a data-link-type="idl" href="https://immersive-web.github.io/webxr/#xrrigidtransform" id="ref-for-xrrigidtransform③">XRRigidTransform</a></code>, based on <var>nativeDepthInformation</var>’s <a data-link-type="dfn" href="#depth-coordinates-transformation-matrix" id="ref-for-depth-coordinates-transformation-matrix①">depth coordinates transformation matrix</a>.</p>
+     <li data-md>
+      <p>Initialize <var>result</var>’s <code class="idl"><a data-link-type="idl" href="#dom-xrwebgldepthinformation-texture" id="ref-for-dom-xrwebgldepthinformation-texture②">texture</a></code> to an <a data-link-type="dfn" href="https://immersive-web.github.io/layers/#opaque-texture" id="ref-for-opaque-texture①">opaque texture</a> containing the depth buffer returned in <var>nativeDepthInformation</var>.</p>
+     <li data-md>
+      <p>Initialize <var>result</var>’s <a data-link-type="dfn" href="#xrdepthinformation-view" id="ref-for-xrdepthinformation-view⑤">view</a> to <var>view</var>.</p>
+     <li data-md>
+      <p>Return <var>result</var>.</p>
+    </ol>
+   </div>
+   <div class="example" id="example-e42aeba5">
+    <a class="self-link" href="#example-e42aeba5"></a> The following code demonstrates how depth data can be obtained within <code class="idl"><a data-link-type="idl" href="https://immersive-web.github.io/webxr/#callbackdef-xrframerequestcallback" id="ref-for-callbackdef-xrframerequestcallback①">XRFrameRequestCallback</a></code>. It is assumed that the session that has depth sensing enabled, with usage set to "gpu-optimized" and data format set to "luminance-alpha": 
+<pre class="highlight"><c- a>const</c-> session <c- o>=</c-> <c- p>...;</c->          <c- c1>// Session created with depth sensing enabled.</c->
+<c- a>const</c-> referenceSpace <c- o>=</c-> <c- p>...;</c->   <c- c1>// Reference space created from the session.</c->
+<c- a>const</c-> glBinding <c- o>=</c-> <c- p>...;</c->        <c- c1>// XRWebGLBinding created from the session.</c->
+
+<c- a>function</c-> requestAnimationFrameCallback<c- p>(</c->t<c- p>,</c-> frame<c- p>)</c-> <c- p>{</c->
+  session<c- p>.</c->requestAnimationFrame<c- p>(</c->requestAnimationFrameCallback<c- p>);</c->
+
+  <c- a>const</c-> pose <c- o>=</c-> frame<c- p>.</c->getViewerPose<c- p>(</c->referenceSpace<c- p>);</c->
+  <c- k>if</c-><c- p>(</c->pose<c- p>)</c-> <c- p>{</c->
+    <c- k>for</c-><c- p>(</c-><c- a>const</c-> view <c- k>of</c-> pose<c- p>.</c->views<c- p>)</c-> <c- p>{</c->
+      <c- a>const</c-> depthInformation <c- o>=</c-> glBinding<c- p>.</c->getDepthInformation<c- p>(</c->view<c- p>);</c->
+      <c- k>if</c-><c- p>(</c->depthInformation<c- p>)</c-> <c- p>{</c->
+        useGpuDepthInformation<c- p>(</c->view<c- p>,</c-> depthInformation<c- p>);</c->
+      <c- p>}</c->
+    <c- p>}</c->
+  <c- p>}</c->
+<c- p>}</c->
+</pre>
+    <p>Once the <code class="idl"><a data-link-type="idl" href="#xrwebgldepthinformation" id="ref-for-xrwebgldepthinformation③">XRWebGLDepthInformation</a></code> is obtained, it can be used to discover a distance from the view plane to user’s environment (see <a href="#results-interpretation">§ 4 Interpreting the results</a> section for details). The below code demonstrates how the data can transferred to the shader:</p>
+<pre class="highlight"><c- a>const</c-> gl <c- o>=</c-> <c- p>...;</c->             <c- c1>// GL context to use.</c->
+<c- a>const</c-> shaderProgram <c- o>=</c-> <c- p>...;</c->  <c- c1>// Linked WebGLProgram.</c->
+<c- a>const</c-> programInfo <c- o>=</c-> <c- p>{</c->
+  uniformLocations<c- o>:</c-> <c- p>{</c->
+    depthTexture<c- o>:</c-> gl<c- p>.</c->getUniformLocation<c- p>(</c->shaderProgram<c- p>,</c-> <c- t>'uDepthTexture'</c-><c- p>),</c->
+    uvTransform<c- o>:</c-> gl<c- p>.</c->getUniformLocation<c- p>(</c->shaderProgram<c- p>,</c-> <c- t>'uUvTransform'</c-><c- p>),</c->
+    rawValueToMeters<c- o>:</c-> gl<c- p>.</c->getUniformLocation<c- p>(</c->shaderProgram<c- p>,</c-> <c- t>'uRawValueToMeters'</c-><c- p>),</c->
+  <c- p>}</c->
+<c- p>};</c->
+
+<c- a>function</c-> useGpuDepthInformation<c- p>(</c->view<c- p>,</c-> depthInformation<c- p>)</c-> <c- p>{</c->
+  <c- c1>// ...</c->
+
+  gl<c- p>.</c->bindTexture<c- p>(</c->gl<c- p>.</c->TEXTURE_2D<c- p>,</c-> depthInformation<c- p>.</c->texture<c- p>);</c->
+  gl<c- p>.</c->activeTexture<c- p>(</c->gl<c- p>.</c->TEXTURE0<c- p>);</c->
+  gl<c- p>.</c->uniform1i<c- p>(</c->programInfo<c- p>.</c->uniformLocations<c- p>.</c->depthTexture<c- p>,</c-> <c- mf>0</c-><c- p>);</c->
+
+  gl<c- p>.</c->uniformMatrix4fv<c- p>(</c->
+    programInfo<c- p>.</c->uniformLocations<c- p>.</c->uvTransform<c- p>,</c-> <c- kc>false</c-><c- p>,</c->
+    depthData<c- p>.</c->normDepthBufferFromNormView<c- p>.</c->matrix<c- p>);</c->
+
+  gl<c- p>.</c->uniform1f<c- p>(</c->
+    programInfo<c- p>.</c->uniformLocations<c- p>.</c->rawValueToMeters<c- p>,</c->
+    depthData<c- p>.</c->rawValueToMeters<c- p>);</c->
+
+  <c- c1>// ...</c->
+<c- p>}</c->
+</pre>
+    <p>The fragment shader that makes use of the depth buffer can be for example:</p>
+<pre class="highlight"><c- k>precision</c-> <c- k>mediump</c-> <c- b>float</c-><c- p>;</c->
+
+<c- k>uniform</c-> <c- b>sampler2D</c-> <c- n>uDepthTexture</c-><c- p>;</c->
+<c- k>uniform</c-> <c- b>mat4</c-> <c- n>uUvTransform</c-><c- p>;</c->
+<c- k>uniform</c-> <c- b>float</c-> <c- n>uRawValueToMeters</c-><c- p>;</c->
+
+<c- k>varying</c-> <c- b>vec2</c-> <c- n>vTexCoord</c-><c- p>;</c->
+
+<c- b>float</c-> <c- n>DepthGetMeters</c-><c- p>(</c-><c- k>in</c-> <c- b>sampler2D</c-> <c- n>depth_texture</c-><c- p>,</c-> <c- k>in</c-> <c- b>vec2</c-> <c- n>depth_uv</c-><c- p>)</c-> <c- p>{</c->
+  <c- c1>// Depth is packed into the luminance and alpha components of its texture.</c->
+  <c- c1>// The texture is a normalized format, storing millimeters.</c->
+  <c- b>vec2</c-> <c- n>packedDepth</c-> <c- o>=</c-> <c- n>texture2D</c-><c- p>(</c-><c- n>depth_texture</c-><c- p>,</c-> <c- n>depth_uv</c-><c- p>).</c-><c- n>ra</c-><c- p>;</c->
+  <c- k>return</c-> <c- n>dot</c-><c- p>(</c-><c- n>packedDepth</c-><c- p>,</c-> <c- b>vec2</c-><c- p>(</c-><c- mf>255.0</c-><c- p>,</c-> <c- mf>256.0</c-> <c- o>*</c-> <c- mf>255.0</c-><c- p>))</c-> <c- o>*</c-> <c- n>uRawValueToMeters</c-><c- p>;</c->
+<c- p>}</c->
+
+<c- b>void</c-> <c- n>main</c-><c- p>(</c-><c- b>void</c-><c- p>)</c-> <c- p>{</c->
+  <c- b>vec2</c-> <c- n>texCoord</c-> <c- o>=</c-> <c- p>(</c-><c- n>uUvTransform</c-> <c- o>*</c-> <c- b>vec4</c-><c- p>(</c-><c- n>vTexCoord</c-><c- p>.</c-><c- n>xy</c-><c- p>,</c-> <c- mo>0</c-><c- p>,</c-> <c- mi>1</c-><c- p>)).</c-><c- n>xy</c-><c- p>;</c->
+
+  <c- b>float</c-> <c- n>depthInMeters</c-> <c- o>=</c-> <c- n>DepthGetMeters</c-><c- p>(</c-><c- n>uDepthTexture</c-><c- p>,</c-> <c- n>texCoord</c-><c- p>);</c->
+
+  gl_FragColor <c- o>=</c-> <c- p>...;</c->
+<c- p>}</c->
+</pre>
+   </div>
    <h2 class="heading settled" data-level="4" id="results-interpretation"><span class="secno">4. </span><span class="content">Interpreting the results</span><a class="self-link" href="#results-interpretation"></a></h2>
-   <p class="issue" id="issue-ebc93800"><a class="self-link" href="#issue-ebc93800"></a> Fill this out.</p>
-   <h2 class="heading settled" data-level="5" id="native-device-concepts"><span class="secno">5. </span><span class="content">Native device concepts</span><a class="self-link" href="#native-device-concepts"></a></h2>
    <section class="non-normative">
-    <p class="issue" id="issue-ebc93800①"><a class="self-link" href="#issue-ebc93800①"></a> Fill this out.</p>
+    <p>The values stored in <code class="idl"><a data-link-type="idl" href="#dom-xrcpudepthinformation-data" id="ref-for-dom-xrcpudepthinformation-data⑦">data</a></code> and <code class="idl"><a data-link-type="idl" href="#dom-xrwebgldepthinformation-texture" id="ref-for-dom-xrwebgldepthinformation-texture③">texture</a></code> represent distance from the camera plane to the real-world-geometry (as understood by the XR system). In the below example, the depth value at point <code>a = (x, y)</code> corresponds to the distance of point A to the camera plane. Specifically, the depth value does NOT represent the length of <b><i>aA</i></b> vector.</p>
+    <p align="center"> <img alt="Depth API data explanation" src="https://raw.githubusercontent.com/immersive-web/depth-sensing/main/img/depth_api_data_explained.png" width="557"> </p>
+    <p>The above image corresponds to the following code:</p>
+<pre class="highlight"><c- c1>// depthInfo is of type XRCPUDepthInformation:</c->
+<c- a>const</c-> depthInMeters <c- o>=</c-> depthInfo<c- p>.</c->getDepthInMeters<c- p>(</c->x<c- p>,</c-> y<c- p>);</c->
+</pre>
+   </section>
+   <h2 class="heading settled" data-level="5" id="native-device-concepts"><span class="secno">5. </span><span class="content">Native device concepts</span><a class="self-link" href="#native-device-concepts"></a></h2>
+   <h3 class="heading settled" data-level="5.1" id="native-depth-sensing-section"><span class="secno">5.1. </span><span class="content">Native depth sensing</span><a class="self-link" href="#native-depth-sensing-section"></a></h3>
+   <section class="non-normative">
+    <p>Depth sensing specification assumes that the native device on top of which the depth sensing API is implemented provides a way to query device’s <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="native-depth-sensing">native depth sensing</dfn> capabilities. The device is said to support querying device’s native depth sensing capabilities if it exposes a way of obtainig <a data-link-type="dfn" href="#xrdepthinformation-view" id="ref-for-xrdepthinformation-view⑥">view</a>-aligned depth buffer data. The depth buffer data MUST contain buffer dimensions, the information about the units used for the values stored in the buffer, and a <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="depth-coordinates-transformation-matrix">depth coordinates transformation matrix</dfn> that performs a coordinate system change from normalized view coordinates to normalized depth buffer coordinates. This transform should leave <code>z</code> coordinate of the transformed 3D vector unaffected.</p>
+    <p>The device can <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="support-depth-sensing-usage">support depth sensing usage</dfn> in 2 ways. If the device is primarily capable of returning the depth data through CPU-accessible memory, it is said to support <code class="idl"><a data-link-type="idl" href="#dom-xrdepthusage-cpu-optimized" id="ref-for-dom-xrdepthusage-cpu-optimized②">"cpu-optimized"</a></code> usage. If the device is primarily capable of returning the depth data through GPU-accessible memory, it is said to support <code class="idl"><a data-link-type="idl" href="#dom-xrdepthusage-gpu-optimized" id="ref-for-dom-xrdepthusage-gpu-optimized②">"gpu-optimized"</a></code> usage.</p>
+    <p class="note" role="note"><span>Note:</span> The user agent can choose to support both usage modes (e.g. when the device is capable of providing both CPU- and GPU-accessible data, or by performing the transfer between CPU- and GPU-accessible data manually).</p>
+    <p>The device can <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="support-depth-sensing-data-format">support depth sensing data format</dfn> given depth sensing usage in the following ways. If, given the depth sensing usage, the device is able to return depth data as a buffer containing 2-byte unsigned integers, it is said to support <code class="idl"><a data-link-type="idl" href="#dom-xrdepthdataformat-luminance-alpha" id="ref-for-dom-xrdepthdataformat-luminance-alpha③">"luminance-alpha"</a></code> data format. If, given the depth sensing usage, the device is able to return depth data as a buffer containing 4-byte floating point values, it is said to support <code class="idl"><a data-link-type="idl" href="#dom-xrdepthdataformat-float32" id="ref-for-dom-xrdepthdataformat-float32②">"float32"</a></code> data format.</p>
+    <p>The device is said to <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="support-depth-sensing-usage-and-data-format-combination">support depth sensing usage and data format combination</dfn> if it <a data-link-type="dfn" href="#support-depth-sensing-usage" id="ref-for-support-depth-sensing-usage①">supports depth sensing usage</a> and <a data-link-type="dfn" href="#support-depth-sensing-data-format" id="ref-for-support-depth-sensing-data-format">supports depth sensing data format</a> given the specified usage.</p>
+    <p class="note" role="note"><span>Note:</span> the support of depth sensing API is not limited only to hardware classified as AR-capable, although it is expected that the feature will be more common in such devices. VR devices that contain appropriate sensors and/or use other techniques to provide depth buffer should also be able to provide the data necessary to implement depth sensing API.</p>
    </section>
    <h2 class="heading settled" data-level="6" id="privacy-security"><span class="secno">6. </span><span class="content">Privacy &amp; Security Considerations</span><a class="self-link" href="#privacy-security"></a></h2>
    <section class="non-normative">
-    <p class="issue" id="issue-ebc93800②"><a class="self-link" href="#issue-ebc93800②"></a> Fill this out.</p>
+    <p>The depth sensing API provides additional information about users' environment to the websites, in the format of depth buffer. Given a depth buffer with sufficiently high resolution, and with sufficiently high precision, the websites could potentially learn more detailed information than the users are comfortable with. Depending on the underlying technology used, the depth data may be created based on camera image and IMU sensors.</p>
+    <p>In order to mitigate privacy risks to the users, user agents should seek user consent prior to enabling the depth sensing API on a session. In addition, as the depth sensing technologies &amp; hardware improve, the user agents should consider <dfn class="dfn-paneled" data-dfn-type="dfn" data-lt="limit the amount of information" data-noexport id="limit-the-amount-of-information">limiting the amount of information</dfn> exposed through the API, or <dfn class="dfn-paneled" data-dfn-type="dfn" data-lt="block access" data-noexport id="block-access">blocking access</dfn> to the data returned from the API if it is not feasible to introduce such limitations. To limit the amount the information, the user agents could for example reduce the resolution of the resulting depth buffer, or reduce the precision of values present in the depth buffer (for example by quantization). User agents that decide to limit the amount of data in such way will still be considered as implementing this specification.</p>
+    <p>In case the user agent is capable of providing depth buffers that are detailed enough that they become equivalent to information provided by the device’s cameras, it must first obtain user consent that is equivalent to consent needed to obtain camera access.</p>
    </section>
    <h2 class="heading settled" data-level="7" id="ack"><span class="secno">7. </span><span class="content">Acknowledgements</span><a class="self-link" href="#ack"></a></h2>
    <p>The following individuals have contributed to the design of the WebXR Depth Sensing specification:</p>
@@ -854,23 +1209,89 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <h2 class="no-num no-ref heading settled" id="index"><span class="content">Index</span><a class="self-link" href="#index"></a></h2>
   <h3 class="no-num no-ref heading settled" id="index-defined-here"><span class="content">Terms defined by this specification</span><a class="self-link" href="#index-defined-here"></a></h3>
   <ul class="index">
-   <li><a href="#create-a-depth-information-instance">create a depth information instance</a><span>, in §3.1</span>
-   <li><a href="#dom-xrdepthinformation-data">data</a><span>, in §3.1</span>
+   <li><a href="#attempting-to-access-the-depth-buffer">attempting to access the depth buffer</a><span>, in §3.1</span>
+   <li><a href="#block-access">block access</a><span>, in §6</span>
+   <li><a href="#dom-xrdepthusage-cpu-optimized">"cpu-optimized"</a><span>, in §2.2</span>
+   <li><a href="#create-a-cpu-depth-information-instance">create a CPU depth information instance</a><span>, in §3.2</span>
+   <li><a href="#create-a-webgl-depth-information-instance">create a WebGL depth information instance</a><span>, in §3.3</span>
+   <li><a href="#dom-xrcpudepthinformation-data">data</a><span>, in §3.2</span>
+   <li><a href="#dom-xrdepthstateinit-dataformatpreference">dataFormatPreference</a><span>, in §2.3</span>
+   <li><a href="#xrdepthinformation-depth-buffer">depth buffer</a><span>, in §3.1</span>
+   <li><a href="#depth-coordinates-transformation-matrix">depth coordinates transformation matrix</a><span>, in §5.1</span>
+   <li><a href="#dom-xrsession-depthdataformat">depthDataFormat</a><span>, in §2.3</span>
    <li><a href="#depth-sensing">depth-sensing</a><span>, in §2.1</span>
-   <li><a href="#dom-xrdepthinformation-getdepth">getDepth(column, row)</a><span>, in §3.1</span>
-   <li><a href="#dom-xrframe-getdepthinformation">getDepthInformation(view)</a><span>, in §3.1</span>
+   <li><a href="#dom-xrsessioninit-depthsensing">depthSensing</a><span>, in §2.3</span>
+   <li><a href="#dom-xrsession-depthusage">depthUsage</a><span>, in §2.3</span>
+   <li><a href="#find-supported-configuration-combination">find supported configuration combination</a><span>, in §2.3</span>
+   <li><a href="#dom-xrdepthdataformat-float32">"float32"</a><span>, in §2.2</span>
+   <li>
+    getDepthInformation(view)
+    <ul>
+     <li><a href="#dom-xrframe-getdepthinformation">method for XRFrame</a><span>, in §3.2</span>
+     <li><a href="#dom-xrwebglbinding-getdepthinformation">method for XRWebGLBinding</a><span>, in §3.3</span>
+     <li><a href="#dom-xrwebgldepthinformation-getdepthinformation">method for XRWebGLDepthInformation</a><span>, in §3.3</span>
+    </ul>
+   <li><a href="#dom-xrcpudepthinformation-getdepthinmeters">getDepthInMeters(x, y)</a><span>, in §3.2</span>
+   <li><a href="#dom-xrdepthusage-gpu-optimized">"gpu-optimized"</a><span>, in §2.2</span>
    <li><a href="#dom-xrdepthinformation-height">height</a><span>, in §3.1</span>
-   <li><a href="#dom-xrdepthinformation-normtexturefromnormview">normTextureFromNormView</a><span>, in §3.1</span>
-   <li><a href="#obtain-depth-at-coordinates">obtain depth at coordinates</a><span>, in §3.1</span>
-   <li><a href="#obtain-depth-information">obtain depth information</a><span>, in §3.1</span>
+   <li><a href="#limit-the-amount-of-information">limit the amount of information</a><span>, in §6</span>
+   <li><a href="#dom-xrdepthdataformat-luminance-alpha">"luminance-alpha"</a><span>, in §2.2</span>
+   <li><a href="#native-depth-sensing">native depth sensing</a><span>, in §5.1</span>
+   <li><a href="#normalized-view-coordinates">normalized view coordinates</a><span>, in §1.1</span>
+   <li><a href="#dom-xrdepthinformation-normdepthbufferfromnormview">normDepthBufferFromNormView</a><span>, in §3.1</span>
+   <li><a href="#obtain-cpu-depth-information">obtain CPU depth information</a><span>, in §3.2</span>
+   <li><a href="#obtain-depth-at-coordinates">obtain depth at coordinates</a><span>, in §3.2</span>
+   <li><a href="#obtain-webgl-depth-information">obtain WebGL depth information</a><span>, in §3.3</span>
+   <li><a href="#dom-xrdepthinformation-rawvaluetometers">rawValueToMeters</a><span>, in §3.1</span>
+   <li><a href="#support-depth-sensing-data-format">support depth sensing data format</a><span>, in §5.1</span>
+   <li><a href="#support-depth-sensing-usage">support depth sensing usage</a><span>, in §5.1</span>
+   <li><a href="#support-depth-sensing-usage-and-data-format-combination">support depth sensing usage and data format combination</a><span>, in §5.1</span>
+   <li><a href="#dom-xrwebgldepthinformation-texture">texture</a><span>, in §3.3</span>
+   <li><a href="#dom-xrdepthstateinit-usagepreference">usagePreference</a><span>, in §2.3</span>
    <li><a href="#xrdepthinformation-view">view</a><span>, in §3.1</span>
    <li><a href="#dom-xrdepthinformation-width">width</a><span>, in §3.1</span>
+   <li><a href="#xrcpudepthinformation">XRCPUDepthInformation</a><span>, in §3.2</span>
+   <li><a href="#enumdef-xrdepthdataformat">XRDepthDataFormat</a><span>, in §2.2</span>
    <li><a href="#xrdepthinformation">XRDepthInformation</a><span>, in §3.1</span>
+   <li><a href="#dictdef-xrdepthstateinit">XRDepthStateInit</a><span>, in §2.3</span>
+   <li><a href="#enumdef-xrdepthusage">XRDepthUsage</a><span>, in §2.2</span>
+   <li><a href="#xrwebgldepthinformation">XRWebGLDepthInformation</a><span>, in §3.3</span>
   </ul>
   <aside class="dfn-panel" data-for="term-for-list-contain">
    <a href="https://infra.spec.whatwg.org/#list-contain">https://infra.spec.whatwg.org/#list-contain</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-list-contain">3.1. XRDepthInformation</a>
+    <li><a href="#ref-for-list-contain">3.2. XRCPUDepthInformation</a>
+    <li><a href="#ref-for-list-contain①">3.3. XRWebGLDepthInformation</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-3.7">
+   <a href="https://www.khronos.org/registry/webgl/specs/latest/2.0/#3.7">https://www.khronos.org/registry/webgl/specs/latest/2.0/#3.7</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-3.7">2.2. Intended data usage and data formats</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-5.1">
+   <a href="https://www.khronos.org/registry/webgl/specs/latest/1.0/#5.1">https://www.khronos.org/registry/webgl/specs/latest/1.0/#5.1</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-5.1">2.2. Intended data usage and data formats</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-5.9">
+   <a href="https://www.khronos.org/registry/webgl/specs/latest/1.0/#5.9">https://www.khronos.org/registry/webgl/specs/latest/1.0/#5.9</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-5.9">3.3. XRWebGLDepthInformation</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-5.14">
+   <a href="https://www.khronos.org/registry/webgl/specs/latest/1.0/#5.14">https://www.khronos.org/registry/webgl/specs/latest/1.0/#5.14</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-5.14">2.2. Intended data usage and data formats</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-idl-ArrayBuffer">
+   <a href="https://heycam.github.io/webidl/#idl-ArrayBuffer">https://heycam.github.io/webidl/#idl-ArrayBuffer</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-idl-ArrayBuffer">3.2. XRCPUDepthInformation</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-Exposed">
@@ -879,28 +1300,41 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
     <li><a href="#ref-for-Exposed">3.1. XRDepthInformation</a>
    </ul>
   </aside>
+  <aside class="dfn-panel" data-for="term-for-idl-Float32Array">
+   <a href="https://heycam.github.io/webidl/#idl-Float32Array">https://heycam.github.io/webidl/#idl-Float32Array</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-idl-Float32Array">2.2. Intended data usage and data formats</a>
+   </ul>
+  </aside>
   <aside class="dfn-panel" data-for="term-for-invalidstateerror">
    <a href="https://heycam.github.io/webidl/#invalidstateerror">https://heycam.github.io/webidl/#invalidstateerror</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-invalidstateerror">3.1. XRDepthInformation</a> <a href="#ref-for-invalidstateerror①">(2)</a>
-   </ul>
-  </aside>
-  <aside class="dfn-panel" data-for="term-for-notallowederror">
-   <a href="https://heycam.github.io/webidl/#notallowederror">https://heycam.github.io/webidl/#notallowederror</a><b>Referenced in:</b>
-   <ul>
-    <li><a href="#ref-for-notallowederror">3.1. XRDepthInformation</a> <a href="#ref-for-notallowederror①">(2)</a>
+    <li><a href="#ref-for-invalidstateerror">2.3. Session configuration</a> <a href="#ref-for-invalidstateerror①">(2)</a>
+    <li><a href="#ref-for-invalidstateerror②">3.1. XRDepthInformation</a> <a href="#ref-for-invalidstateerror③">(2)</a>
+    <li><a href="#ref-for-invalidstateerror④">3.2. XRCPUDepthInformation</a> <a href="#ref-for-invalidstateerror⑤">(2)</a> <a href="#ref-for-invalidstateerror⑥">(3)</a> <a href="#ref-for-invalidstateerror⑦">(4)</a>
+    <li><a href="#ref-for-invalidstateerror⑧">3.3. XRWebGLDepthInformation</a> <a href="#ref-for-invalidstateerror⑨">(2)</a> <a href="#ref-for-invalidstateerror①⓪">(3)</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-notsupportederror">
    <a href="https://heycam.github.io/webidl/#notsupportederror">https://heycam.github.io/webidl/#notsupportederror</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-notsupportederror">3.1. XRDepthInformation</a>
+    <li><a href="#ref-for-notsupportederror">2.3. Session configuration</a> <a href="#ref-for-notsupportederror①">(2)</a>
+    <li><a href="#ref-for-notsupportederror②">3.2. XRCPUDepthInformation</a>
+    <li><a href="#ref-for-notsupportederror③">3.3. XRWebGLDepthInformation</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-exceptiondef-rangeerror">
+   <a href="https://heycam.github.io/webidl/#exceptiondef-rangeerror">https://heycam.github.io/webidl/#exceptiondef-rangeerror</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-exceptiondef-rangeerror">3.2. XRCPUDepthInformation</a> <a href="#ref-for-exceptiondef-rangeerror①">(2)</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-SameObject">
    <a href="https://heycam.github.io/webidl/#SameObject">https://heycam.github.io/webidl/#SameObject</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-SameObject">3.1. XRDepthInformation</a> <a href="#ref-for-SameObject①">(2)</a>
+    <li><a href="#ref-for-SameObject">3.1. XRDepthInformation</a>
+    <li><a href="#ref-for-SameObject①">3.2. XRCPUDepthInformation</a>
+    <li><a href="#ref-for-SameObject②">3.3. XRWebGLDepthInformation</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-SecureContext">
@@ -912,55 +1346,124 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <aside class="dfn-panel" data-for="term-for-idl-Uint16Array">
    <a href="https://heycam.github.io/webidl/#idl-Uint16Array">https://heycam.github.io/webidl/#idl-Uint16Array</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-idl-Uint16Array">3.1. XRDepthInformation</a>
+    <li><a href="#ref-for-idl-Uint16Array">2.2. Intended data usage and data formats</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-idl-float">
    <a href="https://heycam.github.io/webidl/#idl-float">https://heycam.github.io/webidl/#idl-float</a><b>Referenced in:</b>
    <ul>
     <li><a href="#ref-for-idl-float">3.1. XRDepthInformation</a>
+    <li><a href="#ref-for-idl-float①">3.2. XRCPUDepthInformation</a> <a href="#ref-for-idl-float②">(2)</a> <a href="#ref-for-idl-float③">(3)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-idl-sequence">
+   <a href="https://heycam.github.io/webidl/#idl-sequence">https://heycam.github.io/webidl/#idl-sequence</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-idl-sequence">2.3. Session configuration</a> <a href="#ref-for-idl-sequence①">(2)</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-dfn-throw">
    <a href="https://heycam.github.io/webidl/#dfn-throw">https://heycam.github.io/webidl/#dfn-throw</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-dfn-throw">3.1. XRDepthInformation</a> <a href="#ref-for-dfn-throw①">(2)</a> <a href="#ref-for-dfn-throw②">(3)</a> <a href="#ref-for-dfn-throw③">(4)</a>
+    <li><a href="#ref-for-dfn-throw">3.2. XRCPUDepthInformation</a> <a href="#ref-for-dfn-throw①">(2)</a> <a href="#ref-for-dfn-throw②">(3)</a> <a href="#ref-for-dfn-throw③">(4)</a>
+    <li><a href="#ref-for-dfn-throw④">3.3. XRWebGLDepthInformation</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-idl-unsigned-long">
    <a href="https://heycam.github.io/webidl/#idl-unsigned-long">https://heycam.github.io/webidl/#idl-unsigned-long</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-idl-unsigned-long">3.1. XRDepthInformation</a> <a href="#ref-for-idl-unsigned-long①">(2)</a> <a href="#ref-for-idl-unsigned-long②">(3)</a> <a href="#ref-for-idl-unsigned-long③">(4)</a>
+    <li><a href="#ref-for-idl-unsigned-long">3.1. XRDepthInformation</a> <a href="#ref-for-idl-unsigned-long①">(2)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-callbackdef-xrframerequestcallback">
+   <a href="https://immersive-web.github.io/webxr/#callbackdef-xrframerequestcallback">https://immersive-web.github.io/webxr/#callbackdef-xrframerequestcallback</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-callbackdef-xrframerequestcallback">3.2. XRCPUDepthInformation</a>
+    <li><a href="#ref-for-callbackdef-xrframerequestcallback①">3.3. XRWebGLDepthInformation</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-xrrigidtransform">
    <a href="https://immersive-web.github.io/webxr/#xrrigidtransform">https://immersive-web.github.io/webxr/#xrrigidtransform</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-xrrigidtransform">3.1. XRDepthInformation</a> <a href="#ref-for-xrrigidtransform①">(2)</a> <a href="#ref-for-xrrigidtransform②">(3)</a>
+    <li><a href="#ref-for-xrrigidtransform">3.1. XRDepthInformation</a> <a href="#ref-for-xrrigidtransform①">(2)</a>
+    <li><a href="#ref-for-xrrigidtransform②">3.2. XRCPUDepthInformation</a>
+    <li><a href="#ref-for-xrrigidtransform③">3.3. XRWebGLDepthInformation</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-dictdef-xrsessioninit">
+   <a href="https://immersive-web.github.io/webxr/#dictdef-xrsessioninit">https://immersive-web.github.io/webxr/#dictdef-xrsessioninit</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-dictdef-xrsessioninit">2.3. Session configuration</a> <a href="#ref-for-dictdef-xrsessioninit①">(2)</a> <a href="#ref-for-dictdef-xrsessioninit②">(3)</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-xrview">
    <a href="https://immersive-web.github.io/webxr/#xrview">https://immersive-web.github.io/webxr/#xrview</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-xrview">3.1. XRDepthInformation</a> <a href="#ref-for-xrview①">(2)</a> <a href="#ref-for-xrview②">(3)</a> <a href="#ref-for-xrview③">(4)</a>
+    <li><a href="#ref-for-xrview">3.1. XRDepthInformation</a>
+    <li><a href="#ref-for-xrview①">3.2. XRCPUDepthInformation</a> <a href="#ref-for-xrview②">(2)</a> <a href="#ref-for-xrview③">(3)</a>
+    <li><a href="#ref-for-xrview④">3.3. XRWebGLDepthInformation</a> <a href="#ref-for-xrview⑤">(2)</a> <a href="#ref-for-xrview⑥">(3)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-dom-xrsessioninit-optionalfeatures">
+   <a href="https://immersive-web.github.io/webxr/#dom-xrsessioninit-optionalfeatures">https://immersive-web.github.io/webxr/#dom-xrsessioninit-optionalfeatures</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-dom-xrsessioninit-optionalfeatures">2.3. Session configuration</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-dom-xrsystem-requestsession">
+   <a href="https://immersive-web.github.io/webxr/#dom-xrsystem-requestsession">https://immersive-web.github.io/webxr/#dom-xrsystem-requestsession</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-dom-xrsystem-requestsession">2.3. Session configuration</a> <a href="#ref-for-dom-xrsystem-requestsession①">(2)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-dom-xrsessioninit-requiredfeatures">
+   <a href="https://immersive-web.github.io/webxr/#dom-xrsessioninit-requiredfeatures">https://immersive-web.github.io/webxr/#dom-xrsessioninit-requiredfeatures</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-dom-xrsessioninit-requiredfeatures">2.3. Session configuration</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-dom-xrframe-session">
    <a href="https://immersive-web.github.io/webxr/#dom-xrframe-session">https://immersive-web.github.io/webxr/#dom-xrframe-session</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-dom-xrframe-session">3.1. XRDepthInformation</a>
+    <li><a href="#ref-for-dom-xrframe-session">3.2. XRCPUDepthInformation</a> <a href="#ref-for-dom-xrframe-session①">(2)</a> <a href="#ref-for-dom-xrframe-session②">(3)</a>
+    <li><a href="#ref-for-dom-xrframe-session③">3.3. XRWebGLDepthInformation</a> <a href="#ref-for-dom-xrframe-session④">(2)</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-xrframe-interface">
    <a href="https://www.w3.org/TR/webxr/#xrframe-interface">https://www.w3.org/TR/webxr/#xrframe-interface</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-xrframe-interface">3.1. XRDepthInformation</a> <a href="#ref-for-xrframe-interface①">(2)</a> <a href="#ref-for-xrframe-interface②">(3)</a> <a href="#ref-for-xrframe-interface③">(4)</a>
+    <li><a href="#ref-for-xrframe-interface">3.2. XRCPUDepthInformation</a> <a href="#ref-for-xrframe-interface①">(2)</a> <a href="#ref-for-xrframe-interface②">(3)</a> <a href="#ref-for-xrframe-interface③">(4)</a>
+    <li><a href="#ref-for-xrframe-interface④">3.3. XRWebGLDepthInformation</a> <a href="#ref-for-xrframe-interface⑤">(2)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-xrsession-interface">
+   <a href="https://www.w3.org/TR/webxr/#xrsession-interface">https://www.w3.org/TR/webxr/#xrsession-interface</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-xrsession-interface">1. Introduction</a>
+    <li><a href="#ref-for-xrsession-interface①">2.3. Session configuration</a> <a href="#ref-for-xrsession-interface②">(2)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-xrframe-active">
+   <a href="https://www.w3.org/TR/webxr/#xrframe-active">https://www.w3.org/TR/webxr/#xrframe-active</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-xrframe-active">3.1. XRDepthInformation</a>
+    <li><a href="#ref-for-xrframe-active①">3.2. XRCPUDepthInformation</a>
+    <li><a href="#ref-for-xrframe-active②">3.3. XRWebGLDepthInformation</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-xrframe-animationframe">
+   <a href="https://www.w3.org/TR/webxr/#xrframe-animationframe">https://www.w3.org/TR/webxr/#xrframe-animationframe</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-xrframe-animationframe">3.1. XRDepthInformation</a>
+    <li><a href="#ref-for-xrframe-animationframe①">3.2. XRCPUDepthInformation</a>
+    <li><a href="#ref-for-xrframe-animationframe②">3.3. XRWebGLDepthInformation</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-capable-of-supporting">
    <a href="https://www.w3.org/TR/webxr/#capable-of-supporting">https://www.w3.org/TR/webxr/#capable-of-supporting</a><b>Referenced in:</b>
    <ul>
     <li><a href="#ref-for-capable-of-supporting">2.1. Feature descriptor</a> <a href="#ref-for-capable-of-supporting①">(2)</a>
+    <li><a href="#ref-for-capable-of-supporting②">2.3. Session configuration</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-feature-descriptor">
@@ -975,10 +1478,12 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
     <li><a href="#ref-for-feature-policy">2.1. Feature descriptor</a>
    </ul>
   </aside>
-  <aside class="dfn-panel" data-for="term-for-xrview-frame-time">
-   <a href="https://www.w3.org/TR/webxr/#xrview-frame-time">https://www.w3.org/TR/webxr/#xrview-frame-time</a><b>Referenced in:</b>
+  <aside class="dfn-panel" data-for="term-for-xrview-frame">
+   <a href="https://www.w3.org/TR/webxr/#xrview-frame">https://www.w3.org/TR/webxr/#xrview-frame</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-xrview-frame-time">3.1. XRDepthInformation</a>
+    <li><a href="#ref-for-xrview-frame">3.1. XRDepthInformation</a>
+    <li><a href="#ref-for-xrview-frame①">3.2. XRCPUDepthInformation</a> <a href="#ref-for-xrview-frame②">(2)</a>
+    <li><a href="#ref-for-xrview-frame③">3.3. XRWebGLDepthInformation</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-inline-xr-device">
@@ -990,25 +1495,41 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <aside class="dfn-panel" data-for="term-for-xr-device-list-of-enabled-features">
    <a href="https://www.w3.org/TR/webxr/#xr-device-list-of-enabled-features">https://www.w3.org/TR/webxr/#xr-device-list-of-enabled-features</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-xr-device-list-of-enabled-features">3.1. XRDepthInformation</a>
+    <li><a href="#ref-for-xr-device-list-of-enabled-features">3.2. XRCPUDepthInformation</a>
+    <li><a href="#ref-for-xr-device-list-of-enabled-features①">3.3. XRWebGLDepthInformation</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-xrsession-mode">
    <a href="https://www.w3.org/TR/webxr/#xrsession-mode">https://www.w3.org/TR/webxr/#xrsession-mode</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-xrsession-mode">3.1. XRDepthInformation</a>
+    <li><a href="#ref-for-xrsession-mode">3.2. XRCPUDepthInformation</a>
+    <li><a href="#ref-for-xrsession-mode①">3.3. XRWebGLDepthInformation</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-xrframe-time">
    <a href="https://www.w3.org/TR/webxr/#xrframe-time">https://www.w3.org/TR/webxr/#xrframe-time</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-xrframe-time">3.1. XRDepthInformation</a> <a href="#ref-for-xrframe-time①">(2)</a>
+    <li><a href="#ref-for-xrframe-time">3.2. XRCPUDepthInformation</a>
+    <li><a href="#ref-for-xrframe-time①">3.3. XRWebGLDepthInformation</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-xrsession-xr-device">
    <a href="https://www.w3.org/TR/webxr/#xrsession-xr-device">https://www.w3.org/TR/webxr/#xrsession-xr-device</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-xrsession-xr-device">3.1. XRDepthInformation</a> <a href="#ref-for-xrsession-xr-device①">(2)</a>
+    <li><a href="#ref-for-xrsession-xr-device">3.2. XRCPUDepthInformation</a> <a href="#ref-for-xrsession-xr-device①">(2)</a>
+    <li><a href="#ref-for-xrsession-xr-device②">3.3. XRWebGLDepthInformation</a> <a href="#ref-for-xrsession-xr-device③">(2)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-opaque-texture">
+   <a href="https://immersive-web.github.io/layers/#opaque-texture">https://immersive-web.github.io/layers/#opaque-texture</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-opaque-texture">3.3. XRWebGLDepthInformation</a> <a href="#ref-for-opaque-texture①">(2)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-xrwebglbinding">
+   <a href="https://immersive-web.github.io/layers/#xrwebglbinding">https://immersive-web.github.io/layers/#xrwebglbinding</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-xrwebglbinding">3.3. XRWebGLDepthInformation</a> <a href="#ref-for-xrwebglbinding①">(2)</a>
    </ul>
   </aside>
   <h3 class="no-num no-ref heading settled" id="index-defined-elsewhere"><span class="content">Terms defined by reference</span><a class="self-link" href="#index-defined-elsewhere"></a></h3>
@@ -1019,39 +1540,72 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <li><span class="dfn-paneled" id="term-for-list-contain">contain</span>
     </ul>
    <li>
+    <a data-link-type="biblio">[webgl 2.0]</a> defines the following terms:
+    <ul>
+     <li><span class="dfn-paneled" id="term-for-3.7">r32f</span>
+    </ul>
+   <li>
+    <a data-link-type="biblio">[WEBGL-2]</a> defines the following terms:
+    <ul>
+     <li><span class="dfn-paneled" id="term-for-5.1">GLenum</span>
+     <li><span class="dfn-paneled" id="term-for-5.9">WebGLTexture</span>
+     <li><span class="dfn-paneled" id="term-for-5.14">luminance_alpha</span>
+    </ul>
+   <li>
     <a data-link-type="biblio">[WebIDL]</a> defines the following terms:
     <ul>
+     <li><span class="dfn-paneled" id="term-for-idl-ArrayBuffer">ArrayBuffer</span>
      <li><span class="dfn-paneled" id="term-for-Exposed">Exposed</span>
+     <li><span class="dfn-paneled" id="term-for-idl-Float32Array">Float32Array</span>
      <li><span class="dfn-paneled" id="term-for-invalidstateerror">InvalidStateError</span>
-     <li><span class="dfn-paneled" id="term-for-notallowederror">NotAllowedError</span>
      <li><span class="dfn-paneled" id="term-for-notsupportederror">NotSupportedError</span>
+     <li><span class="dfn-paneled" id="term-for-exceptiondef-rangeerror">RangeError</span>
      <li><span class="dfn-paneled" id="term-for-SameObject">SameObject</span>
      <li><span class="dfn-paneled" id="term-for-SecureContext">SecureContext</span>
      <li><span class="dfn-paneled" id="term-for-idl-Uint16Array">Uint16Array</span>
      <li><span class="dfn-paneled" id="term-for-idl-float">float</span>
+     <li><span class="dfn-paneled" id="term-for-idl-sequence">sequence</span>
      <li><span class="dfn-paneled" id="term-for-dfn-throw">throw</span>
      <li><span class="dfn-paneled" id="term-for-idl-unsigned-long">unsigned long</span>
     </ul>
    <li>
     <a data-link-type="biblio">[webxr]</a> defines the following terms:
     <ul>
+     <li><span class="dfn-paneled" id="term-for-callbackdef-xrframerequestcallback">XRFrameRequestCallback</span>
      <li><span class="dfn-paneled" id="term-for-xrrigidtransform">XRRigidTransform</span>
+     <li><span class="dfn-paneled" id="term-for-dictdef-xrsessioninit">XRSessionInit</span>
      <li><span class="dfn-paneled" id="term-for-xrview">XRView</span>
+     <li><span class="dfn-paneled" id="term-for-dom-xrsessioninit-optionalfeatures">optionalFeatures</span>
+     <li><span class="dfn-paneled" id="term-for-dom-xrsystem-requestsession">requestSession(mode, options)</span>
+     <li><span class="dfn-paneled" id="term-for-dom-xrsessioninit-requiredfeatures">requiredFeatures</span>
      <li><span class="dfn-paneled" id="term-for-dom-xrframe-session">session</span>
     </ul>
    <li>
     <a data-link-type="biblio">[webxr device api - level 1]</a> defines the following terms:
     <ul>
      <li><span class="dfn-paneled" id="term-for-xrframe-interface">XRFrame</span>
+     <li><span class="dfn-paneled" id="term-for-xrsession-interface">XRSession</span>
+     <li><span class="dfn-paneled" id="term-for-xrframe-active">active</span>
+     <li><span class="dfn-paneled" id="term-for-xrframe-animationframe">animationframe</span>
      <li><span class="dfn-paneled" id="term-for-capable-of-supporting">capable of supporting</span>
      <li><span class="dfn-paneled" id="term-for-feature-descriptor">feature descriptor</span>
      <li><span class="dfn-paneled" id="term-for-feature-policy">feature policy</span>
-     <li><span class="dfn-paneled" id="term-for-xrview-frame-time">frame time</span>
+     <li><span class="dfn-paneled" id="term-for-xrview-frame">frame</span>
      <li><span class="dfn-paneled" id="term-for-inline-xr-device">inline xr device</span>
      <li><span class="dfn-paneled" id="term-for-xr-device-list-of-enabled-features">list of enabled features</span>
      <li><span class="dfn-paneled" id="term-for-xrsession-mode">mode</span>
      <li><span class="dfn-paneled" id="term-for-xrframe-time">time</span>
      <li><span class="dfn-paneled" id="term-for-xrsession-xr-device">xr device</span>
+    </ul>
+   <li>
+    <a data-link-type="biblio">[webxr layers]</a> defines the following terms:
+    <ul>
+     <li><span class="dfn-paneled" id="term-for-opaque-texture">opaque texture</span>
+    </ul>
+   <li>
+    <a data-link-type="biblio">[webxr-layers-1]</a> defines the following terms:
+    <ul>
+     <li><span class="dfn-paneled" id="term-for-xrwebglbinding">XRWebGLBinding</span>
     </ul>
   </ul>
   <h2 class="no-num no-ref heading settled" id="references"><span class="content">References</span><a class="self-link" href="#references"></a></h2>
@@ -1061,108 +1615,365 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
    <dd>Anne van Kesteren; Domenic Denicola. <a href="https://infra.spec.whatwg.org/">Infra Standard</a>. Living Standard. URL: <a href="https://infra.spec.whatwg.org/">https://infra.spec.whatwg.org/</a>
    <dt id="biblio-rfc2119">[RFC2119]
    <dd>S. Bradner. <a href="https://tools.ietf.org/html/rfc2119">Key words for use in RFCs to Indicate Requirement Levels</a>. March 1997. Best Current Practice. URL: <a href="https://tools.ietf.org/html/rfc2119">https://tools.ietf.org/html/rfc2119</a>
+   <dt id="biblio-webgl-2">[WEBGL-2]
+   <dd>Dean Jackson; Jeff Gilbert. <a href="https://www.khronos.org/registry/webgl/specs/latest/2.0/">WebGL 2.0 Specification</a>. 12 August 2017. URL: <a href="https://www.khronos.org/registry/webgl/specs/latest/2.0/">https://www.khronos.org/registry/webgl/specs/latest/2.0/</a>
    <dt id="biblio-webidl">[WebIDL]
    <dd>Boris Zbarsky. <a href="https://heycam.github.io/webidl/">Web IDL</a>. 15 December 2016. ED. URL: <a href="https://heycam.github.io/webidl/">https://heycam.github.io/webidl/</a>
    <dt id="biblio-webxr">[WEBXR]
    <dd>Brandon Jones; Manish Goregaokar; Nell Waliczek. <a href="https://www.w3.org/TR/webxr/">WebXR Device API</a>. 24 July 2020. WD. URL: <a href="https://www.w3.org/TR/webxr/">https://www.w3.org/TR/webxr/</a>
+   <dt id="biblio-webxr-layers-1">[WEBXR-LAYERS-1]
+   <dd>WebXR Layers API Level 1 URL: <a href="https://immersive-web.github.io/layers/">https://immersive-web.github.io/layers/</a>
+  </dl>
+  <h3 class="no-num no-ref heading settled" id="informative"><span class="content">Informative References</span><a class="self-link" href="#informative"></a></h3>
+  <dl>
+   <dt id="biblio-webxr-ar-module-1">[WEBXR-AR-MODULE-1]
+   <dd>Brandon Jones; Nell Waliczek; Manish Goregaokar. <a href="https://www.w3.org/TR/webxr-ar-module-1/">WebXR Augmented Reality Module - Level 1</a>. 10 October 2019. WD. URL: <a href="https://www.w3.org/TR/webxr-ar-module-1/">https://www.w3.org/TR/webxr-ar-module-1/</a>
   </dl>
   <h2 class="no-num no-ref heading settled" id="idl-index"><span class="content">IDL Index</span><a class="self-link" href="#idl-index"></a></h2>
-<pre class="idl highlight def">[<a class="idl-code" data-link-type="extended-attribute" href="https://heycam.github.io/webidl/#SecureContext"><c- g>SecureContext</c-></a>, <a class="idl-code" data-link-type="extended-attribute" href="https://heycam.github.io/webidl/#Exposed"><c- g>Exposed</c-></a>=<c- n>Window</c->]
-<c- b>interface</c-> <a href="#xrdepthinformation"><code><c- g>XRDepthInformation</c-></code></a> {
-  [<a class="idl-code" data-link-type="extended-attribute" href="https://heycam.github.io/webidl/#SameObject"><c- g>SameObject</c-></a>] <c- b>readonly</c-> <c- b>attribute</c-> <a class="idl-code" data-link-type="interface" href="https://heycam.github.io/webidl/#idl-Uint16Array"><c- b>Uint16Array</c-></a> <a data-readonly data-type="Uint16Array" href="#dom-xrdepthinformation-data"><code><c- g>data</c-></code></a>;
+<pre class="idl highlight def"><c- b>enum</c-> <a href="#enumdef-xrdepthusage"><code><c- g>XRDepthUsage</c-></code></a> {
+  <a class="idl-code" data-link-type="enum-value" href="#dom-xrdepthusage-cpu-optimized"><c- s>"cpu-optimized"</c-></a>,
+  <a class="idl-code" data-link-type="enum-value" href="#dom-xrdepthusage-gpu-optimized"><c- s>"gpu-optimized"</c-></a>,
+};
 
+<c- b>enum</c-> <a href="#enumdef-xrdepthdataformat"><code><c- g>XRDepthDataFormat</c-></code></a> {
+  <a class="idl-code" data-link-type="enum-value" href="#dom-xrdepthdataformat-luminance-alpha"><c- s>"luminance-alpha"</c-></a>,
+  <a class="idl-code" data-link-type="enum-value" href="#dom-xrdepthdataformat-float32"><c- s>"float32"</c-></a>
+};
+
+<c- b>dictionary</c-> <a href="#dictdef-xrdepthstateinit"><code><c- g>XRDepthStateInit</c-></code></a> {
+  <c- b>required</c-> <a data-link-type="dfn" href="https://heycam.github.io/webidl/#idl-sequence"><c- b>sequence</c-></a>&lt;<a data-link-type="idl-name" href="#enumdef-xrdepthusage"><c- n>XRDepthUsage</c-></a>> <a data-type="sequence<XRDepthUsage> " href="#dom-xrdepthstateinit-usagepreference"><code><c- g>usagePreference</c-></code></a>;
+  <c- b>required</c-> <a data-link-type="dfn" href="https://heycam.github.io/webidl/#idl-sequence"><c- b>sequence</c-></a>&lt;<a data-link-type="idl-name" href="#enumdef-xrdepthdataformat"><c- n>XRDepthDataFormat</c-></a>> <a data-type="sequence<XRDepthDataFormat> " href="#dom-xrdepthstateinit-dataformatpreference"><code><c- g>dataFormatPreference</c-></code></a>;
+};
+
+<c- b>partial</c-> <c- b>dictionary</c-> <a class="idl-code" data-link-type="dictionary" href="https://immersive-web.github.io/webxr/#dictdef-xrsessioninit"><c- g>XRSessionInit</c-></a> {
+  <a data-link-type="idl-name" href="#dictdef-xrdepthstateinit"><c- n>XRDepthStateInit</c-></a> <a data-type="XRDepthStateInit " href="#dom-xrsessioninit-depthsensing"><code><c- g>depthSensing</c-></code></a>;
+};
+
+<c- b>partial</c-> <c- b>interface</c-> <a class="idl-code" data-link-type="interface" href="https://www.w3.org/TR/webxr/#xrsession-interface"><c- g>XRSession</c-></a> {
+  <c- b>readonly</c-> <c- b>attribute</c-> <a data-link-type="idl-name" href="#enumdef-xrdepthusage"><c- n>XRDepthUsage</c-></a> <a data-readonly data-type="XRDepthUsage" href="#dom-xrsession-depthusage"><code><c- g>depthUsage</c-></code></a>;
+  <c- b>readonly</c-> <c- b>attribute</c-> <a data-link-type="idl-name" href="#enumdef-xrdepthdataformat"><c- n>XRDepthDataFormat</c-></a> <a data-readonly data-type="XRDepthDataFormat" href="#dom-xrsession-depthdataformat"><code><c- g>depthDataFormat</c-></code></a>;
+};
+
+[<a class="idl-code" data-link-type="extended-attribute" href="https://heycam.github.io/webidl/#SecureContext"><c- g>SecureContext</c-></a>, <a class="idl-code" data-link-type="extended-attribute" href="https://heycam.github.io/webidl/#Exposed"><c- g>Exposed</c-></a>=<c- n>Window</c->]
+<c- b>interface</c-> <a href="#xrdepthinformation"><code><c- g>XRDepthInformation</c-></code></a> {
   <c- b>readonly</c-> <c- b>attribute</c-> <a class="idl-code" data-link-type="interface" href="https://heycam.github.io/webidl/#idl-unsigned-long"><c- b>unsigned</c-> <c- b>long</c-></a> <a data-readonly data-type="unsigned long" href="#dom-xrdepthinformation-width"><code><c- g>width</c-></code></a>;
   <c- b>readonly</c-> <c- b>attribute</c-> <a class="idl-code" data-link-type="interface" href="https://heycam.github.io/webidl/#idl-unsigned-long"><c- b>unsigned</c-> <c- b>long</c-></a> <a data-readonly data-type="unsigned long" href="#dom-xrdepthinformation-height"><code><c- g>height</c-></code></a>;
 
-  [<a class="idl-code" data-link-type="extended-attribute" href="https://heycam.github.io/webidl/#SameObject"><c- g>SameObject</c-></a>] <c- b>readonly</c-> <c- b>attribute</c-> <a data-link-type="idl-name" href="https://immersive-web.github.io/webxr/#xrrigidtransform"><c- n>XRRigidTransform</c-></a> <a data-readonly data-type="XRRigidTransform" href="#dom-xrdepthinformation-normtexturefromnormview"><code><c- g>normTextureFromNormView</c-></code></a>;
-
-  <a class="idl-code" data-link-type="interface" href="https://heycam.github.io/webidl/#idl-float"><c- b>float</c-></a> <a href="#dom-xrdepthinformation-getdepth"><code><c- g>getDepth</c-></code></a>(<a class="idl-code" data-link-type="interface" href="https://heycam.github.io/webidl/#idl-unsigned-long"><c- b>unsigned</c-> <c- b>long</c-></a> <a href="#dom-xrdepthinformation-getdepth-column-row-column"><code><c- g>column</c-></code></a>, <a class="idl-code" data-link-type="interface" href="https://heycam.github.io/webidl/#idl-unsigned-long"><c- b>unsigned</c-> <c- b>long</c-></a> <a href="#dom-xrdepthinformation-getdepth-column-row-row"><code><c- g>row</c-></code></a>);
+  [<a class="idl-code" data-link-type="extended-attribute" href="https://heycam.github.io/webidl/#SameObject"><c- g>SameObject</c-></a>] <c- b>readonly</c-> <c- b>attribute</c-> <a data-link-type="idl-name" href="https://immersive-web.github.io/webxr/#xrrigidtransform"><c- n>XRRigidTransform</c-></a> <a data-readonly data-type="XRRigidTransform" href="#dom-xrdepthinformation-normdepthbufferfromnormview"><code><c- g>normDepthBufferFromNormView</c-></code></a>;
+  <c- b>readonly</c-> <c- b>attribute</c-> <a class="idl-code" data-link-type="interface" href="https://heycam.github.io/webidl/#idl-float"><c- b>float</c-></a> <a data-readonly data-type="float" href="#dom-xrdepthinformation-rawvaluetometers"><code><c- g>rawValueToMeters</c-></code></a>;
 };
 
+<c- b>interface</c-> <a href="#xrcpudepthinformation"><code><c- g>XRCPUDepthInformation</c-></code></a> : <a data-link-type="idl-name" href="#xrdepthinformation"><c- n>XRDepthInformation</c-></a> {
+  [<a class="idl-code" data-link-type="extended-attribute" href="https://heycam.github.io/webidl/#SameObject"><c- g>SameObject</c-></a>] <c- b>readonly</c-> <c- b>attribute</c-> <a class="idl-code" data-link-type="interface" href="https://heycam.github.io/webidl/#idl-ArrayBuffer"><c- b>ArrayBuffer</c-></a> <a data-readonly data-type="ArrayBuffer" href="#dom-xrcpudepthinformation-data"><code><c- g>data</c-></code></a>;
+
+  <a class="idl-code" data-link-type="interface" href="https://heycam.github.io/webidl/#idl-float"><c- b>float</c-></a> <a href="#dom-xrcpudepthinformation-getdepthinmeters"><code><c- g>getDepthInMeters</c-></code></a>(<a class="idl-code" data-link-type="interface" href="https://heycam.github.io/webidl/#idl-float"><c- b>float</c-></a> <a href="#dom-xrcpudepthinformation-getdepthinmeters-x-y-x"><code><c- g>x</c-></code></a>, <a class="idl-code" data-link-type="interface" href="https://heycam.github.io/webidl/#idl-float"><c- b>float</c-></a> <a href="#dom-xrcpudepthinformation-getdepthinmeters-x-y-y"><code><c- g>y</c-></code></a>);
+};
 
 <c- b>partial</c-> <c- b>interface</c-> <a class="idl-code" data-link-type="interface" href="https://www.w3.org/TR/webxr/#xrframe-interface"><c- g>XRFrame</c-></a> {
-  <a data-link-type="idl-name" href="#xrdepthinformation"><c- n>XRDepthInformation</c-></a> <a class="idl-code" data-link-type="method" href="#dom-xrframe-getdepthinformation"><c- g>getDepthInformation</c-></a>(<a data-link-type="idl-name" href="https://immersive-web.github.io/webxr/#xrview"><c- n>XRView</c-></a> <a href="#dom-xrframe-getdepthinformation-view-view"><code><c- g>view</c-></code></a>);
+  <a data-link-type="idl-name" href="#xrcpudepthinformation"><c- n>XRCPUDepthInformation</c-></a>? <a class="idl-code" data-link-type="method" href="#dom-xrframe-getdepthinformation"><c- g>getDepthInformation</c-></a>(<a data-link-type="idl-name" href="https://immersive-web.github.io/webxr/#xrview"><c- n>XRView</c-></a> <a href="#dom-xrframe-getdepthinformation-view-view"><code><c- g>view</c-></code></a>);
 };
 
+<c- b>interface</c-> <a href="#xrwebgldepthinformation"><code><c- g>XRWebGLDepthInformation</c-></code></a> : <a data-link-type="idl-name" href="#xrdepthinformation"><c- n>XRDepthInformation</c-></a> {
+  [<a class="idl-code" data-link-type="extended-attribute" href="https://heycam.github.io/webidl/#SameObject"><c- g>SameObject</c-></a>] <c- b>readonly</c-> <c- b>attribute</c-> <a data-link-type="idl-name" href="https://www.khronos.org/registry/webgl/specs/latest/1.0/#5.9"><c- n>WebGLTexture</c-></a> <a data-readonly data-type="WebGLTexture" href="#dom-xrwebgldepthinformation-texture"><code><c- g>texture</c-></code></a>;
+};
+
+<c- b>partial</c-> <c- b>interface</c-> <a class="idl-code" data-link-type="interface" href="https://immersive-web.github.io/layers/#xrwebglbinding"><c- g>XRWebGLBinding</c-></a> {
+  <a data-link-type="idl-name" href="#xrwebgldepthinformation"><c- n>XRWebGLDepthInformation</c-></a>? <a href="#dom-xrwebglbinding-getdepthinformation"><code><c- g>getDepthInformation</c-></code></a>(<a data-link-type="idl-name" href="https://immersive-web.github.io/webxr/#xrview"><c- n>XRView</c-></a> <a href="#dom-xrwebglbinding-getdepthinformation-view-view"><code><c- g>view</c-></code></a>);
+};
 
 </pre>
-  <h2 class="no-num no-ref heading settled" id="issues-index"><span class="content">Issues Index</span><a class="self-link" href="#issues-index"></a></h2>
-  <div style="counter-reset:issue">
-   <div class="issue"> Accessing raw data could potentially need to have a way of knowing what is the underlying data type and how to convert from the numeric value to a value expressed in meters. This is to ensure that we do not force the implementers to convert the data they are able to obtain from the underlying XR devices. <a href="https://github.com/immersive-web/depth-sensing/issues/6">&lt;https://github.com/immersive-web/depth-sensing/issues/6></a><a href="#issue-ee6e7d97"> ↵ </a></div>
-   <div class="issue"> Fill this out.<a href="#issue-ebc93800"> ↵ </a></div>
-   <div class="issue"> Fill this out.<a href="#issue-ebc93800①"> ↵ </a></div>
-   <div class="issue"> Fill this out.<a href="#issue-ebc93800②"> ↵ </a></div>
-  </div>
+  <aside class="dfn-panel" data-for="normalized-view-coordinates">
+   <b><a href="#normalized-view-coordinates">#normalized-view-coordinates</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-normalized-view-coordinates">3.1. XRDepthInformation</a>
+    <li><a href="#ref-for-normalized-view-coordinates①">3.2. XRCPUDepthInformation</a>
+    <li><a href="#ref-for-normalized-view-coordinates②">3.3. XRWebGLDepthInformation</a>
+   </ul>
+  </aside>
   <aside class="dfn-panel" data-for="depth-sensing">
    <b><a href="#depth-sensing">#depth-sensing</a></b><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-depth-sensing">3.1. XRDepthInformation</a>
+    <li><a href="#ref-for-depth-sensing">2.3. Session configuration</a>
+    <li><a href="#ref-for-depth-sensing①">3.2. XRCPUDepthInformation</a>
+    <li><a href="#ref-for-depth-sensing②">3.3. XRWebGLDepthInformation</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="enumdef-xrdepthusage">
+   <b><a href="#enumdef-xrdepthusage">#enumdef-xrdepthusage</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-enumdef-xrdepthusage">2.3. Session configuration</a> <a href="#ref-for-enumdef-xrdepthusage①">(2)</a> <a href="#ref-for-enumdef-xrdepthusage②">(3)</a> <a href="#ref-for-enumdef-xrdepthusage③">(4)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="dom-xrdepthusage-cpu-optimized">
+   <b><a href="#dom-xrdepthusage-cpu-optimized">#dom-xrdepthusage-cpu-optimized</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-dom-xrdepthusage-cpu-optimized">2.2. Intended data usage and data formats</a>
+    <li><a href="#ref-for-dom-xrdepthusage-cpu-optimized①">3.2. XRCPUDepthInformation</a>
+    <li><a href="#ref-for-dom-xrdepthusage-cpu-optimized②">5.1. Native depth sensing</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="dom-xrdepthusage-gpu-optimized">
+   <b><a href="#dom-xrdepthusage-gpu-optimized">#dom-xrdepthusage-gpu-optimized</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-dom-xrdepthusage-gpu-optimized">2.2. Intended data usage and data formats</a>
+    <li><a href="#ref-for-dom-xrdepthusage-gpu-optimized①">3.3. XRWebGLDepthInformation</a>
+    <li><a href="#ref-for-dom-xrdepthusage-gpu-optimized②">5.1. Native depth sensing</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="enumdef-xrdepthdataformat">
+   <b><a href="#enumdef-xrdepthdataformat">#enumdef-xrdepthdataformat</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-enumdef-xrdepthdataformat">2.3. Session configuration</a> <a href="#ref-for-enumdef-xrdepthdataformat①">(2)</a> <a href="#ref-for-enumdef-xrdepthdataformat②">(3)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="dom-xrdepthdataformat-luminance-alpha">
+   <b><a href="#dom-xrdepthdataformat-luminance-alpha">#dom-xrdepthdataformat-luminance-alpha</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-dom-xrdepthdataformat-luminance-alpha">2.2. Intended data usage and data formats</a> <a href="#ref-for-dom-xrdepthdataformat-luminance-alpha①">(2)</a>
+    <li><a href="#ref-for-dom-xrdepthdataformat-luminance-alpha②">2.3. Session configuration</a>
+    <li><a href="#ref-for-dom-xrdepthdataformat-luminance-alpha③">5.1. Native depth sensing</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="dom-xrdepthdataformat-float32">
+   <b><a href="#dom-xrdepthdataformat-float32">#dom-xrdepthdataformat-float32</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-dom-xrdepthdataformat-float32">2.2. Intended data usage and data formats</a> <a href="#ref-for-dom-xrdepthdataformat-float32①">(2)</a>
+    <li><a href="#ref-for-dom-xrdepthdataformat-float32②">5.1. Native depth sensing</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="dictdef-xrdepthstateinit">
+   <b><a href="#dictdef-xrdepthstateinit">#dictdef-xrdepthstateinit</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-dictdef-xrdepthstateinit">2.3. Session configuration</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="dom-xrdepthstateinit-usagepreference">
+   <b><a href="#dom-xrdepthstateinit-usagepreference">#dom-xrdepthstateinit-usagepreference</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-dom-xrdepthstateinit-usagepreference">2.3. Session configuration</a> <a href="#ref-for-dom-xrdepthstateinit-usagepreference①">(2)</a> <a href="#ref-for-dom-xrdepthstateinit-usagepreference②">(3)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="dom-xrdepthstateinit-dataformatpreference">
+   <b><a href="#dom-xrdepthstateinit-dataformatpreference">#dom-xrdepthstateinit-dataformatpreference</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-dom-xrdepthstateinit-dataformatpreference">2.3. Session configuration</a> <a href="#ref-for-dom-xrdepthstateinit-dataformatpreference①">(2)</a> <a href="#ref-for-dom-xrdepthstateinit-dataformatpreference②">(3)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="dom-xrsessioninit-depthsensing">
+   <b><a href="#dom-xrsessioninit-depthsensing">#dom-xrsessioninit-depthsensing</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-dom-xrsessioninit-depthsensing">2.3. Session configuration</a> <a href="#ref-for-dom-xrsessioninit-depthsensing①">(2)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="find-supported-configuration-combination">
+   <b><a href="#find-supported-configuration-combination">#find-supported-configuration-combination</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-find-supported-configuration-combination">2.3. Session configuration</a> <a href="#ref-for-find-supported-configuration-combination①">(2)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="dom-xrsession-depthusage">
+   <b><a href="#dom-xrsession-depthusage">#dom-xrsession-depthusage</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-dom-xrsession-depthusage">2.3. Session configuration</a> <a href="#ref-for-dom-xrsession-depthusage①">(2)</a>
+    <li><a href="#ref-for-dom-xrsession-depthusage②">3.2. XRCPUDepthInformation</a> <a href="#ref-for-dom-xrsession-depthusage③">(2)</a>
+    <li><a href="#ref-for-dom-xrsession-depthusage④">3.3. XRWebGLDepthInformation</a> <a href="#ref-for-dom-xrsession-depthusage⑤">(2)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="dom-xrsession-depthdataformat">
+   <b><a href="#dom-xrsession-depthdataformat">#dom-xrsession-depthdataformat</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-dom-xrsession-depthdataformat">2.3. Session configuration</a> <a href="#ref-for-dom-xrsession-depthdataformat①">(2)</a>
+    <li><a href="#ref-for-dom-xrsession-depthdataformat②">3.2. XRCPUDepthInformation</a> <a href="#ref-for-dom-xrsession-depthdataformat③">(2)</a> <a href="#ref-for-dom-xrsession-depthdataformat④">(3)</a>
+    <li><a href="#ref-for-dom-xrsession-depthdataformat⑤">3.3. XRWebGLDepthInformation</a> <a href="#ref-for-dom-xrsession-depthdataformat⑥">(2)</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="xrdepthinformation">
    <b><a href="#xrdepthinformation">#xrdepthinformation</a></b><b>Referenced in:</b>
    <ul>
     <li><a href="#ref-for-xrdepthinformation">3.1. XRDepthInformation</a> <a href="#ref-for-xrdepthinformation①">(2)</a> <a href="#ref-for-xrdepthinformation②">(3)</a> <a href="#ref-for-xrdepthinformation③">(4)</a>
-   </ul>
-  </aside>
-  <aside class="dfn-panel" data-for="dom-xrdepthinformation-data">
-   <b><a href="#dom-xrdepthinformation-data">#dom-xrdepthinformation-data</a></b><b>Referenced in:</b>
-   <ul>
-    <li><a href="#ref-for-dom-xrdepthinformation-data">3.1. XRDepthInformation</a> <a href="#ref-for-dom-xrdepthinformation-data①">(2)</a> <a href="#ref-for-dom-xrdepthinformation-data②">(3)</a> <a href="#ref-for-dom-xrdepthinformation-data③">(4)</a> <a href="#ref-for-dom-xrdepthinformation-data④">(5)</a> <a href="#ref-for-dom-xrdepthinformation-data⑤">(6)</a> <a href="#ref-for-dom-xrdepthinformation-data⑥">(7)</a>
+    <li><a href="#ref-for-xrdepthinformation④">3.2. XRCPUDepthInformation</a>
+    <li><a href="#ref-for-xrdepthinformation⑤">3.3. XRWebGLDepthInformation</a> <a href="#ref-for-xrdepthinformation⑥">(2)</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="dom-xrdepthinformation-width">
    <b><a href="#dom-xrdepthinformation-width">#dom-xrdepthinformation-width</a></b><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-dom-xrdepthinformation-width">3.1. XRDepthInformation</a> <a href="#ref-for-dom-xrdepthinformation-width①">(2)</a> <a href="#ref-for-dom-xrdepthinformation-width②">(3)</a> <a href="#ref-for-dom-xrdepthinformation-width③">(4)</a>
+    <li><a href="#ref-for-dom-xrdepthinformation-width">3.1. XRDepthInformation</a> <a href="#ref-for-dom-xrdepthinformation-width①">(2)</a>
+    <li><a href="#ref-for-dom-xrdepthinformation-width②">3.2. XRCPUDepthInformation</a> <a href="#ref-for-dom-xrdepthinformation-width③">(2)</a> <a href="#ref-for-dom-xrdepthinformation-width④">(3)</a>
+    <li><a href="#ref-for-dom-xrdepthinformation-width⑤">3.3. XRWebGLDepthInformation</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="dom-xrdepthinformation-height">
    <b><a href="#dom-xrdepthinformation-height">#dom-xrdepthinformation-height</a></b><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-dom-xrdepthinformation-height">3.1. XRDepthInformation</a> <a href="#ref-for-dom-xrdepthinformation-height①">(2)</a> <a href="#ref-for-dom-xrdepthinformation-height②">(3)</a>
+    <li><a href="#ref-for-dom-xrdepthinformation-height">3.1. XRDepthInformation</a> <a href="#ref-for-dom-xrdepthinformation-height①">(2)</a>
+    <li><a href="#ref-for-dom-xrdepthinformation-height②">3.2. XRCPUDepthInformation</a> <a href="#ref-for-dom-xrdepthinformation-height③">(2)</a>
+    <li><a href="#ref-for-dom-xrdepthinformation-height④">3.3. XRWebGLDepthInformation</a>
    </ul>
   </aside>
-  <aside class="dfn-panel" data-for="dom-xrdepthinformation-normtexturefromnormview">
-   <b><a href="#dom-xrdepthinformation-normtexturefromnormview">#dom-xrdepthinformation-normtexturefromnormview</a></b><b>Referenced in:</b>
+  <aside class="dfn-panel" data-for="dom-xrdepthinformation-normdepthbufferfromnormview">
+   <b><a href="#dom-xrdepthinformation-normdepthbufferfromnormview">#dom-xrdepthinformation-normdepthbufferfromnormview</a></b><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-dom-xrdepthinformation-normtexturefromnormview">3.1. XRDepthInformation</a> <a href="#ref-for-dom-xrdepthinformation-normtexturefromnormview①">(2)</a>
+    <li><a href="#ref-for-dom-xrdepthinformation-normdepthbufferfromnormview">3.1. XRDepthInformation</a>
+    <li><a href="#ref-for-dom-xrdepthinformation-normdepthbufferfromnormview①">3.2. XRCPUDepthInformation</a> <a href="#ref-for-dom-xrdepthinformation-normdepthbufferfromnormview②">(2)</a> <a href="#ref-for-dom-xrdepthinformation-normdepthbufferfromnormview③">(3)</a>
+    <li><a href="#ref-for-dom-xrdepthinformation-normdepthbufferfromnormview④">3.3. XRWebGLDepthInformation</a> <a href="#ref-for-dom-xrdepthinformation-normdepthbufferfromnormview⑤">(2)</a>
    </ul>
   </aside>
-  <aside class="dfn-panel" data-for="dom-xrdepthinformation-getdepth">
-   <b><a href="#dom-xrdepthinformation-getdepth">#dom-xrdepthinformation-getdepth</a></b><b>Referenced in:</b>
+  <aside class="dfn-panel" data-for="dom-xrdepthinformation-rawvaluetometers">
+   <b><a href="#dom-xrdepthinformation-rawvaluetometers">#dom-xrdepthinformation-rawvaluetometers</a></b><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-dom-xrdepthinformation-getdepth">3.1. XRDepthInformation</a> <a href="#ref-for-dom-xrdepthinformation-getdepth①">(2)</a> <a href="#ref-for-dom-xrdepthinformation-getdepth②">(3)</a>
+    <li><a href="#ref-for-dom-xrdepthinformation-rawvaluetometers">3.1. XRDepthInformation</a>
+    <li><a href="#ref-for-dom-xrdepthinformation-rawvaluetometers①">3.2. XRCPUDepthInformation</a> <a href="#ref-for-dom-xrdepthinformation-rawvaluetometers②">(2)</a>
+    <li><a href="#ref-for-dom-xrdepthinformation-rawvaluetometers③">3.3. XRWebGLDepthInformation</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="xrdepthinformation-view">
    <b><a href="#xrdepthinformation-view">#xrdepthinformation-view</a></b><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-xrdepthinformation-view">3.1. XRDepthInformation</a> <a href="#ref-for-xrdepthinformation-view①">(2)</a>
+    <li><a href="#ref-for-xrdepthinformation-view">3.1. XRDepthInformation</a>
+    <li><a href="#ref-for-xrdepthinformation-view①">3.2. XRCPUDepthInformation</a> <a href="#ref-for-xrdepthinformation-view②">(2)</a> <a href="#ref-for-xrdepthinformation-view③">(3)</a>
+    <li><a href="#ref-for-xrdepthinformation-view④">3.3. XRWebGLDepthInformation</a> <a href="#ref-for-xrdepthinformation-view⑤">(2)</a>
+    <li><a href="#ref-for-xrdepthinformation-view⑥">5.1. Native depth sensing</a>
    </ul>
   </aside>
-  <aside class="dfn-panel" data-for="create-a-depth-information-instance">
-   <b><a href="#create-a-depth-information-instance">#create-a-depth-information-instance</a></b><b>Referenced in:</b>
+  <aside class="dfn-panel" data-for="xrdepthinformation-depth-buffer">
+   <b><a href="#xrdepthinformation-depth-buffer">#xrdepthinformation-depth-buffer</a></b><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-create-a-depth-information-instance">3.1. XRDepthInformation</a>
+    <li><a href="#ref-for-xrdepthinformation-depth-buffer">3.1. XRDepthInformation</a> <a href="#ref-for-xrdepthinformation-depth-buffer①">(2)</a> <a href="#ref-for-xrdepthinformation-depth-buffer②">(3)</a> <a href="#ref-for-xrdepthinformation-depth-buffer③">(4)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="attempting-to-access-the-depth-buffer">
+   <b><a href="#attempting-to-access-the-depth-buffer">#attempting-to-access-the-depth-buffer</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-attempting-to-access-the-depth-buffer">3.2. XRCPUDepthInformation</a> <a href="#ref-for-attempting-to-access-the-depth-buffer①">(2)</a>
+    <li><a href="#ref-for-attempting-to-access-the-depth-buffer②">3.3. XRWebGLDepthInformation</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="xrcpudepthinformation">
+   <b><a href="#xrcpudepthinformation">#xrcpudepthinformation</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-xrcpudepthinformation">2.2. Intended data usage and data formats</a>
+    <li><a href="#ref-for-xrcpudepthinformation①">3.2. XRCPUDepthInformation</a> <a href="#ref-for-xrcpudepthinformation②">(2)</a> <a href="#ref-for-xrcpudepthinformation③">(3)</a> <a href="#ref-for-xrcpudepthinformation④">(4)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="dom-xrcpudepthinformation-data">
+   <b><a href="#dom-xrcpudepthinformation-data">#dom-xrcpudepthinformation-data</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-dom-xrcpudepthinformation-data">1.1. Terminology</a>
+    <li><a href="#ref-for-dom-xrcpudepthinformation-data①">2.2. Intended data usage and data formats</a> <a href="#ref-for-dom-xrcpudepthinformation-data②">(2)</a>
+    <li><a href="#ref-for-dom-xrcpudepthinformation-data③">3.2. XRCPUDepthInformation</a> <a href="#ref-for-dom-xrcpudepthinformation-data④">(2)</a> <a href="#ref-for-dom-xrcpudepthinformation-data⑤">(3)</a> <a href="#ref-for-dom-xrcpudepthinformation-data⑥">(4)</a>
+    <li><a href="#ref-for-dom-xrcpudepthinformation-data⑦">4. Interpreting the results</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="dom-xrcpudepthinformation-getdepthinmeters">
+   <b><a href="#dom-xrcpudepthinformation-getdepthinmeters">#dom-xrcpudepthinformation-getdepthinmeters</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-dom-xrcpudepthinformation-getdepthinmeters">3.2. XRCPUDepthInformation</a> <a href="#ref-for-dom-xrcpudepthinformation-getdepthinmeters①">(2)</a> <a href="#ref-for-dom-xrcpudepthinformation-getdepthinmeters②">(3)</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="obtain-depth-at-coordinates">
    <b><a href="#obtain-depth-at-coordinates">#obtain-depth-at-coordinates</a></b><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-obtain-depth-at-coordinates">3.1. XRDepthInformation</a>
+    <li><a href="#ref-for-obtain-depth-at-coordinates">3.2. XRCPUDepthInformation</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="dom-xrframe-getdepthinformation">
    <b><a href="#dom-xrframe-getdepthinformation">#dom-xrframe-getdepthinformation</a></b><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-dom-xrframe-getdepthinformation">3.1. XRDepthInformation</a> <a href="#ref-for-dom-xrframe-getdepthinformation①">(2)</a>
+    <li><a href="#ref-for-dom-xrframe-getdepthinformation">3.2. XRCPUDepthInformation</a> <a href="#ref-for-dom-xrframe-getdepthinformation①">(2)</a>
    </ul>
   </aside>
-  <aside class="dfn-panel" data-for="obtain-depth-information">
-   <b><a href="#obtain-depth-information">#obtain-depth-information</a></b><b>Referenced in:</b>
+  <aside class="dfn-panel" data-for="obtain-cpu-depth-information">
+   <b><a href="#obtain-cpu-depth-information">#obtain-cpu-depth-information</a></b><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-obtain-depth-information">3.1. XRDepthInformation</a>
+    <li><a href="#ref-for-obtain-cpu-depth-information">3.2. XRCPUDepthInformation</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="create-a-cpu-depth-information-instance">
+   <b><a href="#create-a-cpu-depth-information-instance">#create-a-cpu-depth-information-instance</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-create-a-cpu-depth-information-instance">3.2. XRCPUDepthInformation</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="xrwebgldepthinformation">
+   <b><a href="#xrwebgldepthinformation">#xrwebgldepthinformation</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-xrwebgldepthinformation">2.2. Intended data usage and data formats</a>
+    <li><a href="#ref-for-xrwebgldepthinformation①">3.3. XRWebGLDepthInformation</a> <a href="#ref-for-xrwebgldepthinformation②">(2)</a> <a href="#ref-for-xrwebgldepthinformation③">(3)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="dom-xrwebgldepthinformation-texture">
+   <b><a href="#dom-xrwebgldepthinformation-texture">#dom-xrwebgldepthinformation-texture</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-dom-xrwebgldepthinformation-texture">1.1. Terminology</a>
+    <li><a href="#ref-for-dom-xrwebgldepthinformation-texture①">3.3. XRWebGLDepthInformation</a> <a href="#ref-for-dom-xrwebgldepthinformation-texture②">(2)</a>
+    <li><a href="#ref-for-dom-xrwebgldepthinformation-texture③">4. Interpreting the results</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="dom-xrwebglbinding-getdepthinformation">
+   <b><a href="#dom-xrwebglbinding-getdepthinformation">#dom-xrwebglbinding-getdepthinformation</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-dom-xrwebglbinding-getdepthinformation">3.3. XRWebGLDepthInformation</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="obtain-webgl-depth-information">
+   <b><a href="#obtain-webgl-depth-information">#obtain-webgl-depth-information</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-obtain-webgl-depth-information">3.3. XRWebGLDepthInformation</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="create-a-webgl-depth-information-instance">
+   <b><a href="#create-a-webgl-depth-information-instance">#create-a-webgl-depth-information-instance</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-create-a-webgl-depth-information-instance">3.3. XRWebGLDepthInformation</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="native-depth-sensing">
+   <b><a href="#native-depth-sensing">#native-depth-sensing</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-native-depth-sensing">2.1. Feature descriptor</a>
+    <li><a href="#ref-for-native-depth-sensing①">2.3. Session configuration</a> <a href="#ref-for-native-depth-sensing②">(2)</a>
+    <li><a href="#ref-for-native-depth-sensing③">3.3. XRWebGLDepthInformation</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="depth-coordinates-transformation-matrix">
+   <b><a href="#depth-coordinates-transformation-matrix">#depth-coordinates-transformation-matrix</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-depth-coordinates-transformation-matrix">3.2. XRCPUDepthInformation</a>
+    <li><a href="#ref-for-depth-coordinates-transformation-matrix①">3.3. XRWebGLDepthInformation</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="support-depth-sensing-usage">
+   <b><a href="#support-depth-sensing-usage">#support-depth-sensing-usage</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-support-depth-sensing-usage">2.3. Session configuration</a>
+    <li><a href="#ref-for-support-depth-sensing-usage①">5.1. Native depth sensing</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="support-depth-sensing-data-format">
+   <b><a href="#support-depth-sensing-data-format">#support-depth-sensing-data-format</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-support-depth-sensing-data-format">5.1. Native depth sensing</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="support-depth-sensing-usage-and-data-format-combination">
+   <b><a href="#support-depth-sensing-usage-and-data-format-combination">#support-depth-sensing-usage-and-data-format-combination</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-support-depth-sensing-usage-and-data-format-combination">2.3. Session configuration</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="limit-the-amount-of-information">
+   <b><a href="#limit-the-amount-of-information">#limit-the-amount-of-information</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-limit-the-amount-of-information">3.2. XRCPUDepthInformation</a>
+    <li><a href="#ref-for-limit-the-amount-of-information①">3.3. XRWebGLDepthInformation</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="block-access">
+   <b><a href="#block-access">#block-access</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-block-access">3.2. XRCPUDepthInformation</a>
+    <li><a href="#ref-for-block-access①">3.3. XRWebGLDepthInformation</a>
    </ul>
   </aside>
 <script>/* script-dfn-panel */

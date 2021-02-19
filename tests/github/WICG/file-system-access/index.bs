@@ -976,12 +976,6 @@ runs these steps:
       1. If |input| is a {{WriteParams}} and |input|.{{WriteParams/position}} is not `undefined`,
          set |writePosition| to |input|.{{WriteParams/position}}.
       1. Let |oldSize| be |stream|.[=[[buffer]]=]'s [=byte sequence/length=].
-      1. If |writePosition| is larger than |oldSize|,
-         [=/reject=] |p| with a {{InvalidStateError}} and abort.
-
-         Issue: Not clear if this should reject, and if it does, is this really the right error type?
-         Chrome's implementation is actually inconsistent about this rejecting or not.
-
       1. If |data| is a {{BufferSource}},
          let |dataBytes| be [=get a copy of the buffer source|a copy of=] |data|.
       1. Else if |data| is a {{Blob}}:
@@ -991,6 +985,13 @@ runs these steps:
       1. Else:
          1. [=Assert=]: |data| is a {{USVString}}.
          1. Let |dataBytes| be the result of [=UTF-8 encoding=] |data|.
+      1. If |writePosition| is larger than |oldSize|,
+         append |writePosition| - |oldSize| `0x00` (NUL) bytes to the end of |stream|.[=[[buffer]]=].
+
+         Note: Implementations are expected to behave as if the skipped over file contents
+         are indeed filled with NUL bytes. That doesn't mean these bytes have to actually be
+         written to disk and take up disk space. Instead most file systems support so called
+         sparse files, where these NUL bytes don't take up actual disk space.
 
       1. Let |head| be a [=byte sequence=] containing the first |writePosition| bytes of |stream|.[=[[buffer]]=].
       1. Let |tail| be an empty [=byte sequence=].
@@ -998,6 +999,13 @@ runs these steps:
          1. Let |tail| be a [=byte sequence=] containing the last
             |oldSize| - (|writePosition| + |data|.[=byte sequence/length=]) bytes of |stream|.[=[[buffer]]=].
       1. Set |stream|.[=[[buffer]]=] to the concatenation of |head|, |data| and |tail|.
+      1. If the operations modifying |stream|.[=[[buffer]]=] in the previous steps failed
+         due to exceeding the [=storage quota=], [=/reject=] |p| with a {{QuotaExceededError}} and abort,
+         leaving |stream|.[=[[buffer]]=] unmodified.
+
+         Note: [=Storage quota=] only applies to files stored in the [=origin private file system=].
+         However this operation could still fail for other files, for example if the disk being written
+         to runs out of disk space.
       1. Set |stream|.[=[[seekOffset]]=] to |writePosition| + |data|.[=byte sequence/length=].
       1. [=/Resolve=] |p|.
    1. Else if |command| is {{WriteCommandType/"seek"}}:
@@ -1013,6 +1021,13 @@ runs these steps:
       1. If |newSize| is larger than |oldSize|:
          1. Set |stream|.[=[[buffer]]=] to a [=byte sequence=] formed by concating
             |stream|.[=[[buffer]]=] with a [=byte sequence=] containing |newSize|-|oldSize| `0x00` bytes.
+         1. If the operation in the previous step failed due to exceeding the [=storage quota=],
+            [=/reject=] |p| with a {{QuotaExceededError}} and abort,
+            leaving |stream|.[=[[buffer]]=] unmodified.
+
+            Note: [=Storage quota=] only applies to files stored in the [=origin private file system=].
+            However this operation could still fail for other files, for example if the disk being written
+            to runs out of disk space.
       1. Else if |newSize| is smaller than |oldSize|:
          1. Set |stream|.[=[[buffer]]=] to a [=byte sequence=] containing the first |newSize| bytes
             in |stream|.[=[[buffer]]=].
@@ -1747,3 +1762,24 @@ Another risk factor is that of ransomware attacks. The limitations described abo
 blocking access to certain sensitive directories helps limit the damage such an attack can do.
 Additionally user agents can grant write access to files at whatever granularity they deem
 appropriate.
+
+## Filling up a users disk ## {#filling-up-disk}
+
+Other than files in the [=origin private file system=], files written by this API are not subject
+to [=storage quota=]. As such websites can fill up a users disk without being limited by
+quota, which could leave a users device in a bad state (do note that even with storage that is
+subject to [=storage quota=] it is still possible to fill up, or come close to filling up, a users
+disk, since [=storage quota=] in general is not dependent on the amount of available disk
+space).
+
+Without this API websites can write data to disk not subject to quota limitations already
+by triggering downloads of large files (potentially created client side, to not incur any network
+overhead). While the presence of {{FileSystemWritableFileStream/truncate()}} and writing at a
+potentially really large offset past the end of a file makes it much easier and lower cost to
+create large files, on most file systems such files should not actually take up as much disk space as
+most commonly used file systems support sparse files (and thus wouldn't actually store the NUL
+bytes generated by resizing a file or seeking past the end of it).
+
+Whatever mitigations user agents use to guard against websites filling up a disk via either
+quota managed storage or the existing downloads mechanism should also be employed when websites
+use this API to write to disk.

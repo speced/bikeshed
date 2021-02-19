@@ -6753,24 +6753,23 @@ Attributes</h4>
 <dl dfn-type=attribute dfn-for="ConvolverNode">
 	: <dfn>buffer</dfn>
 	::
-
 		At the time when this attribute is set, the {{ConvolverNode/buffer}} and
 		the state of the {{normalize}} attribute will be used to
 		configure the {{ConvolverNode}} with this
 		impulse response having the given normalization. The initial
 		value of this attribute is null.
 
-<div algorithm="set convolver buffer">
-	When setting the <dfn>buffer attribute</dfn>, execute the following <span
-		class="synchronously">steps synchronously</span>:
-	1. If the buffer {{AudioBuffer/numberOfChannels|number of channels}} is not 1, 2, 4, or if the
-		{{AudioBuffer/sampleRate|sample-rate}} of the buffer is not the same as the
-		{{BaseAudioContext/sampleRate|sample-rate}} of its <a
-			href="#associated">associated</a> {{BaseAudioContext}}, a
-		{{NotSupportedError}} MUST be thrown.
-	2. <a href="#acquire-the-content">Acquire the content</a> of the
-		{{AudioBuffer}}.
-</div>
+		<div algorithm="set convolver buffer">
+			When setting the <dfn>buffer attribute</dfn>, execute the following <span
+				class="synchronously">steps synchronously</span>:
+			1. If the buffer {{AudioBuffer/numberOfChannels|number of channels}} is not 1, 2, 4, or if the
+				{{AudioBuffer/sampleRate|sample-rate}} of the buffer is not the same as the
+				{{BaseAudioContext/sampleRate|sample-rate}} of its <a
+					href="#associated">associated</a> {{BaseAudioContext}}, a
+				{{NotSupportedError}} MUST be thrown.
+			2. <a href="#acquire-the-content">Acquire the content</a> of the
+				{{AudioBuffer}}.
+		</div>
 
 		Note: If the {{ConvolverNode/buffer}} is set to an new
 		buffer, audio may glitch.  If this is undesirable, it
@@ -9164,7 +9163,8 @@ Dictionary {{PeriodicWaveOptions}} Members</h5>
 		<code>cosine</code> terms. The first element (index 0) is the
 		DC-offset of the periodic waveform. The second element
 		(index 1) represents the fundmental frequency.  The
-		third represents the first overtone and so on.  </dl>
+		third represents the first overtone and so on.
+</dl>
 
 <h4 id="waveform-generation">
 Waveform Generation</h4>
@@ -10085,6 +10085,9 @@ Every {{AudioWorkletProcessor}} has an associated <dfn>active source</dfn> flag,
 the node to be retained in memory and perform audio processing in
 the absence of any connected inputs.
 
+All tasks posted from an {{AudioWorkletNode}} are posted to the task queue of
+its associated {{BaseAudioContext}}.
+
 <xmp class="idl">
 [Exposed=Window]
 interface AudioParamMap {
@@ -10357,7 +10360,7 @@ used to configure various channel configurations.
 			{{AudioWorkletNodeOptions/outputChannelCount}}.
 
 		1. Otherwise set the channel count of the <em>k</em>th output
-			of the <node>node</node> to the <em>k</em>th element
+			of the <var>node</var> to the <em>k</em>th element
 			of {{AudioWorkletNodeOptions/outputChannelCount}}
 			sequence and return.
 
@@ -11115,12 +11118,20 @@ in the algorithm of <a href="#rendering-a-graph">rendering a graph</a>.
 	finished.
 </div>
 
-The audio callback is also queued as a task in the
-<a href="#control-message-queue">control message queue</a>. The UA MUST perform
+The audio callback is also queued as a task in the <a
+href="#control-message-queue">control message queue</a>. The UA MUST perform
 the following algorithms to process render quanta to fulfill such task by
-filling up the requested buffer size. Along with the primary message queue, the
-<a>rendering thread</a> has another task queue for microtasks for any microtask
-operation such as resolution of {{Promise}}s in the {{AudioWorkletGlobalScope}}.
+filling up the requested buffer size. Along with the <a>control message
+queue</a>, each {{AudioContext}} has a regular <a
+href="https://html.spec.whatwg.org/multipage/webappapis.html#task-queue">task
+queue</a>, called its <dfn for="BaseAudioContext">associated task queue</dfn>
+for tasks that are posted to the rendering thread from the control thread. An
+additional microtask checkpoint is performed after processing a render quantum
+to run any microtasks that might have been queued during the execution of the
+`process` methods of {{AudioWorkletProcessor}}.
+
+All tasks posted from an {{AudioWorkletNode}} are posted to the [=associated
+task queue=] of its associated {{BaseAudioContext}}.
 
 <div id="rendering-initialization" algorithm="initialize rendering loop">
 	The following step MUST be performed once before the rendering loop starts.
@@ -11131,6 +11142,8 @@ operation such as resolution of {{Promise}}s in the {{AudioWorkletGlobalScope}}.
 </div>
 
 <div id="rendering-a-graph" algorithm="rendering a graph">
+  The following steps MUST be performed when rendering a render quantum.
+
 	1. Let <var>render result</var> be <code>false</code>.
 
 	2. Process the [=control message queue=].
@@ -11147,7 +11160,14 @@ operation such as resolution of {{Promise}}s in the {{AudioWorkletGlobalScope}}.
 
 			2. Remove the [=oldest message=] of <var>Q<sub>rendering</sub></var>.
 
-	3. Process a render quantum.
+
+	3. Process the {{BaseAudioContext}}'s [=associated task queue=].
+
+		1. Let <var>task count</var> be the number of tasks in the task queue of the {{AudioContext}} being rendered.
+
+		2. Spin the event loop until <var>task count</var> tasks have been executed.
+
+	4. Process a render quantum.
 
 		1. If the <a>rendering thread state</a> of the {{BaseAudioContext}} is not
 			<code>running</code>, return false.
@@ -11311,9 +11331,9 @@ operation such as resolution of {{Promise}}s in the {{AudioWorkletGlobalScope}}.
 
 		7. Set <var>render result</var> to <code>true</code>.
 
-	4. [=Perform a microtask checkpoint=].
+	5. [=Perform a microtask checkpoint=].
 
-	5. Return <var>render result</var>.
+	6. Return <var>render result</var>.
 </div>
 
 <dfn id="mute">Muting</dfn> an {{AudioNode}} means that its

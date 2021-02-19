@@ -7,7 +7,7 @@ ED: https://immersive-web.github.io/webxr-test-api/
 Repository: immersive-web/webxr-test-api
 Level: 1
 
-Editor: Manish Goregaokar 109489, Mozilla http://mozilla.org/, manish@mozilla.com
+Editor: Manish Goregaokar 109489, Google [Mozilla until 2020], manishearth@google.com
 Editor: Alex Cooper 114716, Google http://google.com/, alcooper@google.com
 
 Abstract: The WebXR Test API module provides a mocking interface for <a href="https://github.com/web-platform-tests/">Web Platform Tests</a> to be able to test the <a href="https://www.w3.org/TR/webxr/">WebXR Device API</a>.
@@ -51,6 +51,13 @@ spec:WebXR Anchors Module; urlPrefix: https://immersive-web.github.io/anchors/#
     for: XRAnchor;
         type: method; text: delete(); url: dom-xranchor-delete
         type: dfn; text: native origin; url: xranchor-native-origin
+spec:WebXR Lighting Estimation; urlPrefix: https://immersive-web.github.io/lighting-estimation/
+    type:interface; text: XRLightEstimate; url: xrlightestimate-interface
+spec: WebXR Depth Sensing Module; urlPrefix: https://immersive-web.github.io/depth-sensing/#
+    type: dfn; text: create a CPU depth information instance; url: create-a-cpu-depth-information-instance
+    type: dfn; text: create a GPU depth information instance; url: create-a-gpu-depth-information-instance
+    type: dfn; text: depth coordinates transformation matrix; url: depth-coordinates-transformation-matrix
+    type: dfn; text: native depth sensing; url: native-depth-sensing
 </pre>
 
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
@@ -117,7 +124,7 @@ Introduction {#intro}
 
 <section class="non-normative">
 
-In order to allow <a href="https://web-platform-tests.org/">Web Platform Tests</a> for WebXR there are some basic functions which are common across all tests, such as adding a fake test device and specifying poses. Below is an API which attempts to capture the necessary functions, based off what was defined in the spec. Different browser vendors can implement this API in whatever way is most compatible with their browser. For example, some browsers may back the interface with a WebDriver API while others may use HTTP or IPC mechanisms to communicate with an out of process fake backend. 
+In order to allow <a href="https://web-platform-tests.org/">Web Platform Tests</a> for WebXR there are some basic functions which are common across all tests, such as adding a fake test device and specifying poses. Below is an API which attempts to capture the necessary functions, based off what was defined in the spec. Different browser vendors can implement this API in whatever way is most compatible with their browser. For example, some browsers may back the interface with a WebDriver API while others may use HTTP or IPC mechanisms to communicate with an out of process fake backend.
 
 
 These initialization object and control interfaces do not represent a complete set of WebXR functionality, and are expected to be expanded on as the WebXR spec grows.
@@ -170,7 +177,7 @@ Every [=simulated XR input source=] has a <dfn for="simulated XR input source">p
 
 Every [=simulated XR input source=] has a <dfn for="simulated XR input source">buttonState</dfn> array which is an array of {{FakeXRButtonStateInit}}s. If a {{FakeXRButtonType/"grip"}} button is specified, it SHOULD drive the [=/primary squeeze action=]. If a UA implements the <a href="https://immersive-web.github.io/webxr-gamepads-module/">WebXR Gamepads Module</a> [=buttonState=] SHOULD be used to set the state for the corresponding [=/XR input source|XR input source's=] {{XRInputSource/gamepad}} object, which SHOULD be of type {{GamepadMappingType/"xr-standard"}} if enough buttons are specified to support it.
 
-Every [=simulated XR input source=] has a <dfn for="simulated XR input source">connectionState</dfn> which is a boolean that is initially <code>true</code> and indicates whether the associated [=/XR input source=] should appear in {{XRSession/inputSources}}. When it is changed the associated changes must be reflected on the XRSession, including triggering the {{XRSession/inputsourceschange}} event if necessary by the [=next animation frame=]. 
+Every [=simulated XR input source=] has a <dfn for="simulated XR input source">connectionState</dfn> which is a boolean that is initially <code>true</code> and indicates whether the associated [=/XR input source=] should appear in {{XRSession/inputSources}}. When it is changed the associated changes must be reflected on the XRSession, including triggering the {{XRSession/inputsourceschange}} event if necessary by the [=next animation frame=].
 
 Every [=simulated XR input source=] has a <dfn for="simulated XR input source">primaryActionStarted</dfn> which is a boolean, initially set to <code>false</code>, that indicates whether or not the primary action of the XR input source has been started.
 
@@ -272,6 +279,9 @@ dictionary FakeXRDeviceInit {
 
     // Hit test extensions:
     FakeXRWorldInit world;
+
+    // Depth sensing extensions:
+    FakeXRDepthSensingDataInit depthSensingData;
 };
 
 dictionary FakeXRViewInit {
@@ -369,6 +379,10 @@ interface FakeXRDevice : EventTarget {
   // Hit test extensions:
   void setWorld(FakeXRWorldInit world);
   void clearWorld();
+
+  // Depth sensing extensions:
+  void setDepthSensingData(FakeXRDepthSensingDataInit depthSensingData);
+  void clearDepthSensingData();
 };
 
 </script>
@@ -411,7 +425,7 @@ The <dfn method for=FakeXRDevice>setViews(|views|)</dfn> method performs the fol
 When <dfn method for=FakeXRDevice>disconnect()</dfn> method is called, perform the following steps:
 
 
-    1. Remove [=FakeXRDevice/device=] from the [=context object=]'s {{XR}} object's [=list of immersive XR devices=] as if it were disconnected. 
+    1. Remove [=FakeXRDevice/device=] from the [=context object=]'s {{XR}} object's [=list of immersive XR devices=] as if it were disconnected.
     1. If the [=inline XR device=] is equal to the {{FakeXRDevice}}, reset it to the default [=inline XR device=].
 
 </div>
@@ -766,3 +780,82 @@ The {{FakeXRAnchorController/stopTracking()}} method can be used by the tests to
 
 The {{FakeXRAnchorController/setAnchorOrigin(anchorOrigin)}} method can be used to set the controller's [=FakeXRAnchorController/anchor origin=]. Tests can use this method to simulate updates in anchor pose.
 
+Lighting estimation extensions {#lighting-estimation-extensions}
+==================
+
+The lighting estimation extensions for test API SHOULD be implemented by all user agents that implement <a href="https://immersive-web.github.io/lighting-estimation/">WebXR Lighting Estimation</a>.
+
+<script type="idl">
+
+dictionary FakeXRLightEstimateInit {
+  required sequence<float> sphericalHarmonicsCoefficients;
+  DOMPointInit primaryLightDirection;
+  DOMPointInit primaryLightIntensity;
+};
+
+partial interface FakeXRDevice {
+  void setLightEstimate(FakeXRLightEstimateInit init);
+};
+
+</script>
+
+The {{FakeXRDevice}} is extended with internal <dfn for=FakeXRDevice>light estimate</dfn> which is a {{FakeXRLightEstimateInit}}, used to supply data for any requested {{XRLightEstimate}}.
+
+<div class="algorithm" data-algorithm="set-light-estimate">
+When the <dfn method for="FakeXRDevice">setLightEstimate(|init|)</dfn> method is invoked on {{FakeXRDevice}} |device|, run the following steps:
+
+  1. Let |c| be |init|'s {{FakeXRLightEstimateInit/sphericalHarmonicsCoefficients}}.
+  1. If |c| does not have 27 elements, throw a {{TypeError}} and abort these steps.
+  1. Let |d| be |init|'s {{FakeXRLightEstimateInit/primaryLightDirection}}.
+  1. If |d| is set and |d|'s {{DOMPointInit/w}} value does not equal <code>0</code>, throw a {{TypeError}} and abort these steps.
+  1. Let |i| be |init|'s {{FakeXRLightEstimateInit/primaryLightIntensity}}.
+  1. If |i| is set and |i|'s {{DOMPointInit/w}} value does not equal <code>1</code>, throw a {{TypeError}} and abort these steps.
+  1. Set |device|'s [=FakeXRDevice/light estimate=] to |init| by the [=next animation frame=].
+
+</div>
+
+Depth sensing extensions {#depth-sensing-extensions}
+========================
+
+The depth sensing extensions for test API SHOULD be implemented by all user agents that implement <a href="https://immersive-web.github.io/depth-sensing/">WebXR Depth Sensing Module</a>.
+
+The {{FakeXRDevice}} is extended with internal <dfn for=FakeXRDevice>depth sensing data</dfn> which is a {{FakeXRDepthSensingDataInit}}, used to supply data for requests to [=native depth sensing=].
+
+<script type="idl">
+
+dictionary FakeXRDepthSensingDataInit {
+  required ArrayBuffer depthData;
+  required FakeXRRigidTransformInit normDepthBufferFromNormView;
+  required float rawValueToMeters;
+  required unsigned long width;
+  required unsigned long height;
+};
+
+</script>
+
+{{FakeXRDepthSensingDataInit}} dictionary describes the state of the depth sensing data that should be used when returning latest depth information in [=creating a CPU depth information instance=] and [=creating a GPU depth information instance=] algorithms. All keys present in {{FakeXRDepthSensingDataInit}} correspond to the data required to be returned by [=native depth sensing=] capabilities of the device.
+
+{{FakeXRDepthSensingDataInit/depthData}} corresponds to the desired depth buffer that is to be set on native depth information returned from querying the native device. Not setting {{FakeXRDepthSensingDataInit/depthData}} key in the dictionary signals that the returned native depth information should be <code>null</code>.
+
+{{FakeXRDepthSensingDataInit/normDepthBufferFromNormView}} corresponds to the desired [=depth coordinates transformation matrix=] that is to be set on native depth information returned from querying the native device.
+
+{{FakeXRDepthSensingDataInit/rawValueToMeters}} corresponds to the desired conversion factor that is to be set on native depth information returned from querying the native device.
+
+{{FakeXRDepthSensingDataInit/width}} and {{FakeXRDepthSensingDataInit/height}} correspond to the desired dimensions of the depth buffer that are to be set on native depth information returned from querying the native device.
+
+<div class="algorithm" data-algorithm="set-depth-sensing-information">
+
+When the {{FakeXRDevice/setDepthSensingData()}} method is invoked on {{FakeXRDevice}} |device| with |depthSensingData|, run the following steps:
+
+1. If |depthSensingData|'s {{FakeXRDepthSensingDataInit/depthData}} is <code>null</code>, throw a {{TypeError}} and abort these steps.
+1. Set |device|'s [=FakeXRDevice/depth sensing data=] to |depthSensingData|.
+
+</div>
+
+<div class="algorithm" data-algorithm="clear-depth-sensing-information">
+
+When the {{FakeXRDevice/clearDepthSensingData()}} method is invoked on {{FakeXRDevice}} |device|, run the following steps:
+
+1. Set |device|'s [=FakeXRDevice/depth sensing data=] to <code>null</code>.
+
+</div>
