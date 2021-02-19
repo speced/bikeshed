@@ -219,7 +219,7 @@ Similarly, if a web application sets the transform synchronously at creation of 
 
 # SFrameTransform # {#sframe}
 
-<pre class="idl">
+<xmp class="idl">
 enum SFrameTransformRole {
     "encrypt",
     "decrypt"
@@ -231,11 +231,11 @@ dictionary SFrameTransformOptions {
 
 [Exposed=(Window,DedicatedWorker)]
 interface SFrameTransform {
-    constructor(optional SFrameTransformOptions options);
-    // FIXME: add key handling methods.
+    constructor(optional SFrameTransformOptions options = {});
+    Promise<undefined> setEncryptionKey(CryptoKey key, optional unsigned long long keyID);
 };
 SFrameTransform includes GenericTransformStream;
-</pre>
+</xmp>
 
 The <dfn constructor for="SFrameTransform" lt="SFrameTransform(options)"><code>new SFrameTransform(<var>options</var>)</code></dfn> constructor steps are:
 1. Let |transformAlgorithm| be an algorithm which takes a |frame| as input and runs the <a href="#sframe-transform-algorithm">SFrame transform algorithm</a> with |this| and |frame|.
@@ -252,15 +252,25 @@ The SFrame transform algorithm, given |sframe| as a SFrameTransform object and |
 2. If |frame|.`[[rtcObject]]` is a {{RTCRtpSender}}, set |role| to 'encrypt'.
 3. If |frame|.`[[rtcObject]]` is a {{RTCRtpReceiver}}, set |role| to 'decrypt'.
 4. Let |data| be undefined.
-5. If |frame| is an ArrayBuffer, set |data| to |frame|. // FIXME Support BufferSource
-6. If |frame| is an {{RTCEncodedAudioFrame}}, set |data| to |frame|.{{RTCEncodedAudioFrame/data}}
-7. If |frame| is an {{RTCEncodedVideoFrame}}, set |data| to |frame|.{{RTCEncodedVideoFrame/data}}
+5. If |frame| is a {{BufferSource}}, set |data| to |frame|.
+6. If |frame| is a {{RTCEncodedAudioFrame}}, set |data| to |frame|.{{RTCEncodedAudioFrame/data}}
+7. If |frame| is a {{RTCEncodedVideoFrame}}, set |data| to |frame|.{{RTCEncodedVideoFrame/data}}
 8. If |data| is undefined, abort these steps.
-9. Let |buffer| be the result of running the SFrame algorithm with |data| and |role| as parameters. This algorithm is defined by the <a href="https://datatracker.ietf.org/doc/draft-omara-sframe/">SFrame specification</a>.
-10. If |frame| is an ArrayBuffer, set |frame| to |buffer|.
-11. If |frame| is an {{RTCEncodedAudioFrame}}, set |frame|.{{RTCEncodedAudioFrame/data}} to |buffer|.
-12. If |frame| is an {{RTCEncodedVideoFrame}}, set |frame|.{{RTCEncodedVideoFrame/data}} to |buffer|.
+9. Let |buffer| be the result of running the SFrame algorithm with |data| and |role| as parameters. This algorithm is defined by the <a href="https://datatracker.ietf.org/doc/draft-omara-sframe/">SFrame specification</a> and returns an {{ArrayBuffer}}.
+10. If |frame| is a {{BufferSource}}, set |frame| to |buffer|.
+11. If |frame| is a {{RTCEncodedAudioFrame}}, set |frame|.{{RTCEncodedAudioFrame/data}} to |buffer|.
+12. If |frame| is a {{RTCEncodedVideoFrame}}, set |frame|.{{RTCEncodedVideoFrame/data}} to |buffer|.
 13. [=ReadableStream/Enqueue=] |frame| in |sframe|.`[[transform]]`.
+
+## Methods
+The <dfn method for="SFrameTransform">setEncryptionKey(|key|, |keyID|)</dfn> method steps are:
+1. Let |promise| be [=a new promise=].
+2.  [=In parallel=], run the following steps:
+    1. Set |key| with its optional |keyID| as key material to use for the SFrame transform algorithm, as defined by the <a href="https://datatracker.ietf.org/doc/draft-omara-sframe/">SFrame specification</a>.
+    2. If setting the key material fails, [=Reject=] |promise| with an {{InvalidModificationError}} error and abort these steps.
+    3. [=Resolve=] |promise| with undefined.
+3. Return |promise|.
+
 
 # RTCRtpScriptTransform # {#scriptTransform}
 

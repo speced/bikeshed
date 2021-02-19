@@ -60,6 +60,11 @@ spec: WEBDRIVER; urlPrefix: https://w3c.github.io/webdriver/
     text: WebDriver new session algorithm; url: dfn-webdriver-new-session-algorithm
     text: web element reference; url: dfn-web-element-reference
     text: window handle; url: dfn-window-handle
+spec: CONSOLE; urlPrefix: https://console.spec.whatwg.org
+  type: dfn
+    text: formatter; url: formatter
+    text: formatting specifier; url: formatting-specifiers
+    text: printer; url: printer
 spec: ECMASCRIPT; urlPrefix: https://tc39.es/ecma262/
   type: dfn
     text: Array; url: sec-array-objects
@@ -71,7 +76,6 @@ spec: ECMASCRIPT; urlPrefix: https://tc39.es/ecma262/
     text: EnumerableOwnPropertyNames; url: sec-enumerableownpropertynames
     text: Get; url: sec-get
     text: HasProperty; url: sec-hasproperty
-    text: internal slot; url: sec-object-internal-methods-and-internal-slots
     text: IsArray; url: sec-isarray
     text: IsCallable; url: sec-iscallable
     text: IsPromise; url: sec-ispromise
@@ -83,12 +87,20 @@ spec: ECMASCRIPT; urlPrefix: https://tc39.es/ecma262/
     text: ToDateString; url: sec-todatestring
     text: ToString; url: sec-tostring
     text: Type; url: sec-ecmascript-data-types-and-values
+    text: current realm record; url: current-realm
+    text: internal slot; url: sec-object-internal-methods-and-internal-slots
+    text: primitive value; url: sec-primitive-value
     text: realm; url: sec-code-realms
+    text: running execution context; url: running-execution-context
+    text: time value; url: sec-time-values-and-time-range
 spec: HTML; urlPrefix: https://html.spec.whatwg.org/
   type: dfn
+    text: WindowProxy; url: windowproxy
     text: a browsing context is discarded; url: a-browsing-context-is-discarded
     text: create a new browsing context; url: creating-a-new-browsing-context
     text: environment settings object's Realm; url: environment-settings-object's-realm
+    text: handled; url: concept-error-handled
+    text: report an error; url: report-the-error
     text: remove a browsing context; url: bcg-remove
     text: session history; url: session-history
     text: set up a window environment settings object; url: set-up-a-window-environment-settings-object
@@ -592,7 +604,27 @@ To <dfn>handle an incoming message</dfn> given a [=WebSocket connection=]
 </div>
 
 <div algorithm>
-To <dfn export>emit an event</dfn> given |body| and |related contexts|:
+
+To <dfn>get related browsing contexts</dfn> given an [=script/settings object=]
+|settings|:
+
+1. Let |related browsing contexts| be an empty set
+
+1. If the [=responsible document=] of |settings| is a [=Document=], append the
+   [=responsible document=]'s [=Document/browsing context=] to |related browsing
+   contexts|.
+
+   Otherwise if the [=Realm/global object=] specified by |settings| is a
+   {{WorkerGlobalScope}}, for each |owner| in the [=Realm/global object=]'s
+   [=owner set=], if |owner| is a [=Document=], append |owner|'s
+   [=Document/browsing context=] to |related browsing contexts|.
+
+1. Return |related browsing contexts|.
+
+</div>
+
+<div algorithm> To <dfn export>emit an event</dfn> given |body| and |related
+browsing contexts|:
 
  1. [=Assert=]: |body| has [=map/size=] 2 and [=contains=] "<code>method</code>"
     and "<code>params</code>".
@@ -601,7 +633,7 @@ To <dfn export>emit an event</dfn> given |body| and |related contexts|:
     Connection=] is null then return.
 
  1. If [=event is enabled=] given [=current session=],
-    |body|["<code>method</code>"] and |related contexts|:
+    |body|["<code>method</code>"] and |related browsing contexts|:
 
    1. Let |connection| be the [=current session=]'s [=WebSocket connection=].
 
@@ -637,8 +669,9 @@ To <dfn>respond with an error</dfn> given a [=WebSocket connection=]
 
 
 <div algorithm>
-To <dfn>handle a connection closing</dfn> given a
-[=WebSocket connection=] |connection|:
+
+To <dfn>handle a connection closing</dfn> given a [=WebSocket connection=]
+|connection|:
 
  1. If there is a WebDriver [=/session=] with |connection| as its [=connection=],
     set the [=connection=] on that [=/session=] to null.
@@ -777,7 +810,6 @@ RemoteValue = {
   BigIntValue //
   SymbolValue //
   ArrayValue //
-  FunctionValue //
   ObjectValue //
   FunctionValue //
   RegExpValue //
@@ -1131,8 +1163,10 @@ To <dfn>serialize as a remote value</dfn> given an |value|, a |max depth|,
                Otherwise, let |children| be an empty list and, for each node
                |child| in the [=children=] of |value|:
 
+              1. Let |child depth| be |max depth| - 1 if |max depth| is not null, or null otherwise.
+
               1. Let |serialized| be the result of [=serialize as a remote value=]
-                 with |child|, |max depth| - 1, |node details| and
+                 with |child|, |child depth|, |node details| and
                  |set of known objects|.
 
               1. Append |serialized| to |children|.
@@ -1156,9 +1190,14 @@ To <dfn>serialize as a remote value</dfn> given an |value|, a |max depth|,
                1. Let |shadow root| be |value|'s [=Element/shadow root=].
 
                1. If |shadow root| is null, let |serialized shadow| be null.
-                  Otherwise let |serialized shadow| be the result of
-                  [=serialize as a remote value=] with |shadow root|, |max depth| - 1,
-                  false and |set of known objects|.
+                  Otherwise run the following substeps:
+
+                 1.  Let |child depth| be |max depth| - 1 if |max depth| is not
+                    null, or null otherwise.
+
+                 1. Let |serialized shadow| be the result of
+                    [=serialize as a remote value=] with |shadow root|, |child depth|,
+                    false and |set of known objects|.
 
                   Note: this means the <code>objectId</code> for the shadow root
                   will be serialized irrespective of whether the shadow is open or closed,
@@ -1221,9 +1260,12 @@ To <dfn>serialize as a list</dfn> given |iterable|, |max depth|,
 
   1. For each |child value| in |iterable|:
 
-    1. Let |serialized child| be the result of [=serialize as a
-       remote value=] with arguments |child value|, |max
-       depth| - 1, |node details| and |set of known objects|.
+    1. Let |child depth| be |max depth| - 1 if |max depth| is not null, or null
+       otherwise.
+
+    1. Let |serialized child| be the result of [=serialize as a remote value=]
+       with arguments |child value|, |child depth|, |node details| and |set of
+       known objects|.
 
     1. Append |serialized child| to |serialized|.
 
@@ -1247,14 +1289,17 @@ To <dfn>serialize as a mapping</dfn> given |iterable|, |max depth|,
 
     1. Let |key| be |property|[0] and let |value| be |property|[1]
 
+    1. Let |child depth| be |max depth| - 1 if |max depth| is not null, or null
+       otherwise.
+
     1. If [=Type=](|key|) is String, let |serialized key| be |child key|,
        otherwise let |serialized key| be the result of [=serialize as a remote
-       value=] with arguments |child key|, |max depth| - 1, |node details| and
+       value=] with arguments |child key|, |child depth|, |node details| and
        |set of known objects|.
 
-    1. Let |serialized value| be the result of [=serialize as a
-       remote value=] with arguments |value|, |max
-       depth| - 1, |node details| and |set of known objects|.
+    1. Let |serialized value| be the result of [=serialize as a remote value=]
+       with arguments |value|, |child depth|, |node details| and |set of known
+       objects|.
 
     1. Let |serialized child| be («|serialized key|, |serialized value|»).
 
@@ -1671,8 +1716,8 @@ When the [=create a new browsing context=] algorithm is invoked, after the
 
  1. Let |context| be the newly created browsing context.
 
- 1. Let |related contexts| be a set containing the [=parent browsing context=]
-    of |context|, if that is not null, or an empty set otherwise.
+ 1. Let |related browsing contexts| be a set containing the [=parent browsing
+    context=] of |context|, if that is not null, or an empty set otherwise.
 
  1. Let |params| be the result of [=get the browsing context info=] given
     |context|, 0, and 1.
@@ -1681,7 +1726,7 @@ When the [=create a new browsing context=] algorithm is invoked, after the
     <code>BrowsingContextCreatedEvent</code> production, with the
     <code>params</code> field set to |params|.
 
- 1. [=Emit an event=] with |body| and |related contexts|.
+ 1. [=Emit an event=] with |body| and |related browsing contexts|.
 
 </div>
 
@@ -1715,10 +1760,10 @@ Run the following [=browsing context tree discarded=] steps:
      <code>BrowsingContextDestroyedEvent</code> production, with the
      <code>params</code> field set to |params|.
 
- 1. Let |related contexts| be a set containing the [=parent browsing context=]
-    of |context|, if that is not null, or an empty set otherwise.
+ 1. Let |related browsing contexts| be a set containing the [=parent browsing
+    context=] of |context|, if that is not null, or an empty set otherwise.
 
- 1. [=Emit an event=] with |body| and |related contexts|.
+ 1. [=Emit an event=] with |body| and |related browsing contexts|.
 
 Issue: the way this hooks into HTML feels very fragile. See https://github.com/whatwg/html/issues/6194
 
@@ -1739,6 +1784,7 @@ relating to script realms and execution.
 <pre class="cddl remote-cddl">
 
 ScriptCommand = (ScriptGetRealmsCommand)
+
 </pre>
 
 [=local end definition=]
@@ -1990,20 +2036,21 @@ object:
 
  1. If |realm info| is null, return.
 
- 1. Let |related contexts| be an empty set.
+ 1. Let |related browsing contexts| be an empty set.
 
  1. If the [=responsible document=] of |settings| is a [=Document=], append the
-    [=responsible document=]'s [=Document/browsing context=] to |related contexts|.
+    [=responsible document=]'s [=Document/browsing context=] to |related
+    browsing contexts|.
 
     Otherwise if the [=Realm/global object=] specified by |settings| is a
     {{WorkerGlobalScope}}, for each |owner| in the [=Realm/global object=]'s
     [=owner set=], if |owner| is a [=Document=], append |owner|'s
-    [=Document/browsing context=] to |related contexts|.
+    [=Document/browsing context=] to |related browsing contexts|.
 
  1. Let |body| be a map matching the <code>RealmCreatedEvent</code>
     production, with the <code>params</code> field set to |realm info|.
 
- 1. [=Emit an event=] with |body| and |related contexts|.
+ 1. [=Emit an event=] with |body| and |related browsing contexts|.
 
 </div>
 
@@ -2029,9 +2076,10 @@ The [=remote end event trigger=] is:
 <div algorithm="remote end event trigger for script.realmDestroyed">
 Define the following [=unloading document cleanup steps=] with |document|:
 
- 1. Let |related contexts| be an empty set.
+ 1. Let |related browsing contexts| be an empty set.
 
- 1. Append |document|'s [=Document/browsing context=] to |related contexts|.
+ 1. Append |document|'s [=Document/browsing context=] to |related browsing
+    contexts|.
 
  1. For each |worklet global scope| in |document|'s [=worklet global scopes=]:
 
@@ -2045,7 +2093,7 @@ Define the following [=unloading document cleanup steps=] with |document|:
    1. Let |body| be a map matching the <code>RealmDestroyedEvent</code>
       production, with the <code>params</code> field set to |params|.
 
-   1. [=Emit an event=] with |body| and |related contexts|.
+   1. [=Emit an event=] with |body| and |related browsing contexts|.
 
  1. Let |environment settings| be the [=environment settings object=] whose
     [=responsible document=] is |document|.
@@ -2060,13 +2108,13 @@ Define the following [=unloading document cleanup steps=] with |document|:
  1. Let |body| be a map matching the <code>RealmDestroyedEvent</code>
     production, with the <code>params</code> field set to |params|.
 
- 1. [=Emit an event=] with |body| and |related contexts|.
+ 1. [=Emit an event=] with |body| and |related browsing contexts|.
 
 Whenever a [=worker event loop=] |event loop| is destroyed, either because the
 worker comes to the end of its lifecycle, or prematurely via the [=terminate a
 worker=] algorithm:
 
- 1. Let |related contexts| be an empty set.
+ 1. Let |related browsing contexts| be an empty set.
 
  1. Let |environment settings| be the [=environment settings object=] for which
     |event loop| is the [=responsible event loop=].
@@ -2074,7 +2122,7 @@ worker=] algorithm:
  1. If the [=Realm/global object=] specified by |environment settings| is a
     {{WorkerGlobalScope}}, for each |owner| in the [=Realm/global object=]'s
     [=owner set=], if |owner| is a [=Document=], append |owner|'s
-    [=Document/browsing context=] to |related contexts|.
+    [=Document/browsing context=] to |related browsing contexts|.
 
  1. Let |realm| be |environment settings|'s [=environment settings object's Realm=].
 
@@ -2085,6 +2133,219 @@ worker=] algorithm:
 
  1. Let |body| be a map matching the <code>RealmDestroyedEvent</code>
     production, with the <code>params</code> field set to |params|.
+
+## Log ## {#module-log}
+
+The <dfn export for=modules>log</dfn> module contains functionality and events
+related to logging.
+
+### Definition ### {#module-log-definition}
+
+[=remote end definition=]
+
+<pre class="cddl remote-cddl">
+
+LogEvent = (
+  LogEntryAddedEvent
+)
+</pre>
+
+### Types ### {#module-log-types}
+
+#### log.LogEntry #### {#types-log-logentry}
+
+<pre class="cddl local-cddl">
+
+LogLevel = "debug" / "info" / "warning" / "error"
+
+LogEntry = (
+  GenericLogEntry //
+  ConsoleLogEntry //
+  JavascriptLogEntry
+)
+
+BaseLogEntry = {
+  level: LogLevel,
+  text: text / null,
+  timestamp: int,
+  ?stackTrace: [*StackFrame],
+}
+
+GenericLogEntry = {
+  BaseLogEntry,
+  type: text,
+}
+
+ConsoleLogEntry = {
+  BaseLogEntry,
+  type: "console",
+  method: text,
+  realm: Realm,
+  args: [*RemoteValue],
+}
+
+JavascriptLogEntry = {
+  BaseLogEntry,
+  type: "javascript",
+}
+
+</pre>
+
+Each log event is represented by a <code>LogEntry</code> object. This has a
+<code>type</code> property which represents the type of log entry added, a
+<code>level</code> property representing severity, a <code>text</code> property
+with the log message string itself, and a <code>timestamp</code> property
+corresponding to the time the log entry was generated. Specific variants of the
+<code>LogEntry</code> are used to represent logs from different sources, and
+provide additional fields specific to the entry type.
+
+#### log.StackFrame #### {#types-log-stackframe}
+
+<pre class="cddl local-cddl">
+
+StackFrame = {
+  url: text,
+  functionName: text,
+  lineNumber: int,
+  columnNumber: int,
+}
+
+</pre>
+
+A frame in a stacktrace is represented by a <code>StackFrame</code> object. This
+has a <code>url</code> property, which represents the URL of the script, a
+<code>functionName</code> property which represents the name of the executing
+function, and <code>lineNumber</code> and <code>columnNumber</code> properties,
+which represent the line and column number of the executed code.
+
+The <dfn>current stack trace</dfn> is a representation of the stack of the
+[=running execution context=]. The details of this are unspecified, and so the
+behaviour here is implementation defined, but the general process is as follows:
+
+ 1. Let |stack trace| be a new list.
+
+ 1. For each stack frame |frame| in the stack of the running execution context,
+    starting from the most recently executed frame, run the following steps:
+
+    1. Let |url| be the result of running the [=URL serializer=], given
+       the <a spec=url for=/>URL</a> of |frame|'s associated script resource.
+
+    1. Let |functionName| be the name of |frame|'s associated function.
+
+    1. Let |lineNumber| and |columnNumber| be the one-based line and zero-based
+       column numbers, respectively, of the location in |frame|'s associated
+       script resource corresponding to |frame|.
+
+    1. Let |frame info| be a new map matching the <code>StackFrame</code>
+       production, with the <code>url</code> field set to |url|, the
+       <code>functionName</code> field set to |functionName|, the
+       <code>lineNumber</code> field set to |lineNumber| and the
+       <code>columnNumber</code> field set to |columnNumber|.
+
+ 1. Append |frame info| to |stack trace|.
+
+ 1. Return |stack trace|
+
+### Events ### {#module-log-events}
+
+#### entryAdded #### {#event-log-entryAdded}
+
+<dl>
+   <dt>Event Type</dt>
+   <dd>
+      <pre class="cddl local-cddl">
+        LogEntryAddedEvent = {
+         method: "log.entryAdded",
+         params: LogEntry,
+       }
+      </pre>
+   </dd>
+</dl>
+
+The [=remote end event trigger=] is:
+
+<div algorithm="remote end event trigger for log.entryAdded">
+
+Define the following [=console steps=] with |method|, |args|, and <var
+ignore>options</var>:
+
+1. If |method| is "<code>error</code>" or "<code>assert</code>", let |level| be
+   "<code>error</code>". If |method| is "<code>debug</code>" or
+   "<code>trace</code>" let |level| be "<code>debug</code>". If |method| is
+   "<code>warn</code>" or <code>warning</code>, let |level| be
+   "<code>warning</code>". Otherwise let
+   |level| be "<code>info</code>".
+
+1. Let |timestamp| be a [=time value=] representing the current date and time in UTC.
+
+1. Let |text| be an empty string.
+
+1. If [=Type=](||args|[0]) is String, and |args|[0] contains a [=formatting
+   specifier=], let |formatted args| be [=Formatter=](|args|). Otherwise let
+   |formatted args| be |args|.
+
+   Issue: This is underdefined in the console spec, so it's unclar if we can get
+   interoperable behaviour here.
+
+1. For each |arg| in |formatted args|:
+
+  1. If |arg| is not the first entry in |args|, append a U+0020 SPACE to |text|.
+
+  1. If |arg| is a [=primitive value=], append [=ToString=](|arg|) to
+     |text|. Otherwise append an implementation-defined string to |text|.
+
+1. Let |serialized args| be a new list.
+
+1. For each |arg| of |args|, append the result of [=serialize as a remote
+   value=] given |arg|, null, true, and an empty [=set=] to |serialized args|.
+
+1. Let |realm| be the [=realm id=] of the [=current Realm Record=].
+
+1. Let |stack| be the [=current stack trace=].
+
+1. Let |entry| be a map matching the <code>ConsoleLogEntry</code> production,
+   with the the <code>level</code> field set to |level|, the <code>text</code>
+   field set to |text|, the <code>timestamp</code> field set to |timestamp|, the
+   <code>stackTrace</code> field set to |stack| if |stack| is not null, or
+   omitted otherwise, the |method| field set to |method|, the <code>realm</code>
+   field set to |realm| and the <code>args</code> field set to |serialized
+   args|.
+
+1. Let |body| be a map matching the <code>LogEntryAddedEvent</code> production, with
+   the <code>params</code> field set to |entry|.
+
+1. Let |settings| be the [=current settings object=]
+
+1. Let |related browsing contexts| be the result of [=get related browsing
+   contexts=] given |settings|.
+
+1. [=Emit an event=] with |body| and |related browsing contexts|.
+
+Define the following [=error reporting steps=] with arguments |script|, <var
+ignore>line number</var>, <var ignore>column number</var>, |message| and
+|handled|:
+
+1. If |handled| is true return.
+
+1. Let |settings| be |script|'s [=script/settings object=].
+
+1. Let |stack| be the [=current stack trace=] for the exception.
+
+1. Let |entry| be a map matching the <code>JavascriptLogEntry</code> production,
+   with <code>level</code> set to "<code>error</code>", <code>text</code> set to
+   |message|, and the <code>timestamp</code> field set to |timestamp|.
+
+1. Let |related browsing contexts| be the result of [=get related browsing
+   contexts=] given |settings|.
+
+1. [=Emit an event=] with |body| and |related browsing contexts|.
+
+Issue: Lots more things require logging. CDP has LogEntryAdded types xml,
+javascript, network, storage, appcache, rendering, security, deprecation,
+worker, violation, intervention, recommendation, other. These are in addition to
+the js exception and console API types that are represented by different methods.
+
+Issue: Allow implementation-defined log types
 
 </div>
 
@@ -2115,3 +2376,29 @@ To discard a browsing context |browsingContext|, run these steps:
 Issue: The actual patch might be better to split the algorithm into an outer algorithm that is
 called by external callers and an inner algorithm that's used for recursive calls. That's quite hard
 to express as a patch to the specification since it requires changing multiple parts.
+
+
+The [=report an error=] algorithm is modified with an additional step at the
+end:
+
+<div algorithm>
+11. Call any <dfn>error reporting steps</dfn> defined in external specifications
+     with <var ignore>script</var>, <var ignore>line</var>, <var
+     ignore>col</var>, <var ignore>message</var>, and true if the error is
+     [=handled=], or false otherwise.
+
+</div>
+## Console ##  {#patches-console}
+
+Other specifications can define <dfn>console steps</dfn>. When any method of the
+{{console}} interface is called, with method name
+|method| and argument |args|:
+
+1. If that method does not call the [=Printer=] operation, call any [=console
+   steps=] defined in external specification with arguments |method|, |args|
+   and, undefined.
+
+   Otherwise, at the point when the [=Printer=] operation is called with
+   arguments |name|, |printerArgs| and |options| (which is undefined if the
+   argument is not provided), call any [=console steps=] defined in
+   external specification with arguments |name|, |printerArgs|, and |options|.

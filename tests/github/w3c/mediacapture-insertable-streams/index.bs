@@ -75,25 +75,30 @@ interface MediaStreamTrackProcessor {
 
 dictionary MediaStreamTrackProcessorInit {
   required MediaStreamTrack track;
-}
+  [EnforceRange] unsigned short maxBufferSize;
+};
 </pre>
 
 ### Internal slots
 <dl>
 <dt><dfn attribute for=MediaStreamTrackProcessor>[[track]]</dfn></dt>
 <dd>Track whose raw data is to be exposed by the {{MediaStreamTrackProcessor}}.</dd>
+<dt><dfn attribute for=MediaStreamTrackProcessor>[[maxBufferSize]]</dfn></dt>
+<dd>The maximum number of media frames buffered by the {{MediaStreamTrackProcessor}}.</dd>
 </dl>
 
 ### Constructor
 <dfn constructor for=MediaStreamTrackProcessor title="MediaStreamTrackProcessor(init)">
   MediaStreamTrackProcessor(init)
 </dfn>
-1. If {{init.}}{{MediaStreamTrackProcessorInit/track}} is not a valid {{MediaStreamTrack}},
+1. If {{init}}.{{MediaStreamTrackProcessorInit/track}} is not a valid {{MediaStreamTrack}},
    throw a {{TypeError}}.
-2. Let |p| be a new {{MediaStreamTrackProcessor}} object.
-3. Assign {{init.}}{{MediaStreamTrackProcessorInit/track}} to the {{MediaStreamTrackProcessor/[track]}}
-   internal slot of |p|.
-4. Return |p|.
+2. Let |processor| be a new {{MediaStreamTrackProcessor}} object.
+3. Assign {{init}}.{{MediaStreamTrackProcessorInit/track}} to the {{MediaStreamTrackProcessor/[track]}}
+   internal slot of |processor|.
+3. Assign {{init}}.{{MediaStreamTrackProcessorInit/maxBufferSize}} to the {{MediaStreamTrackProcessor/[maxBufferSize]}}
+   internal slot of |processor|.
+4. Return |processor|.
 
 ### Attributes
 <dl>
@@ -102,7 +107,17 @@ dictionary MediaStreamTrackProcessorInit {
 in the {{MediaStreamTrackProcessor/[track]}} internal slot. If {{MediaStreamTrackProcessor/[track]}}
 is a video track, chunks read from {{MediaStreamTrackProcessor/readable}} will be {{VideoFrame}}
 objects. If {{MediaStreamTrackProcessor/[track]}} is an audio track, chunks read from
-{{MediaStreamTrackProcessor/readable}} will produce {{AudioFrame}} objects.</dd>
+{{MediaStreamTrackProcessor/readable}} will produce {{AudioFrame}} objects.
+If media frames are not read from {{MediaStreamTrackProcessor/readable}} quickly enough,
+the {{MedeiaStreamTrackProcessor}} will internally buffer up to {{MediaStreamTrackProcessor/[maxBufferSize]}}
+of the frames produced by {{MediaStreamTrackProcessor/[track]}}. If the internal buffer
+is full, each time {{MediaStreamTrackProcessor/[track]}} produces a new frame, the oldest frame
+in the buffer MUST be dropped and the new frame MUST be added to the buffer.
+</dd>
+<p class="note">
+The application may detect that frames have been dropped by noticing that there is a gap in the
+timestamps of the frames.
+</p>
 <dt><dfn attribute for=MediaStreamTrackProcessor>writableControl</dfn></dt>
 <dd>Allows sending control signals to {{MediaStreamTrackProcessor/[track]}}.
 Control signals are objects of type {{MediaStreamTrackSignal}}.
@@ -140,21 +155,21 @@ dictionary MediaStreamTrackGeneratorInit {
 <dfn constructor for=MediaStreamTrackGenerator title="MediaStreamTrackGenerator(init)">
   MediaStreamTrackGenerator(init)
 </dfn>
-1. If {{init.}}{{MediaStreamTrackGeneratorInit/signalTarget}} is not empty and is not a valid {{MediaStreamTrack}},
-   or {{init.}}{{MediaStreamTrackGenerator/[kind]}} is not empty and it is not `"audio"` or `"video"`,
+1. If {{init}}.{{MediaStreamTrackGeneratorInit/signalTarget}} is not empty and is not a valid {{MediaStreamTrack}},
+   or {{init}}.{{MediaStreamTrackGenerator/[kind]}} is not empty and it is not `"audio"` or `"video"`,
    throw a {{TypeError}}.
-2. If neither {{init.}}{{MediaStreamTrackGeneratorInit/signalTarget}} nor
-   and {{init.}}{{MediaStreamTrackGenerator/[kind]}} are empty, and
-   {{init.}}{{MediaStreamTrackGeneratorInit/signalTarget}}{{.}}{{MediaStreamTrack/kind}}
-   does not match {{init.}}{{MediaStreamTrackGeneratorInit/kind}}, throw a {{TypeError}}.
+2. If neither {{init}}.{{MediaStreamTrackGeneratorInit/signalTarget}} nor
+   and {{init}}.{{MediaStreamTrackGenerator/[kind]}} are empty, and
+   {{init}}.{{MediaStreamTrackGeneratorInit/signalTarget}}{{.}}{{MediaStreamTrack/kind}}
+   does not match {{init}}.{{MediaStreamTrackGeneratorInit/kind}}, throw a {{TypeError}}.
 3. Let |g| be a new {{MediaStreamTrackGenerator}} object.
-4. If {{init.}}{{MediaStreamTrackGeneratorInit/signalTarget}} is not empty,
-   assign {{init.}}{{MediaStreamTrackGeneratorInit/signalTarget}}
+4. If {{init}}.{{MediaStreamTrackGeneratorInit/signalTarget}} is not empty,
+   assign {{init}}.{{MediaStreamTrackGeneratorInit/signalTarget}}
    to the {{MediaStreamTrackGenerator/[signalTarget]}} internal slot of |g| and
    initialize the {{MediaStreamTrack/kind}} field of |g| (inherited from {{MediaStreamTrack}})
-   with {{init.}}{{MediaStreamTrackGeneratorInit/signalTarget}}{{.}}{{MediaStreamTrack/kind}}.
+   with {{init}}.{{MediaStreamTrackGeneratorInit/signalTarget}}{{.}}{{MediaStreamTrack/kind}}.
    Otherwise, initialize the {{MediaStreamTrack/kind}} field of |g| with
-   {{init.}}{{MediaStreamTrackGenerator/[kind]}}.
+   {{init}}.{{MediaStreamTrackGenerator/[kind]}}.
 5. Return |g|.
 
 ### Attributes

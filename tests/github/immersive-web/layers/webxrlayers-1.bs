@@ -318,7 +318,6 @@ XRCompositionLayer defines a set of common attributes and behaviors across certa
 
   attribute boolean blendTextureSourceAlpha;
   attribute boolean? chromaticAberrationCorrection;
-  attribute float? fixedFoveation;
   readonly attribute unsigned long mipLevels;
 
   readonly attribute boolean needsRedraw;
@@ -334,13 +333,7 @@ The <dfn attribute for="XRCompositionLayer">blendTextureSourceAlpha</dfn> attrib
 The <dfn attribute for="XRCompositionLayer">chromaticAberrationCorrection</dfn> attribute is a hint for the [=XR Compositor=] to
 enable optical chromatic aberration correction for the layer. If the user agent or device does not support this attribute, they
 should return <code>null</code> on getting, and setting should be a <code>no-op</code>.
-
-The <dfn attribute for="XRCompositionLayer">fixedFoveation</dfn> attribute controls the amount of foveation used by the
-[=XR Compositor=]. If the user agent or device does not support this attribute, they
-should return <code>null</code> on getting, and setting should be a <code>no-op</code>.
-Setting {{XRCompositionLayer/fixedFoveation}} to a value less than <code>0</code> will set it to <code>0</code> and setting it to
-a value higher than <code>1</code> will set it to <code>1</code>. <code>0</code> sets the minimum amount of foveation while
-<code>1</code> set the maximum. It is up to the user agent how the [=XR Compositor=] interprets these values.
+If the {{XRCompositionLayer/chromaticAberrationCorrection}} was changed, it will take effect at the next {{XRFrame}}.
 
 The <dfn attribute for="XRCompositionLayer">needsRedraw</dfn> attribute signals that the {{XRCompositionLayer}} should be
 rerendered in the next [=XR animation frame=]. It MAY be set when [=the underlying resources of a layer are lost=] or
@@ -376,13 +369,6 @@ or a {{WebGL2RenderingContext}} |context|, the user agent MUST run the following
       <dd> Set [=this=] {{XRCompositionLayer/chromaticAberrationCorrection}} to <code>true</code> or <code>false</code> depending on the user agent's preference.
       <dt> Otherwise
       <dd> Set [=this=] {{XRCompositionLayer/chromaticAberrationCorrection}} to <code>null</code>.
-    </dl>
-  1. Initialize [=this=] {{XRCompositionLayer/fixedFoveation}} as follows:
-    <dl class="switch">
-      <dt class="switch">If the user agent supports fixed foveation
-      <dd> Set [=this=] {{XRCompositionLayer/fixedFoveation}} to a value between <code>0</code> and <code>1</code> depending on the user agent's preference.
-      <dt> Otherwise
-      <dd> Set [=this=] {{XRCompositionLayer/fixedFoveation}} to <code>null</code>.
     </dl>
 
 </div>
@@ -452,6 +438,7 @@ Projection layers should be refreshed close to the device's native frame rate.
   readonly attribute unsigned long textureArrayLength;
 
   readonly attribute boolean ignoreDepthValues;
+  attribute float? fixedFoveation;
 };
 </pre>
 
@@ -465,6 +452,13 @@ The <dfn attribute for="XRProjectionLayer">textureArrayLength</dfn> attribute re
 the [=colorTextures=] textures of this layer if the {{XRProjectionLayer}} was initialized with a
 {{XRProjectionLayerInit/textureType}} of {{"texture-array"}}. Otherwise it will return <code>1</code>.
 
+The <dfn attribute for="XRProjectionLayer">fixedFoveation</dfn> attribute controls the amount of foveation used by the
+[=XR Compositor=]. If the user agent or device does not support this attribute, they
+should return <code>null</code> on getting, and setting should be a <code>no-op</code>.
+Setting {{XRProjectionLayer/fixedFoveation}} to a value less than <code>0</code> will set it to <code>0</code> and setting it to
+a value higher than <code>1</code> will set it to <code>1</code>. <code>0</code> sets the minimum amount of foveation while
+<code>1</code> set the maximum. It is up to the user agent how the [=XR Compositor=] interprets these values.
+If the {{XRProjectionLayer/fixedFoveation}} level was changed, it will take effect at the next {{XRFrame}}.
 
 The <dfn attribute for="XRProjectionLayer">ignoreDepthValues</dfn> attribute, if <code>true</code>, indicates that the
 [=XR Compositor=] MUST NOT make use of values in the depth buffer attachment when rendering. When the attribute
@@ -880,12 +874,16 @@ If {{XRProjectionLayerInit/depthFormat}} is <code>0</code> the layer will not pr
 
 This is the <dfn>list of depth formats for projection layers</dfn> that the [=XR Compositor=] MUST support:
 
-For WebGL1 contexts with the '{{WEBGL_depth_texture}}' [=extension=] enabled or WebGL2 contexts:
+For {{WebGLRenderingContext}} contexts with the '{{WEBGL_depth_texture}}' [=extension=] enabled or WebGL2 contexts:
 
  - {{DEPTH_COMPONENT}}
  - {{DEPTH_STENCIL}}
 
-For WebGL2 contexts these additional formats are supported:
+If the extension was not enabled, the request for a depth texture is ignored.
+
+NOTE: this could be confusing to authors because they might expect a depth texture. If possible, provide a warning with the reason why the texture was not created.
+
+For {{WebGL2RenderingContext}} contexts these additional formats are supported:
 
  - {{DEPTH_COMPONENT24}}
  - {{DEPTH24_STENCIL8}}
@@ -946,12 +944,12 @@ If {{XRLayerInit/depthFormat}} is not supplied, the layer will not provide a dep
 
 This is the <dfn>list of depth formats for non-projection layers</dfn> that the [=XR Compositor=] MUST support:
 
-For WebGL1 contexts with the '{{WEBGL_depth_texture}}' [=extension=] enabled or WebGL2 contexts:
+For {{WebGLRenderingContext}} contexts with the '{{WEBGL_depth_texture}}' [=extension=] enabled or WebGL2 contexts:
 
  - {{DEPTH_COMPONENT}}
  - {{DEPTH_STENCIL}}
 
-For WebGL2 contexts these additional formats are supported:
+For {{WebGL2RenderingContext}} contexts these additional formats are supported:
 
  - {{DEPTH_COMPONENT24}}
  - {{DEPTH24_STENCIL8}}
@@ -1037,11 +1035,11 @@ The {{XRWebGLBinding}} object is used to create layers that have a GPU backend.
 
   readonly attribute double nativeProjectionScaleFactor;
 
-  XRProjectionLayer createProjectionLayer(optional XRProjectionLayerInit init);
-  XRQuadLayer createQuadLayer(optional XRQuadLayerInit init);
-  XRCylinderLayer createCylinderLayer(optional XRCylinderLayerInit init);
-  XREquirectLayer createEquirectLayer(optional XREquirectLayerInit init);
-  XRCubeLayer createCubeLayer(optional XRCubeLayerInit init);
+  XRProjectionLayer createProjectionLayer(optional XRProjectionLayerInit init = {});
+  XRQuadLayer createQuadLayer(optional XRQuadLayerInit init = {});
+  XRCylinderLayer createCylinderLayer(optional XRCylinderLayerInit init = {});
+  XREquirectLayer createEquirectLayer(optional XREquirectLayerInit init = {});
+  XRCubeLayer createCubeLayer(optional XRCubeLayerInit init = {});
 
   XRWebGLSubImage getSubImage(XRCompositionLayer layer, XRFrame frame, optional XREye eye = "none");
   XRWebGLSubImage getViewSubImage(XRProjectionLayer layer, XRView view);
@@ -1153,10 +1151,11 @@ To <dfn>allocate color textures for projection layers</dfn> using an {{XRProject
 <div class="algorithm" data-algorithm="allocate depth textures for projection layers">
 
 To <dfn>allocate depth textures for projection layers</dfn> using an {{XRProjectionLayer}} |layer|, an {{XRTextureType}} |textureType|, a {{GLenum}} |textureFormat| and a float |scaleFactor|, the user agent MUST run the following steps:
-  1. let |array| be a [=new=] array in the [=relevant realm=] of |context|.
-  1. let |context| be |layer|'s [=XRCompositionLayer/context=].
-  1. let |session| be |layer|'s [=XRCompositionLayer/session=].
+  1. Let |array| be a [=new=] array in the [=relevant realm=] of |context|.
+  1. Let |context| be |layer|'s [=XRCompositionLayer/context=].
+  1. Let |session| be |layer|'s [=XRCompositionLayer/session=].
   1. If |textureFormat| is <code>0</code>, return |array| and abort these steps.
+  1. If |context| is a {{WebGLRenderingContext}} and the {{WEBGL_depth_texture}} [=extension=] is not enabled in |context|, return |array| and abort these steps.
   1. If |textureFormat| is not in the [=list of depth formats for projection layers=], throw a {{NotSupportedError}} and abort these steps.
   1. let |numViews| be the number of the |session|'s [=list of views=] excluding the [=secondary view|secondary views=].
   1. Let |view| be the first entry in the |session|'s [=list of views=] that is not a [=secondary view=].
@@ -1212,6 +1211,7 @@ To <dfn>allocate the depth textures for the secondary views</dfn> using an {{XRP
   1. Let |context| be |layer|'s [=XRCompositionLayer/context=].
   1. Let |session| be |layer|'s [=XRCompositionLayer/session=].
   1. If |textureFormat| is <code>0</code>, return |array| and abort these steps.
+  1. If |context| is a {{WebGLRenderingContext}} and the {{WEBGL_depth_texture}} [=extension=] is not enabled in |context|, return |array| and abort these steps.
   1. If |textureFormat| is not in the [=list of depth formats for projection layers=], throw a {{NotSupportedError}} and abort these steps.
   1. Let |array| be a [=new=] array in the [=relevant realm=] of |context|.
   1. For each |view| in the |session|'s [=list of views=]:
@@ -1312,6 +1312,7 @@ When this method is invoked, the user agent MUST run the following steps:
         <dt> Otherwise
           <dd> Initialize |layer|'s {{XRProjectionLayer/ignoreDepthValues}} to <code>true</code>
       </dl>
+  1. Initialize |layer|'s {{XRProjectionLayer/fixedFoveation}} to <code>0</code>.
   1. let |layout| be the result of [=determine the layout attribute|determining the layout attribute=] with |init|'s {{XRProjectionLayerInit/textureType}}, |context| and {{XRLayerLayout/"default"}}.
   1. Let |maximum scalefactor| be the result of [=determine the maximum scalefactor|determining the maximum scalefactor=] with |session|, |context| and |layout|.
   1. If {{XRProjectionLayerInit/scaleFactor}} is larger than |maximum scalefactor|, set {{XRProjectionLayerInit/scaleFactor}} to |maximum scalefactor|.
@@ -1694,9 +1695,9 @@ The {{XRMediaBinding}} object is used to create layers that display the content 
 [Exposed=Window] interface XRMediaBinding {
   constructor(XRSession session);
 
-  XRQuadLayer createQuadLayer(HTMLVideoElement video, optional XRMediaQuadLayerInit init);
-  XRCylinderLayer createCylinderLayer(HTMLVideoElement video, optional XRMediaCylinderLayerInit init);
-  XREquirectLayer createEquirectLayer(HTMLVideoElement video, optional XRMediaEquirectLayerInit init);
+  XRQuadLayer createQuadLayer(HTMLVideoElement video, optional XRMediaQuadLayerInit init = {});
+  XRCylinderLayer createCylinderLayer(HTMLVideoElement video, optional XRMediaCylinderLayerInit init = {});
+  XREquirectLayer createEquirectLayer(HTMLVideoElement video, optional XRMediaEquirectLayerInit init = {});
 };
 </pre>
 
