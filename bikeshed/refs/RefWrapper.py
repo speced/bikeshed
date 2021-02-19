@@ -20,10 +20,14 @@ class RefWrapper:
 
     @property
     def spec(self):
+        if self._ref["spec"] is None:
+            return ""
         return decode(self._ref["spec"].strip())
 
     @property
     def shortname(self):
+        if self._ref["shortname"] is None:
+            return ""
         return decode(self._ref["shortname"].strip())
 
     @property
@@ -34,10 +38,14 @@ class RefWrapper:
 
     @property
     def status(self):
+        if self._ref["status"] is None:
+            return ""
         return decode(self._ref["status"].strip())
 
     @property
     def url(self):
+        if self._ref["url"] is None:
+            return ""
         return decode(self._ref["url"].strip())
 
     @property
