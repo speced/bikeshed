@@ -423,14 +423,14 @@ def canonicalizeExpiryDate(base, expires):
     return None
 
 
-def parseLevel(key, val, lineNum):
+def parseLevel(key, val, lineNum):  # pylint: disable=unused-argument
     val = val.lower().strip()
     if val == "none":
         return ""
     return val.strip()
 
 
-def parseInteger(key, val, lineNum):
+def parseInteger(key, val, lineNum):  # pylint: disable=unused-argument
     return int(val)
 
 
@@ -594,11 +594,11 @@ def parseEditor(key, val, lineNum):
     return [data]
 
 
-def parseCommaSeparated(key, val, lineNum):
+def parseCommaSeparated(key, val, lineNum):  # pylint: disable=unused-argument
     return [term.strip().lower() for term in val.split(",")]
 
 
-def parseIdList(key, val, lineNum):
+def parseIdList(key, val, lineNum):  # pylint: disable=unused-argument
     return [term.strip() for term in val.split(",")]
 
 
@@ -631,7 +631,7 @@ def parseLinkDefaults(key, val, lineNum):
     return defaultSpecs
 
 
-def parseBoilerplate(key, val, lineNum):
+def parseBoilerplate(key, val, lineNum):  # pylint: disable=unused-argument
     boilerplate = config.BoolSet(default=True)
     for command in val.split(","):
         pieces = command.lower().strip().split()
@@ -755,7 +755,7 @@ def parseBoolishList(
     return boolset
 
 
-def parseLinkedText(key, val, lineNum):
+def parseLinkedText(key, val, lineNum):  # pylint: disable=unused-argument
     # Parses anything defined as "text url, text url, text url" into a list of 2-tuples.
     entries = []
     vals = [v.strip() for v in val.split(",")]
@@ -764,7 +764,7 @@ def parseLinkedText(key, val, lineNum):
     return entries
 
 
-def parseMarkupShorthands(key, val, lineNum):
+def parseMarkupShorthands(key, val, lineNum):  # pylint: disable=unused-argument
     # Format is comma-separated list of shorthand category followed by boolean.
     # Output is a dict of the shorthand categories with boolean values.
     vals = [v.strip() for v in val.lower().split(",")]
@@ -797,7 +797,7 @@ def parseMarkupShorthands(key, val, lineNum):
     return ret
 
 
-def parseInlineGithubIssues(key, val, lineNum):
+def parseInlineGithubIssues(key, val, lineNum):  # pylint: disable=unused-argument
     val = val.lower()
     if val in ["title", "full"]:
         return val
@@ -814,7 +814,7 @@ def parseInlineGithubIssues(key, val, lineNum):
     return False
 
 
-def parseTextMacro(key, val, lineNum):
+def parseTextMacro(key, val, lineNum):  # pylint: disable=unused-argument
     # Each Text Macro line is just a macro name (must be uppercase)
     # followed by the text it expands to.
     try:
@@ -836,7 +836,7 @@ def parseTextMacro(key, val, lineNum):
     return [(name, text)]
 
 
-def parseWorkStatus(key, val, lineNum):
+def parseWorkStatus(key, val, lineNum):  # pylint: disable=unused-argument
     # The Work Status is one of (completed, stable, testing, refining, revising, exploring, rewriting, abandoned).
     val = val.strip().lower()
     if val not in (
@@ -858,7 +858,7 @@ def parseWorkStatus(key, val, lineNum):
     return val
 
 
-def parseRepository(key, val, lineNum):
+def parseRepository(key, val, lineNum):  # pylint: disable=unused-argument
     # Shortname followed by url, or just url.
     # If just url, I'll try to recognize the shortname from it; otherwise it's the url again.
     val = val.strip()
@@ -885,7 +885,7 @@ def parseRepository(key, val, lineNum):
     return config.Nil()
 
 
-def parseTranslateIDs(key, val, lineNum):
+def parseTranslateIDs(key, val, lineNum):  # pylint: disable=unused-argument
     translations = {}
     for v in val.split(","):
         pieces = v.strip().split()
@@ -901,7 +901,7 @@ def parseTranslateIDs(key, val, lineNum):
     return translations
 
 
-def parseTranslation(key, val, lineNum):
+def parseTranslation(key, val, lineNum):  # pylint: disable=unused-argument
     # Format is <lang-code> <url> [ [ , name <name-in-spec-lang> ] || [ , native-name <name-in-the-lang> ] ]?
     pieces = val.split(",")
     if not (1 <= len(pieces) <= 3):
@@ -939,7 +939,7 @@ def parseTranslation(key, val, lineNum):
     ]
 
 
-def parseAudience(key, val, lineNum):
+def parseAudience(key, val, lineNum):  # pylint: disable=unused-argument
     # WG21 value
     values = [x.strip().upper() for x in val.strip().split(",")]
     if not values:
@@ -982,7 +982,7 @@ def parseAudience(key, val, lineNum):
         return ret
 
 
-def parseEditorTerm(key, val, lineNum):
+def parseEditorTerm(key, val, lineNum):  # pylint: disable=unused-argument
     values = [x.strip() for x in val.strip().split(",")]
     if len(values) == 2:
         return {"singular": values[0], "plural": values[1]}
@@ -993,7 +993,7 @@ def parseEditorTerm(key, val, lineNum):
     return {"singular": "Editor", "plural": "Editors"}
 
 
-def parseMaxToCDepth(key, val, lineNum):
+def parseMaxToCDepth(key, val, lineNum):  # pylint: disable=unused-argument
     if val.lower() == "none":
         return float("inf")
     try:
@@ -1015,12 +1015,12 @@ def parseMaxToCDepth(key, val, lineNum):
     return v
 
 
-def parseMetadataOrder(key, val, lineNum):
+def parseMetadataOrder(key, val, lineNum):  # pylint: disable=unused-argument
     pieces = [x.strip() for x in val.split(",")]
     return pieces
 
 
-def parseWptDisplay(key, val, lineNum):
+def parseWptDisplay(key, val, lineNum):  # pylint: disable=unused-argument
     val = val.lower()
     if val in ("none", "inline"):
         return val
@@ -1032,7 +1032,7 @@ def parseWptDisplay(key, val, lineNum):
     return "none"
 
 
-def parsePreviousVersion(key, val, lineNum):
+def parsePreviousVersion(key, val, lineNum):  # pylint: disable=unused-argument
     biblioMatch = re.match(r"from biblio(\s+\S+)?", val.lower())
     if biblioMatch:
         if biblioMatch.group(1):
@@ -1041,7 +1041,7 @@ def parsePreviousVersion(key, val, lineNum):
     return [{"type": "url", "value": val}]
 
 
-def parseInlineTagCommand(key, val, lineNum):
+def parseInlineTagCommand(key, val, lineNum):  # pylint: disable=unused-argument
     tag, _, command = val.strip().partition(" ")
     command = command.strip()
     return {tag: command}
@@ -1228,7 +1228,7 @@ class Metadata:
     parse = attr.ib()
 
 
-def joinValue(a, b):
+def joinValue(a, b):  # pylint: disable=unused-argument
     return b
 
 
@@ -1256,21 +1256,21 @@ def joinDdList(a, b):
     return x
 
 
-def parseLiteral(key, val, lineNum):
+def parseLiteral(key, val, lineNum):  # pylint: disable=unused-argument
     return val
 
 
-def parseLiteralOrNone(key, val, lineNum):
+def parseLiteralOrNone(key, val, lineNum):  # pylint: disable=unused-argument
     if val.lower() == "none":
         return None
     return val
 
 
-def parseLiteralCaseless(key, val, lineNum):
+def parseLiteralCaseless(key, val, lineNum):  # pylint: disable=unused-argument
     return val.lower()
 
 
-def parseLiteralList(key, val, lineNum):
+def parseLiteralList(key, val, lineNum):  # pylint: disable=unused-argument
     return [val]
 
 

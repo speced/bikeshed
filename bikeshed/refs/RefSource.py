@@ -115,7 +115,7 @@ class RefSource:
         exact=False,
         error=False,
         **kwargs,
-    ):
+    ):  # pylint: disable=unused-argument
         # Query the ref database.
         # If it fails to find a ref, also returns the stage at which it finally ran out of possibilities.
         def allRefsIterator():

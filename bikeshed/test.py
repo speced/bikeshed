@@ -47,7 +47,9 @@ def sortTests(tests):
     return sorted(tests, key=lambda x: ("/" in testNameForPath(x), x))
 
 
-def runAllTests(patterns=None, manualOnly=False, md=None):
+def runAllTests(
+    patterns=None, manualOnly=False, md=None
+):  # pylint: disable=unused-argument
     paths = testPaths(patterns)
     if len(paths) == 0:
         p("No tests were found")

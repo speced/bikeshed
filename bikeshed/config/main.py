@@ -70,7 +70,7 @@ def simplifyText(text):
     return text
 
 
-def linkTextsFromElement(el, preserveCasing=False):
+def linkTextsFromElement(el):
     from ..h import find, textContent
 
     if el.get("data-lt") == "":

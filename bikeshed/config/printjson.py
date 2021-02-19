@@ -56,7 +56,7 @@ def printjsonobjectarray(x, indent, level):
     return ret
 
 
-def printjsonsimplearray(x, indent, level):
+def printjsonsimplearray(x, indent, level):  # pylint: disable=unused-argument
     x = getjson(x)
     ret = printColor("[", "blue")
     for i, v in enumerate(x):

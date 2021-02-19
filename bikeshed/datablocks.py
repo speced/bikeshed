@@ -115,7 +115,7 @@ def transformDataBlocks(doc, lines):
                 # End tag was the first tag on the line.
                 # Remove the tag from the line.
                 repl = blockTypes[blockType](
-                    lines=cleanPrefix([x.text for x in blockLines[1:]], doc.md.indent),
+                    lines=cleanPrefix([x.text for x in blockLines[1:]]),
                     tagName=tagName,
                     firstLine=blockLines[0].text,
                     lineNum=blockLines[0].i,
@@ -129,8 +129,7 @@ def transformDataBlocks(doc, lines):
                 # Process the stuff before it, preserve the stuff after it.
                 repl = blockTypes[blockType](
                     lines=cleanPrefix(
-                        [x.text for x in blockLines[1:]] + [match.group(1)],
-                        doc.md.indent,
+                        [x.text for x in blockLines[1:]] + [match.group(1)]
                     ),
                     tagName=tagName,
                     firstLine=blockLines[0].text,
@@ -157,7 +156,7 @@ def transformDataBlocks(doc, lines):
     return newLines
 
 
-def cleanPrefix(lines, tabSize):
+def cleanPrefix(lines):
     # Remove the longest common whitespace prefix from the lines.
     # Returns a fresh array, does not mutate the passed lines.
     if not lines:
@@ -183,7 +182,9 @@ def getWsPrefix(line):
     return re.match(r"(\s*)", line).group(1)
 
 
-def transformPre(lines, tagName, firstLine, **kwargs):
+def transformPre(
+    lines, tagName, firstLine, **kwargs
+):  # pylint: disable=unused-argument
     # If the last line in the source is a </code></pre>,
     # the generic processor will turn that into a final </code> line,
     # which'll mess up the indent finding.
@@ -227,7 +228,9 @@ def transformPre(lines, tagName, firstLine, **kwargs):
     return lines
 
 
-def transformPropdef(lines, doc, firstLine, lineNum=None, **kwargs):
+def transformPropdef(
+    lines, doc, firstLine, lineNum=None, **kwargs
+):  # pylint: disable=unused-argument
     attrs = OrderedDict()
     parsedAttrs = parseDefBlock(lines, "propdef")
     # Displays entries in the order specified in attrs,
@@ -347,7 +350,9 @@ def transformPropdef(lines, doc, firstLine, lineNum=None, **kwargs):
 # TODO: Make these functions match transformPropdef's new structure
 
 
-def transformDescdef(lines, doc, firstLine, lineNum=None, **kwargs):
+def transformDescdef(
+    lines, doc, firstLine, lineNum=None, **kwargs
+):  # pylint: disable=unused-argument
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = f" line-number={lineNum}"
@@ -402,7 +407,9 @@ def transformDescdef(lines, doc, firstLine, lineNum=None, **kwargs):
     return ret
 
 
-def transformElementdef(lines, doc, firstLine, lineNum=None, **kwargs):
+def transformElementdef(
+    lines, doc, firstLine, lineNum=None, **kwargs
+):  # pylint: disable=unused-argument
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = f" line-number={lineNum}"
@@ -499,7 +506,9 @@ def transformElementdef(lines, doc, firstLine, lineNum=None, **kwargs):
     return ret
 
 
-def transformArgumentdef(lines, firstLine, lineNum=None, **kwargs):
+def transformArgumentdef(
+    lines, firstLine, lineNum=None, **kwargs
+):  # pylint: disable=unused-argument
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = f" line-number={lineNum}"
@@ -597,7 +606,9 @@ def parseDefBlock(lines, type, capitalizeKeys=True, lineNum=None):
     return vals
 
 
-def transformRailroad(lines, doc, firstLine, **kwargs):
+def transformRailroad(
+    lines, doc, firstLine, **kwargs
+):  # pylint: disable=unused-argument
     import io
 
     from . import railroadparser
@@ -661,7 +672,7 @@ def transformRailroad(lines, doc, firstLine, **kwargs):
     return []
 
 
-def transformBiblio(lines, doc, **kwargs):
+def transformBiblio(lines, doc, **kwargs):  # pylint: disable=unused-argument
     storage = defaultdict(list)
     biblio.processSpecrefBiblioFile("".join(lines), storage, order=1)
     for k, vs in storage.items():
@@ -670,7 +681,9 @@ def transformBiblio(lines, doc, **kwargs):
     return []
 
 
-def transformAnchors(lines, doc, lineNum=None, **kwargs):
+def transformAnchors(
+    lines, doc, lineNum=None, **kwargs
+):  # pylint: disable=unused-argument
     anchors = parseInfoTree(lines, doc.md.indent, lineNum)
     processAnchors(anchors, doc, lineNum)
     return []
@@ -770,7 +783,9 @@ def processAnchors(anchors, doc, lineNum=None):
             )
 
 
-def transformLinkDefaults(lines, doc, lineNum=None, **kwargs):
+def transformLinkDefaults(
+    lines, doc, lineNum=None, **kwargs
+):  # pylint: disable=unused-argument
     lds = parseInfoTree(lines, doc.md.indent, lineNum)
     processLinkDefaults(lds, doc, lineNum)
     return []
@@ -817,7 +832,9 @@ def processLinkDefaults(lds, doc, lineNum=None):
             doc.md.linkDefaults[text].append((spec, type, ld.get("status", None), None))
 
 
-def transformIgnoredSpecs(lines, doc, lineNum=None, **kwargs):
+def transformIgnoredSpecs(
+    lines, doc, lineNum=None, **kwargs
+):  # pylint: disable=unused-argument
     specs = parseInfoTree(lines, doc.md.indent, lineNum)
     processIgnoredSpecs(specs, doc, lineNum)
     return []
@@ -848,7 +865,9 @@ def processIgnoredSpecs(specs, doc, lineNum=None):
                 doc.refs.ignoredSpecs.add(specName)
 
 
-def transformInfo(lines, doc, lineNum=None, **kwargs):
+def transformInfo(
+    lines, doc, lineNum=None, **kwargs
+):  # pylint: disable=unused-argument
     # More generic InfoTree system.
     # A <pre class=info> can contain any of the InfoTree collections,
     # identified by an 'info' line.
@@ -881,7 +900,9 @@ def processInfo(infos, doc, lineNum=None):
         knownInfoTypes[infoType](info, doc, lineNum=0)
 
 
-def transformInclude(lines, doc, firstLine, lineNum=None, **kwargs):
+def transformInclude(
+    lines, doc, firstLine, lineNum=None, **kwargs
+):  # pylint: disable=unused-argument
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = f" line-number={lineNum}"
@@ -919,7 +940,9 @@ def transformInclude(lines, doc, firstLine, lineNum=None, **kwargs):
     return []
 
 
-def transformIncludeCode(lines, doc, firstLine, lineNum=None, **kwargs):
+def transformIncludeCode(
+    lines, doc, firstLine, lineNum=None, **kwargs
+):  # pylint: disable=unused-argument
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = f" line-number={lineNum}"
@@ -983,7 +1006,9 @@ def transformIncludeCode(lines, doc, firstLine, lineNum=None, **kwargs):
     return []
 
 
-def transformIncludeRaw(lines, doc, firstLine, lineNum=None, **kwargs):
+def transformIncludeRaw(
+    lines, doc, firstLine, lineNum=None, **kwargs
+):  # pylint: disable=unused-argument
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = f" line-number={lineNum}"

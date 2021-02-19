@@ -38,7 +38,7 @@ class BiblioShorthand:
             self.stage = "end"
             return steps.NextLiteral(biblioEndRe)
 
-    def respondLinkText(self, match, dom):
+    def respondLinkText(self, match, dom):  # pylint: disable=unused-argument
         self.linkText = dom
         self.bsAutolink += outerHTML(dom)
         return self.respondEnd()

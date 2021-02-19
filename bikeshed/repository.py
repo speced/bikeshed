@@ -17,7 +17,7 @@ class Repository:
         else:
             self.type = "unknown"
 
-    def formatIssueUrl(self, *args, **kwargs):
+    def formatIssueUrl(self, *args, **kwargs):  # pylint: disable=unused-argument
         # Dunno how to format an arbitrary issue url,
         # so give up and just point to the repo.
         return self.url

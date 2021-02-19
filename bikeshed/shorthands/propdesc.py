@@ -46,7 +46,7 @@ class PropdescShorthand:
             self.stage = "end"
             return steps.NextLiteral(endRe)
 
-    def respondLinkText(self, match, dom):
+    def respondLinkText(self, match, dom):  # pylint: disable=unused-argument
         self.linkText = dom
         self.bsAutolink += outerHTML(dom)
         return self.respondEnd()

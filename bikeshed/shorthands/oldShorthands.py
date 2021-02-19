@@ -744,7 +744,7 @@ def emReplacer(match):
 escapedRe = re.compile(r"\\\*")
 
 
-def escapedReplacer(match):
+def escapedReplacer(match):  # pylint: disable=unused-argument
     return "*"
 
 

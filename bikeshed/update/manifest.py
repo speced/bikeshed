@@ -335,7 +335,9 @@ def dtFromManifest(lines):
         return
 
 
-def createFinishedManifest(manifestLines, goodPaths, badPaths):
+def createFinishedManifest(
+    manifestLines, goodPaths, badPaths
+):  # pylint: disable=unused-argument
     if not badPaths:
         return "\n".join(manifestLines)
 
