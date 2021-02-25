@@ -70,7 +70,7 @@ will cause JavaScript execution in a number of unexpected ways.
 
 Libraries like [[DOMPURIFY]] attempt to manage this problem by carefully
 parsing and sanitizing strings before insertion by constructing a DOM and
-walking its members through an allowlist. This has proven to be a fragile
+walking its members through an allow-list. This has proven to be a fragile
 approach, as the parsing APIs exposed to the web don't always map in
 reasonable ways to the browser's behavior when actually rendering a string as
 HTML in the "real" DOM. Moreover, the libraries need to keep on top of
@@ -78,7 +78,7 @@ browsers' changing behavior over time; things that once were safe may turn
 into time-bombs based on new platform-level features.
 
 The browser, on the other, has an fairly good idea of when it is going to
-execute code. We can improve upon the userspace libraries by teaching the
+execute code. We can improve upon the user-space libraries by teaching the
 browser how to render HTML from an arbitrary string in a safe manner, and do
 so in a way that is much more likely to be maintained and updated along with
 the browser's own changing parser implementation. This document outlines an
@@ -119,7 +119,7 @@ Framework {#framework}
 ## Sanitizer API {#sanitizer-api}
 
 The core API is the `Sanitizer` object and the sanitize method. Sanitizers can
-be instanited using an optional `SanitizerConfig` dictionary for options.
+be instantiated using an optional `SanitizerConfig` dictionary for options.
 The most common use-case - preventing XSS - is handled by the built-in default
 lists, so that creating a Sanitizer with a custom config is necessary only to
 handle additional, application-specific use cases.
@@ -169,7 +169,7 @@ Note: Sanitizing a string will use the [=HTML Parser=] to parse the input,
 ## The Configuration Dictionary {#config}
 
 The <dfn lt="configuration">sanitizer's configuration object</dfn> is a
-dictionary which describes modifications to the sanitze operation.
+dictionary which describes modifications to the sanitize operation.
 
 <pre class="idl">
   dictionary SanitizerConfig {
@@ -365,7 +365,7 @@ Issue: The sanitizer defaults need to be carefully vetted, and are still
 The sanitizer has a built-in default configuration, which aims to eliminate
 any script-injection possibility. Note that the [=sanitize document fragment=]
 algorithm
-is defined so that these defaults are handled first and cannot be overriden
+is defined so that these defaults are handled first and cannot be overridden
 by a custom configuration.
 
 
@@ -390,6 +390,72 @@ by a custom configuration.
 {}
    ```
 
+# Security Considerations {#security-considerations}
+
+The Sanitizer API is intended to prevent DOM-Based Cross-Site Scripting
+by traversing a supplied HTML content and removing elements and attributes
+according to a configuration. The specified API must not support
+the construction of a Sanitizer object that leaves script-capable markup in
+and doing so would be a bug in the threat model.
+
+That being said, there are security issues which the correct usage of the
+Sanitizer API will not be able to protect against and the scenarios will be
+laid out in the following sections.
+
+## Server-Side Reflected and Stored XSS {#server-side-xss}
+
+<em>This section is not normative.</em>
+
+The Sanitizer API operates solely in the DOM and adds a capability to traverse
+and filter an existing DocumentFragment. The Sanitizer does not address
+server-side reflected or stored XSS.
+
+## DOM clobbering {#dom-clobbering}
+
+<em>This section is not normative.</em>
+
+DOM clobbering describes an attack in which malicious HTML confuses an
+application by naming elements through `id` or `name` attributes such that
+properties like `children` of an HTML element in the DOM are overshadowed by
+the malicious content.
+
+The Sanitizer API does not protect DOM clobbering attacks in its
+default state, but can be configured to remove `id` and `name` attributes.
+
+## XSS with Script gadgets {#script-gadgets}
+
+<em>This section is not normative.</em>
+
+Script gadgets is a technique in which an attacker uses existing application
+code from popular JavaScript libraries to cause their own code to execute.
+This is often done by injecting innocent-looking code or seemingly inert
+DOM nodes that is only parsed and interpreted by a framework which then
+performs the execution of JavaScript based on that input.
+
+The Sanitizer API can not prevent these attacks, but requires page authors to
+explicitly allow attributes and elements that are unknown to HTML and markup
+that is known to be widely used for templating and framework-specific code,
+like `data-` and `slot` attributes and elements like `<slot>` and `<template>`.
+We believe that these restrictions are not exhaustive and encourage page
+authors to examine their third party libraries for this behavior.
+
+## Mutated XSS {#mutated-xss}
+
+<em>This section is not normative.</em>
+
+Mutated XSS or mXSS describes an attack based on parser mismatches when parsing
+an HTML snippet without the correct context. In particular, when a parsed HTML
+fragment has been serialized to a string, the format is not guaranteed to be
+parsed and interpreted exactly the same when inserted into a different parent
+element. An example for carrying out such an attack is by relying on the
+change of parsing behavior for foreign content or misnested tags.
+
+The Sanitizer API does not protect against mutated XSS, however we encourage
+authors to use the `sanitize()` function of the API which returns a
+DocumentFragment and avoids risks that come with serialization and additional
+parsing. Directly operating on a fragment after sanitization also comes with a
+performance benefit, as the cost of additional serialization and parsing is
+avoided.
 
 Acknowledgements {#ack}
 =======================
