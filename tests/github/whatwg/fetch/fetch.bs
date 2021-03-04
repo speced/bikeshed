@@ -89,6 +89,24 @@ url:https://tools.ietf.org/html/draft-ietf-httpbis-header-structure#section-4.2;
         "href": "https://tools.ietf.org/html/draft-ietf-httpbis-header-structure",
         "publisher": "IETF",
         "title": "Structured Field Values for HTTP"
+    },
+    "HTTP3": {
+        "authors": ["M. Bishop, Ed."],
+        "href": "https://tools.ietf.org/html/draft-ietf-quic-http",
+        "publisher": "IETF",
+        "title": "Hypertext Transfer Protocol Version 3 (HTTP/3)"
+    },
+    "WEBTRANSPORT-HTTP3": {
+        "authors": ["V. Vasiliev"],
+        "href": "https://tools.ietf.org/html/draft-ietf-webtrans-http3",
+        "publisher": "IETF",
+        "title": "WebTransport over HTTP/3"
+    },
+    "HTTP3-DATAGRAM": {
+        "authors": ["David Schinazi", "Lucas Pardue"],
+        "href": "https://tools.ietf.org/html/draft-ietf-masque-h3-datagram",
+        "publisher": "IETF",
+        "title": "Using QUIC Datagrams with HTTP/3"
     }
 }
 </pre>
@@ -105,6 +123,7 @@ everything that involves, including:
  <li>Redirects
  <li>Cross-origin semantics
  <li>CSP [[!CSP]]
+ <li>Fetch Metadata [[!FETCH-METADATA]]
  <li>Service workers [[!SW]]
  <li>Mixed Content [[!MIX]]
  <li>`<code>Referer</code>` [[!REFERRER]]
@@ -1653,13 +1672,18 @@ a given context. [[!CSP]]
 <dfn export for=request id=concept-request-reload-navigation-flag>reload-navigation flag</dfn>.
 Unless stated otherwise, it is unset.
 
-<p class="note no-backref">This flag is for exclusive use by HTML's navigate algorithm. [[!HTML]]
+<p class=note>This flag is for exclusive use by HTML's navigate algorithm. [[!HTML]]
 
 <p>A <a for=/>request</a> has an associated
 <dfn export for=request id=concept-request-history-navigation-flag>history-navigation flag</dfn>.
 Unless stated otherwise, it is unset.
 
-<p class="note no-backref">This flag is for exclusive use by HTML's navigate algorithm. [[!HTML]]
+<p class=note>This flag is for exclusive use by HTML's navigate algorithm. [[!HTML]]
+
+<p>A <a for=/>request</a> has an associated boolean <dfn export for=request>user-activation</dfn>.
+Unless stated otherwise, it is false.
+
+<p class=note>This is for exclusive use by HTML's navigate algorithm. [[!HTML]]
 
 <hr>
 
@@ -2044,8 +2068,8 @@ or a <a for=/>URL</a>.
   only parse successfully if it is an <a>absolute-URL-with-fragment string</a>.
 
  <li>
-  <p>If <var>locationURL</var>'s <a for=url>fragment</a> is null, then set <var>locationURL</var>'s
-  <a for=url>fragment</a> to <var>requestFragment</var>.
+  <p>If <var>location</var> is a <a for=/>URL</a> whose <a for=url>fragment</a> is null, then set
+  <var>location</var>'s <a for=url>fragment</a> to <var>requestFragment</var>.
 
   <p class=note>This ensures that synthetic (indeed, all) responses follow the processing model for
   redirects defined by HTTP. [[HTTP-SEMANTICS]]
@@ -2121,12 +2145,27 @@ identified by a <b>key</b> (a <a>network partition key</a>), an <b>origin</b> (a
 <a for=/>origin</a>), and <b>credentials</b> (a boolean).
 
 <p>To <dfn export id=concept-connection-obtain>obtain a connection</dfn>, given a <var>key</var>,
-<var>origin</var>, and <var>credentials</var>, run these steps:
+<var>origin</var>, <var>credentials</var>, an optional boolean
+<dfn export for="obtain a connection"><var>http3Only</var></dfn> (default: false), and an optional
+boolean <dfn export for="obtain a connection"><var>dedicated</var></dfn> (default: false), run these
+steps:
+<!-- http3Only and dedicated have been added for WebTransport -->
 
 <ol>
- <li><p>If the user agent's <a>connection pool</a> contains a <a>connection</a> whose <b>key</b> is
- <var>key</var>, <b>origin</b> is <var>origin</var>, and <b>credentials</b> is
- <var>credentials</var>, then return that <a>connection</a>.
+ <li>
+  <p>If <var>dedicated</var> is false, then:
+
+  <ol>
+   <li><p>Let <var>connections</var> be a set of <a>connections</a> in the user agent's
+   <a>connection pool</a> each of whose <b>key</b> is <var>key</var>, <b>origin</b> is
+   <var>origin</var>, and <b>credentials</b> is <var>credentials</var>.
+
+   <li><p>If <var>connections</var> is not empty and <var>http3Only</var> is false, then return
+   one of <var>connections</var>.
+
+   <li><p>If there is an HTTP/3 <a>connection</a> in <var>connections</var>, then return that
+   <a>connection</a>.
+  </ol>
 
  <li><p>Let <var>connection</var> be null.
 
@@ -2138,6 +2177,12 @@ identified by a <b>key</b> (a <a>network partition key</a>), an <b>origin</b> (a
     <p>Set <var>connection</var> to the result of establishing an HTTP connection to
     <var>origin</var>. [[!HTTP]] [[!HTTP-SEMANTICS]] [[!HTTP-COND]] [[!HTTP-CACHING]] [[!HTTP-AUTH]]
     [[!TLS]]
+
+    <p>If <var>http3Only</var> is true, then establish an HTTP/3 connection. [[!HTTP3]]
+
+    <p>When establishing an HTTP/3 connection, include SETTINGS_ENABLE_WEBTRANSPORT with a value of
+    1 and H3_DATAGRAM with a value of 1 in the initial SETTINGS frame. [[!WEBTRANSPORT-HTTP3]]
+    [[!HTTP3-DATAGRAM]]
 
     <p>If <var>credentials</var> is false, then do <em>not</em> send a TLS client certificate.
 
@@ -2154,9 +2199,9 @@ identified by a <b>key</b> (a <a>network partition key</a>), an <b>origin</b> (a
    <li><p>Return failure.
   </ol>
 
- <li><p>Add <var>connection</var> to the user agent's <a>connection pool</a> with <b>key</b> being
- <var>key</var>, <b>origin</b> being <var>origin</var>, and <b>credentials</b> being
- <var>credentials</var>.
+ <li><p>If <var>dedicated</var> is false, then add <var>connection</var> to the user agent's
+ <a>connection pool</a> with <b>key</b> being <var>key</var>, <b>origin</b> being <var>origin</var>,
+ and <b>credentials</b> being <var>credentials</var>.
 
  <li><p>Return <var>connection</var>.
 </ol>
@@ -2807,10 +2852,44 @@ consideration for the security consequences. New exceptions can be proposed by
 <a href=https://github.com/whatwg/fetch/issues/new>filing an issue</a>.
 
 
+<h3 id=content-length-header>`<code>Content-Length</code>` header</h3>
+
+<p>The `<code>Content-Length</code>` header is largely defined in HTTP. Its processing model is
+defined here as the model defined in HTTP is not compatible with web content. [[HTTP]]
+
+<p>To <dfn export for="header list" lt="extract a length|extracting a length">extract a length</dfn>
+from a <a for=/>header list</a> <var>headers</var>, run these steps:
+
+<ol>
+ <li><p>Let <var>values</var> be the result of
+ <a for="header list">getting, decoding, and splitting</a> `<code>Content-Length</code>` from
+ <var>headers</var>.
+
+ <li><p>If <var>values</var> is null, then return null.
+
+ <li><p>Let <var>candidateValue</var> be null.
+
+ <li>
+  <p><a for=list>For each</a> <var>value</var> of <var>values</var>:
+
+  <ol>
+   <li><p>If <var>candidateValue</var> is null, then set <var>candidateValue</var> to
+   <var>value</var>.
+
+   <li><p>Otherwise, if <var>value</var> is not <var>candidateValue</var>, return failure.
+  </ol>
+
+ <li><p>If <var>candidateValue</var> is the empty string or has a <a for=/>code point</a> that is
+ not an <a for=/>ASCII digit</a>, then return null.
+
+ <li><p>Return <var>candidateValue</var>, interpreted as decimal number.
+</ol>
+
+
 <h3 id=content-type-header>`<code>Content-Type</code>` header</h3>
 
 <p>The `<code>Content-Type</code>` header is largely defined in HTTP. Its processing model is
-defined here as the ABNF defined in HTTP is not compatible with web content. [[HTTP]]
+defined here as the model defined in HTTP is not compatible with web content. [[HTTP]]
 
 <p>To
 <dfn export for="header list" lt="extract a MIME type|extracting a MIME type" id=concept-header-extract-mime-type>extract a MIME type</dfn>
@@ -4203,6 +4282,9 @@ steps. They return a <a for=/>response</a>.
 
    <li><p><a>Append a request `<code>Origin</code>` header</a> for <var>httpRequest</var>.
 
+   <li><p><a abstract-op lt="append the Fetch metadata headers for a request">Append the Fetch metadata headers for <var>httpRequest</var></a>.
+   [[!FETCH-METADATA]]
+
    <li><p>If <var>httpRequest</var>'s <a for=request>header list</a>
    <a for="header list">does not contain</a> `<code>User-Agent</code>`, then user agents should
    <a for="header list">append</a>
@@ -4820,9 +4902,6 @@ these steps:
 
         <ol>
          <li><p>Let <var>bytes</var> be the transmitted bytes.
-
-         <li><p>Increase <var>response</var>'s <a for=response>body</a>'s <a for=body>transmitted
-         bytes</a> with <var>bytes</var>' length.
 
          <li><p>Let <var>codings</var> be the result of <a>extracting header list values</a> given
          `<code>Content-Encoding</code>` and <var>response</var>'s <a for=response>header list</a>.
@@ -5926,11 +6005,15 @@ object), initially null.
 
    <dt>{{RequestInit/mode}}
    <dd>A string to indicate whether the request will use CORS, or will be restricted to same-origin
-   URLs. Sets <var>request</var>'s {{Request/mode}}.
+   URLs. Sets <var>request</var>'s {{Request/mode}}. If <var>input</var> is a string, it defaults to
+   "<code>cors</code>".
 
    <dt>{{RequestInit/credentials}}
    <dd>A string indicating whether credentials will be sent with the request always, never, or only
-   when sent to a same-origin URL. Sets <var>request</var>'s {{Request/credentials}}.
+   when sent to a same-origin URL — as well as whether any credentials sent back in the response
+   will be used always, never, or only when received from a same-origin URL. Sets
+   <var>request</var>'s {{Request/credentials}}. If <var>input</var> is a string, it defaults to
+   "<code>same-origin</code>".
 
    <dt>{{RequestInit/cache}}
    <dd>A string indicating how the request will interact with the browser's cache to set
@@ -7358,6 +7441,7 @@ Tiancheng "Timothy" Gu,
 Tobie Langel,
 Tom Schuster,
 Tomás Aparicio,
+triple-underscore<!-- GitHub -->,
 保呂毅 (Tsuyoshi Horo),
 Tyler Close,
 Ujjwal Sharma,

@@ -1,0 +1,437 @@
+<h1>Content Security Policy: API</h1>
+<pre class="metadata">
+Status: ED
+ED: https://w3c.github.io/webappsec-csp/api/
+Shortname: CSP-API
+Level: 1
+Editor: Mike West 56384, Google Inc., mkwst@google.com
+Group: webappsec
+Abstract:
+  This document defines a mechanism by which web developers can control the
+  resources which a particular page can fetch or execute, as well as a number
+  of security-relevant policy decisions.
+Indent: 2
+Version History: https://github.com/w3c/webappsec-csp/commits/master/api/index.src.html
+Boilerplate: omit conformance, omit feedback-header
+!Participate: <a href="https://github.com/w3c/webappsec-csp/issues/new">File an issue</a> (<a href="https://github.com/w3c/webappsec-csp/issues">open issues</a>)
+Markup Shorthands: css off, markdown on
+</pre>
+<pre class="anchors">
+spec: ES2015; urlPrefix: http://www.ecma-international.org/ecma-262/6.0/index.html
+  type: method
+    text: eval(); url: sec-eval-x
+spec: DOM; urlPrefix: http://www.w3.org/TR/dom/
+  type: interface
+    text: Node; url: interface-node
+spec: FETCH; urlPrefix: https://fetch.spec.whatwg.org/
+  type: dfn
+    text: main fetch
+    text: parse a header value; url: concept-header-parse
+    text: request; url: concept-request
+    text: response; url: concept-response
+  type: attribute
+    text: client; for: Request; url: concept-request-client
+    text: url; for: Request; url: concept-request-url
+    text: url; for: Response; url: concept-response-url
+    text: header list; for: Response; url: concept-response-header-list
+  type: interface
+    text: Request
+spec: HTML5; urlPrefix: http://www.w3.org/TR/html5/
+  type: dfn
+    urlPrefix: embedded-content-0.html
+      text: an iframe srcdoc document
+    urlPrefix: browsers.html
+      text: active document
+      text: browsing context
+      text: create a document object
+      text: creator document
+      text: nested browsing context
+      text: nested through; url: browsing-context-nested-through
+    urlPrefix: webappapis.html
+      text: environment settings object; url: settings-object
+      text: global object
+      text: incumbent settings object
+      text: relevant settings object; url: relevant-settings-object-for-a-global-object
+      text: responsible browsing context
+    urlPrefix: infrastructure.html
+      text: ASCII case-insensitive match; url: ascii-case-insensitive
+      text: reflect
+      text: strictly split a string
+      text: strip leading and trailing whitespace
+      text: collect a sequence of characters
+      text: space characters
+      text: split a string on spaces
+      text: split a string on commas
+    urlPrefix: document-metadata.html
+      text: pragma directives
+  type: element
+    urlPrefix: document-metadata.html
+      text: base; url: the-base-element
+      text: head; url: the-head-element
+      text: link; url: the-link-element
+      text: meta; url: the-meta-element
+      text: style; url: the-style-element
+    urlPrefix: embedded-content-0.html
+      text: iframe; url: the-iframe-element
+    urlPrefix: scripting-1.html
+      text: script; url: the-script-element
+  type: element-attr
+    urlPrefix: document-metadata.html
+      text: content; for: meta; url: attr-meta-content
+      text: http-equiv; for: meta; url: attr-meta-http-equiv
+    urlPrefix: embedded-content-0.html
+      text: srcdoc; for: iframe; url: attr-iframe-srcdoc
+  type: interface
+    urlPrefix: dom.html
+      text: Document
+spec: URL; urlPrefix: https://url.spec.whatwg.org/
+  type: dfn
+    text: local scheme
+  type: attribute
+    text: scheme; for: URL; url: concept-url-scheme
+  type: interface;
+    text: URL
+spec: WORKERS; urlPrefix: http://www.w3.org/TR/workers/
+  type: interface
+    text: Worker
+spec: RFC3986; urlPrefix: https://tools.ietf.org/html/rfc3986
+  type: grammar
+    text: path; url: section-3.3
+    text: scheme; url: section-3.1
+spec: RFC5234; urlPrefix: https://tools.ietf.org/html/rfc5234
+  type: grammar
+    text: ALPHA; url: appendix-B.1
+    text: DIGIT; url: appendix-B.1
+    text: VCHAR; url: appendix-B.1
+    text: WSP; url: appendix-B.1
+spec: RFC5890; urlPrefix: https://tools.ietf.org/html/rfc5890
+  type: dfn
+    text: label; url: section-2.2
+spec: RFC6454; urlPrefix: https://tools.ietf.org/html/rfc6454
+  type: dfn
+    text: globally unique identifier; url: section-2.3
+    text: origin; url: section-3.2
+    text: the same; url: section-5
+spec: RFC7230; urlPrefix: https://tools.ietf.org/html/rfc7230
+  type: grammar
+    text: BWS; url: section-3.2.3
+    text: OWS; url: section-3.2.3
+    text: RWS; url: section-3.2.3
+    text: quoted-string; url: section-3.2.6
+    text: token; url: section-3.2.6
+spec: RFC7231; urlPrefix: https://tools.ietf.org/html/rfc7231
+  type: dfn
+    url: section-3
+      text: resource representation
+      text: representation
+
+spec: HTML; text: run a worker; url: https://html.spec.whatwg.org/multipage/workers.html#run-a-worker; type: dfn
+</pre>
+
+<section>
+  <h2 id="dom-api">
+    DOM API
+  </h2>
+
+  Developers may manipulate a page's policy via a JavaScript API which allows
+  construction of {{SecurityPolicy}} objects, and the application of those
+  objects to an <a>environment settings object</a>.
+
+  <h3 id="javascript-application">
+    Applying a Policy
+  </h3>
+
+  A {{SecurityPolicy}} can be applied to an <a>environment settings object</a>
+  via the following interfaces:
+
+  <pre class="idl">
+    partial interface Window {
+      void applySecurityPolicy(SecurityPolicy policy);
+    };
+  </pre>
+  <dl dfn-for="Window">
+    <dt><dfn method>applySecurityPolicy(policy)</dfn></dt>
+    <dd>
+      To execute this method, execute [[#apply-to-global-object]] on
+      <var>policy</var>'s associated <a>policy</a> and the {{Window}} object.
+    </dd>
+  </dl>
+
+  <pre class="idl">
+    partial interface WorkerGlobalScope {
+      void applySecurityPolicy(SecurityPolicy policy);
+    };
+  </pre>
+  <dl dfn-for="WorkerGlobalScope">
+    <dt><dfn method>applySecurityPolicy(policy)</dfn></dt>
+    <dd>
+      To execute this method, execute [[#apply-to-global-object]] on
+      <var>policy</var>'s associated <a>policy</a> and the {{WorkerGlobalScope}}
+      object.
+    </dd>
+  </dl>
+
+  <div class="example">
+    To apply the policy `script-src 'self'; object-src 'none'` from
+    JavaScript inside a {{Worker}} or {{Document}}, execute the following code:
+
+    <pre>
+      var policy = new SecurityPolicy("script-src 'self'; object-src 'none'");
+      self.applySecurityPolicy(policy);
+    </pre>
+  </div>
+
+  ISSUE: Maybe this makes more sense as `window.csp.apply()`? Which would also
+  allow `window.csp.enforced` and `window.csp.monitored` as sequences of
+  {{SecurityPolicy}} objects?
+
+  <h3 id="idl-securitypolicy">
+    `SecurityPolicy` Interface
+  </h3>
+
+  A policy object is defined via the following IDL:
+
+  <pre class="idl">
+    enum SecurityPolicyType {
+      "enforce",
+      "report-only"
+    };
+
+    [Constructor(DOMString policy, SecurityPolicyType type), Exposed=(Window,Worker)]
+    interface SecurityPolicy {
+      boolean requestMatches(Request request);
+      boolean nodeMatches(Node node);
+  
+      readonly attribute FrozenArray&lt;SecurityPolicyDirective&gt; directives;
+      readonly attribute SecurityPolicyType type;
+      readonly attribute USVString reportingEndpoint;
+    };
+  </pre>
+
+  A {{SecurityPolicy}} object has an internal slot named
+  <dfn attribute for="SecurityPolicy">\[[policy]]</dfn>, which contains a
+  <a>policy</a>. Unless otherwise stated, its value is `null`.
+
+  The <dfn for="SecurityPolicy" attribute>directives</dfn> attribute's getter
+  returns a list of {{SecurityPolicyDirective}}s corresponding to
+  {{SecurityPolicy/[[policy]]}}'s <a for="policy">directive set</a>
+
+  The <dfn for="SecurityPolicy" attribute>type</dfn> attribute's getter
+  returns the value of {{SecurityPolicy/[[policy]]}}'s <a for="policy">type</a>.
+
+  The <dfn for="SecurityPolicy" attribute>reportingEndpoint</dfn> attribute's
+  getter returns the serialization of the <a for="directive">value</a> of
+  the <a>directive</a> in {{SecurityPolicy/[[policy]]}}'s
+  <a for="policy">directive set</a> with a <a for="directive">name</a> of
+  "`report-uri`", if present. If no such directive is present, the
+  empty string is returned.
+
+  The <dfn constructor for="SecurityPolicy">SecurityPolicy(policy, type)</dfn>
+  constructor, when invoked, MUST execute the following steps:
+
+  1.  Let <var>policy list</var> be the result of executing
+      [[#parse-serialized-policy]] on <var>policy</var>.
+
+  2.  If <var>policy list</var> does not have exactly one element, throw a
+      `SyntaxError` exception, and abort the remaining steps.
+
+  3.  Set `this@`{{SecurityPolicy/[[policy]]}} to the only element
+      in <var>policy list</var>.
+
+  4.  Return `this`.
+
+  The <dfn method for="SecurityPolicy">requestMatches(request)</dfn> method
+  returns `true` if [[#match-request-to-directive-list]] returns
+  `Matches` when executed upon <var>request</var> and
+  {{SecurityPolicy/[[policy]]}}'s <a for="policy">directive set</a>, and
+  `false` otherwise.
+
+  The <dfn method for="SecurityPolicy">nodeMatches(node)</dfn> method returns
+  `true` if [[#match-node-to-directive-list]] returns
+  `Matches` when executed upon <var>node</var> and
+  {{SecurityPolicy/[[policy]]}}'s <a for="policy">directive set</a>, and
+  `false` otherwise.
+
+  <h3 id="idl-securitypolicydirective">
+    `SecurityPolicyDirective` Interface
+  </h3>
+
+  Policy objects contain a list of directives, each defined according to the
+  following IDL:
+
+  <pre class="idl">
+    enum DirectiveName {
+      "base-uri",
+      "child-src",
+      "connect-src",
+      "default-src",
+      "font-src",
+      "form-action",
+      "frame-ancestors",
+      "img-src",
+      "media-src",
+      "object-src",
+      "plugin-types",
+      "report-uri",
+      "reports",
+      "sandbox",
+      "script-src",
+      "style-src"
+    };
+
+    [Constructor(DOMString name, DOMString value), Exposed=(Window,Worker)]
+    interface SecurityPolicyDirective {
+      boolean requestMatches(Request request);
+      boolean nodeMatches(Node node);
+
+      readonly attribute DirectiveName name;  
+    };
+  </pre>
+  
+  A {{SecurityPolicyDirective}} object has an internal slot named
+  <dfn attribute for="SecurityPolicyDirective">\[[directive]]</dfn>, which
+  contains a <a>directive</a>. Unless otherwise specified, its value is
+  `null`.
+
+  The <dfn attribute for="SecurityPolicyDirective">name</dfn> attribute's
+  getter returns {{SecurityPolicyDirective/[[directive]]}}'s
+  <a for="directive">name</a>.
+
+  The <dfn attribute for="SecurityPolicyDirective">value</dfn> attribute's
+  getter returns {{SecurityPolicyDirective/[[directive]]}}'s
+  <a for="directive">value</a>.
+
+  The <dfn constructor for="SecurityPolicyDirective">SecurityPolicyDirective(name, value)</dfn>
+  constructor, when invoked, MUST execute the following steps:
+
+  1.  If <var>name</var> is not a valid {{DirectiveName}}, throw a
+      `SyntaxError` exception, and abort the remaining steps.
+
+  2.  Let <var>directive</var> be a new <a>directive</a> with a
+      <a for="directive">name</a> of <var>name</var> and a
+      <a for="directive">value</a> of <var>value</var>.
+
+  3.  Set `this@`{{SecurityPolicyDirective/[[directive]]}} to
+      <var>directive</var>.
+
+  4.  Return `this`.
+
+  The <dfn method for="SecurityPolicyDirective">requestMatches(request)</dfn>
+  method returns `true`.
+
+  The <dfn method for="SecurityPolicyDirective">nodeMatches(node)</dfn> method
+  returns `true`.
+
+  Note: Directives which operate on either {{Request}}s or {{Node}}s are
+  expected to inherit from {{SecurityPolicyDirective}} and override these
+  method implementations. {{SourceListDirective}} is one example of this.
+
+  <h3 id="idl-sourcelistdirective">
+    `SourceListDirective` Interface
+  </h3>
+
+  Directives whose values are <a>source lists</a> are parsed into
+  {{SourceListDirective}} objects (which subclass {{SecurityPolicyDirective}}).
+  These are defined according to the following IDL:
+
+  <pre class="idl">
+    [Constructor(DOMString name, DOMString value), Exposed=(Window,Worker)]
+    interface SourceListDirective : SecurityPolicyDirective {
+      readonly attribute FrozenArray&lt;SourceExpression&gt; sources;
+    };
+  </pre>
+
+  The <dfn constructor for="SourceListDirective">SourceListDirective(name, value)</dfn>
+  constructor, when invoked, MUST execute the following steps:
+
+  1.  If <var>name</var> is not a valid {{DirectiveName}}, throw a
+      `SyntaxError` exception, and abort the remaining steps.
+
+  2.  Let <var>directive</var> be a new <a>directive</a> with a
+      <a for="directive">name</a> of <var>name</var> and a
+      <a for="directive">value</a> of <var>value</var>.
+
+  3.  Set `this@`{{SecurityPolicyDirective/[[directive]]}} to
+      <var>directive</var>.
+
+  4.  `this@`Set {{SourceListDirective/sources}} to the result of
+      executing [[#parse-serialized-source-list]] on <var>value</var>.
+
+  5.  Return `this`.
+
+  The <dfn method for="SourceListDirective">requestMatches(request)</dfn>
+  method, when invoked, MUST execute the following steps:
+
+  1.  Let <var>url</var> be <var>request</var>'s {{Request/url}}.
+
+  2.  For each <var>expression</var> in this object's
+      {{SourceListDirective/sources}} attribute:
+
+      1.  If <var>expression</var>'s {{SourceExpression/urlMatches(url)}}
+          returns `true` when executed upon <var>url</var>, return
+          `true`.
+
+  3.  Return `false`.
+
+  The <dfn method for="SourceListDirective">nodeMatches(node)</dfn> method,
+  when invoked, MUST execute the following steps:
+
+  1.  For each <var>expression</var> in this object's
+      {{SourceListDirective/sources}} attribute:
+
+      1.  If <var>expression</var>'s {{SourceExpression/nodeMatches(node)}}
+          returns `true` when executed upon <var>node</var>,
+          return `true`.
+
+  2.  Return `false`.
+
+  <h3 id="idl-sourceexpression">
+    `SourceExpression` Interface
+  </h3>
+
+  {{SourceListDirective}} objects' {{SourceListDirective/sources}} attribute
+  contains the list of <a>source expressions</a> that make up the directive's
+  value. These are represented as {{SourceExpression}} objects according to
+  the following IDL:
+
+  <pre class="idl">
+    [Constructor(DOMString value), Exposed=(Window,Worker)]
+    interface SourceExpression {
+      boolean urlMatches(USVString url);
+      boolean nodeMatches(Node node);
+
+      readonly attribute DOMString value;
+    };
+  </pre>
+  <dl dfn-for="SourceExpression">
+    <dt><dfn attribute>value</dfn></dt>
+    <dd>
+      The expression's value. `script-src https://example.com/
+      'nonce-abcde'` will, for example, produce two {{SourceExpression}}
+      objects, one with a value of "https://example.com/", the other with a
+      value of "'nonce-abcde'".
+    </dd>
+    <dt><dfn method>urlMatches(url)</dfn></dt>
+    <dd>
+      This method returns `true` if executing
+      [[#match-url-to-source-expression]] on <var>url</var> and the object's
+      {{SourceExpression/value}} attribute returns `Matches`, and
+      `false` otherwise.
+
+      <pre class="argumentdef" for="SourceExpression/urlMatches(url)">
+        url: The URL to match against the SourceExpression.
+      </pre>
+    </dd>
+    <dt><dfn method>nodeMatches(node)</dfn></dt>
+    <dd>
+      This method returns `true` if executing
+      [[#match-node-to-source-expression]] on <var>node</var> and the object's
+      {{SourceExpression/value}} attribute returns `Matches`, and
+      `false` otherwise.
+
+      <pre class="argumentdef" for="SourceExpression/nodeMatches(node)">
+        node: The Node which will be matched against the directive.
+      </pre>
+    </dd>
+  </dl>
+</section>

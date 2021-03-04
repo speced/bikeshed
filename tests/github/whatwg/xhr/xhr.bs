@@ -791,45 +791,45 @@ return <a>this</a>'s <a>cross-origin credentials</a>.
    <li><p>If <a>this</a>'s <a>state</a> is not <i>opened</i> or <a>this</a>'s
    <a><code>send()</code> flag</a> is unset, then return.
 
+   <li><p>Let <var>uploadedBytesLength</var> be 0.
+
    <li>
-    <p>Let <var>processRequestBody</var>, given a <var>request</var>, be these steps:
+    <p>Let <var>processRequestBody</var>, given a <var>bytesLength</var>, be these steps:
 
     <ol>
+     <li><p>Increase <var>uploadedBytesLength</var> by <var>bytesLength</var>.
+
      <li><p>If not roughly 50ms have passed since these steps were last invoked, then return.
 
      <li><p>If <a>this</a>'s <a>upload listener flag</a> is set, then <a>fire a progress event</a>
      named <a event><code>progress</code></a> at <a>this</a>'s <a>upload object</a> with
-     <var>request</var>'s <a for=request>body</a>'s <a>transmitted bytes</a> and
-     <var>request</var>'s <a for=request>body</a>'s <a>total bytes</a>.
+     <var>uploadedBytesLength</var> and <var>req</var>'s <a for=request>body</a>'s
+     <a>total bytes</a>.
      <!-- upload complete flag can never be set here I hope -->
     </ol>
 
     <p class=note>These steps are only invoked when new bytes are transmitted.
 
    <li>
-    <p>Let <var>processRequestEndOfBody</var>, given a <var>request</var>, be these steps:
+    <p>Let <var>processRequestEndOfBody</var> be these steps:
 
     <ol>
      <li><p>Set <a>this</a>'s <a>upload complete flag</a>.
 
      <li><p>If <a>this</a>'s <a>upload listener flag</a> is unset, then return.
 
-     <li><p>Let <var>transmitted</var> be <var>request</var>'s
-     <a for=request>body</a>'s
-     <a>transmitted bytes</a>.
-
-     <li><p>Let <var>length</var> be <var>request</var>'s
+     <li><p>Let <var>length</var> be <var>req</var>'s
      <a for=request>body</a>'s
      <a>total bytes</a>.
 
      <li><p><a>Fire a progress event</a> named <a event><code>progress</code></a> at <a>this</a>'s
-     <a>upload object</a> with <var>transmitted</var> and <var>length</var>.
+     <a>upload object</a> with <var>uploadedBytesLength</var> and <var>length</var>.
 
      <li><p><a>Fire a progress event</a> named <a event><code>load</code></a> at <a>this</a>'s
-     <a>upload object</a> with <var>transmitted</var> and <var>length</var>.
+     <a>upload object</a> with <var>uploadedBytesLength</var> and <var>length</var>.
 
      <li><p><a>Fire a progress event</a> named <a event><code>loadend</code></a> at <a>this</a>'s
-     <a>upload object</a> with <var>transmitted</var> and <var>length</var>.
+     <a>upload object</a> with <var>uploadedBytesLength</var> and <var>length</var>.
     </ol>
     <!-- upload complete flag can never be set here I hope -->
 
@@ -839,8 +839,7 @@ return <a>this</a>'s <a>cross-origin credentials</a>.
     <ol>
      <li><p>Set <a>this</a>'s <a for=XMLHttpRequest>response</a> to <var>response</var>.
 
-     <li><p><a>Handle errors</a> for <a>this</a> and <a>this</a>'s
-     <a for=XMLHttpRequest>response</a>.
+     <li><p><a>Handle errors</a> for <a>this</a>.
 
      <li><p>If <a>this</a>'s <a for=XMLHttpRequest>response</a> is a <a>network error</a>, then
      return.
@@ -852,56 +851,46 @@ return <a>this</a>'s <a>cross-origin credentials</a>.
      <li><p>If <a>this</a>'s <a>state</a> is not <i>headers received</i>, then return.
 
      <li><p>If <a>this</a>'s <a for=XMLHttpRequest>response</a>'s <a for=response>body</a> is null,
-     then run <a>handle response end-of-body</a> for <a>this</a> and <a>this</a>'s
-     <a for=XMLHttpRequest>response</a>, and then return.
+     then run <a>handle response end-of-body</a> for <a>this</a> and return.
 
      <li>
-      <p>Let <var>reader</var> be the result of <a for=ReadableStream>getting a reader</a> for
-      <a>this</a>'s <a for=XMLHttpRequest>response</a>'s <a for=response>body</a>'s
-      <a for=body>stream</a>.
+      <p>Let <var>processBodyChunk</var> given <var>bytes</var> be these steps:
 
-      <p class=note>This operation will not throw an exception.
+      <ol>
+       <li><p>Append <var>bytes</var> to <a>this</a>'s <a>received bytes</a>.
+
+       <li><p>If not roughly 50ms have passed since these steps were last invoked, then return.
+
+       <li><p>If <a>this</a>'s <a>state</a> is <i>headers received</i>, then set <a>this</a>'s
+       <a>state</a> to <i>loading</i>.
+
+       <li>
+        <p><a>Fire an event</a> named <a event><code>readystatechange</code></a> at <a>this</a>.
+
+        <p class=note>Web compatibility is the reason <a event><code>readystatechange</code></a>
+        fires more often than <a>this</a>'s <a>state</a> changes.
+
+       <li><p><a>Fire a progress event</a> named <a event><code>progress</code></a> at <a>this</a>
+       with <a>this</a>'s <a>received bytes</a>'s <a for="byte sequence">length</a> and
+       <a>this</a>'s <a for=XMLHttpRequest>response</a>'s <a for=response>body</a>'s
+       <a>total bytes</a>.
+      </ol>
+
+     <li><p>Let <var>processEndOfBody</var> be this step: run <a>handle response end-of-body</a> for
+     <a>this</a>.
 
      <li>
-      <p>Let <var>readRequest</var> be the following <a>read request</a>:
+      <p>Let <var>processBodyError</var> be these steps:
 
-      <dl>
-       <dt><a for="read request">chunk steps</a>, given <var>chunk</var>
-       <dd>
-        <ol>
-         <li><p>Append <var>chunk</var> to <a>this</a>'s <a>received bytes</a>.
+      <ol>
+       <li><p>Set <a>this</a>'s <a for=XMLHttpRequest>response</a> to a <a for=/>network error</a>.
 
-         <li><p>If not roughly 50ms have passed since these steps were last invoked, then return.
+       <li><p>Run <a>handle errors</a> for <a>this</a>.
+      </ol>
 
-         <li><p>If <a>this</a>'s <a>state</a> is <i>headers received</i>, then set <a>this</a>'s
-         <a>state</a> to <i>loading</i>.
-
-         <li>
-          <p><a>Fire an event</a> named <a event><code>readystatechange</code></a> at <a>this</a>.
-
-          <p class="note no-backref">Web compatibility is the reason
-          <a event><code>readystatechange</code></a> fires more often than <a>this</a>'s
-          <a>state</a> changes.
-
-         <li><p><a>Fire a progress event</a> named <a event><code>progress</code></a> at <a>this</a>
-         with <a>this</a>'s <a for=XMLHttpRequest>response</a>'s <a for=response>body</a>'s
-         <a>transmitted bytes</a> and <a>this</a>'s <a for=XMLHttpRequest>response</a>'s
-         <a for=response>body</a>'s <a>total bytes</a>.
-        </ol>
-
-       <dt><a for="read request">close steps</a>
-       <dd>
-        <ol><li><p>Run <a>handle response end-of-body</a> for <a>this</a> and <a>this</a>'s
-        <a for=XMLHttpRequest>response</a>.</ol>
-
-       <dt><a for="read request">error steps</a>
-       <dd>
-        <ol><li><p>Run <a>handle errors</a> for <a>this</a> and <a>this</a>'s
-        <a for=XMLHttpRequest>response</a>.</ol>
-      </dl>
-
-     <li><p><a for=ReadableStreamDefaultReader>Read a chunk</a> from <var>reader</var> given
-     <var>readRequest</var>.
+     <li><p><a for=body>Incrementally read</a> <a>this</a>'s <a for=XMLHttpRequest>response</a>'s
+     <a for=response>body</a>, given <var>processBodyChunk</var>, <var>processEndOfBody</var>,
+     <var>processBodyError</var>, and <a>this</a>'s <a>relevant global object</a>.
     </ol>
 
    <li><p><a for=/>Fetch</a> <var>req</var> with <a for=fetch><i>processRequestBody</i></a> set to
@@ -931,23 +920,27 @@ return <a>this</a>'s <a>cross-origin credentials</a>.
   <ol>
    <li><p>If <a>this</a>'s <a>relevant settings object</a> has a <a>responsible document</a> which
    is not <a>allowed to use</a> the "<code><a>sync-xhr</a></code>" feature, then run
-   <a>handle response end-of-body</a> for <a>this</a> and a <a>network error</a>, and then return.
-
-   <li><p>Let <var>response</var> be a <a for=/>network error</a>.
+   <a>handle response end-of-body</a> for <a>this</a> and return.
 
    <li><p>Let <var>processedResponse</var> be false.
 
    <li>
-    <p>Let <var>processResponse</var>, given a <var>fetchResponse</var>, be these steps:
+    <p>Let <var>processResponseEndOfBody</var>, given a <var>response</var> and
+    <var>nullOrFailureOrBytes</var>, be these steps:
 
     <ol>
-     <li><p>Set <var>response</var> to <var>fetchResponse</var>.
+     <li><p>If <var>nullOrFailureOrBytes</var> is not failure, then set <a>this</a>'s
+     <a for=XMLHttpRequest>response</a> to <var>response</var>.
+
+     <li><p>If <var>nullOrFailureOrBytes</var> is a <a for=/>byte sequence</a>, then append
+     <var>nullOrFailureOrBytes</var> to <a>this</a>'s <a>received bytes</a>.
 
      <li><p>Set <var>processedResponse</var> to true.
     </ol>
 
-   <li><p><a for=/>Fetch</a> <var>req</var> with <a for=fetch><i>processResponse</i></a>
-   set to <var>processResponse</var> and <a for=fetch><i>useParallelQueue</i></a> set to true.
+   <li><p><a for=/>Fetch</a> <var>req</var> with <a for=fetch><i>processResponseEndOfBody</i></a>
+   set to <var>processResponseEndOfBody</var> and <a for=fetch><i>useParallelQueue</i></a> set to
+   true.
 
    <li><p>Let <var>now</var> be the present time.
    <!-- Eventually this should use some kind of time standard. -->
@@ -959,48 +952,24 @@ return <a>this</a>'s <a>cross-origin credentials</a>.
    <li><p>If <var>processedResponse</var> is false, then set <a>this</a>'s <a>timed out flag</a> and
    <a for=fetch>terminate</a> <a for=/>fetching</a>.
 
-   <li><p>If <var>response</var>'s <a for=response>body</a> is null, then run
-   <a>handle response end-of-body</a> for <a>this</a> and <var>response</var>, and then return.
-
-   <li>
-    <p>Let <var>reader</var> be the result of <a for=ReadableStream>getting a reader</a> for
-    <var>response</var>'s <a for=response>body</a>'s <a for=body>stream</a>.
-
-    <p class=note>This operation will not throw an exception.
-
-   <li><p>Let <var>promise</var> be the result of
-   <a for=ReadableStreamDefaultReader>reading all bytes</a> from <var>reader</var>.
-
-   <li><p><a>Pause</a> until <var>promise</var> is fulfilled or rejected.
-
-   <li><p>If <var>promise</var> is fulfilled with <var>bytes</var>, then append <var>bytes</var>
-   to <a>this</a>'s <a>received bytes</a>.
-
-   <li><p>Run <a>handle response end-of-body</a> for <a>this</a> and <var>response</var>.
+   <li><p>Run <a>handle response end-of-body</a> for <a>this</a>.
   </ol>
 </ol>
 
 <p id=handle-response-end-of-file>To <dfn>handle response end-of-body</dfn> for an
-{{XMLHttpRequest}} object <var>xhr</var> and a <a for=/>response</a> <var>response</var>, run these
-steps:
+{{XMLHttpRequest}} object <var>xhr</var>, run these steps:
 
 <ol>
- <li><p>If <var>xhr</var>'s <a>synchronous flag</a> is set, then set <var>xhr</var>'s
- <a for=XMLHttpRequest>response</a> to <var>response</var>.
-
- <li><p><a>Handle errors</a> for <var>xhr</var> and <var>response</var>.
+ <li><p><a>Handle errors</a> for <var>xhr</var>.
 
  <li><p>If <var>xhr</var>'s <a for=XMLHttpRequest>response</a> is a <a>network error</a>, then
  return.
 
- <li><p>If <var>xhr</var>'s <a>synchronous flag</a> is unset, then update <var>xhr</var>'s
- <a for=XMLHttpRequest>response</a>'s <a for=response>body</a> using <var>response</var>.
+ <li><p>Let <var>transmitted</var> be <var>xhr</var>'s <a>received bytes</a>'s
+ <a for="byte sequence">length</a>.
 
- <li><p>Let <var>transmitted</var> be <var>response</var>'s <a for=response>body</a>'s
- <a for=body>transmitted bytes</a>.
-
- <li><p>Let <var>length</var> be <var>response</var>'s <a for=response>body</a>'s
- <a for=body>total bytes</a>.
+ <li><p>Let <var>length</var> be <var>xhr</var>'s <a for=XMLHttpRequest>response</a>'s
+ <a for=response>body</a>'s <a for=body>total bytes</a>.
 
  <li><p>If <var>xhr</var>'s <a>synchronous flag</a> is unset, then <a>fire a progress event</a>
  named <a event><code>progress</code></a> at <var>xhr</var> with <var>transmitted</var> and
@@ -1019,8 +988,7 @@ steps:
  <var>transmitted</var> and <var>length</var>.
 </ol>
 
-<p>To <dfn>handle errors</dfn> for an {{XMLHttpRequest}} object <var>xhr</var> and a
-<a for=/>response</a> <var>response</var>, run these steps:
+<p>To <dfn>handle errors</dfn> for an {{XMLHttpRequest}} object <var>xhr</var>, run these steps:
 
 <ol>
  <li><p>If <var>xhr</var>'s <a><code>send()</code> flag</a> is unset, then return.
@@ -1029,25 +997,13 @@ steps:
  for <var>xhr</var>, <a event><code>timeout</code></a>, and "{{TimeoutError!!exception}}"
  {{DOMException}}.
 
- <li><p>If <var>response</var> is a <a>network error</a>, then run the <a>request error steps</a>
- for <var>xhr</var>, <a event><code>error</code></a>, and "{{NetworkError!!exception}}"
- {{DOMException}}.
+ <li><p>Otherwise, if <var>xhr</var>'s <a for=XMLHttpRequest>response</a>'s
+ <a for=response>aborted flag</a> is set, run the <a>request error steps</a> for <var>xhr</var>,
+ <a event><code>abort</code></a>, and "{{AbortError!!exception}}" {{DOMException}}.
 
- <li>
-  <p>Otherwise, if <var>response</var>'s <a for=response>body</a>'s <a for=body>stream</a> is
-  <a for=ReadableStream>errored</a>, then:
-
-  <ol>
-   <li><p>Set <var>xhr</var>'s <a>state</a> to <i>done</i>.
-
-   <li><p>Unset <var>xhr</var>'s <a><code>send()</code> flag</a>.
-
-   <li><p>Set <var>xhr</var>'s <a for=XMLHttpRequest>response</a> to a <a>network error</a>.
-  </ol>
-
- <li><p>Otherwise, if <var>xhr</var>'s <var>response</var>'s <a for=response>aborted flag</a> is
- set, then run the <a>request error steps</a> for <var>xhr</var>, <a event><code>abort</code></a>,
- and "{{AbortError!!exception}}" {{DOMException}}.
+ <li><p>Otherwise, if <var>xhr</var>'s <a for=XMLHttpRequest>response</a>'s is a
+ <a for=/>network error</a>, run the <a>request error steps</a> for <var>xhr</var>,
+ <a event><code>error</code></a>, and "{{NetworkError!!exception}}" {{DOMException}}.
 </ol>
 
 <p>The <dfn>request error steps</dfn> for an {{XMLHttpRequest}} object <var>xhr</var>,
