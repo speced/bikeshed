@@ -48,7 +48,7 @@ def transformProductionPlaceholders(doc):
             el.set("data-lt", match.group(2))
             if match.group(1) is not None:
                 el.set("for", match.group(1))
-            el.text = "<\\'" + match.group(2) + "'>"
+            el.text = "<'" + match.group(2) + "'>"
             continue
         match = funcRe.match(text)
         if match:
