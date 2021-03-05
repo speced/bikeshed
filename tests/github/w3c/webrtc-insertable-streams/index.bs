@@ -8,6 +8,7 @@ Repository: w3c/webrtc-insertable-streams
 URL: https://w3c.github.io/webrtc-insertable-streams/
 Editor: Harald Alvestrand, Google https://google.com, hta@google.com
 Editor: Guido Urdaneta, Google https://google.com, guidou@google.com
+Editor: Youenn Fablet, Apple https://www.apple.com, youenn@apple.com
 Abstract: This API defines an API surface for manipulating the bits on
 Abstract: {{MediaStreamTrack}}s being sent via an {{RTCPeerConnection}}.
 Markup Shorthands: css no, markdown yes
@@ -62,54 +63,6 @@ an additional API on {{RTCRtpSender}} and {{RTCRtpReceiver}} to
 insert the processing into the pipeline.
 
 <pre class="idl">
-// New dictionary.
-dictionary RTCInsertableStreams {
-    ReadableStream readable;
-    WritableStream writable;
-};
-
-// New enum for video frame types. Will eventually re-use the equivalent defined
-// by WebCodecs.
-enum RTCEncodedVideoFrameType {
-    "empty",
-    "key",
-    "delta",
-};
-
-dictionary RTCEncodedVideoFrameMetadata {
-    long long frameId;
-    sequence&lt;long long&gt; dependencies;
-    unsigned short width;
-    unsigned short height;
-    long spatialIndex;
-    long temporalIndex;
-    long synchronizationSource;
-    sequence&lt;long&gt; contributingSources;
-};
-
-// New interfaces to define encoded video and audio frames. Will eventually
-// re-use or extend the equivalent defined in WebCodecs.
-[Exposed=Window]
-interface RTCEncodedVideoFrame {
-    readonly attribute RTCEncodedVideoFrameType type;
-    readonly attribute unsigned long long timestamp;
-    attribute ArrayBuffer data;
-    RTCEncodedVideoFrameMetadata getMetadata();
-};
-
-dictionary RTCEncodedAudioFrameMetadata {
-    long synchronizationSource;
-    sequence&lt;long&gt; contributingSources;
-};
-
-[Exposed=Window]
-interface RTCEncodedAudioFrame {
-    readonly attribute unsigned long long timestamp;
-    attribute ArrayBuffer data;
-    RTCEncodedAudioFrameMetadata getMetadata();
-};
-
-
 // New fields in RTCConfiguration
 partial dictionary RTCConfiguration {
     boolean encodedInsertableStreams = false;
@@ -141,13 +94,13 @@ argument, ensure that the codec is disabled and produces no output.
 At construction of each {{RTCRtpSender}} or {{RTCRtpReceiver}}, run the following steps:
 1. Initialize [=this=].`[[Streams]]` to null.
 2. Initialize [=this=].`[[transform]]` to null.
-3. Initialize [=this=].`[[readable]]` to the result of <a dfn for="ReadableStream">creating</a> a {{ReadableStream}}. `[[readable]]` is provided frames using the [=readEncodedData=] algorithm given |this| as parameter.
+3. Initialize [=this=].`[[readable]]` to the result of <a dfn for="ReadableStream">creating</a> a {{ReadableStream}}. [=this=].`[[readable]]` is provided frames using the [=readEncodedData=] algorithm given |this| as parameter.
 4. Set [=this=].`[[readable]]`.`[[owner]]` to |this|.
 5. Initialize [=this=].`[[writable]]` to the result of [=WritableStream/creating=] a {{WritableStream}}, its [=WritableStream/create/writeAlgorithm=] set to [=writeEncodedData=] given |this| as parameter.
 6. Set [=this=].`[[writable]]`.`[[owner]]` to |this|.
 7. Initialize [=this=].`[[pipeToController]]` to null.
 8. Initialize [=this=].`[[lastReceivedFrameTimestamp]]` to zero.
-9. If the {{RTCPeerConnection}}'s configuration does not have {{RTCConfiguration/encodedInsertableStreams}} set to "true", queue a task to run the following steps:
+9. If the {{RTCPeerConnection}}'s configuration does not have {{RTCConfiguration/encodedInsertableStreams}} set to "true", [=queue a task=] to run the following steps:
     1. If [=this=].`[[pipeToController]]` is not null, abort these steps.
     2. Set [=this=].`[[pipeToController]]` to a new {{AbortController}}.
     <!-- FIXME: Use pipeTo algorithm when available. -->
@@ -171,7 +124,7 @@ The <dfn>readEncodedData</dfn> algorithm is given a |rtcObject| as parameter. It
 1. Wait for a frame to be produced by |rtcObject|'s encoder if it is a {{RTCRtpSender}} or |rtcObject|'s packetizer if it is a {{RTCRtpReceiver}}.
 2. Let |frame| be the newly produced frame.
 3. Set |frame|.`[[owner]]` to |rtcObject|.
-4. [=ReadableStream/enqueue=] |frame| in |rtcObject|.`[[readable]]`.
+4. [=ReadableStream/Enqueue=] |frame| in |rtcObject|.`[[readable]]`.
 
 The <dfn>writeEncodedData</dfn> algorithm is given a |rtcObject| as parameter and a |frame| as input. It is defined by running the following steps:
 1. If |frame|.`[[owner]]` is not equal to |rtcObject|, abort these steps and return [=a promise resolved with=] undefined. A processor cannot create frames, or move frames between streams.
@@ -245,7 +198,7 @@ The <dfn constructor for="SFrameTransform" lt="SFrameTransform(options)"><code>n
 5. Set |this|.`[[readable]]` to |this|.`[[transform]]`.`[[readable]]`.
 6. Set |this|.`[[writable]]` to |this|.`[[transform]]`.`[[writable]]`.
 
-## SFrame transform algorithm ## {#sframe-transform-algorithm}
+## Algorithm ## {#sframe-transform-algorithm}
 
 The SFrame transform algorithm, given |sframe| as a SFrameTransform object and |frame|, runs these steps:
 1. Let |role| be |sframe|.`[[role]]`.
@@ -275,20 +228,112 @@ The <dfn method for="SFrameTransform">setEncryptionKey(|key|, |keyID|)</dfn> met
 # RTCRtpScriptTransform # {#scriptTransform}
 
 <pre class="idl">
+// New enum for video frame types. Will eventually re-use the equivalent defined
+// by WebCodecs.
+enum RTCEncodedVideoFrameType {
+    "empty",
+    "key",
+    "delta",
+};
+
+dictionary RTCEncodedVideoFrameMetadata {
+    long long frameId;
+    sequence&lt;long long&gt; dependencies;
+    unsigned short width;
+    unsigned short height;
+    long spatialIndex;
+    long temporalIndex;
+    long synchronizationSource;
+    sequence&lt;long&gt; contributingSources;
+};
+
+// New interfaces to define encoded video and audio frames. Will eventually
+// re-use or extend the equivalent defined in WebCodecs.
+[Exposed=Window]
+interface RTCEncodedVideoFrame {
+    readonly attribute RTCEncodedVideoFrameType type;
+    readonly attribute unsigned long long timestamp;
+    attribute ArrayBuffer data;
+    RTCEncodedVideoFrameMetadata getMetadata();
+};
+
+dictionary RTCEncodedAudioFrameMetadata {
+    long synchronizationSource;
+    sequence&lt;long&gt; contributingSources;
+};
+
+[Exposed=Window]
+interface RTCEncodedAudioFrame {
+    readonly attribute unsigned long long timestamp;
+    attribute ArrayBuffer data;
+    RTCEncodedAudioFrameMetadata getMetadata();
+};
+
+
+// New interfaces to expose JavaScript-based transforms.
+
+[Global=(Worker,DedicatedWorker),Exposed=DedicatedWorker]
+interface RTCTransformEvent : Event {
+    readonly attribute RTCRtpScriptTransformer transformer;
+};
+
+[Global=(Worker,DedicatedWorker),Exposed=DedicatedWorker]
+partial interface DedicatedWorkerGlobalScope : WorkerGlobalScope {
+    attribute EventHandler onrtctransform;
+};
+
+[Global=(Worker,DedicatedWorker),Exposed=DedicatedWorker]
+interface RTCRtpScriptTransformer {
+    readonly attribute ReadableStream readable;
+    readonly attribute WritableStream writable;
+    readonly attribute any options;
+};
+
 [Exposed=(Window)]
 interface RTCRtpScriptTransform {
-    constructor(Worker worker, optional object options);
+    constructor(Worker worker, optional any options);
     // FIXME: add messaging methods.
 };
 </pre>
+
+## Operations ## {#RTCRtpScriptTransform-operations}
 
 The <dfn constructor for="RTCRtpScriptTransform" lt="RTCRtpScriptTransform(worker, options)"><code>new RTCRtpScriptTransform(<var>worker</var>, <var>options</var>)</code></dfn> constructor steps are:
 1. Set |t1| to an [=identity transform stream=].
 2. Set |t2| to an [=identity transform stream=].
 3. Set |this|.`[[writable]]` to |t1|.`[[writable]]`.
 4. Set |this|.`[[readable]]` to |t2|.`[[readable]]`.
-5. FIXME: transfer |t1|.`[[readable]]` and |t2|.`[[writable]]` to the dedicated worker.
-6. FIXME: Create counterpart of |this| in dedicated worker, for instance expose transfered |t1|.`[[readable]]` and |t2|.`[[writable]]`.
+5. Let |serializedOptions| be the result of [$StructuredSerialize$](|object|).
+6. Let |serializedReadable| be the result of [$StructuredSerializeWithTransfer$](|t1|.`[[readable]]`, « |t1|.`[[readable]]` »).
+7. Let |serializedWritable| be the result of [$StructuredSerializeWithTransfer$](|t2|.`[[writable]]`, « |t2|.`[[writable]]` »).
+8. [=Queue a task=] on the DOM manipulation [=task source=] |worker|'s global scope to run the following steps:
+    1. Let |transformerOptions| be the result of [$StructuredDeserialize$](|serializedOptions|, the current Realm).
+    2. Let |readable| be the result of [$StructuredDeserialize$](|serializedReadable|, the current Realm).
+    3. Let |writable| be the result of [$StructuredDeserialize$](|serializedWritable|, the current Realm).
+    4. Let |transformer| be a new {{RTCRtpScriptTransformer}}.
+    5. Set |transformer|.`[[options]]` to |transformerOptions|.
+    6. Set |transformer|.`[[readable]]` to |readable|.
+    7. Set |transformer|.`[[writable]]` to |writable|.
+    8. Let |event| be the result of [=creating an event=] with {{RTCTransformEvent}}.
+    9. Set |event|.type attribute to "rtctransform".
+    10. Set |event|.transformer to |transformer|.
+    11. Dispatch |event| on |worker|’s global scope.
+
+// FIXME: Describe error handling (worker closing flag true at RTCRtpScriptTransform creation time. And worker being terminated while transform is processing data).
+
+## Attributes ## {#RTCRtpScriptTransformer-attributes}
+
+A RTCRtpScriptTransformer has three private slots called `[[options]]`, `[[readable]]` and `[[writable]]`.
+
+The <dfn attribute for="RTCRtpScriptTransformer">options</dfn> getter steps are:
+1. Return [=this=].`[[options]]`.
+
+The <dfn attribute for="RTCRtpScriptTransformer">readable</dfn> getter steps are:
+1. Return [=this=].`[[readable]]`.
+
+The <dfn attribute for="RTCRtpScriptTransformer">writable</dfn> getter steps are:
+1. Return [=this=].`[[writable]]`.
+
 
 # Privacy and security considerations # {#privacy}
 

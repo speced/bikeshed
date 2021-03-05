@@ -1,0 +1,923 @@
+<h1>Content Security Policy Pinning</h1>
+<pre class="metadata">
+Status: NOTE
+Group: WebAppSec
+ED: https://w3c.github.io/webappsec-csp/pinning/
+TR: http://www.w3.org/TR/csp-pinning/
+Shortname: csp-pinning
+Warning: obsolete
+Level: 1
+Editor: Mike West 56384, Google Inc., mkwst@google.com
+Abstract: 
+  This Note provides a historical reference for a proposed mechanism to 
+	allow authors to instruct user agents to remember ("pin") and
+	enforce a Content Security Policy for a set of hosts for a period of time. 
+Indent: 2
+Markup Shorthands: css off
+Version History: https://github.com/w3c/webappsec-csp/commits/master/pinning/index.src.html
+Boilerplate: omit conformance, omit feedback-header
+!Participate: <a href="https://github.com/w3c/webappsec-csp/issues/new?title=PINNING:%20">File an issue</a> (<a href="https://github.com/w3c/webappsec-csp/issues">open issues</a>)
+</pre>
+
+<pre class="anchors">
+urlPrefix: https://w3c.github.io/webappsec/specs/content-security-policy/; spec: CSP
+  type: dfn
+    text: security policy
+    text: policy-token; url: policy_token
+    text: parse the policy
+    text: policy syntax
+    text: content-security-policy; url: content_security_policy
+    text: Delivery via meta element; url: delivery-html-meta-element
+    text: send violation reports
+    url: enforce
+      text: enforce
+      text: enforced
+    url: monitor
+      text: monitor
+      text: monitored
+urlPrefix: http://www.w3.org/TR/dom/; spec: DOM
+  type: interface
+    text: Document; url: interface-document
+urlPrefix: https://fetch.spec.whatwg.org/; spec: FETCH
+  type: dfn
+    text: parse header; url: concept-header-parse
+    text: header list; url: concept-response-header-list
+    text: fetching
+  type: interface
+    text: Response
+urlPrefix: http://www.w3.org/TR/html5/document-metadata.html; spec: HTML5
+  type: element
+    text: meta; url: the-meta-element
+urlPrefix: https://w3c.github.io/webappsec/specs/mixedcontent/; spec: MIX
+  type: dfn
+    text: a priori insecure url
+    text: a priori insecure origin
+urlPrefix: https://url.spec.whatwg.org/; spec: URL
+  type: dfn
+    text: url
+    text: host; url: concept-url-host
+    text: origin of a url; url: concept-url-origin
+    text: ipv6 address; url: concept-ipv6
+urlPrefix: http://www.w3.org/TR/workers/; spec: WORKERS
+  type: interface
+    text: Worker
+urlPrefix: https://tools.ietf.org/html/rfc6454; spec: RFC6454
+  type: dfn
+    text: origin; url: section-3.2
+urlPrefix: https://tools.ietf.org/html/rfc6797; spec: RFC6797
+  type: dfn
+    text: known HSTS host domain name matching; url: section-8.2
+    text: superdomain match; url: section-8.2
+    text: congruent match; url: section-8.2
+urlPrefix: https://tools.ietf.org/html/rfc7231; spec: RFC7231
+  type: dfn
+    text: resource; url: section-2
+    text: resource representation; url: section-3
+</pre>
+
+<!-- BIBLIOGRAPHY -->
+<pre class="biblio">
+{
+  "CSP": {
+    "authors": [ "Mike West", "Dan Veditz" ],
+    "title": "Content Security Policy",
+    "href": "https://w3c.github.io/webappsec-csp/",
+    "status": "WD",
+    "publisher": "W3C"
+  },
+  "PKP": {
+    "authors": [ "Chris Evans", "Chris Palmer", "Ryan Sleevi" ],
+    "title": "Public Key Pinning Extension for HTTP",
+    "href": "https://tools.ietf.org/html/draft-ietf-websec-key-pinning",
+    "publisher": "IETF",
+    "status": "Draft"
+  },
+  "SECURE-CONTEXTS": {
+    "authors": [ "Mike West", "Yan Zhu" ],
+    "title": "Secure Contexts",
+    "href": "https://w3c.github.io/webappsec-secure-contexts/"
+  }
+}
+</pre>
+
+<!-- NOTE STATUS -->
+<div boilerplate="status">
+	<strong>
+		Work on this document has been discontinued and it should not be
+		referenced or used as a basis for implementation.
+	</strong>
+</div>
+
+<!--
+████ ██    ██ ████████ ████████   ███████ 
+ ██  ███   ██    ██    ██     ██ ██     ██
+ ██  ████  ██    ██    ██     ██ ██     ██
+ ██  ██ ██ ██    ██    ████████  ██     ██
+ ██  ██  ████    ██    ██   ██   ██     ██
+ ██  ██   ███    ██    ██    ██  ██     ██
+████ ██    ██    ██    ██     ██  ███████ 
+-->
+<section>
+  <h2 id="intro">Introduction</h2>
+
+  <em>This section is not normative.</em>
+
+  Content Security Policy [[!CSP]] defines a mechanism through which authors
+  can manipulate the security properties of a given resource, providing the
+  ability to mitigate the risk of a broad class of content-injection attacks.
+  CSP, however, can only protect pages for which it is explicitly defined,
+  which means that authors need to ensure that they're delivering a reasonable
+  policy for <em>every</em> page on their origin in order to have confidence
+  that a particular set of restrictions will be consistently applied.
+
+  For example, it's often the case that generic error-handling pages are
+  constructed differently than "real" application pages. They're easy to forget
+  when auditing the security headers set for an origin, and can offer attackers
+  a foot in the door if they contain injection vectors.
+
+  CSP Pinning attempts to address this concern by allowing authors to "pin" a
+  baseline policy to an application's host. Conceptually, this is quite similar
+  to the approach taken by Strict Transport Security [[RFC6797]] and Public Key
+  Pinning [[PKP]]: we define a new header,
+  <code><a>Content-Security-Policy-Pin</a></code> which instructs a user agent
+  to remember a baseline policy that will be enforced for any document and
+  worker delivered by an application that doesn't come with its own
+  <code>Content-Security-Policy</code> header.
+
+  <h3 id="use-cases">Use Cases</h3>
+
+  <code>example.com</code> has a number of applications running on the same
+  origin; each has a specific set of resources it needs to load, so a single
+  Content Security Policy would become unwieldy for the whole set of resources.
+  Moreover, the admins aren't exactly sure they have a clear understanding of
+  all the applications running on subdomains; the marketing department went a
+  bit wild with branded partnerships a year or two back.
+
+  After doing an audit of existing code, they have a good feel for the needs
+  of individual applications, and give each a suitable policy. They decide to
+  err on the side of caution, and pin a restrictive policy for pages they didn't
+  catch:
+
+  <div class="example">
+    <code>https://example.com/application1/</code> delivers the following HTTP
+    response headers:
+
+    <pre>
+      Content-Security-Policy-Pin: <a>max-age</a>: 10886400;
+                                   <a>includeSubDomains</a>;
+                                   default-src https:;
+                                   form-action 'none';
+                                   frame-ancestors 'none';
+                                   referrer no-referrer;
+                                   report-uri /csp-endpoint/pinned
+      Content-Security-Policy: script-src https://application1.cdn.com;
+                               style-src https://application1.cdn.com;
+                               connect-src 'self';
+                               form-action 'self'
+    </pre>
+
+    While <code>https://example.com/application2/</code> delivers the following
+    HTTP response headers:
+
+    <pre>
+      Content-Security-Policy-Pin: <a>max-age</a>: 10886400;
+                                   <a>includeSubDomains</a>;
+                                   default-src https:;
+                                   form-action 'none';
+                                   frame-ancestors 'none';
+                                   referrer no-referrer;
+                                   report-uri /csp-endpoint/pinned
+      Content-Security-Policy: script-src https://application2.cdn.com;
+                               style-src https://application2.cdn.com;
+    </pre>
+
+    Meanwhile, they've forgotten about the coincidentally well-named
+    <code>https://forgotten-partnership.example.com/</code>. It doesn't send
+    any CSP headers at all, and yet, it is still protected by the pinned policy
+    for any users who have visited either Application 1 or Application 2.
+  </div>
+</section>
+
+<!--
+████████  ████████ ████████ ████ ██    ██ ████ ████████ ████  ███████  ██    ██  ██████ 
+██     ██ ██       ██        ██  ███   ██  ██     ██     ██  ██     ██ ███   ██ ██    ██
+██     ██ ██       ██        ██  ████  ██  ██     ██     ██  ██     ██ ████  ██ ██      
+██     ██ ██████   ██████    ██  ██ ██ ██  ██     ██     ██  ██     ██ ██ ██ ██  ██████ 
+██     ██ ██       ██        ██  ██  ████  ██     ██     ██  ██     ██ ██  ████       ██
+██     ██ ██       ██        ██  ██   ███  ██     ██     ██  ██     ██ ██   ███ ██    ██
+████████  ████████ ██       ████ ██    ██ ████    ██    ████  ███████  ██    ██  ██████ 
+-->
+<section>
+  <h2 id="key-concepts">Key Concepts and Terminology</h2>
+
+  <h3 id="terms-defined-here">Terms defined by this specification</h3>
+
+  <dl>
+    <dt>
+      <dfn export local-lt="pinned policy">
+        pinned security policy
+      </dfn>
+    </dt>
+    <dd>
+      A <a>security policy</a> that is enforced for resources
+      delivered from a <a>protected host</a> without their own policy.
+      The pinned policy's properties are defined in [[#policy-delivery]].
+    </dd>
+
+    <dt><dfn>pinned policy cache</dfn></dt>
+    <dd>
+      In order to persistently <a>enforce</a> policy for an origin, the user
+      agent caches the following details about each <a>pinned policy</a>:
+
+      <ol>
+        <li>
+          The <dfn>protected host</dfn>: a hostname to which the policy applies
+          (e.g. <code>example.com</code>)
+        </li>
+        <li>
+          <dfn>subdomains included</dfn>: <code>true</code> if
+          <code><a>includeSubDomains</a></code> is asserted, <code>false</code>
+          otherwise.
+        </li>
+        <li>
+          The <dfn>policy expiration date</dfn>: the moment at which a pinned
+          policy is no longer applicable
+        </li>
+        <li>
+          The <dfn>policy directive set</dfn>: a set of Content Security Policy
+          directives [[!CSP]] that the user agent MUST apply, according to its
+          <a>mode</a>, for each {{Document}} and {{Worker}} served from 
+          <a>protected host</a>, (and, potentially, its subdomains)
+          that does not provide its own policy.
+        </li>
+        <li>
+          <dfn>mode</dfn>: <code>monitor</code> if the <a>policy directive
+          set</a> is to be <a>monitored</a>, <code>enforce</code> if the
+          <a>policy directive set</a> is to be <a>enforced</a>.
+        </li>
+      </ol>
+    </dd>
+  </dl>
+
+  The Augmented Backus-Naur Form (ABNF) notation used in [[#policy-delivery]]
+  is specified in RFC5234. [[!ABNF]]
+</section>
+
+<!--
+████████  ████████ ██       ████ ██     ██ ████████ ████████  ██    ██
+██     ██ ██       ██        ██  ██     ██ ██       ██     ██  ██  ██
+██     ██ ██       ██        ██  ██     ██ ██       ██     ██   ████
+██     ██ ██████   ██        ██  ██     ██ ██████   ████████     ██
+██     ██ ██       ██        ██   ██   ██  ██       ██   ██      ██
+██     ██ ██       ██        ██    ██ ██   ██       ██    ██     ██
+████████  ████████ ████████ ████    ███    ████████ ██     ██    ██
+-->
+<section>
+  <h2 id="policy-delivery">Pinned Policy Delivery</h2>
+
+  A server MAY instruct a user agent to pin a single <a>security policy</a> by
+  sending either a <code><a>Content-Security-Policy-Pin</a></code> or
+  <code><a>Content-Security-Policy-Report-Only-Pin</a></code> HTTP response
+  header field along with a resource. [[#policy-processing]] defines the user
+  agent's behavior when it receives such a response.
+
+  Once a policy is pinned, it will be either <a>enforced</a> or <a>monitored</a>
+  as specified for any resource that doesn't <a>enforce</a> or <a>monitor</a>
+  its own policy.
+
+  Note: Pinned policies are delivered <em>only</em> via HTTP header fields; no
+  <a element>meta</a> element delivery mechanism is defined. Moreover, pinned
+  policies override policies delivered via <a element>meta</a> elements. See
+  [[#pins-override-meta]] for authoring guidelines.
+
+  <section>
+    <h3 id="content-security-policy-pin-header-field">
+      <code>Content-Security-Policy-Pin</code> Header Field
+    </h3>
+
+    The <code><dfn export>Content-Security-Policy-Pin</dfn></code> header field
+    is the mechanism for delivering a pinned policy that the user agent MUST
+    <a>enforce</a> for any resource which is not delivered with a
+    <code>Content-Security-Policy</code> header (as described in the
+    [[#apply-pinned-policy]] algorithm).
+    
+    The ABNF grammar is as follows:
+
+    <pre>
+      "Content-Security-Policy-Pin:" 1#&lt;<a lt="policy-token">policy-token production from CSP, Section 4.1</a>&gt;
+    </pre>
+
+    Pinning a <a>security policy</a> is a somewhat dangerous operation, and
+    requires some reasonable expectation that the pinning is in fact desired by
+    a particular <a>origin</a>'s owner. To that end, a server MUST NOT send a
+    <code><a>Content-Security-Policy-Pin</a></code> header with a
+    <a>resource</a> delivered from an <a><i lang="la">a priori</i> insecure
+    URL</a>. The threat is discussed in more detail in [[#hostile-pinning]].
+
+    Note: This means that pinning is only practically available over HTTPS.
+    This is intentional, as pinning is a powerful feature that ought to be
+    limited to secure contexts [[SECURE-CONTEXTS]].
+
+    A server MUST NOT send more than one HTTP header field named
+    <code>Content-Security-Policy-Pin</code> with a given <a>resource
+    representation</a>.
+
+    A server SHOULD send a <code>Content-Security-Policy-Pin</code> with every
+    <a>resource representation</a> in order to ensure that pinning takes place
+    for a given user agent no matter how it accesses a site. The value of the
+    header SHOULD be the same for every <a>resource representation</a>, as the
+    goal is to enforce a consistent baseline policy for an entire set of hosts.
+  </section>
+
+  <section>
+    <h3 id="content-security-policy-report-only-pin-header-field">
+      <code>Content-Security-Policy-Report-Only-Pin</code> Header Field
+    </h3>
+
+    The <code><dfn export>Content-Security-Policy-Report-Only-Pin</dfn></code>
+    header field is the mechanism for delivering a pinned policy that the user
+    agent MUST <a>monitor</a> for any resource which is not delivered with a
+    <code>Content-Security-Policy-Report-Only</code> header (as described in the
+    [[#apply-pinned-policy]] algorithm).
+    
+    The ABNF grammar is as follows:
+
+    <pre>
+      "Content-Security-Policy-Report-Only-Pin:" 1#&lt;<a lt="policy-token">policy-token production from CSP, Section 4.1</a>&gt;
+    </pre>
+
+    As with <code><a>Content-Security-Policy-Pin</a></code>, a server MUST NOT
+    send a <code><a>Content-Security-Policy-Report-Only-Pin</a></code> header
+    with a <a>resource</a> delivered from an <a><i lang="la">a priori</i>
+    insecure URL</a>. The threat is discussed in more detail in
+    [[#hostile-pinning]].
+
+    Note: This means that pin-reporting is only practically available over HTTPS.
+    This is intentional, as pinning is a powerful feature that ought to be
+    limited to secure contexts [[SECURE-CONTEXTS]].
+
+    A server MUST NOT send more than one HTTP header field named
+    <code>Content-Security-Policy-Report-Only-Pin</code> with a given
+    <a>resource representation</a>.
+
+    A server SHOULD send a <code>Content-Security-Policy-Report-Only-Pin</code>
+    with every <a>resource representation</a> in order to ensure that pinning
+    takes place for a given user agent no matter how they access a site. The
+    value of the header SHOULD be the same for every <a>resource
+    representation</a>, as the goal is to monitor a consistent baseline policy
+    for an entire set of hosts.
+
+    ISSUE: What's the impact of reporting? If headers can be injected into
+    <code>appspot.com</code> or <code>newyorktimes.com</code>, can attackers use
+    reporting to determine what apps you're using, or what articles you're
+    reading? Brian
+    <a href="https://lists.w3.org/Archives/Public/public-webappsec/2015Feb/0164.html">has
+    explored this space a bit</a>. Perhaps dropping reporting from pinned
+    policies would be reasonable. The main use-case I see would be discovering
+    pieces of your site that you haven't covered with a policy (e.g. where did
+    the pin decrease attack surface?). It's not clear we can even do that
+    without the implications Brian suggests.
+  </section>
+
+  <section>
+    <h3 id="csp-pins-syntax">Pinned Policy Syntax</h3>
+
+    The grammar for a pinned policy is the same as the grammar for the
+    <code><a>Content-Security-Policy</a></code> header, defined in 
+    <a lt="policy syntax">Section 4.1 of the Content Security Policy
+    specification</a>.
+
+    A pinned policy's value MUST contain a <code><a>max-age</a></code>
+    directive, and MAY contain an <code><a>includeSubDomains</a></code>
+    directive.
+
+    <section>
+      <h4 id="max-age-directive">The <code>max-age</code> directive</h4>
+
+      The <code><dfn>max-age</dfn></code> directive specifies the number of
+      seconds after the reception of the
+      <code><a>Content-Security-Policy-Pin</a></code> HTTP response header
+      field during which the UA SHOULD <a>enforce</a> the <a>pinned policy</a>.
+
+      The directive is defined via the following ABNF grammar:
+      
+      <pre>
+        directive-name  = "max-age"
+        directive-value = 1*DIGIT
+      </pre>
+
+      The <code>max-age</code> directive MUST be present within the
+      <code><a>Content-Security-Policy-Pin</a></code> header field. If it is not
+      present, the header field will be ignored (see [[#policy-processing]] for
+      user agent requirements).
+    </section>
+
+    <section>
+      <h4 id="includesubdomains-directive">
+        The <code>includeSubDomains</code> directive
+      </h4>
+
+      The <code><dfn>includeSubDomains</dfn></code> directive signals to
+      the user agent that the <a>pinned policy</a> defined in the
+      <code><a>Content-Security-Policy-Pin</a></code> header field applies not
+      only to the <a>origin</a> that served the <a>resource representation</a>,
+      but also to any <a>origin</a> whose <a>host</a> component is a subdomain
+      of the <a>host</a> component of the <a>resource representation</a>'s
+      <a>origin</a> (see [[#policy-processing]] for user agent requirements).
+    </section>
+  </section>
+
+</section>
+
+<!-- Big Text: Processing -->
+<section>
+  <h2 id="policy-processing">Pinned Policy Processing</h2>
+
+  The user agent discovers and processes pinned policies during <a>fetching</a>.
+  Upon receiving a response, the user agent will:
+
+  1. Sift through the HTTP headers according to the [[#discover-pinned-policy]]
+     algorithm to determine if the <a>pinned policy cache</a> for the response's
+     host needs to be updated.
+  2. Update the <a>pinned policy cache</a>, according to the [[#pin-policy]]
+     algorithm.
+  3. Update the response's headers to ensure that any relevant <a>pinned
+     policies</a> are applied, according to the [[#apply-pinned-policy]]
+     algorithm.
+
+  ISSUE: We probably need a hook in [[Fetch]]. In
+  particular, we need to ensure that we detect and pin a policy early enough
+  for <code>frame-ancestors</code> and <code>referrer</code> to handle blocking
+  and redirects.
+
+  Periodically, the user agent will run through the <a>pinned policies</a> it
+  has stored in the <a>pinned policy cache</a>, and remove those that have
+  expired, according to the [[#expire-pinned-policies]] algorithm.
+
+  <h3 id="fetching-algorithms">Fetching Algorithms</h3>
+
+  <h4 id="discover-pinned-policy">
+     Discover pinned policies for <var>response</var>
+  </h4>
+
+  Upon receiving a {{Response}} <var>response</var> containing at least one
+  <code><a>Content-Security-Policy-Pin</a></code> header field, the user agent
+  MUST peform the following steps:
+
+  <ol>
+    <li>
+      Let <var>origin</var> be the <a lt="origin of a url">origin</a> of
+      <var>response</var>'s URL.
+    </li>
+
+    <li>
+      Let <var>value</var> be the result of <a lt="parse header">parsing</a>
+      <code>Content-Security-Policy-Pin</code> in <var>response</var>'s
+      <a>header list</a>.
+    </li>
+
+    <li>
+      If <var>value</var> is not <code>null</code>, then execute the
+      [[#pin-policy]] algorithm, passing in <var>value</var>, the
+      <a lt="origin of a url">origin</a> of <var>response</var>'s URL,
+      and <code>enforce</code>.
+    </li>
+
+    <li>
+      Let <var>value</var> be the result of <a lt="parse header">parsing</a>
+      <code>Content-Security-Policy-Report-Only-Pin</code> in
+      <var>response</var>'s <a>header list</a>.
+    </li>
+
+    <li>
+      If <var>value</var> is not <code>null</code>, then execute the
+      [[#pin-policy]] algorithm, passing in <var>value</var>, the
+      <a lt="origin of a url">origin</a> of <var>response</var>'s URL,
+      and <code>monitor</code>.
+    </li>
+  </ol>
+
+  <h4 id="pin-policy">
+    Pin <var>policy</var> for <var>origin</var> in <var>mode</var>
+  </h4>
+
+  Given an <a>Origin</a> <var>origin</var>, a parsed set of directives
+  <var>policy</var>, and a <var>mode</var> (either <code>enforce</code> or
+  <code>monitor</code>), this algorithm defines the user agent behavior that
+  results in a <a>pinned policy</a> for <var>origin</var>.
+
+  <ol>
+    <li>
+      If <var>origin</var> is an <a><i lang="la">a priori</i> insecure
+      origin</a>, output a developer-friendly warning, and abort these steps.
+    </li>
+
+    <li>
+      Let <var>host</var> be the host component of <var>origin</var>.
+    </li>
+
+    <li>
+      If <var>host</var> is an IPv4 or IPv6 address, output a developer-friendly
+      warning, and abort these steps.
+    </li>
+
+    <li>
+      Let <var>policy</var> be the result of executing the <a>parse the
+      policy</a> algorithm on <var>directives</var>.
+    </li>
+
+    <li>
+      If <var>policy</var> does <strong>not</strong> contain a
+      <code><a>max-age</a></code> directive, then output a developer-friendly
+      warning, and abort these steps.
+    </li>
+    <li>
+      Let <var>subdomains</var> be <code>true</code> if an
+      <code><a>includeSubDomains</a></code> is present in <var>policy</var>,
+      and <code>false</code> otherwise.
+    </li>
+    <li>
+      Let <var>TTL</var> be the number of seconds specified in
+      <var>policy</var>'s <code><a>max-age</a></code> directive. If more than
+      one such directive is present, let <var>TTL</var> be the largest value
+      specified.
+    </li>
+    <li>
+      Let <var>expiration</var> be the current time, plus <var>TTL</var>.
+    </li>
+    <li>
+      Remove any <code><a>max-age</a></code> and
+      <code><a>includeSubDomains</a></code> directives from <var>policy</var>.
+    </li>
+    <li>
+      Let <var>pinned</var> be the result of executing
+      [[#pinned-policy-for-host]] for <var>mode</var> and <var>host</var>.
+    </li>
+    <li>
+      If <var>pinned</var> is not <code>null</code>, then update the <a>pinned
+      policy</a> <var>pinned</var> as follows:
+   
+      <ol>
+        <li>
+          If <code><a>max-age</a></code> is <code>0</code>, then remove
+          <var>pinned</var> from the <a>pinned policy cache</a> and abort these
+          steps.
+        </li>
+
+        <li>
+          Otherwise:
+
+          <ol>
+            <li>
+              Set <var>pinned</var>'s <a>policy expiration date</a> to
+              <var>expiration</var>.
+            </li>
+            <li>
+              Set <var>pinned</var>'s <a>subdomains included</a> to
+              <var>subdomains</var>.
+            </li>
+            <li>
+              Set <var>pinned</var>'s <a>policy directive set</a> to
+              <var>policy</var>.
+            </li>
+          </ol>
+        </li>
+      </ol>
+    </li>
+    <li>
+      Otherwise, <var>host</var> is not a <a>protected host</a>. If
+      <var>TTL</var> is not <code>0</code>, then:
+     
+      <ol>
+        <li>
+          Let <var>pinned</var> be a new <a>pinned policy</a>.
+        </li>
+        <li>
+          Set <var>pinned</var>'s <a>protected host</a> to <var>host</var>.
+        </li>
+        <li>
+          Set <var>pinned</var>'s <a>policy expiration date</a> to
+          <var>expiration</var>.
+        </li>
+        <li>
+          Set <var>pinned</var>'s <a>subdomains included</a> to
+          <var>subdomains</var>.
+        </li>
+        <li>
+          Set <var>pinned</var>'s <a>policy directive set</a> to
+          <var>policy</var>.
+        </li>
+        <li>
+          Set <var>pinned</var>'s <a>mode</a> to <var>mode</var>. 
+        </li>
+        <li>
+          Add <var>pinned</var> to the <a>pinned policy cache</a>.
+        </li>
+      </ol>
+    </li>
+  </ol>
+
+  <h4 id="apply-pinned-policy">
+    Pin a policy to <var>response</var>
+  </h4>
+
+  Upon receiving a {{Response}} <var>response</var>, ensure that it contains
+  appropriate <code>Content-Security-Policy</code> headers by performing the
+  following steps:
+
+  <ol>
+    <li>
+      Let <var>host</var> be the <a>host</a> component of <var>response</var>'s
+      URL's <a lt="origin of a url">origin</a>.
+    </li>
+
+    <li>
+      Let <var>pinned</var> be the result of executing
+      [[#pinned-policy-for-host]] for <code>enforce</code> and <var>host</var>.
+    </li>
+
+    <li>
+      If <var>pinned</var> is not <code>null</code>:
+
+      <ol>
+        <li>
+          Let <var>value</var> be the result of
+          <a lt="parse header">parsing</a>
+          <code>Content-Security-Policy</code> in <var>response</var>'s
+          <a>header list</a>.
+        </li>
+
+        <li>
+          If <var>value</var> is <code>null</code>:
+
+          <ol>
+            <li>
+              Append a header named <code>Content-Security-Policy</code> with a
+              value of <var>pinned</var>'s <a>policy directive set</a> to
+              <var>response</var>'s <a>header list</a>.
+            </li>
+          </ol>
+        </li>
+      </ol>
+    </li>
+
+    <li>
+      Let <var>pinned</var> be the result of executing
+      [[#pinned-policy-for-host]] for <code>monitor</code> and <var>host</var>.
+    </li>
+
+    <li>
+      If <var>pinned</var> is not <code>null</code>:
+
+      <ol>
+        <li>
+          Let <var>value</var> be the result of
+          <a lt="parse header">parsing</a>
+          <code>Content-Security-Policy-Report-Only</code> in
+          <var>response</var>'s <a>header list</a>.
+        </li>
+
+        <li>
+          If <var>value</var> is <code>null</code>:
+
+          <ol>
+            <li>
+              Append a header named
+              <code>Content-Security-Policy-Report-Only</code> with a value of
+              <var>pinned</var>'s <a>policy directive set</a> to
+              <var>response</var>'s <a>header list</a>.
+            </li>
+          </ol>
+        </li>
+      </ol>
+    </li>
+  </ol>
+
+  <h3 id="cache-algorithms">
+    Pinned Policy Cache Algorithms
+  </h3>
+
+  <h4 id="pinned-policy-for-host">
+    Get the <var>mode</var> pinned policy for <var>host</var>
+  </h4>
+
+  Given a <var>host</var>, and a <a>mode</a> <var>mode</var>, this algorithm
+  walks through the <a>pinned policy cache</a>, and returns the first matching
+  policy. If no policies match, this algorithm returns <code>null</code>.
+
+  Note: There ought to be at most one policy that matches, given the constraints
+  in [[#pin-policy]].
+
+  <ol>
+    <li>
+      For each <var>policy</var> in the <a>pinned policy cache</a>:
+
+      <ol>
+        <li>
+          If <var>policy</var>'s <a>mode</a> is not <var>mode</var>, skip to the
+          next policy in the <a>pinned policy cache</a>.
+        </li>
+        <li>
+          Let <var>match type</var> be the result of applying the <a>Known HSTS
+          Host domain name matching</a> algorithm specified in [[!RFC6797]] to
+          <var>host</var> and <var>policy</var>'s <a>protected host</a>.
+        </li>
+        <li>
+          If <var>match type</var> is <code><a>Superdomain Match</a></code>, and
+          <var>policy</var>'s <a>subdomains included</a> is <code>true</code>,
+          then return <var>policy</var>.
+        </li>
+        <li>
+          If <var>match type</var> is <code><a>Congruent Match</a></code>, then
+          return <var>policy</var>.
+        </li>
+      </ol>
+    </li>
+    <li>
+      Return <code>null</code>.
+    </li>
+  </ol>
+
+
+
+  <h4 id="expire-pinned-policies">
+    Remove expired pinned policies from the cache
+  </h4>
+
+  Periodically, the user agent MUST remove expired policies from the <a>pinned
+  policy cache</a>. Removal will have no web-visible effect, as expired policies
+  will not modify {{Response}}s during <a>fetching</a>, but expired policies can
+  have privacy impact if they aren't removed completely (as they offer evidence
+  that a particular user visited a particular host at some point in the past).
+
+  Expired entries can be removed via the following steps:
+
+  <ol>
+    <li>
+      For each <var>policy</var> in the list of <a>pinned policies</a> contained
+      in the <a>pinned policy cache</a>:
+
+      <ol>
+        <li>
+          If <var>policy</var>'s <a>policy expiration date</a> is prior to the
+          current time, remove <var>policy</var> from the <a>pinned policy
+          cache</a>.
+        </li>
+      </ol>
+    </li>
+  </ol>
+</section>
+
+<section>
+  <h2 id="security-considerations">Security Considerations</h2>
+
+  <h3 id="hostile-pinning">Hostile Pinning</h3>
+
+  An active network attacker who is able to inject headers into a site's
+  responses may attempt to maliciously pin a <a>security policy</a> for a host
+  and its subdomains. Pinning <code>default-src 'none'</code> on a page that
+  wasn't built to work under such restrictions could deny service for an
+  entire application.
+
+  Unlike public key pinning [[PKP]], however, pinning a security policy cannot
+  completely deny access to a site. This means that maliciously (or
+  accidentally) pinned policies can be easily overridden in two ways:
+
+  <ol>
+    <li>
+      Authors SHOULD send a valid <a>security policy</a> down with each HTTP
+      response, and use the pin only as a backup (see [[#pins-as-defaults]]).
+
+      Note: A future version of this specification may add a directive which
+      prevents overriding the pinned policy (<code>no-override</code>?). This
+      would allow authors to choose a stricter deployment model, but would
+      remove this override possibility.
+    </li>
+    <li>
+      Authors may also rescind a pinned policy by sending a new
+      <code><a>Content-Security-Policy-Pin</a></code> header with a
+      <code><a>max-age</a></code> of <code>0</code>.
+    </li>
+  </ol>
+
+  Moreover, the risk of malicious injection is mitigated by the fact that we
+  only accept pins over secure and authenticated connections.
+</section>
+<section>
+  <h2 id="privacy-considerations">Privacy Considerations</h2>
+
+  <h3 id="fingerprinting">Fingerprinting</h3>
+
+  Similar to HSTS and HPKP, a <a>pinned security policy</a> could be used as a
+  "supercookie", setting a distinct policy for each user which can be used as
+  an identifier in combination with (or instead of) HTTP cookies.
+
+  For example, the <code>report-uri</code> directive could contain a unique
+  identifier (<code>report-uri https://example.com/endpoint?id=123</code>) which
+  could identify a user based on correlating violation reports with user
+  activity.
+
+  To mitigate this risk, user agents MUST:
+
+  <ol>
+    <li>
+      Clear the <a>pinned policy cache</a> when the user clears her browsing
+      data (cookies, site data, history, etc).
+    </li>
+    <li>
+      Refuse to process <code>Set-Cookie</code> response headers during the
+      <a>send violation reports</a> algorithm.
+    </li>
+  </ol>
+
+  ISSUE: Can we assume that subdomains are really owned by the owner of the
+  root domain? 
+</section>
+<section>
+  <h2 id="authoring-considerations">Authoring Considerations</h2>
+
+  <h3 id="pins-as-defaults">Pins as a default</h3>
+
+  ISSUE: Explain something about the theory; pins act as a baseline for
+  resources that don't otherwise have a policy. Explain layering, granularity,
+  etc.
+
+  <h3 id="pins-override-meta">Pins override <code>&lt;meta&gt;</code></h3>
+
+  Pinned policies are applied before <a element>meta</a> elements can be
+  discovered. This means that a resource delivered without a header that
+  specified a <a>security policy</a> will be subject to the policy pinned
+  for its host, even if it then delivers a policy via the mechanisms described
+  in the <a lt="delivery via meta element">HTML <code>&lt;meta&gt;</code>
+  element</a> section of [[CSP]].
+</section>
+<!--
+████    ███    ██    ██    ███
+ ██    ██ ██   ███   ██   ██ ██
+ ██   ██   ██  ████  ██  ██   ██
+ ██  ██     ██ ██ ██ ██ ██     ██
+ ██  █████████ ██  ████ █████████
+ ██  ██     ██ ██   ███ ██     ██
+████ ██     ██ ██    ██ ██     ██
+-->
+<section>
+  <h2 id="iana-considerations">IANA Considerations</h2>
+
+  The permanent message header field registry should be updated
+  with the following registrations: [[!RFC3864]]
+
+  <section>
+    <h3 id="iana-content-security-policy-pin">
+      Content-Security-Policy-Pin
+    </h3>
+
+    <dl>
+      <dt>Header field name</dt>
+      <dd>Content-Security-Policy-Pin</dd>
+
+      <dt>Applicable protocol</dt>
+      <dd>http</dd>
+
+      <dt>Status</dt>
+      <dd>standard</dd>
+
+      <dt>Author/Change controller</dt>
+      <dd>W3C</dd>
+
+      <dt>Specification document</dt>
+      <dd>This specification (See <code><a>Content-Security-Policy-Pin</a></code>
+      Header Field)</dd>
+    </dl>
+  </section>
+
+  <section>
+    <h3 id="iana-content-security-policy-report-only-pin">
+      Content-Security-Policy-Report-Only-Pin
+    </h3>
+
+    <dl>
+      <dt>Header field name</dt>
+      <dd>Content-Security-Policy-Report-Only-Pin</dd>
+
+      <dt>Applicable protocol</dt>
+      <dd>http</dd>
+
+      <dt>Status</dt>
+      <dd>standard</dd>
+
+      <dt>Author/Change controller</dt>
+      <dd>W3C</dd>
+
+      <dt>Specification document</dt>
+      <dd>This specification (See <code><a>Content-Security-Policy-Report-Only-Pin</a></code>
+      Header Field)</dd>
+    </dl>
+  </section>
+</section>
+
+<section>
+  <h2 id="acknowledgements">Acknowledgements</h2>
+
+  Yan Zhu kicked my butt to get this document out the door. I stole concepts
+  wholesale from both HSTS and PKP.
+</section>
