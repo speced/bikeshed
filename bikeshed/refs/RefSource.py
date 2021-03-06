@@ -182,17 +182,15 @@ class RefSource:
         if not refs:
             return refs, "spec"
 
-        """
-        for=A | forHint=B | explicitFor
-        ✘ | ✘ | ✘ = anything
-        ✘ | ✘ | ✔ = /
-        ✘ | ✔ | ✘ = B/, fallback to anything
-        ✘ | ✔ | ✔ = B/, fallback to /
-        ✔ | ✘ | ✘ = A/
-        ✔ | ✘ | ✔ = A/
-        ✔ | ✔ | ✘ = A/
-        ✔ | ✔ | ✔ = A/
-        """
+        # for=A | forHint=B | explicitFor
+        # ✘ | ✘ | ✘ = anything
+        # ✘ | ✘ | ✔ = /
+        # ✘ | ✔ | ✘ = B/, fallback to anything
+        # ✘ | ✔ | ✔ = B/, fallback to /
+        # ✔ | ✘ | ✘ = A/
+        # ✔ | ✘ | ✔ = A/
+        # ✔ | ✔ | ✘ = A/
+        # ✔ | ✔ | ✔ = A/
 
         def filterByFor(refs, linkFor):
             return [x for x in refs if matchFor(x.for_, linkFor)]

@@ -64,18 +64,16 @@ class RefWrapper:
     def el(self):
         return self._ref.get("el", None)
 
-    """
-        "type": linesIter.next(),
-        "spec": linesIter.next(),
-        "shortname": linesIter.next(),
-        "level": linesIter.next(),
-        "status": linesIter.next(),
-        "url": linesIter.next(),
-        "export": linesIter.next() != "\n",
-        "normative": linesIter.next() != "\n",
-        "for": [],
-        (optionall) "el": manuallyProvided,
-    """
+    # "type": linesIter.next(),
+    # "spec": linesIter.next(),
+    # "shortname": linesIter.next(),
+    # "level": linesIter.next(),
+    # "status": linesIter.next(),
+    # "url": linesIter.next(),
+    # "export": linesIter.next() != "\n",
+    # "normative": linesIter.next() != "\n",
+    # "for": [],
+    # (optionall) "el": manuallyProvided,
 
     def __json__(self):
         refCopy = copy.copy(self._ref)
