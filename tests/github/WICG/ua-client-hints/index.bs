@@ -184,22 +184,24 @@ given [=user agent=], which servers can opt-into receiving via the Client Hints 
 defined in [[!RFC8942]]. The definitions below assume that each [=user agent=]
 has defined a number of properties for itself:
 
-*   <dfn for="user agent" export>brand</dfn> - The [=user agent=]'s commercial name (for example:
+*   <dfn for="user agent" export>brand</dfn> - The [=user agent=]'s commercial name (e.g.,
       "cURL", "Edge", "The World's Best Web Browser")
 *   <dfn for="user agent" export>significant version</dfn> - The [=user agent=]'s marketing version,
-      which includes distinguishable web-exposed features (for example: "72", "3", or "12.1")
-*   <dfn for="user agent" export>full version</dfn> - The [=user agent=]'s build version (for
-      example: "72.0.3245.12", "3.14159", or "297.70E04154A")
+      which includes distinguishable web-exposed features (e.g., "72", "3", or "12.1")
+*   <dfn for="user agent" export>full version</dfn> - The [=user agent=]'s build version (e.g.,
+      "72.0.3245.12", "3.14159", or "297.70E04154A")
 *   <dfn for="user agent" export>platform brand</dfn> - The [=user agent=]'s operating system's
-      commercial name. (for example: "Windows", "iOS", or "AmazingOS")
+      commercial name. (e.g., "Windows", "iOS", or "AmazingOS")
 *   <dfn for="user agent" export>platform version</dfn> - The [=user agent=]'s operating system's
-      version. (for example: "NT 6.0", "15", or "17G")
+      version. (e.g., "NT 6.0", "15", or "17G")
 *   <dfn for="user agent" export>platform architecture</dfn> - The [=user agent=]'s underlying CPU
-      architecture (for example: "ARM", or "x86")
-*   <dfn for="user agent" export>model</dfn> - The [=user agent=]'s device model (for example: "",
-      or "Pixel 2 XL")
+      architecture (e.g., "ARM", or "x86")
+*   <dfn for="user agent" export>platform bitness</dfn> - The [=user agent=]'s underlying CPU
+      architecture bitness (e.g., "32" or "64")
+*   <dfn for="user agent" export>model</dfn> - The [=user agent=]'s device model (e.g., "", or
+      "Pixel 2 XL")
 *   <dfn for="user agent" export>mobileness</dfn> - A boolean indicating if the [=user agent=]'s
-      device is a mobile device. (for example: ?0 or ?1)
+      device is a mobile device. (e.g., ?0 or ?1)
 
 
 [=User agents=] SHOULD keep these strings short and to the point, but servers MUST accept arbitrary
@@ -213,23 +215,18 @@ values for each, as they are all values constructed at the [=user agent=]'s whim
 Other CPU architectures could be mapped into one of these values in case that makes sense, or be
 mapped to the empty string.
 
-ISSUE 105: There might be use-cases for higher-entropy, more specific CPU architectures (e.g. 32
-vs. 64 bit architectures, or specific instruction sets for the download of highly optimized
-executable binaries). If necessary, we could support those use-cases through one or more separate
-hints.
-
 [=User agents=] SHOULD return the empty string or a fictitious value for [=platform architecture=]
-unless the user's platform is one where both the following conditions apply:
+or [=platform bitness=] unless the user's platform is one where both the following conditions apply:
  * Binary download of executables is likely.
  * Different CPU architectures are likely to require different binary executable resources, and
-     different binary exeutable resources are likely to be available.
+     different binary executable resources are likely to be available.
 
 [=User Agents=] MUST return the empty string for [=model=] if [=mobileness=] is false. [=User
 Agents=] MUST return the empty string for [=model=] even if [=mobileness=] is true, except on
 platforms where the model is typically exposed.
 
 [=User agents=] MAY return the empty string or a fictitious value for [=full version=], [=platform
-architecture=] or [=model=], for privacy, compatibility, or other reasons.
+architecture=], [=platform bitness=] or [=model=], for privacy, compatibility, or other reasons.
 
 The 'Sec-CH-UA-Arch' Header Field {#sec-ch-ua-arch}
 ------------------------------
@@ -245,6 +242,19 @@ The header's ABNF is:
   Sec-CH-UA-Arch = sh-string
 ~~~
 
+The 'Sec-CH-UA-Bitness' Header Field {#sec-ch-ua-bitness}
+------------------------------
+
+The <dfn http-header>`Sec-CH-UA-Bitness`</dfn> request header field gives a server information about
+the bitness of the architecture of the platform on which a given [=user agent=] is executing. It is
+a [=Structured Header=] whose value MUST be a [=structured header/string=]
+[[!RFC8941]].
+
+The header's ABNF is:
+
+~~~ abnf
+  Sec-CH-UA-Bitness = sh-string
+~~~
 
 The 'Sec-CH-UA-Model' Header Field {#sec-ch-ua-model}
 -------------------------------
@@ -380,10 +390,11 @@ dictionary NavigatorUABrandVersion {
 };
 
 dictionary UADataValues {
+  DOMString architecture;
+  DOMString bitness;
+  DOMString model;
   DOMString platform;
   DOMString platformVersion;
-  DOMString architecture;
-  DOMString model;
   DOMString uaFullVersion;
 };
 
@@ -504,17 +515,19 @@ ISSUE(wicg/ua-client-hints): We can improve upon when and why a UA decides to re
 
     1. Let |uaData| be a new {{UADataValues}}.
 
-    2. If |hints| [=list/contains=] "platform", set |uaData|["{{UADataValues/platform}}"] to the [=user agent=]'s [=user agent/platform brand=].
-
-    3. If |hints| [=list/contains=] "platformVersion", set |uaData|["{{UADataValues/platformVersion}}"] to the [=user agent=]'s [=user agent/platform version=].
-
-    4. If |hints| [=list/contains=] "architecture", set |uaData|["{{UADataValues/architecture}}"] to the [=user agent=]'s [=user agent/platform architecture=].
-
-    5. If |hints| [=list/contains=] "model", set |uaData|["{{UADataValues/model}}"] to the [=user agent=]'s [=user agent/model=].
-
-    6. If |hints| [=list/contains=] "uaFullVersion", let |uaData|["{{UADataValues/uaFullVersion}}"] be the the user agent's [=user agent/full version=].
-
-    7. [=Queue a task=] on the [=permission task source=] to [=resolve=] |p| with |uaData|.
+    1. If |hints| [=list/contains=] "architecture", set |uaData|["{{UADataValues/architecture}}"] to
+        the [=user agent=]'s [=user agent/platform architecture=].
+    1. If |hints| [=list/contains=] "bitness", set |uaData|["{{UADataValues/bitness}}"] to
+        the [=user agent=]'s [=user agent/platform bitness=].
+    1. If |hints| [=list/contains=] "model", set |uaData|["{{UADataValues/model}}"] to the
+        [=user agent=]'s [=user agent/model=].
+    1. If |hints| [=list/contains=] "platform", set |uaData|["{{UADataValues/platform}}"] to the
+        [=user agent=]'s [=user agent/platform brand=].
+    1. If |hints| [=list/contains=] "platformVersion", set |uaData|["{{UADataValues/platformVersion}}"]
+        to the [=user agent=]'s [=user agent/platform version=].
+    1. If |hints| [=list/contains=] "uaFullVersion", let |uaData|["{{UADataValues/uaFullVersion}}"]
+        be the the user agent's [=user agent/full version=].
+    1. [=Queue a task=] on the [=permission task source=] to [=resolve=] |p| with |uaData|.
 
 4.  Return |p|.
 
@@ -555,10 +568,10 @@ The information in the Client Hints defined above reveals quite a bit of informa
 agent and the platform/device upon which it runs. [=User agents=] ought to exercise judgement before
 granting access to this information, and MAY impose restrictions above and beyond the secure
 transport and delegation requirements noted above. For instance, [=user agents=] could choose to reveal
-[=user agent/platform architecture=] only on requests it intends to download, giving the server the
-opportunity to serve the right binary. Likewise, they could offer users control over the values
-revealed to servers, or gate access on explicit user interaction via a permission prompt or via a
-settings interface.
+[=user agent/platform architecture=] or [=user agent/platform bitness=] only on requests it intends
+to download, giving the server the opportunity to serve the right binary. Likewise, they could offer
+users control over the values revealed to servers, or gate access on explicit user interaction via a
+permission prompt or via a settings interface.
 
 Implementation Considerations {#impl-considerations}
 =============================
@@ -658,6 +671,19 @@ Status: standard
 Author/Change controller: IETF
 
 Specification document: this specification ([[#sec-ch-ua-arch]])
+
+'Sec-CH-UA-Bitness' Header Field {#iana-bitness}
+--------------------------
+
+Header field name: Sec-CH-UA-Bitness
+
+Applicable protocol: http
+
+Status: standard
+
+Author/Change controller: IETF
+
+Specification document: this specification ([[#sec-ch-ua-bitness]])
 
 'Sec-CH-UA-Model' Header Field {#iana-model}
 ---------------------------

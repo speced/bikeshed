@@ -302,7 +302,7 @@ Each time the [=list of immersive XR devices=] changes the user agent should <df
   1. If this is the first time devices have been enumerated or |oldDevice| equals the [=immersive XR device=], abort these steps.
   1. [=Shut down the session|Shut down=] any active {{XRSession}}s.
   1. [=Queue a task=] to set the [=XR compatible=] boolean of all {{WebGLRenderingContextBase}} instances to `false`.
-  1. [=Queue a task=] to [=fire an event=] named {{devicechange!!event}} on the [=context object=]'s {{Window/navigator}}'s {{Navigator/xr}}.
+  1. [=Queue a task=] to [=fire an event=] named <a for="XRSystem" data-link-type="event">devicechange</a> on the [=context object=]'s {{Window/navigator}}'s {{Navigator/xr}}.
   1. [=Queue a task=] to fire appropriate `change` events on any {{XRPermissionStatus}} objects who are affected by the change in the [=immersive XR device=] or [=/inline XR device=].
 
 Note: These steps should always be run [=in parallel=].
@@ -324,7 +324,7 @@ Note: These steps should always be run [=in parallel=].
 
 </div>
 
-The <dfn attribute for="XRSystem">ondevicechange</dfn> attribute is an [=Event handler IDL attribute=] for the {{devicechange}} event type.
+The <dfn attribute for="XRSystem">ondevicechange</dfn> attribute is an [=Event handler IDL attribute=] for the <a for="XRSystem" data-link-type="event">devicechange</a> event type.
 
 <div class="algorithm" data-algorithm="session-supported">
 The <dfn method for="XRSystem">isSessionSupported(|mode|)</dfn> method queries if a given |mode| may be supported by the user agent and device capabilities.
@@ -1186,16 +1186,22 @@ To <dfn>populate the pose</dfn> of an {{XRSpace}} |space| in an {{XRSpace}} |bas
       : If |limit| is `false` and the tracking system provides a [=6DoF=] pose whose position is actively tracked or statically known for |space|'s pose relative to |baseSpace|:
       :: Set |transform|'s {{XRRigidTransform/orientation}} to the orientation of |space|'s [=effective origin=] in |baseSpace|'s [=coordinate system=].
       :: Set |transform|'s {{XRRigidTransform/position}} to the position of |space|'s [=effective origin=] in |baseSpace|'s [=coordinate system=].
+      :: If supported, set |pose|'s {{XRPose/linearVelocity}} to the linear velocity of |space|'s [=effective origin=] compared to |baseSpace|'s [=coordinate system=].
+      :: If supported, set |pose|'s {{XRPose/angularVelocity}} to the angular velocity of |space|'s [=effective origin=] compared to |baseSpace|'s [=coordinate system=].
       :: Set |pose|'s {{XRPose/emulatedPosition}} to `false`.
 
       : Else if |limit| is `false` and the tracking system provides a [=3DoF=] pose or a [=6DoF=] pose whose position is neither actively tracked nor statically known for |space|'s pose relative to |baseSpace|:
       :: Set |transform|'s {{XRRigidTransform/orientation}} to the orientation of |space|'s [=effective origin=] in |baseSpace|'s [=coordinate system=].
       :: Set |transform|'s {{XRRigidTransform/position}} to the tracking system's best estimate of the position of |space|'s [=effective origin=] in |baseSpace|'s [=coordinate system=]. This MAY include a computed offset such as a neck or arm model. If a position estimate is not available, the last known position MUST be used.
+      :: Set |pose|'s {{XRPose/linearVelocity}} to `null`.
+      :: Set |pose|'s {{XRPose/angularVelocity}} to `null`.
       :: Set |pose|'s {{XRPose/emulatedPosition}} to `true`.
 
       : Else if |space|'s pose relative to |baseSpace| has been determined in the past and |force emulation| is `true`:
       :: Set |transform|'s {{XRRigidTransform/position}} to the last known position of |space|'s [=effective origin=] in |baseSpace|'s [=coordinate system=].
       :: Set |transform|'s {{XRRigidTransform/orientation}} to the last known orientation of |space|'s [=effective origin=] in |baseSpace|'s [=coordinate system=].
+      :: Set |pose|'s {{XRPose/linearVelocity}} to `null`.
+      :: Set |pose|'s {{XRPose/angularVelocity}} to `null`.
       :: Set |pose|'s {{XRPose/emulatedPosition}} boolean to `true`.
 
       : Otherwise:
@@ -1246,6 +1252,8 @@ An {{XRReferenceSpace}} is most frequently obtained by calling {{XRSession/reque
   - Passing a type of <dfn enum-value for="XRReferenceSpaceType">bounded-floor</dfn> creates an {{XRBoundedReferenceSpace}} instance. It represents a tracking space with its [=native origin=] at the floor, where the user is expected to move within a pre-established boundary, given as the {{boundsGeometry}}. Tracking in a {{bounded-floor}} reference space is optimized for keeping the [=native origin=] and {{boundsGeometry}} stable relative to the user's environment.
 
   - Passing a type of <dfn enum-value for="XRReferenceSpaceType">unbounded</dfn> creates an {{XRReferenceSpace}} instance. It represents a tracking space where the user is expected to move freely around their environment, potentially even long distances from their starting point. Tracking in an {{unbounded}} reference space is optimized for stability around the user's current position, and as such the [=native origin=] may drift over time.
+
+Note: it is assumed that the conventions of the underlying platform regarding Y axes of the reference spaces stay consistent across different types of {{XRReferenceSpace}}s. In other words, if an XR system supports multiple reference spaces, their Y axes will be parallel to each other and point in the same direction for the duration of the {{XRSession}} in which they were created. This does not apply to {{XRReferenceSpaceType/"viewer"}}, which does not rely on the conventions of the underlying platform for its orientation. {{XRReferenceSpaceType/"unbounded"}} reference spaces should align their Y axes with other reference spaces when their origins are nearby, but may deviate if the user moves over large distances.
 
 Devices that support {{XRReferenceSpaceType/"local"}} reference spaces MUST support {{XRReferenceSpaceType/"local-floor"}} reference spaces, through emulation if necessary, and vice versa.
 
@@ -1687,11 +1695,18 @@ An {{XRPose}} describes a position and orientation in space relative to an {{XRS
 <pre class="idl">
 [SecureContext, Exposed=Window] interface XRPose {
   [SameObject] readonly attribute XRRigidTransform transform;
+  [SameObject] readonly attribute DOMPointReadOnly? linearVelocity;
+  [SameObject] readonly attribute DOMPointReadOnly? angularVelocity;
+
   readonly attribute boolean emulatedPosition;
 };
 </pre>
 
 The <dfn attribute for="XRPose">transform</dfn> attribute describes the position and orientation relative to the base {{XRSpace}}.
+
+The <dfn attribute for="XRPose">linearVelocity</dfn> attribute describes the linear velocity in meters per second relative to the base {{XRSpace}}. If the user agent can't populate this, it's allowed to return <code>null</code>.
+
+The <dfn attribute for="XRPose">angularVelocity</dfn> attribute describes the angular velocity in radians per second relative to the base {{XRSpace}}. If the user agent can't populate this, it's allowed to return <code>null</code>.
 
 The <dfn attribute for="XRPose">emulatedPosition</dfn> attribute is `false` when the {{XRPose/transform}} represents an actively tracked [=6DoF=] pose based on sensor readings, or `true` if its {{XRRigidTransform/position}} value includes a <dfn for="XRPose">computed offset</dfn>, such as that provided by a neck or arm model. [=Estimated floor level=]s MUST NOT be considered when determining if an {{XRPose}} includes a [=XRPose/computed offset=].
 
@@ -2607,7 +2622,7 @@ The trusted UI must be drawn by an independent rendering context whose state is 
 
 Also, to prevent CORS-related vulnerabilities each [=browsing context=] will see a new instance of objects returned by the API, such as {{XRSession}}. Attributes such as the [=XRWebGLLayer/context=] set on an {{XRWebGLLayer}} with one [=relevant realm=] should not be able to be read through an {{XRWebGLLayer}} with a [=relevant realm=] that does not have the [=same origin=]. Similarly, methods invoked on the API MUST NOT cause an observable state change on other [=browsing contexts=]. For example: No method will be exposed that enables a system-level orientation reset, as this could be called repeatedly by a malicious page to prevent other pages from tracking properly. The user agent MUST, however, respect system-level orientation resets triggered by a user gesture or system menu.
 
-Note: this doesn't apply to state changes that are caused by one [=browsing context=] entering immersive mode, acquiring a lock on the device, and potentially firing {{devicechange}} events on other [=browsing contexts=].
+Note: this doesn't apply to state changes that are caused by one [=browsing context=] entering immersive mode, acquiring a lock on the device, and potentially firing <a for="XRSystem" data-link-type="event">devicechange</a> events on other [=browsing contexts=].
 
 Fingerprinting {#fingerprinting-security}
 --------------
@@ -2675,7 +2690,7 @@ Integrations {#integrations}
 Permissions Policy {#permissions-policy}
 --------------
 
-This specification defines a [=policy-controlled feature=] that controls whether any {{XRSession}} that requires the use of spatial tracking may be returned by {{XRSystem/requestSession()}}, and whether support for session modes that require spatial tracking may be indicated by either {{XRSystem/isSessionSupported()}} or {{devicechange}} events on the {{Navigator/xr|navigator.xr}} object.
+This specification defines a [=policy-controlled feature=] that controls whether any {{XRSession}} that requires the use of spatial tracking may be returned by {{XRSystem/requestSession()}}, and whether support for session modes that require spatial tracking may be indicated by either {{XRSystem/isSessionSupported()}} or <a for="XRSystem" data-link-type="event">devicechange</a> events on the {{Navigator/xr|navigator.xr}} object.
 
 The feature identifier for this feature is `"xr-spatial-tracking"`.
 

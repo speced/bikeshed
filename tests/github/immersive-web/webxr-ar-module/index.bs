@@ -128,10 +128,25 @@ Terminology {#terminology}
 -----------
 Augmented Reality describes a class of XR experiences in which virtual content is aligned and composed with the <dfn>real-world environment</dfn> before being displayed to users.
 
-XR hardware can be divided into categories based on <dfn>display technology</dfn>.
-- Devices described as <dfn>additive light</dfn>, also known as see-through, use transparent optical displays to present virtual content. On these devices, the user may always be able to see through to the [=real-world environment=] regardless of developer requests during session creation.
-- Devices described as <dfn>pass-through</dfn> use an opaque display to combine virtual content with a camera stream of the [=real-world environment=]. On these devices, the [=real-world environment=] will only be visible when the developer has made an explicit request for it during session creation.
-- Devices described as <dfn>opaque</dfn> fully obscure the [=real-world environment=] and do not provide a way to view the [=real-world environment=].
+XR hardware can be divided into categories based on <dfn>display technology</dfn>: [=additive light=], [=pass-through=], and [=opaque=].
+
+
+Devices described as having an <dfn>additive light</dfn> [=display technology=], also known as see-through, use transparent optical displays to present virtual content. On these devices, the user may always be able to see through to the [=real-world environment=] regardless of developer requests during session creation. 
+
+Note: Such devices typically will not do any compositing in software, relying on the natural compositing afforded by transparent displays.
+
+<div class=example>Examples of such devices include the <a href="https://www.microsoft.com/en-us/hololens/hardware">Hololens 2</a> and <a href="https://www.magicleap.com/en-us">Magic Leap</a> devices. </div>
+
+
+Devices described as having a <dfn>pass-through</dfn> [=display technology=] use an opaque display to combine virtual content with a camera stream of the [=real-world environment=]. On these devices, the [=real-world environment=] will only be visible when the developer has made an explicit request for it during session creation.
+
+Note: Such devices will typically use cameras to collect images of the real world, and composite the AR scene with these images in software before displaying them to the user.
+
+<div class=example>Examples of such devices include handheld mobile AR with a phone, and the <a href="https://varjo.com/products/xr-3/">Varjo XR-3</a> device. </div>
+
+Devices described as having an <dfn>opaque</dfn> [=display technology=] fully obscure the [=real-world environment=] and do not provide a way to view the [=real-world environment=].
+
+Note: Such devices are typically VR devices that have chosen to allow {{XRSessionMode/"immersive-ar"}} sessions in an attempt to provide a compatibility path for AR content on VR devices.
 
 WebXR Device API Integration {#webxr-device-api-integration}
 ==============
@@ -249,13 +264,13 @@ First Person Observer Views {#first-person-observer}
 
 Many AR devices have a camera, however the camera is typically not aligned with the eyes. When doing video capture of the session for streaming or saving to a file, it is suboptimal to simply composite this camera feed with one of the rendered eye feeds as there will be an internal offset. Devices may use reprojection or other tricks to fix up the stream, but some may expose a [=secondary view=], the <dfn>first-person observer view</dfn>, which has an [=view/eye=] of {{XREye/"none"}}.
 
-Content MUST explicitly opt-in to receiving a [=first-person observer view=] by enabling the "[=secondary view/secondary-views=]" [=feature descriptor=].
+Site content MUST explicitly opt-in to receiving a [=first-person observer view=] by enabling the "[=secondary view/secondary-views=]" [=feature descriptor=].
 
 Enabling the "[=secondary view/secondary-views=]" feature for a session that supports  [=first-person observer views=] SHOULD NOT enable the [=first-person observer view=] unconditionally on every frame of the session, rather it will only expose this view in the {{XRViewerPose/views}} array for frames when capture is going on.
 
 While the {{XRSession}} has a [=blend technique=] exposed by the {{XRSession/environmentBlendMode}}, [=first-person observer views=] always use [=alpha-blend environment blending=].
 
-Content may wish to know which view is the [=first-person observer view=] so that it can account for the different [=blend technique=], or choose to render UI elements differently. {{XRView}} objects that correspond to the [=first-person observer view=] have their {{isFirstPersonObserver}} attribute returning <code>true</code>.
+Site content may wish to know which view is the [=first-person observer view=] so that it can account for the different [=blend technique=], or choose to render UI elements differently. {{XRView}} objects that correspond to the [=first-person observer view=] have their {{isFirstPersonObserver}} attribute returning <code>true</code>.
 
 <pre class="idl">
 partial interface XRView {
@@ -263,23 +278,49 @@ partial interface XRView {
 };
 </pre>
 
+<div class=example>
+For most programs, supporting secondary views is simply a matter of:
+
+- Including `"secondary-views"` as an optional feature in {{XRSystem/requestSession()}}
+- Ensuring that {{XRViewerPose/views}} is iterated over instead of just accessing the first two elements
+
+<pre highlight="js">
+
+let session = await navigator.xr.requestSession("immersive-ar", {optionalFeatures: ["secondary-views"]});
+let space = await session.requestReferenceSpace("local");
+// perform other set up
+let gl = /* obtain a graphics context */;
+
+session.requestAnimationFrame(function(frame) {
+  let views = frame.getViewerPose(space);
+
+  // IMPORTANT: use `view of views` here instead of
+  // directly indexing the first two or three elements
+  for (view of views) {
+    render(session, gl, view);
+  }
+});
+
+function render(session, gl, view) {
+  // render content to the view
+  // potentially use view.isFirstPersonObserver if necessary to
+  // distinguish between compositing info
+}
+</pre>
+
+</div>
 
 Privacy & Security Considerations {#privacy-security}
 =================================
 
-<section class="non-normative">
+Implementations of the AR Module MUST NOT expose camera images to the content, rather they MUST handle any compositing with the real world in their own implementations via the [=XR compositor=]. Further extensions to this module MAY expose real-world information (like raw camera frames or lighting estimation), however they MUST gate this behavior on an additional [=feature descriptor=] that requires user consent.
 
-The AR Module does not provide new information compared to the WebXR Device API
-specification it is extending. It allows websites to start an XR session as
+Compared to the WebXR Device API it extends, the AR module only provides some additional details about the nature of the device it is running on via the {{XRSession/environmentBlendMode}} and {{XRSession/interactionMode}} attributes. It allows websites to start an XR session as
 {{XRSessionMode/"immersive-ar"}} which blends the real world behind the XR
-scene. The website does not have access to the real world information (camera
-images) but knows how the XR scene will be composited on top of the real world
-(blend mode).
+scene.
 
 Even if this module does not allow websites to access the camera images, it may
-not be obvious to end users and user agents may want to clarify this.
-
-</section>
+not be obvious to end users and user agents SHOULD clarify this.
 
 Acknowledgements {#ack}
 ================

@@ -1,0 +1,1103 @@
+<h1>Upgrade Insecure Requests</h1>
+<pre class="metadata">
+Status: ED
+Group: WebAppSec
+ED: https://w3c.github.io/webappsec-upgrade-insecure-requests/
+TR: http://www.w3.org/TR/upgrade-insecure-requests/
+Previous Version: from biblio
+Shortname: upgrade-insecure-requests
+Editor: Mike West 56384, Google Inc., mkwst@google.com
+Abstract:
+  This document defines a mechanism which allows authors to instruct a user
+  agent to upgrade insecure resource requests to secure transport before
+  fetching them.
+Indent: 2
+Level: None
+Version History: https://github.com/w3c/webappsec-upgrade-insecure-requests/commits/main/index.bs
+Boilerplate: omit conformance, omit feedback-header
+!Participate: <a href="https://github.com/w3c/webappsec-upgrade-insecure-requests/issues/new">File an issue</a> (<a href="https://github.com/w3c/webappsec-upgrade-insecure-requests/issues">open issues</a>)
+</pre>
+<pre class="anchors">
+spec: CSP; urlPrefix: https://www.w3.org/TR/CSP/
+  type: dfn
+    text: content-security-policy
+    text: content-security-policy-report-only
+    text: default-src
+    text: report-uri
+    text: protected resource
+    text: security policy
+    text: send violation reports
+    text: report a violation
+    text: violation report; url: example-violation-report
+    url: enforce
+      text: enforce
+      text: enforced
+    url: monitor
+      text: monitor
+      text: monitored
+spec: DOM; urlPrefix: http://www.w3.org/TR/dom/
+  type: interface
+    text: Document; url: interface-document
+spec: FETCH; urlPrefix: https://fetch.spec.whatwg.org/
+  type: dfn
+    text: main fetch
+spec: HTML; urlPrefix: https://html.spec.whatwg.org/multipage/
+  type: dfn
+    urlPrefix: browsers.html
+      text: ancestor browsing context
+      text: browsing context
+      text: creating a new document object; url: create-a-document-object
+      text: nested browsing context
+    urlPrefix: webappapis.html
+      text: environment settings object; url: settings-object
+      text: incumbent settings object
+      text: responsible document
+      text: responsible browsing context
+      text: relevant settings object for a script
+spec: MIX; urlPrefix: https://w3c.github.io/webappsec/specs/mixedcontent/
+  type: dfn
+    text: strict mode
+    text: block-all-mixed-content
+spec: SERVICE-WORKERS; urlPrefix: https://slightlyoff.github.io/ServiceWorker/spec/service_worker/
+  type: interface
+    text: ServiceWorker; url: service-worker-interface
+spec: WORKERS; urlPrefix: http://www.w3.org/TR/workers/
+  type: dfn
+    text: set up a worker environment settings object; url: script-settings-for-workers
+  type: interface
+    text: SharedWorker
+    text: Worker
+spec: RFC5234; urlPrefix: https://tools.ietf.org/html/rfc5234
+  type: dfn
+    text: BIT; url: appendix-B.1
+    text: WSP; url: appendix-B.1
+spec: RFC6454; urlPrefix: https://tools.ietf.org/html/rfc6454
+  type: dfn
+    text: origin; url: section-3.2
+spec: RFC6797; urlPrefix: https://tools.ietf.org/html/rfc6797
+  type: dfn
+    text: Strict-Transport-Security; url: section-6.1
+    text: congruent match; url: section-8.2
+    text: superdomain match; url: section-8.2
+    text: includeSubDomains; url: section-6.1.2
+    text: Known HSTS Host Domain Name Matching; url: section-8.2
+    text: Known HSTS Host; url: section-8.1.1
+spec: RFC7231; urlPrefix: https://tools.ietf.org/html/rfc7231
+  type: dfn
+    text: Vary; url: section-7.1.4
+    text: resource representation; url: section-3
+spec: RFC7234; urlPrefix: https://tools.ietf.org/html/rfc7234
+  type: dfn
+    text: Cache-Control; url: section-5.2
+    text: no-store; url: section-5.2.2.3
+spec: RFC7240; urlPrefix: https://tools.ietf.org/html/rfc7240
+  type: dfn
+    text: Prefer; url: section-2
+</pre>
+
+<!-- BIBLIOGRAPHY -->
+<pre class="biblio">
+{
+  "BBC-ARCHIVE": {
+    "authors": [ "Neil McIntosh" ],
+    "title": "Labelling BBC Online's archived websites",
+    "href": "http://www.bbc.co.uk/blogs/internet/entries/f7126d19-2afa-3231-9c4e-0f7198c468ab"
+  },
+  "CSP": {
+    "authors": [ "Mike West", "Adam Barth", "Dan Veditz" ],
+    "title": "Content Security Policy",
+    "href": "https://www.w3.org/TR/CSP/",
+    "status": "CR",
+    "publisher": "W3C"
+  },
+  "NYT-HTTPS": {
+    "authors": [ "Eitan Konigsburg", "Rajiv Pant", "Elena Kvochko" ],
+    "title": "Embracing HTTPS",
+    "href": "http://open.blogs.nytimes.com/2014/11/1%33/embracing-https/"
+  },
+  "WEB-HTTPS": {
+    "authors": [ "Mark Nottingham" ],
+    "title": "Securing the Web",
+    "href": "http://www.w3.org/2001/tag/doc/web-https",
+    "status": "TAG Finding",
+    "publisher": "W3C"
+  },
+  "WORKERS": {
+    "authors": [ "Ian Hickson" ],
+    "title": "Web Workers",
+    "href": "http://www.w3.org/TR/workers/",
+    "status": "WD",
+    "publisher": "W3C"
+  }
+}
+</pre>
+
+<!--
+████ ██    ██ ████████ ████████   ███████
+ ██  ███   ██    ██    ██     ██ ██     ██
+ ██  ████  ██    ██    ██     ██ ██     ██
+ ██  ██ ██ ██    ██    ████████  ██     ██
+ ██  ██  ████    ██    ██   ██   ██     ██
+ ██  ██   ███    ██    ██    ██  ██     ██
+████ ██    ██    ██    ██     ██  ███████
+-->
+<section>
+  <h2 id="intro">Introduction</h2>
+
+  <em>This section is not normative.</em>
+
+  Increasingly, we encourage authors to transition their sites and applications
+  away from insecure transport, and onto encrypted and authenticated connections
+  [[WEB-HTTPS]]. While this migration has significant advantages for both
+  authors and users, it isn't without negative side-effects.
+
+  Most notably, mixed content checking [[MIX]] has the potential to cause real
+  headache for administrators tasked with moving substantial amounts of legacy
+  content onto HTTPS. In particular, going through old content and rewriting
+  resource URLs manually is a huge undertaking. Moreover, it's often the case
+  that truly legacy content is difficult or impossible to update. Consider the
+  BBC's archived websites [[BBC-ARCHIVE]], or the New York Times' hard-coded
+  URLs [[NYT-HTTPS]].
+
+  We should remove this burden from site authors by allowing them to assert to a
+  user agent that they intend a site to load only secure resources, and that
+  insecure URLs ought to be treated as though they had been replaced with equivalent secure
+  URLs.
+
+  This document defines a new Content Security Policy directive,
+  <code><a>upgrade-insecure-requests</a></code>, through which authors can make
+  this assertion.
+  Note: Delivering the policy as a header allows an administrator to easily
+  opt a set of pages into the upgrade mechanism without touching their source
+  code individually. The legacy content examples above would not be feasible
+  with an approach that inlined the policy into HTML, for example.
+
+  <h3 id="goals">Goals</h3>
+
+  The overarching goal is to reduce the burden of migrating websites from
+  insecure origins by reducing the negative side effects of mixed content
+  blocking [[MIX]].
+
+  If we assume that authors do the server-side legwork (obtaining a certificate,
+  configuring the server, setting up redirects), and that authors also ensure
+  that both first- and third-party content is accessible at <em>the same
+  [=url/host=] and [=url/path=]</em> on a secure [=url/scheme=], then the
+  following statements ought to hold after implementing this feature:
+
+  <ol>
+    <li>
+      Authors should be able to ensure that all content requested by a given
+      page loads successfully, and securely. Mixed content blocking should not
+      break pages as a result of migrating to a secure origin.
+
+      Note: This requirement is <em>not</em> met by Mixed Content's <a>strict
+      mode</a>, which makes something like the opposite assertion.
+    </li>
+    <li>
+      As a result of #1, the user agent should not degrade any security
+      indicators related to requesting mixed content, as no insecure content
+      should be requested.
+    </li>
+    <li>
+      Authors should be able to ensure that all internal links correctly send
+      users to the site's secure address, and not to its pre-migration insecure
+      address.
+    </li>
+    <li>
+      Authors should be able to achieve all these goals without editing a site's
+      content. This is particularly important for archived content and legacy
+      systems for which maintenance is difficult enough, never mind upgrades.
+    </li>
+    <li>
+      Authors should be able to pursue a gradual transition from insecure to
+      secure, serving secure resources to clients that support upgrades, while
+      retaining insecure resources for clients that don't.
+    </li>
+  </ol>
+
+  Note: The mechanism defined here does <em>not</em> intend to supplant Strict
+  Transport Security [[RFC6797]]. See [[#relation-to-hsts]] for details.
+
+  <h3 id="examples">Examples</h3>
+
+  <h4 id="example-nonnavigational">Non-navigational Upgrades</h4>
+
+  <div class="example">
+    Megacorp, Inc. wishes to migrate <code>http://example.com/</code> to
+    <code>https://example.com</code>. They set up their servers
+    to make their own resources available over HTTPS, and work with partners in
+    order to make third-party widgets available securely as well.
+
+    They quickly realize, however, that the majority of their content is locked
+    up in a database tied to an old content management system, and it contains
+    hardcoded links to insecure resources (e.g., http:// URLs to images and
+    other content). Unfortunately, it's a substantial amount of work to update
+    it.
+
+    As a stopgap measure, Megacorp injects the following header field into every
+    HTML response that goes out from their servers:
+
+    <pre>
+      <a>Content-Security-Policy</a>: <a>upgrade-insecure-requests</a>
+    </pre>
+
+    This automatically upgrades all insecure resource requests from their pages
+    to secure variants, allowing a user agent to treat the following HTML code:
+
+    <pre>
+      &lt;img src="http://example.com/image.png"&gt;
+      &lt;img src="http://not-example.com/image.png"&gt;
+    </pre>
+
+    as though it had been delivered as:
+
+    <pre>
+      &lt;img src="https://example.com/image.png"&gt;
+      &lt;img src="https://not-example.com/image.png"&gt;
+    </pre>
+
+    The URL will be rewritten before the request is made, meaning that no
+    insecure requests will hit the network. Users will be safer, and Megacorp's
+    administrators will be happier, as all resource requests will be
+    transparently upgraded with no effort on their part.
+  </div>
+
+  <h4 id="example-navigation">Navigational Upgrades</h4>
+
+  <div class="example">
+    Megacorp, Inc. isn't quite ready to deliver Strict Transport Security
+    headers [[RFC6797]], but does want to keep users on secure pages when
+    possible. Happily, this comes for free with
+    <code><a>upgrade-insecure-requests</a></code>. That is, they're already
+    delivering pages with the following header:
+
+    <pre>
+      <a>Content-Security-Policy</a>: <a>upgrade-insecure-requests</a>
+    </pre>
+
+    This allows user agents to treat the following HTML code:
+
+    <pre>
+      &lt;a href="http://example.com/"&gt;Home&lt;/a&gt;
+    </pre>
+
+    as though it had been delivered as:
+
+    <pre>
+      &lt;a href="https://example.com/"&gt;Home&lt;/a&gt;
+    </pre>
+
+    Links to third-party sites will not be upgraded. That is, the following
+    HTML code:
+
+    <pre>
+      &lt;a href="http://not-example.com/"&gt;Home&lt;/a&gt;
+    </pre>
+
+    won't be upgraded.
+  </div>
+
+  <h4 id="example-failed">Failed Upgrade</h4>
+
+  <div class="example">
+    Tinycorp, Inc. enabled <code><a>upgrade-insecure-requests</a></code> a bit
+    earlier than they should have, as they don't actually support HTTPS on
+    <code>http://cdn.example.com/</code>. Given the following code:
+
+    <pre>
+      &lt;img src="http://cdn.example.com/image.png"&gt;
+    </pre>
+
+    User agents will upgrade requests, as described in [[#example-nonnavigational]],
+    rewriting the URL as <code>https://cdn.example.com/image.png</code>. As the
+    server doesn't respond to secure requests, this results in a network error.
+
+    There is no fallback in this scenario: the user agent acts just as though
+    the request had been intentionally made, and the request fails.
+  </div>
+
+  <h3 id="recommendations">Recommendations</h3>
+
+  We recommend that authors who wish to ensure that user agents which support
+  <a>upgrade-insecure-requests</a> are as secure as possible do the following:
+
+  <ol>
+    <li>
+      Redirect insecure, <a>safely upgradable requests</a> from HTTP to HTTPS by
+      responding with a <code>Location</code> header and a <code>307</code>
+      status code.
+
+      <div class="example">
+        In Nginx, this kind of redirection might look like this:
+
+        <pre>
+            server {
+              if ($http_upgrade_insecure_requests = "1") {
+                add_header Vary Upgrade-Insecure-Requests;
+                return 307 https://$host$request_uri;
+              }
+            }
+        </pre>
+
+        This is, of course, greatly simplified; your configuration will likely
+        be significantly more complex.
+      </div>
+    </li>
+    <li>
+      Respond to <a>potentially trustworthy URL</a> <a>safely
+      upgradable requests</a> with a <code><a>upgrade-insecure-requests</a></code>
+      directive if necessary for the resource being requested.
+
+      <div class="example">
+        In Nginx, adding this directive might look like this:
+
+        <pre>
+            server {
+              ...
+
+              add_header <a>Content-Security-Policy</a> <a>upgrade-insecure-requests</a>;
+
+              ...
+            }
+        </pre>
+
+        This is, of course, greatly simplified; your configuration will likely
+        be significantly more complex.
+      </div>
+    </li>
+    <li>
+      If the origin is <a>HSTS-safe</a>, then protect
+      against SSL-stripping man-in-the-middle attacks by sending a
+      <code><a>Strict-Transport-Security</a></code> header with the
+      <code>preload</code> directive, and ensure that insecure content is
+      never loaded by enabling Mixed Content's <a>strict mode</a>.
+
+      <div class="example">
+        In Nginx, adding this header might look like this (note the use of
+        the <code>preloaded</code> directive, which signifies that this
+        origin's HSTS state can be safely imported into user agents' HSTS
+        preload lists):
+
+        <pre>
+            server {
+              ...
+
+              add_header <a>Strict-Transport-Security</a> "max-age=10886400; preload"
+              add_header <a>Content-Security-Policy</a> <a>block-all-mixed-content</a>;
+
+              ...
+            }
+        </pre>
+
+        This is, of course, greatly simplified; your configuration will likely
+        be significantly more complex.
+      </div>
+
+      Additionally, work with user agent vendors to add the origin to
+      HSTS Preload Lists (for example, by submitting the origin to
+      <a href="https://hstspreload.appspot.com/">hstspreload.appspot.com</a>).
+    </li>
+    <li>
+      If the origin is <a>conditionally HSTS-safe</a>, then opt-into HSTS only
+      in response to <a>safely upgradable requests</a>.
+
+      <div class="example">
+        In Nginx, adding this header conditionally might look like this (note
+        the use of <code>map</code>, as setting headers inside <code>if</code>
+        without returning immediately is, well, iffy):
+
+        <pre>
+            server {
+              ...
+
+              map $http_https $sts {
+                "1" "max-age=10886400"
+              }
+
+              add_header <a>Strict-Transport-Security</a> $sts;
+
+              ...
+            }
+        </pre>
+
+        This is, of course, greatly simplified; your configuration will likely
+        be significantly more complex.
+      </div>
+    </li>
+  </ol>
+</section>
+
+<!--
+████████  ████████ ████████ ████ ██    ██ ████ ████████ ████  ███████  ██    ██  ██████
+██     ██ ██       ██        ██  ███   ██  ██     ██     ██  ██     ██ ███   ██ ██    ██
+██     ██ ██       ██        ██  ████  ██  ██     ██     ██  ██     ██ ████  ██ ██
+██     ██ ██████   ██████    ██  ██ ██ ██  ██     ██     ██  ██     ██ ██ ██ ██  ██████
+██     ██ ██       ██        ██  ██  ████  ██     ██     ██  ██     ██ ██  ████       ██
+██     ██ ██       ██        ██  ██   ███  ██     ██     ██  ██     ██ ██   ███ ██    ██
+████████  ████████ ██       ████ ██    ██ ████    ██    ████  ███████  ██    ██  ██████
+-->
+<section>
+  <h2 id="key-concepts">Key Concepts and Terminology</h2>
+
+  : <dfn export lt="upgrade a request">upgrade</dfn>
+  :: A [=/request=] is said to be <strong>upgraded</strong> if it is rewritten
+     to contain a URL with a [=url/scheme=] of <code>https</code> or
+     <code>wss</code>.
+
+  :  <dfn export local-lt="safely upgradable">safely upgradable requests</dfn>
+  ::  A [=/request=] is said to be <strong>safely upgradable</strong> if the
+      <a>resource representation</a> which will be returned does not require the
+      <code><a>upgrade-insecure-requests</a></code> mechanism described in this
+      document to avoid breakage, or if the [=/request=]'s
+      [=request/header list=] contains an
+      <a><code>Upgrade-Insecure-Requests</code> header field</a> with a value of
+      <code>1</code>.
+
+  :  <dfn export local-lt="HSTS-safe">HSTS-safe origin</dfn>
+  ::  An <a>origin</a> is said to be <strong>HSTS-safe</strong> if no
+      <a>resource representations</a> it returns requires the the
+      <code><a>upgrade-insecure-requests</a></code> mechanism described in
+      this document to avoid breakage, and if all <a>resource representations</a>
+      it returns can be served over HTTPS.
+
+      <a>HSTS-safe origins</a> can safely opt-into
+      <code><a>Strict-Transport-Security</a></code> for all user agents,
+      without risking broken pages for user agents which do not support
+      <code><a>upgrade-insecure-requests</a></code>.
+
+  :  <dfn export local-lt="conditionally HSTS-safe">conditionally HSTS-safe origin</dfn>
+  ::  An <a>origin</a> is said to be <strong>conditionally HSTS-safe</strong>
+      if one or more <a>resource representations</a> it returns requires the
+      <code><a>upgrade-insecure-requests</a></code> mechanism described in
+      this document to avoid breakage, and if all <a>resource representations</a> it
+      returns can be served over HTTPS.
+
+      <a>Conditionally HSTS-safe origins</a> can safely opt-into
+      <code><a>Strict-Transport-Security</a></code> only for user agents which
+      support <code><a>upgrade-insecure-requests</a></code>.
+
+  :  <dfn export>preloadable HSTS host</dfn>
+  ::  A [=url/host=] <var>host</var> is a <strong>preloadable HSTS
+      host</strong> if, when performing <a>Known HSTS Host Domain Name
+      Matching</a>, <var>host</var> is a <a>superdomain match</a> for a
+      <a>Known HSTS Host</a> which asserts both the <a>includeSubDomains</a>
+      directive and the <code>preload</code> directive, or <var>host</var>
+      is a <a>congruent match</a>for a <a>Known HSTS Host</a> which asserts
+      the <code>preload</code> directive.
+
+      Note: This is a long way of saying "any host the user agent has pinned
+      with a <code><a>Strict-Transport-Security</a></code> header that contained
+      a <code>preload</code> directive".
+
+  The Augmented Backus-Naur Form (ABNF) notation used in [[#delivery]] is
+  specified in RFC5234. [[!ABNF]]
+</section>
+
+<!-- Big Text: Delivery -->
+<section>
+  <h2 id="upgrading">Upgrading Insecure Resource Requests</h2>
+
+  In order to allow authors to mitigate the negative side-effects of migration
+  away from insecure origins, authors may instruct the user agent to
+  transparently upgrade resource requests to <a>potentially trustworthy URL</a>
+  variants of the original request's URL.
+
+  To support this instruction:
+
+  <ol>
+    <li>
+      <a>Environment settings objects</a> and <a>browsing contexts</a> are
+      given an <dfn export>insecure requests policy</dfn> which has two
+      potential values <dfn for="insecure requests policy" value export>Do Not
+      Upgrade</dfn> and
+      <dfn for="insecure requests policy" value export>Upgrade</dfn>. It is
+      set to <a value>Do Not Upgrade</a> unless otherwise specified. This policy
+      is checked in [[#upgrade-request]] in order to determine whether or not
+      non-navigation requests and form submissions should be upgraded during
+      [=/fetching=].
+    </li>
+    <li>
+      <a>Environment settings objects</a> and <a>browsing contexts</a> are
+      given an <dfn export>upgrade insecure navigations set</dfn> which
+      contains a set of ([=url/host=], [=url/port=]) tuples to which navigations
+      ought to be upgraded. Its value is the empty set unless otherwise
+      specified. This set is checked in [[#upgrade-request]] in order to
+      determine whether or not <a>navigation requests</a> should be upgraded.
+    </li>
+  </ol>
+
+  <h3 id="delivery">
+    The <code>upgrade-insecure-requests</code> Content Security Policy directive
+  </h3>
+
+  A server MAY instruct a user agent to upgrade insecure requests for a
+  particular <a>protected resource</a> by sending a
+  <code><a>Content-Security-Policy</a></code> header [[!CSP]] that contains a
+  <dfn export>upgrade-insecure-requests</dfn> directive, defined via the
+  following ABNF grammar:
+
+  <pre>
+    directive-name  = "upgrade-insecure-requests"
+    directive-value = ""
+  </pre>
+
+  When <a>enforcing</a> the <code>upgrade-insecure-requests</code> directive:
+
+  <ol>
+    <li>
+      Let <var>settings</var> be the <a>protected resource</a>'s <a>incumbent
+      settings object</a>.
+    </li>
+    <li>
+      Set <var>settings</var>'s <a>insecure requests policy</a> to
+      <a value>Upgrade</a>.
+    </li>
+    <li>
+      Let <var>tuple</var> be a tuple of the <a>protected resource</a>'s
+      [=/URL=]'s [=url/host=] and [=url/port=].
+    </li>
+    <li>
+      Insert <var>tuple</var> into <var>settings</var>'s <a>upgrade insecure
+      navigations set</a>.
+    </li>
+  </ol>
+
+  <a>Monitoring</a> the <code>upgrade-insecure-requests</code> directive has
+  no effect: the directive is ignored when sent via a
+  <code><a>Content-Security-Policy-Report-Only</a></code> header. Authors can
+  determine whether or not upgraded resources' original URLs
+  were insecure via <code><a>Content-Security-Policy-Report-Only</a></code>. For
+  example, <code><a>Content-Security-Policy-Report-Only</a>:
+  default-src https:; report-uri /endpoint</code>. See [[#reporting-upgrades]]
+  for additional detail.
+
+  <h4 id="mix">Relation to "Mixed Content"</h4>
+
+  The <code><a>upgrade-insecure-requests</a></code> directive results in
+  requests being rewritten at the top of the [=/Fetching=] algorithm
+  [[!FETCH]], as specified in [[#upgrade-request]]. It's important to note that
+  the rewrite happens <em>before</em> either Mixed Content [[MIX]] or Content
+  Security Policy checks take effect [[CSP]].
+
+  This ordering means that upgraded requests <em>will not</em> be flagged as
+  mixed content. Moreover, it means that
+  <code><a>upgrade-insecure-requests</a></code>'s effect takes place before
+  the <code><a>block-all-mixed-content</a></code> directive would have a chance
+  to block the request. If the former is set, the latter is effectively a no-op.
+
+  We recommend that authors set one directive or the other, as outlined in
+  [[#recommendations]].
+
+  <h3 id="feature-detect">Feature Detecting Clients Capable of Upgrading</h3>
+
+  Sites which require the upgrade mechanism laid out in this document in order
+  to provide users with a reasonable experience over secure transit need some
+  way to determine whether or not a particular [=/request=] can safely be
+  redirected from HTTP to HTTPS (and vice-versa). Moreover, <a>conditionally
+  HSTS-safe origins</a> can only opt-into
+  <code><a>Strict-Transport-Security</a></code> for supported user agents, and
+  doing otherwise could have negative consequences for the site's users.
+
+  Rather than relying on user-agent sniffing to make this decision, user agents
+  can advertise their upgrade capability when making <a>navigation requests</a>
+  by including an <a><code>Upgrade-Insecure-Requests</code> header field</a> as
+  described in [[#preference]].
+
+  <h4 id="preference">
+    The <code>Upgrade-Insecure-Requests</code> HTTP Request Header Field
+  </h4>
+
+  The <dfn export local-lt="Upgrade-Insecure-Requests header field">
+  <code>Upgrade-Insecure-Requests</code> HTTP request header
+  field</dfn> sends a signal to the server expressing the client's preference
+  for an encrypted and authenticated response, and that it can successfully
+  handle the <code><a>upgrade-insecure-requests</a></code> directive in order
+  to make that preference as seamless as possible to provide.
+
+  This preference is represented by the following ANBF:
+
+  <pre>
+    "Upgrade-Insecure-Requests:" *<a>WSP</a> "1" *<a>WSP</a>
+  </pre>
+
+  Note: Though the <code>Upgrade-Insecure-Requests</code> header expresses a
+  preference, sending it via the existing <code><a>Prefer</a></code> header is
+  problematic, as we expect the response from the server to use it as part of
+  the cache key. <code>Vary: Prefer</code> is too broad, as discussed in
+  <a href="https://github.com/w3c/webappsec/issues/216">w3/webappsec#216</a>.
+
+  User agent conformance details are described in step #1 of the the
+  [[#upgrade-request]] algorithm. That step represents the following
+  requirements:
+
+  <ol>
+    <li>
+      User agents MUST send an <a><code>Upgrade-Insecure-Requests</code> header
+      field</a> along with [=/request=]s for insecure URLs.
+
+      Note: Servers can use this signal to upgrade HTTP requests to HTTPS for
+      pages that require <code><a>upgrade-insecure-requests</a></code> support.
+    </li>
+    <li>
+      User agents MUST send an <a><code>Upgrade-Insecure-Requests</code> header
+      field</a> along with [=/request=]s for <a>potentially trustworthy URLs</a>
+      whose [=request/URL=]'s
+      [=url/host=] is <em>not</em> a <a>preloadable HSTS host</a>.
+
+      Note: Servers can use the absence of this signal to downgrade HTTPS
+      requests to HTTP for pages that require
+      <code><a>upgrade-insecure-requests</a></code> support.
+    </li>
+    <li>
+      User agents SHOULD periodically send an
+      <a><code>Upgrade-Insecure-Requests</code> header field</a> along with
+      [=/request=]s for <a>potentially trustworthy URLs</a>
+      whose [=request/URL=]'s [=url/host=] <em>is</em> a
+      <a>preloadable HSTS host</a>. For example, user agents could send an
+      <a><code>Upgrade-Insecure-Requests</code> header field</a> only when
+      the asserted <code>max-age</code> is a few days from expiration, or
+      only for a small percentage of requests.
+
+      Note: <a>preloadable HSTS hosts</a> have asserted that they are
+      <a>HSTS-safe</a>, and therefore don't need a downgrade signal. They will
+      need to refresh HSTS status before the asserted <code>max-age</code>
+      expires, and the <a><code>Upgrade-Insecure-Requests</code> header
+      field</a> serves as a fine signal that HSTS could be refreshed.
+    </li>
+  </ol>
+
+  When a server encounters this preference in an HTTP request's headers, it
+  SHOULD redirect the user to a <a>potentially trustworthy URL</a> variant
+  of the resource being requested.
+
+  When a server encounters this preference in an HTTPS request's headers,
+  it SHOULD include a <code><a>Strict-Transport-Security</a></code> header in
+  the response if the request's [=url/host=] is <a>HSTS-safe</a> or
+  <a>conditionally HSTS-safe</a> [[RFC6797]].
+
+  <div class="example">
+    A client that supports this document's upgrade mechanism requests
+    <code>http://example.com/</code> as follows:
+
+    <pre>
+      GET / HTTP/1.1
+      Host: example.com
+      <a lt="Upgrade-Insecure-Requests header field">Upgrade-Insecure-Requests</a>: 1
+    </pre>
+
+    The server parses the preference, notices that the user's client can deal
+    well with upgrade requests, and therefore responds to the request by
+    redirecting the user to a secure version of the resource she's requesting:
+
+    <pre>
+      HTTP/1.1 307 Moved Temporarily
+      Location: https://example.com/
+      <a>Vary</a>: <a lt="Upgrade-Insecure-Requests header field">Upgrade-Insecure-Requests</a>
+    </pre>
+
+    The <a lt="Upgrade-Insecure-Requests header field"><code>Upgrade-Insecure-Requests</code>
+    header field</a> is listed in the <a><code>Vary</code></a> header, as the
+    redirect response might otherwise be served by caches to clients that
+    don't support the upgrade mechanism defined here. A similar effect could be
+    achieved by making this redirect response uncachable via the
+    <a><code>Cache-Control</code></a> header:
+
+    <pre>
+      HTTP/1.1 307 Moved Temporarily
+      Location: https://example.com/
+      <a>Cache-Control</a>: <a>no-store</a>
+    </pre>
+  </div>
+
+  <h3 id="nesting">Policy Inheritance</h3>
+
+  If a {{Document}}'s <a>incumbent settings object</a>'s <a>insecure requests
+  policy</a> is set to <a value>Upgrade</a>, the user agent MUST ensure that
+  all <a>nested browsing contexts</a> inherit the setting in the following ways:
+
+  <ol>
+    <li>
+      When a <a>nested browsing context</a> <var>context</var> is created:
+
+      <ol>
+        <li>
+          If <var>context</var>'s <a>embedding document</a>'s <a>insecure
+          requests policy</a> is <a value>Upgrade</a>, then:
+
+          <ol>
+            <li>
+              Set <var>context</var>'s <a>insecure requests policy</a> to
+              <a value>Upgrade</a>.
+            </li>
+            <li>
+              For each <var>value</var> in <var>context</var>'s <a>embedding
+              document</a>'s <a>upgrade insecure navigations set</a>, add
+              <var>value</var> to <var>context</var>'s <a>upgrade insecure
+              navigations set</a>.
+            </li>
+          </ol>
+        </li>
+      </ol>
+    </li>
+    <li>
+      When <a>creating a new <code>Document</code> object</a>
+      <var>document</var> in a <a>browsing context</a> <var>context</var>:
+
+      <ol>
+        <li>
+          If <var>context</var>'s <a>insecure requests policy</a> is
+          <a value>Upgrade</a>, then:
+
+          <ol>
+            <li>
+              Let <var>settings</var> be <var>document</var>'s <a>incumbent
+              settings object</a>.
+            </li>
+            <li>
+              Set <var>settings</var>' <a>insecure requests policy</a> to
+              <a value>Upgrade</a>.
+            </li>
+            <li>
+              For each <var>value</var> in <var>context</var>'s <a>upgrade
+              insecure navigations set</a>, add <var>value</var> to
+              <var>settings</var>'s <a>upgrade insecure navigations set</a>.
+            </li>
+          </ol>
+        </li>
+      </ol>
+    </li>
+  </ol>
+
+  Likewise, when spinning up a worker, the user agent MUST ensure that it
+  inherits the setting from the context that created it in the following ways:
+
+  <ol>
+    <li>
+      When executing the <a>set up a worker environment settings object</a>
+      algorithm, perform the following steps after the current step #4:
+
+      <ol start="5">
+        <li>
+          If <var>inherited responsible browsing context</var>'s <a>insecure
+          requests policy</a> is <a value>Upgrade</a>, then:
+
+          <ol>
+            <li>
+              Set <var>settings object</var>'s <a>insecure requests policy</a>
+              to <a value>Upgrade</a>.
+            </li>
+            <li>
+              For each <var>value</var> in <var>inherited responsible browsing
+              context</var>'s <a>upgrade insecure navigations set</a>, add
+              <var>value</var> to <var>settings object</var>'s <a>upgrade
+              insecure navigations set</a>.
+            </li>
+          </ol>
+        </li>
+      </ol>
+    </li>
+  </ol>
+
+  <h3 id="reporting-upgrades">Reporting Upgrades</h3>
+
+  Upgrading insecure requests MUST not interfere with an authors' ability to
+  track down requests that would be insecure in a user agent that does not
+  support upgrades. To that end, upgrades MUST be performed <em>after</em>
+  evaluating <var>request</var> against all <a>monitored</a> security policies,
+  but <em>before</em> evaluating <var>request</var> against all <a>enforced</a>
+  policies.
+
+  <div class="example">
+    Within the context of a <a>protected resource</a> which contains the
+    insecure image <code>&lt;img src="http://example.com/image.png"&gt;</code>,
+    and delivers the following HTTP headers:
+
+    <pre>
+      <a>Content-Security-Policy</a>: <a>upgrade-insecure-requests</a>; <a>default-src</a> https:
+      <a>Content-Security-Policy-Report-Only</a>: <a>default-src</a> https:; <a>report-uri</a> /endpoint
+    </pre>
+
+    The user agent will fire off a [=/request=] <var>request</var> that:
+
+    <ol>
+      <li>
+        Violates the policy being <a>monitored</a>, thereby delivering a
+        <a>violation report</a> to <code>/endpoint</code>.
+      </li>
+      <li>
+        Is upgraded from <code>http://example.com/image.png</code> to
+        <code>http<strong>s</strong>://example.com/image.png</code>.
+      </li>
+      <li>
+        Does not violate the policy being <a>enforced</a>.
+      </li>
+    </ol>
+  </div>
+
+  Note: This will be significantly clarified once [[CSP]] is rewritten in terms
+  of [[FETCH]].
+</section>
+
+<!-- Big Text: Algorithms -->
+<section>
+  <h2 id="algorithms">Processing Algorithms</h2>
+
+  <h3 export dfn id="upgrade-request">
+    Upgrade <var>request</var> to a <a>potentially trustworthy URL</a>, if appropriate
+  </h3>
+
+  Given a [=/request=] <var>request</var>, this algorithm will rewrite its
+  [=request/URL=] if the [=request/client=] from which the request originates
+  has opted-in to upgrades. It will also inject an
+  <a><code>Upgrade-Insecure-Requests</code> header field</a> header for
+  insecure <a>navigation requests</a> in order to improve a server's ability to
+  feature-detect a client's upgrade capabilities.
+
+  We will not upgrade cross-origin <a>navigation requests</a>, with the
+  exception of form submissions. Form submissions will be upgraded to mitigate
+  the risk of data leakage via plaintext submissions.
+
+  Note: This algorithm is called at the top of the <a>Main Fetch</a> algorithm.
+
+  <ol>
+    <li>
+      If <var>request</var> is a <a>navigation request</a>, [=header list/append=] a
+      header named <code>Upgrade-Insecure-Requests</code> with a value of
+      <code>1</code> to <var>request</var>'s
+      [=request/header list=] if any of the following
+      criteria are met:
+
+      <ol>
+        <li>
+          <var>request</var>'s [=request/URL=] is not a
+          <a>potentially trustworthy URL</a>
+        </li>
+        <li>
+          <var>request</var>'s [=request/URL=]'s [=url/host=]
+          is <em>not</em> a <a>preloadable HSTS host</a>
+        </li>
+      </ol>
+
+      Note: User agents can choose to append the
+      <a><code>Upgrade-Insecure-Requests</code> header field</a> for other
+      requests, as discussed in [[#preference]].
+    </li>
+    <li>
+      If <var>request</var> is a <a>navigation request</a>, then:
+
+      <ol>
+        <li>
+          If <var>request</var> is a form submission, skip the remaining
+          substeps, and continue upgrading <var>request</var>.
+        </li>
+        <li>
+          If <var>request</var>'s [=request/client=]'s
+          [=environment/target browsing context=]
+          is a <a>nested browsing context</a>, skip the remaining substeps
+          and continue upgrading <var>request</var>.
+        </li>
+        <li>
+          Let <var>tuple</var> be a tuple of <var>request</var>'s
+          [=request/URL=]'s [=url/host=] and [=url/port=].
+        </li>
+        <li>
+          If <var>tuple</var> is contained in [=request/client=]'s
+          <a>upgrade insecure navigations set</a>, then skip the remaining
+          substeps, and continue upgrading <var>request</var>.
+
+        </li>
+        <li>
+          Return without further modifying <var>request</var>.
+        </li>
+      </ol>
+
+      Note: We only upgrade top-level <a>navigation requests</a> for hosts
+      that have explicitly opted-into the behavior for a particular
+      <a>protected resource</a>, as described in [[#examples]]. Performing
+      upgrades for top-level navigations to third-party resources brings a
+      significantly higher potential for breakage, so we're avoiding it for
+      the moment. Nested navigations (via <{iframe}>, for example) affect
+      the security status of their embedder, so we ensure that they are
+      upgraded if necessary.
+    </li>
+    <li>
+      Let <var>upgrade state</var> be the result of executing
+      [[#should-upgrade-for-client]] upon <var>request</var>'s
+      [=request/client=].
+    </li>
+    <li>
+      If <var>upgrade state</var> is <a value>Do Not Upgrade</a>, return without
+      modifying <var>request</var>.
+    </li>
+    <li>
+      If <var>request</var>'s [=request/URL=]'s [=url/scheme=] is
+      "<code>http</code>", set <var>request</var>'s [=request/URL=]'s
+      [=url/scheme=] to "<code>https</code>", and return.
+    </li>
+  </ol>
+
+  Note: Due to [[FETCH]]'s recursive nature, this algorithm will upgrade
+  insecurely-redirected requests as well as insecure initial requests.
+
+  <h3 id="should-upgrade-for-client">
+    Should insecure [=/request=]s be upgraded for <var>client</var>?
+  </h3>
+
+  Given an [=/request=]'s [=request/client=]
+  <var>client</var> (an <a>environment settings object</a>), this algorithm
+  returns <code>Enforced Upgrade</code> if insecure requests associated with
+  that client should be upgraded, or <a value>Do Not Upgrade</a> otherwise. In
+  short, this will check the client and return the appropriate <a>insecure
+  requests policy</a> set on it or its <a>browsing context</a>.
+
+  <ol>
+    <li>
+      If <var>client</var> has a <a>responsible document</a>, return the value
+      of its <a>insecure requests policy</a>.
+
+      Note: This catches {{Document}}s or {{Worker}}s whose policy is set
+      directly by the <code><a>upgrade-insecure-requests</a></code> directive,
+      or which have inherited the policy from an <a>embedding document</a>.
+    </li>
+    <li>
+      If <var>client</var> has a <a>responsible browsing context</a>, return the
+      value of its <a>insecure requests policy</a>.
+
+      Note: This catches requests triggered from detached
+      [=request/client=]s. Not sure this is necessary, really,
+      given the inheritance structure defined in [[#nesting]].
+    </li>
+    <li>
+      Return <a value>Do Not Upgrade</a>.
+    </li>
+  </ol>
+</section>
+
+<section>
+  <h2 id="security">Security Considerations</h2>
+
+  <h3 id="hsts">Interaction with HSTS</h3>
+
+  The <code><a>upgrade-insecure-requests</a></code> directive does not replace
+  the <code><a>Strict-Transport-Security</a></code> HTTP response header
+  [[RFC6797]]. Authors who serve their site over secure transport SHOULD send
+  that header with an appropriate <code>max-age</code> in order to ensure that
+  users are not subject to SSL stripping attacks by maliciously active network
+  attackers, or monitoring by maliciously passive network attackers.
+
+  <h3 id="violation-report-target">CSP Violation Reports</h3>
+
+  When sending a violation report for an upgraded resource, user agents MUST
+  target the {{Document}} or {{Worker}} that triggered the request, rather
+  than the {{Document}} or {{Worker}} on which the
+  <code><a>upgrade-insecure-requests</a></code> directive was set. Due to
+  [[#nesting]], the latter might be a cross-origin ancestor of the former, and
+  sending violation reports to that set of reporting endpoints could leak data
+  in unexpected ways.
+
+  Likewise, the <code>SecurityPolicyViolationEvent</code> MUST NOT target any
+  {{Document}} other than the one which triggered the request, for the same
+  reasons.
+</section>
+
+<section>
+  <h2 id="performance">Performance Considerations</h2>
+
+  The upgrade mechanism specified here adds <code>Upgrade-Insecure-Requests:
+  1\r\n</code> to every outgoing <a>navigation request</a> to non-<a>preloadable
+  HSTS hosts</a> (as discussed at length on public-webappsec@, and
+  <a href="https://github.com/w3c/webappsec/issues/216">w3c/webappsec#216</a>).
+  The advantages and intent of the header are laid out in [[#preference]], and
+  though we've taken some steps to ensure that it won't be a permanent fixture
+  of the platform (by carving out <a>preloadable HSTS hosts</a>), it's going
+  to be a long, long time before the header vanishes.
+
+  User agents are encouraged to find additional carveouts, and implement them.
+</section>
+
+<section>
+  <h2 id="authoring">Authoring Considerations</h2>
+
+  <h3 id="legacy-clients">Legacy Clients</h3>
+
+  Legacy clients which do support mixed content blocking [[MIX]], but do not
+  support the <code><a>upgrade-insecure-requests</a></code> directive will
+  continue to have a suboptimal experience on pages containing insecure URLs.
+  Authors SHOULD ensure that they collect
+  <a lt="send violation reports">violation reports</a> in order to determine
+  which resources are most problematic for their users, and SHOULD use that
+  information to prioritize fixes for URLs in legacy content that users will
+  most likely request.
+
+  <h3 id="relation-to-hsts">Relation to HSTS</h3>
+
+  The mechanism specified here deals only with the security policy for a
+  specific <a>protected resource</a>. It does not deprecate, replace, or in any
+  way reduce the value of the <code>Strict-Transport-Security</code> HTTP
+  response header [[RFC6797]]. Authors can and should continue to use that
+  header to ensure that their users are not subject to SSL stripping downgrade
+  attacks, as the <code><a>upgrade-insecure-requests</a></code> directive will
+  not ensure that users visiting your site via links on third-party sites will
+  be upgraded to HTTPS for the top-level navigation.
+
+  Likewise, the <code>Strict-Transport-Security</code> header does not imply
+  the behavior that <code><a>upgrade-insecure-requests</a></code> activates.
+  It only ensures that resources requested from an origin will never hit the
+  network insecurely.
+
+  We are intentionally keeping these concepts distinct, as authors may choose
+  to activate one or the other behavior, but ought not be forced to bind them
+  together.
+
+</section>
+
+<section>
+  <h2 id="iana-considerations">IANA Considerations</h2>
+
+  <h3 id="iana-https">
+    Upgrade-Insecure-Requests Header
+  </h3>
+
+  The permanent message header field registry should be updated
+  with the following registration: [[!RFC3864]]
+
+  <dl>
+    <dt>Header field name</dt>
+    <dd>Upgrade-Insecure-Requests</dd>
+
+    <dt>Applicable protocol</dt>
+    <dd>http</dd>
+
+    <dt>Status</dt>
+    <dd>standard</dd>
+
+    <dt>Author/Change controller</dt>
+    <dd>W3C</dd>
+
+    <dt>Specification document</dt>
+    <dd>This specification (See [[#preference]])</dd>
+  </dl>
+
+  <h3 id="iana-directive">
+    Upgrade-Insecure-Requests Directive
+  </h3>
+
+  The Content Security Policy Directive registry should be updated with the
+  following registration: [[!RFC7762]]
+
+  <dl>
+    <dt>Directive name</dt>
+    <dd>Upgrade-Insecure-Requests</dd>
+
+    <dt>Reference</dt>
+    <dd>This specification (See [[#delivery]])</dd>
+  </dl>
+</section>
+
+<section>
+  <h2 id="acknowledgements">Acknowledgements</h2>
+
+  Anne van Kesteren helped ensure that the initial draft of this document was
+  sane. Peter Eckersley and Daniel Kahn Gillmor clarified the problem space, and
+  helped point out the impact.
+</section>

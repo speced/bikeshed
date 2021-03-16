@@ -1,9 +1,9 @@
 <h1>Content Security Policy Level 3</h1>
 <pre class="metadata">
-Status: ED
+Status: WD
 ED: https://w3c.github.io/webappsec-csp/
 TR: https://www.w3.org/TR/CSP3/
-Previous Version: https://www.w3.org/TR/2016/WD-CSP3-20181015/
+Previous Version: from biblio
 Shortname: CSP3
 Level: None
 Editor: Mike West 56384, Google Inc., mkwst@google.com
@@ -43,7 +43,6 @@ spec:fetch
     text: main fetch
     text: http-network fetch
     text: http fetch
-    text: keepalive flag
     text: response; for: /
 spec:url
   type: dfn
@@ -80,7 +79,6 @@ spec: ECMA262; urlPrefix: https://tc39.github.io/ecma262
     text: HostEnsureCanCompileStrings(); url: sec-hostensurecancompilestrings
     text: eval(); url: sec-eval-x
     text: Function(); url: sec-function-objects
-    text: JSON.stringify(); url: sec-json.stringify
 spec: FETCH; urlPrefix: https://fetch.spec.whatwg.org/
   type: dfn
     for: request
@@ -341,8 +339,8 @@ spec: INFRA; urlPrefix: https://infra.spec.whatwg.org/
       hashes. Details in [[#unsafe-hashes-usage]].
 
   9.  The <a>source expression</a> matching has been changed to require explicit presence
-      of any non-<a>network scheme</a>, rather than <a>local scheme</a>,
-      unless that non-<a>network scheme</a> is the same as the scheme of protected resource,
+      of any non-<a>HTTP(S) scheme</a>, rather than <a>local scheme</a>,
+      unless that non-<a>HTTP(S) scheme</a> is the same as the scheme of protected resource,
       as described in [[#match-url-to-source-expression]].
 
   10. Hash-based source expressions may now match external scripts if the
@@ -1632,7 +1630,7 @@ spec: INFRA; urlPrefix: https://infra.spec.whatwg.org/
   string representation of the violation, suitable for submission to a reporting
   endpoint associated with the deprecated <a>`report-uri`</a> directive.
 
-  1.  Let |body| be a new JavaScript object with properties initialized as
+  1.  Let |body| be a <a lt="ordered map">map</a> with its keys initialized as
       follows:
 
       :   "`document-url`"
@@ -1672,36 +1670,31 @@ spec: INFRA; urlPrefix: https://infra.spec.whatwg.org/
 
   2.  If |violation|'s <a for="violation">source file</a> is not `null`:
 
-      1.  Set |body|'s "`source-file`" property to the result of executing
+      1.  Set |body|["`source-file`"] to the result of executing
           the <a>URL serializer</a> on |violation|'s <a for="violation">source
           file</a>, with the `exclude fragment` flag set.
 
-      2.  Set |body|'s "`lineno`" property to |violation|'s
+      2.  Set |body|["`lineno`"] to |violation|'s
           <a for="violation">line number</a>.
 
-      3.  Set |body|'s "`line-number`" property to |violation|'s
+      3.  Set |body|["`line-number`"] to |violation|'s
           <a for="violation">line number</a>.
 
-      4.  Set |body|'s "`colno`" property to |violation|'s
+      4.  Set |body|["`colno`"] to |violation|'s
           <a for="violation">column number</a>.
 
-      5.  Set |body|'s "`column-number`" property to |violation|'s
+      5.  Set |body|["`column-number`"] to |violation|'s
           <a for="violation">column number</a>.
 
-          Note: the "`line-number`" and "`column-number`" properties are
+          Note: the "`line-number`" and "`column-number`" keys are
           maintained for historical reasons and are duplicates of "`lineno`"
           and "`colno`" respectively.
 
-  3.  Assert: If |body|'s "`blocked-url`" property is not "`inline`", then its "`sample`"
-      property is the empty string.
+  3.  Assert: If |body|["`blocked-url`"] is not "`inline`", then |body|["`sample`"]
+      is the empty string.
 
-  4.  Let |object| be a new JavaScript object with properties initialized as
-      follows:
-
-      :   "`csp-report`"
-      ::  |body|
-
-  5.  Return the result of executing {{JSON.stringify()}} on |object|.
+  4.  Return the result of <a>serialize an infra value to JSON bytes</a> given
+      «[ "csp-report" → body ]».
 
   <h3 id="report-violation" algorithm>
     Report a |violation|
@@ -1821,7 +1814,7 @@ spec: INFRA; urlPrefix: https://infra.spec.whatwg.org/
                   ::  ""
                   :   <a for="request">credentials mode</a>
                   ::  "`same-origin`"
-                  :   <a for="request">keepalive flag</a>
+                  :   <a for="request">keepalive</a>
                   ::  "`true`"
                   :   <a for="request">header list</a>
                   ::  A header list containing a single header whose name is
@@ -2475,7 +2468,7 @@ spec: INFRA; urlPrefix: https://infra.spec.whatwg.org/
       on |request|.
 
   2.  If the result of executing [[#should-directive-execute]] on |name|,
-      `frame-src` and |policy| is "`No`", return "`Allowed`".
+      `img-src` and |policy| is "`No`", return "`Allowed`".
 
   3.  If the result of executing [[#match-response-to-source-list]] on
       |response|, |request|, this directive's <a for="directive">value</a>,
@@ -3955,11 +3948,11 @@ spec: INFRA; urlPrefix: https://infra.spec.whatwg.org/
   1.  If |expression| is the string "*", return "`Matches`" if one or more of
       the following conditions is met:
 
-      1. |url|'s <a for="url">scheme</a> is a <a>network scheme</a>.
+      1. |url|'s <a for="url">scheme</a> is an <a>HTTP(S) scheme</a>.
 
       2. |url|'s <a for="url">scheme</a> is the same as |origin|'s <a for="origin">scheme</a>.
 
-      Note: This logic means that in order to allow a resource from a non-<a>network scheme</a>,
+      Note: This logic means that in order to allow a resource from a non-<a>HTTP(S) scheme</a>,
       it has to be either explicitly specified (e.g.
       `default-src * data: custom-scheme-1: custom-scheme-2:`),
       or the protected resource must be loaded from the same scheme.
