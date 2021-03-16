@@ -31,35 +31,35 @@ Boilerplate: omit conformance
   },
   "quic-datagram": {
     "authors": ["Tommy Pauly", "Eric Kinnear", "David Schinazi"],
-    "href": "https://tools.ietf.org/html/draft-ietf-quic-datagram",
+    "href": "https://datatracker.ietf.org/doc/html/draft-ietf-quic-datagram/",
     "title": "An Unreliable Datagram Extension to QUIC",
     "status": "Internet-Draft",
     "publisher": "IETF"
   },
     "http3-datagram": {
     "authors": ["David Schinazi", "Lucas Pardue"],
-    "href": "https://tools.ietf.org/html/draft-ietf-masque-h3-datagram",
+    "href": "https://datatracker.ietf.org/doc/html/draft-ietf-masque-h3-datagram",
     "title": "Using QUIC Datagrams with HTTP/3",
     "status": "Internet-Draft",
     "publisher": "IETF"
   },
   "web-transport-overview": {
     "authors": ["Victor Vasiliev"],
-    "href": "https://tools.ietf.org/html/draft-ietf-webtrans-overview",
+    "href": "https://datatracker.ietf.org/doc/html/draft-ietf-webtrans-overview",
     "title": "WebTransport Protocol Framework",
     "status": "Internet-Draft",
     "publisher": "IETF"
   },
   "web-transport-quic": {
     "authors": ["Victor Vasiliev"],
-    "href": "https://tools.ietf.org/html/draft-vvv-webtransport-quic",
+    "href": "https://datatracker.ietf.org/doc/html/draft-vvv-webtransport-quic",
     "title": "WebTransport over QUIC",
     "status": "Internet-Draft",
     "publisher": "IETF"
   },
   "web-transport-http3": {
     "authors": ["Victor Vasiliev"],
-    "href": "https://tools.ietf.org/html/draft-ietf-webtrans-http3",
+    "href": "https://datatracker.ietf.org/doc/html/draft-ietf-webtrans-http3/",
     "title": "WebTransport over HTTP/3",
     "status": "Internet-Draft",
     "publisher": "IETF"
@@ -366,6 +366,7 @@ The <dfn>writeDatagrams</dfn> algorithm is given a |transport| as parameter and
 A <dfn interface>DatagramDuplexStream</dfn> is a generic duplex stream.
 
 <pre class="idl">
+[Exposed=(Window,Worker)]
 interface DatagramDuplexStream {
   readonly attribute ReadableStream readable;
   readonly attribute WritableStream writable;
@@ -427,6 +428,13 @@ agent MUST run the following steps:
 1. If |parsedURL| is a failure, [=throw=] a {{SyntaxError}} exception.
 1. If |parsedURL| [=scheme=] is not `https`, [=throw=] a {{SyntaxError}} exception.
 1. If |parsedURL| [=fragment=] is not null, [=throw=] a {{SyntaxError}} exception.
+1. Let |allowPooling| be {{WebTransport/constructor(url, options)/options}}'s
+   {{WebTransportOptions/allowPooling}} if it exists, and false otherwise.
+1. Let |dedicated| be the negation of |allowPooling|.
+1. Let |serverCertificateFingerprints| be {{WebTransport/constructor(url, options)/options}}'s
+   {{WebTransportOptions/serverCertificateFingerprints}} if it exists, and null otherwise.
+1. If |dedicated| is false and |serverCertificateFingerprints| is non-null, then [=throw=] a
+   {{TypeError}}.
 1. Let |transport| be a newly constructed {{WebTransport}} object.
 1. Let |transport| have an
    <dfn attribute for="WebTransport">\[[OutgoingStreams]]</dfn> internal slot
@@ -445,6 +453,9 @@ agent MUST run the following steps:
 1. Let |transport| have a
    <dfn attribute for="WebTransport">\[[Ready]]</dfn> internal
    slot, initialized to a promise.
+1. Let |transport| have a
+   <dfn attribute for="WebTransport">\[[Closed]]</dfn> internal
+   slot, initialized to a promise.
 1. Let |transport| have an
    <dfn attribute for="WebTransport">\[[OutgoingDatagrams]]</dfn> internal slot
    initialized to the result of [=WritableStream/creating=] a {{WritableStream}},
@@ -460,23 +471,42 @@ agent MUST run the following steps:
    initialized to the result of [=DatagramDuplexStream/creating=] a {{DatagramDuplexStream}},
    its [=DatagramDuplexStream/create/readable=] set to |transport|.{{[[IncomingDatagrams]]}},
    and its [=DatagramDuplexStream/create/writable=] set to |transport|.{{[[OutgoingDatagrams]]}}.
-1. If the scheme of |parsedURL| is `https`, [=in parallel=],
-   [=initialize WebTransport over HTTP=].
+1. Let |transport| have a
+   <dfn attribute for="WebTransport">\[[Connection]]</dfn> internal slot initialized to null.
+1. Let |promise| be the result of [=initialize WebTransport over HTTP|initializing WebTransport
+   over HTTP=], with |transport|, |parsedURL| and |dedicated|.
+1. [=Upon fulfillment=] of |promise|, run these steps:
+   1. If |transport|'s {{[[WebTransportState]]}} internal slot is not `"connecting"`, then abort
+      these steps.
+   1. Set |transport|'s {{[[WebTransportState]]}} internal slot to `"connected"`.
+   1. Resolve |transport|'s {{[[Ready]]}} internal slot with {{undefined}}.
+1. [=Upon rejection=] of |promise| with |error|, run these steps:
+   1. Set |transport|'s {{[[WebTransportState]]}} internal slot to `"failed"`.
+   1. Reject |transport|'s {{[[Ready]]}} internal slot with |error|.
+   1. Reject |transport|'s {{[[Closed]]}} internal slot with |error|.
 1. Return |transport|.
 
 <div algorithm="initialize WebTransport over HTTP">
-To <dfn>initialize WebTransport over HTTP</dfn> for a given |transport| and
-|parsedURL|, do the following:
+To <dfn>initialize WebTransport over HTTP</dfn>, given a {{WebTransport}} object
+<var>transport</var>, a [=URL record=] |url|, and a boolean |dedicated|, run these steps.
 
-1. If {{WebTransportOptions/serverCertificateFingerprints}} is specified, throw
-   a {{NotSupportedError}} exception.
-1. Establish an HTTP/3 WebTransport session to the address identified by
-   |parsedURL| following the procedures in [[!WEB-TRANSPORT-HTTP3]].
-1. If the session establishment fails, set |transport|'s {{[[WebTransportState]]}}
-   internal slot to `"failed"`, reject |transport|'s {{[[Ready]]}} with a
-   {{TypeError}} and abort these steps.
-1. Set |transport|'s {{[[WebTransportState]]}} internal slot to `"connected"`.
-1. Resolve |transport|'s {{[[Ready]]}} internal slot with {{undefined}}.
+1. Let |promise| be a new promise.
+1. Let |networkPartitionKey| be the result of [=determining the network partition key=] with
+   |transport|'s [=relevant settings object=].
+1. Return |promise| and run the following steps [=in parallel=].
+1. Let |connection| be the result of [=obtain a connection|obtaining a connection=] with
+   |networkPartitionKey|, |url|'s [=url/origin=], false, [=obtain a connection/http3Only=] set to
+   true, and [=obtain a connection/dedicated=] set to |dedicated|.
+1. If |connection| is failure, then reject |promise| with a {{TypeError}} and abort these steps.
+1. Set |transport|'s {{[[Connection]]}} internal slot to |connection|.
+1. Wait for |connection| to receive the first SETTINGS frame, and let |settings| be a dictionary that
+   represents the SETTINGS frame.
+1. If |settings| doesn't contain SETTINGS_ENABLE_WEBTRANPORT with a value of 1, or it doesn't
+   contain H3_DATAGRAM with a value of 1, then reject |promise| with a {{TypeError}} and abort
+   these steps.
+1. Create a WebTransport session with |connection|, as described in [[!WEB-TRANSPORT-HTTP3]].
+1. If the previous step fails, then reject |promise| with a {{TypeError}} and abort these steps.
+1. Resolve |promise| with {{undefined}}.
 
 </div>
 
@@ -488,6 +518,7 @@ To <dfn>initialize WebTransport over HTTP</dfn> for a given |transport| and
 : <dfn for="WebTransport" attribute>ready</dfn>
 :: On getting, it MUST return the value of the {{[[Ready]]}} internal slot.
 : <dfn for="WebTransport" attribute>closed</dfn>
+:: On getting, it MUST return the value of the {{[[Closed]]}} internal slot.
 :: This promise MUST be [=resolved=] when the transport is closed; an
    implementation SHOULD include error information in the `reason` and
    `errorCode` fields of {{WebTransportCloseInfo}}.
@@ -531,12 +562,17 @@ To <dfn>initialize WebTransport over HTTP</dfn> for a given |transport| and
 
 <pre class="idl">
 dictionary WebTransportOptions {
+  boolean allowPooling;
   sequence&lt;RTCDtlsFingerprint&gt; serverCertificateFingerprints;
 };
 </pre>
 
 <dfn dictionary>WebTransportOptions</dfn> is a dictionary of parameters
 that determine how WebTransport connection is established and used.
+
+: <dfn for="WebTransportOptions" dict-member>allowPooling</dfn>
+:: When set to true, the WebTransport connection can be pooled, that is, the network connection for
+   the WebTransport session can be shared with other HTTP/3 sessions.
 
 : <dfn for="WebTransportOptions" dict-member>serverCertificateFingerprints</dfn>
 :: This option is only supported for transports using dedicated connections.
@@ -550,6 +586,7 @@ that determine how WebTransport connection is established and used.
    or has a malformed {{RTCDtlsFingerprint/value}}.  If empty, the user agent
    SHALL use certificate verification procedures it would use for normal
    [=fetch=] operations.
+:: This cannot be used with {{WebTransportOptions/allowPooling}}.
 
 <div algorithm="compute a certificate fingerprint">
 To <dfn>compute a certificate fingerprint</dfn>, do the following:
@@ -873,7 +910,7 @@ ReceiveStream includes IncomingStream;
 
 *This section is non-normative.*
 
-This section describes the QUIC protocol behavior of methods defined
+This section describes the [[QUIC]] protocol behavior of methods defined
 in this specification, utilizing [[WEB-TRANSPORT-HTTP3]].
 
   <table class="data">

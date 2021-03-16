@@ -13,6 +13,9 @@ Abstract: This API defines an API surface for manipulating the bits on
 Abstract: {{MediaStreamTrack}}s being sent via an {{RTCPeerConnection}}.
 Markup Shorthands: css no, markdown yes
 </pre>
+<pre class=link-defaults>
+spec:webidl; type:dfn; text:resolve
+</pre>
 <pre class=biblio>
 {
   "WEB-CODECS": {
@@ -63,6 +66,12 @@ an additional API on {{RTCRtpSender}} and {{RTCRtpReceiver}} to
 insert the processing into the pipeline.
 
 <pre class="idl">
+// New dictionary
+dictionary RTCInsertableStreams {
+    ReadableStream readable;
+    WritableStream writable;
+};
+
 // New fields in RTCConfiguration
 partial dictionary RTCConfiguration {
     boolean encodedInsertableStreams = false;
@@ -194,7 +203,7 @@ The <dfn constructor for="SFrameTransform" lt="SFrameTransform(options)"><code>n
 1. Let |transformAlgorithm| be an algorithm which takes a |frame| as input and runs the <a href="#sframe-transform-algorithm">SFrame transform algorithm</a> with |this| and |frame|.
 2. Set |this|.`[[transform]]` to the result of [=TransformStream/creating=] a {{TransformStream}}, with [=TransformStream/create/transformAlgorithm=] set to |transformAlgorithm|.
 3. Let |options| be the method's first argument.
-4. Set |this|.`[[role]]` to |options|["{{SFrameTransportOptions/role}}"].
+4. Set |this|.`[[role]]` to |options|["{{SFrameTransformOptions/role}}"].
 5. Set |this|.`[[readable]]` to |this|.`[[transform]]`.`[[readable]]`.
 6. Set |this|.`[[writable]]` to |this|.`[[transform]]`.`[[writable]]`.
 
@@ -202,8 +211,8 @@ The <dfn constructor for="SFrameTransform" lt="SFrameTransform(options)"><code>n
 
 The SFrame transform algorithm, given |sframe| as a SFrameTransform object and |frame|, runs these steps:
 1. Let |role| be |sframe|.`[[role]]`.
-2. If |frame|.`[[rtcObject]]` is a {{RTCRtpSender}}, set |role| to 'encrypt'.
-3. If |frame|.`[[rtcObject]]` is a {{RTCRtpReceiver}}, set |role| to 'decrypt'.
+2. If |frame|.`[[owner]]` is a {{RTCRtpSender}}, set |role| to 'encrypt'.
+3. If |frame|.`[[owner]]` is a {{RTCRtpReceiver}}, set |role| to 'decrypt'.
 4. Let |data| be undefined.
 5. If |frame| is a {{BufferSource}}, set |data| to |frame|.
 6. If |frame| is a {{RTCEncodedAudioFrame}}, set |data| to |frame|.{{RTCEncodedAudioFrame/data}}
@@ -272,24 +281,23 @@ interface RTCEncodedAudioFrame {
 
 // New interfaces to expose JavaScript-based transforms.
 
-[Global=(Worker,DedicatedWorker),Exposed=DedicatedWorker]
+[Exposed=DedicatedWorker]
 interface RTCTransformEvent : Event {
     readonly attribute RTCRtpScriptTransformer transformer;
 };
 
-[Global=(Worker,DedicatedWorker),Exposed=DedicatedWorker]
-partial interface DedicatedWorkerGlobalScope : WorkerGlobalScope {
+partial interface DedicatedWorkerGlobalScope {
     attribute EventHandler onrtctransform;
 };
 
-[Global=(Worker,DedicatedWorker),Exposed=DedicatedWorker]
+[Exposed=DedicatedWorker]
 interface RTCRtpScriptTransformer {
     readonly attribute ReadableStream readable;
     readonly attribute WritableStream writable;
     readonly attribute any options;
 };
 
-[Exposed=(Window)]
+[Exposed=Window]
 interface RTCRtpScriptTransform {
     constructor(Worker worker, optional any options);
     // FIXME: add messaging methods.
