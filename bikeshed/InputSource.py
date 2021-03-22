@@ -6,7 +6,7 @@ import os
 import sys
 import urllib.parse
 from abc import abstractmethod
-from datetime import date, datetime
+from datetime import datetime
 from typing import List, Optional
 
 import attr
@@ -19,7 +19,7 @@ from .Line import Line
 @attr.s(auto_attribs=True)
 class InputContent:
     rawLines: List[str]
-    date: Optional[date]
+    date: Optional[datetime.date]
 
     @property
     def lines(self) -> List[Line]:
