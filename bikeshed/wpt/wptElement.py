@@ -81,9 +81,13 @@ def createHTML(doc, blockEl, testNames, testData):
     if doc.md.wptDisplay == "none":
         removeNode(blockEl)
     elif doc.md.wptDisplay == "inline":
-        blockEl.tag = "ul"
+        blockEl.tag = "details"
         addClass(blockEl, "wpt-tests-block")
         clearContents(blockEl)
+        testSummaryEl = E.summary("Tests")
+        appendChild(blockEl, testSummaryEl)
+        testListEl = E.ul({"class": "wpt-tests-list"})
+        appendChild(blockEl, testListEl)
         for testName in testNames:
             if testName not in testData:
                 warn(f"Cannot find '{testName}' in the test data.")
@@ -164,7 +168,7 @@ def createHTML(doc, blockEl, testNames, testData):
                 )
                 continue
 
-            appendChild(blockEl, singleTestEl)
+            appendChild(testListEl, singleTestEl)
     else:
         die("Programming error, uncaught WPT Display value in createHTML.")
 
@@ -266,15 +270,19 @@ wptStyle = """
     color: var(--wpt-text);
     margin: 1em auto;
     padding: .5em;
+}
+.wpt-tests-block summary {
+    color: var(--wptheading-text);
+    font-weight: normal;
+    text-transform: uppercase;
+}
+.wpt-tests-list {
+    list-style: none;
     display: grid;
+    margin: 0;
+    padding: 0;
     grid-template-columns: 1fr auto auto;
     grid-column-gap: .5em;
-}
-.wpt-tests-block::before {
-    content: "Tests";
-    grid-column: 1/-1;
-    color: var(--wptheading-text);
-    text-transform: uppercase;
 }
 .wpt-test {
     display: contents;
