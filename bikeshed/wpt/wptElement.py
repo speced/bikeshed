@@ -5,6 +5,7 @@ from ..h import (
     clearContents,
     findAll,
     removeNode,
+    removeAttr,
     textContent,
 )
 from ..messages import *
@@ -83,6 +84,7 @@ def createHTML(doc, blockEl, testNames, testData):
     elif doc.md.wptDisplay == "inline":
         blockEl.tag = "details"
         addClass(blockEl, "wpt-tests-block")
+        removeAttr(blockEl, "pathprefix")
         clearContents(blockEl)
         testSummaryEl = E.summary("Tests")
         appendChild(blockEl, testSummaryEl)
