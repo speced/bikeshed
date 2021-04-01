@@ -237,6 +237,7 @@ class Spec:
         idl.markupIDL(self)
         inlineRemoteIssues(self)
         wpt.processWptElements(self)
+        addImageSize(self)
 
         # Handle all the links
         processBiblioLinks(self)
