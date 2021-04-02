@@ -1700,7 +1700,7 @@ def addImageSize(doc):
             if m is None:
                 die(
                     "Couldn't parse 'srcset' attribute: \"{0}\"\n"
-                    + "Bikeshed only supports a single image followed by an integer resolution. If not targeting Bikeshed specifically, there should be an 'src' attribute (and probably a 'width' and 'height' attribute too). This warning can also be suppressed by adding a 'no-autosize' attribute.",
+                    + "Bikeshed only supports a single image followed by an integer resolution. If not targeting Bikeshed specifically, HTML requires a 'src' attribute (and probably a 'width' and 'height' attribute too). This warning can also be suppressed by adding a 'no-autosize' attribute.",
                     srcset,
                     el=el,
                 )
@@ -1711,7 +1711,7 @@ def addImageSize(doc):
                 res = int(m.group(2))
         if re.match(r"^(https?:/)?/", src):
             warn(
-                "Autodetection of image dimensions is only supported for local files, skiping this image: {0}\nConsider setting 'width' and 'height' manually or opting out of autodetection by setting the 'no-autosize' attribute.",
+                "Autodetection of image dimensions is only supported for local files, skipping this image: {0}\nConsider setting 'width' and 'height' manually or opting out of autodetection by setting the 'no-autosize' attribute.",
                 src,
                 el=el,
             )
