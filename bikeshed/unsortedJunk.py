@@ -1709,6 +1709,14 @@ def addImageSize(doc):
                 src = m.group(1)
                 el.set("src", src)
                 res = int(m.group(2))
+        if not doc.inputSource.cheaplyExists(""):
+            # If the input source can't tell whether a file cheaply exists,
+            # PIL very likely can't use it either.
+            warn(
+                "At least one <img> doesn't have its size set, but given the type of input document, Bikeshed can't figure out what the size should be.\nEither set 'width'/'height' manually, or opt out of auto-detection by setting the 'no-autosize' attribute.",
+                el=el,
+            )
+            return
         if re.match(r"^(https?:/)?/", src):
             warn(
                 "Autodetection of image dimensions is only supported for local files, skipping this image: {0}\nConsider setting 'width' and 'height' manually or opting out of autodetection by setting the 'no-autosize' attribute.",
