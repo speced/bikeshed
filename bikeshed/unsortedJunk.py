@@ -3,6 +3,7 @@ import logging
 import re
 from collections import Counter, defaultdict, namedtuple
 from urllib import parse
+from PIL import Image
 
 from . import biblio, config, dfnpanels
 from .func import Functor
@@ -1671,3 +1672,88 @@ def forceCrossorigin(doc):
         ):
             continue
         el.set("crossorigin", "")
+
+
+def addImageSize(doc):
+    if doc.md.imgAutoSize is False:
+        return
+    imgElements = findAll("img", doc)
+    for el in imgElements:
+        if el.get("width") or el.get("height"):
+            continue
+        if el.get("no-autosize") is not None:
+            removeAttr(el, "no-autosize")
+            continue
+        src = el.get("src")
+        srcset = el.get("srcset")
+        res = 1
+        if src is None and srcset is None:
+            warn(
+                "<img> elements must have at least one of src or srcset.",
+                el=el,
+            )
+            continue
+        elif src is not None and srcset is not None:
+            continue
+        elif src is None:
+            m = re.match(r"^[ \t\n]*([^ \t\n]+)[ \t\n]+(\d+)x[ \t\n]*$", srcset)
+            if m is None:
+                die(
+                    "Couldn't parse 'srcset' attribute: \"{0}\"\n"
+                    + "Bikeshed only supports a single image followed by an integer resolution. If not targeting Bikeshed specifically, HTML requires a 'src' attribute (and probably a 'width' and 'height' attribute too). This warning can also be suppressed by adding a 'no-autosize' attribute.",
+                    srcset,
+                    el=el,
+                )
+                continue
+            else:
+                src = m.group(1)
+                el.set("src", src)
+                res = int(m.group(2))
+        if not doc.inputSource.cheaplyExists(""):
+            # If the input source can't tell whether a file cheaply exists,
+            # PIL very likely can't use it either.
+            warn(
+                "At least one <img> doesn't have its size set ({0}), but given the type of input document, Bikeshed can't figure out what the size should be.\nEither set 'width'/'height' manually, or opt out of auto-detection by setting the 'no-autosize' attribute.",
+                outerHTML(el),
+                el=el,
+            )
+            return
+        if re.match(r"^(https?:/)?/", src):
+            warn(
+                "Autodetection of image dimensions is only supported for local files, skipping this image: {0}\nConsider setting 'width' and 'height' manually or opting out of autodetection by setting the 'no-autosize' attribute.",
+                outerHTML(el),
+                el=el,
+            )
+            continue
+        imgPath = doc.inputSource.relative(src).sourceName
+        try:
+            im = Image.open(imgPath)
+            w, h = im.size
+        except Exception as e:
+            warn(
+                "Couldn't determine width and height of this image: {0}\n{1}",
+                src,
+                e,
+                el=el,
+            )
+            continue
+        if w % res == 0:
+            el.set("width", str(int(w / res)))
+        else:
+            warn(
+                "The width ({0}px) of this image is not a multiple of the declared resolution ({1}): {2}\nConsider fixing the image so its width is a multiple of the resolution, or setting its 'width' and 'height' attribute manually.",
+                w,
+                res,
+                src,
+                el=el,
+            )
+        if h % res == 0:
+            el.set("height", str(int(h / res)))
+        else:
+            warn(
+                "The height ({0}px) of this image is not a multiple of the declared resolution ({1}): {2}\nConsider fixing the image so its height is a multiple of the resolution, or setting its 'width' and 'height' attribute manually.",
+                h,
+                res,
+                src,
+                el=el,
+            )

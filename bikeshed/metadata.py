@@ -126,6 +126,7 @@ class MetadataManager:
         self.workStatus = None
         self.wptDisplay = "none"
         self.wptPathPrefix = None
+        self.imgAutoSize = True
 
         self.otherMetadata = DefaultOrderedDict(list)
 
@@ -1347,6 +1348,9 @@ knownKeys = {
     ),
     "Ignored Vars": Metadata(
         "Ignored Vars", "ignoredVars", joinList, parseCommaSeparated
+    ),
+    "Image Auto Size": Metadata(
+        "Image Auto Size", "imgAutoSize", joinValue, parseBoolean
     ),
     "Implementation Report": Metadata(
         "Implementation Report", "implementationReport", joinValue, parseLiteral
