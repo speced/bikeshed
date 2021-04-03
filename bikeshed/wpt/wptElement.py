@@ -20,7 +20,8 @@ def processWptElements(doc):
     wptElements = findAll("wpt", doc)
     seenTestNames = set()
     for el in wptElements:
-        atLeastOneElement = True
+        if el.get("hidden") is None:
+            atLeastOneElement = True
         if testData is None:
             testData = loadTestData(doc)
         testNames = testNamesFromEl(el, pathPrefix=pathPrefix)
@@ -33,7 +34,10 @@ def processWptElements(doc):
                 )
                 continue
             seenTestNames.add(testName)
-        createHTML(doc, el, testNames, testData)
+        if el.get("hidden") is not None:
+            removeNode(el)
+        else:
+            createHTML(doc, el, testNames, testData)
 
     # <wpt-rest> elements
     wptRestElements = findAll("wpt-rest", doc)
