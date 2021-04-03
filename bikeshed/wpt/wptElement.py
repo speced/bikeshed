@@ -19,6 +19,7 @@ def processWptElements(doc):
     # <wpt> elements
     wptElements = findAll("wpt", doc)
     seenTestNames = set()
+    prevEl = None
     for el in wptElements:
         if el.get("hidden") is None:
             atLeastOneElement = True
@@ -41,6 +42,16 @@ def processWptElements(doc):
             titleLang = el.get("lang")
             titleDir = el.get("dir")
             createHTML(doc, el, testNames, testData, title, titleLang, titleDir)
+            if (
+                prevEl is not None
+                and prevEl.getnext() is el
+                and (prevEl.tail is None or prevEl.tail.strip() == "")
+            ):
+                appendTestList(prevEl, testNames, testData, title, titleLang, titleDir)
+                removeNode(el)
+            else:
+                createHTML(doc, el, testNames, testData, title, titleLang, titleDir)
+                prevEl = el
 
     # <wpt-rest> elements
     wptRestElements = findAll("wpt-rest", doc)
@@ -100,100 +111,105 @@ def createHTML(
         clearContents(blockEl)
         testSummaryEl = E.summary("Tests")
         appendChild(blockEl, testSummaryEl)
-        if title:
-            titleEl = E.p(
-                {
-                    "lang": titleLang,
-                    "dir": titleDir,
-                },
-                title,
-            )
-            appendChild(blockEl, titleEl)
-        testListEl = E.ul({"class": "wpt-tests-list"})
-        appendChild(blockEl, testListEl)
-        for testName in testNames:
-            if testName not in testData:
-                warn(f"Cannot find '{testName}' in the test data.")
-                continue
-            if ".https." in testName or ".serviceworker." in testName:
-                liveTestScheme = "https"
-            else:
-                liveTestScheme = "http"
-            _, _, lastNameFragment = testName.rpartition("/")
-            testType = testData[testName]
-            if testType in ["crashtest", "print-reftest", "reftest", "testharness"]:
-                singleTestEl = E.li(
-                    {"class": "wpt-test"},
-                    E.a(
-                        {
-                            "href": "https://wpt.fyi/results/" + testName,
-                            "class": "wpt-name",
-                        },
-                        lastNameFragment,
-                    ),
-                    " ",
-                    E.a(
-                        {
-                            "title": testName,
-                            "href": f"{liveTestScheme}://wpt.live/{testName}",
-                            "class": "wpt-live",
-                        },
-                        E.small("(live test)"),
-                    ),
-                    " ",
-                    E.a(
-                        {
-                            "href": "https://github.com/web-platform-tests/wpt/blob/master/"
-                            + testName,
-                            "class": "wpt-source",
-                        },
-                        E.small("(source)"),
-                    ),
-                )
-            elif testType in ["manual", "visual"]:
-                singleTestEl = E.li(
-                    {"class": "wpt-test"},
-                    E.span(
-                        {"class": "wpt-name"}, lastNameFragment, f" ({testType} test) "
-                    ),
-                    E.a(
-                        {
-                            "href": "https://github.com/web-platform-tests/wpt/blob/master/"
-                            + testName,
-                            "class": "wpt-source",
-                        },
-                        E.small("(source)"),
-                    ),
-                )
-            elif testType in ["wdspec"]:
-                singleTestEl = E.li(
-                    {"class": "wpt-test"},
-                    E.a(
-                        {
-                            "href": "https://wpt.fyi/results/" + testName,
-                            "class": "wpt-name",
-                        },
-                        lastNameFragment,
-                    ),
-                    " ",
-                    E.a(
-                        {
-                            "href": "https://github.com/web-platform-tests/wpt/blob/master/"
-                            + testName,
-                            "class": "wpt-source",
-                        },
-                        E.small("(source)"),
-                    ),
-                )
-            else:
-                warn(
-                    f"Programming error, the test {testName} is of type {testType}, which I don't know how to render. Please report this!"
-                )
-                continue
-
-            appendChild(testListEl, singleTestEl)
+        appendTestList(blockEl, testNames, testData, title, titleLang, titleDir)
     else:
         die("Programming error, uncaught WPT Display value in createHTML.")
+
+
+def appendTestList(
+    blockEl, testNames, testData, title=None, titleLang=None, titleDir=None
+):
+    if title:
+        titleEl = E.p(
+            {
+                "lang": titleLang,
+                "dir": titleDir,
+            },
+            title,
+        )
+        appendChild(blockEl, titleEl)
+    testListEl = E.ul({"class": "wpt-tests-list"})
+    appendChild(blockEl, testListEl)
+    for testName in testNames:
+        if testName not in testData:
+            warn(f"Cannot find '{testName}' in the test data.")
+            continue
+        if ".https." in testName or ".serviceworker." in testName:
+            liveTestScheme = "https"
+        else:
+            liveTestScheme = "http"
+        _, _, lastNameFragment = testName.rpartition("/")
+        testType = testData[testName]
+        if testType in ["crashtest", "print-reftest", "reftest", "testharness"]:
+            singleTestEl = E.li(
+                {"class": "wpt-test"},
+                E.a(
+                    {
+                        "href": "https://wpt.fyi/results/" + testName,
+                        "class": "wpt-name",
+                    },
+                    lastNameFragment,
+                ),
+                " ",
+                E.a(
+                    {
+                        "title": testName,
+                        "href": f"{liveTestScheme}://wpt.live/{testName}",
+                        "class": "wpt-live",
+                    },
+                    E.small("(live test)"),
+                ),
+                " ",
+                E.a(
+                    {
+                        "href": "https://github.com/web-platform-tests/wpt/blob/master/"
+                        + testName,
+                        "class": "wpt-source",
+                    },
+                    E.small("(source)"),
+                ),
+            )
+        elif testType in ["manual", "visual"]:
+            singleTestEl = E.li(
+                {"class": "wpt-test"},
+                E.span({"class": "wpt-name"}, lastNameFragment, f" ({testType} test) "),
+                E.a(
+                    {
+                        "href": "https://github.com/web-platform-tests/wpt/blob/master/"
+                        + testName,
+                        "class": "wpt-source",
+                    },
+                    E.small("(source)"),
+                ),
+            )
+        elif testType in ["wdspec"]:
+            singleTestEl = E.li(
+                {"class": "wpt-test"},
+                E.a(
+                    {
+                        "href": "https://wpt.fyi/results/" + testName,
+                        "class": "wpt-name",
+                    },
+                    lastNameFragment,
+                ),
+                " ",
+                E.a(
+                    {
+                        "href": "https://github.com/web-platform-tests/wpt/blob/master/"
+                        + testName,
+                        "class": "wpt-source",
+                    },
+                    E.small("(source)"),
+                ),
+            )
+        else:
+            warn(
+                f"Programming error, the test {testName} is of type {testType}, which I don't know how to render. Please report this!"
+            )
+            continue
+        appendChild(testListEl, singleTestEl)
+    if title:
+        appendChild(blockEl, E.hr())
 
 
 def testNamesFromEl(el, pathPrefix=None):
@@ -306,6 +322,9 @@ wptStyle = """
     padding: 0;
     grid-template-columns: 1fr auto auto;
     grid-column-gap: .5em;
+}
+.wpt-tests-block hr:last-child {
+    display: none;
 }
 .wpt-test {
     display: contents;
