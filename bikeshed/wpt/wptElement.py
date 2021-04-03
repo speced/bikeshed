@@ -37,7 +37,7 @@ def processWptElements(doc):
         if el.get("hidden") is not None:
             removeNode(el)
         else:
-            createHTML(doc, el, testNames, testData)
+            createHTML(doc, el, testNames, testData, el.get("title"))
 
     # <wpt-rest> elements
     wptRestElements = findAll("wpt-rest", doc)
@@ -82,16 +82,19 @@ def processWptElements(doc):
         doc.extraStyles["style-wpt"] = wptStyle
 
 
-def createHTML(doc, blockEl, testNames, testData):
+def createHTML(doc, blockEl, testNames, testData, title=None):
     if doc.md.wptDisplay == "none":
         removeNode(blockEl)
     elif doc.md.wptDisplay == "inline":
         blockEl.tag = "details"
         addClass(blockEl, "wpt-tests-block")
         removeAttr(blockEl, "pathprefix")
+        removeAttr(blockEl, "title")
         clearContents(blockEl)
         testSummaryEl = E.summary("Tests")
         appendChild(blockEl, testSummaryEl)
+        if title:
+            appendChild(blockEl, E.p(title))
         testListEl = E.ul({"class": "wpt-tests-list"})
         appendChild(blockEl, testListEl)
         for testName in testNames:
