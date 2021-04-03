@@ -101,13 +101,15 @@ def createHTML(
 ):
     if doc.md.wptDisplay == "none":
         removeNode(blockEl)
-    elif doc.md.wptDisplay == "inline":
+    elif doc.md.wptDisplay in ("inline", "open", "closed"):
         blockEl.tag = "details"
         addClass(blockEl, "wpt-tests-block")
         removeAttr(blockEl, "pathprefix")
         removeAttr(blockEl, "title")
         blockEl.set("lang", "en")
         blockEl.set("dir", "ltr")
+        if doc.md.wptDisplay in ("open", "inline"):
+            blockEl.set("open", "")
         clearContents(blockEl)
         testSummaryEl = E.summary("Tests")
         appendChild(blockEl, testSummaryEl)

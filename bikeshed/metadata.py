@@ -1023,10 +1023,10 @@ def parseMetadataOrder(key, val, lineNum):  # pylint: disable=unused-argument
 
 def parseWptDisplay(key, val, lineNum):  # pylint: disable=unused-argument
     val = val.lower()
-    if val in ("none", "inline"):
+    if val in ("none", "inline", "open", "closed"):
         return val
     die(
-        "WPT Display metadata only accepts the values 'none' or 'inline'. Got '{0}'.",
+        "WPT Display metadata only accepts the values 'none', 'closed', 'open', or 'inline'. Got '{0}'.",
         val,
         lineNum=lineNum,
     )
