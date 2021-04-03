@@ -78,7 +78,7 @@ def processWptElements(doc):
                 testData = loadTestData(doc)
             checkForOmittedTests(pathPrefix, testData, seenTestNames)
 
-    if atLeastOneElement:
+    if atLeastOneElement and doc.md.wptDisplay != "none":
         doc.extraStyles["style-wpt"] = wptStyle
 
 
