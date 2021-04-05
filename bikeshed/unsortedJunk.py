@@ -937,6 +937,8 @@ def processBiblioLinks(doc):
         biblioDisplay = el.get("data-biblio-display", doc.md.defaultBiblioDisplay)
         if biblioDisplay == "inline":
             replaceContents(el, ref.title)
+            if ref.url is not None:
+                el.set("href", ref.url)
 
 
 def verifyUsageOfAllLocalBiblios(doc):
