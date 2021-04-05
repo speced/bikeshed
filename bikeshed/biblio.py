@@ -1,6 +1,7 @@
 import re
 from collections import defaultdict
 
+import html5lib
 import attr
 
 from . import constants
@@ -165,6 +166,14 @@ class StringBiblioEntry(BiblioEntry):
 
     data = attr.ib(default="")
     linkText = attr.ib(default="")
+
+    def __attrs_post_init__(self):
+        doc = html5lib.parse(self.data, treebuilder="lxml", namespaceHTMLElements=False)
+        title = find("cite", doc)
+        if title is not None:
+            self.title = textContent(title)
+        else:
+            self.title = textContent(doc.getroot())
 
     def valid(self):
         return True
