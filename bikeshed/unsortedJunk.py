@@ -937,7 +937,7 @@ def processBiblioLinks(doc):
         biblioDisplay = el.get("data-biblio-display", doc.md.defaultBiblioDisplay)
         if biblioDisplay == "inline":
             if (
-                el.text == "[" + linkText + "]"
+                el.text == f"[{linkText}]"
             ):  # False if it's already been replaced by an author supplied text using the [[FOOBAR inline|custom text]] syntax.
                 replaceContents(el, ref.title)
             if ref.url is not None:
