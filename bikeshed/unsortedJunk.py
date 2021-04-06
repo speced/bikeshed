@@ -554,7 +554,7 @@ def fillInterDocumentReferenceFromShepherd(doc, el, spec, section):
     el.set("href", heading["url"])
     if isEmpty(el):
         appendChild(el, E.cite("{spec}".format(**heading)))
-        appendChild(el, " §{number} {text}".format(**heading))
+        appendChild(el, " §\u202f{number} {text}".format(**heading))
     removeAttr(el, "data-link-spec", "spec-section")
 
 
@@ -570,7 +570,7 @@ def fillInterDocumentReferenceFromSpecref(doc, el, spec, section):
     el.tag = "a"
     el.set("href", bib.url + section)
     if isEmpty(el):
-        el.text = bib.title + " §" + section[1:]
+        el.text = bib.title + " §\u202f" + section[1:]
     removeAttr(el, "data-link-spec", "spec-section")
 
 
