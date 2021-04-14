@@ -274,10 +274,12 @@ class MetadataManager:
             macros["longstatus"] = config.shortToLongStatus[self.status]
         else:
             macros["longstatus"] = ""
-        if self.status in ("w3c/LCWD", "w3c/FPWD"):
+        if self.status in ("w3c/LCWD", "w3c/FPWD", "w3c/NOTE-FPWD"):
             macros["status"] = "WD"
         elif self.status in ("w3c/WG-NOTE", "w3c/IG-NOTE"):
             macros["status"] = "NOTE"
+        elif self.status == "w3c/NOTE-ED":
+            macros["status"] = "ED"
         else:
             macros["status"] = self.rawStatus
         if self.workStatus:
@@ -339,7 +341,7 @@ class MetadataManager:
             macros["mailinglist"] = self.mailingList
         if self.mailingListArchives:
             macros["mailinglistarchives"] = self.mailingListArchives
-        if self.status == "w3c/FPWD":
+        if self.status in ("w3c/FPWD", "w3c/NOTE-FPWD", "w3c/NOTE-WD"):
             macros[
                 "w3c-stylesheet-url"
             ] = "https://www.w3.org/StyleSheets/TR/2016/W3C-WD"
@@ -355,6 +357,10 @@ class MetadataManager:
             macros[
                 "w3c-stylesheet-url"
             ] = "https://www.w3.org/StyleSheets/TR/2016/cg-final"
+        elif self.status == "w3c/NOTE-ED":
+            macros[
+                "w3c-stylesheet-url"
+            ] = "https://www.w3.org/StyleSheets/TR/2016/W3C-ED"
         else:
             shortStatus = (
                 self.rawStatus.partition("/")[2]
