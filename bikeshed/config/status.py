@@ -23,6 +23,9 @@ shortToLongStatus = {
     "w3c/WG-NOTE": "W3C Working Group Note",
     "w3c/IG-NOTE": "W3C Interest Group Note",
     "w3c/NOTE": "W3C Note",
+    "w3c/NOTE-ED": "Editor's Draft",
+    "w3c/NOTE-WD": "W3C Working Draft",
+    "w3c/NOTE-FPWD": "W3C First Public Working Draft",
     "w3c/MO": "W3C Member-only Draft",
     "w3c/UD": "Unofficial Proposal Draft",
     "w3c/CG-DRAFT": "Draft Community Group Report",
@@ -90,6 +93,8 @@ snapshotStatuses = [
     "w3c/WG-NOTE",
     "w3c/IG-NOTE",
     "w3c/NOTE",
+    "w3c/NOTE-WD",
+    "w3c/NOTE-FPWD",
     "w3c/MO",
 ]
 datedStatuses = [
@@ -104,6 +109,8 @@ datedStatuses = [
     "w3c/WG-NOTE",
     "w3c/IG-NOTE",
     "w3c/NOTE",
+    "w3c/NOTE-WD",
+    "w3c/NOTE-FPWD",
     "w3c/MO",
     "whatwg/RD",
 ]
@@ -138,7 +145,16 @@ noEDStatuses = [
 
 # These statuses are usable by any group operating under the W3C Process
 # Document. (So, not by Community and Business Groups.)
-w3cProcessDocumentStatuses = frozenset(["w3c/ED", "w3c/NOTE", "w3c/UD"])
+w3cProcessDocumentStatuses = frozenset(
+    [
+        "w3c/ED",
+        "w3c/NOTE",
+        "w3c/NOTE-ED",
+        "w3c/NOTE-WD",
+        "w3c/NOTE-FPWD",
+        "w3c/UD",
+    ]
+)
 
 # Interest Groups are limited to these statuses
 w3cIGStatuses = frozenset(["w3c/IG-NOTE"]).union(w3cProcessDocumentStatuses)

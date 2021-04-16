@@ -889,6 +889,9 @@ Several keys are required information, and will cause the processor to flag an e
 			* WG-NOTE: "W3C Working Group Note"
 			* IG-NOTE: "W3C Interest Group Note"
 			* NOTE: "W3C Note" ([unclear what this is used for](https://github.com/w3c/tr-design/issues/124))
+			* NOTE-ED: "Editor's Draft" of a Group Note
+			* NOTE-WD: "W3C Working Draft" of a Group Note
+			* NOTE-FPWD: "W3C First Public Working Draft" of a Group Note
 			* MO: "W3C Member-only Draft"
 			* UD: "Unofficial Proposal Draft"
 			* CG-DRAFT: "Draft Community Group Report"
@@ -1238,8 +1241,8 @@ There are several additional optional keys:
 		or skip the element entirely by putting `nocrossorigin` on it or an ancestor.
 	* <dfn>WPT Path Prefix</dfn> is a partial URL path
 		that specifies a common path prefix for all of the tests in your <{wpt}> elements.
-	* <dfn>WPT Display</dfn> takes the values "none" or "inline",
-		and specifies whether or not <{wpt}> elements display anything in the output document.
+	* <dfn>WPT Display</dfn> takes the values "none", "closed", "open", or "inline",
+		and specifies whether and how <{wpt}> elements display anything in the output document.
 	* <dfn>Tracking Vector Class</dfn> is the HTML `class` attribute value used on the link inserted in elements annotated with the `tracking-vector` attribute.
 	* <dfn>Tracking Vector Image</dfn> is an image URL that can be used to represent tracking vectors with an external image.
 		Otherwise an inline SVG is used. The image is a child of the aforementioned link.
@@ -1247,6 +1250,8 @@ There are several additional optional keys:
 	* <dfn>Tracking Vector Image Height</dfn> is the height of the external image, if any.
 	* <dfn>Tracking Vector Alt Text</dfn> is the replacement text for the inline SVG or external image.
 	* <dfn>Tracking Vector Title</dfn> is the title for the inline SVG or external image.
+	* <dfn>Image Auto Size</dfn> is a [=boolish=] (defaulting to true)
+		that specifies whether Bikeshed should [[#img-size|automatically detect the size]] of images used in the document.
 </ul>
 
 <div class=note>
@@ -2035,7 +2040,59 @@ The various "Tracking Vector *" metadata keys can be used to customize the appea
 though it's encouraged to leave those in their default state for a consistent appearance across standards.
 
 
+Image Size Detection {#img-size}
+----------------
 
+If an <{img}> element has a neither a <{img/width}> nor a <{img/height}> attribute,
+Bikeshed will automatically detect these dimensions from the image file
+and insert both attributes into the resulting markup.
+
+<div class=example id=img-size-simple>
+  Given this markup:
+  <xmp highlight=html><img alt="…" src="img.jpg"></xmp>
+  if the <code>img.jpg</code> file is 300 pixels wide and 100 pixels tall,
+  bikeshed will generate the following output:
+  <xmp highlight=html><img alt="…" src="img.jpg" width="300" height="100"></xmp>
+</div>
+
+Bikeshed will also detect and insert the dimensions of the image
+if the element has no <{img/src}> attribute but does have a <{img/srcset}> attribute.
+In that case,
+it accepts a narrow subset of the <{img/srcset}> syntax:
+a single <a spec=html>image source</a> URL
+followed by a single <a spec=html>pixel density descriptor</a>,
+limited to integers.
+Since the <{img/src}> attribute is mandatory in HTML,
+bikeshed will also add it to the output.
+
+<div class=example id=img-size-srcset>
+  In order to specify high resolution images,
+  use the following syntax:
+  <xmp highlight=html><img alt="…" srcset="highDPI.jpg 2x"></xmp>
+  If the <code>highDPI.jpg</code> file is 600 pixels wide and 200 pixels tall,
+  bikeshed will generate the following output:
+  <xmp highlight=html><img alt="…" src="highDPI.jpg" srcset="highDPI.jpg 2x" width="300" height="100"></xmp>
+</div>
+
+Note: Bikeshed will only successfully detect the size of local images,
+and will not attempt to fetch resources over the network,
+as there is no way for Bikeshed to know
+whether the size it would get is stable.
+Using local images is generally preferred,
+but if you need to use a remote one,
+consider setting the <{img/width}> and <{img/height}> manually.
+
+If either of the <{img/width}> and <{img/height}> attributes is already set
+(or both are),
+or if both the <{img/src}> and <{img/srcset}> attributes are set,
+Bikeshed will assume you know what you're doing,
+skip detection,
+and leave the element unchanged.
+
+To opt out of this automated size detection for a single image,
+set the boolean <dfn dfn-for=img element-attr>no-autosize</dfn> attribute on it.
+To opt out for the entire document,
+specify the [=Image Auto Size=] metadata with the value false.
 
 <!--
 ████████  ████████ ██    ██
@@ -3455,7 +3512,7 @@ and will override the metadata if specified.
 
 	<xmp highlight=html>
 		<pre class=metadata>
-		WPT Display: inline
+		WPT Display: open
 		WPT Path Prefix: /foo-spec/
 		</pre>
 
@@ -3491,19 +3548,92 @@ By default, <{wpt}> elements don't display in the output document;
 they're intended to annotate the source file to help with spec authoring,
 and trigger Bikeshed's checks.
 If you want to produce a test-annotated version of the output,
-specify the [=WPT Display=] metadata with the value "inline";
+specify the [=WPT Display=] metadata with the value "open" or "closed";
 all of the <{wpt}> elements will become usefully-formatted lists of their contained tests,
 with links to <a href="https://wpt.fyi">wpt.fyi</a>,
 the live test on <a href="https://w3c-test.org">w3c-test.org</a>,
 and the source code on [GitHub](https://github.com/web-platform-tests/wpt).
+The difference between "open" and "closed" is that
+with the former, all <{wpt}> elements are initially displayed in a collapsed state
+to avoid getting in the way of reading the document,
+while "open" causes them to be expanded initially.
+In either case, the use can interactively collapse or expand each element.
 
 <figure>
-	<img src=images/wpt-display-example.png>
+	<img srcset="images/wpt-display-open.png 2x">
 	<figcaption>
-		When `WPT Display: inline` is set,
+		When `WPT Display: open` is set,
 		the <{wpt}> element turns into a "TESTS" block.
 	</figcaption>
 </figure>
+<figure>
+	<img srcset="images/wpt-display-closed.png 2x">
+	<figcaption>
+		When `WPT Display: closed` is set,
+		the <{wpt}> element also turns into a "TESTS" block,
+		but it is initially collapsed.
+	</figcaption>
+</figure>
+
+Note: For compatibility with earlier versions of Bikshed,
+"inline" is accepted as a synonym of "open".
+
+When the  <a element-attr>hidden</a> attribute is set on the <{wpt}> element,
+Bikeshed will take the tests listed in that element into account,
+but exclude them from the output,
+even when producing a test-annotated version.
+
+Note: This can be useful
+when tests for all versions or levels of a single specification are stored together
+under a single directory.
+Using [=WPT Path Prefix=] would cause Bikeshed to complain
+if the tests are not listed,
+but the tests may only be relevant for a later version of the specification.
+In such cases,
+listing the tests in a <code highlight=html>&lt;wpt hidden></code> element silences the warnings,
+without adding anything irrelevant to the output.
+
+Information about a set of tests described in a <{wpt}> element
+can be provided to the reader
+by writing it in the <a element-attr for=html-global>title</a> attribute of the <{wpt}> element.
+This will be inserted in the output as an introductory paragraph
+before the test list.
+A <a element-attr for=html-global>lang</a> or <a element-attr>dir</a> set on the <{wpt}> element
+will apply to the introductory paragraph if there is one.
+
+<div class=example>
+	<xmp highlight=html>
+		<h1 id=intro>Introduction</h1>
+
+		This specification introduces…
+
+		<wpt title="The following tests are crash tests
+		            that relate to general usage
+		            of the features described in this specification
+		            but are not tied to any particular normative statement.">
+		crash-001.html
+		crash-002.html
+		</wpt>
+	</xmp>
+
+	The test block in the example above would be rendered as follows:
+
+	<figure>
+		<img alt="A WPT element with a list of tests, preceded by an introductory paragraph"
+		     srcset="images/tests-with-intro.png 2x">
+	</figure>
+</div>
+
+If multiple <{wpt}> follow each other in the source,
+with nothing between them other than whitespace,
+they will be fused together in the output,
+visually taking less space than if they remained as separate elements.
+This will work even
+if they have different <a element-attr>pathprefix</a>
+or <a element-attr for=html-global>title</a> attributes.
+When merging elements with <a element-attr for=html-global>title</a> attributes,
+the tests listed in each element will be preceded by the relevant introductory paragraph,
+and visually separated from tests listed in different <{wpt}> elements.
 
 Note: More tools and options for integrating with WPT will be developed in the future.
 
