@@ -137,11 +137,7 @@ The terms [=fulfilled=], [=rejected=], [=resolved=], [=pending=] and
 [=settled=] used in the context of Promises are defined in [[!ECMASCRIPT-6.0]].
 
 The terms {{ReadableStream}} and {{WritableStream}} are defined in
-[[!WHATWG-STREAMS]].  Note that despite sharing the name "stream", these are
-distinct from the IncomingStream, OutgoingStream, and BidirectionalStream
-defined here. The IncomingStream, OutgoingStream, and BidirectionalStream
-defined here correspend to a higher level of abstraction that contain and
-depend on the lower-level concepts of "streams" defined in [[!WHATWG-STREAMS]].
+[[!WHATWG-STREAMS]].
 
 # `UnidirectionalStreamsTransport` Mixin #  {#unidirectional-streams-transport}
 
@@ -195,9 +191,9 @@ interface mixin UnidirectionalStreamsTransport {
    The getter steps for `incomingUnidirectionalStreams` are:
      1. Let |transport| be the `UnidirectionalStreamsTransport` on which
         the `incomingUnidirectionalStreams` getter is invoked.
-     1. Return the value of the {{[[ReceivedStreams]]}} internal slot.
+     1. Return |transport|'s [=[[ReceivedStreams]]=].
      1. For each unidirectional stream received, create a corresponding
-        {{ReceiveStream}} and insert it into {{[[ReceivedStreams]]}}. As data
+        {{ReceiveStream}} and insert it into [=[[ReceivedStreams]]=]. As data
         is received over the unidirectional stream, insert that data into the
         corresponding `ReceiveStream` object.  When the remote side closes or
         aborts the stream, close or abort the corresponding `ReceiveStream`.
@@ -216,7 +212,7 @@ steps:
 1. Queue a task to run the following sub-steps:
   1. If |transport|'s state is `"closed"` or `"failed"`, abort these sub-steps.
   1. Let |stream| be a newly created {{SendStream}} for |association|.
-  1. Add |stream| to |transport|'s {{[[OutgoingStreams]]}} slot.
+  1. Add |stream| to |transport|'s [=[[OutgoingStreams]]=].
   1. Resolve |p| with |stream|.
 
 </div>
@@ -283,9 +279,9 @@ interface mixin BidirectionalStreamsTransport {
 
    The getter steps for the `incomingBidirectionalStreams` attribute SHALL be:
 
-     1. Return the value of the {{[[ReceivedBidirectionalStreams]]}} internal slot.
+     1. Return [=[[ReceivedBidirectionalStreams]]=].
      1. For each bidirectional stream received, create a corresponding
-        {{BidirectionalStream}} and insert it into {{[[ReceivedBidirectionalStreams]]}}.
+        {{BidirectionalStream}} and insert it into [=[[ReceivedBidirectionalStreams]]=].
         As data is received over the bidirectional stream, insert that data into the
         corresponding {{BidirectionalStream}}.  When the remote side closes or aborts
         the stream, close or abort the corresponding {{BidirectionalStream}}.
@@ -304,8 +300,8 @@ interface mixin BidirectionalStreamsTransport {
 1. Queue a task to run the following sub-steps:
   1. If |transport|'s state is `"closed"` or `"failed"`, abort these sub-steps.
   1. Let |stream| be a newly created {{BidirectionalStream}} object for |association|.
-  1. Add |stream| to |transport|'s {{[[ReceivedBidirectionalStreams]]}} slot.
-  1. Add |stream| to |transport|'s {{[[OutgoingStreams]]}} slot.
+  1. Add |stream| to |transport|'s [=[[ReceivedBidirectionalStreams]]=].
+  1. Add |stream| to |transport|'s [=[[OutgoingStreams]]=].
   1. Resolve |p| with |stream|.
 
 </div>
@@ -346,7 +342,7 @@ interface mixin DatagramTransport {
    Datagrams written to the returned {{WritableStream}} member will be sent.
 
    The getter steps for the `datagrams` attribute SHALL be:
-     1. Return the value of the {{[[Datagrams]]}} internal slot.
+     1. Return [=this=]'s [=[[Datagrams]]=].
 
 ## Procedures ## {#datagrams-transport-procedures}
 
@@ -357,9 +353,41 @@ is defined by running the following steps:
 
 The <dfn>writeDatagrams</dfn> algorithm is given a |transport| as parameter and
 |data| as input. It is defined by running the following steps:
-1. TODO
-1. Enqueue data for datagram transmission.
-1. Return [=a promise resolved with=] undefined.
+1. Let |timestamp| be a timestamp representing now.
+1. If |data| is not a {{Uint8Array}} object, then return [=a promise rejected with=] a {{TypeError}}.
+1. Let |promise| be a new promise.
+1. Let |bytes| be a copy of bytes which |data| represents.
+1. Let |chunk| be a tuple of |bytes|, |timestamp| and |promise|.
+1. Enqueue |chunk| to |transport|'s [=[[OutgoingDatagramsQueue]]=].
+1. If the length of |transport|'s [=[[OutgoingDatagramsQueue]]=] is less than
+   |transport|'s [=[[OutgoingDatagramsHighWaterMark]]=], then [=resolve=] |promise| with undefined.
+1. Return |promise|.
+
+Note: The associated {{WritableStream}} calls [=writeDatagrams=] only when all the promises that
+have been returned by [=writeDatagrams=] have been resolved. Hence the timestamp and the expiration
+duration work well only when the web developer pays attention to
+{{WritableStreamDefaultWriter/ready|WritableStreamDefaultWriter.ready}}.
+
+To <dfn>sendDatagrams</dfn>, given a {{WebTransport}} object |transport|, run these steps:
+1. Let |queue| be |transport|'s [=[[OutgoingDatagramsQueue]]=].
+1. Let |duration| be |transport|'s [=[[OutgoingDatagramsExpirationDuration]]=].
+1. If |duration| is null, then set |duration| to an [=implementation-defined=] value.
+1. While |queue| is not empty:
+  1. Let |bytes|, |timestamp| and |promise| be |queue|'s first element.
+  1. If more than |duration| milliseconds have passed since |timestamp|, then:
+     1. [=Resolve=] |promise| with undefined.
+     1. Remove the first element from |queue|.
+  1. Otherwise, break this loop.
+1. While |queue| is not empty:
+  1. Let |bytes|, |timestamp| and |promise| be |queue|'s first element.
+  1. If it is not possible to send |bytes| to the network immediately, then break this loop.
+  1. Send |bytes| to the network. [[!WEB-TRANSPORT-HTTP3]]
+  1. [=Resolve=] |promise| with undefined.
+  1. Remove the first element from |queue|.
+
+The user agent SHOULD run [=sendDatagrams=] for any {{WebTransport}} object whose
+[=[[State]]=] is `"connected"` as soon as reasonably possible whenever the algorithm can make
+progress.
 
 # `DatagramDuplexStream` Interface #  {#duplex-stream}
 
@@ -419,6 +447,69 @@ WebTransport includes BidirectionalStreamsTransport;
 WebTransport includes DatagramTransport;
 </pre>
 
+## Internal slots ## {#webtransport-internal-slots}
+
+A {{WebTransport}} object has the following internal slots.
+
+<table class="data" dfn-for="WebTransport">
+ <thead>
+  <tr>
+   <th>Internal Slot
+   <th>Description (<em>non-normative</em>)
+  </tr>
+ </thead>
+ <tbody>
+  <tr>
+   <td><dfn>\[[OutgoingStreams]]</dfn>
+   <td class="non-normative">A sequence of {{SendStream}} objects.
+  </tr>
+  <tr>
+   <td><dfn>\[[ReceivedStreams]]</dfn>
+   <td class="non-normative">A {{ReadableStream}} consisting of {{ReceiveStream}} objects.
+  </tr>
+  <tr>
+   <td><dfn>\[[ReceivedBidirectionalStreams]]</dfn>
+   <td class="non-normative">A {{ReadableStream}} consisting of {{BidirectionalStream}} objects.
+  </tr>
+  <tr>
+   <td><dfn>\[[State]]</dfn>
+   <td class="non-normative">A {{WebTransportState}}.
+  </tr>
+  <tr>
+   <td><dfn>\[[Ready]]</dfn>
+   <td class="non-normative">A promise fulfilled when the associated {{WebTransport}} object is
+   ready to use, or rejected if it failed to connect.
+  </tr>
+  <tr>
+   <td><dfn>\[[Closed]]</dfn>
+   <td class="non-normative">A promise fulfilled when the associated {{WebTransport}} object is
+   closed gracefully, or rejected when it is closed abruptly or failed on initialization.
+  </tr>
+  <tr>
+   <td><dfn>\[[Datagrams]]</dfn>
+   <td class="non-normative">A {{DatagramDuplexStream}}.
+  </tr>
+  <tr>
+   <td><dfn>\[[OutgoingDatagramsQueue]]</dfn>
+   <td class="non-normative">A queue of tuples of an outgoing datagram, a timestamp and a promise
+   which is resolved when the datagram is sent or discarded.
+  </tr>
+  <tr>
+   <td><dfn>\[[OutgoingDatagramsHighWaterMark]]</dfn>
+   <td class="non-normative">An integer representing the [=high water mark=] of the outgoing
+   datagrams.
+  </tr>
+  <tr>
+   <td><dfn>\[[OutgoingDatagramsExpirationDuration]]</dfn>
+   <td class="non-normative">A {{double}} value representing the expiration duration for outgoing
+   datagrams (in seconds), or null.
+  </tr>
+  <tr>
+   <td><dfn>\[[Connection]]</dfn>
+   <td class="non-normative">A [=connection=] for this {{WebTransport}} object, or null.
+  </tr>
+</table>
+
 ## Constructor ##  {#webtransport-constructor}
 
 When the {{WebTransport/constructor()}} constructor is invoked, the user
@@ -435,55 +526,56 @@ agent MUST run the following steps:
    {{WebTransportOptions/serverCertificateFingerprints}} if it exists, and null otherwise.
 1. If |dedicated| is false and |serverCertificateFingerprints| is non-null, then [=throw=] a
    {{TypeError}}.
-1. Let |transport| be a newly constructed {{WebTransport}} object.
-1. Let |transport| have an
-   <dfn attribute for="WebTransport">\[[OutgoingStreams]]</dfn> internal slot
-   representing a sequence of {{OutgoingStream}} objects, initialized to empty.
-1. Let |transport| have a
-   <dfn attribute for="WebTransport">\[[ReceivedStreams]]</dfn> internal slot
-   representing a {{ReadableStream}} of {{IncomingStream}} objects, initialized
-   to empty.
-1. Let |transport| have a
-  <dfn attribute for="WebTransport">\[[ReceivedBidirectionalStreams]]</dfn>
-  internal slot representing a {{ReadableStream}} of {{BidirectionalStream}}
-  objects, initialized to empty.
-1. Let |transport| have a
-   <dfn attribute for="WebTransport">\[[WebTransportState]]</dfn> internal
-   slot, initialized to `"connecting"`.
-1. Let |transport| have a
-   <dfn attribute for="WebTransport">\[[Ready]]</dfn> internal
-   slot, initialized to a promise.
-1. Let |transport| have a
-   <dfn attribute for="WebTransport">\[[Closed]]</dfn> internal
-   slot, initialized to a promise.
-1. Let |transport| have an
-   <dfn attribute for="WebTransport">\[[OutgoingDatagrams]]</dfn> internal slot
-   initialized to the result of [=WritableStream/creating=] a {{WritableStream}},
+1. Let |transport| be a newly constructed {{WebTransport}} object, with:
+    : [=[[OutgoingStreams]]=]
+    :: empty
+    : [=[[ReceivedStreams]]=]
+    :: a new {{ReadableStream}}
+    : [=[[ReceivedBidirectionalStreams]]=]
+    :: a new {{ReadableStream}}
+    : [=[[State]]=]
+    :: `"connecting"`
+    : [=[[Ready]]=]
+    :: a new promise
+    : [=[[Closed]]=]
+    :: a new promise
+    : [=[[Datagrams]]=]
+    :: null
+       <div class="note">
+        <p>This slot cannot be set to null, but this case is fine because we set a value in the
+           subsequent steps.</p>
+       </div>
+    : [=[[OutgoingDatagramsQueue]]=]
+    :: an empty queue
+    : [=[[OutgoingDatagramsHighWaterMark]]=]
+    :: an [=implementation-defined=] integer
+       <div class="note">
+        <p>This implementation-defined value should be tuned to ensure decent throughput, without
+           jeopardizing the timeliness of transmitted data.</p>
+       </div>
+    : [=[[OutgoingDatagramsExpirationDuration]]=]
+    :: null
+    : [=[[Connection]]=]
+    :: null
+1. Let |outgoingDatagrams| be the result of [=WritableStream/creating=] a {{WritableStream}},
    its [=WritableStream/create/writeAlgorithm=] set to [=writeDatagrams=] given
    |transport| as a parameter.
-1. Let |transport| have an
-   <dfn attribute for="WebTransport">\[[IncomingDatagrams]]</dfn> internal
-   slot initialized to the result of <a dfn for="ReadableStream">creating</a> a
+1. Let |incomingDatagrams| be the result of <a dfn for="ReadableStream">creating</a> a
    {{ReadableStream}}. `transport.[[IncomingDatagrams]]` is provided datagrams
     using the [=readDatagrams=] algorithm given |transport| as a parameter.
-1. Let |transport| have a
-   <dfn attribute for="WebTransport">\[[Datagrams]]</dfn> internal slot
-   initialized to the result of [=DatagramDuplexStream/creating=] a {{DatagramDuplexStream}},
-   its [=DatagramDuplexStream/create/readable=] set to |transport|.{{[[IncomingDatagrams]]}},
-   and its [=DatagramDuplexStream/create/writable=] set to |transport|.{{[[OutgoingDatagrams]]}}.
-1. Let |transport| have a
-   <dfn attribute for="WebTransport">\[[Connection]]</dfn> internal slot initialized to null.
+1. Set |transport|'s [=[[Datagrams]]=] to the result of [=DatagramDuplexStream/creating=] a
+   {{DatagramDuplexStream}}, its [=DatagramDuplexStream/create/readable=] set to
+   |incomingDatagrams| and its [=DatagramDuplexStream/create/writable=] set to |outgoingDatagrams|.
 1. Let |promise| be the result of [=initialize WebTransport over HTTP|initializing WebTransport
    over HTTP=], with |transport|, |parsedURL| and |dedicated|.
 1. [=Upon fulfillment=] of |promise|, run these steps:
-   1. If |transport|'s {{[[WebTransportState]]}} internal slot is not `"connecting"`, then abort
-      these steps.
-   1. Set |transport|'s {{[[WebTransportState]]}} internal slot to `"connected"`.
-   1. Resolve |transport|'s {{[[Ready]]}} internal slot with {{undefined}}.
+   1. If |transport|'s [=[[State]]=] is not `"connecting"`, then abort these steps.
+   1. Set |transport|'s [=[[State]]=] to `"connected"`.
+   1. Resolve |transport|'s [=[[Ready]]=] with {{undefined}}.
 1. [=Upon rejection=] of |promise| with |error|, run these steps:
-   1. Set |transport|'s {{[[WebTransportState]]}} internal slot to `"failed"`.
-   1. Reject |transport|'s {{[[Ready]]}} internal slot with |error|.
-   1. Reject |transport|'s {{[[Closed]]}} internal slot with |error|.
+   1. Set |transport|'s [=[[State]]=] to `"failed"`.
+   1. Reject |transport|'s [=[[Ready]]=] with |error|.
+   1. Reject |transport|'s [=[[Closed]]=] with |error|.
 1. Return |transport|.
 
 <div algorithm="initialize WebTransport over HTTP">
@@ -498,7 +590,7 @@ To <dfn>initialize WebTransport over HTTP</dfn>, given a {{WebTransport}} object
    |networkPartitionKey|, |url|'s [=url/origin=], false, [=obtain a connection/http3Only=] set to
    true, and [=obtain a connection/dedicated=] set to |dedicated|.
 1. If |connection| is failure, then reject |promise| with a {{TypeError}} and abort these steps.
-1. Set |transport|'s {{[[Connection]]}} internal slot to |connection|.
+1. Set |transport|'s [=[[Connection]]=] to |connection|.
 1. Wait for |connection| to receive the first SETTINGS frame, and let |settings| be a dictionary that
    represents the SETTINGS frame.
 1. If |settings| doesn't contain SETTINGS_ENABLE_WEBTRANPORT with a value of 1, or it doesn't
@@ -513,18 +605,17 @@ To <dfn>initialize WebTransport over HTTP</dfn>, given a {{WebTransport}} object
 ## Attributes ##  {#webtransport-attributes}
 
 : <dfn for="WebTransport" attribute>state</dfn>
-:: The current state of the transport. On getting, it MUST return the value of
-   the {{[[WebTransportState]]}} internal slot.
+:: The current state of the transport. On getting, it MUST return [=this=]'s [=[[State]]=].
 : <dfn for="WebTransport" attribute>ready</dfn>
-:: On getting, it MUST return the value of the {{[[Ready]]}} internal slot.
+:: On getting, it MUST return [=this=]'s [=[[Ready]]=].
 : <dfn for="WebTransport" attribute>closed</dfn>
-:: On getting, it MUST return the value of the {{[[Closed]]}} internal slot.
+:: On getting, it MUST return [=this=]'s [=[[Closed]]=].
 :: This promise MUST be [=resolved=] when the transport is closed; an
    implementation SHOULD include error information in the `reason` and
    `errorCode` fields of {{WebTransportCloseInfo}}.
 : <dfn for="WebTransport" attribute>onstatechange</dfn>
 :: This event handler, of event handler event type `statechange`, MUST be fired
-   any time the {{[[WebTransportState]]}} slot changes, unless the state changes
+   any time the [=[[State]]=] changes, unless the state changes
    due to calling {{WebTransport/close}}.
 
 ## Methods ##  {#webtransport-methods}
@@ -535,9 +626,9 @@ To <dfn>initialize WebTransport over HTTP</dfn>, given a {{WebTransport}} object
 
    When close is called, the user agent MUST run the following steps:
      1. Let |transport| be the WebTransport on which `close` is invoked.
-     1. If |transport|'s {{[[WebTransportState]]}} is `"closed"` or `"failed"`,
+     1. If |transport|'s [=[[State]]=] is `"closed"` or `"failed"`,
         then abort these steps.
-     1. Set |transport|'s {{[[WebTransportState]]}} to `"closed"`.
+     1. Set |transport|'s [=[[State]]=] to `"closed"`.
      1. Let `closeInfo` be the first argument.
      1. If the connection is dedicated, start the [=Immediate Close=] procedure
         by sending an CONNECTION_CLOSE frame with its error code value set to the value
@@ -643,34 +734,31 @@ enum WebTransportState {
 : <dfn for="WebTransportState" enum-value>"closed"</dfn>
 :: The transport has been closed intentionally via a call to
    {{WebTransport/close()}} or receipt of a closing message from the remote
-   side.  When the {{WebTransport}}'s internal {{[[WebTransportState]]}} slot
+   side.  When the {{WebTransport}}'s [=[[State]]=]
    transitions to `closed` the user agent MUST run the following steps:
 
    1. Let |transport| be the {{WebTransport}}.
-   1. Close the {{ReadableStream}} in |transport|'s {{[[ReceivedStreams]]}} internal slot.
+   1. Close the {{ReadableStream}} in |transport|'s [=[[ReceivedStreams]]=].
    1. Close the {{ReadableStream}} in |transport|'s
-      {{[[ReceivedBidirectionalStreams]]}} internal slot.
-   1. For each {{OutgoingStream}} in |transport|'s {{[[OutgoingStreams]]}}
-      internal slot run the following:
+      [=[[ReceivedBidirectionalStreams]]=].
+   1. For each {{SendStream}} in |transport|'s [=[[OutgoingStreams]]=]
+      run the following:
 
-     1. Let |stream| be the {{OutgoingStream}}.
-     1. Remove the |stream| from the |transport|'s {{[[OutgoingStreams]]}}
-        internal slot.
+     1. Let |stream| be the {{SendStream}}.
+     1. Remove the |stream| from the |transport|'s [=[[OutgoingStreams]]=].
 
 : <dfn for="WebTransportState" enum-value>"failed"</dfn>
 :: The transport has been closed as the result of an error (such as receipt of
-   an error alert). When the WebTransport's internal {{[[WebTransportState]]}}
-   slot transitions to `failed` the user agent MUST run the following steps:
+   an error alert). When the WebTransport's [=[[State]]=] transitions to
+   `failed` the user agent MUST run the following steps:
 
-   1. Close the {{ReadableStream}} in |transport|'s {{[[ReceivedStreams]]}}
-      internal slot.
+   1. Close the {{ReadableStream}} in |transport|'s [=[[ReceivedStreams]]=].
    1. Close the {{ReadableStream}} in |transport|'s
-      {{[[ReceivedBidirectionalStreams]]}} internal slot.
-   1. For each {{OutgoingStream}} in |transport|'s {{[[OutgoingStreams]]}}
-      internal slot run the following:
+      [=[[ReceivedBidirectionalStreams]]=].
+   1. For each {{SendStream}} in |transport|'s [=[[OutgoingStreams]]=]
+      run the following:
 
-     1. Remove the |stream| from the |transport|'s {{[[OutgoingStreams]]}}
-        internal slot.
+     1. Remove the |stream| from the |transport|'s [=[[OutgoingStreams]]=].
 
 ## `WebTransportCloseInfo` Dictionary ##  {#web-transport-close-info}
 
@@ -743,15 +831,14 @@ The dictionary SHALL have the following attributes:
 :: The number of datagrams that were dropped, due to too many datagrams buffered
    between calls to {{DatagramTransport/datagrams}}' {{DatagramDuplexStream/readable}}.
 
-# Interface Mixin `OutgoingStream` #  {#outgoing-stream}
+# Interface `SendStream` #  {#send-stream}
 
-An <dfn interface>OutgoingStream</dfn> is a stream that can be written to, as
-either a {{SendStream}} or a {{BidirectionalStream}}.
+A <dfn interface>SendStream</dfn> is a {{WritableStream}} of {{Uint8Array}}
+that can be written to, to transmit data to the remote host.
 
 <pre class="idl">
 [ Exposed=(Window,Worker) ]
-interface mixin OutgoingStream {
-  readonly attribute WritableStream writable;
+interface SendStream : WritableStream /* of Uint8Array */ {
   readonly attribute Promise&lt;StreamAbortInfo&gt; writingAborted;
   undefined abortWriting(optional StreamAbortInfo abortInfo = {});
 };
@@ -759,45 +846,36 @@ interface mixin OutgoingStream {
 
 ## Overview ##  {#outgoing-stream-overview}
 
-The {{OutgoingStream}} will initialize with the following:
-
-1. Let |stream| be the {{OutgoingStream}}.
-1. Let |stream| have a <dfn attribute for="OutgoingStream">\[[Writable]]</dfn>
-   internal slot initialized to a new {{WritableStream}}.
+The {{SendStream}} will be initialized by running the {{WritableStream}}
+initialization steps.
 
 ## Attributes ##  {#outgoing-stream-attributes}
 
-: <dfn attribute for="OutgoingStream">writable</dfn>
-:: The `writable` attribute represents a {{WritableStream}} (of bytes) that can
-   be used to write to the {{OutgoingStream}}. On getting it MUST return the
-   value of the {{[[Writable]]}} slot.
-: <dfn attribute for="OutgoingStream">writingAborted</dfn>
+: <dfn attribute for="SendStream">writingAborted</dfn>
 :: The `writingAborted` attribute represents a promise that is [=fulfilled=]
     when the a message from the remote side aborting the stream is received.
     For QUIC, that message is a STOP_SENDING frame. When the stream receives
     this mesage, the user agent MUST run the following:
-      1. Let |stream| be the {{OutgoingStream}} object.
+      1. Let |stream| be the {{SendStream}} object.
       1. Let |transport| be the {{WebTransport}}, which the |stream| was created
          from.
-      1. Remove the stream from the |transport|'s {{[[OutgoingStreams]]}}
-         internal slot.
+      1. Remove the stream from the |transport|'s [=[[OutgoingStreams]]=].
       1. [=Resolve=] the promise with the resulting {{StreamAbortInfo}} with
          the {{StreamAbortInfo/errorCode}} set to the value from the aborting
          message from the remote side.
 
 ## Methods ##  {#outgoing-stream-methods}
 
-: <dfn method for="OutgoingStream">abortWriting()</dfn>
-:: A hard shutdown of the {{OutgoingStream}}. It may be called regardless of
-   whether the {{OutgoingStream}} was created by the local or remote peer. When
+: <dfn method for="SendStream">abortWriting()</dfn>
+:: A hard shutdown of the {{SendStream}}. It may be called regardless of
+   whether the {{SendStream}} was created by the local or remote peer. When
    the `abortWriting` method is called, the user agent MUST run the following
    steps:
-     1. Let |stream| be the {{OutgoingStream}} object which is about to abort
+     1. Let |stream| be the {{SendStream}} object which is about to abort
         writing.
      1. Let |transport| be the {{WebTransport}}, which the |stream| was created
         from.
-     1. Remove the stream from the transport's {{[[OutgoingStreams]]}} internal
-        slot.
+     1. Remove the stream from the transport's [=[[OutgoingStreams]]=].
      1. Let |abortInfo| be the first argument.
      1. Start the closing procedure by sending a RST_STREAM frame with its
         error code set to the value of |abortInfo.errorCode|.
@@ -810,7 +888,7 @@ in either a RST_STREAM frame or a STOP_SENDING frame).
 
 <pre class="idl">
 dictionary StreamAbortInfo {
-  unsigned long long errorCode = 0;
+  [EnforceRange] octet errorCode = 0;
 };
 </pre>
 
@@ -819,16 +897,14 @@ The dictionary SHALL have the following fields:
 : <dfn for="StreamAbortInfo" dict-member>errorCode</dfn>
 :: The error code. The default value of 0 means "CLOSING."
 
-# Interface Mixin `IncomingStream` #  {#incoming-stream}
+# Interface `ReceiveStream` #  {#receive-stream}
 
-An <dfn interface>IncomingStream</dfn> is a stream that can be read from, as
-either a {{ReceiveStream}} or a {{BidirectionalStream}}.
+A <dfn interface>ReceiveStream</dfn> is a {{ReadableStream}} of {{Uint8Array}}
+that can be read from, to consume data received from the remote host.
 
 <pre class="idl">
 [ Exposed=(Window,Worker) ]
-interface mixin IncomingStream {
-  /* a ReadableStream of Uint8Array */
-  readonly attribute ReadableStream readable;
+interface ReceiveStream : ReadableStream /* of Uint8Array */ {
   readonly attribute Promise&lt;StreamAbortInfo&gt; readingAborted;
   undefined abortReading(optional StreamAbortInfo abortInfo = {});
 };
@@ -836,24 +912,17 @@ interface mixin IncomingStream {
 
 ## Overview ##  {#incoming-stream-overview}
 
-The {{IncomingStream}} will initialize with the following:
-
-1. Let |stream| be the {{IncomingStream}}.
-1. Let |stream| have a <dfn attribute for="IncomingStream">\[[Readable]]</dfn>
-   internal slot initialized to a new {{ReadableStream}}.
+The {{ReceiveStream}} will be initialized by running the {{ReadableStream}}
+initialization steps.
 
 ## Attributes ##  {#incoming-stream-attributes}
 
-: <dfn attribute for="IncomingStream">readable</dfn>
-:: The `readable` attribute represents a {{ReadableStream}} that can
-   be used to read from the {{IncomingStream}}. On getting it MUST return the
-   value of the {{IncomingStream}}'s {{[[Readable]]}} slot.
-: <dfn attribute for="IncomingStream">readingAborted</dfn>
+: <dfn attribute for="ReceiveStream">readingAborted</dfn>
 :: The `readingAborted` attribute represents a promise that is [=fulfilled=]
     when the a message from the remote side aborting the stream is received.
     For QUIC, that message is a RST_STREAM frame. When the stream receives
     this mesage, the user agent MUST run the following:
-      1. Let |stream| be the {{IncomingStream}} object for which the abort
+      1. Let |stream| be the {{ReceiveStream}} object for which the abort
          message was received.
       1. Let |transport| be the {{WebTransport}}, which the |stream| was created
          from.
@@ -863,12 +932,12 @@ The {{IncomingStream}} will initialize with the following:
 
 ## Methods ##  {#incoming-stream-methods}
 
-: <dfn method for="IncomingStream">abortReading()</dfn>
-:: A hard shutdown of the {{IncomingStream}}. It may be called regardless of
-   whether the {{IncomingStream}} was created by the local or remote peer. When
+: <dfn method for="ReceiveStream">abortReading()</dfn>
+:: A hard shutdown of the {{ReceiveStream}}. It may be called regardless of
+   whether the {{ReceiveStream}} was created by the local or remote peer. When
    the `abortWriting` method is called, the user agent MUST run the following
    steps:
-     1. Let |stream| be the {{IncomingStream}} object which is about to abort
+     1. Let |stream| be the {{ReceiveStream}} object which is about to abort
         reading.
      1. Let |transport| be the {{WebTransport}}, which the |stream| was created
         from.
@@ -883,28 +952,18 @@ The {{IncomingStream}} will initialize with the following:
 <pre class="idl">
 [ Exposed=(Window,Worker) ]
 interface BidirectionalStream {
+  readonly attribute ReceiveStream readable;
+  readonly attribute SendStream writable;
 };
-BidirectionalStream includes OutgoingStream;
-BidirectionalStream includes IncomingStream;
 </pre>
 
-# Interface `SendStream` #  {#send-stream}
+The {{BidirectionalStream}} will initialize with the following:
 
-<pre class="idl">
-[ Exposed=(Window,Worker) ]
-interface SendStream {
-};
-SendStream includes OutgoingStream;
-</pre>
-
-# Interface `ReceiveStream` #  {#receive-stream}
-
-<pre class="idl">
-[ Exposed=(Window,Worker) ]
-interface ReceiveStream {
-};
-ReceiveStream includes IncomingStream;
-</pre>
+1. Let |duplexStream| be the {{BidirectionalStream}}.
+1. Let |duplexStream| have a <dfn attribute for="BidirectionalStream">\[[Readable]]</dfn>
+   internal slot initialized to a new {{ReceiveStream}}.
+1. Let |duplexStream| have a <dfn attribute for="BidirectionalStream">\[[Writable]]</dfn>
+   internal slot initialized to a new {{SendStream}}.
 
 # Protocol Mappings # {#protocol-mapping}
 
@@ -924,43 +983,43 @@ in this specification, utilizing [[WEB-TRANSPORT-HTTP3]].
     </thead>
     <tbody>
       <tr>
-        <td>{{IncomingStream/abortReading}}</td>
+        <td>{{ReceiveStream/abortReading}}</td>
         <td>send STOP_SENDING with code</td>
       </tr>
       <tr>
-        <td>{{OutgoingStream/abortWriting}}</td>
+        <td>{{SendStream/abortWriting}}</td>
         <td>send RESET_STREAM with code</td>
       </tr>
       <tr>
-        <td>{{OutgoingStream/writable}}.abort()</td>
+        <td>{{BidirectionalStream/writable}}.abort()</td>
         <td>send RESET_STREAM</td>
       </tr>
       <tr>
-        <td>{{OutgoingStream/writable}}.close()</td>
+        <td>{{BidirectionalStream/writable}}.close()</td>
         <td>send STREAM_FINAL</td>
       </tr>
       <tr>
-        <td>{{OutgoingStream/writable}}.getWriter().write()</td>
+        <td>{{BidirectionalStream/writable}}.getWriter().write()</td>
         <td>send STREAM</td>
       </tr>
       <tr>
-        <td>{{OutgoingStream/writable}}.getWriter().close()</td>
+        <td>{{BidirectionalStream/writable}}.getWriter().close()</td>
         <td>send STREAM_FINAL</td>
       </tr>
       <tr>
-        <td>{{OutgoingStream/writable}}.getWriter().abort()</td>
+        <td>{{BidirectionalStream/writable}}.getWriter().abort()</td>
         <td>send RESET_STREAM</td>
       </tr>
       <tr>
-        <td>{{IncomingStream/readable}}.cancel()</td>
+        <td>{{BidirectionalStream/readable}}.cancel()</td>
         <td>send STOP_SENDING</td>
       </tr>
       <tr>
-        <td>{{IncomingStream/readable}}.getReader().read()</td>
+        <td>{{BidirectionalStream/readable}}.getReader().read()</td>
         <td>receive STREAM or STREAM_FINAL</td>
       </tr>
       <tr>
-        <td>{{IncomingStream/readable}}.getReader().cancel()</td>
+        <td>{{BidirectionalStream/readable}}.getReader().cancel()</td>
         <td>send STOP_SENDING</td>
       </tr>
     </tbody>
@@ -1092,8 +1151,8 @@ resulting stream's writer.
 <pre class="example" highlight="js">
 async function sendData(url, data) {
   const wt = new WebTransport(url);
-  const stream = await wt.createUnidirectionalStream();
-  const writer = stream.writable.getWriter();
+  const writable = await wt.createUnidirectionalStream();
+  const writer = writable.getWriter();
   await writer.write(data);
   await writer.close();
 }
@@ -1105,10 +1164,10 @@ Encoding can also be done through pipes from a {{ReadableStream}}, for example u
 <pre class="example" highlight="js">
 async function sendText(url, readableStreamOfTextData) {
   const wt = new WebTransport(url);
-  const stream = await wt.createUnidirectionalStream();
+  const writable = await wt.createUnidirectionalStream();
   await readableStreamOfTextData
     .pipeThrough(new TextEncoderStream("utf-8"))
-    .pipeTo(stream.writable);
+    .pipeTo(writable);
 }
 </pre>
 
@@ -1123,11 +1182,11 @@ and then consuming each {{ReceiveStream}} by iterating over its chunks.
 <pre class="example" highlight="js">
 async function receiveData(url, processTheData) {
   const wt = new WebTransport(url);
-  for await (const stream of wt.incomingUnidirectionalStreams) {
+  for await (const readable of wt.incomingUnidirectionalStreams) {
     // consume streams individually, reporting per-stream errors
     ((async () => {
       try {
-        for await (const chunk of stream.readable.getReader()) {
+        for await (const chunk of readable.getReader()) {
           processTheData(chunk);
         }
       } catch (e) {
@@ -1145,10 +1204,10 @@ interleaved, and therefore only reads one stream at a time.
 <pre class="example" highlight="js">
 async function receiveText(url, createWritableStreamForTextData) {
   const wt = new WebTransport(url);
-  for await (const stream of wt.incomingUnidirectionalStreams) {
+  for await (const readable of wt.incomingUnidirectionalStreams) {
     // consume sequentially to not interleave output, reporting per-stream errors
     try {
-      await stream.readable
+      await readable
        .pipeThrough(new TextDecoderStream("utf-8"))
        .pipeTo(createWritableStreamForTextData());
     } catch (e) {
@@ -1209,19 +1268,19 @@ sendData.onclick = async () => {
         break;
       }
       case 'unidi': {
-        const stream = await wt.createUnidirectionalStream();
-        const writer = stream.writable.getWriter();
+        const writable = await wt.createUnidirectionalStream();
+        const writer = writable.getWriter();
         await writer.write(data);
         await writer.close();
         addToEventLog(&#96;Sent a unidirectional stream with data: ${rawData}&#96;);
         break;
       }
       case 'bidi': {
-        const stream = await wt.createBidirectionalStream();
+        const duplexStream = await wt.createBidirectionalStream();
         const n = streamNumber++;
-        readFromIncomingStream(stream, n);
+        readFromIncomingStream(duplexStream.readable, n);
 
-        const writer = stream.writable.getWriter();
+        const writer = duplexStream.writable.getWriter();
         await writer.write(data);
         await writer.close();
         addToEventLog(&#96;Sent bidirectional stream #${n} with data: ${rawData}&#96;);
@@ -1249,10 +1308,10 @@ async function readDatagrams() {
 
 async function acceptUnidirectionalStreams() {
   try {
-    for await (const stream of wt.incomingUnidirectionalStreams) {
+    for await (const readable of wt.incomingUnidirectionalStreams) {
       const number = streamNumber++;
       addToEventLog(&#96;New incoming unidirectional stream #${number}&#96;);
-      readFromIncomingStream(stream, number);
+      readFromIncomingStream(readable, number);
     }
     addToEventLog('Done accepting unidirectional streams!');
   } catch (e) {
@@ -1260,10 +1319,10 @@ async function acceptUnidirectionalStreams() {
   }
 }
 
-async function readFromIncomingStream(stream, number) {
+async function readFromIncomingStream(readable, number) {
   try {
     const decoder = new TextDecoderStream('utf-8');
-    for await (const chunk of stream.readable.pipeThrough(decoder)) {
+    for await (const chunk of readable.pipeThrough(decoder)) {
       addToEventLog(&#96;Received data on stream #${number}: ${chunk}&#96;);
     }
     addToEventLog(&#96;Stream #${number} closed&#96;);

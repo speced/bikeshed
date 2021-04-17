@@ -16,7 +16,6 @@ Complain About: accidental-2119 true
 <pre class="link-defaults">
 spec:infra; type:dfn; text:size;  for:list
 spec:infra; type:dfn; text:string
-spec:url;   type:dfn; text:origin
 spec:url;   type:dfn; text:scheme
 </pre>
 
@@ -30,7 +29,7 @@ Many websites deliver one-time codes over SMS. [[GSM-SMS]]
 
 Without a standard format for such messages, programmatic extraction of codes from them has to rely on heuristics, which are often unreliable and error-prone. Additionally, without a mechanism for associating such codes with specific websites, users might be tricked into providing the code to malicious sites.
 
-This specification defines a format for the delivery of one-time codes over SMS. This format associates the one-time code with a specific [=origin=].
+This specification defines a format for the delivery of one-time codes over SMS. This format associates the one-time code with a specific website.
 
 </div>
 
@@ -40,11 +39,17 @@ This specification depends on the Infra Standard. [[!INFRA]]
 
 <h2 id="origin-bound-one-time-codes">Origin-bound one-time codes</h2>
 
-An <dfn export>origin-bound one-time code</dfn> is a [=tuple=] consisting of an [=origin=] and a code (a [=string=]).
+An <dfn export>origin-bound one-time code</dfn> is a [=tuple=] consisting of a top-level origin (an [=/origin=]), an embedded origin (an [=/origin=] or `null`), and a code (a [=string=]).
 
 <div class=example>
 
-((`"https"`, `"example.com"`, `null`, `null`), `"747723"`) is an [=origin-bound one-time code=] whose origin is (`"https"`, `"example.com"`, `null`, `null`) and whose code is `"747723"`.
+((`"https"`, `"example.com"`, `null`, `null`), `null`, `"747723"`) is an [=origin-bound one-time code=] whose top-level origin is (`"https"`, `"example.com"`, `null`, `null`), whose embedded origin is `null`, and whose code is `"747723"`.
+
+</div>
+
+<div class=example>
+
+((`"https"`, `"example.com"`, `null`, `null`), (`"https"`, `"ecommerce.example"`, `null`, `null`), `"747723"`) is an [=origin-bound one-time code=] whose origin is (`"https"`, `"example.com"`, `null`, `null`), whose embedded origin is (`"https"`, `"ecommerce.example"`, `null`, `null`), and whose code is `"747723"`.
 
 </div>
 
@@ -52,19 +57,40 @@ An <dfn export>origin-bound one-time code</dfn> is a [=tuple=] consisting of an 
 
 Many User Agents help users fill out forms on websites. Sites can use features like <a href="https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#attr-fe-autocomplete-one-time-code">`autocomplete=one-time-code`</a> to hint to User Agents that they could assist the user with providing a one-time code to the website. [[HTML]]
 
+Note: This specification does not impose any requirements or restrictions on the use of one-time codes which are not  [=origin-bound one-time codes=].
+
 <!-- We should be able to reference autocomplete=one-time-code with Bikeshed syntax along the lines of <{html/autocomplete/one-time-code}>. See whatwg/html#5418. -->
 
-In this section, an <dfn>active origin</dfn> is an [=origin=] of a [=top-level browsing context=]'s [=active document=].
+User Agents determine whether or not to assist the user to provide an origin-bound one-time code to a website with [=origin-bound one-time code=] |otc| and {{Document}} |doc| by running these steps:
 
-When a User Agent is in possession of an [=origin-bound one-time code=] and an [=active origin=] is <strong>[=same origin=]</strong> with the [=origin-bound one-time code=]'s origin, the User Agent may assist the user with providing the [=origin-bound one-time code=]'s code to the website.
+1. If |doc| is not the [=active document=] of a [=/browsing context=], return failure.
+1. Let |context| be |doc|'s [=Document/browsing context=].
+1. If |context| is a [=top-level browsing context=]. run these steps:
+    1. If |otc|'s embedded origin is not `null`, return failure.
+    1. If |otc|'s top-level origin is [=same origin=] with |doc|'s [=Document/origin=], return `"origin"`.
+    1. If |otc|'s top-level origin is [=same site=] with |doc|'s [=Document/origin=], return `"site"`.
+    1. Return failure.
+1. If |otc|'s embedded origin is `null`, return failure.
+1. Let |match type| be `"origin"`.
+1. If |otc|'s embedded origin is not [=same origin=] with |doc|'s [=Document/origin=], set |match type| to `"site"`.
+1. If |otc|'s embedded origin is not [=same site=] with |doc|'s [=Document/origin=], return failure.
+1. Set |context| to its [=parent browsing context=].
+1. While |context| is not a [=top-level browsing context=], run these steps:
+    1. If |context|'s [=active document=]'s [=Document/origin=] is [=same origin=] with neither |otc|'s embedded origin nor |otc|'s top-level origin, set |match type| to `"site"`.
+    1. If |context|'s [=active document=]'s [=Document/origin=] is [=same site=] with neither |otc|'s embedded origin nor |otc|'s top-level origin, return failure.
+    1. Set |context| to its [=parent browsing context=].
+1. If |context| is not a [=top-level browsing context=], return failure.
+1. If |context|'s [=active document=]'s [=Document/origin=] is [=same origin=] with |otc|'s top-level origin, return |match type|.
+1. If |context|'s [=active document=]'s [=Document/origin=] is [=same site=] with |otc|'s top-level origin, return `"site"`.
+1. Return failure.
 
-When a User Agent is in possession of an [=origin-bound one-time code=] and an [=active origin=] is <strong>[=same site=] but not [=same origin=]</strong> with the [=origin-bound one-time code=]'s origin, the User Agent may assist the user with providing the [=origin-bound one-time code=]'s code to the website, and should indicate the [=origin-bound one-time code=]'s origin to the user.
+If the above steps returned `"origin"` or `"site"`, the User Agent may assist the user with providing the [=origin-bound one-time code=]'s code to the website.
 
-When a User Agent is in possession of an [=origin-bound one-time code=] and an [=active origin=] is <strong>neither [=same site=] nor [=same origin=]</strong> with the [=origin-bound one-time code=]'s origin, the User Agent should not assist the user with providing the [=origin-bound one-time code=]'s code to the website.
+If the above steps returned `"site"`, the User Agent should indicate the [=origin-bound one-time code=]'s top-level and embedded origins to the user when assisting them.
 
-Note: because the [=scheme=] of an [=origin-bound one-time code=]'s origin is always `"https"`, assisting the user with providing [=origin-bound one-time codes=] is only available in [=secure contexts=].
+If the above steps returned failure, the User Agent should not assist the user with providing the [=origin-bound one-time code=]'s code to the website.
 
-This specification does not impose any requirements or restrictions on the use of one-time codes which are not  [=origin-bound one-time codes=].
+Note: because the [=schemes=] of an [=origin-bound one-time code=]'s top-level and embedded origins are always `"https"`, assisting the user with providing [=origin-bound one-time codes=] is only available in [=secure contexts=].
 
 <h2 id="format">Message format</h2>
 
@@ -77,11 +103,11 @@ An <dfn export>origin-bound one-time code message</dfn> is a [=string=] for whic
 
 <em>This section is non-normative. [[#parsing]] is the normative text.</em>
 
-[=Origin-bound one-time code messages=] can optionally begin with human-readable <dfn for="origin-bound one-time code message">explanatory text</dfn>. This consists of all but the last line of the message. The last line of the message contains both a <dfn for="origin-bound one-time code message">host</dfn> and a <dfn for="origin-bound one-time code message">code</dfn>, each prefixed with a sigil: U+0040 (@) before the <a for="origin-bound one-time code message">host</a>, and U+0023 (#) before the [=code=].
+[=Origin-bound one-time code messages=] can optionally begin with human-readable <dfn for="origin-bound one-time code message">explanatory text</dfn>. This consists of all but the last line of the message. The last line of the message contains both a <dfn for="origin-bound one-time code message">top-level host</dfn> and a <dfn for="origin-bound one-time code message">code</dfn>, each prefixed with a sigil: U+0040 (@) before the [=origin-bound one-time code message/top-level host=], and U+0023 (#) before the [=code=]. Following the [=code=], an <dfn for="origin-bound one-time code message">embedded host</dfn> can be specified. It is preceeded with a U+0040 (@) sigil.
 
 <div class="example">
 
-In the following [=origin-bound one-time code message=], the <a for="origin-bound one-time code message">host</a> is `"example.com"`, the [=code=] is `"747723"`, and the [=explanatory text=] is `"747723 is your ExampleCo authentication code.\n\n"`.
+In the following [=origin-bound one-time code message=], the [=origin-bound one-time code message/top-level host=] is `"example.com"`, the [=code=] is `"747723"`, no [=origin-bound one-time code message/embedded host=] is specified, and the [=explanatory text=] is `"747723 is your ExampleCo authentication code.\n\n"`.
 
 ```
 "747723 is your ExampleCo authentication code.
@@ -91,21 +117,33 @@ In the following [=origin-bound one-time code message=], the <a for="origin-boun
 
 </div>
 
-The last line has to begin with U+0040 (@). (Which is to say, the <a for="origin-bound one-time code message">host</a> always comes before the [=code=] in the message.)
+<div class="example">
+
+In the following [=origin-bound one-time code message=], the [=origin-bound one-time code message/top-level host=] is `"example.com"`, the [=code=] is `"747723"`, the [=origin-bound one-time code message/embedded host=] is `"ecommerce.example"`, and the [=explanatory text=] is `"747723 is your ExampleCo authentication code.\n\n"`.
+
+```
+"747723 is your ExampleCo authentication code.
+
+@example.com #747723 @ecommerce.example"
+```
+
+</div>
+
+The order of fields in the last line is always [=origin-bound one-time code message/top-level host=], [=code=], and [=origin-bound one-time code message/embedded host=] (if present). Nothing can come before the [=origin-bound one-time code message/top-level host=] in the last line.
 
 <div class="example">
 
-The message `"something @example.com #747723"` is not an [=origin-bound one-time code message=], because its last line does not begin with U+0040 (@).
+The message `"something @example.com #747723"` is not an [=origin-bound one-time code message=], because it doesn't start with the [=origin-bound one-time code message/top-level host=].
 
 </div>
 
 <div class="example">
 
-The message `"#747723 @example.com"` is not an [=origin-bound one-time code message=], because its last line does not begin with U+0040 (@).
+The message `"#747723 @ecommerce.example @example.com"` is not an [=origin-bound one-time code message=], because the fields are in the wrong order.
 
 </div>
 
-Exactly one U+0020 (SPACE) separates the two values in the last line of the message.
+Exactly one U+0020 (SPACE) separates the values in the last line of the message.
 
 <div class="example">
 
@@ -117,7 +155,7 @@ Trailing text in the last line is ignored. This is because we might identify add
 
 <div class="example">
 
-In the [=origin-bound one-time code message=] `"@example.com #747723 %future"`, the <a for="origin-bound one-time code message">host</a> is `"example.com"`, the [=code=] is `"747723"`, and the [=explanatory text=] is `""`. The trailing text `" %future"` is ignored.
+In the [=origin-bound one-time code message=] `"@example.com #747723 @ecommerce.example $future"`, the [=origin-bound one-time code message/top-level host=] is `"example.com"`, the [=code=] is `"747723"`, the [=origin-bound one-time code message/embedded host=] is `"ecommerce.example"`, and the [=explanatory text=] is `""`. The trailing text `" %future"` is ignored.
 
 </div>
 
@@ -128,18 +166,32 @@ In the [=origin-bound one-time code message=] `"@example.com #747723 %future"`, 
 To <dfn export type="abstract-op">parse an origin-bound one-time code message</dfn> from |message|, run these steps:
 
 1. Let |line| be the [=last line=] of |message|, and |position| be 0.
-1. If the code point at |position| within |line| is not U+0040 (@), return failure.
+1. If |position| points past the end of |line|, return failure.
+1. Let |top-level host| be the result of [=extract a marked token|extracting a marked token=] from |line| at |position| with marker U+0040 (@).
+1. If |top-level host| is failure, return failure.
+1. Let |top-level origin| be the [=/origin=] (`"https"`, |top-level host|, `null`, `null`).
+1. If |position| points past the end of |line|, return failure.
+1. If the [=code point=] at |position| within |line| is not U+0020 (SPACE), return failure.
 1. Advance |position| by 1.
-1. Let |host| be the result of [=collecting a sequence of code points=] which are not [=ASCII whitespace=] from |line| with |position|.
-1. If |host| is the empty string, return failure.
-1. If |host| is not a [=valid domain string=], a [=valid IPv4-address string=], or a [=valid IPv6-address string=], return failure.
-1. If the code point at |position| within |line| is not U+0020 (SPACE), return failure.
+1. If |position| points past the end of |line|, return failure.
+1. Let |code| be the result of [=extract a marked token|extracting a marked token=] from |line| at |position| with marker U+0023 (#).
+1. If |code| is failure, return failure.
+1. Let |embedded origin| be null.
+1. If |position| does not point past the end of |line|, and if the [=code point=] at |position| within |line| is U+0020 (SPACE), run the following steps:
+    1. Advance |position| by 1.
+    1. Let |embedded host| be the result of [=extract a marked token|extracting a marked token=] from |line| at |position| with marker U+0040 (@).
+    1. If |embedded host| is failure, set |embedded origin| to null. Otherwise, set |embedded origin| to the [=/origin=] (`"https"`, |embedded host|, `null`, `null`).
+1. Return the [=origin-bound one-time code=] (|top-level origin|, |embedded origin|, |code|).
+
+To <dfn type="abstract-op">extract a marked token</dfn> from |string| at |position| with [=code point=] |marker|, run the following steps:
+
+1. If |position| points past the end of |string|, return failure.
+1. If the [=code point=] at |position| within |string| is not |marker|, return failure.
 1. Advance |position| by 1.
-1. If the code point at |position| within |line| is not U+0023 (#), return failure.
-1. Advance |position| by 1.
-1. Let |code| be the result of [=collecting a sequence of code points=] which are not [=ASCII whitespace=] from |line| with |position|.
-1. If |code| is the empty string, return failure.
-1. Return the [=origin-bound one-time code=] ((`"https"`, |host|, `null`, `null`), |code|).
+1. If |position| points past the end of |string|, return failure.
+1. Let |token| be the result of [=collecting a sequence of code points=] which are not [=ASCII whitespace=] from |string| with |position|.
+1. If |token| is the empty string, return failure.
+1. Return |token|.
 
 The <dfn type=abstract-op>last line</dfn> of |string| is the result of running these steps:
 

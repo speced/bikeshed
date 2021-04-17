@@ -30,7 +30,7 @@ Abstract: This specification describes a high-level Web <abbr title="Application
 	where a number of {{AudioNode}} objects are connected together to define the overall audio rendering.
 	The actual processing will primarily take place in the underlying implementation
 	(typically optimized Assembly / C / C++ code),
-	but [[#audioworklet|direct script processing and synthesis]] is also supported.
+	but [[#AudioWorklet|direct script processing and synthesis]] is also supported.
 
 	The [[#introductory]] section covers the motivation behind this specification.
 
@@ -292,7 +292,7 @@ The API supports these primary features:
 		peer using a {{MediaStreamAudioDestinationNode}}
 		and [[!webrtc]].
 
-* Audio stream synthesis and processing [[#audioworklet|directly using scripts]].
+* Audio stream synthesis and processing [[#AudioWorklet|directly using scripts]].
 
 * [[#Spatialization|Spatialized audio]] supporting a wide
 	range of 3D games and immersive environments:
@@ -322,7 +322,7 @@ The API supports these primary features:
 
 * Dynamics compression for overall control and sweetening of the mix
 
-* Efficient [[#analysernode|real-time time-domain and frequency-domain analysis / music visualizer support]].
+* Efficient [[#AnalyserNode|real-time time-domain and frequency-domain analysis / music visualizer support]].
 
 * Efficient biquad filters for lowpass, highpass, and other common filters.
 
@@ -658,7 +658,7 @@ The Audio API</h2>
 ████████  ██     ██  ██████  ████████       ██     ██  ██████
 -->
 
-<h3 id="BaseAudioContext">
+<h3 interface lt="baseaudiocontext" id="BaseAudioContext">
 The {{BaseAudioContext}} Interface</h3>
 
 This interface represents a set of {{AudioNode}}
@@ -675,6 +675,14 @@ but is instead extended by the concrete interfaces
 <dfn attribute for="BaseAudioContext">[[pending promises]]</dfn>  that is an
 initially empty ordered list of promises.
 
+Each {{BaseAudioContext}} has a unique
+<a href="https://html.spec.whatwg.org/multipage/media.html#media-element-event-task-source">
+media element event task source</a>.
+Additionally, a {{BaseAudioContext}} has two private slots <dfn attribute
+for="BaseAudioContext">[[rendering thread state]]</dfn> and <dfn attribute
+for="BaseAudioContext">[[control thread state]]</dfn> that take values from
+{{AudioContextState}}, and that are both initialy set to
+<code>"suspended"</code>.
 
 <pre class="idl">
 enum AudioContextState {
@@ -848,8 +856,8 @@ Attributes</h4>
 
 	: <dfn>state</dfn>
 	::
-		Describes the current state of the {{AudioContext}}. Its value is identical
-		to <a>control thread state</a>.
+		Describes the current state of the {{BaseAudioContext}}.  Getting this
+		attribute returns the contents of the {{[[control thread state]]}} slot.
 </dl>
 
 <h4 id="BaseAudioContent-methods">
@@ -1154,7 +1162,10 @@ Methods</h4>
 				1. Let <var>error</var> be a {{DataCloneError}}.
 				2. Reject <var>promise</var> with <var>error</var>, and remove it from
 					{{BaseAudioContext/[[pending promises]]}}.
-				3. <a>Queue a task</a> to invoke {{BaseAudioContext/decodeAudioData()/errorCallback!!argument}} with <var>error</var>.
+
+				3. <a href="https://html.spec.whatwg.org/multipage/media.html#queue-a-media-element-task">
+					Queue a media element task</a> to invoke
+					{{BaseAudioContext/decodeAudioData()/errorCallback!!argument}} with |error|.
 
 			5. Return <var>promise</var>.
 		</div>
@@ -1182,9 +1193,9 @@ Methods</h4>
 				errorCallback)/audioData!!argument}} into [=linear PCM=]. In case of
 				failure, set <var>can decode</var> to <em>false</em>.
 
-			4. If <var>can decode</var> is <em>false</em>, <a>queue a task</a> to
-				execute the following step, on the <a>control thread</a>'s
-				event loop:
+			4. If |can decode| is `false`,
+				<a href="https://html.spec.whatwg.org/multipage/media.html#queue-a-media-element-task">
+				queue a media element task</a> to execute the following steps:
 
 				1. Let <var>error</var> be a <code>DOMException</code>
 					whose name is {{EncodingError}}.
@@ -1200,12 +1211,12 @@ Methods</h4>
 			5. Otherwise:
 				1. Take the result, representing the decoded [=linear PCM=]
 					audio data, and resample it to the sample-rate of the
-					{{AudioContext}} if it is different from
+					{{BaseAudioContext}} if it is different from
 					the sample-rate of {{BaseAudioContext/decodeAudioData(audioData,
 					successCallback, errorCallback)/audioData!!argument}}.
 
-				2. <a>Queue a task</a> on the <a>control thread</a>'s event loop
-					to execute the following steps:
+				2. <a href="https://html.spec.whatwg.org/multipage/media.html#queue-a-media-element-task">
+					queue a media element task</a> to execute the following steps:
 
 					1. Let <var>buffer</var> be an
 						{{AudioBuffer}} containing the final result
@@ -1308,7 +1319,7 @@ processing.
 ██     ██  ██████
 -->
 
-<h3 id="AudioContext">
+<h3 interface lt="audiocontext" id="AudioContext">
 The {{AudioContext}} Interface</h3>
 
 This interface represents an audio graph whose
@@ -1372,8 +1383,8 @@ interface AudioContext : BaseAudioContext {
 
 An {{AudioContext}} is said to be <dfn>allowed to start</dfn> if the user agent
 allows the context state to transition from "{{AudioContextState/suspended}}" to
-"{{AudioContextState/running}}". A user agent may delay this initial transition,
-to allow it only when the {{AudioContext}}'s [=relevant global object=] has
+"{{AudioContextState/running}}". A user agent may disallow this initial transition,
+and to allow it only when the {{AudioContext}}'s [=relevant global object=] has
 [=sticky activation=].
 
 {{AudioContext}} has an internal slot:
@@ -1406,9 +1417,9 @@ Constructors</h4>
 			<span class="synchronous">When creating an {{AudioContext}},
 			execute these steps:</span>
 
-			1. Set a <a>control thread state</a> to <code>suspended</code> on the {{AudioContext}}.
+			1. Set a {{[[control thread state]]}} to <code>suspended</code> on the {{AudioContext}}.
 
-			2. Set a <a>rendering thread state</a> to <code>suspended</code> on the {{AudioContext}}.
+			2. Set a {{[[rendering thread state]]}} to <code>suspended</code> on the {{AudioContext}}.
 
 			3. Let <dfn attribute for="AudioContext">[[pending resume promises]]</dfn> be a
 				slot on this {{AudioContext}}, that is an initially empty ordered list of
@@ -1445,13 +1456,16 @@ Constructors</h4>
 			1. Attempt to <a href="#acquiring">acquire system resources</a>.
 				In case of failure, abort the following steps.
 
-			3. Set the <a>rendering thread state</a> to <code>running</code> on the {{AudioContext}}.
+			3. Set the {{[[rendering thread state]]}} to <code>running</code> on the {{AudioContext}}.
 
-			4. <a>Queue a task</a> on the <a>control thread</a> event loop, to execute these steps:
+			1. <a href="https://html.spec.whatwg.org/multipage/media.html#queue-a-media-element-task">
+				queue a media element task</a> to execute the following steps:
 
 				1. Set the {{BaseAudioContext/state}} attribute of the {{AudioContext}} to "{{AudioContextState/running}}".
 
-				2. <a>Queue a task</a> to fire a simple event named <code>statechange</code> at the {{AudioContext}}.
+				1. <a href="https://html.spec.whatwg.org/multipage/media.html#queue-a-media-element-task">
+					queue a media element task</a> to <a spec="dom" lt="fire an event">fire an event
+					</a> named `statechange` at the {{AudioContext}}.
 		</div>
 
 		Note: It is unfortunately not possible to programatically notify
@@ -1525,12 +1539,13 @@ Methods</h4>
 
 			1. Let <var>promise</var> be a new Promise.
 
-			1. If the <a>control thread state</a> flag on the
+			1. If the {{[[control thread state]]}} flag on the
 				{{AudioContext}} is <code>closed</code> reject the promise
 				with {{InvalidStateError}}, abort these steps,
 				returning <var>promise</var>.
 
-			1. Set the <a>control thread state</a> flag on the {{AudioContext}} to <code>closed</code>.
+			1. Set the {{[[control thread state]]}} flag on the {{AudioContext}} to
+				<code>closed</code>.
 
 			1. <a>Queue a control message</a> to close the {{AudioContext}}.
 
@@ -1544,7 +1559,7 @@ Methods</h4>
 
 			1. Attempt to <a>release system resources</a>.
 
-			2. Set the <a>rendering thread state</a> to <code>suspended</code>.
+			2. Set the {{[[rendering thread state]]}} to <code>suspended</code>.
 				<div class="note">
 					This will stop rendering.
 				</div>
@@ -1555,11 +1570,16 @@ Methods</h4>
 					There is no need to notify the control thread in this case.
 				</div>
 
-			4. <a>Queue a task</a> on the <a>control thread</a>'s event loop, to execute these steps:
+			4. <a href="https://html.spec.whatwg.org/multipage/media.html#queue-a-media-element-task">
+				queue a media element task</a> to execute the following steps:
+
 				1. Resolve <em>promise</em>.
 				2. If the {{BaseAudioContext/state}} attribute of the {{AudioContext}} is not already "{{AudioContextState/closed}}":
 					1. Set the {{BaseAudioContext/state}} attribute of the {{AudioContext}} to "{{AudioContextState/closed}}".
-					2. <a>Queue a task</a> to fire a simple event named <code>statechange</code> at the {{AudioContext}}.
+
+					1. <a href="https://html.spec.whatwg.org/multipage/media.html#queue-a-media-element-task">
+						queue a media element task</a> to <a spec="dom" lt="fire an event">fire
+						an event</a> named `statechange` at the {{AudioContext}}.
 		</div>
 
 		When an {{AudioContext}} is closed, any
@@ -1710,7 +1730,7 @@ Methods</h4>
 
 			1. Let <var>promise</var> be a new Promise.
 
-			2. If the <a>control thread state</a> on the
+			2. If the {{[[control thread state]]}} on the
 				{{AudioContext}} is <code>closed</code> reject the
 				promise with {{InvalidStateError}}, abort these steps,
 				returning <var>promise</var>.
@@ -1722,7 +1742,7 @@ Methods</h4>
 				{{AudioContext/[[pending resume promises]]}} and abort these steps, returning
 				<var>promise</var>.
 
-			5. Set the <a>control thread state</a> on the
+			5. Set the {{[[control thread state]]}} on the
 				{{AudioContext}} to <code>running</code>.
 
 			6. <a>Queue a control message</a> to resume the {{AudioContext}}.
@@ -1737,12 +1757,13 @@ Methods</h4>
 
 			1. Attempt to <a href="#acquiring">acquire system resources</a>.
 
-			2. Set the <a>rendering thread state</a> on the {{AudioContext}} to <code>running</code>.
+			2. Set the {{[[rendering thread state]]}} on the {{AudioContext}} to <code>running</code>.
 
 			3. Start <a href="#rendering-loop">rendering the audio graph</a>.
 
-			4. In case of failure, queue a task on the <a>control thread</a> to execute the following,
-				and abort these steps:
+			4. In case of failure,
+				<a href="https://html.spec.whatwg.org/multipage/media.html#queue-a-media-element-task">
+				queue a media element task</a> to execute the following steps:
 
 				1. Reject all promises from {{AudioContext/[[pending resume promises]]}}
 					in order, then clear {{AudioContext/[[pending resume promises]]}}.
@@ -1750,9 +1771,8 @@ Methods</h4>
 				2. Additionally, remove those promises from {{BaseAudioContext/[[pending
 					promises]]}}.
 
-			5. Queue a task on the <a>control thread</a>'s event loop, to
-				execute these steps:
-
+			5. <a href="https://html.spec.whatwg.org/multipage/media.html#queue-a-media-element-task">
+				queue a media element task</a> to execute the following steps:
 
 				1. Resolve all promises from {{AudioContext/[[pending resume promises]]}} in order.
 				1. Clear {{AudioContext/[[pending resume promises]]}}. Additionally, remove those
@@ -1764,7 +1784,9 @@ Methods</h4>
 
 					1. Set the {{BaseAudioContext/state}} attribute of the {{AudioContext}} to "{{AudioContextState/running}}".
 
-					2. Queue a task to fire a simple event named <code>statechange</code> at the {{AudioContext}}.
+					1. <a href="https://html.spec.whatwg.org/multipage/media.html#queue-a-media-element-task">
+						queue a media element task</a> to <a spec="dom" lt="fire an event">fire
+						an event </a> named `statechange` at the {{AudioContext}}.
 		</div>
 
 		<div>
@@ -1798,7 +1820,7 @@ Methods</h4>
 
 			1. Let <var>promise</var> be a new Promise.
 
-			2. If the <a>control thread state</a> on the
+			2. If the {{[[control thread state]]}} on the
 				{{AudioContext}} is <code>closed</code> reject the promise
 				with {{InvalidStateError}}, abort these steps,
 				returning <var>promise</var>.
@@ -1807,7 +1829,7 @@ Methods</h4>
 
 			4. Set {{[[suspended by user]]}} to <code>true</code>.
 
-			5. Set the <a>control thread state</a> on the {{AudioContext}} to <code>suspended</code>.
+			5. Set the {{[[control thread state]]}} on the {{AudioContext}} to <code>suspended</code>.
 
 			6. <a>Queue a control message</a> to suspend the {{AudioContext}}.
 
@@ -1821,9 +1843,10 @@ Methods</h4>
 
 			1. Attempt to <a>release system resources</a>.
 
-			2. Set the <a>rendering thread state</a> on the {{AudioContext}} to <code>suspended</code>.
+			2. Set the {{[[rendering thread state]]}} on the {{AudioContext}} to <code>suspended</code>.
 
-			3. <a>Queue a task</a> on the <a>control thread</a>'s event loop, to execute these steps:
+			3. <a href="https://html.spec.whatwg.org/multipage/media.html#queue-a-media-element-task">
+				queue a media element task</a> to execute the following steps:
 
 				1. Resolve <em>promise</em>.
 
@@ -1831,7 +1854,10 @@ Methods</h4>
 					attribute of the {{AudioContext}} is not already "{{AudioContextState/suspended}}":
 
 					1. Set the {{BaseAudioContext/state}} attribute of the {{AudioContext}} to "{{AudioContextState/suspended}}".
-					2. <a>Queue a task</a> to fire a simple event named <code>statechange</code> at the {{AudioContext}}.
+
+					1. <a href="https://html.spec.whatwg.org/multipage/media.html#queue-a-media-element-task">
+						queue a media element task</a> to <a spec="dom" lt="fire an event">fire
+						an event </a> named `statechange` at the {{AudioContext}}.
 		</div>
 
 		While an {{AudioContext}} is suspended,
@@ -1858,7 +1884,7 @@ Methods</h4>
 		</div>
 </dl>
 
-<h4 id="AudioContextOptions">
+<h4 dictionary lt="audiocontextoptions" id="AudioContextOptions">
 {{AudioContextOptions}}</h4>
 
 The {{AudioContextOptions}} dictionary is used to
@@ -1902,7 +1928,7 @@ Dictionary {{AudioContextOptions}} Members</h5>
 		this {{AudioContext}} is used.
 </dl>
 
-<h4 id="AudioTimestamp">
+<h4 dictionary lt="audiotimestamp" id="AudioTimestamp">
 {{AudioTimestamp}}</h4>
 
 <pre class="idl">
@@ -1938,7 +1964,7 @@ Dictionary {{AudioTimestamp}} Members</h5>
  ███████  ██       ██       ████████ ████ ██    ██ ████████       ██     ██  ██████
 -->
 
-<h3 id="OfflineAudioContext">
+<h3 interface lt="offlineaudiocontext" id="OfflineAudioContext">
 The {{OfflineAudioContext}} Interface</h3>
 
 {{OfflineAudioContext}} is a particular type of
@@ -1982,10 +2008,10 @@ Constructors</h4>
 			Let <var>c</var> be a new {{OfflineAudioContext}} object.
 			Initialize <var>c</var> as follows:
 
-			1. Set the <a>control thread state</a> for <var>c</var>
+			1. Set the {{[[control thread state]]}} for <var>c</var>
 				to <code>"suspended"</code>.
 
-			2. Set the <a>rendering thread state</a> for
+			2. Set the {{[[rendering thread state]]}} for
 				<var>c</var> to <code>"suspended"</code>.
 
 			3. Construct an {{AudioDestinationNode}} with its
@@ -2110,17 +2136,19 @@ Methods</h4>
 				<li>If a suspended context is resumed, continue to render the
 				buffer.
 
-				<li>Once the rendering is complete, <a>queue a task</a> on the
-				<a>control thread</a>'s event loop to perform the following
-				steps:
+				<li>Once the rendering is complete,
+					<a href="https://html.spec.whatwg.org/multipage/media.html#queue-a-media-element-task">
+					queue a media element task</a> to execute the following steps:
+
 					<ol>
 						<li>Resolve the <var ignore>promise</var> created by {{startRendering()}} with {{[[rendered buffer]]}}.
 
-						<li><a>Queue a task</a> to fire an event named
-						<code>complete</code> at this instance, using an instance
-						of {{OfflineAudioCompletionEvent}} whose
-						<code>renderedBuffer</code> property is set to
-						{{[[rendered buffer]]}}.
+						<li><a href="https://html.spec.whatwg.org/multipage/media.html#queue-a-media-element-task">
+							queue a media element task</a> to
+							<a spec="dom" lt="fire an event">fire an event</a> named
+							`complete` using an instance of {{OfflineAudioCompletionEvent}}
+							whose `renderedBuffer` property is set to
+							{{[[rendered buffer]]}}.
 
 					</ol>
 
@@ -2152,12 +2180,12 @@ Methods</h4>
 
 			1. Abort these steps and reject <var>promise</var> with
 				{{InvalidStateError}} when any of following conditions is true:
-				- The <a>control thread state</a> on the {{OfflineAudioContext}}
+				- The {{[[control thread state]]}} on the {{OfflineAudioContext}}
 					is <code>closed</code>.
 				- The {{[[rendering started]]}} slot on the {{OfflineAudioContext}}
 					is <em>false</em>.
 
-			1. Set the <a>control thread state</a> flag on the
+			1. Set the {{[[control thread state]]}} flag on the
 				{{OfflineAudioContext}} to <code>running</code>.
 
 			1. <a>Queue a control message</a> to resume the {{OfflineAudioContext}}.
@@ -2170,15 +2198,16 @@ Methods</h4>
 			{{OfflineAudioContext}} means running these steps on the
 			<a>rendering thread</a>:
 
-			1. Set the <a>rendering thread state</a> on the {{OfflineAudioContext}} to <code>running</code>.
+			1. Set the {{[[rendering thread state]]}} on the {{OfflineAudioContext}} to <code>running</code>.
 
 			2. Start <a href="#rendering-loop">rendering the audio graph</a>.
 
-			3. In case of failure, queue a task on the <a>control thread</a> to
-				reject <var>promise</var> and abort these steps:
+			3. In case of failure,
+				<a href="https://html.spec.whatwg.org/multipage/media.html#queue-a-media-element-task">
+				queue a media element task</a> to reject |promise| and abort the remaining steps.
 
-			4. Queue a task on the <a>control thread</a>'s event loop, to
-				execute these steps:
+			4. <a href="https://html.spec.whatwg.org/multipage/media.html#queue-a-media-element-task">
+				queue a media element task</a> to execute the following steps:
 
 				1. Resolve <var>promise</var>.
 
@@ -2188,8 +2217,10 @@ Methods</h4>
 					1. Set the {{BaseAudioContext/state}} attribute of the
 						{{OfflineAudioContext}} to "{{AudioContextState/running}}".
 
-					2. Queue a task to fire a simple event named <code>statechange</code>
-						at the {{OfflineAudioContext}}.
+					1. <a href="https://html.spec.whatwg.org/multipage/media.html#queue-a-media-element-task">
+						queue a media element task</a> to <a spec="dom" lt="fire an event">fire
+						an event</a> named `statechange` at the {{OfflineAudioContext}}.
+
 		</div>
 
 		<div>
@@ -2224,7 +2255,7 @@ Methods</h4>
 		</div>
 </dl>
 
-<h4 id="OfflineAudioContextOptions">
+<h4 dictionary lt="offlineaudiocontextoptions" id="OfflineAudioContextOptions">
 {{OfflineAudioContextOptions}}</h4>
 
 This specifies the options to use in constructing an
@@ -2255,7 +2286,7 @@ Dictionary {{OfflineAudioContextOptions}} Members</h5>
 		The sample rate for this {{OfflineAudioContext}}.
 </dl>
 
-<h4 id="OfflineAudioCompletionEvent">
+<h4 interface lt="offlineaudiocompletionevent" id="OfflineAudioCompletionEvent">
 The {{OfflineAudioCompletionEvent}} Interface</h4>
 
 This is an {{Event}} object which is dispatched to
@@ -2278,7 +2309,7 @@ Attributes</h5>
 		An {{AudioBuffer}} containing the rendered audio data.
 </dl>
 
-<h5 id="OfflineAudioCompletionEventInit">
+<h5 dictionary lt="offlineaudiocompletioneventinit" id="OfflineAudioCompletionEventInit">
 {{OfflineAudioCompletionEventInit}}</h5>
 
 <pre class="idl">
@@ -2306,7 +2337,7 @@ Dictionary {{OfflineAudioCompletionEventInit}} Members</h6>
 ██     ██  ███████  ████████  ████  ███████  ████████   ███████  ██       ██       ████████ ██     ██
 -->
 
-<h3 id="AudioBuffer">
+<h3 interface lt="audiobuffer" id="AudioBuffer">
 The {{AudioBuffer}} Interface</h3>
 
 This interface represents a memory-resident audio asset. It can contain one or
@@ -2566,7 +2597,7 @@ the content of an {{AudioBuffer}} currently in use by an
 since the {{AudioNode}} will continue to use the data previously
 acquired.
 
-<h4 id="AudioBufferOptions">
+<h4 dictionary lt="audiobufferoptions" id="AudioBufferOptions">
 {{AudioBufferOptions}}</h4>
 
 This specifies the options to use in constructing an
@@ -2612,7 +2643,7 @@ The allowed values for the members of this dictionary are constrained.  See {{Ba
 -->
 
 
-<h3 interface lt=AudioNode>
+<h3 interface lt="audionode" id="AudioNode">
 The {{AudioNode}} Interface</h3>
 
 {{AudioNode}}s are the building blocks of an {{AudioContext}}. This interface
@@ -3268,7 +3299,7 @@ Methods</h4>
 		</div>
 </dl>
 
-<h4 dictionary lt="AudioNodeOptions">
+<h4 dictionary lt="audionodeoptions" id="AudioNodeOptions">
 {{AudioNodeOptions}}</h4>
 
 This specifies the options that can be used in constructing all
@@ -3307,7 +3338,7 @@ Dictionary {{AudioNodeOptions}} Members</h5>
 ██     ██  ███████  ████████  ████  ███████  ██        ██     ██ ██     ██ ██     ██ ██     ██
 -->
 
-<h3 id="AudioParam" interface lt="AudioParam">
+<h3 interface lt="audioparam" id="AudioParam">
 The {{AudioParam}} Interface</h3>
 
 {{AudioParam}} controls an individual aspect of an
@@ -4053,7 +4084,7 @@ http://googlechrome.github.io/web-audio-samples/samples/audio/timeline.html -->
 ██     ██  ██████   ██████  ██    ██  ███████  ████████  ████████
 -->
 
-<h3 id="AudioScheduledSourceNode" interface lt="AudioScheduledSourceNode">
+<h3 interface lt="audioscheduledsourcenode" id="AudioScheduledSourceNode">
 The {{AudioScheduledSourceNode}} Interface</h3>
 
 The interface represents the common features of source nodes such
@@ -4141,7 +4172,7 @@ Methods</h4>
 			5. Send a <a>control message</a> to the associated {{AudioContext}} to
 				<a href="#context-resume">start running its rendering thread</a> only when
 				all the following conditions are met:
-				1. The context's <a>control thread state</a> is
+				1. The context's {{[[control thread state]]}} is
 					"{{AudioContextState/suspended}}".
 				1. The context is <a>allowed to start</a>.
 				1. {{[[suspended by user]]}} flag is <code>false</code>.
@@ -4215,7 +4246,7 @@ Methods</h4>
 ██     ██ ██    ██ ██     ██ ████████    ██     ██████  ████████ ██     ██ ██    ██  ███████  ████████  ████████
 -->
 
-<h3 interface lt="AnalyserNode">
+<h3 interface lt="analysernode" id="AnalyserNode">
 The {{AnalyserNode}} Interface</h3>
 
 This interface represents a node which is able to provide real-time
@@ -4456,7 +4487,7 @@ Methods</h4>
 		</div>
 </dl>
 
-<h4 dictionary lt="AnalyserOptions">
+<h4 dictionary lt="analyseroptions" id="AnalyserOptions">
 {{AnalyserOptions}}</h4>
 
 This specifies the options to be used when constructing an
@@ -4626,7 +4657,7 @@ In the following, let \(N\) be the value of the
 ██     ██ ████████   ██████   ███████   ███████  ██     ██  ██████  ████████ ██    ██  ███████  ████████  ████████
 -->
 
-<h3 interface lt="AudioBufferSourceNode" id="AudioBufferSourceNode">
+<h3 interface lt="audiobuffersourcenode" id="AudioBufferSourceNode">
 The {{AudioBufferSourceNode}} Interface</h3>
 
 This interface represents an audio source from an in-memory audio
@@ -4855,7 +4886,7 @@ Methods</h4>
 			1. Send a <a>control message</a> to the associated {{AudioContext}} to
 				<a href="#context-resume">start running its rendering thread</a> only when
 				all the following conditions are met:
-				1. The context's <a>control thread state</a> is
+				1. The context's {{[[control thread state]]}} is
 					{{AudioContextState/suspended}}.
 				1. The context is <a>allowed to start</a>.
 				1. {{[[suspended by user]]}} flag is <code>false</code>.
@@ -4885,7 +4916,7 @@ Methods</h4>
 
 </dl>
 
-<h4 dictionary lt="AudioBufferSourceOptions">
+<h4 dictionary lt="audiobuffersourceoptions" id="AudioBufferSourceOptions">
 {{AudioBufferSourceOptions}}</h4>
 
 This specifies options for constructing a
@@ -5282,7 +5313,7 @@ were references to exact sample frames:
 ████████  ████████  ██████     ██    ████ ██    ██ ██     ██    ██    ████  ███████  ██    ██
 -->
 
-<h3 interface lt="AudioDestinationNode" id="AudioDestinationNode">
+<h3 interface lt="audiodestinationnode" id="AudioDestinationNode">
 The {{AudioDestinationNode}} Interface</h3>
 
 This is an {{AudioNode}} representing the final audio
@@ -5377,7 +5408,7 @@ Attributes</h4>
 ████████ ████  ██████     ██    ████████ ██    ██ ████████ ██     ██
 -->
 
-<h3 interface lt="AudioListener">
+<h3 interface lt="audiolistener" id="AudioListener">
 The {{AudioListener}} Interface</h3>
 
 This interface represents the position and orientation of the person
@@ -5672,7 +5703,7 @@ the graph have the {{AudioListener}} as input.
 ██        ██     ██  ███████   ██████  ████████  ██████   ██████  ████ ██    ██  ██████
 -->
 
-<h3 interface lt="AudioProcessingEvent">
+<h3 interface lt="audioprocessingevent" id="AudioProcessingEvent">
 The {{AudioProcessingEvent}} Interface - DEPRECATED</h3>
 
 This is an {{Event}} object which is dispatched to
@@ -5728,7 +5759,7 @@ Attributes</h4>
 		{{BaseAudioContext/currentTime}}.
 </dl>
 
-<h4 dictionary lt="AudioProcessingEventInit">
+<h4 dictionary lt="audioprocessingeventinit" id="AudioProcessingEventInit">
 {{AudioProcessingEventInit}}</h4>
 
 <pre class="idl">
@@ -5759,7 +5790,7 @@ Dictionary {{AudioProcessingEventInit}} Members</h5>
 		of the event.
 </dl>
 
-<h3 interface lt="BiquadFilterNode">
+<h3 interface lt="biquadfilternode" id="BiquadFilterNode">
 The {{BiquadFilterNode}} Interface</h3>
 
 {{BiquadFilterNode}} is an
@@ -6112,7 +6143,7 @@ Methods</h4>
 		</div>
 </dl>
 
-<h4 dictionary lt="BiquadFilterOptions">
+<h4 dictionary lt="biquadfilteroptions" id="BiquadFilterOptions">
 {{BiquadFilterOptions}}</h4>
 
 This specifies the options to be used when constructing a
@@ -6359,7 +6390,7 @@ filter type, are:
 ██     ██ ████████ ██     ██  ██████   ████████ ██     ██
 -->
 
-<h3 interface lt="ChannelMergerNode">
+<h3 interface lt="channelmergernode" id="ChannelMergerNode">
 The {{ChannelMergerNode}} Interface</h3>
 
 The {{ChannelMergerNode}} is for use in more advanced
@@ -6439,7 +6470,7 @@ Constructors</h4>
 		</pre>
 </dl>
 
-<h4 dictionary lt="ChannelMergerOptions">
+<h4 dictionary lt="channelmergeroptions" id="ChannelMergerOptions">
 {{ChannelMergerOptions}}</h4>
 
 <pre class="idl">
@@ -6475,7 +6506,7 @@ Dictionary {{ChannelMergerOptions}} Members</h5>
  ██████  ██        ████████ ████    ██       ██    ████████ ██     ██
 -->
 
-<h3 interface lt="ChannelSplitterNode">
+<h3 interface lt="channelsplitternode" id="ChannelSplitterNode">
 The {{ChannelSplitterNode}} Interface</h3>
 
 The {{ChannelSplitterNode}} is for use in more advanced
@@ -6552,7 +6583,7 @@ Constructors</h4>
 		</pre>
 </dl>
 
-<h4 dictionary lt="ChannelSplitterOptions">
+<h4 dictionary lt="channelsplitteroptions" id="ChannelSplitterOptions">
 {{ChannelSplitterOptions}}</h4>
 
 <pre class="idl">
@@ -6588,7 +6619,7 @@ Dictionary {{ChannelSplitterOptions}} Members</h5>
  ██████   ███████   ███████  ██     ██  ██████  ████████
 -->
 
-<h3 interface lt="ConstantSourceNode" id="ConstantSourceNode">
+<h3 interface lt="constantsourcenode" id="ConstantSourceNode">
 The {{ConstantSourceNode}} Interface</h3>
 
 This interface represents a constant audio source whose output is
@@ -6655,7 +6686,7 @@ Attributes</h4>
 		</pre>
 </dl>
 
-<h4 dictionary lt="ConstantSourceOptions">
+<h4 dictionary lt="constantsourceoptions" id="ConstantSourceOptions">
 {{ConstantSourceOptions}}</h4>
 
 This specifies options for constructing a
@@ -6688,7 +6719,7 @@ Dictionary {{ConstantSourceOptions}} Members</h5>
  ██████   ███████  ██    ██    ███     ███████  ████████    ███    ████████ ██     ██
 -->
 
-<h3 interface lt="ConvolverNode" id="ConvolverNode">
+<h3 interface lt="convolvernode" id="ConvolverNode">
 The {{ConvolverNode}} Interface</h3>
 
 This interface represents a processing node which applies a linear
@@ -6890,7 +6921,7 @@ Attributes</h4>
 		<var>normalizationScale</var>.
 </dl>
 
-<h4 dictionary lt="ConvolverOptions">
+<h4 dictionary lt="convolveroptions" id="ConvolverOptions">
 {{ConvolverOptions}}</h4>
 
 The specifies options for constructing a
@@ -6962,7 +6993,7 @@ Note: The diagrams below show the outputs when [=actively processing=].
 ████████  ████████ ████████ ██     ██    ██
 -->
 
-<h3 interface lt="DelayNode" id="DelayNode">
+<h3 interface lt="delaynode" id="DelayNode">
 The {{DelayNode}} Interface</h3>
 
 A delay-line is a fundamental building block in audio applications.
@@ -7055,7 +7086,7 @@ Attributes</h4>
 		</pre>
 </dl>
 
-<h4 dictionary lt="DelayOptions">
+<h4 dictionary lt="delayoptions" id="DelayOptions">
 {{DelayOptions}}</h4>
 
 This specifies options for constructing a
@@ -7131,7 +7162,7 @@ has passed.
  ██████   ███████  ██     ██ ██        ██     ██ ████████  ██████   ██████   ███████  ██     ██
 -->
 
-<h3 interface lt="DynamicsCompressorNode">
+<h3 interface lt="dynamicscompressornode" id="DynamicsCompressorNode">
 The {{DynamicsCompressorNode}} Interface</h3>
 
 {{DynamicsCompressorNode}} is an
@@ -7280,7 +7311,7 @@ Attributes</h4>
 		</pre>
 </dl>
 
-<h4 dictionary lt="DynamicsCompressorOptions">
+<h4 dictionary lt="dynamicscompressoroptions" id="DynamicsCompressorOptions">
 {{DynamicsCompressorOptions}}</h4>
 
 This specifies the options to use in constructing a
@@ -7600,7 +7631,7 @@ of the same shape.
  ██████   ██     ██ ████ ██    ██ ██    ██  ███████  ████████  ████████
 -->
 
-<h3 interface lt="GainNode">
+<h3 interface lt="gainnode" id="GainNode">
 The {{GainNode}} Interface</h3>
 
 Changing the gain of an audio signal is a fundamental operation in
@@ -7668,7 +7699,7 @@ Attributes</h4>
 		</pre>
 </dl>
 
-<h4 dictionary lt="GainOptions">
+<h4 dictionary lt="gainoptions" id="GainOptions">
 {{GainOptions}}</h4>
 
 This specifies options to use in constructing a
@@ -7700,7 +7731,7 @@ Dictionary {{GainOptions}} Members</h5>
 ████ ████ ██     ██ ██       ████ ████████    ██    ████████ ██     ██
 -->
 
-<h3 interface lt="IIRFilterNode">
+<h3 interface lt="iirfilternode" id="IIRFilterNode">
 The {{IIRFilterNode}} Interface</h3>
 
 {{IIRFilterNode}} is an {{AudioNode}}
@@ -7785,8 +7816,8 @@ Methods</h4>
 		</div>
 </dl>
 
-<h4 dictionary lt="IIRFilterOptions">
-IIRFilterOptions</h4>
+<h4 dictionary lt="iirfilteroptions" id="IIRFilterOptions">
+{{IIRFilterOptions}}</h4>
 
 The <code>IIRFilterOptions</code> dictionary is used to specify the
 filter coefficients of the {{IIRFilterNode}}.
@@ -7863,7 +7894,7 @@ Note: The UA may produce a warning to notify the user that NaN values have occur
 ██     ██  ███████  ████████  ████  ███████   ██████   ███████   ███████  ██     ██  ██████  ████████
 -->
 
-<h3 interface lt="MediaElementAudioSourceNode">
+<h3 interface lt="mediaelementaudiosourcenode" id="MediaElementAudioSourceNode">
 The {{MediaElementAudioSourceNode}} Interface</h3>
 
 This interface represents an audio source from an <{audio}>
@@ -7940,7 +7971,7 @@ Attributes</h4>
 		{{MediaElementAudioSourceNode}}.
 </dl>
 
-<h4 dictionary lt="MediaElementAudioSourceOptions">
+<h4 dictionary lt="mediaelementaudiosourceoptions" id="MediaElementAudioSourceOptions">
 {{MediaElementAudioSourceOptions}}</h4>
 
 This specifies the options to use in constructing a
@@ -7984,7 +8015,7 @@ algorithm</a> [[!FETCH]] labeled the resource as
 <!-- Big Text: Audio -->
 <!-- Big Text: Destination -->
 
-<h3 interface lt="MediaStreamAudioDestinationNode">
+<h3 interface lt="mediastreamaudiodestinationnode" id="MediaStreamAudioDestinationNode">
 The {{MediaStreamAudioDestinationNode}} Interface</h3>
 
 This interface is an audio destination representing a
@@ -8048,7 +8079,7 @@ Attributes</h4>
 <!-- Big Text: MediaStream -->
 <!-- Big Text: AudioSource -->
 
-<h3 interface lt="MediaStreamAudioSourceNode">
+<h3 interface lt="mediastreamaudiosourcenode" id="MediaStreamAudioSourceNode">
 The {{MediaStreamAudioSourceNode}} Interface</h3>
 
 This interface represents an audio source from a
@@ -8134,7 +8165,7 @@ Attributes</h4>
 	:: The {{MediaStream}} used when constructing this {{MediaStreamAudioSourceNode}}.
 </dl>
 
-<h4 dictionary lt="MediaStreamAudioSourceOptions">
+<h4 dictionary lt="mediastreamaudiosourceoptions" id="MediaStreamAudioSourceOptions">
 {{MediaStreamAudioSourceOptions}}</h4>
 
 This specifies the options for constructing a {{MediaStreamAudioSourceNode}}.
@@ -8158,7 +8189,7 @@ Dictionary {{MediaStreamAudioSourceOptions}} Members</h5>
 <!-- Big Text: TrackAudio -->
 <!-- Big Text: Source -->
 
-<h3 interface lt="MediaStreamTrackAudioSourceNode">
+<h3 interface lt="mediastreamtrackaudiosourcenode" id="MediaStreamTrackAudioSourceNode">
 The {{MediaStreamTrackAudioSourceNode}} Interface</h3>
 
 This interface represents an audio source from a {{MediaStreamTrack}}.
@@ -8198,7 +8229,7 @@ Constructors</h4>
 		</pre>
 </dl>
 
-<h4 dictionary lt="MediaStreamTrackAudioSourceOptions">
+<h4 dictionary lt="mediastreamtrackaudiosourceoptions" id="MediaStreamTrackAudioSourceOptions">
 {{MediaStreamTrackAudioSourceOptions}}</h4>
 
 This specifies the options for constructing a
@@ -8226,7 +8257,7 @@ Dictionary {{MediaStreamTrackAudioSourceOptions}} Members</h5>
 
 <!-- Big Text: Oscillator -->
 
-<h3 interface lt="OscillatorNode">
+<h3 interface lt="oscillatornode" id="OscillatorNode">
 The {{OscillatorNode}} Interface</h3>
 
 {{OscillatorNode}} represents an audio source
@@ -8275,6 +8306,8 @@ The OscillatorNode's instantaneous phase at each time is the definite
 time integral of <a>computedOscFrequency</a>, assuming a phase angle
 of zero at the node's exact start time. Its <a>nominal range</a> is
 [-<a>Nyquist frequency</a>, <a>Nyquist frequency</a>].
+
+The single output of this node consists of one channel (mono).
 
 <pre class=include>
 path: audionode.include
@@ -8408,7 +8441,7 @@ Methods</h4>
 		</div>
 </dl>
 
-<h4 dictionary lt="OscillatorOptions">
+<h4 dictionary lt="oscillatoroptions" id="OscillatorOptions">
 {{OscillatorOptions}}</h4>
 
 This specifies the options to be used when constructing an
@@ -8525,7 +8558,7 @@ basic waveforms.
 
 <!-- Big Text: Panner -->
 
-<h3 interface lt="PannerNode">
+<h3 interface lt="pannernode" id="PannerNode">
 The {{PannerNode}} Interface</h3>
 
 This interface represents a processing node which
@@ -8977,7 +9010,7 @@ Methods</h4>
 		</div>
 </dl>
 
-<h4 dictionary lt="PannerOptions">
+<h4 dictionary lt="panneroptions" id="PannerOptions">
 {{PannerOptions}}</h3>
 
 This specifies options for constructing a
@@ -9059,7 +9092,7 @@ to {{PannerNode}}.
 
 <!-- Big Text: Periodic -->
 
-<h3 interface lt="PeriodicWave">
+<h3 interface lt="periodicwave" id="PeriodicWave">
 The {{PeriodicWave}} Interface</h3>
 
 {{PeriodicWave}} represents an arbitrary periodic waveform to be used
@@ -9118,7 +9151,7 @@ Constructors</h4>
 		</pre>
 </dl>
 
-<h4 dictionary lt="PeriodicWaveConstraints">
+<h4 dictionary lt="periodicwaveconstraints" id="PeriodicWaveConstraints">
 {{PeriodicWaveConstraints}}</h4>
 
 The {{PeriodicWaveConstraints}} dictionary is used to
@@ -9141,7 +9174,7 @@ Dictionary {{PeriodicWaveConstraints}} Members</h5>
 		the waveform is normalized.
 </dl>
 
-<h4 dictionary lt="PeriodicWaveOptions">
+<h4 dictionary lt="periodicwaveoptions" id="PeriodicWaveOptions">
 {{PeriodicWaveOptions}}</h4>
 
 The {{PeriodicWaveOptions}} dictionary is used to specify
@@ -9296,7 +9329,7 @@ for \(n \ge 1\) is specified below.
 <!-- Big Text: Script -->
 <!-- Big Text: Processor -->
 
-<h3 interface lt="ScriptProcessorNode">
+<h3 interface lt="scriptprocessornode" id="ScriptProcessorNode">
 The {{ScriptProcessorNode}} Interface - DEPRECATED</h3>
 
 This interface is an {{AudioNode}} which can
@@ -9368,7 +9401,7 @@ Attributes</h4>
 <!-- Big Text: Stereo -->
 <!-- Big Text: Panner -->
 
-<h3 interface lt="StereoPannerNode">
+<h3 interface lt="stereopannernode" id="StereoPannerNode">
 The {{StereoPannerNode}} Interface</h3>
 
 This interface represents a processing node which positions an
@@ -9441,7 +9474,7 @@ Attributes</h4>
 		</pre>
 </dl>
 
-<h4 dictionary lt="StereoPannerOptions">
+<h4 dictionary lt="stereopanneroptions" id="StereoPannerOptions">
 {{StereoPannerOptions}}</h4>
 
 This specifies the options to use in constructing a
@@ -9478,7 +9511,7 @@ approaches to panning and mixing.
 <!-- Big Text: Wave -->
 <!-- Big Text: Shaper -->
 
-<h3 interface lt="WaveShaperNode">
+<h3 interface lt="waveshapernode" id="WaveShaperNode">
 The {{WaveShaperNode}} Interface</h3>
 
 {{WaveShaperNode}} is an
@@ -9689,7 +9722,7 @@ Attributes</h4>
 		another.
 </dl>
 
-<h4 dictionary lt="WaveShaperOptions">
+<h4 dictionary lt="waveshaperoptions" id="WaveShaperOptions">
 {{WaveShaperOptions}}</h4>
 
 This specifies the options for constructing a
@@ -9717,7 +9750,7 @@ Dictionary {{WaveShaperOptions}} Members</h5>
 
 <!-- Big Text: AudioWorklet -->
 
-<h3 interface lt="AudioWorklet">
+<h3 interface lt="audioworklet" id="AudioWorklet">
 The {{AudioWorklet}} Interface</h3>
 
 <pre class="idl">
@@ -9808,7 +9841,7 @@ created in {{AudioWorkletGlobalScope}}. These two objects
 communicate via the asynchronous message passing described in
 [[#processing-model]].
 
-<h4 interface lt="AudioWorkletGlobalScope">
+<h4 interface lt="audioworkletglobalscope" id="AudioWorkletGlobalScope">
 The {{AudioWorkletGlobalScope}} Interface</h4>
 
 This special execution context is designed to enable the
@@ -9992,11 +10025,10 @@ Methods</h5>
 				<a>node name to processor constructor map</a>
 				of the associated {{AudioWorkletGlobalScope}}.
 
-			1. <a>Queue a task</a> to the <a>control thread</a> to
-				append the key-value pair <var>name</var> →
-				<var>parameterDescriptorSequence</var> to
-				the <a>node name to parameter descriptor map</a>
-				of the associated {{BaseAudioContext}}.
+			1. <a href="https://html.spec.whatwg.org/multipage/media.html#queue-a-media-element-task">
+				queue a media element task</a> to append the key-value pair |name| →
+				|parameterDescriptorSequence| to the <a>node name to parameter descriptor map</a> of the
+				associated {{BaseAudioContext}}.
 		</div>
 
 		Note: The class constructor should only be looked up once, thus it
@@ -10074,12 +10106,17 @@ the <a>rendering thread</a> will invoke the algorithm below:
 			of this {{AudioWorkletGlobalScope}}'s
 			[=pending processor construction data=] respectively.
 
-		1. <a spec=webidl lt=construct>Construct a callback function</a>
-			from <var>processorCtor</var> with the argument of
-			<var>deserializedOptions</var>.
+		1. <a spec=webidl lt=construct>Construct a callback function</a> from |processorCtor| with the argument
+			of |deserializedOptions|. If any exceptions are thrown in the callback, <a>queue a task</a> to
+			the <a>control thread</a> to <a spec="dom" lt="fire an event">fire an event</a> named
+			`processorerror` using
+			<a href="https://www.w3.org/TR/html50/webappapis.html#the-errorevent-interface">ErrorEvent</a>
+			at |nodeReference|.
+
+		1. Empty the [=pending processor construction data=] slot.
 	</div>
 
-<h4 interface lt="AudioWorkletNode">
+<h4 interface lt="audioworkletnode" id="AudioWorkletNode">
 The {{AudioWorkletNode}} Interface</h4>
 
 This interface represents a user-defined {{AudioNode}} which
@@ -10258,8 +10295,8 @@ Attributes</h5>
 		When an unhandled exception is thrown from the processor's
 		<code>constructor</code>, <code>process</code> method,
 		or any user-defined class method, the processor will
-		<a>queue a task</a> to <a spec="dom" lt="fire an event">
-		fire an event</a> named <code>processorerror</code> using
+		<a href="https://html.spec.whatwg.org/multipage/media.html#queue-a-media-element-task">	queue a media
+		element task</a> to <a spec="dom" lt="fire an event">fire an event</a> named `processorerror` using
 		<a href="https://html.spec.whatwg.org/multipage/webappapis.html#the-errorevent-interface">
 		ErrorEvent</a> at the associated {{AudioWorkletNode}}.
 
@@ -10295,7 +10332,7 @@ Attributes</h5>
 		resources to be [[html#ports-and-garbage-collection|collected]].
 </dl>
 
-<h5 dictionary lt="AudioWorkletNodeOptions">
+<h5 dictionary lt="audioworkletnodeoptions" id="AudioWorkletNodeOptions">
 {{AudioWorkletNodeOptions}}</h5>
 
 The {{AudioWorkletNodeOptions}} dictionary can be used
@@ -10400,7 +10437,7 @@ used to configure various channel configurations.
 			<var>node</var> to 1 and return.
 </div>
 
-<h4 interface lt="AudioWorkletProcessor">
+<h4 interface lt="audioworkletprocessor" id="AudioWorkletProcessor">
 The {{AudioWorkletProcessor}} Interface</h4>
 
 This interface represents an audio processing code that runs on the
@@ -10453,22 +10490,6 @@ Constructors</h5>
 				current {{AudioWorkletGlobalScope}}.
 				Throw a {{TypeError}} exception if the slot is
 				empty.
-
-			1. If any of following steps throws any exception,
-				perform these substeps:
-
-				1. Empty the
-					[=pending processor construction data=]
-					slot.
-
-				2. Abort the rest of the constructor algorithm
-					and <a>queue a task</a> to the
-					<a>control thread</a>
-					to <a spec="dom" lt="fire an event">fire
-					an event</a> named
-					<code>processorerror</code> using
-					<a href="https://www.w3.org/TR/html50/webappapis.html#the-errorevent-interface">ErrorEvent</a>
-					at <var>nodeReference</var>.
 
 			1. Let <var>processor</var> be the
 				<a spec="webidl" lt="this">this</a> value.
@@ -10642,7 +10663,7 @@ transferred.
 
 </dl>
 
-<h5 dictionary lt="AudioParamDescriptor">
+<h5 dictionary lt="audioparamdescriptor" id="AudioParamDescriptor">
 {{AudioParamDescriptor}}</h5>
 
 The {{AudioParamDescriptor}} dictionary is used to
@@ -11024,11 +11045,6 @@ reaction to the calls from the <a>control thread</a>. It can be a
 real-time, callback-based audio thread, if computing audio for an
 {{AudioContext}}, or a normal thread if computing audio for an {{OfflineAudioContext}}.
 
-Each thread has an internal slot that indicates its current state.
-<dfn>control thread state</dfn> is the equivalent of {{BaseAudioContext/state}}
-and <dfn>rendering thread state</dfn> in the counterpart from the rendering
-thread. These slots have a value of {{AudioContextState}}.
-
 The <a>control thread</a> uses a traditional event loop, as described
 in [[HTML]].
 
@@ -11182,13 +11198,20 @@ task queue=] of its associated {{BaseAudioContext}}.
 
 	3. Process the {{BaseAudioContext}}'s [=associated task queue=].
 
-		1. Let <var>task count</var> be the number of tasks in the task queue of the {{AudioContext}} being rendered.
 
-		2. Spin the event loop until <var>task count</var> tasks have been executed.
+		1. Let <var>task queue</var> be the {{BaseAudioContext}}'s [=associated task queue=].
+		2. Let <var>task count</var> be the number of tasks in the in <var>task queue</var>
+		3. While <var>task count</var> is not equal to 0, execute the following steps:
+			1. Let <var>oldest task</var> be the first runnable task in <var>task queue</var>, and remove it from <var>task queue</var>.
+			2. Set the rendering loop's currently running task to <var>oldest task</var>.
+			3. Perform <var>oldest task</var>'s steps.
+			4. Set the rendering loop currently running task back to <code>null</code>.
+			6. Decrement <var>task count</var>
+			5. Perform a microtask checkpoint.
 
 	4. Process a render quantum.
 
-		1. If the <a>rendering thread state</a> of the {{BaseAudioContext}} is not
+		1. If the {{[[rendering thread state]]}} of the {{BaseAudioContext}} is not
 			<code>running</code>, return false.
 
 		2. Order the {{AudioNode}}s of the {{BaseAudioContext}} to be processed.
@@ -11285,54 +11308,101 @@ task queue=] of its associated {{BaseAudioContext}}.
 				[=Computing a block of audio|compute a block of audio=], and
 				[=Making a buffer available for reading|make it available for reading=].
 
-			4. If this {{AudioNode}} is an {{AudioWorkletNode}}, execute these
-				substeps:
+			4. If this {{AudioNode}} is an {{AudioWorkletNode}}, execute these substeps:
 
-				1. Let <var>processor</var> be the associated {{AudioWorkletProcessor}}
+				1. Let |processor| be the associated {{AudioWorkletProcessor}}
 					instance of {{AudioWorkletNode}}.
 
-				1. If {{[[callable process]]}} of <var>processor</var> is `true`,
-					execute the following steps:
+				1. Let |O| be the ECMAScript object corresponding to |processor|.
 
-					1. Let <var>processFunction</var> be the result of
-						<code><a href="http://www.ecma-international.org/ecma-262/6.0/#sec-get-o-p">
-						Get</a>(O=<i><var>processor</var></i>, P="process")</code>.
+				1. Let |processCallback| be an uninitialized variable.
 
-					1. Set {{[[callable process]]}} to be the return value of
-						<code><a href="http://www.ecma-international.org/ecma-262/6.0/#sec-iscallable">
-						IsCallable</a>(argument=<i><var>processFunction</var></i>)</code>.
+				1. Let |completion| be an uninitialized variable.
 
-					1. If {{[[callable process]]}} is `true`,
-						invoke <var>processFunction</var> to
-						[=Computing a block of audio|compute a block of audio=] with the
-						argument of [=input buffer=], output buffer and
-						[=input AudioParam buffer=]. A buffer containing copies of the
-            					elements of the {{Float32Array}}s passed via the
-            					{{AudioWorkletProcessCallback/outputs!!argument}} parameter to <var>processFunction</var> is
-						<a href="#available-for-reading">made available for reading</a>.
+				1. [=Prepare to run script=] with the [=current settings object=].
 
-					1. At the conclusion of <var>processFunction</var>,
-						<a href="https://tc39.github.io/ecma262/#sec-toboolean"><code>ToBoolean</code></a>
-						is applied to the return value and the result is
-						assigned to the associated {{AudioWorkletProcessor}}'s
-						<a>active source</a> flag. This in turn affects whether
-						subsequent invocations of [=process()=] occur, and has
-						an impact on the lifetime of the node.
+				1. [=Prepare to run a callback=] with the [=current settings object=].
 
-					1. Else if {{[[callable process]]}} is `false`,
-						<a>queue a task</a> to the <a>control thread</a>
-						<a spec="dom" lt="fire an event">fire</a> an
-						<a href="https://www.w3.org/TR/html50/webappapis.html#the-errorevent-interface">ErrorEvent</a>
-						named <code>processorerror</code> at the associated
-						{{AudioWorkletNode}}.
+				1. Let |getResult| be
+					<a href="https://tc39.github.io/ecma262/#sec-get-o-p">
+					Get</a>(|O|, "process").
 
-				1. If {{[[callable process]]}} of <var>processor</var> is `false`,
-					execute the following steps:
+				1. If |getResult| is an
+					<a href="https://tc39.github.io/ecma262/#sec-completion-record-specification-type">
+					abrupt completion</a>, set |completion| to |getResult| and jump to the step
+					labeled <a href="#audio-worklet-render-return">return</a>.
 
-					1. [=Making a buffer available for reading|Make a silent output buffer available for reading=].
+				1. Set |processCallback| to |getResult|.\[[Value]].
 
-				1. Any {{Promise}} resolved within the execution of process method will
-					be queued into the microtask queue in the {{AudioWorkletGlobalScope}}.
+				1. If <a href="https://tc39.es/ecma262/#sec-returnifabrupt-shorthands">!</a>
+					<a href="https://tc39.es/ecma262/#sec-iscallable">
+					IsCallable</a>(|processCallback|) is `false`, then:
+
+					1. Set |completion| to new
+						<a href="https://tc39.es/ecma262/#sec-completion">Completion</a>
+						{\[[Type]]: throw, \[[Value]]: a newly created
+						<a href="https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-typeerror">
+						TypeError</a> object, \[[Target]]: empty}.
+
+					1. Jump to the step labeled
+						<a href="#audio-worklet-render-return">return</a>.
+
+				1. Set {{[[callable process]]}} to `true`.
+
+				1. Perform the following substeps:
+
+					1. Let |args| be a
+						<a href="https://heycam.github.io/webidl/#web-idl-arguments-list">
+						Web IDL arguments list</a> consisting of
+						{{AudioWorkletProcessCallback/inputs}},
+						{{AudioWorkletProcessCallback/outputs}}, and
+						{{AudioWorkletProcessCallback/parameters}}.
+
+					1. Let |esArgs| be the result of
+						<a href="https://heycam.github.io/webidl/#web-idl-arguments-list-converting">
+						converting</a> |args| to an ECMAScript arguments list.
+
+					1. Let |callResult| be the <a href="https://tc39.github.io/ecma262/#sec-call">
+						Call</a>(|processCallback|, |O|, |esArgs|). This operation
+						[=Computing a block of audio|computes a block of audio=] with |esArgs|.
+						Upon a successful function call, a buffer containing copies of
+						the elements of the {{Float32Array}}s passed via the
+						{{AudioWorkletProcessCallback/outputs}} is
+						[=Making a buffer available for reading|made available for reading=].
+						Any {{Promise}} resolved within this call will be queued into the
+						microtask queue in the {{AudioWorkletGlobalScope}}.
+
+					1. If |callResult| is an
+						<a href="https://tc39.github.io/ecma262/#sec-completion-record-specification-type">
+						abrupt completion</a>, set |completion| to |callResult| and jump to the
+						step labeled <a href="#audio-worklet-render-return">return</a>.
+
+					1. Set |processor|’s <a>active source</a> flag to
+						<a href="https://tc39.github.io/ecma262/#sec-toboolean">
+						ToBoolean</a>(|callResult|.\[[Value]]).
+
+				1. <b id="audio-worklet-render-return">Return:</b> at this point |completion|
+					will be set to an ECMAScript
+					<a href="https://tc39.es/ecma262/#sec-completion">completion</a> value.
+
+					1. [=Clean up after running a callback=] with the [=current settings object=].
+
+					1. [=Clean up after running script=] with the [=current settings object=].
+
+					1. If |completion| is an
+						<a href="https://tc39.github.io/ecma262/#sec-completion-record-specification-type">
+						abrupt completion</a>:
+
+						1. Set {{[[callable process]]}} to `false`.
+
+						1. Set |processor|'s <a>active source</a> flag to `false`.
+
+						1. [=Making a buffer available for reading|Make a silent output buffer available for reading=].
+
+						1. <a>Queue a task</a> to the <a>control thread</a>
+							<a spec="dom" lt="fire an event">fire</a> an
+							{{ErrorEvent}} named <code>processorerror</code> at the
+							associated {{AudioWorkletNode}}.
 
 			5. If this {{AudioNode}} is a <a>destination node</a>,
 				[=Recording the input|record the input=] of this {{AudioNode}}.
@@ -12601,6 +12671,25 @@ class Vec3 {
 
 <h2 id="changes">
 Change Log</h2>
+<h3 id="changes-2021-01-14">
+  Since Candidate Recommendation of 14 January 2021
+</h3>
+<!-- Last updated: 2021-04-06 -->
+ * <a href="https://github.com/WebAudio/web-audio-api/pull/2312">PR 2312</a>: Rework description of control thread state and rendering thread state
+ * <a href="https://github.com/WebAudio/web-audio-api/pull/2311">PR 2311</a>: Adjust the steps to process a context's regular task queue
+ * <a href="https://github.com/WebAudio/web-audio-api/pull/2310">PR 2310</a>: OscillatorNode output is mono
+ * <a href="https://github.com/WebAudio/web-audio-api/pull/2308">PR 2308</a>: Refine phrasing for "allowed to start"
+ * <a href="https://github.com/WebAudio/web-audio-api/pull/2307">PR 2307</a>: Replace "queue a task" with "queue a media element task"
+ * <a href="https://github.com/WebAudio/web-audio-api/pull/2306">PR 2306</a>: Move some steps from AudioWorkletProcessor constructor to the instantiation algorithm
+ * <a href="https://github.com/WebAudio/web-audio-api/pull/2304">PR 2304</a>: Add required components for ES operations in the rendering loop
+ * <a href="https://github.com/WebAudio/web-audio-api/pull/2301">PR 2301</a>: Define when and how regular tasks are processed wrt the processing model
+ * <a href="https://github.com/WebAudio/web-audio-api/pull/2286">PR 2286</a>: Clean up ABSN start algorithm
+ * <a href="https://github.com/WebAudio/web-audio-api/pull/2277">PR 2277</a>: Fix compression curve diagram
+ * <a href="https://github.com/WebAudio/web-audio-api/pull/2273">PR 2273</a>: Clarify units used in threshold & knee value calculations
+ * <a href="https://github.com/WebAudio/web-audio-api/pull/2256">PR 2256</a>: ABSN extrapolates the last output
+ * <a href="https://github.com/WebAudio/web-audio-api/pull/2250">PR 2250</a>: Use FrozenArray for AudioWorkletProcessor process()
+ * <a href="https://github.com/WebAudio/web-audio-api/pull/2298">PR 2298</a>: Bikeshed HTML validation issues
+ 
 <h3 id="changes-2020-06-11">
   Since Candidate Recommendation of 11 June 2020
 </h3>

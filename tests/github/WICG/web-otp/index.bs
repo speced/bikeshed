@@ -1,5 +1,5 @@
 <pre class='metadata'>
-Title: Web OTP API
+Title: WebOTP API
 Shortname: webotp
 Level: 1
 Status: CG-DRAFT
@@ -10,6 +10,8 @@ Editor: Sam Goto, Google Inc. https://google.com, goto@google.com
 Favicon: logo-otp.png
 Markup Shorthands: markdown yes, css no, biblio yes
 Text Macro: FALSE <code>false</code>
+Text Macro: RP Relying Party
+Text Macro: RPS Relying Parties
 Text Macro: TRUE <code>true</code>
 Abstract: A Javascript API to request one time passwords for verifying credentials (e.g. phone numbers, emails).
 Test Suite: https://github.com/web-platform-tests/wpt/tree/master/sms
@@ -110,6 +112,18 @@ place to guarantee that the OTP is delivered safely and
 programatically.
 
 For SMS, for example, servers should send [=origin-bound one-time code messages=] to clients. [[sms-one-time-codes]]
+
+<div class="example">
+
+In the following [=origin-bound one-time code message=], the host is `"example.com"`, the code is `"123456"`, and the explanatory text is `"Your authentication code is 123456.\n"`.
+
+```
+"Your authentication code is 123456.
+
+@example.com #123456"
+```
+
+</div>
 
 <!-- ============================================================ -->
 ## Feature Detection ## {#intro-feature-detection}
@@ -288,6 +302,10 @@ This [=internal method=] accepts three arguments:
     :   <dfn>sameOriginWithAncestors</dfn>
     ::  This argument is a Boolean value which is [TRUE] if and only if the caller's [=environment settings object=] is
         [=same-origin with its ancestors=]. It is [FALSE] if caller is cross-origin.
+
+        Note: Invocation of this [=internal method=] indicates that it was allowed by
+        [=permissions policy=], which is evaluated at the [[!CREDENTIAL-MANAGEMENT-1]] level.
+        See [[#sctn-permissions-policy]].
 </dl>
 
 Note: <strong>This algorithm is synchronous:</strong> the {{Promise}} resolution/rejection is handled by
@@ -373,6 +391,29 @@ OTP.
 </div>
 
 <!-- ============================================================ -->
+## Permissions Policy integration ## {#sctn-permissions-policy}
+<!-- ============================================================ -->
+
+This specification defines one [=policy-controlled feature=] identified by
+the feature-identifier token "<code><dfn data-lt="otp-credentials-feature" export>otp-credentials</dfn></code>".
+Its [=default allowlist=] is '<code>self</code>'. [[!Permissions-Policy]]
+
+A {{Document}}'s [=Document/permissions policy=] determines whether any content in that <a href="https://html.spec.whatwg.org/multipage/dom.html#documents">document</a> is
+[=allowed to use|allowed to successfully invoke=] the [=WebOTP API=], i.e., via
+<code><a idl for="CredentialsContainer" lt="get()">navigator.credentials.get({otp: { transport: ["sms"]}})</a></code>.
+If disabled in any document, no content in the document will be [=allowed to use=]
+the foregoing methods: attempting to do so will [return an error](https://www.w3.org/2001/tag/doc/promises-guide#errors).
+
+<!-- ============================================================ -->
+## Using WebOTP within <code>iframe</code> elements ## {#sctn-iframe-guidance}
+<!-- ============================================================ -->
+
+The [=WebOTP API=] is available in inner frames when the origins match but it's disabled by default in cross-origin <{iframe}>s.
+To override this default policy and indicate that a cross-origin <{iframe}> is allowed to invoke the [=WebOTP API=]'s {{[[DiscoverFromExternalSource]](origin, options, sameOriginWithAncestors)}} method, specify the <{iframe/allow}> attribute on the <{iframe}> element and include the <code>[=otp-credentials-feature|otp-credentialst=]</code> feature-identifier token in the <{iframe/allow}> attribute's value.
+
+[=[RPS]=] utilizing the WebOTP API in an embedded context should review [[#sctn-seccons-visibility]] regarding [=UI redressing=] and its possible mitigations.
+
+<!-- ============================================================ -->
 # Transports # {#transports}
 <!-- ============================================================ -->
 
@@ -403,8 +444,6 @@ pasted by users.
 From a security perspective, there are two considerations with this
 API:
 
-* addressing: preventing crossing an origin boundary between the
-    sending and the receiving of OTPs.
 * tampering: preventing attacks based on the modification of the message.
 
 <!-- ============================================================ -->
@@ -413,14 +452,7 @@ API:
 
 This API is only available on:
 
-* top level frames and
 * https (or localhost, for development purposes)
-
-This API is also only available on top level frames, to avoid abuse by
-third party iframes / libraries. It could be made available to inner
-frames when the origin match, but we haven't yet found a concrete
-requirement / demand for this feature, so we keep it more constrained
-for the moment. 
 
 This API is also only available via https or localhost (for development
 purposes). We don't entirely adopt the concept of trustworthy urls
@@ -469,6 +501,12 @@ It is the responsibility for the caller to:
         (e.g. only alpha numeric values),
     * storing and checking OTPs that were sent on a server side database.
 * degrade gracefully when an invalid OTP is received (e.g. re-request one).
+
+<!-- ============================================================ -->
+## Visibility Considerations for Embedded Usage ## {#sctn-seccons-visibility}
+<!-- ============================================================ -->
+
+Simplistic use of WebOTP in an embedded context, e.g., within <{iframe}>s as described in [[#sctn-iframe-guidance]], may make users vulnerable to <dfn>UI Redressing</dfn> attacks, also known as "[Clickjacking](https://en.wikipedia.org/wiki/Clickjacking)". This is where an attacker overlays their own UI on top of a [=[RP]=]'s intended UI and attempts to trick the user into performing unintended actions with the [=[RP]=]. For example, using these techniques, an attacker might be able to trick users into purchasing items, transferring money, etc.
 
 <!-- ============================================================ -->
 # Privacy # {#privacy}

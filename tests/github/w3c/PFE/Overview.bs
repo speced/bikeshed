@@ -1,5 +1,5 @@
 <pre class='metadata'>
-Title: Progressive Font Enrichment, or whatever we call it
+Title: Incremental Font Transfer
 Shortname: PFE
 Status: w3c/ED
 Group: webfontswg
@@ -8,7 +8,7 @@ TR: https://www.w3.org/TR/example/
 ED: https://w3c.github.io/PFE/Overview.html
 Editor: Chris Lilley, W3C, https://svgees.us/, w3cid 1438
 Editor: Myles C. Maxfield, Apple Inc., mmaxfield@apple.com, w3cid 77180
-Editor: Garret Rieger, Google Inc., http://example.com/contact
+Editor: Garret Rieger, Google Inc., grieger@google.com
 Abstract: Example example
 Status Text: This is a largely empty document because we have just started working on it.
 </pre>
@@ -79,18 +79,25 @@ should be encoded by CBOR are given in the definition of those data types.
 ### SparseBitSet ### {#sparsebitset}
 
 A data structure which compactly stores a set of distinct unsigned integers. The set is represented as
-an oct-tree where each node has 8 children that recursively sub-divides an interval into 8 equal
-partitions. A tree of height <i>H</i> can store set membership for integers in the interval [0 to
-8<sup><i>H</i></sup>-1] inclusive. The tree is encoded into a ByteString for transport.
+a tree where each node has a fixed number of children that recursively sub-divides an interval into
+equal partitions. A tree of height <i>H</i> with branching factor <i>B</i> can store set membership
+for integers in the interval [0 to <i>B</i><sup><i>H</i></sup>-1] inclusive. The tree is encoded into
+a ByteString for transport.
 
-To construct the tree <i>T</i> which encodes set <i>S</i> first determine the height, <i>H</i>, of the
-tree:
+To construct the tree <i>T</i> which encodes set <i>S</i> first select the branching factor <i>B</i>
+(how many children each node has). <i>B</i> can be 4, 8, 16, or 32. 
 
-<i>H</i> = ceil(log<sub>8</sub>(max(</i>S</i>) + 1))
+Note: the encoder can use any of the possible branching factors, but it is recommended to
+use 4 as that has been shown to give the smallest encodings for most sets typically encountered.
 
-Next create a tree of height H where all non-leaf nodes have 8 children. Each node in the tree has
-a single byte value. Given a node <i>p</i> which has 8 children:
-<i>c<sub>0</sub></i> ... <i>c<sub>7</sub></i> and is in a tree, <i>T</i>, of height <i>H</i>, then:
+Next, determine the height, <i>H</i>, of the tree:
+
+<i>H</i> = ceil(log<sub><i>B</i></sub>(max(</i>S</i>) + 1))
+
+Next create a tree of height H where all non-leaf nodes have <i>B</i> children. Each node in the tree
+has a single value composed of <i>B</i> bits. Given a node <i>p</i> which has <i>B</i> children:
+<i>c<sub>0</sub></i> ... <i>c<sub><i>B</i> - 1</sub></i> and is in a tree, <i>T</i>, of height
+<i>H</i>, then:
 
 *  D(<i>c<sub>i</sub></i>) is depth of node <i>c<sub>i</sub></i>, that is the number of edges between
     the root node and <i>c<sub>i</sub></i>.
@@ -98,58 +105,139 @@ a single byte value. Given a node <i>p</i> which has 8 children:
 *  Start(<i>c<sub>i</sub></i>) is the start (inclusive) of the interval  covered by
      <i>c<sub>i</sub></i> :<br/>
      Start(<i>c<sub>i</sub></i>) =
-     Start(<i>p</i>) + <i>i</i> * 8<sup><i>H</i> - D(<i>c<sub>i</sub></i>)</sup>
+     Start(<i>p</i>) + <i>i</i> * <i>B</i><sup><i>H</i> - D(<i>c<sub>i</sub></i>)</sup>
      
 *  End(<i>c<sub>i</sub></i>) is the end (exclusive) of the interval  covered by
      <i>c<sub>i</sub></i> :<br/>
      End(<i>c<sub>i</sub></i>) =
-     Start(<i>p</i>) + (<i>i</i> + 1) * 8<sup><i>H</i> - D(<i>c<sub>i</sub></i>)</sup>
+     Start(<i>p</i>) + (<i>i</i> + 1) * <i>B</i><sup><i>H</i> - D(<i>c<sub>i</sub></i>)</sup>
 
 *  Start(root node) = 0
      
-*  The value of node <i>p</i> is as a single byte (8 bits). If its bits are numbered from 0
-    (least significant bit) to 7 (most significant bit) then bit <i>i</i> will be 1 if the
-    set <i>S</i> contains at least one member in the interval
-    [Start(<i>c<sub>i</sub></i>), End(<i>c<sub>i</sub></i>)), otherwise bit <i>i</i> will be 0.
+*  The value of node <i>p</i> is a string of <i>B</i> bits. If its bits are numbered from 0 (least
+    significant) to <i>B</i> - 1 (most significant) then bit <i>i</i> will be 1 if the set <i>S</i>
+    contains at least one member in the interval [Start(<i>c<sub>i</sub></i>),
+    End(<i>c<sub>i</sub></i>)), otherwise bit <i>i</i> will be 0.
 
-*  If for node <i>p</i>, End(<i>p</i>) - Start(<i>p</i>) = 1, then <i>p</i> will have no children
-    and its value byte is 0.
+*  If for node <i>p</i>, End(<i>p</i>) - Start(<i>p</i>) = <i>B</i>, then <i>p</i> will have no
+    children.
 
-Finally, tree <i>T</i> is encoded into a ByteString by traversing the nodes of the <i>T</i> in level
-order and appending the value byte for each node to the ByteString if the value byte has a non-zero
-value.
+The tree is encoded into a bit string. The bits of the bit string are numbered from 0 to M. When
+appending multi bit values to the bit string, bits are added in order from least significant bit to
+most significant bit.
+
+First append 2 bits which encode the branching factor:
+
+<table>
+  <tr>
+    <th>Bits</th><th>Branching Factor</th>
+  </tr>
+  <tr><td>00</td><td>4</td></tr>
+  <tr><td>01</td><td>8</td></tr>
+  <tr><td>10</td><td>16</td></tr>
+  <tr><td>11</td><td>32</td></tr>
+</table>
+
+Then append the value <i>H</i> - 1 as a 6 bit unsigned integer.
+
+Next the nodes are encoded into the bit string by traversing the nodes of the <i>T</i> in level
+order and appending the value for each non-zero node to the bit string.If all set values
+covered by a node's interval are present within set <i>S</i> that node can instead be encoded in the
+bit string as <i>B</i> bits all set to zero. All children of that node must not be encoded.
+
+Lastly the bit string is converted into a ByteString by converting each consecutive group of 8 bits
+into the next byte of the string. The bit with the smallest index in the bit string is the least
+significant bit in the byte and the bit with the largest index is the most significant bit.
+
 
 <div class=example>
-  The set {2, 33, 323} is encoded as the byte string:
+  The set {2, 33, 323} in a tree with a branching factor of 8 is encoded as the bit string:
   
   ```
-  |- level 0 -|------ level 1 --------|----------- level 2 ----------------|
-  |     n0    |     n1          n2    |      n3         n4          n5     |
-  [ 0b00100001, 0b00010001, 0b00000001, 0b00000100, 0b00000010, 0b00001000 ]
+  BitString:
+  |- header |- lvl 0 |---- level 1 ----|------- level 2 -----------|
+  |         |   n0   |   n1       n2   |   n3       n4       n5    |
+  [ 10010000 10000100 10001000 10000000 00100000 01000000 00010000 ]
+
+  Which then becomes the ByteString:
+  [
+    0b00001001,
+    0b00100001,
+    0b00010001,
+    0b00000001,
+    0b00000100,
+    0b00000010,
+    0b00001000
+  ]
   ```
   
   First determine the height of the tree:
   
   <i>H</i> = ceil(log<sub>8</sub>(323 + 1)) = 3
 
-  The value of the root node, n<sub>0</sub>, is 0b00100001 since there are set members in the intervals
-  [0, 64) for bit 0 and [320, 384) for bit 5.
+  Then append
 
-  In the next level of the tree there will be two non-zero children corresponding to bit 0
-  and bit 5 in n<sub>0</sub>:
+  *  branching factor = 8 = 01
+  *  <i>H</i> - 1 = 2 = 000010
 
-  * 0b00010001 is child 0 of n<sub>0</sub> it subdivides the interval [0, 64). Bit 0 is set
-     since there are set members in [0, 8) and bit 4 for [32, 40).
+  Level 0:
   
-  * 0b10000000 is child 5 of n<sub>0</sub> it subdivides the interval [320, 384). Bit 0 is
-     set since there are set members in [320 - 328).
-  
-  Finally the last 3 bytes 0b00100000, 0b01000000, 0b00010000 represent
-  the non-zero children in the third level of the tree:
+  * root node, n<sub>0</sub> append 00100001. Since there are set members in the intervals
+     [0, 64) for bit 0 and [320, 384) for bit 5.
 
-  * 0b00000100 is child 0 of n<sub>1</sub>, bit 2 is set for the interval [2, 3) or 2.
-  * 0b00000010 is child 4 of n<sub>1</sub>, bit 1 is set for the interval [33, 34) or 33.
-  * 0b00001000 is child 0 of n<sub>2</sub>, bit 3 is set for the interval [323, 324) or 323.
+  Level 1:
+  
+  * There will be two non-zero children corresponding to bit 0 and bit 5 in n<sub>0</sub>:
+  * n<sub>1</sub> append 00010001. It is child 0 of n<sub>0</sub> and subdivides the interval
+     [0, 64). Bit 0 is set since there are set members in [0, 8) and bit 4 for [32, 40).
+  
+  * n<sub>2</sub> append 00000001. It is child 5 of n<sub>0</sub> it subdivides the interval
+     [320, 384). Bit 0 is set since there are set members in [320 - 328).
+
+  Level 2:
+
+  * n<sub>3</sub> append 00000100. Child 0 of n<sub>1</sub>, bit 2 is set for the interval [2, 3) or 2.
+  * n<sub>4</sub> append 00000010. Child 4 of n<sub>1</sub>, bit 1 is set for the interval [33, 34) or 33.
+  * n<sub>5</sub> append 00001000. Child 0 of n<sub>2</sub>, bit 3 is set for the interval [323, 324)
+     or 323.
+     
+</div>
+
+<div class=example>
+  The set {0, 1, 2, ..., 17} can be encoded with a branching factor of 4 as:
+
+  ```
+  BitString:
+  |- header | l0 |- lvl 1 -| l2  |
+  |         | n0 | n1 | n2 | n3  |
+  [ 00010000 1100 0000 1000 1100 ]
+
+  ByteString:
+  [
+    0b00001000,
+    0b00000011,
+    0b00110001
+  ]
+  ```
+
+  First determine the height of the tree:
+  
+  <i>H</i> = ceil(log<sub>4</sub>(17 + 1)) = 3
+
+  Then append
+  
+  *  branching factor = 4 = 00
+  *  <i>H</i> - 1 = 2 = 000010
+
+  Level 0:
+  *  n<sub>0</sub> append 0011. Bit 0 set for [0, 16), bit 1 set for [16, 32)
+
+  Level 1:
+  *  n<sub>1</sub> append 0000. All bits zero to indicate interval [0, 16) is fully filled.
+  *  n<sub>2</sub> append 0001. Bit 0 set for [16, 20)
+
+  Level 2:
+  *  n<sub>3</sub> append 0011. Bit 0 set for value 16, bit 1 set for value 17.
 
 </div>
 

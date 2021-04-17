@@ -12,7 +12,7 @@ Former Editor: Mike West 56384, Google LLC, mkwst@google.com
 Abstract:
     This document defines a set of Client Hints that aim to provide developers with the ability to
     perform agent-based content negotiation when necessary, while avoiding the historical baggage and
-    passive fingerprinting surface exposed by the venerable `User-Agent` header.
+    [=passive fingerprinting=] surface exposed by the venerable `User-Agent` header.
 Indent: 4
 Default Biblio Status: current
 Markup Shorthands: css off, markdown on
@@ -48,6 +48,12 @@ urlPrefix: https://wicg.github.io/client-hints-infrastructure/
 urlPrefix: https://tc39.es/ecma262/
     type: dfn
         text: current realm; url: #current-realm
+urlPrefix: https://w3c.github.io/fingerprinting-guidance/
+    type: dfn
+        text: passive fingerprinting; url: #dfn-passive-fingerprinting
+        text: active fingerprinting; url: #dfn-active-fingerprinting
+        text: Best Practice 1; url: #avoid-passive-increases
+
 </pre>
 <pre class="biblio">
 {
@@ -134,33 +140,36 @@ Client Hints ([[!RFC8942]]) that can provide the client's branding and version
 information, the underlying operating system's branding and major version, as well as details about
 the underlying device. Rather than broadcasting this data to everyone, all the time, user agents can
 make reasonable decisions about how to respond to given sites' requests for more granular data,
-reducing the passive fingerprinting surface area exposed to the network.
+reducing the [=passive fingerprinting=] surface area exposed to the network (see [=Best Practice 1=]
+in [[FINGERPRINTING-GUIDANCE]]).
 
 Examples {#examples}
 --------
 
-A user navigates to `https://example.com/` for the first time using the latest version of the "Examplary Browser". Their
-user agent sends the following header along with the HTTP request:
+A user navigates to `https://example.com/` for the first time using the latest version of the
+"Examplary Browser". Their user agent sends the following headers along with the HTTP request:
 
 ``` http
   Sec-CH-UA: "Examplary Browser"; v="73", ";Not?A.Brand"; v="27"
+  Sec-CH-UA-Mobile: ?0
+  Sec-CH-UA-Platform: "Windows"
 ```
 
-The server is interested in rendering content consistent with the user's underlying platform, and
-asks for a little more information by sending an `Accept-CH` header (Section 2.2.1 of
+The server is interested in rendering content consistent with the user's underlying platform version,
+and asks for a little more information by sending an `Accept-CH` header (Section 2.2.1 of
 [[!RFC8942]]) along with the initial response:
 
 ``` http
-  Accept-CH: Sec-CH-UA-Full-Version, Sec-CH-UA-Platform
+  Accept-CH: Sec-CH-UA-Platform-Version
 ```
 
-In response, the user agent includes more detailed version information, as well as information about
-the underlying platform in the next request:
+In response, the user agent includes the platform version information in the next request:
 
 ``` http
   Sec-CH-UA: "Examplary Browser"; v="73", ";Not?A.Brand"; v="27"
-  Sec-CH-UA-Full-Version: "73.3R8.2H.1"
+  Sec-CH-UA-Mobile: ?0
   Sec-CH-UA-Platform: "Windows"
+  Sec-CH-UA-Full-Version: "10.0.19042"
 ```
 
 Infrastructure {#infrastructure}
@@ -228,6 +237,30 @@ platforms where the model is typically exposed.
 [=User agents=] MAY return the empty string or a fictitious value for [=full version=], [=platform
 architecture=], [=platform bitness=] or [=model=], for privacy, compatibility, or other reasons.
 
+The 'Sec-CH-UA' Header Field {#sec-ch-ua}
+----------------------------
+
+The <dfn http-header>`Sec-CH-UA`</dfn> request header field gives a server information about a
+[=user agent=]'s branding and version. It is a [=Structured Header=] whose value MUST be a
+[=structured header/list=] [[!RFC8941]]. The list's items MUST be
+[=structured header/string=]. The value of each item SHOULD include a "v" parameter, indicating the
+[=user agent=]'s version.
+
+The header's ABNF is:
+
+``` abnf
+  Sec-CH-UA = sf-list
+```
+
+Note: Unlike most Client Hints, since it's included in the [=low entropy hint table=],
+the `Sec-CH-UA` header will be sent by default, whether or not the server opted-into
+receiving the header via an `Accept-CH` header (although it can still be controlled by it's
+[=policy controlled client hints feature=].
+It is considered low entropy because it includes only the [=user agent=]'s branding information,
+and the significant version number (both of which are fairly clearly sniffable by "examining the
+structure of other headers and by testing for the availability and semantics of the features
+introduced or modified between releases of a particular browser" [[Janc2014]]).
+
 The 'Sec-CH-UA-Arch' Header Field {#sec-ch-ua-arch}
 ------------------------------
 
@@ -239,7 +272,7 @@ the architecture of the platform on which a given [=user agent=] is executing. I
 The header's ABNF is:
 
 ~~~ abnf
-  Sec-CH-UA-Arch = sh-string
+  Sec-CH-UA-Arch = sf-string
 ~~~
 
 The 'Sec-CH-UA-Bitness' Header Field {#sec-ch-ua-bitness}
@@ -253,8 +286,40 @@ a [=Structured Header=] whose value MUST be a [=structured header/string=]
 The header's ABNF is:
 
 ~~~ abnf
-  Sec-CH-UA-Bitness = sh-string
+  Sec-CH-UA-Bitness = sf-string
 ~~~
+
+The 'Sec-CH-UA-Full-Version' Header Field {#sec-ch-ua-full-version}
+--------------------------------
+
+The <dfn http-header>`Sec-CH-UA-Full-Version`</dfn> request header field gives a server information
+about the user agent's [=user agent/full version=]. It is a [=Structured Header=]
+whose value MUST be a [=structured header/string=] [[!RFC8941]].
+
+The header's ABNF is:
+
+``` abnf
+  Sec-CH-UA-Full-Version = sf-string
+```
+
+The 'Sec-CH-UA-Mobile' Header Field {#sec-ch-ua-mobile}
+--------------------------------
+
+The <dfn http-header>`Sec-CH-UA-Mobile`</dfn> request header field gives a server information about
+whether or not a [=user agent=] prefers a "mobile" user experience. It is a [=Structured Header=]
+whose value MUST be a [=structured header/boolean=] [[!RFC8941]].
+
+The header's ABNF is:
+
+``` abnf
+  Sec-CH-UA-Mobile = sf-boolean
+```
+
+Note: Like `Sec-CH-UA` above, since it's included in the [=low entropy hint table=],
+the `Sec-CH-UA-Mobile` header will be sent by default, whether or not the server opted-into
+receiving the header via an `Accept-CH` header (although it can still be controlled by its
+[=policy controlled client hints feature=]). It is considered low entropy because it is a single
+bit of information directly controllable by the user.
 
 The 'Sec-CH-UA-Model' Header Field {#sec-ch-ua-model}
 -------------------------------
@@ -266,7 +331,7 @@ be a [=structured header/string=] [[!RFC8941]].
 The header's ABNF is:
 
 ``` abnf
-  Sec-CH-UA-Model = sh-string
+  Sec-CH-UA-Model = sf-string
 ```
 
 ISSUE(wicg/ua-client-hints): Perhaps `Sec-CH-UA-Mobile` is enough, and we don't need to expose the model?
@@ -275,16 +340,22 @@ ISSUE(wicg/ua-client-hints): Perhaps `Sec-CH-UA-Mobile` is enough, and we don't 
 The 'Sec-CH-UA-Platform' Header Field {#sec-ch-ua-platform}
 ----------------------------------
 
-The <dfn http-header>`Sec-CH-UA-Platform`</dfn> request header field gives a server information about the platform on
-which a given [=user agent=] is executing. It is a [=Structured Header=] whose value MUST be a
-[=structured header/string=] [[!RFC8941]]. Its value SHOULD match one of the following common
-platform values: "Android", "Chrome OS", "iOS", "Linux", "macOS", "Windows", or "Unknown".
+The <dfn http-header>`Sec-CH-UA-Platform`</dfn> request header field gives a server information
+about the platform on which a given [=user agent=] is executing. It is a [=Structured Header=]
+whose value MUST be a [=structured header/string=] [[!RFC8941]]. Its value SHOULD match one of the
+following common platform values: "Android", "Chrome OS", "iOS", "Linux", "macOS", "Windows", or
+"Unknown".
 
 The header's ABNF is:
 
 ``` abnf
-  Sec-CH-UA-Platform = sh-string
+  Sec-CH-UA-Platform = sf-string
 ```
+
+Note: Like `Sec-CH-UA` above, since it's included in the [=low entropy hint table=], the
+`Sec-CH-UA-Platform` header will be sent by default, whether or not the server opted-into receiving
+the header via an `Accept-CH` header (although it can still be controlled by its
+[=policy controlled client hints feature=]).
 
 The 'Sec-CH-UA-Platform-Version' Header Field {#sec-ch-ua-platform-version}
 ----------------------------------
@@ -297,32 +368,8 @@ information about the platform version on which a given [=user agent=] is execut
 The header's ABNF is:
 
 ``` abnf
-  Sec-CH-UA-Platform-Version = sh-string
+  Sec-CH-UA-Platform-Version = sf-string
 ```
-
-The 'Sec-CH-UA' Header Field {#sec-ch-ua}
-----------------------------
-
-The <dfn http-header>`Sec-CH-UA`</dfn> request header field gives a server information about a
-[=user agent=]'s branding and version. It is a [=Structured Header=] whose value MUST be a
-[=structured header/list=] [[!RFC8941]]. The list's items MUST be
-[=structured header/string=]. The value of each item SHOULD include a "v" parameter, indicating the
-[=user agent=]'s version.
-
-The header's ABNF is:
-
-``` abnf
-  Sec-CH-UA = sh-list
-```
-
-Note: Unlike most Client Hints, since it's included in the [=low entropy hint table=],
-the `Sec-CH-UA` header will be sent by default, whether or not the server opted-into
-receiving the header via an `Accept-CH` header (although it can still be controlled by it's
-[=policy controlled client hints feature=].
-It is considered low entropy because it includes only the [=user agent=]'s branding information,
-and the significant version number (both of which are fairly clearly sniffable by "examining the
-structure of other headers and by testing for the availability and semantics of the features
-introduced or modified between releases of a particular browser" [[Janc2014]]).
 
 
 To <dfn abstract-op local-lt="set-ua">return the `Sec-CH-UA` value for a request</dfn>, [=user agents=] MUST:
@@ -343,41 +390,9 @@ To <dfn abstract-op local-lt="set-ua">return the `Sec-CH-UA` value for a request
 
 3. Return the output of running [=serializing a list=] with |list| as input.
 
-The 'Sec-CH-UA-Full-Version' Header Field {#sec-ch-ua-full-version}
---------------------------------
-
-The <dfn http-header>`Sec-CH-UA-Full-Version`</dfn> request header field gives a server information
-about the user agent's [=user agent/full version=]. It is a [=Structured Header=]
-whose value MUST be a [=structured header/string=] [[!RFC8941]].
-
-The header's ABNF is:
-
-``` abnf
-  Sec-CH-UA-Full-Version = sh-string
-```
-
-The 'Sec-CH-UA-Mobile' Header Field {#sec-ch-ua-mobile}
---------------------------------
-
-The <dfn http-header>`Sec-CH-UA-Mobile`</dfn> request header field gives a server information about
-whether or not a [=user agent=] prefers a "mobile" user experience. It is a [=Structured Header=]
-whose value MUST be a [=structured header/boolean=] [[!RFC8941]].
-
-The header's ABNF is:
-
-``` abnf
-  Sec-CH-UA-Mobile = sh-boolean
-```
-
-Note: Like `Sec-CH-UA` above, since it's included in the [=low entropy hint table=],
-the `Sec-CH-UA-Mobile` header will be sent by default, whether or not the server opted-into
-receiving the header via an `Accept-CH` header (although it can still be controlled by it's
-[=policy controlled client hints feature=].
-It is considered low enropy because it is a single bit of information directly controllable
-by the user.
-
-Note: These client hints can be evoked with the following set of [=Client hints tokens=]:
-`Sec-CH-UA-Arch`, `Sec-CH-UA-Model`, `Sec-CH-UA-Platform`, `Sec-CH-UA`, `Sec-CH-UA-Mobile`
+Note: These client hints can be evoked with the following set of [=client hints tokens=]:
+`Sec-CH-UA`, `Sec-CH-UA-Arch`, `Sec-CH-UA-Bitness`, `Sec-CH-UA-Full-Version`, `Sec-CH-UA-Mobile`,
+`Sec-CH-UA-Model`, `Sec-CH-UA-Platform`, `Sec-CH-UA-Platform-Version`
 
 
 Interface {#interface}
@@ -390,10 +405,12 @@ dictionary NavigatorUABrandVersion {
 };
 
 dictionary UADataValues {
+  FrozenArray&lt;NavigatorUABrandVersion&gt; brands;
+  boolean mobile;
+  DOMString platform;
   DOMString architecture;
   DOMString bitness;
   DOMString model;
-  DOMString platform;
   DOMString platformVersion;
   DOMString uaFullVersion;
 };
@@ -402,6 +419,7 @@ dictionary UADataValues {
 interface NavigatorUAData {
   readonly attribute FrozenArray&lt;NavigatorUABrandVersion&gt; brands;
   readonly attribute boolean mobile;
+  readonly attribute DOMString platform;
   Promise&lt;UADataValues&gt; getHighEntropyValues(sequence&lt;DOMString&gt; hints);
 };
 
@@ -501,6 +519,8 @@ On getting, the {{NavigatorUAData/brands}} attribute MUST return [=this=]'s [=re
 
 On getting, the {{NavigatorUAData/mobile}} attribute must return the [=user agent=]'s [=user agent/mobileness=].
 
+On getting, the {{NavigatorUAData/platform}} attribute must return the [=user agent=]'s [=user agent/platform brand=].
+
 <h4 id="getHighEntropyValues"><code>getHighEntropyValues</code> method</h4>
 
 The <dfn method for="NavigatorUA"><code>getHighEntropyValues(|hints|)</code></dfn> method MUST run these steps:
@@ -515,14 +535,15 @@ ISSUE(wicg/ua-client-hints): We can improve upon when and why a UA decides to re
 
     1. Let |uaData| be a new {{UADataValues}}.
 
+    1. set |uaData|["{{UADataValues/brands}}"] to [=this=]'s [=relevant global object=]'s [=WindowOrWorkerGlobalScope/brands frozen array=].
+    1. set |uaData|["{{UADataValues/mobile}}"] to the [=user agent=]'s [=user agent/mobileness=].
+    1. set |uaData|["{{UADataValues/platform}}"] to the [=user agent=]'s [=user agent/platform brand=].
     1. If |hints| [=list/contains=] "architecture", set |uaData|["{{UADataValues/architecture}}"] to
         the [=user agent=]'s [=user agent/platform architecture=].
     1. If |hints| [=list/contains=] "bitness", set |uaData|["{{UADataValues/bitness}}"] to
         the [=user agent=]'s [=user agent/platform bitness=].
     1. If |hints| [=list/contains=] "model", set |uaData|["{{UADataValues/model}}"] to the
         [=user agent=]'s [=user agent/model=].
-    1. If |hints| [=list/contains=] "platform", set |uaData|["{{UADataValues/platform}}"] to the
-        [=user agent=]'s [=user agent/platform brand=].
     1. If |hints| [=list/contains=] "platformVersion", set |uaData|["{{UADataValues/platformVersion}}"]
         to the [=user agent=]'s [=user agent/platform version=].
     1. If |hints| [=list/contains=] "uaFullVersion", let |uaData|["{{UADataValues/uaFullVersion}}"]
@@ -547,7 +568,7 @@ Delegation {#delegation}
 
 Client Hints will be delegated from top-level pages via Permissions Policy. This reduces the likelihood that [=user agent=]
 information will be delivered along with subresource requests, which reduces the potential for
-passive fingerprinting.
+[=passive fingerprinting=].
 
 That delegation is defined as part of [=append client hints to request=].
 
@@ -555,17 +576,17 @@ Fingerprinting {#fingerprinting}
 --------------
 
 The primary goal of User Agent Client Hints is to reduce the default entropy
-available to the network for passive fingerprinting. However, it will still be possible
-for some, or all, hints to be requested and used for active fingerprinting purposes by
+available to the network for [=passive fingerprinting=]. However, it will still be possible
+for some, or all, hints to be requested and used for [=active fingerprinting=] purposes by
 first or delegated third parties. As noted in [[#access]], [=User agents=] should consider
-policies to restrict or reduce access to parties that are known to actively
-fingerprint their users.
+policies to restrict or reduce access to parties that are known to <a lt="active fingerprinting">
+actively fingerprint</a> their users.
 
 Access Restrictions {#access}
 -------------------
 
 The information in the Client Hints defined above reveals quite a bit of information about the user
-agent and the platform/device upon which it runs. [=User agents=] ought to exercise judgement before
+agent and the device upon which it runs. [=User agents=] ought to exercise judgement before
 granting access to this information, and MAY impose restrictions above and beyond the secure
 transport and delegation requirements noted above. For instance, [=user agents=] could choose to reveal
 [=user agent/platform architecture=] or [=user agent/platform bitness=] only on requests it intends
@@ -629,12 +650,12 @@ arbitrary value.
 The value order in [=user agent/brands=] MUST change over time to prevent receivers of the header
 from relying on certain values being in certain locations in the list.
 
-When choosing GREASE strategies, [=user agents=] SHOULD keep caching variance in mind and minimize
-variance among identical [=user agent=] versions.
+When choosing GREASE strategies, [=user agents=] SHOULD keep caching variance and analytics use
+cases in mind and minimize variance among identical [=user agent=] versions.
 
-Note: One approach to minimize caching variance could be to determine the GREASE parts of the UA set
-at build time, and keep them identical throughout the lifetime of the [=user agent=]'s significant
-version.
+Note: One approach to minimize variance for caching and analytics could be to determine the GREASE
+parts of the UA set at build time, and keep them identical throughout the lifetime of the
+[=user agent=]'s significant version.
 
 The 'Sec-CH-' prefix {#sec-ch}
 --------------------
@@ -653,11 +674,25 @@ Therefore, request headers defined in this specification include a `Sec-CH-` pre
 IANA Considerations {#iana}
 ===================
 
-This document intends to define the `Sec-CH-UA-Arch`, `Sec-CH-UA-Model`, `Sec-CH-UA-Platform`,
-`Sec-CH-UA-Platform-Version`, `Sec-CH-UA-Mobile` and `Sec-CH-UA` HTTP request header fields, and
-register them in the permanent message header field registry ([[RFC3864]]).
+This document intends to define the `Sec-CH-UA`, `Sec-CH-UA-Arch`, `Sec-CH-UA-Bitness`,
+`Sec-CH-UA-Full-Version`, `Sec-CH-UA-Mobile`, `Sec-CH-UA-Model`, `Sec-CH-UA-Platform`, and the
+`Sec-CH-UA-Platform-Version` HTTP request header fields, and register them in the permanent message
+header field registry ([[RFC3864]]).
 
 It also intends to deprecate usage of the `User-Agent` header field.
+
+'Sec-CH-UA' Header Field {#iana-ua}
+------------------------
+
+Header field name: Sec-CH-UA
+
+Applicable protocol: http
+
+Status: standard
+
+Author/Change controller: IETF
+
+Specification document: this specification ([[#sec-ch-ua]])
 
 'Sec-CH-UA-Arch' Header Field {#iana-arch}
 --------------------------
@@ -684,6 +719,32 @@ Status: standard
 Author/Change controller: IETF
 
 Specification document: this specification ([[#sec-ch-ua-bitness]])
+
+'Sec-CH-UA-Full-Version' Header Field {#iana-full-version}
+----------------------------
+
+Header field name: Sec-CH-UA-Full-Version
+
+Applicable protocol: http
+
+Status: standard
+
+Author/Change controller: IETF
+
+Specification document: this specification ([[#sec-ch-ua-full-version]])
+
+'Sec-CH-UA-Mobile' Header Field {#iana-mobile}
+----------------------------
+
+Header field name: Sec-CH-UA-Mobile
+
+Applicable protocol: http
+
+Status: standard
+
+Author/Change controller: IETF
+
+Specification document: this specification ([[#sec-ch-ua-mobile]])
 
 'Sec-CH-UA-Model' Header Field {#iana-model}
 ---------------------------
@@ -723,45 +784,6 @@ Status: standard
 Author/Change controller: IETF
 
 Specification document: this specification ([[#sec-ch-ua-platform-version]])
-
-'Sec-CH-UA' Header Field {#iana-ua}
-------------------------
-
-Header field name: Sec-CH-UA
-
-Applicable protocol: http
-
-Status: standard
-
-Author/Change controller: IETF
-
-Specification document: this specification ([[#sec-ch-ua]])
-
-'Sec-CH-UA-Mobile' Header Field {#iana-mobile}
-----------------------------
-
-Header field name: Sec-CH-UA-Mobile
-
-Applicable protocol: http
-
-Status: standard
-
-Author/Change controller: IETF
-
-Specification document: this specification ([[#sec-ch-ua-mobile]])
-
-'Sec-CH-UA-Full-Version' Header Field {#iana-full-version}
-----------------------------
-
-Header field name: Sec-CH-UA-Full-Version
-
-Applicable protocol: http
-
-Status: standard
-
-Author/Change controller: IETF
-
-Specification document: this specification ([[#sec-ch-ua-full-version]])
 
 'User-Agent' Header Field {#iana-user-agent}
 -------------------------
