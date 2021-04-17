@@ -7,6 +7,8 @@ Work Status: Exploring
 Group: csswg
 ED: https://drafts.csswg.org/css-cascade/
 TR: https://www.w3.org/TR/css-cascade-5/
+Previous Version: https://www.w3.org/TR/2021/WD-css-cascade-5-20210317/
+Previous Version: https://www.w3.org/TR/2021/WD-css-cascade-5-20210119/
 Editor: Elika J. Etemad / fantasai, Invited Expert, http://fantasai.inkedblade.net/contact, w3cid 35400
 Editor: Miriam E. Suzanne, Invited Expert, http://miriamsuzanne.com/contact, w3cid 117151
 Editor: Tab Atkins Jr., Google, http://xanthir.com/contact/, w3cid 42199
@@ -813,6 +815,48 @@ Examples</h3>
 				<td><css>3</css>
 	</table>
 
+<h3 id="fragments">
+Per-Fragment Value Processing</h3>
+
+	Certain CSS features
+	can interfere with value processing
+	on a per-fragment basis.
+	See for example [[css-pseudo-4#first-line-inheritance]]
+	which alters inheritance for fragments within the ''::first-line'' pseudo-element.
+	In such cases, where individual fragments are given different [=specified values=],
+	any values that resolve
+	based on the [=computed value=] of other properties
+	(such as ''currentcolor'' or ''em'' units)
+	are resolved per [=box fragment=].
+	Subsequent value processing proceeds as normal in each fragment.
+
+	APIs that assume a singular value per [=box=] (rather than per [=box fragment=])
+	must ignore the effects of non-[=tree-abiding=] [=pseudo-elements=].
+	(For example, ''::first-line'' styles have no effect on the value returned by {{getComputedStyle()}}.)
+
+	<div class=example>
+		For example, given the following markup:
+
+		<xmp highlight=html>
+			<div><span>First line<br />Second line</span></div>
+			<div><span>First line</span></div>
+			<div>First line<br><span>Second line</span></div>
+			<style>
+			div { color: blue; }
+			div::first-line { color: yellow; }
+			span { border: thin solid currentcolor; }
+			</style>
+		</xmp>
+
+		In each <{div}>, the “First line” text is yellow and the “Second line” text is blue;
+		the border for each fragment of the <{span}>s that wrap each line matches that color.
+
+		However, {{getComputedStyle()}} on all three of the spans
+		will return <code>"blue"</code> for 'border-color',
+		because the effects of a ''::first-line'' pseudo-element
+		are ignored for APIs that aren't fragment-aware.
+	</div>
+
 
 <!--
 ████████ ████ ██       ████████ ████████ ████████  ████ ██    ██  ██████
@@ -1189,7 +1233,7 @@ Declaring Cascade Layers: the ''@layer'' rule</h4>
 	that represents its <dfn>layer name</dfn>.
 	If the [=layer name=] matches that of a [=cascade layer=]
 	already defined within this [=origin=] and [=context=]
-	(and same [=layer=] scope, see [[#nested-layers]]),
+	(and the same [=layer=] scope, see [[#nested-layers]]),
 	then its style rules are assigned to that same [=cascade layer=].
 	Otherwise, or if no <<layer-ident>> is provided,
 	a new [=cascade layer=] is created.
@@ -1219,8 +1263,8 @@ Declaring Cascade Layers: the ''@layer'' rule</h4>
 		are cascaded within the same layer as the <code>audio[controls]</code> rule:
 
 		<pre class='lang-css'>
-			@layer default url(headings.css);
-			@layer default url(links.css);
+			@import url(headings.css) layer(default);
+			@import url(links.css) layer(default);
 
 			@layer default {
 			  audio[controls] {
@@ -1245,7 +1289,7 @@ Declaring Cascade Layers: the ''@layer'' rule</h4>
 			@layer theme;
 			@layer components;
 
-			@layer theme url(theme.css);
+			@import url(theme.css) layer(theme);
 
 			@layer default {
 			  audio[controls] {
@@ -1259,7 +1303,7 @@ Declaring Cascade Layers: the ''@layer'' rule</h4>
 		<pre class='lang-css'>
 			@layer default, theme, components;
 
-			@layer theme url(theme.css);
+			@import url(theme.css) layer(theme);
 
 			@layer default {
 			  audio[controls] {
@@ -1392,17 +1436,17 @@ Un-Named Layers</h5>
 		<pre class='lang-css'>
 			/* bootstrap-base.css */
 			/* unnamed wrapper layers around each sub-file */
-			@layer url(base-forms.css);
-			@layer url(base-links.css);
-			@layer url(base-headings.css);
+			@import url(base-forms.css) layer;
+			@import url(base-links.css) layer;
+			@import url(base-headings.css) layer;
 
 			/* bootstrap.css */
 			/* the internal names are hidden from access, subsumed in "base" */
-			@layer base url(bootstrap-base.css);
+			@import url(bootstrap-base.css) layer(base);
 
 			/* author.css */
 			/* author has access to bootstrap.base layer, but not into unnamed layers */
-			@layer bootstrap url(bootstrap.css);
+			@import url(bootstrap.css) layer(bootstrap);
 		</pre>
 	</div>
 
@@ -1572,16 +1616,24 @@ Rolling Back Cascade Layers: the ''revert-layer'' keyword</h4>
 <h2 id="changes">
 Changes</h2>
 
+	Changes since the <a href="https://www.w3.org/TR/2021/WD-css-cascade-5-20210119/">19 January 2021 First Public Working Draft</a> include:
+
+	* Switched [=layer=] import syntax from using ''@layer'' to using ''@import''.
+		(<a href="https://github.com/w3c/csswg-drafts/issues/5681">Issue 5681</a>)
+	* Added ''revert-layer'' keyword.
+		(<a href="https://github.com/w3c/csswg-drafts/issues/5793">Issue 5793</a>)
+
 <h3 id="additions-l4">
 Additions Since Level 4</h3>
 
 	The following features have been added since
 	<a href="https://www.w3.org/TR/css-cascade-4/">Level 4</a>:
 
-	* Added ''layer()'' option to ''@import'' definition.
-	* Added [=cascade layers=] to the [=cascade=] sort criteria.
-	* Defined style attributes as a distinct step of the [=cascade=] sort criteria.
+	* Added [=cascade layers=] to the [=cascade=] sort criteria
+		(and defined style attributes as a distinct step of the [=cascade=] sort criteria
+		so that they interact appropriately).
 	* Introduced the ''@layer'' rule for defining cascade layers.
+	* Added ''layer''/''layer()'' option to ''@import'' definition.
 	* Introduced the ''revert-layer'' keyword for rolling back values to previous layers.
 
 <h3 id="additions-l3">

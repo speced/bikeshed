@@ -3,9 +3,9 @@
 Status: WD
 ED: https://w3c.github.io/webappsec-csp/
 TR: https://www.w3.org/TR/CSP3/
-Previous Version: from biblio
 Shortname: CSP3
 Level: None
+Issue Tracking: Github https://github.com/w3c/webappsec-csp/issues/new
 Editor: Mike West 56384, Google Inc., mkwst@google.com
 Group: webappsec
 Abstract:
@@ -14,7 +14,8 @@ Abstract:
   of security-relevant policy decisions.
 Indent: 2
 Version History: https://github.com/w3c/webappsec-csp/commits/main/index.src.html
-Boilerplate: omit conformance, omit feedback-header
+Boilerplate: feedback-header off
+Local Boilerplate: bs-extensions yes
 !Participate: <a href="https://github.com/w3c/webappsec-csp/issues/new">File an issue</a> (<a href="https://github.com/w3c/webappsec-csp/issues">open issues</a>)
 !Tests: <a href=https://github.com/web-platform-tests/wpt/tree/master/content-security-policy>web-platform-tests content-security-policy/</a> (<a href=https://github.com/web-platform-tests/wpt/labels/content-security-policy>ongoing work</a>)
 Markup Shorthands: css off, markdown on
@@ -24,13 +25,9 @@ At Risk: The [[#is-element-nonceable]] algorithm.
 spec:dom; type:interface; text:Document
 spec:html
   type: dfn
-    text: applet
-    text: case-sensitive
-    text: browsing context; for: /
     text: plugin document
     text: fallback base url
     text: duplicate-attribute
-    text: origin; for: /
   type: element
     text: a
     text: link
@@ -134,6 +131,12 @@ spec: HTML; urlPrefix: https://html.spec.whatwg.org/
     for: WorkerGlobalScope
       text: owner set; url: concept-WorkerGlobalScope-owner-set
     text: process the iframe attributes; url: process-the-iframe-attributes
+    for: script
+      text: "parser-inserted"
+    text: origin; url: concept-origin
+    text: browsing context; url: browsing-context
+    text: content security policy state; url: attr-meta-http-equiv-content-security-policy
+    text: create and initialize a new document object; url: initialise-the-document-object
 
 spec: INFRA; urlPrefix: https://infra.spec.whatwg.org/
   type: grammar
@@ -443,7 +446,7 @@ spec: INFRA; urlPrefix: https://infra.spec.whatwg.org/
     Parse a serialized CSP
   </h4>
 
-  To <dfn abstract-op>parse a serialized CSP</dfn>, given a [=serialized CSP=] (|serialized|), a
+  To <dfn abstract-op>parse a serialized CSP</dfn>, given a [=string=] (|serialized|), a
   [=policy/source=] (|source|), and a [=policy/disposition=] (|disposition|), execute the
   following steps.
 
@@ -459,7 +462,7 @@ spec: INFRA; urlPrefix: https://infra.spec.whatwg.org/
 
         1.  [=Strip leading and trailing ASCII whitespace=] from |token|.
 
-        2.  If |token| is an empty string, [=iteration/continue=].
+        2.  If |token| is an empty string, or if |token| is not an [=ASCII string=], [=iteration/continue=].
 
         3.  Let |directive name| be the result of [=collecting a sequence of code points=] from
             |token| which are not [=ASCII whitespace=].
@@ -492,17 +495,20 @@ spec: INFRA; urlPrefix: https://infra.spec.whatwg.org/
     Parse a serialized CSP list
   </h4>
 
-  To <dfn abstract-op>parse a serialized CSP list</dfn>, given a [=serialized CSP list=] (|list|), a
-  [=policy/source=] (|source|), and a [=policy/disposition=] (|disposition|), execute the following
-  steps.
+  To <dfn abstract-op>parse a serialized CSP list</dfn>, given a [=byte sequence=] or [=string=]
+  (|list|), a [=policy/source=] (|source|), and a [=policy/disposition=] (|disposition|), execute
+  the following steps.
 
   This algorithm returns a [=list=] of [=Content Security Policy objects=]. If |list| cannot be
   parsed, the returned list will be empty.
 
   <ol class="algorithm">
-    1.  Let |policies| be an empty [=list=].
+    1.  If |list| is a [=byte sequence=], then set |list| to be the result of <a
+        lt="isomorphic decode">isomorphic decoding</a> |list|.
 
-    2.  For each |token| returned by <a lt="split a string on commas">splitting |list| on commas</a>:
+    2.  Let |policies| be an empty [=list=].
+
+    3.  [=list/For each=] |token| returned by <a lt="split a string on commas">splitting |list| on commas</a>:
 
         1.  Let |policy| be the result of <a abstract-op lt="parse a serialized CSP">parsing</a>
             |token|, with a [=policy/source=] of |source|, and [=policy/disposition=] of
@@ -512,7 +518,7 @@ spec: INFRA; urlPrefix: https://infra.spec.whatwg.org/
 
         3.  [=list/append|Append=] |policy| to |policies|.
 
-    3.  Return |policies|.
+    4.  Return |policies|.
   </ol>
 
   <h3 id="framework-directives">Directives</h3>
@@ -1143,7 +1149,7 @@ spec: INFRA; urlPrefix: https://infra.spec.whatwg.org/
       algorithm in order to bind a set of <a for="/">policy</a> objects associated
       with a <a>response</a> {{WorkerGlobalScope}} or {{WorkletGlobalScope}}.
 
-  5.  [[#initialize-document-csp]] is called during the <a>initializing a
+  5.  [[#initialize-document-csp]] is called during the <a>create and initialize a
       new `Document` object</a> algorithm in order to bind a set of <a for="/">policy</a>
       objects associated with a <a>response</a> to a newly created {{Document}}.
 
@@ -1158,9 +1164,8 @@ spec: INFRA; urlPrefix: https://infra.spec.whatwg.org/
   8.  <a for="/">policy</a> is <a>enforced</a> during processing of the <{meta}>
       element's <{meta/http-equiv}>.
 
-  9.  A {{Document}}'s <dfn>embedding document</dfn> is the {{Document}}
-      <a lt="nested through">through which</a> the {{Document}}'s
-      <a>browsing context</a> is nested.
+  9.  A {{Document}}'s <dfn>embedding document</dfn> is the {{Document}}'s
+      <a>browsing context</a>'s [=browsing context/container document=].
 
   10. HTML populates each <a for="/">request</a>'s <a for="request">cryptographic nonce
       metadata</a> and <a>parser metadata</a> with relevant data from the
@@ -2637,7 +2642,6 @@ spec: INFRA; urlPrefix: https://infra.spec.whatwg.org/
     <pre highlight="html">
       &lt;embed src="https://example.org/flash"&gt;&lt;/embed&gt;
       &lt;object data="https://example.org/flash"&gt;&lt;/object&gt;
-      &lt;applet archive="https://example.org/flash"&gt;&lt;/applet&gt;
     </pre>
   </div>
 
@@ -2647,7 +2651,7 @@ spec: INFRA; urlPrefix: https://infra.spec.whatwg.org/
   `'none'`, but will otherwise be allowed.
 
   Note: The `object-src` directive acts upon any request made on behalf of
-  an <{object}>, <{embed}>, or <a>`applet`</a> element. This includes requests
+  an <{object}> or <{embed}> element. This includes requests
   which would populate the <a>nested browsing context</a> generated by the
   former two (also including navigations). This is true even when the data is
   semantically equivalent to content which would otherwise be restricted by
@@ -2656,7 +2660,7 @@ spec: INFRA; urlPrefix: https://infra.spec.whatwg.org/
 
   Note: When a plugin resource is navigated to directly (that is, as a <a>plugin document</a> in the
   <a>top-level browsing context</a> or a <a>nested browsing context</a>, and not as an embedded
-  subresource via <{embed}>, <{object}>, or <a>`applet`</a>), any <a for="/">policy</a> delivered along
+  subresource via <{embed}> or <{object}>), any <a for="/">policy</a> delivered along
   with that resource will be applied to the <a>plugin document</a>. This means, for instance, that
   developers can prevent the execution of arbitrary resources as plugin content by delivering the
   policy `object-src 'none'` along with a response. Given plugins' power (and the
@@ -3477,10 +3481,9 @@ spec: INFRA; urlPrefix: https://infra.spec.whatwg.org/
   <h4 id="directive-frame-ancestors">`frame-ancestors`</h4>
 
   The <dfn export>frame-ancestors</dfn> directive restricts the {{URL}}s which can
-  embed the resource using <{frame}>, <{iframe}>, <{object}>, <{embed}>, or
-  <a>`applet`</a> element. Resources can use this directive to avoid many UI
-  Redressing [[UISECURITY]] attacks, by avoiding the risk of being embedded into
-  potentially hostile contexts.
+  embed the resource using <{frame}>, <{iframe}>, <{object}>, or <{embed}>. Resources
+  can use this directive to avoid many UI Redressing [[UISECURITY]] attacks, by
+  avoiding the risk of being embedded into potentially hostile contexts.
 
   The directive's syntax is described by the following ABNF grammar:
 
@@ -3530,11 +3533,11 @@ spec: INFRA; urlPrefix: https://infra.spec.whatwg.org/
 
     4.  While |current| is a <a>nested browsing context</a>:
 
-        1.  Let |document| be the {{Document}} that |current| is <a>nested through</a>.
+        1.  Let |document| be |current|'s [=browsing context/container document=].
 
         2.  Let |origin| be the result of executing the <a>URL parser</a> on the
             <a lt="ASCII serialization of an origin">ASCII serialization</a>
-            of |document|'s {{Document/origin}}.
+            of |document|'s [=Document/origin=].
 
         3.  If [[#match-url-to-source-list]] returns `Does Not Match` when
             executed upon |origin|, this directive's <a for="directive">value</a>,
@@ -3694,7 +3697,7 @@ spec: INFRA; urlPrefix: https://infra.spec.whatwg.org/
   </div>
 
   The <dfn export>`report-uri`</dfn> directive defines a set of endpoints to which
-  <a>violation reports</a> will be sent when particular behaviors are prevented.
+  <a>csp violation reports</a> will be sent when particular behaviors are prevented.
 
   <pre link-type="grammar">
     directive-name  = "report-uri"
@@ -3777,8 +3780,8 @@ spec: INFRA; urlPrefix: https://infra.spec.whatwg.org/
                   contain a <a>source expression</a> whose
                   <a grammar>hash-algorithm</a> is an <a>ASCII case-insensitive</a> match
                   for |source|'s <a grammar>hash-algorithm</a>, and whose
-                  <a grammar>base64-value</a> is a <a>case-sensitive</a> match
-                  for |source|'s `base64-value`, then set |bypass due to
+                  <a grammar>base64-value</a> is <a for="string" lt="is">identical to</a>
+                  |source|'s `base64-value`, then set |bypass due to
                   integrity match| to `false`.
 
           5.  If |bypass due to integrity match| is `true`, return
@@ -3872,7 +3875,7 @@ spec: INFRA; urlPrefix: https://infra.spec.whatwg.org/
   3.  For each |expression| in |source list|:
 
       1.  If |expression| matches the <a grammar>`nonce-source`</a> grammar,
-          and |nonce| is a <a>case-sensitive</a> match for |expression|'s
+          and |nonce| is <a for="string" lt="is">identical to</a> |expression|'s
           <a grammar>`base64-value`</a> part, return "`Matches`".
 
   4.  Return "`Does Not Match`".
@@ -4116,7 +4119,7 @@ spec: INFRA; urlPrefix: https://infra.spec.whatwg.org/
 
     2.  If |port A| is equal to "*", return "`Matches`".
 
-    3.  If |port A| is a <a>case-sensitive</a> match for |port B|, return "`Matches`".
+    3.  If |port A| is <a for="string" lt="is">identical to</a> |port B|, return "`Matches`".
 
     4.  If |port B| is empty:
 
@@ -4305,9 +4308,9 @@ spec: INFRA; urlPrefix: https://infra.spec.whatwg.org/
       1.  For each |expression| in |list|:
 
           1.  If |expression| matches the <a grammar>`nonce-source`</a> grammar,
-              and |element| has a <{htmlsvg-global/nonce}> attribute whose value is a
-              <a>case-sensitive</a> match for |expression|'s
-              <a grammar>`base64-value`</a> part, return "`Matches`".
+              and |element| has a <{htmlsvg-global/nonce}> attribute whose value
+              [=string/is=] |expression|'s <a grammar>`base64-value`</a> part,
+              return "`Matches`".
 
       Note: Nonces only apply to inline <{script}> and inline <{style}>, not to
       attributes of either element or to `javascript:` navigations.
@@ -4358,8 +4361,8 @@ spec: INFRA; urlPrefix: https://infra.spec.whatwg.org/
                       Note: This replacement normalizes hashes expressed in [=base64url
                       encoding=] into [=base64 encoding=] for matching.
 
-                  3.  If |actual| is a <a>case-sensitive</a> match for |expected|, return
-                      "`Matches`".
+                  3.  If |actual| is <a for="string" lt="is">identical to</a>
+                      |expected|, return "`Matches`".
 
       Note: Hashes apply to inline <{script}> and inline <{style}>. If the
       "<a grammar>`'unsafe-hashes'`</a>" source expression is present,

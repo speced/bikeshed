@@ -1,11 +1,11 @@
 <pre class='metadata'>
-Title: WebRTC Insertable Media using Streams
-Shortname: webrtc-media-streams
+Title: WebRTC Encoded Transform
+Shortname: webrtc-encoded-transform
 Level: None
 Status: ED
 Group: webrtc
-Repository: w3c/webrtc-insertable-streams
-URL: https://w3c.github.io/webrtc-insertable-streams/
+Repository: w3c/webrtc-encoded-transform
+URL: https://w3c.github.io/webrtc-encoded-transform/
 Editor: Harald Alvestrand, Google https://google.com, hta@google.com
 Editor: Guido Urdaneta, Google https://google.com, guidou@google.com
 Editor: Youenn Fablet, Apple https://www.apple.com, youenn@apple.com
@@ -103,13 +103,15 @@ argument, ensure that the codec is disabled and produces no output.
 At construction of each {{RTCRtpSender}} or {{RTCRtpReceiver}}, run the following steps:
 1. Initialize [=this=].`[[Streams]]` to null.
 2. Initialize [=this=].`[[transform]]` to null.
-3. Initialize [=this=].`[[readable]]` to the result of <a dfn for="ReadableStream">creating</a> a {{ReadableStream}}. [=this=].`[[readable]]` is provided frames using the [=readEncodedData=] algorithm given |this| as parameter.
-4. Set [=this=].`[[readable]]`.`[[owner]]` to |this|.
-5. Initialize [=this=].`[[writable]]` to the result of [=WritableStream/creating=] a {{WritableStream}}, its [=WritableStream/create/writeAlgorithm=] set to [=writeEncodedData=] given |this| as parameter.
-6. Set [=this=].`[[writable]]`.`[[owner]]` to |this|.
-7. Initialize [=this=].`[[pipeToController]]` to null.
-8. Initialize [=this=].`[[lastReceivedFrameTimestamp]]` to zero.
-9. If the {{RTCPeerConnection}}'s configuration does not have {{RTCConfiguration/encodedInsertableStreams}} set to "true", [=queue a task=] to run the following steps:
+3. Initialize [=this=].`[[readable]]` to a new {{ReadableStream}}.
+4. <a dfn for="ReadableStream">Set up</a> [=this=].`[[readable]]`. [=this=].`[[readable]]` is provided frames using the [=readEncodedData=] algorithm given |this| as parameter.
+5. Set [=this=].`[[readable]]`.`[[owner]]` to |this|.
+6. Initialize [=this=].`[[writable]]` to a new {{WritableStream}}.
+7. <a dfn for="WritableStream">Set up</a> [=this=].`[[writable]]` with its [=WritableStream/set up/writeAlgorithm=] set to [=writeEncodedData=] given |this| as parameter.
+8. Set [=this=].`[[writable]]`.`[[owner]]` to |this|.
+9. Initialize [=this=].`[[pipeToController]]` to null.
+10. Initialize [=this=].`[[lastReceivedFrameTimestamp]]` to zero.
+11. If the {{RTCPeerConnection}}'s configuration does not have {{RTCConfiguration/encodedInsertableStreams}} set to "true", [=queue a task=] to run the following steps:
     1. If [=this=].`[[pipeToController]]` is not null, abort these steps.
     2. Set [=this=].`[[pipeToController]]` to a new {{AbortController}}.
     <!-- FIXME: Use pipeTo algorithm when available. -->
@@ -191,21 +193,25 @@ dictionary SFrameTransformOptions {
     SFrameTransformRole role = "encrypt";
 };
 
+typedef [EnforceRange] unsigned long long SmallCryptoKeyID;
+typedef (SmallCryptoKeyID or bigint) CryptoKeyID;
+
 [Exposed=(Window,DedicatedWorker)]
 interface SFrameTransform {
     constructor(optional SFrameTransformOptions options = {});
-    Promise<undefined> setEncryptionKey(CryptoKey key, optional unsigned long long keyID);
+    Promise<undefined> setEncryptionKey(CryptoKey key, optional CryptoKeyID keyID);
 };
 SFrameTransform includes GenericTransformStream;
 </xmp>
 
 The <dfn constructor for="SFrameTransform" lt="SFrameTransform(options)"><code>new SFrameTransform(<var>options</var>)</code></dfn> constructor steps are:
 1. Let |transformAlgorithm| be an algorithm which takes a |frame| as input and runs the <a href="#sframe-transform-algorithm">SFrame transform algorithm</a> with |this| and |frame|.
-2. Set |this|.`[[transform]]` to the result of [=TransformStream/creating=] a {{TransformStream}}, with [=TransformStream/create/transformAlgorithm=] set to |transformAlgorithm|.
-3. Let |options| be the method's first argument.
-4. Set |this|.`[[role]]` to |options|["{{SFrameTransformOptions/role}}"].
-5. Set |this|.`[[readable]]` to |this|.`[[transform]]`.`[[readable]]`.
-6. Set |this|.`[[writable]]` to |this|.`[[transform]]`.`[[writable]]`.
+2. Set |this|.`[[transform]]` to a new {{TransformStream}}.
+3. <a dfn for="ReadableStream">Set up</a> [=this=].`[[transform]]` with [=TransformStream/set up/transformAlgorithm=] set to |transformAlgorithm|.
+4. Let |options| be the method's first argument.
+5. Set |this|.`[[role]]` to |options|["{{SFrameTransformOptions/role}}"].
+6. Set |this|.`[[readable]]` to |this|.`[[transform]]`.`[[readable]]`.
+7. Set |this|.`[[writable]]` to |this|.`[[transform]]`.`[[writable]]`.
 
 ## Algorithm ## {#sframe-transform-algorithm}
 
@@ -224,14 +230,15 @@ The SFrame transform algorithm, given |sframe| as a SFrameTransform object and |
 12. If |frame| is a {{RTCEncodedVideoFrame}}, set |frame|.{{RTCEncodedVideoFrame/data}} to |buffer|.
 13. [=ReadableStream/Enqueue=] |frame| in |sframe|.`[[transform]]`.
 
-## Methods
+## Methods ## {#sframe-transform-methods}
 The <dfn method for="SFrameTransform">setEncryptionKey(|key|, |keyID|)</dfn> method steps are:
 1. Let |promise| be [=a new promise=].
-2.  [=In parallel=], run the following steps:
+2. If |keyID| is a {{bigint}} which cannot be represented as a integer between 0 and 2<sup>64</sup>-1 inclusive, [=reject=] |promise| with a {{RangeError}} exception.
+3. Otherwise, [=in parallel=], run the following steps:
     1. Set |key| with its optional |keyID| as key material to use for the SFrame transform algorithm, as defined by the <a href="https://datatracker.ietf.org/doc/draft-omara-sframe/">SFrame specification</a>.
-    2. If setting the key material fails, [=Reject=] |promise| with an {{InvalidModificationError}} error and abort these steps.
+    2. If setting the key material fails, [=reject=] |promise| with an {{InvalidModificationError}} exception and abort these steps.
     3. [=Resolve=] |promise| with undefined.
-3. Return |promise|.
+4. Return |promise|.
 
 
 # RTCRtpScriptTransform # {#scriptTransform}
@@ -258,7 +265,7 @@ dictionary RTCEncodedVideoFrameMetadata {
 
 // New interfaces to define encoded video and audio frames. Will eventually
 // re-use or extend the equivalent defined in WebCodecs.
-[Exposed=Window]
+[Exposed=(Window,DedicatedWorker)]
 interface RTCEncodedVideoFrame {
     readonly attribute RTCEncodedVideoFrameType type;
     readonly attribute unsigned long long timestamp;
@@ -271,7 +278,7 @@ dictionary RTCEncodedAudioFrameMetadata {
     sequence&lt;long&gt; contributingSources;
 };
 
-[Exposed=Window]
+[Exposed=(Window,DedicatedWorker)]
 interface RTCEncodedAudioFrame {
     readonly attribute unsigned long long timestamp;
     attribute ArrayBuffer data;
@@ -299,19 +306,18 @@ interface RTCRtpScriptTransformer {
 
 [Exposed=Window]
 interface RTCRtpScriptTransform {
-    constructor(Worker worker, optional any options);
-    // FIXME: add messaging methods.
+    constructor(Worker worker, optional any options, optional sequence&lt;object&gt; transfer);
 };
 </pre>
 
 ## Operations ## {#RTCRtpScriptTransform-operations}
 
-The <dfn constructor for="RTCRtpScriptTransform" lt="RTCRtpScriptTransform(worker, options)"><code>new RTCRtpScriptTransform(<var>worker</var>, <var>options</var>)</code></dfn> constructor steps are:
+The <dfn constructor for="RTCRtpScriptTransform" lt="RTCRtpScriptTransform(worker, options)"><code>new RTCRtpScriptTransform(|worker|, |options|, |transfer|)</code></dfn> constructor steps are:
 1. Set |t1| to an [=identity transform stream=].
 2. Set |t2| to an [=identity transform stream=].
 3. Set |this|.`[[writable]]` to |t1|.`[[writable]]`.
 4. Set |this|.`[[readable]]` to |t2|.`[[readable]]`.
-5. Let |serializedOptions| be the result of [$StructuredSerialize$](|object|).
+5. Let |serializedOptions| be the result of [$StructuredSerializeWithTransfer$](|options|, |transfer|).
 6. Let |serializedReadable| be the result of [$StructuredSerializeWithTransfer$](|t1|.`[[readable]]`, « |t1|.`[[readable]]` »).
 7. Let |serializedWritable| be the result of [$StructuredSerializeWithTransfer$](|t2|.`[[writable]]`, « |t2|.`[[writable]]` »).
 8. [=Queue a task=] on the DOM manipulation [=task source=] |worker|'s global scope to run the following steps:
@@ -358,4 +364,4 @@ otherwise unavailable, which allows some fingerprinting surface.
 
 # Examples # {#examples}
 
-See the [explainer document](https://github.com/w3c/webrtc-insertable-streams/blob/master/explainer.md#code-examples).
+See the [explainer document](https://github.com/w3c/webrtc-encoded-transform/blob/master/explainer.md#code-examples).

@@ -1,0 +1,157 @@
+<pre class='metadata'>
+Title: Managed Configuration API
+Shortname: managed-configuration
+Level: 1
+Editor: Anatoliy Potapchuk 130190, Google LLC https://www.google.com, apotapchuk@google.com
+Status: w3c/CG-DRAFT
+URL: https://wicg.github.io/WebApiDevice/managed_config
+Abstract: This document defines a web platform API that enables developers to access administrator-set configuration on managed devices. Such API invaluable for such use cases as digital signage and device-centric personalization.
+Repository: https://github.com/WICG/WebApiDevice
+Group: wicg
+</pre>
+
+<pre class=link-defaults>
+spec:html; type:interface; text:Navigator
+spec:url; type:dfn; text:origin
+spec:html; type:dfn; for:/; text:global object
+spec:webidl; type:dfn; text:resolve
+spec:webidl; type:dfn; text:record
+</pre>
+
+<pre class="anchors">
+
+</pre>
+
+# Model # {#model}
+
+## Managed devices ## {#managed-devices}
+
+The API is presumed to be used on devices which are not fully controlled by the end user but rather by an external entity, the device administrator. Device administrators are given the power to fully control the managed device.
+
+## Managed configuration ## {#managed-configuration}
+
+For the purposes of this specification the device administrator can control a list of managed web applications. Each entry in this list can have a set JSON configuration, which is accessible by the documents hosted at the origin of the web application.
+
+Note that this does not apply to anonymous contexts, where the observed state is indistinguishable from a non-managed one.
+
+## <dfn dfn>Data model</dfn> ## {#data-model-section}
+
+We can assume without loss of generality that managed configuration is stored in a two-level key-value store.
+
+[=Data model=] is declared as a [=map=] where each [=key=] is a configured [=origin=] and the value is a <xmp><code>record<DOMString, object></code></xmp> with items corresponding to per-origin configuration keys and their values.
+
+## Data integrity verification ## {#data-integrity-verification}
+
+There is no managed configuration verification mechanism defined in the specification, which implies that the website should assume that the configuration could be tampered with, stolen or be replayed on a non-managed device. 
+
+Alternative security measures should be put in place by the website itself.
+
+# Extensions to the {{Navigator}} interface # {#navigator-extensions}
+
+<xmp class="idl">
+[
+  SecureContext
+] partial interface Navigator {
+  [SecureContext, SameObject]
+  readonly attribute NavigatorManagedData managed;
+};
+</xmp>
+
+
+## {{managed}} attribute ## {#managed-attribute}
+When getting, the {{managed}} attribute always returns the same instance of the {{NavigatorManagedData}} object.
+
+# {{NavigatorManagedData}} interface # {#navigatormanageddata-interface}
+
+<xmp class="idl">
+[
+  SecureContext,
+  Exposed=Window
+] interface NavigatorManagedData : EventTarget {
+  // Managed Configuration API.
+  Promise<record<DOMString, object>> getManagedConfiguration(sequence<DOMString> keys);
+  attribute EventHandler onmanagedconfigurationchange;
+};
+</xmp>
+
+Methods on this interface typically complete asynchronously, queuing work on the <dfn>managed data task source</dfn>.
+
+## {{getManagedConfiguration()}} method ## {#getmanagedconfiguration-method}
+
+<div class="example">
+Suppose the following configuration was set by the administrator for the current [=origin=].
+
+<xmp class="lang-js">
+{
+   "interactable" : "false",
+   "deviceType" : "map"
+}
+</xmp>
+
+A client, which would like to get a configuration for a particular |key| would call:
+
+<xmp class="lang-js">
+navigator.managed.getManagedConfiguration(["interactable"])
+ .then(function(result) {
+     // result = { “interactable” : “false” }
+     // Process the value of the key.
+});
+</xmp>
+
+For apps that are not managed, the promise gets rejected.
+
+<xmp class="lang-js">
+navigator.managed.getManagedConfiguration(["interactable","deviceType","theme"])
+ .then(onSuccess, function(error) { 
+      console.log(error.name); // Will print "NotAllowedArror");
+});
+</xmp>
+
+</div>
+
+  The <dfn method for="NavigatorManagedData">getManagedConfiguration(|keys|)</dfn> method steps are:
+  1. Let |promise| be [=a new promise=].
+  1. Run the following steps in parallel:
+      1. Let |map| be the [=data model=] configured by the device administrator.
+      1. Let |origin| be the [=relevant global object=] of [=this=]'s associated {{Document}}'s [=origin=].
+      
+          NOTE: Third-party contexts have access to the same configuration values as if they were the top-level document.
+      1. If there is no entry in the |map| with key equal to |origin|, reject |promise| with a {{NotAllowedError}} DOMException.
+      1. Create an empty IDL [=record=] |record|.
+      1. For each |key| of the |keys|, if there is a record with key |key| in map[origin], add an attribute to record with |key| as the key and |map|[|origin|][|key|] as the value.
+      1. [=Queue a global task=] on the [=relevant global object=] of [=this=] using the [=managed data task source=] to [=resolve=] promise with |record|.
+  1. Return |promise|.
+
+## {{onmanagedconfigurationchange}} attribute ## {#onmanagedconfigurationchange-attribute}
+
+<div class="example">
+A client can subscribe to the managed configuration updates by subscribiting to the [=managedconfigurationchange=] event.
+
+<xmp class="lang-js">
+navigator.managed.addEventListener("managedconfigurationchange",
+ function() { 
+     // Whenever something changes in the configuration, this method is
+     // called.
+});
+</xmp>
+
+</div>
+
+{{onmanagedconfigurationchange}} is an event handler IDL attribute for the <code><dfn>managedconfigurationchange</dfn></code> event type.
+
+When any of the configuration values under the origin-level key changes for an [=origin=] |origin|, run the following steps:
+1. For each instance |data| of {{NavigatorManagedData}}:
+    1. Let |document| be |data|'s [=relevant global object=]'s associated [=Document=].
+    1. If |document| is [=fully active=] and |document|'s [=origin=] is equal to |origin|, [=fire an event=] named [=managedconfigurationchange=] at |data| with no value associated with it.
+
+
+# Security considerations # {#security-considerations}
+
+In accordance with the modern security practices, the configuration data is designed to be isolated by origin and available to secure contexts only, thus preventing other websites from accessing it.
+
+# Privacy considerations # {#privacy-considerations}
+
+Using this API, websites will be capable of identifying managed environments among other non-managed ones. However, this is only possible for web applications which are explicitly configured by the device administrator, which is the whole purpose of this API. Administrator consent for this identification is assumed.
+
+The managed configuration is not exposed to users in anonymous contexts and behaves as if the current origin was not managed.
+

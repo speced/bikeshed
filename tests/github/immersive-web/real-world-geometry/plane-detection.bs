@@ -18,12 +18,10 @@ Abstract:
 </pre>
 
 <pre class="link-defaults">
-spec:webxr device api - level 1; type:dfn; for:/; text:xr device
-spec:webxr-ar-module-1; type:enum-value; text:"immersive-ar"
 </pre>
 
 <pre class="anchors">
-spec: WebXR Device API - Level 1; urlPrefix: https://www.w3.org/TR/webxr/#
+spec: WebXR Device API - Level 1; urlPrefix: https://immersive-web.github.io/webxr/#
     for: XRFrame;
         type: dfn; text: active; url: xrframe-active
         type: dfn; text: session; url: dom-xrframe-session
@@ -42,6 +40,23 @@ spec: WebXR Device API - Level 1; urlPrefix: https://www.w3.org/TR/webxr/#
     type: dfn; text: identity transform; url: identity-transform
     type: dfn; text: inline XR device; url: inline-xr-device
     type: dfn; text: XR device; url: xr-device
+spec: WebXR Anchors Module; urlPrefix: https://immersive-web.github.io/anchors/#
+    type: dfn; text: create new anchor object; url: create-new-anchor-object
+    type: dfn; text: update anchors; url: update-anchors
+    type: interface; text: XRAnchor; url: xr-anchor
+</pre>
+
+<pre class=biblio>
+{
+	"webxr-anchors-module": {
+		"authors": [
+			"Piotr Bialecki"
+		],
+		"href": "https://immersive-web.github.io/anchors/",
+		"title": "WebXR Anchors Module",
+		"status": "DR"
+	}
+}
 </pre>
 
 <style>
@@ -104,9 +119,6 @@ Introduction {#intro}
 
 </section>
 
-Terminology {#terminology}
------------
-
 Initialization {#anchor-feature-initialization}
 ==================
 
@@ -115,21 +127,207 @@ Feature descriptor {#anchor-feature-descriptor}
 
 In order for the applications to signal their interest in using plane detection during a session, the session must be requested with appropriate [=feature descriptor=]. The string <dfn>plane-detection</dfn> is introduced by this module as a new valid feature descriptor for plane detection feature.
 
-A device is [=capable of supporting=] the plane-detection feature if the device's tracking system exposes a [[#native-plane-detection]] capability. The [=inline XR device=] MUST NOT be treated as [=capable of supporting=] the plane-detection feature.
+A device is [=capable of supporting=] the plane-detection feature if the device's tracking system exposes a [=native plane detection=] capability. The [=inline XR device=] MUST NOT be treated as [=capable of supporting=] the plane-detection feature.
+
+When a session is created with plane-detection feature enabled, the [=update planes=] algorithm MUST be added to the [=list of frame updates=] of that session.
+
+<div class="example">
+The following code demonstrates how a session that requires plane detection could be requested:
+
+<pre highlight="js">
+const session = await navigator.xr.requestSession("immersive-ar", {
+  requiredFeatures: ["plane-detection"]
+});
+</pre>
+
+</div>
+
+Planes {#planes-section}
+======
+
+XRPlaneOrientation {#plane-orientation}
+------------------
+
+<script type="idl">
+enum XRPlaneOrientation {
+    "horizontal",
+    "vertical"
+};
+</script>
+
+- A plane orientation of <dfn enum-value for="XRPlaneOrientation">"horizontal"</dfn> indicates that the plane is primarily oriented horizontally (according to the conventions of the underlying platform).
+- A plane orientation of <dfn enum-value for="XRPlaneOrientation">"vertical"</dfn> indicates that the plane is primarily oriented vertically (according to the conventions of the underlying platform).
+
+XRPlane {#plane}
+-------
+
+<script type="idl">
+interface XRPlane {
+    [SameObject] readonly attribute XRSpace planeSpace;
+
+    readonly attribute FrozenArray<DOMPointReadOnly> polygon;
+    readonly attribute XRPlaneOrientation? orientation;
+    readonly attribute DOMHighResTimeStamp lastChangedTime;
+};
+</script>
+
+An {{XRPlane}} represents a single, flat surface detected by the underlying XR system.
+
+The {{XRPlane/planeSpace}} is an {{XRSpace}} that establishes the coordinate system of the plane. The [=XRSpace/native origin=] of the {{XRPlane/planeSpace}} tracks plane's center. The underlying XR system defines the exact meaning of the plane center. The Y axis of the coordinate system defined by {{XRPlane/planeSpace}} MUST represent the plane's normal vector.
+
+Each {{XRPlane}} has an associated <dfn for=XRPlane>native entity</dfn>.
+
+Each {{XRPlane}} has an associated <dfn for=XRPlane>frame</dfn>.
+
+The {{XRPlane/polygon}} is an array of vertices that describe the shape of the plane. They are returned in the form of a loop of points at the edges of the polygon, expressed in the coordinate system defined by {{XRPlane/planeSpace}}. The Y coordinate of each vertex MUST be <code>0.0</code>.
+
+The {{XRPlane/orientation}} describes orientation of the plane, as classified by the underlying XR system. In case the orientation cannot be classified into {{XRPlaneOrientation/"horizontal"}} or {{XRPlaneOrientation/"vertical"}} by the underlying XR system, this attribute will be set to <code>null</code>.
+
+The {{XRPlane/lastChangedTime}} is the last time some of the plane attributes have been changed.
+
+Note: The pose of a plane is not considered a plane attribute and therefore updates to plane pose will not cause the {{XRPlane/lastChangedTime}} to change. This is because plane pose is a property that is derived from two different entities - {{XRPlane/planeSpace}} and the {{XRSpace}} relative to which the pose is to be computed via {{XRFrame/getPose()}} function.
+
+Obtaining detected planes {#obtaining-planes}
+=========================
+
+XRPlaneSet {#plane-set}
+----------
+
+<script type="idl">
+interface XRPlaneSet {
+  readonly setlike<XRPlaneSet>;
+};
+</script>
+
+An {{XRPlaneSet}} is a collection of {{XRPlane}}s. It is the primary mechanism of obtaining the collection of planes detected in an {{XRFrame}}.
+
+<script type="idl">
+partial interface XRFrame {
+  readonly attribute XRPlaneSet detectedPlanes;
+};
+</script>
+
+An {{XRFrame}} is extended to contain {{XRFrame/detectedPlanes}} attribute which contains all planes that are still tracked in the frame. The set is initially empty and will be populated by the [=update planes=] algorithm. If this attribute is accessed when the frame is not [=XRFrame/active=], the user agent MUST throw {{InvalidStateError}}.
+
+An {{XRSession}} is extended to contain associated <dfn for=XRSession>set of tracked planes</dfn>, which is initially empty. The elements of the set will be of {{XRPlane}} type.
+
+<div class="algorithm" data-algorithm="update-planes">
+In order to <dfn>update planes</dfn> for |frame|, the user agent MUST run the following steps:
+    1. Let |session| be a |frame|'s [=XRFrame/session=].
+    1. Let |device| be a |session|'s [=XRSession/XR device=].
+    1. Let |trackedPlanes| be a result of calling into |device|'s [=native plane detection=] capability to obtain tracked planes at |frame|'s [=XRFrame/time=].
+    1. For each |native plane| in |trackedPlanes|, run:
+        1. If |session|'s [=XRSession/set of tracked planes=] contains an object |plane| that [=corresponds to=] |native plane|, invoke [=update plane object=] algorithm with |plane|, |native plane|, and |frame|, and continue to the next entry.
+        1. Let |plane| be the result of invoking the [=create plane object=] algorithm with |native plane| and |frame|.
+        1. Add |plane| to |session|'s [=XRSession/set of tracked planes=].
+    1. Remove each object in |session|'s [=XRSession/set of tracked planes=] that was not created or updated during the invocation of this algorithm.
+    1. Set |frame|'s {{XRFrame/detectedPlanes}} to [=XRSession/set of tracked planes=].
+</div>
+
+<div class="algorithm" data-algorithm="create-plane-object">
+In order to <dfn>create plane object</dfn> from a [=native plane object=] |native plane| and {{XRFrame}} |frame|, the user agent MUST run the following steps:
+    1. Let |result| be a new instance of {{XRPlane}}.
+    1. Set |result|'s [=XRPlane/native entity=] to |native plane|.
+    1. Set |result|'s {{XRPlane/planeSpace}} to a new {{XRSpace}} object created with [=XRSpace/session=] set to |frame|'s {{XRFrame/session}} and [=XRSpace/native origin=] set to track |native plane|'s native origin.
+    1. Invoke [=update plane object=] algorithm with |result|, |native plane|, and |frame|.
+    1. Return |result|.
+
+A plane object, |result|, created in such way is said to <dfn>correspond to</dfn> the passed in native plane object |native plane|.
+</div>
+
+<div class="algorithm" data-algorithm="update-plane-object">
+In order to <dfn>update plane object</dfn> |plane| from a [=native plane object=] |native plane| and {{XRFrame}} |frame|, the user agent MUST run the following steps:
+    1. Set |plane|'s [=XRPlane/frame=] to |frame|.
+    1. If |native plane| is classified by the underlying system as vertical, set |plane|'s {{XRPlane/orientation}} to {{XRPlaneOrientation/"vertical"}}. Otherwise, if |native plane| is classified by the underlying system as horizontal, set |plane|'s {{XRPlane/orientation}} to {{XRPlaneOrientation/"horizontal"}}. Otherwise, set |plane|'s {{XRPlane/orientation}} to <code>null</code>.
+    1. Set |plane|'s {{XRPlane/polygon}} to the new array of vertices representing |native plane|'s polygon, performing all necessary conversions to account for differences in native plane polygon representation.
+    1. Set |plane|'s {{XRPlane/lastChangedTime}} to [=XRFrame/time=].
+</div>
+
+<div class="example">
+
+The following example demonstrates how an application could obtain information about detected planes and act on it. The code that can be used to render a graphical representation of the planes is not shown.
+
+<pre highlight="js">
+// `planes` will track all detected planes that the application is aware of,
+// and at what timestamp they were updated. Initially, this is an empty map.
+const planes = Map();
+
+function onXRFrame(timestamp, frame) {
+  const detectedPlanes = frame.detectedPlanes;
+
+  // First, let's check if any of the planes we knew about is no longer tracked:
+  for (const [plane, timestamp] of planes) {
+    if(!detectedPlanes.has(plane)) {
+      // Handle removed plane - `plane` was present in previous frame,
+      // but is no longer tracked.
+
+      // We know the plane no longer exists, remove it from the map:
+      planes.delete(plane);
+    }
+  }
+
+  // Then, let's handle all the planes that are still tracked.
+  // This consists both of tracked planes that we have previously seen (may have
+  // been updated), and new planes.
+  detectedPlanes.forEach(plane => {
+    if (planes.has(plane)) {
+      // Handle previously-seen plane:
+
+      if(plane.lastChangedTime > planes.get(plane)) {
+        // Handle previously seen plane that was updated.
+        // It means that one of the plane's properties is different than
+        // it used to be - most likely, the polygon has changed.
+
+        ... // Render / prepare the plane for rendering, etc.
+
+        // Update the time when we have updated the plane:
+        planes.set(plane, plane.lastChangedTime);
+      } else {
+        // Handle previously seen plane that was not updated in current frame.
+        // Note that plane's pose relative to some other space MAY have changed.
+      }
+    } else {
+      // Handle new plane.
+
+      // Set the time when we have updated the plane:
+      planes.set(plane, plane.lastChangedTime);
+    }
+
+    // Irrespective of whether the plane was previously seen or not,
+    // & updated or not, its pose MAY have changed:
+    const planePose = frame.getPose(plane.planeSpace, xrReferenceSpace);
+  });
+
+  frame.session.requestAnimationFrame(onXRFrame);
+}
+</pre>
+
+</div>
 
 Native device concepts {#native-device-concepts}
 ======================
 
-Native plane detection {#native-plane-detection}
+Native plane detection {#native-plane-detection-section}
 ----------------------
 
 <section class="non-normative">
+
+The plane detection API provides information about flat surfaces detected in users' environment. It is assumed in this specification that user agents can rely on <dfn>native plane detection</dfn> capabilities provided by the underlying platform for their implementation of plane-detection features. Specifically, the underlying XR device should provide a way to query all planes that are tracked at a time that corresponds to the [=XRFrame/time=]of a specific {{XRFrame}}.
+
+Moreover, it is assumed that the tracked planes, known as <dfn>native plane objects</dfn>, maintain their identity across frames - that is, given a plane object <code>P</code> returned by the underlying system at time <code>t0</code>, and a plane object <code>Q</code> returned by the underlying system at time <code>t1</code>, it is possible for the user agent to query the underlying system about whether <code>P</code> and <code>Q</code> correspond to the same logical plane object. The underlying system is also expected to provide a [=native origin=] that can be used to query the location of a pose at time <code>t</code>, although it is not guaranteed that plane pose will always be known (for example for planes that are still tracked but not localizable at a given time). In addition, the native plane object should expose a polygon describing approximate shape of the detected plane.
+
+In addition, the underlying system should recognize native planes as native entities for the purposes of {{XRAnchor}} creation. For more information, see [[webxr-anchors-module#native-anchor]] section.
+
 </section>
 
 Privacy & Security Considerations {#privacy-security}
 =================================
 
 <section class="non-normative">
+
+The plane detection API exposes information about users' physical environment. The exposed plane information (such as plane's polygon) may be limited if the user agent so chooses. Some of the ways in which the user agent can reduce the amount of exposed information are for example: decreasing the level of detail of the plane's polygon in [=update plane object=] algorithm, or removing the plane altogether by behaving as if the plane object was not present in <code>trackedPlanes</code> collection in [=update planes=] algorithm.
+
+Since concepts from plane detection API can be used in methods exposed by [[webxr-anchors-module]] specification, some of the privacy & security considerations that are relevant to WebXR Anchors Module also apply here. For details, see [[webxr-anchors-module#privacy-security]] section.
 
 </section>
 

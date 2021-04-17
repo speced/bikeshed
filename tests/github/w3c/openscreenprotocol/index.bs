@@ -4,6 +4,7 @@ Shortname: openscreenprotocol
 Level: 1
 Status: w3c/ED
 ED: https://w3c.github.io/openscreenprotocol/
+TR: https://www.w3.org/TR/openscreenprotocol/
 Canonical URL: ED
 Editor: Mark Foltz, Google, https://github.com/mfoltzgoogle, w3cid 68454
 Repository: w3c/openscreenprotocol
@@ -2129,7 +2130,26 @@ Video encoding sender stats include the following fields:
 During a streaming session, the receiver should send stats with the
 [=streaming-session-receiver-stats-event=] at the interval the sender requested.
 It should send all of the following stats for all of the media streams it is
-receiving.  The [=streaming-session-receiver-stats-event=] message contains the
+receiving.
+
+If the receiver is using a buffer to hold frames before playing them out, it
+should also send the status of that buffer using the `remote-buffer-status` field.
+It can have one of three values:
+
+- `enough-data`: The buffer has neither too much data nor insufficient data.
+- `insufficient-data`: The buffer will underrun and not have sufficient frame
+    data at the time it is scheduled to be played out.
+- `too-much-data`: At the current send rate, the buffer will overrun and future
+    frame data will be discarded before it can be played out.
+
+A sender that receives a status of `insufficient-data` should increase its send
+rate, or switch to a more efficient encoding for future frames.  A sender that
+receives a status of `too-much-data` should decrease its send rate.
+
+If the receiver is playing frames immediately without buffering, it should always
+report a buffering status of `enough-data`.
+
+The [=streaming-session-receiver-stats-event=] message contains the
 following fields:
 
 : streaming-session-id
@@ -2170,6 +2190,9 @@ present, that indicates the value has not changed since the last value.
 : cumulative-decode-delay
 :: The sum of the time spent decoding frames received.
 
+: remote-buffer-status : streaming-buffer-status
+:: The status of the remote buffer for this encoding.
+
 Video encoding receiver stats include the following fields.  If not
 present, that indicates the value has not changed since the last
 value.
@@ -2188,6 +2211,9 @@ value.
 
 : cumulative-decode-delay
 :: The sum of the time spent decoding frames received.
+
+: remote-buffer-status : streaming-buffer-status
+:: The status of the remote buffer for this encoding.
 
 
 Requests, Responses, and Watches {#requests-responses-watches}

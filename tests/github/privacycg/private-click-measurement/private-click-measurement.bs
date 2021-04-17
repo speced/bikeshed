@@ -9,7 +9,7 @@ URL: https://privacycg.github.io/private-click-measurement/
 Editor: John Wilander, w3cid 89478, Apple Inc. https://apple.com/, wilander@apple.com
 Status Text: This specification is intended to be merged into the HTML Living Standard. It is neither a WHATWG Living Standard nor is it on the standards track at W3C.
 Text Macro: LICENSE <a href=https://creativecommons.org/licenses/by/4.0/>Creative Commons Attribution 4.0 International License</a>
-Abstract: This specification defines a privacy preserving way to attribute a conversion, such as a purchase or a sign-up, to a previous ad click.
+Abstract: This specification defines a privacy-preserving way to measure clicks that result in cross-site navigations, such as ad clicks that result in a purchase or a sign-up.
 Markup Shorthands: idl yes, markdown yes
 Complain About: missing-example-ids yes
 </pre>
@@ -25,42 +25,47 @@ Complain About: missing-example-ids yes
 
 <em>This section is non-normative.</em>
 
-A popular business model for the web is to get attribution and payment for conversions, for instance purchases or sign-ups, which result from the click on an ad. Traditionally, such attribution has been facilitated by user identifying cookies sent in third-party HTTP requests to the click source. However, the same technology can be and has been used for privacy invasive cross-site tracking of users.
+A popular business model for the web is to get attribution and payment for clicks, for instance ad clicks that result in purchases or sign-ups. Traditionally, such attribution has been facilitated by user or device identifying cookies sent in cross-site HTTP requests. However, the same technology can be and has been used for privacy invasive cross-site tracking of users.
 
-The technology described in this document is intended to allow for ad click attribution while disallowing arbitrary cross-site tracking.
+The technology described in this document is intended to allow for click attribution, such as ad click attribution, while disallowing arbitrary cross-site tracking.
 
 ## Goals ## {#goals}
 
-* Support ad click attribution.
+* Support click attribution or measurement of clicks across websites.
 
 * Preserve user privacy, specifically prevent cross-site tracking of users.
 
 ## Terminology ## {#terminology}
 
-: ad click
-:: This document will use the term “ad click” for any kind of user gesture on an ad that invokes the navigation to a link destination, such as clicks, taps, and accessibility tools.
-: <dfn>conversion</dfn>
-:: A user activity that is notable such as a purchase, a sign-up to a service, or the submission of personal information such as an email address.
+: click
+:: This document will use the term “click” for any kind of user gesture on web content that invokes the navigation to a link destination, such as clicks, taps, and use of accessibility tools.
+: <dfn>attribution</dfn>
+:: A user action on one website is attributed to a preceding click, meaning that the source of the click should receive attribution for the user action.
 
 The four parties involved in this technology are:
 
 : user
-:: They click on an ad, end up on a destination website, and perform what's deemed to be a [=conversion=], such as a purchase.
+:: They click, end up on a destination website, and perform an action that triggers [=attribution=], such as a purchase.
 : user agent
-:: The web browser that acts on behalf of the user and facilitates ad click attribution.
-: <dfn>ad click source</dfn>
-:: The first-party website where the user clicks on the ad.
-: <dfn>ad click destination</dfn>
-:: The destination website where the [=conversion=] happens.
+:: The web browser that acts on behalf of the user and facilitates click attribution.
+: <dfn>click source website</dfn>
+:: The first-party website where the user clicks.
+: <dfn>attribution destination website</dfn>
+:: The destination website where the user performs an action that triggers attribution.
 
-The data consumed by the user agent to support ad click attribution is:
+The data consumed by the user agent to support private click measurement is:
 
-: <dfn>ad campaign id</dfn>
-:: A [=six-bit decimal value=] for an ad campaign associated with the ad click destination. This means support for 64 concurrent ad campaigns per ad click destination on the ad click source. Example: `merchant.example` can run up to 64 concurrent ad campaigns on `search.example`. The valid decimal values are 00 to 63.
-: <dfn>ad attribution data</dfn>
-:: A [=six-bit decimal value=] encoding the details of the attribution. This data may contain things like specific steps in a sales funnel or the value of the sale in buckets, such as less than $10, between $10 and $50, between $51 and $200, above $200, and so on. The valid decimal values are 00 to 63.
-: <dfn>ad attribution priority</dfn>
-:: An optional [=six-bit decimal value=] encoding the priority of the attribution. The priority is only intended for the user agent to be able to pick the most important attribution request if there are multiple. One such case may be after the user has taken step 1 through 3 in a sales funnel and the third step is the most important to get attribution for. The valid decimal values are 00 to 63.
+: <dfn>attribution source id</dfn>
+:: An [=eight-bit decimal value=] identifying the content that was clicked to navigate to the destination. This means support for 255 unique pieces of content, such as ads, per click destination on the click source. Example: `merchant.example` can run up to 255 concurrent ad campaigns on `search.example`. The valid decimal values are 0 to 255.
+: <dfn>trigger data</dfn>
+:: A [=four-bit decimal value=] encoding the user action that triggers the attribution. This value may encode things like specific steps in a sales funnel or the value of the sale in buckets, such as less than $10, between $10 and $50, between $51 and $200, above $200, and so on. The valid decimal values are 00 to 15.
+: <dfn>optional trigger priority</dfn>
+:: An optional [=six-bit decimal value=] encoding the priority of the triggering event. The priority is only intended for the user agent to be able to pick the most important trigger data if there are multiple. One such case may be after the user has taken step 1 through 3 in a sales funnel and the third step is the most important to get attribution for. The valid decimal values are 00 to 63.
+
+The final step in private click measurement results in an:
+
+: <dfn>attribution report</dfn>
+:: An report comprised of the [=click source website=], [=attribution source id=], [=attribution destination website=], and [=trigger data=].
 
 ## A High Level Scenario ## {#scenario}
 
@@ -68,77 +73,131 @@ A high level example of a scenario where the described technology is intended to
 
 1. A user searches for something on `search.example`'s website.
 2. The user is shown an ad for a product and clicks it.
-3. The ad click source, `search.example`, informs the user agent (see [[#linkformat]]):
-    - That it will want ad click attribution for this click.
-    - What the intended [=ad click destination=] is.
-    - What the [=ad campaign id=] is.
-4. The user agent navigates and takes note that the user landed on the intended [=ad click destination=].
-5. The user's activity on the [=ad click destination=] leads to a [=conversion=].
-6. A third-party HTTP request is made on the ad click destination website to `​https://search.example/.well-known/ad-click-attribution`
-7. The user agent checks for pending ad click attributions for the [=ad click source-destination pair=] and if there's a hit, makes or schedules an HTTP request to `​https://search.example/.well-known/ad-click-attribution` with the [=ad attribution data=].
+3. The [=click source website=], `search.example`, informs the user agent (see [[#linkformat]]):
+    - That it will want attribution for this click.
+    - What the intended [=attribution destination website=] is.
+    - What the [=attribution source id=] is.
+4. The user agent navigates and takes note that the user landed on the intended [=attribution destination website=].
+5. The user's activity on the [=attribution destination website=] leads to a [=triggering event=].
+6. A third-party HTTP request is made on the [=click source website=] to `​https://search.example/.well-known/private-click-measurement/trigger-attribution/` with [=trigger data=].
+7. The user agent checks for stored clicks for the [=click source-attribute-on pair=] and if there's a hit, makes or schedules an HTTP POST request to `​https://search.example/.well-known/private-click-measurement/report-attribution/` with the corresponding [=attribution report=].
 
-    ISSUE: One thing to consider here is whether there should be an option to send the [=ad attribution data=] to the [=ad click destination=] too.
+    ISSUE: One thing to consider here is whether there should be an option to send the [=attribution report=] to the [=attribution destination website=] too.
 
-# Ad Click Source Link Format # {#linkformat}
+# Click Source Link Format # {#linkformat}
 
-This specification adds two attributes to the {{HTMLAnchorElement}} interface. Authors can use these attributes in HTML content like so (where `17` is an [=ad campaign id=] and `https://destination.example/` is an [=ad click destination=]):
+This specification adds two attributes to the {{HTMLAnchorElement}} interface. Authors can use these attributes in HTML content like so (where `17` is an [=attribution source id=] and `https://destination.example/` is an [=attribution destination website=]):
 
 <xmp class="highlight" highlight=html>
-<a adcampaignid="17" addestination="https://destination.example/">
+<a attributionsourceid="17" attributiondestination="https://destination.example/">
 </xmp>
 
 Formally:
 
 <pre class="idl">
 partial interface HTMLAnchorElement {
-    [CEReactions] attribute DOMString adCampaignId;
-    [CEReactions] attribute USVString adDestination;
+    [CEReactions] attribute unsigned long attributionSourceId;
+    [CEReactions] attribute DOMString attributionDestination;
 };
 </pre>
 
-The IDL attributes {{HTMLAnchorElement/adCampaignId}} and {{HTMLAnchorElement/adDestination}} must [=reflect=] the <code>adcampaignid</code> and <code>addestination</code> content attributes, respectively.
+The IDL attributes {{HTMLAnchorElement/attributionSourceId}} and {{HTMLAnchorElement/attributionDestination}} must [=reflect=] the <code>attributionsourceid</code> and <code>attributiondestination</code> content attributes, respectively.
 
 ISSUE(1): Should these attributes be on {{HTMLHyperlinkElementUtils}} instead?
 
-If an element with such attributes triggers a top frame navigation that lands, possibly after HTTP redirects, on the [=ad click destination=], the user agent stores the request for ad click attribution as the [=tuple=] ( [=ad click source=], [=ad click destination=], [=ad campaign id=] ). If any of the conditions do not hold, such as the [=ad campaign id=] not being a valid [=six-bit decimal value=], the request for ad click attribution is ignored.
+If an element with such attributes triggers a top frame navigation that lands, possibly after HTTP redirects, on the [=attribution destination website=], the user agent stores the request for click attribution as the [=tuple=] ( [=click source website=], [=attribution destination website=], [=attribution source id=] ). If any of the conditions do not hold, such as the [=attribution source id=] not being a valid [=eight-bit decimal value=], the request for click attribution is ignored.
 
-# Legacy Triggering of Ad Click Attribution # {#legacytriggering}
+# Triggering of Click Attribution # {#triggering}
 
-Triggering of attribution is what happens when there is a [=conversion=].
+Triggering of attribution is what happens when there is a [=triggering event=].
 
-Existing ad click attribution relies on third-party HTTP requests to the [=ad click source=] and these requests are typically the result of invisible image elements or "tracking pixels" placed in the DOM solely to fire HTTP GET requests. To allow for a smooth transition from these old pixel requests to the new Ad Click Attribution technology, we propose a server-side redirect to a well-known location as a legacy triggering mechanism. [[!WELL-KNOWN]]
+Existing ad click attribution relies on third-party HTTP requests to the [=click source website=] or other websites and these requests are typically the result of invisible image elements or "tracking pixels" placed in the DOM solely to fire HTTP GET requests. To allow for a smooth transition from these old pixel requests to Private Click Measurement, a server-side redirect to a well-known location is used as triggering mechanism. [[!WELL-KNOWN]]
 
 <div algorithm>
-To <dfn export>trigger an ad click attribution request</dfn>, the top frame context of an [=ad click destination=] page needs to do the following:
 
-1. An HTTP GET request to the [=ad click source=]. This HTTP request may be the result of an HTTP redirect, such as `searchUK.example` HTTP 302 redirect to `search.example`. The use of HTTP GET is intentional in that existing “pixel requests” can be repurposed for this and in that the HTTP request should be idempotent.
-1. A secure HTTP GET redirect to the URL returned by [=generate an ad click attribution URL|generating an ad click attribution URL=] for [=ad click source=] with [=ad attribution data=] and [=ad attribution priority=]. This ensures that the [=ad click source=] is in control of who can trigger click attribution on its behalf and optionally what the priority of the attribution is. If the user agent gets such an HTTP request, it will check its stored requests for click attribution, and if there's a match for ([=ad click source=], [=ad click destination=]), it will make or schedule a secure HTTP POST request to the URL returned by [=generate an ad click attribution URL|generating an ad click attribution URL=] for [=ad click source=] with [=ad attribution data=] and [=ad campaign id=] with the referer header set to [=ad click destination=]. The use of HTTP POST is intentional in that it differs from the HTTP GET redirect used to trigger the attribution and in that it is not expected to be idempotent. If any of the conditions do not hold, such as the [=ad attribution data=] being a valid [=six-bit decimal value=], the request for ad click attribution is ignored.
+To generate a <dfn export>triggering event</dfn>, the top frame context of an [=attribution destination website=] page needs to do the following:
+
+1. An HTTP GET request to the [=click source website=]. This HTTP request may be the result of an HTTP redirect, such as `searchUK.example` HTTP 302 redirect to `search.example`. The use of HTTP GET is intentional in that existing “pixel requests” can be repurposed for this and in that the HTTP request should be idempotent.
+1. A secure HTTP GET redirect to the URL returned by [=generate a tiggering event URL|generating a triggering event URL=] for [=click source website=] with [=trigger data=] and [=optional trigger priority=]. This mandatory redirect ensures that the [=click source website=] is in control of who can trigger click attribution on its behalf and optionally what the priority is. If the user agent gets such an HTTP request, it will check its stored clicks, and if there's a match for ([=click source website=], [=attribution destination website=]), attribution has been triggered for that stored click.
+
+</div>
+
+# Attribution Report Format # {#report-format}
+
+An attribution report has this JSON format:
+
+{
+  "source_engagement_type":"click",
+  "source_site":"search.example",
+  "source_id":3,
+  "attributed_on_site":"destination.example",
+  "trigger_data":12,
+  "version":1
+}
+
+# Receiving Attribution Reports # {#receving-reports}
+
+1. The user agent makes or schedules a secure HTTP POST request to the URL returned by [=generate an attribution report URL|generating an attribution report URL=] for [=click source website=] with an [=attribution report=]. The use of HTTP POST is intentional in that it differs from the HTTP GET redirect used to trigger the attribution and in that it is not expected to be idempotent.
     ISSUE: We may have to add a nonce to the HTTP POST request to prohibit double counting in cases where the user agent decides to retry the request.
 
-If there are multiple ad click attribution requests for the same [=ad click source-destination pair=], the one with the highest [=ad attribution priority=] will be the one sent and the rest discarded.
+If there are multiple ad click attribution requests for the same [=click source-attribute-on pair=], the one with the highest [=optional trigger priority=] will be the one sent and the rest discarded.
 
 Issue: This needs to be reworked to monkeypatch HTML's "follows a hyperlink" algorithm.
 
 </div>
 
-# Ad Click Attribution URLs # {#ad-click-attribution}
+# Well-Known URLs # {#well-known-urls}
+
+## Triggering Event URL ## {#triggering-event-url}
 
 <div algorithm>
 
-Clients <dfn>generate an ad click attribution URL</dfn> for |source| with |attribution data| and |additional data| by following these steps:
+Clients <dfn>generate a tiggering event URL</dfn> for |source site| with |trigger data| and |optional trigger priority| by following these steps:
 
-1. Let |url| be the result of [=concatenating=] the strings « `".well-known"`, `"ad-click-attribution"` |attribution data|, |additional data| » using the separator U+002F (/).
-1. Return the result of calling {{URL(url, base)}} with url |url| and base |source|.
+1. Let |url| be the result of [=concatenating=] the strings « `".well-known"`, `"private-click-measurement"`, `"trigger-attribution"`, |trigger data|, |optional trigger priority| » using the separator U+002F (/).
+1. Return the result of calling {{URL(url, base)}} with url |url| and base |source site|.
 
 </div>
 
-# Click source/destination pairs # {#click-source-destination-pairs}
+## Attribution Report URL ## {#attribution-report-url}
 
-An <dfn>ad click source-destination pair</dfn> is a [=tuple=] of two [=sites=]: (source, destination).
+<div algorithm>
 
-# Six-bit decimal values # {#six-bit-decimal-values}
+User agents <dfn>generate an attribution report URL</dfn> for |source site| by following these steps:
 
+1. Let |url| be `".well-known/private-click-measurement/report-attribution/"`.
+1. Return the result of calling {{URL(url, base)}} with url |url| and base |source site|.
+
+</div>
+
+# Click source/attribute-on pairs # {#click-source-attribute-on-pairs}
+
+An <dfn>click source-attribute-on pair</dfn> is a [=tuple=] of two [=sites=]: (source, attribute-on).
+
+# N-bit decimal values # {#n-bit-decimal-values}
+
+A <dfn>four-bit decimal value</dfn> is a [=string=] for which the [=extract a four-bit decimal value=] algorithm does not return failure.
 A <dfn>six-bit decimal value</dfn> is a [=string=] for which the [=extract a six-bit decimal value=] algorithm does not return failure.
+A <dfn>eight-bit decimal value</dfn> is an unsigned long between 0 and 255 inclusive.
+
+<div class=example id="valid-four-bit-decimal-values">
+
+The [=strings=] `"00"` and `"15"` are both [=four-bit decimal values=], whereas `"7"`, `"20"`, and `"!!11one"` are not.
+
+</div>
+
+<div algorithm>
+
+Clients <dfn type=abstract-op>extract a four-bit decimal value</dfn> from a [=string=] |string| by running these steps:
+
+1. If |string|'s [=string/length=] is not 2, return failure.
+1. Let |tens| be the [=code unit=] at position 0 within |string|, and |ones| be the [=code unit=] at position 1.
+1. If |tens| is less than U+0030 (0) or greater than U+0031 (1), return failure.
+1. If |ones| is less than U+0030 (0) or greater than U+0039 (9), return failure.
+1. If |tens| is U+0031 (1) and |ones| is greater than U+0035 (5), return failure.
+1. Return (|tens| - 30) * 10 + ones - 30.
+
+</div>
 
 <div class=example id="valid-six-bit-decimal-values">
 
@@ -159,50 +218,47 @@ Clients <dfn type=abstract-op>extract a six-bit decimal value</dfn> from a [=str
 
 </div>
 
-# Modern Triggering of Ad Click Attribution # {#moderntriggering}
+# Modern Triggering of Attribution # {#modern-triggering}
 
-We envision a JavaScript API that is called on an ad click destination page as a modern means to trigger attribution at a [=conversion=]. This API call removes the necessity for third-party "pixels" which is great for ad click sources who do not want to be third party resources.
+We envision a JavaScript API and a same-site "pixel" redirect on the [=attribution destination website=] as a modern [=triggering event=]. This removes the necessity for third-party "pixels" and would allow the [=attribution destination website=] to fire a [=triggering event=] without direct dependencies to the exact [=click source website=]s where their incoming clicks are coming from.
 
 # Privacy Considerations # {#privacy}
 
-The total entropy in ad click attribution HTTP requests is 12 bits (6+6), which means 4096 unique values can be managed for each [=ad click source-destination pair=].
+The total entropy in Private Click Measurement HTTP requests is 12 bits (8+4), which means 4096 unique values can be managed for each [=click source-attribute-on pair=].
 
-With no other means of cross-site tracking, neither the ad click source nor the ad click destination will know whether the user has clicked an associated ad or not when a [=conversion=] happens. This restricts the entropy under control to 6 bits at any moment.
+With no other means of cross-site tracking, the [=click source website=] and the [=attribution destination website=] have no joint view of the user or the device. This restricts the entropy under control to 8 bits, or 256 values, at any moment.
 
-Even if the [=ad click source=] and/or the [=ad click destination=] were to be in control of both [=six-bit decimal value=], the total is 12 bits or 4096 unique values.
+We believe these restrictions avoid general cross-site tracking while still providing useful click attribution at web scale.
 
-We believe these restrictions avoid general cross-site tracking while still providing useful ad click attribution at web scale.
+In the interest of user privacy, user agents are encouraged to deploy the following restrictions to when and how they make secure HTTP POST requests to an [[#attribution-report-url|Attribution Report URL]]:
 
-In the interest of user privacy, user agents are encouraged to deploy the following restrictions to when and how they make secure HTTP POST requests to an [[#ad-click-attribution|Ad Click Attribution URL]]:
-
-* The user agent targets a delay of ad click attribution requests by 24–48 hours. However, the user agent might not be running or the user's device may be or disconnected from the internet, in which case the request may be delayed further.
-* The user agent only holds on to the [=tuple=] ([=ad click source=], [=ad click destination=], [=ad campaign id=]) for 7 days, i.e. one week of potential ad click attribution.
-* The user agent doesn't guarantee any specific order in which multiple ad click attribution requests for the same ad click destination are sent, since the order itself could be abused to increase the entropy.
-* The user agent uses an ephemeral session (a.k.a. private or incognito mode) to make ad click attribution requests.
-* The user agent doesn't use or accept any credentials such as cookies, client certificates, or Basic Authentication in ad click attribution requests.
-* The user agent may use a central clearinghouse to further anonymize ad click attribution requests, should a trustworthy clearinghouse exist.
-* The user agent offers users a way to turn ad click attribution on and off. The default setting is on to encourage businesses to move to this technology and abandon general cross-site tracking.
-* The user agent doesn't support ad click attribution in private/incognito mode.
+* The user agent targets a delay of [=attribution report=] requests by 24–48 hours. However, the user agent might not be running or the user's device may be or disconnected from the internet, in which case the request may be delayed further.
+* The user agent only holds on to the [=tuple=] ([=click source website=], [=attribution destination website=], [=attribution source id=]) for 7 days, i.e. one week of potential click attribution.
+* The user agent doesn't guarantee any specific order in which multiple [=attribution report=] requests for the same [=attribution destination website=] are sent, since the order itself could be abused to increase the entropy.
+* The user agent uses an ephemeral session (a.k.a. private or incognito mode) to make [=attribution report=] requests.
+* The user agent doesn't use or accept any credentials such as cookies, client certificates, or Basic Authentication in [=attribution report=] requests or responses.
+* The user agent may use a central clearinghouse to further anonymize [=attribution report=] requests, should a trustworthy clearinghouse exist.
+* The user agent offers users a way to turn Private Click Measurement on and off.
+* The user agent doesn't support Private Click Measurement in private/incognito mode.
 
 # Performance Considerations # {#performance}
 
-The user agent may want to limit the amount of stored ad click attribution data. Limitations can be set per ad click source, per ad click destination, and on the total amount of ad click attribution data.
+The user agent may want to limit the amount of stored click attribution data. Limitations can be set per [=click source website=], per [=attribution destination website=], and on the total amount of click attribution data.
 
 # IANA considerations # {#iana}
 
-<h3 id="the-ad-click-attribution-well-known-uri">The `ad-click-attribution` well-known URI</h3>
-
-This document defines the “`.well-known`” URI `ad-click-attribution`.
-This registration will be submitted to the IESG for review, approval, and registration with IANA using the template defined in [[!WELL-KNOWN]] as follows:
+This document defines the `".well-known"` URIs `"trigger-attribution"` and `"report-attribution"`.
+These registrations will be submitted to the IESG for review, approval, and registration with IANA using the template defined in [[!WELL-KNOWN]] as follows:
 
 : URI suffix
-:: `ad-click-attribution`
+:: `"trigger-attribution"`
+:: `"report-attribution"`
 
 : Change controller
 :: W3C
 
 : Specification document(s)
-:: This document is the relevant specification. (See [[#ad-click-attribution]].)
+:: This document is the relevant specification. (See [[#triggering-event-url]] [[#attribution-report-url]].)
 
 : Related information:
 :: None.

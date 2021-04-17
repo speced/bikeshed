@@ -299,6 +299,11 @@ occurred on the [=remote end=].
       parameters</code>.
  - A <dfn export>remote end event trigger</dfn> which defines when the event is
    triggered and steps to construct the [=event type=] data.
+ - Optionally, a set of <dfn>remote end subscribe steps</dfn>, which define
+   steps to take when a local end subscribes to an event. Where defined these
+   steps have an associated <dfn>subscribe priority</dfn> which is an integer
+   controlling the order in which the steps are run when multiple events are
+   enabled at once, with lower integers indicating steps that run earlier.
 
 A [=/session=] has a <dfn export for=event>global event set</dfn> which is a set
 containing the event names for events that are enabled for all
@@ -306,9 +311,24 @@ browsing contexts. This initially contains the [=event name=] for events that
 are <dfn export for=event>in the default event set</dfn>.
 
 A [=/session=] has a <dfn export for=event>browsing context event map</dfn>,
-which is a map with [=/browsing context=] keys and values that are maps from an
-[=event name=] to a boolean indicating whether the specified event is enabled or
-disabled for a given browsing context.
+which is a map with [=/top-level browsing context=] keys and values that are a
+set of [=event name=]s for events that are enabled in the given browsing
+context.
+
+<div algorithm>
+
+To obtain a list of <dfn>event enabled browsing contexts</dfn> given
+|session| and |event name|:
+
+1. Let |contexts| be an empty set.
+
+1. For each |context| → |events| of |session|'s [=browsing context event map=]:
+
+  1. If |events| contains |event name|, append |context| to |contexts|
+
+1. Return |contexts|.
+
+</div>
 
 <div algorithm>
 
@@ -318,27 +338,26 @@ To determine if an <dfn export>event is enabled</dfn> given |session|,
 Note: |browsing contexts| is a set because a [=shared worker=] can be associated
       with multiple contexts.
 
-  1. For each |browsing context| in |browsing contexts|:
+1. Let |top-level browsing contexts| be an empty set.
 
-    1. While |browsing context| is not null:
+1. For each |browsing context| of |browsing contexts|, append |browsing
+   context|'s [=top-level browsing context=] to |top-level browsing contexts|.
 
-      1. Let |event map| be the [=browsing context event map=] for |session|.
+1. Let |event map| be the [=browsing context event map=] for |session|.
 
-      1. If |event map| [=contains=] |browsing context|, let |browsing context
-         events| be |event map|[|browsing context|].  Otherwise let |browsing
-         context events| be null.
+1. For each |browsing context| of |top-level browsing contexts|:
 
-      1. If |browsing context events| is not null, and |browsing context events|
-         [=contains=] for |event name| return |browsing context
-         events|[|event name|].
+  1. If |event map| [=contains=] |browsing context|, let |browsing context
+     events| be |event map|[|browsing context|].  Otherwise let |browsing
+     context events| be null.
 
-      1. Let |browsing context| be the [=parent browsing context=] of |browsing
-         context|, if it has one, or null otherwise.
+  1. If |browsing context events| is not null, and |browsing context events|
+     [=contains=] |event name|, return true.
 
-  1. If the [=global event set=] for |session| [=contains=] |event name| return
-     true.
+1. If the [=global event set=] for |session| [=contains=] |event name| return
+   true.
 
-  1. Return false.
+1. Return false.
 
 </div>
 
@@ -630,7 +649,7 @@ browsing contexts|:
     and "<code>params</code>".
 
  1. If the [=current session=] is null, or the [=current session=]'s [=WebSocket
-    Connection=] is null then return.
+    Connection=] is null then return false.
 
  1. If [=event is enabled=] given [=current session=],
     |body|["<code>method</code>"] and |related browsing contexts|:
@@ -641,6 +660,10 @@ browsing contexts|:
         bytes=] given |body|.
 
    1. [=Send a WebSocket message=] comprised of |serialized| over |connection|.
+
+   1. Return true
+
+ 1. Return false
 
 </div>
 
@@ -1334,52 +1357,109 @@ SessionResult = (StatusResult)
 
 <div algorithm>
 
-To <dfn lt="updating the event map">update the event map</dfn>, given
-|session|, |list of event names|, |list of contexts|, and |enabled|:
+To <dfn>update the event map</dfn>, given
+|session|, |list of event names|, |browsing contexts|, and |enabled|:
 
-  1. Let |global event set| be the [=global event set=] for |session|.
+Note: The return value of this algorithm is a map between event names and
+contexts. When the events are being enabled globally, the contexts in the return
+value are those for which the event was already enabled. When the events are
+enabled for specific contexts, the contexts in the return value are those for
+which the event are now enabled but were not previously. When events are
+disabled, the return value is always empty.
 
-  1. Let |event map| be the [=browsing context event map=] for |session|.
+  1. Let |global event set| be a [=set/clone=] of the [=global event set=] for
+     |session|.
+
+  1. Let |event map| be a new map.
+
+  1. For each |key| → |value| of the [=browsing context event map=] for
+     |session|:
+
+    1. Set |event map|[|key|] to a [=set/clone=] of |value|.
+
+  1. Let |enabled events| be a new map.
 
   1. Let |event names| be an empty set.
 
-    1. For each entry |name| in the |list of event names|, let |event names| be
+    1. For each entry |name| in |list of event names|, let |event names| be
        the union of |event names| and the result of [=trying=] to [=obtain a set
        of event names=] with |name|.
 
-    1. If the |list of contexts| is null:
+  1. If |browsing contexts| is null:
 
-      1. If |enabled| is true, for each |event name| in |event names|,
-         append |event name| to |global event set|. Otherwise for for each
-         |event name| in |event names|, if the |global event set| [=contains=]
-         |event name|, remove |event name| from the |global event set|.
+      1. If |enabled| is true:
 
-      1. Return
+        1. For each |event name| of |event names|:
 
-    1. Let |targets| be an empty list.
+           1. If |global event set| doesn't contain |event name|:
 
-    1. For each entry |context id| in the |list of contexts|:
+             1. Let |event enabled contexts| be the [=event enabled browsing
+                contexts=] given |session| and |event name|
+
+             1. Add |event name| to |global event set|.
+
+             1. For each |context| of |event enabled contexts|, remove |event
+                name| from |event map|[|context|].
+
+             1. Set |enabled events|[|event name|] to |event enabled contexts|.
+
+      1. If |enabled| is false:
+
+        1. For each |event name| in |event names|:
+
+          1. If |global event set| [=contains=] |event name|, remove |event
+             name| from |global event set|. Otherwise return [=error=] with
+             [=error code=] [=invalid argument=].
+
+  1. Otherwise, if |browsing contexts| is not null:
+
+    1. Let |targets| be an empty map.
+
+    1. For each |context id| in |browsing contexts|:
 
       1. Let |context| be the result of [=trying=] to [=get a browsing context=]
-         with |context id|.  If the |event map| does not contain an entry for
-         |context|, set the value of the entry for |context| to a new empty map.
+         with |context id|.
 
-      1. Get the entry from the |event map| for |context| and append it to
-         |targets|.
+      1. Let |top-level context| be the [=top-level browsing context=] for |context|.
 
-    1. For each |target| in |targets|:
+      1. If |event map| does not contain |top-level context|, set |event
+         map|[|top-level context|] to a new set.
 
-      1. For each |event name| in |event names|:
+      1. Set |targets|[|top-level context|] to |event map|[|top-level context|].
 
-        1. Set |target|[|event name|] to |enabled|.
+    1. For each |event name| in |event names|:
 
-    1. Return [=success=] with data null.
+      1. If |enabled| is true and |global event set| contains |event name|, continue.
 
-    Note: Implementations that do additional work when an event is enabled,
-    e.g. subscribing to the relevant engine-internal events, will likely perform
-    those additional steps when updating the event map. This specification uses
-    a model where hooks are always called and then the event map is used to
-    filter only those that ought to be returned to the local end.
+      1. For each |context| → |target| in |targets|:
+
+        1. If |enabled| is true and |target| does not contain |event name|:
+
+          1. Add |event name| to |target|.
+
+          1. If |enabled events| does not contain |event name|, set |enabled
+             events|[|event name|] to a new set.
+
+          1. Append |context| to |enabled events|[|event name|].
+
+        1. If |enabled| is false:
+
+          1. If |target| contains |event name|, remove |event name| from
+             |target|. Otherwise return [=error=] with [=error code=] [=invalid
+             argument=].
+
+  1. Set the [=global event set=] for |session| to |global event set|.
+
+  1. Set the [=browsing context event map=] for |session| to |event map|.
+
+  1. Return [=success=] with data |enabled events|.
+
+Note: Implementations that do additional work when an event is enabled,
+e.g. subscribing to the relevant engine-internal events, will likely perform
+those additional steps when updating the event map. This specification uses
+a model where hooks are always called and then the event map is used to
+filter only those that ought to be returned to the local end.
+
 </div>
 
 ### Commands ### {#module-session-commands}
@@ -1459,14 +1539,49 @@ Issue: This needs to be generalized to work with realms too
 
 The [=remote end steps=] with |command parameters| are:
 <div algorithm="remote end steps for session.subscribe">
-    1. Let the |list of event names| be the value of the <code>events</code> field of
-       |command parameters|.
 
-    1. Let the |list of contexts| be the value of the <code>contexts</code>
-       field of |command parameters| if it is present or null if it isn't.
+1. Let the |list of event names| be the value of the <code>events</code> field of
+   |command parameters|
 
-    1. Return the result of [=updating the event map=] with [=current session=],
-       |list of event names|, |list of contexts| and enabled true.
+1. Let the |list of contexts| be the value of the <code>contexts</code>
+   field of |command parameters| if it is present or null if it isn't.
+
+1. Let |enabled events| be the result of [=trying=] to [=update the event map=]
+   with [=current session=], |list of event names| , |list of contexts| and
+   enabled true.
+
+1. Let |subscribe step events| be a new map.
+
+1. For each |event name| → |contexts| in |enabled events|:
+
+  1. If the [=event=] with [=event name=] |event name| defines [=remote end
+     subscribe steps=], set |subscribe step events|[|event name|] to |contexts|.
+
+1. [=map/Sort in ascending order=] |subscribe step events| using the following less
+   than algorithm given two entries with keys |event name one| and |event
+   name two|:
+
+    1. Let |event one| be the [=event=] with name |event name one|
+
+    1. Let |event two| be the [=event=] with name |event name two|
+
+    1. Return true if |event one|'s [=subscribe priority=] is less than |event
+       two|'s susbscribe priority, or false otherwise.
+
+1. For each |event name| → |contexts| in |subscribe step events|:
+
+  1. If |list of contexts| is null, let |include contexts| be a list of all
+     [=top-level browsing contexts=] that are not contained in |contexts|, and
+     let |include global| be true.
+
+     Otherwise let |include contexts| be |contexts| and let |include global| be
+     false.
+
+  1. Run the [=remote end subscribe steps=] for the [=event=] with [=event name=]
+     |event name| given |include contexts| and |include global|.
+
+1. Return [=success=] with data null.
+
 </div>
 
 #### The session.unsubscribe Command #### {#command-session-unsubscribe}
@@ -1496,14 +1611,18 @@ Issue: This needs to be generalised to work with realms too
 
 The [=remote end steps=] with |command parameters| are:
 <div algorithm="remote end steps for session.unsubscribe">
-    1. Let the |list of event names| be the value of the <code>events</code> field of
-       |command parameters|.
 
-    1. Let the |list of contexts| be the value of the <code>contexts</code>
-       field of |command parameters| if it is present or null if it isn't.
+1. Let the |list of event names| be the value of the <code>events</code> field of
+   |command parameters|.
 
-    1. Return the result of [=updating the event map=] with [=current session=],
-       |list of event names|, |list of contexts| and enabled false.
+1. Let the |list of contexts| be the value of the <code>contexts</code>
+   field of |command parameters| if it is present or null if it isn't.
+
+1. [=Try=] to [=update the event map=] with [=current session=],
+   |list of event names|, |list of contexts| and enabled false.
+
+1. Return [=success=] with data null.
+
 </div>
 
 
@@ -1708,25 +1827,57 @@ The [=remote end steps=] with |command parameters| are:
       </pre>
    </dd>
 </dl>
-The [=remote end event trigger=] is:
+
+<div algorithm>
+
+To <dfn>Recursively emit context created events</dfn> given |context|:
+
+1. [=Emit a context created event=] with |context|.
+
+1. For each child browsing context, |child|, of |context|:
+
+  1. [=Recursively emit context created events=] given |child|.
+
+</div>
+
+<div algorithm>
+
+To <dfn>Emit a context created event</dfn> given |context|:
+
+1. Let |related contexts| be a set containing |context|.
+
+1. Let |params| be the result of [=get the browsing context info=] given
+   |context|, 0, and 1.
+
+1. Let |body| be a [=map=] matching the
+   <code>BrowsingContextCreatedEvent</code> production, with the
+   <code>params</code> field set to |params|.
+
+1. [=Emit an event=] with |body| and |related contexts|.
+
+</div>
 
 <div algorithm="remote end event trigger for browsingContext.contextCreated">
+
+The [=remote end event trigger=] is:
+
 When the [=create a new browsing context=] algorithm is invoked, after the
 [=active document=] of the browsing context is set, run the following steps:
 
- 1. Let |context| be the newly created browsing context.
+1. Let |context| be the newly created browsing context.
 
- 1. Let |related browsing contexts| be a set containing the [=parent browsing
-    context=] of |context|, if that is not null, or an empty set otherwise.
+1. [=Emit a context created event=] given |context|.
 
- 1. Let |params| be the result of [=get the browsing context info=] given
-    |context|, 0, and 1.
+</div>
 
- 1. Let |body| be a [=map=] matching the
-    <code>BrowsingContextCreatedEvent</code> production, with the
-    <code>params</code> field set to |params|.
+<div algorithm="remote end subscribe steps for browsingContext.contextCreated">
 
- 1. [=Emit an event=] with |body| and |related browsing contexts|.
+The [=remote end subscribe steps=], with [=subscribe priority=] 1, given
+|contexts| and <var ignore>include global</var> are:
+
+1. For each |context| in |contexts|:
+
+  1. [=Recursively emit context created events=] given |context|.
 
 </div>
 
@@ -2036,21 +2187,45 @@ object:
 
  1. If |realm info| is null, return.
 
- 1. Let |related browsing contexts| be an empty set.
-
- 1. If the [=responsible document=] of |settings| is a [=Document=], append the
-    [=responsible document=]'s [=Document/browsing context=] to |related
-    browsing contexts|.
-
-    Otherwise if the [=Realm/global object=] specified by |settings| is a
-    {{WorkerGlobalScope}}, for each |owner| in the [=Realm/global object=]'s
-    [=owner set=], if |owner| is a [=Document=], append |owner|'s
-    [=Document/browsing context=] to |related browsing contexts|.
+ 1. Let |related browsing contexts| be the result of [=get related browsing
+    contexts=] given |environment settings|.
 
  1. Let |body| be a map matching the <code>RealmCreatedEvent</code>
     production, with the <code>params</code> field set to |realm info|.
 
  1. [=Emit an event=] with |body| and |related browsing contexts|.
+
+</div>
+
+<div algorithm="remote end subscribe steps for script.realmCreated">
+
+The [=remote end subscribe steps=] with [=subscribe priority=] 2, given
+|contexts| and |include global| are:
+
+1. Let |environment settings| be a list of all the [=environment settings objects=]
+   that have their [=execution ready flag=] set.
+
+1. For each |settings| of |environment settings|:
+
+  1. If the [=responsible document=] of |settings| is a [=Document=]:
+
+     1. Let |context| be |settings|'s [=responsible document=]'s
+        [=Document/browsing context=]'s [=top-level browsing context=].
+
+     1. If |context| is not in |contexts|, continue.
+
+     1. Append |context| to |related contexts|.
+
+    Otherwise, if |include global| is false, continue.
+
+  1. Let |realm info| be the result of [=get the realm info=] given |settings|
+
+  1. Let |body| be a map matching the <code>RealmCreatedEvent</code>
+     production, with the <code>params</code> field set to |realm info|.
+
+  1. [=Emit an event=] with |body| and |related contexts|.
+
+Issue: Should the order here be better defined?
 
 </div>
 
@@ -2114,15 +2289,11 @@ Whenever a [=worker event loop=] |event loop| is destroyed, either because the
 worker comes to the end of its lifecycle, or prematurely via the [=terminate a
 worker=] algorithm:
 
- 1. Let |related browsing contexts| be an empty set.
-
  1. Let |environment settings| be the [=environment settings object=] for which
     |event loop| is the [=responsible event loop=].
 
- 1. If the [=Realm/global object=] specified by |environment settings| is a
-    {{WorkerGlobalScope}}, for each |owner| in the [=Realm/global object=]'s
-    [=owner set=], if |owner| is a [=Document=], append |owner|'s
-    [=Document/browsing context=] to |related browsing contexts|.
+ 1. Let |related browsing contexts| be the result of [=get related browsing
+    contexts=] given |environment settings|.
 
  1. Let |realm| be |environment settings|'s [=environment settings object's Realm=].
 
@@ -2134,10 +2305,56 @@ worker=] algorithm:
  1. Let |body| be a map matching the <code>RealmDestroyedEvent</code>
     production, with the <code>params</code> field set to |params|.
 
+</div>
+
 ## Log ## {#module-log}
 
 The <dfn export for=modules>log</dfn> module contains functionality and events
 related to logging.
+
+A [=/session=] has a <dfn>log event buffer</dfn> which is a [=map=] from
+[=browsing context id=] to a list of log events for that context that have not
+been emitted. User agents may impose a maximum size on this buffer, subject to
+the condition that if events A and B happen in the same context with A occuring
+before B, and both are added to the buffer, the entry for B must not be removed
+before the entry for A.
+
+<div algorithm>
+
+To <dfn>buffer a log event</dfn> given |contexts| and |event|:
+
+1. Let |buffer| be the [=current session=]'s [=log event buffer=].
+
+1. Let |context ids| be a new list.
+
+1. For each |context| of |contexts|:
+
+  1. Append the [=browsing context id=] for |context| to |context ids|.
+
+1. For each |context id| in |context ids|:
+
+  1. Let |other contexts| be an empty list
+
+  1. For each |other id| in |context ids|:
+
+   1. If |other id| is not equal to |context id|, append |other id| to |other
+      contexts|.
+
+  1. If |buffer| does not contain |context id|, let |buffer|[|context id|] be a
+     new list.
+
+  1. Append (|event|, |other contexts|) to |buffer|[|context id|].
+
+Note: we store the other contexts here so that each event is only emitted
+once. In practice this is only relevant for workers that can be associated with
+multiple browsing contexts.
+
+Issue: Do we want to key this on browsing context or top-level browsing context?
+The difference is in what happens if an event occurs in a frame and that frame
+is then navigated before the local end subscribes to log events for the top
+level context.
+
+</div>
 
 ### Definition ### {#module-log-definition}
 
@@ -2319,7 +2536,11 @@ ignore>options</var>:
 1. Let |related browsing contexts| be the result of [=get related browsing
    contexts=] given |settings|.
 
-1. [=Emit an event=] with |body| and |related browsing contexts|.
+1. Let |emitted| be the result of [=emit an event=] with |body| and |related
+   browsing contexts|.
+
+1. If |emitted| is false, append (|related browsing contexts|, |body|) to the
+   [=current session=]'s [=log event buffer=].
 
 Define the following [=error reporting steps=] with arguments |script|, <var
 ignore>line number</var>, <var ignore>column number</var>, |message| and
@@ -2338,7 +2559,11 @@ ignore>line number</var>, <var ignore>column number</var>, |message| and
 1. Let |related browsing contexts| be the result of [=get related browsing
    contexts=] given |settings|.
 
-1. [=Emit an event=] with |body| and |related browsing contexts|.
+1. Let |emitted| be the result of [=emit an event=] with |body| and |related
+   browsing contexts|.
+
+1. If |emitted| is false, [=buffer a log event=] given |related browsing contexts|
+   and |body|.
 
 Issue: Lots more things require logging. CDP has LogEntryAdded types xml,
 javascript, network, storage, appcache, rendering, security, deprecation,
@@ -2346,6 +2571,39 @@ worker, violation, intervention, recommendation, other. These are in addition to
 the js exception and console API types that are represented by different methods.
 
 Issue: Allow implementation-defined log types
+
+</div>
+
+<div algorithm="remote end subscribe steps for log.entryAdded">
+
+The [=remote end subscribe steps=], with [=subscribe priority=] 10, given
+|contexts| and |include global| are:
+
+1. For each |context id| → |events| in [=log event buffer=]:
+
+  1. Let |maybe context| be the result of [=getting a browsing context=] given
+     |context id|.
+
+  1. If |maybe context| is an [=error=], remove |context id| from [=log event
+     buffer=] and continue.
+
+  1. Let |context| be |maybe context|'s data
+
+  1. Let |top level context| be |context|'s [=top-level browsing context=].
+
+  1. Let |related contexts| be a new set containing |context|.
+
+  1. If |include global| is true and |top level context| is not in |contexts|,
+     or if |include global| is false and |top level context| is in |contexts|:
+
+    1. For each (|event|, |other contexts|) in |events|:
+
+      1. [=Emit an event=] with |event| and |related contexts|.
+
+      1. For each |other context id| in |other contexts|:
+
+        1. If [=log event buffer=] contains |other context id|, remove |event|
+           from [=log event buffer=][|other context id|].
 
 </div>
 

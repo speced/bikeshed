@@ -91,6 +91,7 @@ spec:html; urlPrefix: https://html.spec.whatwg.org/multipage/
     type: dfn; text: same origin-domain; url: origin.html#same-origin-domain
     type: dfn; text: browsing context; url: browsers.html#browsing-context
     type: dfn; text: associated document; url: window-object.html#concept-document-window
+    type: dfn; text: origin; url: origin.html#concept-origin
 spec: SecureContexts; urlPrefix: https://w3c.github.io/webappsec-secure-contexts/#
     type: dfn; text: secure context; url: secure-contexts
 spec: PointerEvents; urlPrefix: https://www.w3.org/TR/pointerevents/#
@@ -231,7 +232,7 @@ An <dfn for="">XR device</dfn> is a physical unit of hardware that can present i
 
 An [=/XR device=] has a <dfn>list of supported modes</dfn> (a [=/list=] of [=/strings=]) that [=list/contains=] the enumeration values of {{XRSessionMode}} that the [=/XR device=] supports.
 
-Each [=/XR device=] has a <dfn for="XR device">list of enabled features</dfn> for each {{XRSessionMode}} in its [=list of supported modes=], which is a [=/list=] of [=feature descriptors=] which MUST be initially an empty [=/list=].
+Each [=/XR device=] has a <dfn for="XR device">set of granted features</dfn> for each {{XRSessionMode}} in its [=list of supported modes=], which is a [=/set=] of [=feature descriptors=] which MUST be initially an empty [=/set=].
 
 The user-agent has a <dfn for="">list of immersive XR devices</dfn> (a [=/list=] of [=/XR device=]), which MUST be initially an empty [=/list=].
 
@@ -333,7 +334,7 @@ When this method is invoked, it MUST run the following steps:
 
   1. Let |promise| be [=a new Promise=] in the [=relevant realm=] of this {{XRSystem}}.
   1. If |mode| is {{XRSessionMode/"inline"}}, [=/resolve=] |promise| with `true` and return it.
-  1. If the requesting document's origin is not allowed to use the "xr-spatial-tracking" [[#permissions-policy|permissions policy]], [=reject=] |promise| with a "{{SecurityError}}" {{DOMException}} and return it.
+  1. If the requesting document's [=origin=] is not allowed to use the "xr-spatial-tracking" [[#permissions-policy|permissions policy]], [=reject=] |promise| with a "{{SecurityError}}" {{DOMException}} and return it.
   1. Check whether the session |mode| is supported as follows:
     <dl class="switch">
       : If the user agent and system are known to [=never support=] |mode| sessions
@@ -414,8 +415,9 @@ When this method is invoked, the user agent MUST run the following steps:
             1. [=Reject=] |promise| with a "{{NotSupportedError}}" {{DOMException}}.
             1. If |immersive| is `true`, set [=pending immersive session=] to `false`.
             1. Abort these steps.
+        1. Let |granted| be a [=/set=] obtained from |status|' {{XRPermissionStatus/granted}}.
         1. Let |session| be a [=new=] {{XRSession}} object in the [=relevant realm=] of this {{XRSystem}}.
-        1. [=Initialize the session=] with |session|, |mode|, and |device|.
+        1. [=Initialize the session=] with |session|, |mode|, |granted|, and |device|.
         1. Potentially set the [=active immersive session=] as follows:
             <dl class="switch">
               : If |immersive| is `true`:
@@ -641,11 +643,14 @@ Each {{XRSession}} has a <dfn for="XRSession">mode</dfn>, which is one of the va
 
 Each {{XRSession}} has an <dfn for=XRSession>animation frame</dfn>, which is an {{XRFrame}} initialized with [=XRFrame/active=] set to `false`, [=XRFrame/animationFrame=] set to `true`, and {{XRFrame/session}} set to the {{XRSession}}.
 
+Each {{XRSession}} has a <dfn for=XRSession>set of granted features</dfn>, which is a [=/set=] of {{DOMString}}s corresponding the the [=feature descriptors=] that have been granted to the {{XRSession}}.
+
 <div class="algorithm" data-algorithm="initialize-session">
 
-To <dfn>initialize the session</dfn>, given |session|, |mode|, and |device|, the user agent MUST run the following steps:
+To <dfn>initialize the session</dfn>, given |session|, |mode|, |granted|, and |device|, the user agent MUST run the following steps:
   1. Set |session|'s [=XRSession/mode=] to |mode|.
   1. Set |session|'s [=XRSession/XR device=] to |device|.
+  1. Set |session|'s [=XRSession/set of granted features=] to |granted|.
   1. [=Initialize the render state=].
   1. If no other features of the user agent have done so already, perform the necessary platform-specific steps to initialize the device's tracking and rendering capabilities, including showing any necessary instructions to the user.
 
@@ -1281,7 +1286,7 @@ When an {{XRReferenceSpace}} is requested with {{XRReferenceSpaceType}} |type| f
 <div class="algorithm" data-algorithm="reference-space-supported">
 To check if a <dfn>reference space is supported</dfn> for a given reference space type |type| and {{XRSession}} |session|, run the following steps:
 
-  1. If |type| is not [=list/contain|contained=] in |session|'s [=XRSession/XR device=]'s [=XR device/list of enabled features=] for [=XRSession/mode=] return `false`.
+  1. If |type| is not [=list/contain|contained=] in |session|'s [=XRSession/set of granted features=]'s return `false`.
   1. If |type| is {{viewer}}, return `true`.
   1. If |type| is {{local}} or {{local-floor}}, and |session| is an [=immersive session=], return `true`.
   1. If |type| is {{local}} or {{local-floor}}, and the [=XRSession/XR device=] supports reporting orientation data, return `true`.
@@ -2170,7 +2175,7 @@ When a user agent implements this specification it MUST set a <dfn>XR compatible
 
 Note: This flag introduces slow synchronous behavior and is discouraged. Consider calling {{WebGLRenderingContextBase/makeXRCompatible()}} instead for an asynchronous solution.
 
-The [=XR compatible=] boolean can be set either at context creation time or after context creation, potentially incurring a context loss. To set the [=XR compatible=] boolean at context creation time, the {{xrCompatible}} context creation attribute must be set to `true` when requesting a WebGL context.   If the requesting document's origin is not allowed to use the "xr-spatial-tracking" [[#permissions-policy|permissions policy]], {{xrCompatible}} has no effect.
+The [=XR compatible=] boolean can be set either at context creation time or after context creation, potentially incurring a context loss. To set the [=XR compatible=] boolean at context creation time, the {{xrCompatible}} context creation attribute must be set to `true` when requesting a WebGL context.   If the requesting document's [=origin=] is not allowed to use the "xr-spatial-tracking" [[#permissions-policy|permissions policy]], {{xrCompatible}} has no effect.
 
 
 The {{WebGLContextAttributes/xrCompatible}} flag on {{WebGLContextAttributes}}, if `true`, affects context creation by requesting the user-agent [=create the WebGL context=] using a [=compatible graphics adapter=] for the [=immersive XR device=]. If the user agent succeeds in this, the created context's [=XR compatible=] boolean will be set to true. To obtain the [=immersive XR device=], [=ensure an immersive XR device is selected=] SHOULD be called.
@@ -2201,7 +2206,7 @@ The <dfn method for="WebGLRenderingContextBase">makeXRCompatible()</dfn> method 
 
 When this method is invoked, the user agent MUST run the following steps:
 
-  1. If the requesting document's origin is not allowed to use the "xr-spatial-tracking" [[#permissions-policy|permissions policy]], [=/resolve=] |promise| and return it. <span class=note>When the XR permissions policy is disabled, we wish to behave as if there is no XR device in this case, since {{WebGLRenderingContextBase/makeXRCompatible()}} is supposed to be a set-and-forget method.</span>
+  1. If the requesting document's [=origin=] is not allowed to use the "xr-spatial-tracking" [[#permissions-policy|permissions policy]], [=/resolve=] |promise| and return it. <span class=note>When the XR permissions policy is disabled, we wish to behave as if there is no XR device in this case, since {{WebGLRenderingContextBase/makeXRCompatible()}} is supposed to be a set-and-forget method.</span>
   1. Let |promise| be [=a new Promise=] created in the [=Realm=] of this {{WebGLRenderingContextBase}}.
   1. Let |context| be [=this=].
   1. Run the following steps [=in parallel=]:
@@ -2397,7 +2402,7 @@ Event Types {#event-types}
 
 The user agent MUST provide the following new events. Registration for and firing of the events must follow the usual behavior of DOM4 Events.
 
-The user agent MUST fire a <dfn event for="XRSystem">devicechange</dfn> event on the {{XRSystem}} object to indicate that the availability of [=immersive XR device=]s has been changed unless the document's origin is not allowed to use the "xr-spatial-tracking" [[#permissions-policy|permissions policy]]. The event MUST be of type {{Event}}.
+The user agent MUST fire a <dfn event for="XRSystem">devicechange</dfn> event on the {{XRSystem}} object to indicate that the availability of [=immersive XR device=]s has been changed unless the document's [=origin=] is not allowed to use the "xr-spatial-tracking" [[#permissions-policy|permissions policy]]. The event MUST be of type {{Event}}.
 
 A user agent MUST dispatch a <dfn event for="XRSession">visibilitychange</dfn> event on an {{XRSession}} each time the [=XRSession/visibility state=] of the {{XRSession}} has changed. The event MUST be of type {{XRSessionEvent}}.
 
@@ -2452,7 +2457,7 @@ In some environments a page may be presented as an application, installed with t
 
 ### Implicit and Explicit consent ### {#user-consent}
 
-<dfn>Implicit consent</dfn> is when the user agent makes a judgement on the consent of a user without explicitly asking for it, for example, based on the install status of a web application or frequency and recency of visits. Given the sensitivity of XR data, caution is strongly advised when relying on implicit signals.
+<dfn>Implicit consent</dfn> is when the user agent makes a judgement on the consent of a user without explicitly asking for it, for example, based on the install status of a web application, frequency and recency of visits or a user agent defined action where the user clearly signals intent that they want to enter an immersive experience. Given the sensitivity of XR data, caution is strongly advised when relying on implicit signals.
 
 <dfn>Explicit consent</dfn> is when the user agent makes a judgement on the consent of a user based on having explicitly asked for it. When gathering [=explicit consent=], user agents present an explanation of what is being requested and provide users the option to decline. Requests for user consent can be presented in many visual forms based on the features being protected and user agent choice. Install status of a web application MAY count as a signal of [=explicit consent=] provided some form of [=explicit consent=] is requested at install time.
 
@@ -2696,7 +2701,7 @@ The feature identifier for this feature is `"xr-spatial-tracking"`.
 
 The [=default allowlist=] for this feature is `["self"]`.
 
-Note: If the document's origin is not allowed to use the `"xr-spatial-tracking"` [=permissions policy=] any [=immersive sessions=] will be blocked, because all [=immersive sessions=] require some use of spatial tracking. [=Inline sessions=] will still be allowed, but restricted to only using the {{XRReferenceSpaceType/"viewer"}} {{XRReferenceSpace}}.
+Note: If the document's [=origin=] is not allowed to use the `"xr-spatial-tracking"` [=permissions policy=] any [=immersive sessions=] will be blocked, because all [=immersive sessions=] require some use of spatial tracking. [=Inline sessions=] will still be allowed, but restricted to only using the {{XRReferenceSpaceType/"viewer"}} {{XRReferenceSpace}}.
 
 
 Permissions API Integration {#permissions}
@@ -2760,11 +2765,12 @@ To <dfn lt="request the xr permission">request the "xr" permission</dfn> with an
       1. If a clear signal of [=user intent=] to enable |feature| has not been determined, continue to the next entry.
       1. If |feature| is not in |granted|, append |feature| to |granted|.
   1. Set |status|'s {{XRPermissionStatus/granted}} to |granted|.
-  1. Set |device|'s [=list of enabled features=] for |mode| to |granted|.
+  1. Add all elements of |granted| to |device|'s [=set of granted features=] for |mode|.
   1. Set |status|'s {{PermissionStatus/state}} to {{PermissionState/"granted"}}.
 
 Note: The user agent has the freedom to batch up permissions prompts for all requested features when gauging if there is a clear signal of [=user intent=], but it is also allowed to show them one at a time.
 
+Note: When determining [=user intent=] for a web application, user agents must check that it was explicitly [=launching a web application|launched by the user=] as an web application. They must NOT just check if the [=origin=] matches that of an installed web application.
 </div>
 
 
@@ -2797,11 +2803,12 @@ To <dfn>resolve the requested features</dfn> given |requiredFeatures| and |optio
 
   1. Let |consentRequired| be an empty [=/list=] of {{DOMString}}.
   1. Let |consentOptional| be an empty [=/list=] of {{DOMString}}.
+  1. Let |granted| be an empty [=/list=] of {{DOMString}}.
   1. Let |device| be the result of [=obtain the current device|obtaining the current device=] for |mode|, |requiredFeatures|, and |optionalFeatures|.
-  1. Let |granted| be a [=/list=] of {{DOMString}} initialized to |device|'s [=XR device/list of enabled features=] for |mode|.
+  1. Let |previouslyEnabled| be |device|'s [=XR device/set of granted features=] for |mode|.
   1. If |device| is `null` or |device|'s [=list of supported modes=] does not [=list/contain=] |mode|, run the following steps:
     1. Return the [=tuple=] (|consentRequired|, |consentOptional|, |granted|)
-  1. Add every [=feature descriptor=] in the [=default features=] table associated with |mode| to the indicated feature list if it is not already present.
+  1. Add every [=feature descriptor=] in the [=default features=] table associated with |mode| to |granted| if it is not already present.
   1. For each |feature| in |requiredFeatures| perform the following steps:
     1. If the |feature| is `null`, [=continue=] to the next entry.
     1. If |feature| is not a valid [=feature descriptor=], perform the following steps:
@@ -2809,9 +2816,9 @@ To <dfn>resolve the requested features</dfn> given |requiredFeatures| and |optio
         1. If |s| is not a valid [=feature descriptor=] or is `undefined`, return `null`.
         1. Set |feature| to |s|.
     1. If |feature| is already in |granted|, continue to the next entry.
-    1. If the requesting document's origin is not allowed to use any [[#permissions-policy|permissions policy]] required by |feature| as indicated by the [=feature requirements=] table, return `null`.
+    1. If the requesting document's [=origin=] is not allowed to use any [[#permissions-policy|permissions policy]] required by |feature| as indicated by the [=feature requirements=] table, return `null`.
     1. If |session|'s [=XRSession/XR device=] is not [=capable of supporting=] the functionality described by |feature| or the user agent has otherwise determined to reject the feature, return `null`.
-    1. If the functionality described by |feature| requires [=explicit consent=], append it to |consentRequired|.
+    1. If the functionality described by |feature| requires [=explicit consent=] and |feature| is not in |previouslyEnabled|, append it to |consentRequired|.
     1. Else append |feature| to |granted|.
   1. For each |feature| in |optionalFeatures| perform the following steps:
     1. If the |feature| is `null`, [=continue=] to the next entry.
@@ -2822,7 +2829,7 @@ To <dfn>resolve the requested features</dfn> given |requiredFeatures| and |optio
     1. If |feature| is already in |granted|, continue to the next entry.
     1. If the requesting document's origin is not allowed to use any [[#permissions-policy|permissions policy]] required by |feature| as indicated by the [=feature requirements=] table, continue to the next entry.
     1. If |session|'s [=XRSession/XR device=] is not [=capable of supporting=] the functionality described by |feature| or the user agent has otherwise determined to reject the feature, continue to the next entry.
-    1. If the functionality described by |feature| requires [=explicit consent=], append it to |consentOptional|.
+    1. If the functionality described by |feature| requires [=explicit consent=] and |feature| is not in |previouslyEnabled|, append it to |consentOptional|.
     1. Else append |feature| to |granted|.
   1. Return the [=tuple=] `(|consentRequired|, |consentOptional|, |granted|)`
 

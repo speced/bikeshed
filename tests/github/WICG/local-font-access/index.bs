@@ -120,29 +120,26 @@ The API allows script to enumerate local fonts, including properties about each 
 The following code queries the available local fonts, and logs details about each to the console.
 
 ```js
-// Asynchronous Query and Iteration
-(async () => { // Async block
-  const status = await navigator.permissions.query({ name: "font-access" });
-  if (status.state === "denied")
-    throw new Error("Cannot enumerate local fonts");
-
+showLocalFontsButton.onclick = async function() {
+  // This sketch returns individual FontMetadata instances rather than families:
   // In the future, query() could take filters e.g. family name, and/or options
-  // e.g. locale.
-  const iterable = navigator.fonts.query();
-
+  // e.g. locale. A user agent can return all fonts, or show UI allowing selection
+  // of a subset of fonts.
   try {
-    // May prompt the user:
-    for await (const metadata of iterable) {
+    const array = await navigator.fonts.query();
+
+    array.forEach(metadata => {
       console.log(metadata.postscriptName);
       console.log(metadata.fullName);
       console.log(metadata.family);
-    }
-  } catch(e) {
-    // Handle error. It could be a permission error.
-    throw new Error(e);
+      console.log(metadata.family);
+      console.log(metadata.style);
+    });
+   } catch(e) {
+    // Handle error, e.g. user cancelled the operation.
+    console.warn(`Local font access not available: ${e.message}`);
   }
-}
-})();
+};
 ```
 </aside>
 
@@ -150,39 +147,41 @@ The following code queries the available local fonts, and logs details about eac
 ## Styling with local fonts ## {#example-style-with-local-fonts}
 <!-- ============================================================ -->
 
-Advanced creative tools may wish to use CSS to style text using all available local fonts. In this case, getting access to the local font name allows the user to select from a richer set of choices:
+Advanced creative tools can offer the ability to style text using all available local fonts. In this case, getting access to the local font name allows the user to select from a richer set of choices:
 
 <aside class=example id=example-query-build-ui>
 
 The following code populates a drop-down selection form element with the available local fonts, and could be used as part of the user interface for an editing application.
 
 ```js
-(async () => { // Async block
-  const status = await navigator.permissions.query({ name: "font-access" });
-  if (status.state === "denied")
-    throw new Error("Cannot continue to style with local fonts");
+useLocalFontsButton.onclick = async function() {
 
-  const exampleText = document.createElement("p");
-  exampleText.id = "exampleText";
-  exampleText.innerText = "The quick brown fox jumps over the lazy dog";
-  exampleText.style.fontFamily = "dynamic-font";
-
-  const textStyle = document.createElement("style");
-  const fontSelect = document.createElement("select");
-  fontSelect.onchange = e => {
-    console.log("selected:", fontSelect.value);
-    // An example of styling using @font-face src: local matching.
-    changeFontStyle(fontSelect.value);
-    textStyle.textContent = \`
-      @font-face {
-        font-family: "dynamic-font";
-        src: local("${postscriptName}");
-      }\`;
-  };
-
+  // Query for allowed local fonts.
   try {
-    // May prompt the user:
-    for await (const metadata of navigator.fonts.query()) {
+    // Query for allowed local fonts.
+    const array = await navigator.fonts.query();
+
+    // Create an element to style.
+    const exampleText = document.createElement("p");
+    exampleText.id = "exampleText";
+    exampleText.innerText = "The quick brown fox jumps over the lazy dog";
+    exampleText.style.fontFamily = "dynamic-font";
+
+    // Create a list of fonts to select from, and a selection handler.
+    const textStyle = document.createElement("style");
+    const fontSelect = document.createElement("select");
+    fontSelect.onchange = e => {
+      console.log("selected:", fontSelect.value);
+      // An example of styling using @font-face src: local matching.
+      textStyle.textContent = `
+        @font-face {
+          font-family: "dynamic-font";
+          src: local("${postscriptName}");
+        }`;
+    };
+
+    // Populate the list with the available fonts.
+    array.forEach(metadata => {
       const option = document.createElement("option");
       option.text = metadata.fullName;
       // postscriptName works well as an identifier of sorts.
@@ -191,16 +190,17 @@ The following code populates a drop-down selection form element with the availab
       // matching to be used to style elements.
       option.value = metadata.postscriptName;
       fontSelect.append(option);
-    }
+    });
+
+    // Add all of the elements to the page.
     document.body.appendChild(textStyle);
     document.body.appendChild(exampleText);
     document.body.appendChild(fontSelect);
   } catch(e) {
-    // Handle error. It could be a permission error.
-    throw new Error(e);
+    // Handle error, e.g. user cancelled the operation.
+    console.warn(`Local font access not available: ${e.message}`);
   }
-}
-})();
+};
 ```
 </aside>
 
@@ -217,17 +217,17 @@ The following code queries the available local fonts, and logs details about eac
 Here we use enumeration to access specific local font data; we can use this to parse out specific tables or feed it into, e.g., WASM version of [HarfBuzz](https://www.freedesktop.org/wiki/Software/HarfBuzz/) or [Freetype](https://www.freetype.org/):
 
 ```js
-(async () => { // Async block
-  const status = await navigator.permissions.query({ name: "font-access" });
-  if (status.state === "denied")
-    throw new Error("Cannot continue to style with local fonts");
-
+useLocalFontsButton.onclick = async function() {
+  // This sketch returns individual FontMetadata instances rather than families:
+  // In the future, query() could take filters e.g. family name, and/or options
+  // e.g. locale. A user agent can return all fonts, or show UI allowing selection
+  // of a subset of fonts.
   try {
-    // May prompt the user
-    for await (const metadata of navigator.fonts.query()) {
-      // 'blob()' returns a Blob containing valid and complete SFNT wrapped
-      // font data. See:
-      //    https://docs.microsoft.com/en-us/typography/opentype/spec/
+    const array = await navigator.fonts.query();
+
+    array.forEach(metadata => {
+      // blob() returns a Blob containing valid and complete SFNT
+      // wrapped font data.
       const sfnt = await metadata.blob();
 
       // Slice out only the bytes we need: the first 4 bytes are the SFNT
@@ -250,12 +250,41 @@ Here we use enumeration to access specific local font data; we can use this to p
     }
   } catch(e) {
     // Handle error. It could be a permission error.
-    throw new Error(e);
+    console.warn(`Local font access not available: ${e.message}`);
   }
-}
-})();
+};
 ```
+
+Parsing font files in more detail, for example enumerating the contained tables, is beyond the scope of this specification.
 </aside>
+
+
+Issue: Add example with {{QueryOptions/select}}.
+
+<!-- ============================================================ -->
+## Persistent access ## {#example-persistent-access}
+<!-- ============================================================ -->
+
+In the above examples, the `query()` call allows the user agent to prompt the user for access to some or all local fonts at the time of the call. For example, this could show a font picker interface allowing selection of fonts.
+
+Other scenarios would benefit from access to local fonts on an ongoing basis. For example, a web application could offer font selection UI showing both fonts provided by the web application's server as well as local fonts. Calling `query()` with `{persistentAccess:true}` will request a permission (`"font-access"`). If that permission is granted, then subsequent calls to `query()` with that option not prompt the user.
+
+```js
+// User activation is required.
+includeLocalFontsButton.onclick = async function() {
+  try {
+    const array = await navigator.fonts.query({persistentAccess: true});
+
+    // Was persistent access granted?
+    console.log('Expect granted: ' + (await navigator.permission.query('font-access')).state);
+
+  } catch(e) {
+    // Handle error. It could be a permission error.
+    console.warn(`Local font access not available: ${e.message}`);
+  }
+};
+```
+
 
 <!-- ============================================================ -->
 # Concepts # {#concepts}
@@ -286,8 +315,6 @@ A <dfn>font table</dfn> is an OpenType [[!OPENTYPE]] table.
 <div dfn-for="font table">
 
 A [=/font table=] has a <dfn>tag</dfn>, which is a {{ByteString}} of length 4, derived from the `Tag` of the table record.
-
-A [=/font table=] has <dfn>table bytes</dfn>, which are a [=/byte sequence=] corresponding to the table data.
 
 </div>
 
@@ -326,7 +353,7 @@ The <dfn for=PermissionName enum-value>"`font-access`"</dfn> [=/powerful feature
 
 
 <aside class=example id=example-request-permission>
-Permission to enumerate local fonts can be requested using the `navigator.permissions` API:
+Permission to enumerate local fonts can be queried using the `navigator.permissions` API:
 
 ```js
 const status = await navigator.permissions.query({ name: "font-access" });
@@ -349,8 +376,12 @@ else
 
 <div class="domintro note">
 
-: for await (const |metadata| of navigator . fonts . {{FontManager/query()}}) { ... }
-  :: Asynchronously iterate over the available fonts. Each time through the loop, |metadata| will be a new {{FontMetadata}} object.
+: await navigator . fonts . {{FontManager/query()}})
+  :: Asynchronously query for available/allowed fonts. The returned promise resolves to an array of {{FontMetadata}} objects.
+
+     If the `{persistentAccess}` option is true, the user will be prompted for permission for ongoing access to query fonts without further prompts. If the option is not passed, the user agent will prompt the user to select fonts.
+
+     If the `{select}` option is a non-empty array, then only fonts with matching PostScript names will be included in the results.
 
 </div>
 
@@ -374,69 +405,39 @@ The <dfn attribute for=NavigatorFonts>fonts</dfn> getter steps are to return [=/
 [SecureContext,
  Exposed=(Window,Worker)]
 interface FontManager {
-  FontIterator query();
+  Promise<sequence<FontMetadata>> query(QueryOptions options);
+};
+
+dictionary QueryOptions {
+  boolean persistentAccess = false;
+  sequence<DOMString> select = [];
 };
 </xmp>
 
 <div algorithm>
-The <dfn method for=FontManager>query()</dfn> method steps are:
-
-Issue: This is returning an async iterable; should it be defined using Promise jargon here?
-
-Issue: Do we want query() to implicitly request the permission?
+The <dfn method for=FontManager>query(|options|)</dfn> method steps are:
 
 1. Let |promise| be [=/a new promise=].
 1. If [=/this=]’s [=relevant settings object=]'s [=origin=] is an [=/opaque origin=], then [=/reject=] |promise| with a {{TypeError}}.
 1. Otherwise, run these steps [=in parallel=]:
-    1. Let |permission| be the result of [=requesting permission to use=] {{PermissionName/"font-access"}}.
-    1. If |permission| is not {{PermissionState/"granted"}}, then [=/reject=] |promise| with a "{{NotAllowedError}}" {{DOMException}}, and abort these steps.
-    1. [=/Resolve=] |promise| with a newly created {{FontIterator}}.
+    1. Let |select| be |options|' {{QueryOptions/"select"}} member.
+    1. If |options|' {{QueryOptions/"persistentAccess"}} member is true, then run these steps:
+        1. Let |permission| be the result of [=requesting permission to use=] {{PermissionName/"font-access"}}.
+        1. If |permission| is not {{PermissionState/"granted"}}, then [=/reject=] |promise| with a "{{NotAllowedError}}" {{DOMException}}, and abort these steps.
+        1. Let |fonts| be [=/list=] of all local fonts on the system.
+    1. Otherwise, let |fonts| be a [=/list=] of fonts on the system selected by the user.
+    1. Let |result| be an new [=/list=].
+    1. [=list/For each=] font |font| in |fonts|, run these steps:
+        1. Let |representation| be a [=/font representation=] for |font|.
+        1. Let |postscriptName| be |representation|'s [=font representation/name string=] 6 for \``en`\`.
+        1. If |select| is empty, or if |select| [=list/contains=] |postscriptName|, then [=list/append=] a new {{FontMetadata}} instance associated with |representation| to |result|.
+    1. Sort |list| in [=list/sort in ascending order|ascending order=] by using {{FontMetadata/postscriptName}} as the sort key and store the result as |list|.
+    1. [=/Resolve=] |promise| with |list|.
 1. Return |promise|.
 
-</div>
-
-<xmp class=idl>
-[SecureContext,
- Exposed=(Window,Worker)]
-interface FontIterator {
-  async iterable<FontMetadata>;
-};
-</xmp>
-
-All {{FontIterator}} objects contain an internal <dfn attribute for=FontIterator>\[[FontList]]</dfn> slot.
-
-<div algorithm>
-The <dfn iterator for=FontIterator>asynchronous iterator initialization steps</dfn> for {{FontIterator}} are as follows:
-
-1. Create a new empty [=/queue=], |temp queue|.
-1. For each local font |font| on the system, run these steps:
-    1. Let |representation| be a [=/font representation=] for |font|.
-    1. [=queue/Enqueue=] |representation| to |temp queue|.
-1. Sort |temp queue| in [=list/sort in ascending order|ascending order=] by using {{FontMetadata/postscriptName}} as the sort key and store the result as |temp queue|.
-1. Set [=/this=]'s {{FontIterator/[[FontList]]}} to a new empty [=/queue=].
-1. For each |representation| in |temp queue|, run these steps:
-    1. [=queue/Enqueue=] |representation| to [=/this=]'s {{FontIterator/[[FontList]]}}.
+Issue: Make "selected by the user" more spec-like.
 
 </div>
-
-Issue: Make it clear that the user agent can filter fonts and/or prompt the user to select a subset of system fonts.
-
-Note: User agents are expected to actually populate the iterator's queue asynchronously and possibly lazily, although this is not observable.
-
-<div algorithm>
-To <dfn iterator for=FontIterator>get the next iteration result</dfn> for {{FontIterator}}, run the following steps:
-
-1. Let |promise| be [=/a new promise=].
-1. If [=/this=]'s {{FontIterator/[[FontList]]}} is [=queue/empty=], then:
-    1. [=/Resolve=] |promise| with undefined.
-1. Otherwise:
-    1. Let |representation| be the result of [=queue/dequeuing=] from [=/this=]'s {{FontIterator/[[FontList]]}}.
-    1. Let |metadata| be a new {{FontMetadata}} instance associated with |representation|.
-    1. [=/Resolve=] |promise| with |metadata|.
-1. Return |promise|.
-
-</div>
-
 
 <!-- ============================================================ -->
 ## The {{FontMetadata}} interface ## {#fontmetadata-interface}
@@ -455,6 +456,9 @@ A {{FontMetadata}} provides details about a font face. Each {{FontMetadata}} has
     : |metadata| . {{FontMetadata/family}}
     :: The font family name. Example: "`Arial`"
 
+    : |metadata| . {{FontMetadata/style}}
+    :: The font style (or subfamily) name. Example: "`Regular`", "`Bold Italic`"
+
 </div>
 
 
@@ -466,6 +470,7 @@ interface FontMetadata {
   readonly attribute USVString postscriptName;
   readonly attribute USVString fullName;
   readonly attribute USVString family;
+  readonly attribute USVString style;
 };
 </xmp>
 
@@ -477,6 +482,8 @@ The <dfn attribute>fullName</dfn> getter steps are to return [=/this=]'s associa
 
 The <dfn attribute>family</dfn> getter steps are to return [=/this=]'s associated [=/font representation=]'s [=font representation/name string=] 1 for the [=/current language=].
 
+The <dfn attribute>style</dfn> getter steps are to return [=/this=]'s associated [=/font representation=]'s [=font representation/name string=] 2 for the [=/current language=].
+
 </div>
 
 <aside class=issue>
@@ -486,8 +493,6 @@ Verify source for all of the above. See [Microsoft Typography](https://docs.micr
 * Localization - we will provide "en-us"-equivalent labels here - define that behavior.
 
 </aside>
-
-Issue: Include `name` ID 2 (Font subfamily/style, e.g. "Regular", "Bold", etc.) as well?
 
 Issue: Include `name` ID 3 (Unique identifier) as well?
 
@@ -505,8 +510,6 @@ The <dfn method for=FontMetadata>blob()</dfn> method steps are:
 
 1. Let |promise| be [=/a new promise=].
 1. Run these steps [=in parallel=]:
-    1. Let |permission| be the result of [=requesting permission to use=] {{PermissionName/"font-access"}}.
-    1. If |permission| is not {{PermissionState/"granted"}}, then [=/reject=] |promise| with a "{{NotAllowedError}}" {{DOMException}}, and abort these steps.
     1. Let |blob| be a new {{Blob}} whose contents are [=this=]'s [=font representation/data bytes=] and {{Blob/type}} attribute is \``application/octet-stream`\`.
     1. [=/Resolve=] |promise| with |blob|.
 1. Return |promise|.
@@ -525,7 +528,7 @@ Issue: Document internationalization consideration, e.g. string localization
 
 The \``name`\` table in OpenType [[!OPENTYPE]] fonts allows names (family, subfamily, etc) to have multilingual strings, using either platform-specific numeric language identifiers or language-tag strings conforming to [[BCP47]]. For example, a font could have family name strings defined for both \``en`\` and \``zh-Hant-HK`\`.
 
-The {{FontMetadata}} properties {{FontMetadata/postscriptName}}, {{FontMetadata/fullName}}, and {{FontMetadata/family}} are provided by this API simply as strings, using the \``en`\` locale. This matches the behavior of the {{FontFace}} {{FontFace/family}} property.
+The {{FontMetadata}} properties {{FontMetadata/postscriptName}}, {{FontMetadata/fullName}}, {{FontMetadata/family}}, and {{FontMetadata/style}} are provided by this API simply as strings, using the \``en`\` locale. This matches the behavior of the {{FontFace}} {{FontFace/family}} property.
 
 Issue: The above does not match the spec/implementation. Resolve the ambiguity.
 
