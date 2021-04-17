@@ -803,7 +803,7 @@ styleSelflinks = """
     --selflink-bg: gray;
     --selflink-hover-text: black;
 }
-.heading, .issue, .note, .example, li, dt {
+.heading[id], .issue[id], .note[id], .example[id], li[id], dt[id] {
     position: relative;
 }
 a.self-link {
