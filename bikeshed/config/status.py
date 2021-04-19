@@ -225,6 +225,7 @@ megaGroups = {
             "webplatform",
             "webrtc",
             "webspecs",
+            "webtransport",
             "webvr",
             "wicg",
         ]
