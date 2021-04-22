@@ -7,6 +7,7 @@ from ..h import (
     removeNode,
     removeAttr,
     textContent,
+    parseHTML,
 )
 from ..messages import *
 
@@ -127,7 +128,7 @@ def appendTestList(
                 "lang": titleLang,
                 "dir": titleDir,
             },
-            title,
+            parseHTML(title),
         )
         appendChild(blockEl, titleEl)
     testListEl = E.ul({"class": "wpt-tests-list"})
