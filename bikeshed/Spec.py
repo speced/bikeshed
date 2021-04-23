@@ -226,6 +226,7 @@ class Spec:
         boilerplate.addAtRisk(self)
         addNoteHeaders(self)
         boilerplate.removeUnwantedBoilerplate(self)
+        wpt.processWptElements(self)
         shorthands.run(self)
         inlineTags.processTags(self)
         canonicalizeShortcuts(self)
@@ -236,7 +237,6 @@ class Spec:
         processIssuesAndExamples(self)
         idl.markupIDL(self)
         inlineRemoteIssues(self)
-        wpt.processWptElements(self)
         addImageSize(self)
 
         # Handle all the links
