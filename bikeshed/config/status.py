@@ -194,6 +194,7 @@ megaGroups = {
             "fxtf",
             "fxtf-csswg",
             "geolocation",
+            "gpuwg",
             "houdini",
             "html",
             "i18n",
