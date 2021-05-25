@@ -1370,6 +1370,17 @@ def cleanupHTML(doc):
             )
         if el.tag == "var":
             removeAttr(el, "data-var-ignore")
+        # Strip the control attributes
+        if el.tag == "pre":
+            removeAttr(
+                el,
+                "path",
+                "highlight",
+                "line-start",
+                "data-code-show",
+                "line-highlight",
+                "line-numbers",
+            )
         removeAttr(
             el,
             "bs-autolink-syntax",

@@ -123,16 +123,6 @@ def handleCodeInclude(el, doc):
                     # If manually overridden, leave it alone,
                     # but otherwise DWIM.
                     el.set("line-start", str(start))
-    # Strip the control attributes
-    removeAttr(
-        el,
-        "path",
-        "highlight",
-        "line-start",
-        "data-code-show",
-        "line-highlight",
-        "line-numbers",
-    )
     appendChild(el, *lines)
 
 
