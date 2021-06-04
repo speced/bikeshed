@@ -215,7 +215,7 @@ class ReferenceManager:
                 "date": "March 1997\n",
                 "status": "Best Current Practice\n",
                 "title": "Key words for use in RFCs to Indicate Requirement Levels\n",
-                "snapshot_url": "https://tools.ietf.org/html/rfc2119\n",
+                "snapshot_url": "https://www.rfc-editor.org/info/rfc2119\n",
                 "current_url": "\n",
                 "obsoletedBy": "\n",
                 "other": "\n",
