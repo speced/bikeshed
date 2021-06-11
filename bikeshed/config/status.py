@@ -221,6 +221,7 @@ megaGroups = {
             "webauthn",
             "webfontswg",
             "webml",
+            "webmlwg",
             "web-payments",
             "webperf",
             "webplatform",
@@ -268,6 +269,7 @@ w3cCgs = frozenset(
         "processcg",
         "ricg",
         "sacg",
+        "webml",
         "web-bluetooth-cg",
         "wicg",
     ]
