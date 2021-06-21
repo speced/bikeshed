@@ -439,34 +439,57 @@ I don't know how Docker works
 and this guide is based on a community member's experience,
 so use at your own risk.
 
-Typically, this requires login to the docker registry and pulling a Bikeshed image.
+For simplicity, docker-compose can be used to build a local bikeshed image,
+thus removing the need for installing python or building a custom image and
+pushing to a registry.
 
-    For some `<organization>` and some `<date>`:
+First, create a `.Dockerfile` which will import a python image and install bikeshed.
 
     ```
-    docker login
-    docker pull <organization>/bikeshed:<date>
+    FROM python:buster
+
+    RUN pip install bikeshed==<version>
+    RUN bikeshed update
+
+    ENTRYPOINT ["bikeshed"]
+    CMD ["--help"]
     ```
+    
+Replace `<version>` with a published release of bikeshed or remove it altogether to
+always install the latest available.
 
 Regardless of host environment's operating system, running Bikeshed from a docker image
 requires two things:
 - mapping a host directory to a path in the docker image (e.g. `/data`)
 - specifying the location of Bikeshed's input and output relative to the path in the docker image (i.e., `/data`)
+- using `docker-compose run` to execute bikeshed installed in the local image
 
-Example for a Unix host:
+   ```
+   version: "3"
+   services:
+     bikeshed:
+       build:
+         context: .
+         dockerfile: bs.Dockerfile
+       volumes:
+       - .:/data
+   ```
 
-    ```
-    docker run --rm -v $(pwd):/data <organization>/bikeshed:<date> bikeshed spec /data/<some *.bs file> [/data/<some output file>]
-    ```
+To run, use `docker-compose run`, and remember to adjust for the mapped volume path:
 
-Example for a Windows host:
-
-    ```
-    docker run --rm --volume C:\mystuff\project1\:/data <organization>/bikeshed:<date> spec /data/Index.bs /data/out/Index.html
-    ```
+   ```
+   docker-compose run bikeshed spec /data/<some *.bs file> [/data/<some output file>]
+   ```
+   
+Since the container is running a Linux system, the paths will be same regardless of the host operating system.
 
 Note that the [[#cli-options]] apply to running Bikeshed from a docker image.
 Since the Bikeshed docker image is read-only, it does not make sense to execute the Bikeshed `update` command from a docker image.
+Instead, the image has to be rebuilt with the `--no-cache` option, which will run `update` as a build step:
+
+   ```
+   docker-compose build --no-cache bikeshed
+   ```
 
 Global Options {#cli-options}
 -----------------------------
