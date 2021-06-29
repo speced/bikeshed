@@ -803,7 +803,7 @@ def dedupIDs(doc):
                     continue
             if el.get("data-silently-dedup") is not None:
                 warnAboutDupes = False
-            if dupeId.startswith("ref-for-"):
+            if dupeId.startswith("ref-for-") or dupeId.endswith("-dev"):
                 warnAboutDupes = False
             # Try to de-dup the id by appending an integer after it.
             if warnAboutDupes:

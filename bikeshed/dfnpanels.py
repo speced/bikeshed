@@ -45,7 +45,10 @@ def addDfnPanels(doc, dfns):
             for i, el in enumerate(els):
                 refID = el.get("id")
                 if refID is None:
-                    refID = f"ref-for-{id}"
+                    if hasAncestor(el, lambda x: hasClass(x, "domintro")):
+                        refID = f"{id}-dev"
+                    else:
+                        refID = f"ref-for-{id}"
                     el.set("id", safeID(doc, refID))
                 if i == 0:
                     appendChild(
