@@ -768,6 +768,15 @@ def safeID(transOrDoc, id):
     return id
 
 
+def generateAndSetRefID(id, el, doc):
+    if hasAncestor(el, lambda x: hasClass(x, "domintro")):
+        refID = f"{id}-dev"
+    else:
+        refID = f"ref-for-{id}"
+    el.set("id", safeID(doc, refID))
+    return refID
+
+
 def addOldIDs(els):
     for el in els:
         if not el.get("oldids"):

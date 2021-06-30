@@ -25,6 +25,7 @@ from .h import (
     findAll,
     fixupIDs,
     foldWhitespace,
+    generateAndSetRefID,
     hasAncestor,
     hasClass,
     hashContents,
@@ -1078,10 +1079,7 @@ def decorateAutolink(doc, el, linkType, linkText, ref):
     if el.get("id") is None:
         _, _, id = ref.url.partition("#")
         if id:
-            if hasAncestor(el, lambda x: hasClass(x, "domintro")):
-                el.set("id", f"{id}-dev")
-            else:
-                el.set("id", f"ref-for-{id}")
+            generateAndSetRefID(id, el, doc)
             el.set("data-silently-dedup", "")
 
     # Get all the values that the type expands to, add it as a title.

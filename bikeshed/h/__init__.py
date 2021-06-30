@@ -25,6 +25,7 @@ from .dom import (
     fixTypography,
     fixupIDs,
     foldWhitespace,
+    generateAndSetRefID,
     hasAncestor,
     hasAttr,
     hasAttrs,
