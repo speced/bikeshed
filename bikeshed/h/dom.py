@@ -782,6 +782,7 @@ def dedupIDs(doc):
     import itertools as iter
 
     ids = DefaultOrderedDict(list)
+    subdfns = DefaultOrderedDict(list)
     for el in findAll("[id]", doc):
         ids[el.get("id")].append(el)
     for dupeId, els in list(ids.items()):
@@ -794,6 +795,25 @@ def dedupIDs(doc):
             warnAboutDupes = False
         ints = iter.count(1)
         for el in els[1:]:
+            # Ensure a stable ID for any element with a subdfn attribute
+            if "subdfn" in el.attrib:
+                if subdfns[dupeId] is True:
+                    warn(
+                        "Multiple '{0}' elements with subdfn attribute."
+                        + " Ignoring subdfn for all but the first one found.",
+                        dupeId,
+                        el=el,
+                    )
+                else:
+                    subdfns[dupeId] = True
+                    earlierRef = find("#{}".format(dupeId), doc)
+                    # See if earlier element already got the ID this one needs
+                    if earlierRef is not None:
+                        # Change earlier element's ID to one with ⓪ appended
+                        altId = "{}{}".format(dupeId, "⓪")
+                        earlierRef.set("id", altId)
+                        ids[altId].append(earlierRef)
+                    continue
             # If I registered an alternate ID, try to use that.
             if el.get("data-alternate-id"):
                 altId = el.get("data-alternate-id")
