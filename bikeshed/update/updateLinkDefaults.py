@@ -9,7 +9,7 @@ def update(path, dryRun=False):
     try:
         say("Downloading link defaults...")
         data = requests.get(
-            "https://raw.githubusercontent.com/tabatkins/bikeshed/master/bikeshed/spec-data/readonly/link-defaults.infotree"
+            "https://raw.githubusercontent.com/tabatkins/bikeshed/main/bikeshed/spec-data/readonly/link-defaults.infotree"
         ).text
     except Exception as e:
         die("Couldn't download link defaults data.\n{0}", e)
