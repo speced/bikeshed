@@ -395,10 +395,10 @@ def transformDescdef(
                 lineNum=lineNum,
             )
             continue
-    for key, _ in vals.items():
+    for key, val in vals.items():
         if key in requiredKeys:
             continue
-        ret.append("<tr><th>{}:<td>{}".format(key, vals[key]))
+        ret.append("<tr><th>{}:<td>{}".format(key, val))
     ret.append("</table>")
 
     indent = getWsPrefix(firstLine)

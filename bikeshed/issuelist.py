@@ -1,3 +1,5 @@
+# pylint: disable=R1732
+
 import glob
 import re
 import sys

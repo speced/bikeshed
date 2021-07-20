@@ -63,7 +63,8 @@ class Font:
 
     def __init__(self, fontfilename=config.scriptPath("bigblocks.bsfont")):
         try:
-            lines = open(fontfilename, encoding="utf-8").readlines()
+            with open(fontfilename, encoding="utf-8") as fh:
+                lines = fh.readlines()
         except Exception as e:
             die("Couldn't find font file “{0}”:\n{1}", fontfilename, e)
         self.metadata, lines = parseMetadata(lines)
@@ -172,7 +173,8 @@ def getInputLines(inputFilename):
         if inputFilename == "-":
             lines = list(sys.stdin.readlines())
         else:
-            lines = open(inputFilename, encoding="utf-8").readlines()
+            with open(inputFilename, encoding="utf-8") as fh:
+                lines = fh.readlines()
     except FileNotFoundError:
         die(
             "Couldn't find the input file at the specified location '{0}'.",

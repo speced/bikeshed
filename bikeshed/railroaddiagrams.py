@@ -957,4 +957,5 @@ if __name__ == "__main__":
         </style>
         """
     )
-    exec(open("css-example.py-js").read())
+    with open("css-example.py-js") as fh:
+        exec(fh.read())

@@ -69,11 +69,13 @@ def fixupDataFiles():
     using the legacy files with the new code is quite bad!
     """
     try:
-        localVersion = int(open(localPath("version.txt")).read())
+        with open(localPath("version.txt")) as fh:
+            localVersion = int(fh.read())
     except OSError:
         localVersion = None
     try:
-        remoteVersion = int(open(remotePath("version.txt")).read())
+        with open(remotePath("version.txt")) as fh:
+            remoteVersion = int(fh.read())
     except OSError as err:
         warn("Couldn't check the datafile version. Bikeshed may be unstable.\n{0}", err)
         return

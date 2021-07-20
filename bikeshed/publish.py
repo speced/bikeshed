@@ -1,3 +1,5 @@
+# pylint: disable=R1732
+
 import logging
 import os
 import tarfile
