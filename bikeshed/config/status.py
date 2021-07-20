@@ -229,6 +229,7 @@ megaGroups = {
             "webspecs",
             "webtransport",
             "webvr",
+            "wecg",
             "wicg",
         ]
     ),
@@ -272,6 +273,7 @@ w3cCgs = frozenset(
         "sacg",
         "webml",
         "web-bluetooth-cg",
+        "wecg",
         "wicg",
     ]
 )
