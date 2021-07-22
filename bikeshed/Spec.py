@@ -314,6 +314,7 @@ class Spec:
             ).serialize(self.document)
         except Exception as e:
             die("{0}", e)
+            return
         rendered = finalHackyCleanup(rendered)
         return rendered
 

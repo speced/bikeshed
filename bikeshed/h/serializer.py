@@ -222,7 +222,7 @@ class Serializer:
         """
         if len(el) == 0 and dom.emptyText(el.text):
             return "empty", None
-        children = dom.childNodes(el)
+        children = dom.childNodes(el, clear=True)
         for child in children:
             if self.isElement(child) and self.isBlockElement(child.tag):
                 return "blocks", self._blocksFromChildren(children)
