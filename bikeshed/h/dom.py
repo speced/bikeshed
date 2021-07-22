@@ -144,16 +144,16 @@ def innerHTML(el):
     return (el.text or "") + "".join(tostring(x, encoding="unicode") for x in el)
 
 
-def outerHTML(el, literal=False):
+def outerHTML(el, literal=False, with_tail=False):
     if el is None:
         return ""
     if isinstance(el, str):
         return el
     if isinstance(el, list):
-        return "".join(map(outerHTML, el))
+        return "".join(outerHTML(x, with_tail=True) for x in el)
     if el.get("bs-autolink-syntax") is not None and not literal:
         return el.get("bs-autolink-syntax")
-    return tostring(el, with_tail=False, encoding="unicode")
+    return tostring(el, with_tail=with_tail, encoding="unicode")
 
 
 def serializeTag(el):
@@ -419,7 +419,23 @@ def childNodes(parentEl, clear=False, skipOddNodes=True):
     if it's false, there might be comments, PIs, etc.
     """
     if isinstance(parentEl, list):
-        return parentEl
+        ret = []
+        for c in parentEl:
+            if isinstance(c, str):
+                ret.append(c)
+                continue
+            if skipOddNodes and isOddNode(c):
+                pass
+            else:
+                ret.append(c)
+            if not emptyText(c.tail, wsAllowed=False):
+                ret.append(c.tail)
+                if clear:
+                    c.tail = None
+        if clear:
+            parentEl[:] = []
+        return ret
+
     ret = []
     if not emptyText(parentEl.text, wsAllowed=False):
         ret.append(parentEl.text)
