@@ -101,6 +101,7 @@ def extractHeaderInfo(lines, infilename):
     ed = None
     date = None
     cdate = None
+    intro = None
     for line in lines:
         match = re.match(r"(Draft|Title|Status|Date|ED):\s*(.*)", line)
         if match:
@@ -156,6 +157,10 @@ def extractHeaderInfo(lines, infilename):
         die("Missing 'ED' metadata.")
         return
 
+    match = re.search(r"^Intro:\s*(.*(\n^$|\n[ \t]+.*)*)", "".join(lines), re.M)
+    if match:
+        intro = match.group(1)
+
     return {
         "title": title,
         "date": date,
@@ -163,6 +168,7 @@ def extractHeaderInfo(lines, infilename):
         "ed": ed,
         "status": status,
         "url": url,
+        "intro": intro,
     }
 
 
@@ -173,7 +179,14 @@ Title:    CSS Foo Level 3 (Mandatory)
 Date:     YYYY-MM-DD (Optional if can be autodetected from the Draft's URL)
 Status:   CR/FPWD/LCWD/LS/Version/… (Optional if can be autodetected from the Draft's URL)
 ED:       https://url.to.the.editor.s/draft/ (Optional, defaults to a csswg editor's draft if shortname can be infered from the Draft's URL)
+Intro:    <p>Optional markup to be injected into the output document.
+          the intro can continue on multiple lines
+          as long as they're indented.
+
+          <p>Blank lines in the middle are fine.
+
 ... anything else you want here, except 4 dashes ...
+... this will not be included in the output ...
 
 ----
 Issue 1.
@@ -208,7 +221,9 @@ def printHeader(outfile, headerInfo):
 
 <p>Review document: <a href="{url}">{url}</a>
 
-<p>Editor's draft: <a href="{ed}">{ed}</a>
+<p>Editor's draft: <a href="{ed}">{ed}</a></p>
+
+{intro}
 
 <p>The following color coding convention is used for comments:</p>
 
