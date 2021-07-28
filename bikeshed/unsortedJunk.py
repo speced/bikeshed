@@ -553,7 +553,8 @@ def fillInterDocumentReferenceFromShepherd(doc, el, spec, section):
     el.tag = "a"
     el.set("href", heading["url"])
     if isEmpty(el):
-        el.text = "{spec} §{number} {text}".format(**heading)
+        appendChild(el, E.cite("{spec}".format(**heading)))
+        appendChild(el, " §\u202f{number} {text}".format(**heading))
     removeAttr(el, "data-link-spec", "spec-section")
 
 
@@ -569,7 +570,7 @@ def fillInterDocumentReferenceFromSpecref(doc, el, spec, section):
     el.tag = "a"
     el.set("href", bib.url + section)
     if isEmpty(el):
-        el.text = bib.title + " §" + section[1:]
+        el.text = bib.title + " §\u202f" + section[1:]
     removeAttr(el, "data-link-spec", "spec-section")
 
 
@@ -939,7 +940,8 @@ def processBiblioLinks(doc):
             if (
                 el.text == f"[{linkText}]"
             ):  # False if it's already been replaced by an author supplied text using the [[FOOBAR inline|custom text]] syntax.
-                replaceContents(el, ref.title)
+                clearContents(el)
+                appendChild(el, E.cite(ref.title))
             if ref.url is not None:
                 el.set("href", ref.url)
 

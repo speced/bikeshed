@@ -96,10 +96,11 @@ class BiblioEntry:
         ret.append(str)
 
         if self.url:
-            ret.append(E.a({"href": self.url}, self.title))
+            ret.append(E.a({"href": self.url}, E.cite(self.title)))
             ret.append(". ")
         else:
-            ret.append(self.title + ". ")
+            ret.append(E.cite(self.title))
+            ret.append(". ")
 
         str = ""
         if self.preferredURL == "current" and self.current_url:
