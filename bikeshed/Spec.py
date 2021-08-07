@@ -58,7 +58,7 @@ class Spec:
                 "No input file specified, and no *.bs or *.src.html files found in current directory.\nPlease specify an input file, or use - to pipe from STDIN."
             )
             return
-        self.inputSource = InputSource(inputFilename)
+        self.inputSource = InputSource(inputFilename, chroot=constants.chroot)
         self.transitiveDependencies = set()
         self.debug = debug
         self.token = token

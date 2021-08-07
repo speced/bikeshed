@@ -75,6 +75,18 @@ def main():
         choices=["nothing", "fatal", "link-error", "warning", "everything"],
         help="Determines what sorts of errors cause Bikeshed to die (quit immediately with an error status code). Default is 'fatal'; the -f flag is a shorthand for 'nothing'",
     )
+    argparser.add_argument(
+        "--allow-nonlocal-files",
+        dest="allowNonlocalFiles",
+        action="store_true",
+        help="Allows Bikeshed to see/include files from folders higher than the one your source document is in."
+    )
+    argparser.add_argument(
+        "--allow-execute",
+        dest="allowExecute",
+        action="store_true",
+        help="Allow some features to execute arbitrary code from outside the Bikeshed codebase."
+    )
 
     subparsers = argparser.add_subparsers(title="Subcommands", dest="subparserName")
 
@@ -444,6 +456,8 @@ def main():
             constants.printMode = "console"
     else:
         constants.printMode = options.printMode
+    constants.chroot = not options.allowNonlocalFiles
+    constants.executeCode = options.allowExecute
 
     update.fixupDataFiles()
     if options.subparserName == "update":

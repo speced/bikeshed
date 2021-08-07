@@ -4,6 +4,9 @@ import re
 
 import lxml
 
+from .. import constants
+from .. import messages
+
 
 def englishFromList(items, conjunction="or"):
     # Format a list of strings into an English list.
@@ -168,7 +171,19 @@ def flatten(arr):
 
 def scriptPath(*pathSegs):
     startPath = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-    return os.path.join(startPath, *pathSegs)
+    path = os.path.join(startPath, *pathSegs)
+    return path
+
+
+def chrootPath(chrootPath, path):
+    chrootPath = os.path.abspath(chrootPath)
+    path = os.path.abspath(path)
+    if not path.startswith(chrootPath):
+        messages.die(f"Attempted to access a file ({path}) outside the source document's directory ({chrootPath}). See --allow-nonlocal-files.")
+        raise Exception()
+    else:
+        return path
+
 
 
 def doEvery(s, action, lastTime=None):

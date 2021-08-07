@@ -63,7 +63,7 @@ defaultRequester = DataFileRequester(
 )
 
 
-def retrieveBoilerplateFile(doc, name, group=None, status=None, error=True):
+def retrieveBoilerplateFile(doc, name, group=None, status=None, error=True, allowLocal=True):
     # Looks in three or four locations, in order:
     # the folder the spec source is in, the group's boilerplate folder, the megagroup's boilerplate folder, and the generic boilerplate folder.
     # In each location, it first looks for the file specialized on status, and then for the generic file.
@@ -77,7 +77,7 @@ def retrieveBoilerplateFile(doc, name, group=None, status=None, error=True):
             status = doc.md.rawStatus
     megaGroup, status = splitStatus(status)
 
-    searchLocally = doc.md.localBoilerplate[name]
+    searchLocally = allowLocal and doc.md.localBoilerplate[name]
 
     def boilerplatePath(*segs):
         return scriptPath("boilerplate", *segs)
@@ -101,13 +101,13 @@ def retrieveBoilerplateFile(doc, name, group=None, status=None, error=True):
                 # We should remove this after giving specs time to react to the warning:
                 sources.append(doc.inputSource.relative(f))
     if group:
-        sources.append(InputSource(boilerplatePath(group, statusFile)))
-        sources.append(InputSource(boilerplatePath(group, genericFile)))
+        sources.append(InputSource(boilerplatePath(group, statusFile), chroot=False))
+        sources.append(InputSource(boilerplatePath(group, genericFile), chroot=False))
     if megaGroup:
-        sources.append(InputSource(boilerplatePath(megaGroup, statusFile)))
-        sources.append(InputSource(boilerplatePath(megaGroup, genericFile)))
-    sources.append(InputSource(boilerplatePath(statusFile)))
-    sources.append(InputSource(boilerplatePath(genericFile)))
+        sources.append(InputSource(boilerplatePath(megaGroup, statusFile), chroot=False))
+        sources.append(InputSource(boilerplatePath(megaGroup, genericFile), chroot=False))
+    sources.append(InputSource(boilerplatePath(statusFile), chroot=False))
+    sources.append(InputSource(boilerplatePath(genericFile), chroot=False))
 
     # Watch all the possible sources, not just the one that got used, because if
     # an earlier one appears, we want to rebuild.

@@ -13,6 +13,7 @@ import attr
 import requests
 import tenacity
 
+from . import config
 from .Line import Line
 
 
@@ -38,17 +39,17 @@ class InputSource:
     manager for temporarily switching to the directory of a file InputSource.
     """
 
-    def __new__(cls, sourceName: str):
+    def __new__(cls, sourceName: str, **kwargs):
         """Dispatches to the right subclass."""
         if cls != InputSource:
             # Only take control of calls to InputSource(...) itself.
             return super().__new__(cls)
 
         if sourceName == "-":
-            return StdinInputSource(sourceName)
+            return StdinInputSource(sourceName, **kwargs)
         if sourceName.startswith("https:"):
-            return UrlInputSource(sourceName)
-        return FileInputSource(sourceName)
+            return UrlInputSource(sourceName, **kwargs)
+        return FileInputSource(sourceName, **kwargs)
 
     @abstractmethod
     def __str__(self) -> str:
@@ -157,10 +158,16 @@ class UrlInputSource(InputSource):
 
 
 class FileInputSource(InputSource):
-    def __init__(self, sourceName: str):
+    def __init__(self, sourceName: str, *, chroot: bool, chrootPath: Optional[str] = None):
         self.sourceName = sourceName
+        self.chrootPath = chrootPath
         self.type = "file"
         self.content = None
+
+        if chroot and self.chrootPath is None:
+            self.chrootPath = self.directory()
+        if self.chrootPath is not None:
+            self.sourceName = config.chrootPath(self.chrootPath, self.sourceName)
 
     def __str__(self) -> str:
         return self.sourceName
@@ -179,7 +186,7 @@ class FileInputSource(InputSource):
         return os.path.dirname(os.path.abspath(self.sourceName))
 
     def relative(self, relativePath) -> FileInputSource:
-        return FileInputSource(os.path.join(self.directory(), relativePath))
+        return FileInputSource(os.path.join(self.directory(), relativePath), chroot=False, chrootPath=self.chrootPath)
 
     def cheaplyExists(self, relativePath) -> bool:
         return os.access(self.relative(relativePath).sourceName, os.R_OK)
