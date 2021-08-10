@@ -219,6 +219,7 @@ megaGroups = {
             "webapps",
             "webappsec",
             "webauthn",
+            "webediting",
             "webfontswg",
             "webml",
             "webmlwg",
