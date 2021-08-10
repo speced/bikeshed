@@ -4,7 +4,6 @@ import re
 
 import lxml
 
-from .. import constants
 from .. import messages
 
 
