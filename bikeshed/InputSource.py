@@ -158,7 +158,9 @@ class UrlInputSource(InputSource):
 
 
 class FileInputSource(InputSource):
-    def __init__(self, sourceName: str, *, chroot: bool, chrootPath: Optional[str] = None):
+    def __init__(
+        self, sourceName: str, *, chroot: bool, chrootPath: Optional[str] = None
+    ):
         self.sourceName = sourceName
         self.chrootPath = chrootPath
         self.type = "file"
@@ -186,7 +188,11 @@ class FileInputSource(InputSource):
         return os.path.dirname(os.path.abspath(self.sourceName))
 
     def relative(self, relativePath) -> FileInputSource:
-        return FileInputSource(os.path.join(self.directory(), relativePath), chroot=False, chrootPath=self.chrootPath)
+        return FileInputSource(
+            os.path.join(self.directory(), relativePath),
+            chroot=False,
+            chrootPath=self.chrootPath,
+        )
 
     def cheaplyExists(self, relativePath) -> bool:
         return os.access(self.relative(relativePath).sourceName, os.R_OK)

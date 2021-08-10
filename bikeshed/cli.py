@@ -79,13 +79,13 @@ def main():
         "--allow-nonlocal-files",
         dest="allowNonlocalFiles",
         action="store_true",
-        help="Allows Bikeshed to see/include files from folders higher than the one your source document is in."
+        help="Allows Bikeshed to see/include files from folders higher than the one your source document is in.",
     )
     argparser.add_argument(
         "--allow-execute",
         dest="allowExecute",
         action="store_true",
-        help="Allow some features to execute arbitrary code from outside the Bikeshed codebase."
+        help="Allow some features to execute arbitrary code from outside the Bikeshed codebase.",
     )
 
     subparsers = argparser.add_subparsers(title="Subcommands", dest="subparserName")

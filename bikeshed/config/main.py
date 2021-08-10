@@ -179,11 +179,12 @@ def chrootPath(chrootPath, path):
     chrootPath = os.path.abspath(chrootPath)
     path = os.path.abspath(path)
     if not path.startswith(chrootPath):
-        messages.die(f"Attempted to access a file ({path}) outside the source document's directory ({chrootPath}). See --allow-nonlocal-files.")
+        messages.die(
+            f"Attempted to access a file ({path}) outside the source document's directory ({chrootPath}). See --allow-nonlocal-files."
+        )
         raise Exception()
     else:
         return path
-
 
 
 def doEvery(s, action, lastTime=None):
