@@ -107,7 +107,7 @@ class InputSource:
 
 
 class StdinInputSource(InputSource):
-    def __init__(self, sourceName: str):
+    def __init__(self, sourceName: str, **kwargs):
         assert sourceName == "-"
         self.type = "stdin"
         self.sourceName = sourceName
@@ -121,7 +121,7 @@ class StdinInputSource(InputSource):
 
 
 class UrlInputSource(InputSource):
-    def __init__(self, sourceName: str):
+    def __init__(self, sourceName: str, **kwargs):
         assert sourceName.startswith("https:")
         self.sourceName = sourceName
         self.type = "url"
