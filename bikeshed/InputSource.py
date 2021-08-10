@@ -46,9 +46,9 @@ class InputSource:
             return super().__new__(cls)
 
         if sourceName == "-":
-            return StdinInputSource(sourceName, **kwargs)
+            return StdinInputSource(sourceName)
         if sourceName.startswith("https:"):
-            return UrlInputSource(sourceName, **kwargs)
+            return UrlInputSource(sourceName)
         return FileInputSource(sourceName, **kwargs)
 
     @abstractmethod
