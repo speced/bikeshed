@@ -1,3 +1,5 @@
+# pylint: disable=cyclic-import
+
 import base64
 import fnmatch
 import os
