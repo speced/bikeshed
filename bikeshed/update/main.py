@@ -6,6 +6,7 @@ from . import (
     manifest,
     updateBackRefs,
     updateBiblio,
+    updateBoilerplates,
     updateCanIUse,
     updateCrossRefs,
     updateLanguages,
@@ -20,6 +21,7 @@ def update(
     anchors=False,
     backrefs=False,
     biblio=False,
+    boilerplate=False,
     caniuse=False,
     linkDefaults=False,
     mdn=False,
@@ -42,13 +44,14 @@ def update(
     if force:
         # fmt: off
         # If all are False, update everything
-        if anchors == backrefs == biblio == caniuse == linkDefaults == mdn == testSuites == languages == wpt == False:  # noqa: E712
-            anchors = backrefs =  biblio =  caniuse =  linkDefaults =  mdn =  testSuites =  languages =  wpt =  True  # noqa: E222
+        if anchors == backrefs == biblio == boilerplate == caniuse == linkDefaults == mdn == testSuites == languages == wpt == False:  # noqa: E712
+            anchors = backrefs =  biblio =  boilerplate =  caniuse =  linkDefaults =  mdn =  testSuites =  languages =  wpt =  True  # noqa: E222
 
         touchedPaths = {
             "anchors": updateCrossRefs.update(path=path, dryRun=dryRun) if anchors else None,
             "backrefs": updateBackRefs.update(path=path, dryRun=dryRun) if backrefs else None,
             "biblio": updateBiblio.update(path=path, dryRun=dryRun) if biblio else None,
+            "boilerplate": updateBoilerplates.update(path=path, dryRun=dryRun) if boilerplate else None,
             "caniuse": updateCanIUse.update(path=path, dryRun=dryRun) if caniuse else None,
             "mdn": updateMdn.update(path=path, dryRun=dryRun) if mdn else None,
             "linkDefaults": updateLinkDefaults.update(path=path, dryRun=dryRun) if linkDefaults else None,

@@ -17,6 +17,10 @@ class DataFileRequester:
         # fallback is another requester, used if the main one fails.
         self.fallback = fallback
 
+    def path(self, *segs, **kwargs):
+        fileType = kwargs.get("type", self.type)
+        return self._buildPath(segs=segs, fileType=fileType)
+
     def fetch(self, *segs, **kwargs):
         str = kwargs.get("str", False)
         okayToFail = kwargs.get("okayToFail", False)
@@ -64,12 +68,17 @@ defaultRequester = DataFileRequester(
 
 
 def retrieveBoilerplateFile(
-    doc, name, group=None, status=None, error=True, allowLocal=True
+    doc, name, group=None, status=None, error=True, allowLocal=True, fileRequester=None,
 ):
     # Looks in three or four locations, in order:
     # the folder the spec source is in, the group's boilerplate folder, the megagroup's boilerplate folder, and the generic boilerplate folder.
     # In each location, it first looks for the file specialized on status, and then for the generic file.
     # Filenames must be of the format NAME.include or NAME-STATUS.include
+    if fileRequester is None:
+        dataFile = doc.dataFile
+    else:
+        dataFile = fileRequester
+
     if group is None and doc.md.group is not None:
         group = doc.md.group.lower()
     if status is None:
@@ -82,7 +91,7 @@ def retrieveBoilerplateFile(
     searchLocally = allowLocal and doc.md.localBoilerplate[name]
 
     def boilerplatePath(*segs):
-        return scriptPath("boilerplate", *segs)
+        return dataFile.path("boilerplate", *segs)
 
     statusFile = f"{name}-{status}.include"
     genericFile = f"{name}.include"

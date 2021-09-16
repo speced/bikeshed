@@ -259,6 +259,9 @@ def main():
         "--biblio", action="store_true", help="Download biblio data."
     )
     updateParser.add_argument(
+        "--boilerplate", action="store_true", help="Download boilerplate files."
+    )
+    updateParser.add_argument(
         "--caniuse", action="store_true", help="Download Can I Use... data."
     )
     updateParser.add_argument(
@@ -493,6 +496,7 @@ def handleUpdate(options):
         anchors=options.anchors,
         backrefs=options.backrefs,
         biblio=options.biblio,
+        boilerplate=options.boilerplate,
         caniuse=options.caniuse,
         mdn=options.mdn,
         linkDefaults=options.linkDefaults,
