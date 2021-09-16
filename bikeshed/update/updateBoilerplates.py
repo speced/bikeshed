@@ -43,7 +43,7 @@ def update(path, dryRun=False):
 
 def pathsFromManifest(manifest):
     lines = manifest.split("\n")[1:]
-    return [l.partition(" ")[2] for l in lines if l != ""]
+    return [line.partition(" ")[2] for line in lines if line != ""]
 
 
 async def updateFiles(localPrefix, newPaths):
