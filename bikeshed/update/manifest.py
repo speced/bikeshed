@@ -31,6 +31,7 @@ knownFiles = [
 knownFolders = [
     "anchors",
     "biblio",
+    "boilerplate",
     "caniuse",
     "headings",
     "mdn",
