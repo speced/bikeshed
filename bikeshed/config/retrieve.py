@@ -68,7 +68,13 @@ defaultRequester = DataFileRequester(
 
 
 def retrieveBoilerplateFile(
-    doc, name, group=None, status=None, error=True, allowLocal=True, fileRequester=None,
+    doc,
+    name,
+    group=None,
+    status=None,
+    error=True,
+    allowLocal=True,
+    fileRequester=None,
 ):
     # Looks in three or four locations, in order:
     # the folder the spec source is in, the group's boilerplate folder, the megagroup's boilerplate folder, and the generic boilerplate folder.

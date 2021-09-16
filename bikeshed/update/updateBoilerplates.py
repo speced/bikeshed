@@ -12,6 +12,7 @@ from ..messages import *
 
 ghPrefix = "https://raw.githubusercontent.com/tabatkins/bikeshed-boilerplate/master/"
 
+
 def update(path, dryRun=False):
     try:
         say("Downloading boilerplates...")
