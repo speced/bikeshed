@@ -1102,7 +1102,7 @@ def processIssuesAndExamples(doc):
             elif doc.md.issueTrackerTemplate:
                 remoteIssueURL = doc.md.issueTrackerTemplate.format(remoteIssueID)
             if remoteIssueURL:
-                appendChild(el, " ", E.a({"href": remoteIssueURL}, "<" + remoteIssueURL + ">"))
+                appendChild(el, " ", E.a({"href": remoteIssueURL}, "[Issue #" + remoteIssueID + "]"))
     for el in findAll(".example:not([id])", doc):
         el.set("id", safeID(doc, "example-" + hashContents(el)))
     fixupIDs(doc, findAll(".issue, .example", doc))
