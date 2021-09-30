@@ -47,9 +47,7 @@ dfnClassToType = {
 
 dfnTypes = frozenset(list(dfnClassToType.values()) + ["dfn"])
 maybeTypes = frozenset(["value", "type", "at-rule", "function", "selector"])
-cssTypes = frozenset(
-    ["property", "value", "at-rule", "descriptor", "type", "function", "selector"]
-)
+cssTypes = frozenset(["property", "value", "at-rule", "descriptor", "type", "function", "selector"])
 markupTypes = frozenset(["element", "element-attr", "element-state", "attr-value"])
 idlTypes = frozenset(
     [
@@ -76,14 +74,10 @@ idlTypes = frozenset(
         "setlike",
     ]
 )
-idlNameTypes = frozenset(
-    ["interface", "namespace", "dictionary", "enum", "typedef", "callback"]
-)
+idlNameTypes = frozenset(["interface", "namespace", "dictionary", "enum", "typedef", "callback"])
 functionishTypes = frozenset(["function", "method", "constructor", "stringifier"])
 idlMethodTypes = frozenset(["method", "constructor", "stringifier", "idl", "idl-name"])
-linkTypes = dfnTypes | frozenset(
-    ["propdesc", "functionish", "idl", "idl-name", "element-sub", "maybe", "biblio"]
-)
+linkTypes = dfnTypes | frozenset(["propdesc", "functionish", "idl", "idl-name", "element-sub", "maybe", "biblio"])
 typesUsingFor = frozenset(
     [
         "descriptor",
@@ -126,9 +120,7 @@ typesNotUsingFor = frozenset(
 )
 assert not (typesUsingFor & typesNotUsingFor)
 lowercaseTypes = (
-    cssTypes
-    | markupTypes
-    | frozenset(["propdesc", "element-sub", "maybe", "dfn", "grammar", "http-header"])
+    cssTypes | markupTypes | frozenset(["propdesc", "element-sub", "maybe", "dfn", "grammar", "http-header"])
 )
 
 
@@ -141,8 +133,7 @@ linkTypeToDfnType = {
     "maybe": maybeTypes,
     "dfn": frozenset(["dfn"]),
     "biblio": frozenset(["biblio"]),
-    "codelike": frozenset(["element", "element-attr", "element-state", "attr-value"])
-    | idlTypes,
+    "codelike": frozenset(["element", "element-attr", "element-state", "attr-value"]) | idlTypes,
     "all": linkTypes,
 }
 for dfnType in dfnClassToType.values():

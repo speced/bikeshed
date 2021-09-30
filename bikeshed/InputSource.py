@@ -158,9 +158,7 @@ class UrlInputSource(InputSource):
 
 
 class FileInputSource(InputSource):
-    def __init__(
-        self, sourceName: str, *, chroot: bool, chrootPath: Optional[str] = None
-    ):
+    def __init__(self, sourceName: str, *, chroot: bool, chrootPath: Optional[str] = None):
         self.sourceName = sourceName
         self.chrootPath = chrootPath
         self.type = "file"

@@ -22,9 +22,7 @@ def update(path, dryRun=False):
         )
         res = shepherd.get("test_suites")
         if (not res) or (res.status_code == 406):
-            die(
-                "This version of the test suite API is no longer supported. Please update Bikeshed."
-            )
+            die("This version of the test suite API is no longer supported. Please update Bikeshed.")
             return
         if res.content_type not in testSuiteDataContentTypes:
             die("Unrecognized test suite content-type '{0}'.", res.content_type)
@@ -52,12 +50,8 @@ def update(path, dryRun=False):
 
     if not dryRun:
         try:
-            with open(
-                os.path.join(path, "test-suites.json"), "w", encoding="utf-8"
-            ) as f:
-                f.write(
-                    json.dumps(testSuites, ensure_ascii=False, indent=2, sort_keys=True)
-                )
+            with open(os.path.join(path, "test-suites.json"), "w", encoding="utf-8") as f:
+                f.write(json.dumps(testSuites, ensure_ascii=False, indent=2, sort_keys=True))
         except Exception as e:
             die("Couldn't save test-suite database to disk.\n{0}", e)
     say("Success!")

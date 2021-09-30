@@ -28,9 +28,7 @@ def addDfnPanels(doc, dfns):
             # Just insert a self-link instead
             # unless it already has a self-link, of course
             if find(".self-link", dfn) is None:
-                appendChild(
-                    dfn, E.a({"href": "#" + escapeUrlFrag(id), "class": "self-link"})
-                )
+                appendChild(dfn, E.a({"href": "#" + escapeUrlFrag(id), "class": "self-link"}))
             continue
         addClass(dfn, "dfn-paneled")
         atLeastOnePanel = True

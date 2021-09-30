@@ -135,13 +135,7 @@ class Serializer:
             if attrVal == "":
                 strs.append(" " + self.unfuckName(attrName))
             else:
-                strs.append(
-                    " "
-                    + self.unfuckName(attrName)
-                    + '="'
-                    + dom.escapeAttr(attrVal)
-                    + '"'
-                )
+                strs.append(" " + self.unfuckName(attrName) + '="' + dom.escapeAttr(attrVal) + '"')
         strs.append(">")
         write("".join(strs))
 
@@ -173,9 +167,7 @@ class Serializer:
     def justWS(self, block):
         if self.isElement(block):
             return False
-        return (
-            len(block) == 1 and not self.isElement(block[0]) and block[0].strip() == ""
-        )
+        return len(block) == 1 and not self.isElement(block[0]) and block[0].strip() == ""
 
     def _writeVoidElement(self, tag, el, write, indent):
         write(" " * indent)
@@ -185,9 +177,7 @@ class Serializer:
         self.startTag(tag, el, write)
         for node in dom.childNodes(el):
             if self.isElement(node):
-                raise Exception(
-                    f"Somehow a CDATA element got an element child:\n{dom.outerHTML(el)}"
-                )
+                raise Exception(f"Somehow a CDATA element got an element child:\n{dom.outerHTML(el)}")
             else:
                 write(node)
         self.endTag(tag, write)
@@ -211,9 +201,7 @@ class Serializer:
         self.endTag(tag, write)
 
     def _blocksFromChildren(self, children):
-        return [
-            block for block in self.groupIntoBlocks(children) if not self.justWS(block)
-        ]
+        return [block for block in self.groupIntoBlocks(children) if not self.justWS(block)]
 
     def _categorizeBlockChildren(self, el):
         """

@@ -85,9 +85,7 @@ async def updateFile(localPrefix, filePath, session):
     if res.is_ok():
         res = await saveFile(localPath, res.ok())
     else:
-        warn(
-            f"Error downloading {filePath}, full error was:\n{await errorFromAsyncErr(res)}"
-        )
+        warn(f"Error downloading {filePath}, full error was:\n{await errorFromAsyncErr(res)}")
     if res.is_err():
         res = Err(filePath)
     return res

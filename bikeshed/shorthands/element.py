@@ -58,9 +58,7 @@ class ElementShorthand:
 
     def respondEnd(self):
         if self.escapedText:
-            return steps.Success(
-                skips=["<"], nodes=[self.escapedText[1:], *self.linkText, "}>"]
-            )
+            return steps.Success(skips=["<"], nodes=[self.escapedText[1:], *self.linkText, "}>"])
 
         self.bsAutolink += "}>"
 

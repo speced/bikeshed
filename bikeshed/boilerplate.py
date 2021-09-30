@@ -57,9 +57,7 @@ def addBikeshedVersion(doc):
         )
     except Exception:
         # Not in Bikeshed's repo, so instead grab from the datafile.
-        bikeshedVersion = doc.dataFile.fetch(
-            "bikeshed-version.txt", type="readonly", str=True
-        ).strip()
+        bikeshedVersion = doc.dataFile.fetch("bikeshed-version.txt", type="readonly", str=True).strip()
     appendChild(doc.head, E.meta({"name": "generator", "content": bikeshedVersion}))
 
 
@@ -89,9 +87,7 @@ def addSpecVersion(doc):
         # Check for a Git repo
         with open(os.devnull, "wb") as fnull:
             revision = (
-                subprocess.check_output(
-                    "git rev-parse HEAD", stderr=fnull, shell=True, cwd=source_dir
-                )
+                subprocess.check_output("git rev-parse HEAD", stderr=fnull, shell=True, cwd=source_dir)
                 .decode(encoding="utf-8")
                 .strip()
             )
@@ -112,22 +108,12 @@ def addSpecVersion(doc):
         except subprocess.CalledProcessError:
             pass
     if revision:
-        appendChild(
-            doc.head, E.meta({"name": "document-revision", "content": revision})
-        )
+        appendChild(doc.head, E.meta({"name": "document-revision", "content": revision}))
 
 
 def addHeaderFooter(doc):
-    header = (
-        config.retrieveBoilerplateFile(doc, "header")
-        if "header" in doc.md.boilerplate
-        else ""
-    )
-    footer = (
-        config.retrieveBoilerplateFile(doc, "footer")
-        if "footer" in doc.md.boilerplate
-        else ""
-    )
+    header = config.retrieveBoilerplateFile(doc, "header") if "header" in doc.md.boilerplate else ""
+    footer = config.retrieveBoilerplateFile(doc, "footer") if "footer" in doc.md.boilerplate else ""
 
     doc.html = "\n".join([header, doc.html, footer])
 
@@ -297,17 +283,12 @@ def addBikeshedBoilerplate(doc):
 
 
 def addIndexSection(doc):
-    if (
-        len(findAll(config.dfnElementsSelector, doc)) == 0
-        and len(list(doc.externalRefsUsed.keys())) == 0
-    ):
+    if len(findAll(config.dfnElementsSelector, doc)) == 0 and len(list(doc.externalRefsUsed.keys())) == 0:
         return
     container = getFillContainer("index", doc=doc, default=True)
     if container is None:
         return
-    appendChild(
-        container, E.h2({"class": "no-num no-ref", "id": safeID(doc, "index")}, "Index")
-    )
+    appendChild(container, E.h2({"class": "no-num no-ref", "id": safeID(doc, "index")}, "Index"))
 
     if len(findAll(config.dfnElementsSelector, doc)) > 0:
         addIndexOfLocallyDefinedTerms(doc, container)
@@ -420,9 +401,7 @@ def addExplicitIndexes(doc):
                 export = False
             else:
                 die(
-                    "Unknown export value '{}' (should be boolish) on {}".format(
-                        exportVal, outerHTML(el)
-                    ),
+                    "Unknown export value '{}' (should be boolish) on {}".format(exportVal, outerHTML(el)),
                     el=el,
                 )
                 export = None
@@ -431,9 +410,7 @@ def addExplicitIndexes(doc):
 
         # Initial filter of the ref database according to the <index> parameters
         possibleRefs = []
-        for ref in doc.refs.queryAllRefs(
-            dedupURLs=False, latestOnly=False, ignoreObsoletes=False
-        ):
+        for ref in doc.refs.queryAllRefs(dedupURLs=False, latestOnly=False, ignoreObsoletes=False):
             ref.text = re.sub(r"\s{2,}", " ", ref.text.strip())
             if export is not None and ref.export != export:
                 continue
@@ -489,8 +466,7 @@ def addExplicitIndexes(doc):
             refs = refUtils.filterOldVersions(refs)
             if refs:
                 filteredRefs[ttf[0]].extend(
-                    {"url": ref.url, "disambiguator": disambiguator(ref, types, specs)}
-                    for ref in refs
+                    {"url": ref.url, "disambiguator": disambiguator(ref, types, specs)} for ref in refs
                 )
 
         appendChild(el, htmlFromIndexTerms(filteredRefs))
@@ -557,9 +533,7 @@ def addIndexOfExternallyDefinedTerms(doc, container):
             continue
         elsFromHref[href].append(a)
     atLeastOnePanel = False
-    for spec, refGroups in sorted(
-        doc.externalRefsUsed.items(), key=lambda x: x[0].upper()
-    ):
+    for spec, refGroups in sorted(doc.externalRefsUsed.items(), key=lambda x: x[0].upper()):
         # ref.spec is always lowercase; if the same string shows up in biblio data,
         # use its casing instead.
         biblioRef = doc.refs.getBiblioRef(spec, quiet=True)
@@ -710,14 +684,7 @@ def addPropertyIndex(doc):
                 {"class": "big-element-wrapper"},
                 E.table(
                     {"class": "index"},
-                    E.thead(
-                        E.tr(
-                            *[
-                                E.th({"scope": "col"}, formatColumnName(column))
-                                for column in columns
-                            ]
-                        )
-                    ),
+                    E.thead(E.tr(*[E.th({"scope": "col"}, formatColumnName(column)) for column in columns])),
                     E.tbody(*[createRow(prop, "property") for prop in props]),
                 ),
             ),
@@ -760,17 +727,8 @@ def addPropertyIndex(doc):
                     {"class": "big-element-wrapper"},
                     E.table(
                         {"class": "index"},
-                        E.thead(
-                            E.tr(
-                                *[E.th({"scope": "col"}, column) for column in columns]
-                            )
-                        ),
-                        E.tbody(
-                            *[
-                                createRow(desc, "descriptor", for_=atRuleName)
-                                for desc in descs
-                            ]
-                        ),
+                        E.thead(E.tr(*[E.th({"scope": "col"}, column) for column in columns])),
+                        E.tbody(*[createRow(desc, "descriptor", for_=atRuleName) for desc in descs]),
                     ),
                 ),
             )
@@ -837,9 +795,7 @@ def addTOCSection(doc):
     previousLevel = 1
     containers = [0, 1, 2, 3, 4, 5, 6, 7]
     containers[1] = toc
-    containers[2] = appendChild(
-        containers[1], E.ol({"class": "toc", "role": "directory"})
-    )
+    containers[2] = appendChild(containers[1], E.ol({"class": "toc", "role": "directory"}))
     for header in findAll("h2, h3, h4, h5, h6", doc):
         level = int(header.tag[-1])
         container = containers[level]
@@ -929,9 +885,7 @@ def addSpecMetadataSection(doc):
             appendChild(dd, E.span({"class": "p-name fn"}, editor["name"]))
         if editor["org"]:
             if editor["orglink"]:
-                el = E.a(
-                    {"class": "p-org org", "href": editor["orglink"]}, editor["org"]
-                )
+                el = E.a({"class": "p-org org", "href": editor["orglink"]}, editor["org"])
             else:
                 el = E.span({"class": "p-org org"}, editor["org"])
             appendChild(dd, " (", el, ")")
@@ -978,9 +932,7 @@ def addSpecMetadataSection(doc):
                 ),
             )
         if name:
-            return E.a(
-                {"href": url, "hreflang": lang, "rel": "alternate", "title": lang}, name
-            )
+            return E.a({"href": url, "hreflang": lang, "rel": "alternate", "title": lang}, name)
         return E.a({"href": url, "hreflang": lang, "rel": "alternate"}, lang)
 
     def printPreviousVersion(v):
@@ -992,26 +944,20 @@ def addSpecMetadataSection(doc):
             key = doc.md.vshortname
         dated = doc.refs.getLatestBiblioRef(key)
         if not dated:
-            die(
-                f"While trying to generate a Previous Version line, couldn't find a dated biblio reference for {key}."
-            )
+            die(f"While trying to generate a Previous Version line, couldn't find a dated biblio reference for {key}.")
             return
         return E.a({"href": dated.url, "rel": "prev"}, dated.url)
 
     md = DefaultOrderedDict(list)
     mac = doc.macros
     if "version" in mac:
-        md["This version"].append(
-            E.a({"href": mac["version"], "class": "u-url"}, mac["version"])
-        )
+        md["This version"].append(E.a({"href": mac["version"], "class": "u-url"}, mac["version"]))
     if doc.md.TR:
         md["Latest published version"].append(E.a({"href": doc.md.TR}, doc.md.TR))
     if doc.md.ED and doc.md.status in config.snapshotStatuses:
         md["Editor's Draft"].append(E.a({"href": doc.md.ED}, doc.md.ED))
     if doc.md.previousVersions:
-        md["Previous Versions"] = [
-            printPreviousVersion(ver) for ver in doc.md.previousVersions
-        ]
+        md["Previous Versions"] = [printPreviousVersion(ver) for ver in doc.md.previousVersions]
     if doc.md.versionHistory:
         md["Version History"] = [E.a({"href": vh}, vh) for vh in doc.md.versionHistory]
     if doc.md.mailingList:
@@ -1042,20 +988,14 @@ def addSpecMetadataSection(doc):
             )
         md["Feedback"].append(span)
     if doc.md.implementationReport is not None:
-        md["Implementation Report"].append(
-            E.a({"href": doc.md.implementationReport}, doc.md.implementationReport)
-        )
+        md["Implementation Report"].append(E.a({"href": doc.md.implementationReport}, doc.md.implementationReport))
     if doc.md.testSuite is not None:
         md["Test Suite"].append(E.a({"href": doc.md.testSuite}, doc.md.testSuite))
-    elif (doc.md.vshortname in doc.testSuites) and (
-        doc.testSuites[doc.md.vshortname]["url"] is not None
-    ):
+    elif (doc.md.vshortname in doc.testSuites) and (doc.testSuites[doc.md.vshortname]["url"] is not None):
         url = doc.testSuites[doc.md.vshortname]["url"]
         md["Test Suite"].append(E.a({"href": url}, url))
     if doc.md.issues:
-        md["Issue Tracking"] = [
-            E.a({"href": href}, text) for text, href in doc.md.issues
-        ]
+        md["Issue Tracking"] = [E.a({"href": href}, text) for text, href in doc.md.issues]
     if doc.md.editors:
         md["Editor"] = list(map(printEditor, doc.md.editors))
     if doc.md.previousEditors:
@@ -1105,9 +1045,7 @@ def addSpecMetadataSection(doc):
             "Previous Version": "Previous Versions",
             "Test Suite": "Test Suites",
             doc.md.editorTerm["singular"]: doc.md.editorTerm["plural"],
-            "Former "
-            + doc.md.editorTerm["singular"]: "Former "
-            + doc.md.editorTerm["plural"],
+            "Former " + doc.md.editorTerm["singular"]: "Former " + doc.md.editorTerm["plural"],
         }
         if len(vals) > 1 and displayKey in pluralization:
             displayKey = pluralization[displayKey]

@@ -109,10 +109,7 @@ def determineHeadingLevels(headings):
             del header.attrib["data-level"]
 
         # If we encounter a no-num or an appendix, don't number it or any in the same section.
-        if (
-            hasClass(header, "no-num")
-            or textContent(header).lstrip()[0:9].lower() == "appendix "
-        ):
+        if hasClass(header, "no-num") or textContent(header).lstrip()[0:9].lower() == "appendix ":
             skipLevel = min(level, skipLevel)
             continue
         if skipLevel < level:

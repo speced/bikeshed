@@ -16,9 +16,7 @@ def update(path, dryRun=False):
         return
 
     if "version" not in jsonData:
-        die(
-            "Can't figure out the WPT data version. Please report this to the maintainer!"
-        )
+        die("Can't figure out the WPT data version. Please report this to the maintainer!")
         return
 
     if jsonData["version"] != 8:

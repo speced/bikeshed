@@ -11,10 +11,7 @@ def addAttributeInfoSpans(doc):
         dfn = h.find("dfn", dt)
         if dfn is None:
             continue
-        if (
-            h.find("span[data-attribute-info], span[data-dict-member-info]", dt)
-            is not None
-        ):
+        if h.find("span[data-attribute-info], span[data-dict-member-info]", dt) is not None:
             # Already has a span, nothing to add
             continue
         dfnType = dfn.get("data-dfn-type")
@@ -64,9 +61,7 @@ def getTargetInfo(doc, el):
     if "/" in referencedAttribute:
         interface, referencedAttribute = referencedAttribute.split("/")
         targets = h.findAll(
-            'a[data-link-type={2}][data-lt="{0}"][data-link-for="{1}"]'.format(
-                referencedAttribute, interface, refType
-            ),
+            'a[data-link-type={2}][data-lt="{0}"][data-link-for="{1}"]'.format(referencedAttribute, interface, refType),
             doc,
         )
     else:
@@ -113,13 +108,8 @@ def htmlFromInfo(info):
     if re.match(r"\w+<\w+(\s*,\s*\w+)*>", info["type"]):
         # Simple higher-kinded types
         match = re.match(r"(\w+)<(\w+(?:\s*,\s*\w+)*)>", info["type"])
-        types = [
-            h.E.a({"data-link-type": "idl-name"}, x.strip())
-            for x in match.group(2).split(",")
-        ]
-        deco.extend(
-            [" of type ", match.group(1), "<", config.intersperse(types, ", "), ">"]
-        )
+        types = [h.E.a({"data-link-type": "idl-name"}, x.strip()) for x in match.group(2).split(",")]
+        deco.extend([" of type ", match.group(1), "<", config.intersperse(types, ", "), ">"])
     elif "<" in info["type"] or "(" in info["type"]:
         # Unions or more-complex higher-kinded types
         # Currently just bail, but I need to address this at some point.

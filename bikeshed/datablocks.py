@@ -90,9 +90,7 @@ def transformDataBlocks(doc, lines):
             inBlock = False
             if len(blockLines) == 0:
                 # Single-line <pre>.
-                match = re.match(
-                    r"(\s*<{0}[^>]*>)(.*)</{0}>(.*)".format(tagName), line.text, re.I
-                )
+                match = re.match(r"(\s*<{0}[^>]*>)(.*)</{0}>(.*)".format(tagName), line.text, re.I)
                 if not match:
                     die(
                         "Can't figure out how to parse this datablock line:\n{0}",
@@ -128,9 +126,7 @@ def transformDataBlocks(doc, lines):
                 # End tag was at the end of line of useful content.
                 # Process the stuff before it, preserve the stuff after it.
                 repl = blockTypes[blockType](
-                    lines=cleanPrefix(
-                        [x.text for x in blockLines[1:]] + [match.group(1)]
-                    ),
+                    lines=cleanPrefix([x.text for x in blockLines[1:]] + [match.group(1)]),
                     tagName=tagName,
                     firstLine=blockLines[0].text,
                     lineNum=blockLines[0].i,
@@ -182,9 +178,7 @@ def getWsPrefix(line):
     return re.match(r"(\s*)", line).group(1)
 
 
-def transformPre(
-    lines, tagName, firstLine, **kwargs
-):  # pylint: disable=unused-argument
+def transformPre(lines, tagName, firstLine, **kwargs):  # pylint: disable=unused-argument
     # If the last line in the source is a </code></pre>,
     # the generic processor will turn that into a final </code> line,
     # which'll mess up the indent finding.
@@ -228,9 +222,7 @@ def transformPre(
     return lines
 
 
-def transformPropdef(
-    lines, doc, firstLine, lineNum=None, **kwargs
-):  # pylint: disable=unused-argument
+def transformPropdef(lines, doc, firstLine, lineNum=None, **kwargs):  # pylint: disable=unused-argument
     attrs = OrderedDict()
     parsedAttrs = parseDefBlock(lines, "propdef")
     # Displays entries in the order specified in attrs,
@@ -240,9 +232,7 @@ def transformPropdef(
     # attrs with any other value are optional, and use the specified value if not present in parsedAttrs
     forHint = ""
     if "Name" in parsedAttrs:
-        forHint = " data-link-for-hint='{}'".format(
-            parsedAttrs["Name"].split(",")[0].strip()
-        )
+        forHint = " data-link-for-hint='{}'".format(parsedAttrs["Name"].split(",")[0].strip())
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = f" line-number={lineNum}"
@@ -250,9 +240,7 @@ def transformPropdef(
         attrs["Name"] = None
         attrs["New values"] = None
         ret = [
-            "<table class='def propdef partial'{forHint}{lineNumAttr}>".format(
-                forHint=forHint, lineNumAttr=lineNumAttr
-            )
+            "<table class='def propdef partial'{forHint}{lineNumAttr}>".format(forHint=forHint, lineNumAttr=lineNumAttr)
         ]
     elif "shorthand" in firstLine:
         attrs["Name"] = None
@@ -267,11 +255,7 @@ def transformPropdef(
         ]:
             attrs[defaultKey] = "see individual properties"
         attrs["Canonical order"] = "per grammar"
-        ret = [
-            "<table class='def propdef'{forHint}{lineNumAttr}>".format(
-                forHint=forHint, lineNumAttr=lineNumAttr
-            )
-        ]
+        ret = ["<table class='def propdef'{forHint}{lineNumAttr}>".format(forHint=forHint, lineNumAttr=lineNumAttr)]
     else:
         attrs["Name"] = None
         attrs["Value"] = None
@@ -282,11 +266,7 @@ def transformPropdef(
         attrs["Computed value"] = "as specified"
         attrs["Canonical order"] = "per grammar"
         attrs["Animation type"] = None
-        ret = [
-            "<table class='def propdef'{forHint}{lineNumAttr}>".format(
-                forHint=forHint, lineNumAttr=lineNumAttr
-            )
-        ]
+        ret = ["<table class='def propdef'{forHint}{lineNumAttr}>".format(forHint=forHint, lineNumAttr=lineNumAttr)]
     # We are in the process of migrating specs from using 'Animatable' to
     # using 'Animation type'. If we find 'Animatable' in the parsed attributes,
     # drop the default 'Animation type' entry.
@@ -322,9 +302,7 @@ def transformPropdef(
         td = f"<td>{val}"
         if key in ("Value", "New values"):
             tr = "<tr class=value>"
-            th = (
-                f"<th><a href='https://www.w3.org/TR/css-values/#value-defs'>{key}:</a>"
-            )
+            th = f"<th><a href='https://www.w3.org/TR/css-values/#value-defs'>{key}:</a>"
             td = f"<td class=prod>{val}"
         elif key == "Initial":
             th = f"<th><a href='https://www.w3.org/TR/css-cascade/#initial-values'>{key}:</a>"
@@ -352,9 +330,7 @@ def transformPropdef(
 # TODO: Make these functions match transformPropdef's new structure
 
 
-def transformDescdef(
-    lines, doc, firstLine, lineNum=None, **kwargs
-):  # pylint: disable=unused-argument
+def transformDescdef(lines, doc, firstLine, lineNum=None, **kwargs):  # pylint: disable=unused-argument
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = f" line-number={lineNum}"
@@ -382,9 +358,7 @@ def transformDescdef(
         ]
     for key in requiredKeys:
         if key == "For":
-            ret.append(
-                "<tr><th>{}:<td><a at-rule>{}</a>".format(key, vals.get(key, ""))
-            )
+            ret.append("<tr><th>{}:<td><a at-rule>{}</a>".format(key, vals.get(key, "")))
         elif key == "Value":
             ret.append("<tr><th>{}:<td class='prod'>{}".format(key, vals.get(key, "")))
         elif key in vals:
@@ -409,9 +383,7 @@ def transformDescdef(
     return ret
 
 
-def transformElementdef(
-    lines, doc, firstLine, lineNum=None, **kwargs
-):  # pylint: disable=unused-argument
+def transformElementdef(lines, doc, firstLine, lineNum=None, **kwargs):  # pylint: disable=unused-argument
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = f" line-number={lineNum}"
@@ -422,11 +394,7 @@ def transformElementdef(
         if "Attribute groups" in parsedAttrs:
             groups = [x.strip() for x in parsedAttrs["Attribute groups"].split(",")]
             for group in groups:
-                html += (
-                    "<li><a dfn data-element-attr-group{lineNumAttr}>{0}</a>".format(
-                        group, lineNumAttr=lineNumAttr
-                    )
-                )
+                html += "<li><a dfn data-element-attr-group{lineNumAttr}>{0}</a>".format(group, lineNumAttr=lineNumAttr)
             del parsedAttrs["Attribute groups"]
         if "Attributes" in parsedAttrs:
             atts = [x.strip() for x in parsedAttrs["Attributes"].split(",")]
@@ -457,9 +425,7 @@ def transformElementdef(
                 ret.append("<tr><th>Name:<td>")
                 ret.append(
                     ", ".join(
-                        "<dfn element{lineNumAttr}>{0}</dfn>".format(
-                            x.strip(), lineNumAttr=lineNumAttr
-                        )
+                        "<dfn element{lineNumAttr}>{0}</dfn>".format(x.strip(), lineNumAttr=lineNumAttr)
                         for x in val.split(",")
                     )
                 )
@@ -470,19 +436,14 @@ def transformElementdef(
                 ret.append("<tr><th>Categories:<td>")
                 ret.append(
                     ", ".join(
-                        "<a dfn{lineNumAttr}>{0}</a>".format(
-                            x.strip(), lineNumAttr=lineNumAttr
-                        )
-                        for x in val.split(",")
+                        "<a dfn{lineNumAttr}>{0}</a>".format(x.strip(), lineNumAttr=lineNumAttr) for x in val.split(",")
                     )
                 )
             elif key == "Dom interfaces":
                 ret.append("<tr><th>DOM Interfaces:<td>")
                 ret.append(
                     ", ".join(
-                        "<a interface{lineNumAttr}>{0}</a>".format(
-                            x.strip(), lineNumAttr=lineNumAttr
-                        )
+                        "<a interface{lineNumAttr}>{0}</a>".format(x.strip(), lineNumAttr=lineNumAttr)
                         for x in val.split(",")
                     )
                 )
@@ -508,9 +469,7 @@ def transformElementdef(
     return ret
 
 
-def transformArgumentdef(
-    lines, firstLine, lineNum=None, **kwargs
-):  # pylint: disable=unused-argument
+def transformArgumentdef(lines, firstLine, lineNum=None, **kwargs):  # pylint: disable=unused-argument
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = f" line-number={lineNum}"
@@ -536,9 +495,7 @@ def transformArgumentdef(
         )
         return []
     addClass(el, "data")
-    rootAttrs = " ".join(
-        "{}='{}'".format(k, escapeAttr(v)) for k, v in el.attrib.items()
-    )
+    rootAttrs = " ".join("{}='{}'".format(k, escapeAttr(v)) for k, v in el.attrib.items())
     text = (
         """
 <table {attrs}{lineNumAttr}>
@@ -608,9 +565,7 @@ def parseDefBlock(lines, type, capitalizeKeys=True, lineNum=None):
     return vals
 
 
-def transformRailroad(
-    lines, doc, firstLine, **kwargs
-):  # pylint: disable=unused-argument
+def transformRailroad(lines, doc, firstLine, **kwargs):  # pylint: disable=unused-argument
     import io
 
     from . import railroadparser
@@ -683,9 +638,7 @@ def transformBiblio(lines, doc, **kwargs):  # pylint: disable=unused-argument
     return []
 
 
-def transformAnchors(
-    lines, doc, lineNum=None, **kwargs
-):  # pylint: disable=unused-argument
+def transformAnchors(lines, doc, lineNum=None, **kwargs):  # pylint: disable=unused-argument
     anchors = parseInfoTree(lines, doc.md.indent, lineNum)
     processAnchors(anchors, doc, lineNum)
     return []
@@ -722,11 +675,7 @@ def processAnchors(anchors, doc, lineNum=None):
             urlSuffix = anchor["url"][0]
         else:
             urlSuffix = config.simplifyText(anchor["text"][0])
-        url = (
-            urlPrefix
-            + ("" if "#" in urlPrefix or "#" in urlSuffix else "#")
-            + urlSuffix
-        )
+        url = urlPrefix + ("" if "#" in urlPrefix or "#" in urlSuffix else "#") + urlSuffix
         status = "local"
         shortname = None
         level = None
@@ -768,9 +717,7 @@ def processAnchors(anchors, doc, lineNum=None):
                 "linkingText": anchor["text"][0],
                 "type": anchor["type"][0].lower(),
                 "url": url,
-                "shortname": shortname.lower()
-                if shortname is not None
-                else doc.md.shortname,
+                "shortname": shortname.lower() if shortname is not None else doc.md.shortname,
                 "level": level if level is not None else doc.md.level,
                 "for": anchor.get("for", []),
                 "export": True,
@@ -780,14 +727,10 @@ def processAnchors(anchors, doc, lineNum=None):
         )
         methodishStart = re.match(r"([^(]+\()[^)]", anchor["text"][0])
         if methodishStart:
-            doc.refs.anchorBlockRefs.addMethodVariants(
-                anchor["text"][0], anchor.get("for", []), doc.md.shortname
-            )
+            doc.refs.anchorBlockRefs.addMethodVariants(anchor["text"][0], anchor.get("for", []), doc.md.shortname)
 
 
-def transformLinkDefaults(
-    lines, doc, lineNum=None, **kwargs
-):  # pylint: disable=unused-argument
+def transformLinkDefaults(lines, doc, lineNum=None, **kwargs):  # pylint: disable=unused-argument
     lds = parseInfoTree(lines, doc.md.indent, lineNum)
     processLinkDefaults(lds, doc, lineNum)
     return []
@@ -827,16 +770,12 @@ def processLinkDefaults(lds, doc, lineNum=None):
 
         if "for" in ld:
             for _for in ld["for"]:
-                doc.md.linkDefaults[text].append(
-                    (spec, type, ld.get("status", None), _for)
-                )
+                doc.md.linkDefaults[text].append((spec, type, ld.get("status", None), _for))
         else:
             doc.md.linkDefaults[text].append((spec, type, ld.get("status", None), None))
 
 
-def transformIgnoredSpecs(
-    lines, doc, lineNum=None, **kwargs
-):  # pylint: disable=unused-argument
+def transformIgnoredSpecs(lines, doc, lineNum=None, **kwargs):  # pylint: disable=unused-argument
     specs = parseInfoTree(lines, doc.md.indent, lineNum)
     processIgnoredSpecs(specs, doc, lineNum)
     return []
@@ -867,9 +806,7 @@ def processIgnoredSpecs(specs, doc, lineNum=None):
                 doc.refs.ignoredSpecs.add(specName)
 
 
-def transformInfo(
-    lines, doc, lineNum=None, **kwargs
-):  # pylint: disable=unused-argument
+def transformInfo(lines, doc, lineNum=None, **kwargs):  # pylint: disable=unused-argument
     # More generic InfoTree system.
     # A <pre class=info> can contain any of the InfoTree collections,
     # identified by an 'info' line.
@@ -902,9 +839,7 @@ def processInfo(infos, doc, lineNum=None):
         knownInfoTypes[infoType](info, doc, lineNum=0)
 
 
-def transformInclude(
-    lines, doc, firstLine, lineNum=None, **kwargs
-):  # pylint: disable=unused-argument
+def transformInclude(lines, doc, firstLine, lineNum=None, **kwargs):  # pylint: disable=unused-argument
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = f" line-number={lineNum}"
@@ -916,9 +851,7 @@ def transformInclude(
             if path is None:
                 path = info["path"][0]
             else:
-                die(
-                    "Include blocks must only contain a single 'path'.", lineNum=lineNum
-                )
+                die("Include blocks must only contain a single 'path'.", lineNum=lineNum)
         if "macros" in info:
             for k, v in info.items():
                 if k == "macros":
@@ -942,9 +875,7 @@ def transformInclude(
     return []
 
 
-def transformIncludeCode(
-    lines, doc, firstLine, lineNum=None, **kwargs
-):  # pylint: disable=unused-argument
+def transformIncludeCode(lines, doc, firstLine, lineNum=None, **kwargs):  # pylint: disable=unused-argument
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = f" line-number={lineNum}"
@@ -1008,9 +939,7 @@ def transformIncludeCode(
     return []
 
 
-def transformIncludeRaw(
-    lines, doc, firstLine, lineNum=None, **kwargs
-):  # pylint: disable=unused-argument
+def transformIncludeRaw(lines, doc, firstLine, lineNum=None, **kwargs):  # pylint: disable=unused-argument
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = f" line-number={lineNum}"

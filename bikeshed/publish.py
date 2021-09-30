@@ -43,9 +43,7 @@ def publishEchidna(
         print("Check the URL in a few seconds to see if it was published successfully:")
         print("https://labs.w3.org/echidna/api/status?id=" + r.text)
     else:
-        print(
-            "There was an error publishing your spec. Here's some information that might help?"
-        )
+        print("There was an error publishing your spec. Here's some information that might help?")
         print(r.status_code)
         print(r.text)
         print(r.headers)
@@ -65,9 +63,7 @@ def prepareTar(doc, visibleTar=False, additionalDirectories=None):
         tar = tarfile.open(fileobj=f, mode="w")
     tar.add(specOutput.name, arcname="Overview.html")
     # Loaded from .include files
-    additionalFiles = extensions.BSPublishAdditionalFiles(  # pylint: disable=no-member
-        additionalDirectories
-    )
+    additionalFiles = extensions.BSPublishAdditionalFiles(additionalDirectories)  # pylint: disable=no-member
     for fname in additionalFiles:
         try:
             if isinstance(fname, str):

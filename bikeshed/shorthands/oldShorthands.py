@@ -297,23 +297,17 @@ def transformProductionGrammars(doc):
     hashMultRe = re.compile(r"#{\s*\d+(\s*,(\s*\d+)?)?\s*}")
 
     def hashMultReplacer(match):
-        return E.a(
-            {"data-link-type": "grammar", "data-lt": "#", "for": ""}, match.group(0)
-        )
+        return E.a({"data-link-type": "grammar", "data-lt": "#", "for": ""}, match.group(0))
 
     multRe = re.compile(r"{\s*\d+\s*}")
 
     def multReplacer(match):
-        return E.a(
-            {"data-link-type": "grammar", "data-lt": "{A}", "for": ""}, match.group(0)
-        )
+        return E.a({"data-link-type": "grammar", "data-lt": "{A}", "for": ""}, match.group(0))
 
     multRangeRe = re.compile(r"{\s*\d+\s*,(\s*\d+)?\s*}")
 
     def multRangeReplacer(match):
-        return E.a(
-            {"data-link-type": "grammar", "data-lt": "{A,B}", "for": ""}, match.group(0)
-        )
+        return E.a({"data-link-type": "grammar", "data-lt": "{A,B}", "for": ""}, match.group(0))
 
     simpleRe = re.compile(r"(\?|!|#|\*|\+|\|\||\||&amp;&amp;|&&|,)(?!')")
     # Note the negative-lookahead, to avoid matching delim tokens.
@@ -393,18 +387,14 @@ def biblioReplacer(match):
     statusCurrent = "current" in modifiers
     statusSnapshot = "snapshot" in modifiers
     if statusCurrent and statusSnapshot:
-        die(
-            f"Biblio shorthand {match.group(0)} contains *both* 'current' and 'snapshot', please pick one."
-        )
+        die(f"Biblio shorthand {match.group(0)} contains *both* 'current' and 'snapshot', please pick one.")
     elif statusCurrent or statusSnapshot:
         attrs["data-biblio-status"] = "current" if statusCurrent else "snapshot"
 
     displayInline = "inline" in modifiers
     displayIndex = "index" in modifiers
     if displayInline and displayIndex:
-        die(
-            f"Biblio shorthand {match.group(0)} contains *both* 'inline' and 'index', please pick one."
-        )
+        die(f"Biblio shorthand {match.group(0)} contains *both* 'inline' and 'index', please pick one.")
     elif displayInline or displayIndex:
         attrs["data-biblio-display"] = "inline" if displayInline else "index"
 

@@ -3,9 +3,7 @@ from collections import defaultdict
 from .. import config
 
 
-def filterObsoletes(
-    refs, replacedSpecs, ignoredSpecs, localShortname=None, localSpec=None
-):
+def filterObsoletes(refs, replacedSpecs, ignoredSpecs, localShortname=None, localSpec=None):
     # Remove any ignored or obsoleted specs
     possibleSpecs = {ref.spec for ref in refs}
     if localSpec:
@@ -149,9 +147,7 @@ def linkTextVariations(str, linkType):
         if str == "thrown":
             yield "throw"
 
-    if " " in str and (
-        config.linkTypeIn(linkType, "dfn") or config.linkTypeIn(linkType, "abstract-op")
-    ):
+    if " " in str and (config.linkTypeIn(linkType, "dfn") or config.linkTypeIn(linkType, "abstract-op")):
         # Multi-word phrase, which often contains the conjugated word as the *first*,
         # rather than at the end.
         first, _, rest = str.partition(" ")

@@ -147,9 +147,7 @@ def canIUsePanelFor(id, data, update, classFromBrowser):
         minVersion = support[2:]
         appendChild(
             mainPara,
-            browserCompatSpan(
-                classFromBrowser[browser], browser, statusCode, minVersion
-            ),
+            browserCompatSpan(classFromBrowser[browser], browser, statusCode, minVersion),
         )
     appendChild(
         panel,
@@ -211,10 +209,7 @@ def validateCanIUseURLs(doc, elements):
     if unusedFeatures:
         warn(
             "The following Can I Use features are associated with your URLs, but don't show up in your spec:\n{0}",
-            "\n".join(
-                " * {0} - https://caniuse.com/#feat={0}".format(x)
-                for x in sorted(unusedFeatures)
-            ),
+            "\n".join(" * {0} - https://caniuse.com/#feat={0}".format(x) for x in sorted(unusedFeatures)),
         )
 
 

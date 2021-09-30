@@ -128,11 +128,7 @@ def splitForValues(forValues):
     if forValues is None:
         return None
     forValues = re.sub(r"\s+", " ", forValues)
-    return [
-        value.strip()
-        for value in re.split(r",(?![^()]*\))", forValues)
-        if value.strip()
-    ]
+    return [value.strip() for value in re.split(r",(?![^()]*\))", forValues) if value.strip()]
 
 
 def groupFromKey(key, length=2):
@@ -158,11 +154,7 @@ _groupFromKeyCache = {}
 
 def flatten(arr):
     for el in arr:
-        if (
-            isinstance(el, collections.Iterable)
-            and not isinstance(el, str)
-            and not lxml.etree.iselement(el)
-        ):
+        if isinstance(el, collections.Iterable) and not isinstance(el, str) and not lxml.etree.iselement(el):
             yield from flatten(el)
         else:
             yield el

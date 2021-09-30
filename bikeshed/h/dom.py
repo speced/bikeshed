@@ -13,11 +13,7 @@ from ..messages import *
 
 def flatten(arr):
     for el in arr:
-        if (
-            isinstance(el, collections.Iterable)
-            and not isinstance(el, str)
-            and not lxml.etree.iselement(el)
-        ):
+        if isinstance(el, collections.Iterable) and not isinstance(el, str) and not lxml.etree.iselement(el):
             yield from flatten(el)
         else:
             yield el
@@ -33,9 +29,7 @@ def findAll(sel, context):
     if isinstance(context, constants.specClass):
         context = context.document
     try:
-        return CSSSelector(sel, namespaces={"svg": "http://www.w3.org/2000/svg"})(
-            context
-        )
+        return CSSSelector(sel, namespaces={"svg": "http://www.w3.org/2000/svg"})(context)
     except Exception as e:
         die("The selector '{0}' returned an error:\n{1}", sel, e)
         return []
@@ -703,9 +697,7 @@ def hashContents(el):
     # Hash the contents of an element into an 8-character alphanum string.
     # Generally used for generating probably-unique IDs.
     # Normalize whitespace away to avoid git-related newline normalization issues.
-    text = re.sub(r"\s+", " ", textContent(el).strip()).encode(
-        "ascii", "xmlcharrefreplace"
-    )
+    text = re.sub(r"\s+", " ", textContent(el).strip()).encode("ascii", "xmlcharrefreplace")
     return hashlib.md5(text).hexdigest()[0:8]
 
 
@@ -888,9 +880,7 @@ def createElement(tag, attrs={}, *children):
 class ElementCreationHelper:
     def __getattr__(self, name):
         def _creater(*children):
-            if children and not (
-                isinstance(children[0], str) or isElement(children[0])
-            ):
+            if children and not (isinstance(children[0], str) or isElement(children[0])):
                 attrs = children[0]
                 children = children[1:]
             else:

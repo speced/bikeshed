@@ -43,11 +43,7 @@ def processWptElements(doc):
             titleLang = el.get("lang")
             titleDir = el.get("dir")
             createHTML(doc, el, testNames, testData, title, titleLang, titleDir)
-            if (
-                prevEl is not None
-                and prevEl.getnext() is el
-                and (prevEl.tail is None or prevEl.tail.strip() == "")
-            ):
+            if prevEl is not None and prevEl.getnext() is el and (prevEl.tail is None or prevEl.tail.strip() == ""):
                 appendTestList(prevEl, testNames, testData, title, titleLang, titleDir)
                 removeNode(el)
             else:
@@ -69,17 +65,10 @@ def processWptElements(doc):
         if localPrefix is not None:
             pathPrefix = localPrefix
         if pathPrefix is None:
-            die(
-                "Can't use <wpt-rest> without either a pathprefix="
-                " attribute or a 'WPT Path Prefix' metadata."
-            )
+            die("Can't use <wpt-rest> without either a pathprefix=" " attribute or a 'WPT Path Prefix' metadata.")
             return
         atLeastOneElement = True
-        prefixedNames = [
-            p
-            for p in testData
-            if prefixInPath(pathPrefix, p) and p not in seenTestNames
-        ]
+        prefixedNames = [p for p in testData if prefixInPath(pathPrefix, p) and p not in seenTestNames]
         if len(prefixedNames) == 0:
             die("Couldn't find any tests with the path prefix '{0}'.", pathPrefix)
             return
@@ -97,9 +86,7 @@ def processWptElements(doc):
         doc.extraStyles["style-wpt"] = wptStyle
 
 
-def createHTML(
-    doc, blockEl, testNames, testData, title=None, titleLang=None, titleDir=None
-):
+def createHTML(doc, blockEl, testNames, testData, title=None, titleLang=None, titleDir=None):
     if doc.md.wptDisplay == "none":
         removeNode(blockEl)
     elif doc.md.wptDisplay in ("inline", "open", "closed"):
@@ -119,9 +106,7 @@ def createHTML(
         die("Programming error, uncaught WPT Display value in createHTML.")
 
 
-def appendTestList(
-    blockEl, testNames, testData, title=None, titleLang=None, titleDir=None
-):
+def appendTestList(blockEl, testNames, testData, title=None, titleLang=None, titleDir=None):
     if title:
         titleEl = E.p(
             {
@@ -165,8 +150,7 @@ def appendTestList(
                 " ",
                 E.a(
                     {
-                        "href": "https://github.com/web-platform-tests/wpt/blob/master/"
-                        + testName,
+                        "href": "https://github.com/web-platform-tests/wpt/blob/master/" + testName,
                         "class": "wpt-source",
                     },
                     E.small("(source)"),
@@ -178,8 +162,7 @@ def appendTestList(
                 E.span({"class": "wpt-name"}, lastNameFragment, f" ({testType} test) "),
                 E.a(
                     {
-                        "href": "https://github.com/web-platform-tests/wpt/blob/master/"
-                        + testName,
+                        "href": "https://github.com/web-platform-tests/wpt/blob/master/" + testName,
                         "class": "wpt-source",
                     },
                     E.small("(source)"),
@@ -198,8 +181,7 @@ def appendTestList(
                 " ",
                 E.a(
                     {
-                        "href": "https://github.com/web-platform-tests/wpt/blob/master/"
-                        + testName,
+                        "href": "https://github.com/web-platform-tests/wpt/blob/master/" + testName,
                         "class": "wpt-source",
                     },
                     E.small("(source)"),

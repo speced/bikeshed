@@ -36,9 +36,7 @@ def update(path, dryRun=False):
             lastTime=lastMsgTime,
             action=progressMessager(i, len(rawSpecData)),
         )
-        rawSpec = dataFromApi(
-            shepherd, "specifications", draft=True, anchors=True, spec=rawSpec["name"]
-        )
+        rawSpec = dataFromApi(shepherd, "specifications", draft=True, anchors=True, spec=rawSpec["name"])
         spec = genSpec(rawSpec)
         specs[spec["vshortname"]] = spec
         specHeadings = headings[spec["vshortname"]]
@@ -47,12 +45,8 @@ def update(path, dryRun=False):
             obj["status"] = status
             return obj
 
-        rawAnchorData = [
-            setStatus(x, "snapshot")
-            for x in linearizeAnchorTree(rawSpec.get("anchors", []))
-        ] + [
-            setStatus(x, "current")
-            for x in linearizeAnchorTree(rawSpec.get("draft_anchors", []))
+        rawAnchorData = [setStatus(x, "snapshot") for x in linearizeAnchorTree(rawSpec.get("anchors", []))] + [
+            setStatus(x, "current") for x in linearizeAnchorTree(rawSpec.get("draft_anchors", []))
         ]
         for rawAnchor in rawAnchorData:
             rawAnchor = fixupAnchor(rawAnchor)
@@ -88,11 +82,7 @@ def update(path, dryRun=False):
                 p = os.path.join(path, "headings", f"headings-{spec}.json")
                 writtenPaths.add(p)
                 with open(p, "w", encoding="utf-8") as f:
-                    f.write(
-                        json.dumps(
-                            specHeadings, ensure_ascii=False, indent=2, sort_keys=True
-                        )
-                    )
+                    f.write(json.dumps(specHeadings, ensure_ascii=False, indent=2, sort_keys=True))
         except Exception as e:
             die("Couldn't save headings database to disk.\n{0}", e)
             return
@@ -105,9 +95,7 @@ def update(path, dryRun=False):
             p = os.path.join(path, "methods.json")
             writtenPaths.add(p)
             with open(p, "w", encoding="utf-8") as f:
-                f.write(
-                    json.dumps(methods, ensure_ascii=False, indent=2, sort_keys=True)
-                )
+                f.write(json.dumps(methods, ensure_ascii=False, indent=2, sort_keys=True))
         except Exception as e:
             die("Couldn't save methods database to disk.\n{0}", e)
             return
@@ -124,9 +112,7 @@ def update(path, dryRun=False):
     return writtenPaths
 
 
-@tenacity.retry(
-    reraise=True, stop=tenacity.stop_after_attempt(3), wait=tenacity.wait_random(1, 2)
-)
+@tenacity.retry(reraise=True, stop=tenacity.stop_after_attempt(3), wait=tenacity.wait_random(1, 2))
 def dataFromApi(api, *args, **kwargs):
     anchorDataContentTypes = [
         "application/json",
@@ -180,9 +166,7 @@ def genSpec(rawSpec):
         "status": rawSpec.get("status"),
         "abstract": rawSpec.get("abstract"),
     }
-    if spec["shortname"] is not None and spec["vshortname"].startswith(
-        spec["shortname"]
-    ):
+    if spec["shortname"] is not None and spec["vshortname"].startswith(spec["shortname"]):
         # S = "foo", V = "foo-3"
         # Strip the prefix
         level = spec["vshortname"][len(spec["shortname"]) :]
@@ -244,9 +228,7 @@ def addToHeadings(rawAnchor, specHeadings, spec):
         # Either single-page spec, or link on the top page of a multi-page spec
         heading = {
             "url": spec["{}_url".format(rawAnchor["status"])] + uri,
-            "number": rawAnchor["name"]
-            if re.match(r"[\d.]+$", rawAnchor["name"])
-            else "",
+            "number": rawAnchor["name"] if re.match(r"[\d.]+$", rawAnchor["name"]) else "",
             "text": rawAnchor["title"],
             "spec": spec["title"],
         }
@@ -274,9 +256,7 @@ def addToHeadings(rawAnchor, specHeadings, spec):
         shorthand = page + fragment
         heading = {
             "url": spec["{}_url".format(rawAnchor["status"])] + uri,
-            "number": rawAnchor["name"]
-            if re.match(r"[\d.]+$", rawAnchor["name"])
-            else "",
+            "number": rawAnchor["name"] if re.match(r"[\d.]+$", rawAnchor["name"]) else "",
             "text": rawAnchor["title"],
             "spec": spec["title"],
         }

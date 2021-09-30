@@ -21,9 +21,7 @@ def main():
         semver = "???"
         semverText = ""
 
-    argparser = argparse.ArgumentParser(
-        description=f"{semverText}Processes spec source files into valid HTML."
-    )
+    argparser = argparse.ArgumentParser(description=f"{semverText}Processes spec source files into valid HTML.")
     argparser.add_argument("--version", action="version", version=semver)
     argparser.add_argument(
         "-q",
@@ -90,15 +88,9 @@ def main():
 
     subparsers = argparser.add_subparsers(title="Subcommands", dest="subparserName")
 
-    specParser = subparsers.add_parser(
-        "spec", help="Process a spec source file into a valid output file."
-    )
-    specParser.add_argument(
-        "infile", nargs="?", default=None, help="Path to the source file."
-    )
-    specParser.add_argument(
-        "outfile", nargs="?", default=None, help="Path to the output file."
-    )
+    specParser = subparsers.add_parser("spec", help="Process a spec source file into a valid output file.")
+    specParser.add_argument("infile", nargs="?", default=None, help="Path to the source file.")
+    specParser.add_argument("outfile", nargs="?", default=None, help="Path to the output file.")
     specParser.add_argument(
         "--debug",
         dest="debug",
@@ -129,21 +121,15 @@ def main():
         "echidna",
         help="Process a spec source file into a valid output file and publish it according to certain automatic protocols.",
     )
-    echidnaParser.add_argument(
-        "infile", nargs="?", default=None, help="Path to the source file."
-    )
+    echidnaParser.add_argument("infile", nargs="?", default=None, help="Path to the source file.")
     echidnaParser.add_argument(
         "--gh-token",
         dest="ghToken",
         nargs="?",
         help="GitHub access token. Useful to avoid API rate limits. Generate tokens: https://github.com/settings/tokens.",
     )
-    echidnaParser.add_argument(
-        "--u", dest="un", metavar="USERNAME", required=False, help="W3C username."
-    )
-    echidnaParser.add_argument(
-        "--p", dest="pw", metavar="PASSWORD", required=False, help="W3C password."
-    )
+    echidnaParser.add_argument("--u", dest="un", metavar="USERNAME", required=False, help="W3C username.")
+    echidnaParser.add_argument("--p", dest="pw", metavar="PASSWORD", required=False, help="W3C password.")
     echidnaParser.add_argument(
         "--decision",
         dest="decision",
@@ -184,12 +170,8 @@ def main():
         "watch",
         help="Process a spec source file into a valid output file, automatically rebuilding when it changes.",
     )
-    watchParser.add_argument(
-        "infile", nargs="?", default=None, help="Path to the source file."
-    )
-    watchParser.add_argument(
-        "outfile", nargs="?", default=None, help="Path to the output file."
-    )
+    watchParser.add_argument("infile", nargs="?", default=None, help="Path to the source file.")
+    watchParser.add_argument("outfile", nargs="?", default=None, help="Path to the output file.")
     watchParser.add_argument(
         "--gh-token",
         dest="ghToken",
@@ -203,15 +185,9 @@ def main():
         help="Bring-Your-Own-Spec: turns off all the Bikeshed auto-niceties, so you can piecemeal its features into your existing doc instead. Experimental, let me know if things get crashy or weird.",
     )
 
-    serveParser = subparsers.add_parser(
-        "serve", help="Identical to 'watch', but also serves the folder on localhost."
-    )
-    serveParser.add_argument(
-        "infile", nargs="?", default=None, help="Path to the source file."
-    )
-    serveParser.add_argument(
-        "outfile", nargs="?", default=None, help="Path to the output file."
-    )
+    serveParser = subparsers.add_parser("serve", help="Identical to 'watch', but also serves the folder on localhost.")
+    serveParser.add_argument("infile", nargs="?", default=None, help="Path to the source file.")
+    serveParser.add_argument("outfile", nargs="?", default=None, help="Path to the output file.")
     serveParser.add_argument(
         "--port",
         dest="port",
@@ -249,24 +225,12 @@ def main():
         action="store_true",
         help="Forces Bikeshed to do a full update manually, rather than using the manifest to get the preprocessed update (which can be several minutes old).",
     )
-    updateParser.add_argument(
-        "--anchors", action="store_true", help="Download crossref anchor data."
-    )
-    updateParser.add_argument(
-        "--backrefs", action="store_true", help="Download link backref data."
-    )
-    updateParser.add_argument(
-        "--biblio", action="store_true", help="Download biblio data."
-    )
-    updateParser.add_argument(
-        "--boilerplate", action="store_true", help="Download boilerplate files."
-    )
-    updateParser.add_argument(
-        "--caniuse", action="store_true", help="Download Can I Use... data."
-    )
-    updateParser.add_argument(
-        "--mdn", action="store_true", help="Download MDN Spec Links... data."
-    )
+    updateParser.add_argument("--anchors", action="store_true", help="Download crossref anchor data.")
+    updateParser.add_argument("--backrefs", action="store_true", help="Download link backref data.")
+    updateParser.add_argument("--biblio", action="store_true", help="Download biblio data.")
+    updateParser.add_argument("--boilerplate", action="store_true", help="Download boilerplate files.")
+    updateParser.add_argument("--caniuse", action="store_true", help="Download Can I Use... data.")
+    updateParser.add_argument("--mdn", action="store_true", help="Download MDN Spec Links... data.")
     updateParser.add_argument(
         "--link-defaults",
         dest="linkDefaults",
@@ -302,9 +266,7 @@ def main():
         action="store_true",
         help="Output example Issues List template.",
     )
-    issueParser.add_argument(
-        "infile", nargs="?", default=None, help="Path to the plain-text issue file."
-    )
+    issueParser.add_argument("infile", nargs="?", default=None, help="Path to the plain-text issue file.")
     issueParser.add_argument(
         "outfile",
         nargs="?",
@@ -313,9 +275,7 @@ def main():
     )
 
     debugParser = subparsers.add_parser("debug", help="Run various debugging commands.")
-    debugParser.add_argument(
-        "infile", nargs="?", default=None, help="Path to the source file."
-    )
+    debugParser.add_argument("infile", nargs="?", default=None, help="Path to the source file.")
     debugCommands = debugParser.add_mutually_exclusive_group(required=True)
     debugCommands.add_argument(
         "--print-exports",
@@ -328,9 +288,7 @@ def main():
         dest="linkText",
         help="Prints the ref data for a given link text.",
     )
-    debugCommands.add_argument(
-        "--print", dest="code", help="Runs the specified code and prints it."
-    )
+    debugCommands.add_argument("--print", dest="code", help="Runs the specified code and prints it.")
     debugCommands.add_argument(
         "--print-json",
         dest="jsonCode",
@@ -344,9 +302,7 @@ def main():
     )
 
     refParser = subparsers.add_parser("refs", help="Search Bikeshed's ref database.")
-    refParser.add_argument(
-        "infile", nargs="?", default=None, help="Path to the source file."
-    )
+    refParser.add_argument("infile", nargs="?", default=None, help="Path to the source file.")
     refParser.add_argument("--text", dest="text", default=None)
     refParser.add_argument("--type", dest="linkType", default=None)
     refParser.add_argument("--for", dest="linkFor", default=None)
@@ -365,25 +321,17 @@ def main():
         help="Apply Bikeshed's logic for only returning the latest version of a given ref when it exists in multiple levels of a spec.",
     )
 
-    sourceParser = subparsers.add_parser(
-        "source", help="Tools for formatting the *source* document."
-    )
+    sourceParser = subparsers.add_parser("source", help="Tools for formatting the *source* document.")
     sourceParser.add_argument(
         "--big-text",
         dest="bigText",
         action="store_true",
         help="Finds HTML comments containing 'Big Text: foo' and turns them into comments containing 'foo' in big text.",
     )
-    sourceParser.add_argument(
-        "infile", nargs="?", default=None, help="Path to the source file."
-    )
-    sourceParser.add_argument(
-        "outfile", nargs="?", default=None, help="Path to the output file."
-    )
+    sourceParser.add_argument("infile", nargs="?", default=None, help="Path to the source file.")
+    sourceParser.add_argument("outfile", nargs="?", default=None, help="Path to the output file.")
 
-    testParser = subparsers.add_parser(
-        "test", help="Tools for running Bikeshed's testsuite."
-    )
+    testParser = subparsers.add_parser("test", help="Tools for running Bikeshed's testsuite.")
     testParser.add_argument(
         "--rebase",
         default=False,
@@ -430,13 +378,9 @@ def main():
         help="Save the graph to a specified SVG file, rather than outputting with xdot immediately.",
     )
 
-    subparsers.add_parser(
-        "template", help="Outputs a skeleton .bs file for you to start with."
-    )
+    subparsers.add_parser("template", help="Outputs a skeleton .bs file for you to start with.")
 
-    wptParser = subparsers.add_parser(
-        "wpt", help="Tools for writing Web Platform Tests."
-    )
+    wptParser = subparsers.add_parser("wpt", help="Tools for writing Web Platform Tests.")
     wptParser.add_argument(
         "--template",
         default=False,
@@ -660,9 +604,7 @@ def handleSource(options):
         from . import fonts
 
         font = fonts.Font()
-        fonts.replaceComments(
-            font=font, inputFilename=options.infile, outputFilename=options.outfile
-        )
+        fonts.replaceComments(font=font, inputFilename=options.infile, outputFilename=options.outfile)
 
 
 def handleTest(options, extras):
@@ -674,9 +616,7 @@ def handleTest(options, extras):
     if options.rebase:
         test.rebase(options.testFiles, md=md)
     else:
-        result = test.runAllTests(
-            options.testFiles, manualOnly=options.manualOnly, md=md
-        )
+        result = test.runAllTests(options.testFiles, manualOnly=options.manualOnly, md=md)
         sys.exit(0 if result else 1)
 
 

@@ -104,10 +104,7 @@ class IDLMarker:
             return (None, None)
 
         # The name in [PutForwards=foo] is an attribute of the same interface.
-        if (
-            construct.idl_type == "extended-attribute"
-            and construct.name == "PutForwards"
-        ):
+        if construct.idl_type == "extended-attribute" and construct.name == "PutForwards":
             # In [PutForwards=value] attribute DOMString foo
             # the "value" is a DOMString attr
             attr = construct.parent
@@ -125,10 +122,7 @@ class IDLMarker:
 
         # LegacyWindowAlias defines additional names for the construct,
         # so all the names should be forced <dfn>s, just like the interface name itself.
-        if (
-            construct.idl_type == "extended-attribute"
-            and construct.name == "LegacyWindowAlias"
-        ):
+        if construct.idl_type == "extended-attribute" and construct.name == "LegacyWindowAlias":
             return (
                 f'<idl data-idl-type=interface data-lt="{text}">',
                 "</idl>",
@@ -150,9 +144,7 @@ class IDLMarker:
             if construct.name is None:
                 # If no name was defined, you're required to define stringification behavior.
                 return (
-                    "<a dfn for='{}' data-lt='stringification behavior'>".format(
-                        construct.parent.full_name
-                    ),
+                    "<a dfn for='{}' data-lt='stringification behavior'>".format(construct.parent.full_name),
                     "</a>",
                 )
             # Otherwise, you *can* point to/dfn stringification behavior if you want.
@@ -219,9 +211,7 @@ class IDLMarker:
                 readonly = "data-readonly"
             else:
                 readonly = ""
-            extraParameters = '{} data-type="{}"'.format(
-                readonly, str(rest.type).strip()
-            )
+            extraParameters = '{} data-type="{}"'.format(readonly, str(rest.type).strip())
         elif idlType == "dict-member":
             extraParameters = f'data-type="{construct.type}"'
             if construct.default is not None:
@@ -243,10 +233,7 @@ class IDLMarker:
         if idlType in config.typesUsingFor:
             if idlType == "argument" and construct.parent.idl_type == "method":
                 interfaceName = construct.parent.parent.name
-                methodNames = [
-                    f"{interfaceName}/{m}"
-                    for m in self.methodLinkingTexts(construct.parent)
-                ]
+                methodNames = [f"{interfaceName}/{m}" for m in self.methodLinkingTexts(construct.parent)]
                 idlFor = "data-idl-for='{}'".format(", ".join(methodNames))
             else:
                 idlFor = f"data-idl-for='{construct.parent.full_name}'"
@@ -374,9 +361,7 @@ def processIDL(doc):
             for idlText in el.get("data-lt").split("|"):
                 if idlType == "interface" and idlText in forcedInterfaces:
                     forceDfn = True
-                for linkFor in config.splitForValues(el.get("data-idl-for", "")) or [
-                    None
-                ]:
+                for linkFor in config.splitForValues(el.get("data-idl-for", "")) or [None]:
                     ref = doc.refs.getRef(
                         idlType,
                         idlText,
@@ -416,9 +401,7 @@ def processIDL(doc):
                     # ID was defensively added by the Marker.
                     del el.attrib["id"]
 
-    dfns = findAll(
-        "pre.idl:not([data-no-idl]) dfn, xmp.idl:not([data-no-idl]) dfn", doc
-    ) + list(localDfns)
+    dfns = findAll("pre.idl:not([data-no-idl]) dfn, xmp.idl:not([data-no-idl]) dfn", doc) + list(localDfns)
     classifyDfns(doc, dfns)
     fixupIDs(doc, dfns)
     doc.refs.addLocalDfns(dfn for dfn in dfns if dfn.get("id") is not None)

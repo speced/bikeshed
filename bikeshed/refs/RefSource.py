@@ -25,9 +25,7 @@ class RefSource:
     # Which sources use lazy-loading; other sources always have all their refs loaded immediately.
     lazyLoadedSources = ["foreign"]
 
-    def __init__(
-        self, source, specs=None, ignored=None, replaced=None, fileRequester=None
-    ):
+    def __init__(self, source, specs=None, ignored=None, replaced=None, fileRequester=None):
         if fileRequester is None:
             self.dataFile = config.defaultRequester
         else:
@@ -64,9 +62,7 @@ class RefSource:
             # Group was loaded, but previous check didn't find it, so it's just not here.
             return []
         # Otherwise, load the group file.
-        with self.dataFile.fetch(
-            "anchors", f"anchors-{group}.data", okayToFail=True
-        ) as fh:
+        with self.dataFile.fetch("anchors", f"anchors-{group}.data", okayToFail=True) as fh:
             self.refs.update(decodeAnchors(fh))
             self._loadedAnchorGroups.add(group)
         return self.refs.get(key, [])
@@ -147,9 +143,7 @@ class RefSource:
                 textsToSearch = list(linkTextVariations(text, linkType))
                 if text.endswith("()") and text in self.methods:
                     textsToSearch += list(self.methods[text].keys())
-                if (
-                    linkType is None or linkType in config.lowercaseTypes
-                ) and text.lower() != text:
+                if (linkType is None or linkType in config.lowercaseTypes) and text.lower() != text:
                     textsToSearch += [t.lower() for t in textsToSearch]
                 refs = list(textRefsIterator(textsToSearch))
         elif linkFor:
@@ -230,21 +224,15 @@ class RefSource:
                         ref
                         for ref in refs
                         if ref.status == "current"
-                        or (
-                            ref.status == "snapshot"
-                            and self.specs.get(ref.spec, {}).get("current_url") is None
-                        )
+                        or (ref.status == "snapshot" and self.specs.get(ref.spec, {}).get("current_url") is None)
                     ]
                 # If status is "snapshot", kill current refs if there's a corresponding snapshot ref for the same spec.
                 elif status == constants.refStatus.snapshot:
-                    snapshotSpecs = [
-                        ref.spec for ref in refs if ref.status == "snapshot"
-                    ]
+                    snapshotSpecs = [ref.spec for ref in refs if ref.status == "snapshot"]
                     return [
                         ref
                         for ref in refs
-                        if ref.status == "snapshot"
-                        or (ref.status == "current" and ref.spec not in snapshotSpecs)
+                        if ref.status == "snapshot" or (ref.status == "current" and ref.spec not in snapshotSpecs)
                     ]
             # Status is a non-refStatus, but is a valid linkStatus, like "local"
             elif status in config.linkStatuses:
@@ -270,9 +258,7 @@ class RefSource:
         if ignoreObsoletes and not spec:
             # Remove any ignored or obsoleted specs
             # If you specified the spec, don't filter things - you know what you're doing.
-            refs = filterObsoletes(
-                refs, replacedSpecs=self.replacedSpecs, ignoredSpecs=self.ignoredSpecs
-            )
+            refs = filterObsoletes(refs, replacedSpecs=self.replacedSpecs, ignoredSpecs=self.ignoredSpecs)
         if not refs:
             return refs, "ignored-specs"
 

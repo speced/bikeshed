@@ -70,26 +70,20 @@ def findIssuesFile():
 
     possibleFiles = [*glob.glob("issues*.txt"), *glob.glob("*.bsi")]
     if len(possibleFiles) == 0:
-        die(
-            "Can't find an 'issues*.txt' or '*.bsi' file in this folder. Explicitly pass a filename."
-        )
+        die("Can't find an 'issues*.txt' or '*.bsi' file in this folder. Explicitly pass a filename.")
         return
     if len(possibleFiles) == 1:
         return possibleFiles[0]
 
     # If there are more than one, assume they contain either an index or a YYYYMMDD date,
     # and select the largest such value.
-    possibleFiles = [
-        (extractNumber(fn), fn) for fn in possibleFiles if extractNumber(fn) is not None
-    ]
+    possibleFiles = [(extractNumber(fn), fn) for fn in possibleFiles if extractNumber(fn) is not None]
     if len(possibleFiles) == 1:
         return possibleFiles[0][1]
 
     possibleFiles.sort(reverse=True)
     if len(possibleFiles) == 0 or possibleFiles[0][0] == possibleFiles[1][0]:
-        die(
-            "Can't tell which issues-list file is the most recent. Explicitly pass a filename."
-        )
+        die("Can't tell which issues-list file is the most recent. Explicitly pass a filename.")
         return
     return possibleFiles[0][1]
 

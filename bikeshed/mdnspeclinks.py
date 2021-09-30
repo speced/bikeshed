@@ -21,9 +21,7 @@ def addMdnPanels(doc):
                 # if "maybe", failure is fine, don't complain
                 pass
             else:
-                die(
-                    f"Couldn't find the MDN data for '{doc.md.vshortname}' nor '{doc.md.shortname}'."
-                )
+                die(f"Couldn't find the MDN data for '{doc.md.vshortname}' nor '{doc.md.shortname}'.")
             return
     try:
         data = json.loads(datafile, object_pairs_hook=OrderedDict)
@@ -148,9 +146,7 @@ def panelsFromData(doc, data):
         featureDivs = []
         targetElement = find(f"[id='{elementId}']", doc)
         if targetElement is None:
-            warn(
-                f"No '{elementId}' ID found, skipping MDN features that would target it."
-            )
+            warn(f"No '{elementId}' ID found, skipping MDN features that would target it.")
             continue
 
         panels = True
@@ -226,9 +222,7 @@ def panelsFromData(doc, data):
 
         className = "mdn-anno wrapped"
         if isAnnoForListItemOrTableContent:
-            if targetElement.getchildren() and hasClass(
-                targetElement.getchildren()[0], "mdn-anno"
-            ):
+            if targetElement.getchildren() and hasClass(targetElement.getchildren()[0], "mdn-anno"):
                 # If there's already an annotation at the point where we want
                 # this, just re-use it (instead of creating another one).
                 appendChild(targetElement.getchildren()[0], featureDivs)
@@ -238,29 +232,19 @@ def panelsFromData(doc, data):
                 # cases where we have a long table or list, all the annotations
                 # for everything in it otherwise ends up being merged into a
                 # single annotation way up at the top of the table or list.
-                prependChild(
-                    targetElement, createAnno(className, mdnButton, featureDivs)
-                )
+                prependChild(targetElement, createAnno(className, mdnButton, featureDivs))
         elif isAnnoForHeadingContent:
             className = "mdn-anno wrapped after"
-            if (
-                targetElement.getnext() is not None
-                and targetElement.getnext().get("class") == className
-            ):
+            if targetElement.getnext() is not None and targetElement.getnext().get("class") == className:
                 # If there's already an annotation at the point where we want
                 # this, just re-use it (instead of creating another one).
                 appendChild(targetElement.getnext(), featureDivs)
             else:
                 # For elements we're annotating inside an h1-h6 heading, we
                 # insert the annotation as the next sibling of the heading.
-                insertAfter(
-                    targetElement, createAnno(className, mdnButton, featureDivs)
-                )
+                insertAfter(targetElement, createAnno(className, mdnButton, featureDivs))
         else:
-            if (
-                targetElement.getprevious() is not None
-                and targetElement.getprevious().get("class") == className
-            ):
+            if targetElement.getprevious() is not None and targetElement.getprevious().get("class") == className:
                 # If there's already an annotation at the point where we want
                 # this, just re-use it (instead of creating another one) —
                 # unless it's a class=after annotation (following a heading).
@@ -269,9 +253,7 @@ def panelsFromData(doc, data):
                 # For elements we're annotating that aren't inside a table or
                 # list or heading, we insert the annotation as the previous
                 # sibling of whatever block-level element holds the element.
-                insertBefore(
-                    targetElement, createAnno(className, mdnButton, featureDivs)
-                )
+                insertBefore(targetElement, createAnno(className, mdnButton, featureDivs))
     return panels
 
 
@@ -346,9 +328,7 @@ def addSupportRow(browserCodeName, nameFromCodeName, support, supportData):
     browserFullName = nameFromCodeName[browserCodeName]
     appendChild(
         supportData,
-        browserCompatSpan(
-            browserCodeName, browserFullName, statusCode, minVersion, needsFlag
-        ),
+        browserCompatSpan(browserCodeName, browserFullName, statusCode, minVersion, needsFlag),
     )
 
 
@@ -367,20 +347,14 @@ def mdnPanelFor(
         displaySlug = slug.split("/", 1)[1]
         title = feature.get("summary", "")
         mdnURL = mdnBaseUrl + slug
-        appendChild(
-            featureDiv, E.p({}, E.a({"href": mdnURL, "title": title}, displaySlug))
-        )
+        appendChild(featureDiv, E.p({}, E.a({"href": mdnURL, "title": title}, displaySlug)))
     if "engines" in feature:
         engines = len(feature["engines"])
         enginesPara = None
         if engines == 0:
-            enginesPara = E.p(
-                {"class": "less-than-two-engines-text"}, "In no current engines."
-            )
+            enginesPara = E.p({"class": "less-than-two-engines-text"}, "In no current engines.")
         elif engines == 1:
-            enginesPara = E.p(
-                {"class": "less-than-two-engines-text"}, "In only one current engine."
-            )
+            enginesPara = E.p({"class": "less-than-two-engines-text"}, "In only one current engine.")
         elif engines >= len(browsersProvidingCurrentEngines):
             enginesPara = E.p({"class": "all-engines-text"}, "In all current engines.")
         if enginesPara is not None:
@@ -405,18 +379,14 @@ def mdnPanelFor(
     return featureDiv
 
 
-def browserCompatSpan(
-    browserCodeName, browserFullName, statusCode, minVersion, needsFlag
-):
+def browserCompatSpan(browserCodeName, browserFullName, statusCode, minVersion, needsFlag):
     # browserCodeName: e.g. "chrome"
     # browserFullName: e.g. "Chrome for Android"
     minVersionAttributes = {}
     flagSymbol = ""
     if needsFlag:
         flagSymbol = "\U0001f530 "
-        minVersionAttributes[
-            "title"
-        ] = "Requires setting a user preference or runtime flag."
+        minVersionAttributes["title"] = "Requires setting a user preference or runtime flag."
     statusClass = {"y": "yes", "n": "no"}[statusCode]
     outer = E.span({"class": browserCodeName + " " + statusClass})
     appendChild(outer, E.span({}, browserFullName))

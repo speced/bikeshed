@@ -10,9 +10,7 @@ from ..messages import *
 def update(path, dryRun=False):
     say("Downloading Can I Use data...")
     try:
-        response = requests.get(
-            "https://raw.githubusercontent.com/Fyrd/caniuse/master/fulldata-json/data-2.0.json"
-        )
+        response = requests.get("https://raw.githubusercontent.com/Fyrd/caniuse/master/fulldata-json/data-2.0.json")
     except Exception as e:
         die("Couldn't download the Can I Use data.\n{0}", e)
         return
@@ -98,19 +96,13 @@ def update(path, dryRun=False):
             p = os.path.join(path, "caniuse", "data.json")
             writtenPaths.add(p)
             with open(p, "w", encoding="utf-8") as fh:
-                fh.write(
-                    json.dumps(basicData, indent=1, ensure_ascii=False, sort_keys=True)
-                )
+                fh.write(json.dumps(basicData, indent=1, ensure_ascii=False, sort_keys=True))
 
             for featureName, feature in featureData.items():
                 p = os.path.join(path, "caniuse", f"feature-{featureName}.json")
                 writtenPaths.add(p)
                 with open(p, "w", encoding="utf-8") as fh:
-                    fh.write(
-                        json.dumps(
-                            feature, indent=1, ensure_ascii=False, sort_keys=True
-                        )
-                    )
+                    fh.write(json.dumps(feature, indent=1, ensure_ascii=False, sort_keys=True))
         except Exception as e:
             die("Couldn't save Can I Use database to disk.\n{0}", e)
             return

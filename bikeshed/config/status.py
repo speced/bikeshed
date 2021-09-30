@@ -393,9 +393,7 @@ def canonicalizeStatus(rawStatus, group):
 
     # Otherwise, they provided a bare status.
     # See if their group is compatible with any of the prefixed statuses matching the bare status.
-    assert (
-        "" not in possibleMgs
-    )  # if it was here, the literal "in" test would have caught this bare status
+    assert "" not in possibleMgs  # if it was here, the literal "in" test would have caught this bare status
     for mg in possibleMgs:
         if group in megaGroups[mg]:
             canonStatus = mg + "/" + status

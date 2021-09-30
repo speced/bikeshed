@@ -5,7 +5,5 @@ from .messages import *  # noqa: F401
 
 
 def load(doc):
-    code = config.retrieveBoilerplateFile(
-        doc, "bs-extensions", allowLocal=constants.executeCode
-    )
+    code = config.retrieveBoilerplateFile(doc, "bs-extensions", allowLocal=constants.executeCode)
     exec(code, globals())

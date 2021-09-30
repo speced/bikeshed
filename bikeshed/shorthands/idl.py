@@ -50,9 +50,7 @@ class IdlShorthand:
 
     def respondEnd(self):
         if self.escapedText:
-            return steps.Success(
-                skips=["{"], nodes=[self.escapedText[1:], *self.linkText, "}}"]
-            )
+            return steps.Success(skips=["{"], nodes=[self.escapedText[1:], *self.linkText, "}}"])
 
         self.bsAutolink += "}}"
 
@@ -65,11 +63,7 @@ class IdlShorthand:
             return steps.Success(E.span({}, self.bsAutolink))
 
         if not self.linkText:
-            if (
-                self.lt.startswith("constructor(")
-                and self.linkFor
-                and self.linkFor != "/"
-            ):
+            if self.lt.startswith("constructor(") and self.linkFor and self.linkFor != "/":
                 # make {{Foo/constructor()}} output as "Foo()" so you know what it's linking to.
                 self.linkText = self.linkFor + self.lt[11:]
             else:
@@ -81,9 +75,7 @@ class IdlShorthand:
             "lt": self.lt,
             "bs-autolink-syntax": self.bsAutolink,
         }
-        return steps.Success(
-            E.code({"class": "idl", "nohighlight": ""}, E.a(attrs, self.linkText))
-        )
+        return steps.Success(E.code({"class": "idl", "nohighlight": ""}, E.a(attrs, self.linkText)))
 
 
 IdlShorthand.startRe = re.compile(

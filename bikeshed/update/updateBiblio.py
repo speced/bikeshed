@@ -72,13 +72,7 @@ def update(path, dryRun=False):
             p = os.path.join(path, "biblio-keys.json")
             writtenPaths.add(p)
             with open(p, "w", encoding="utf-8") as fh:
-                fh.write(
-                    str(
-                        json.dumps(
-                            reducedNames, indent=0, ensure_ascii=False, sort_keys=True
-                        )
-                    )
-                )
+                fh.write(str(json.dumps(reducedNames, indent=0, ensure_ascii=False, sort_keys=True)))
         except Exception as e:
             die("Couldn't save biblio database to disk.\n{0}", e)
             return
@@ -89,13 +83,7 @@ def update(path, dryRun=False):
             p = os.path.join(path, "biblio-numeric-suffixes.json")
             writtenPaths.add(p)
             with open(p, "w", encoding="utf-8") as fh:
-                fh.write(
-                    str(
-                        json.dumps(
-                            numberedNames, indent=0, ensure_ascii=False, sort_keys=True
-                        )
-                    )
-                )
+                fh.write(str(json.dumps(numberedNames, indent=0, ensure_ascii=False, sort_keys=True)))
         except Exception as e:
             die("Couldn't save biblio numeric-suffix information to disk.\n{0}", e)
     say("Success!")
@@ -120,9 +108,7 @@ def getWG21Data():
 
 def getCSSWGData():
     try:
-        return requests.get(
-            "https://raw.githubusercontent.com/w3c/csswg-drafts/master/biblio.ref"
-        ).text.splitlines()
+        return requests.get("https://raw.githubusercontent.com/w3c/csswg-drafts/master/biblio.ref").text.splitlines()
     except Exception as e:
         die("Couldn't download the CSSWG biblio data.\n{0}", e)
         return []
@@ -161,9 +147,7 @@ def writeBiblioFile(fh, biblios):
     for key, entries in biblios.items():
         b = sorted(entries, key=lambda x: x["order"])[0]
         format = b["biblioFormat"]
-        fh.write(
-            "{prefix}:{key}\n".format(prefix=typePrefixes[format], key=key.lower())
-        )
+        fh.write("{prefix}:{key}\n".format(prefix=typePrefixes[format], key=key.lower()))
         if format == "dict":
             for field in [
                 "linkText",

@@ -121,9 +121,7 @@ class Diagram(DiagramItem):
         # Accepts a type=[simple|complex] kwarg
         DiagramItem.__init__(self, "svg", {"class": DIAGRAM_CLASS})
         self.type = kwargs.get("type", "simple")
-        self.items = (
-            [Start(self.type)] + [wrapString(item) for item in items] + [End(self.type)]
-        )
+        self.items = [Start(self.type)] + [wrapString(item) for item in items] + [End(self.type)]
         self.up = 0
         self.down = 0
         self.height = 0
@@ -139,9 +137,7 @@ class Diagram(DiagramItem):
             self.width -= 10
         self.formatted = False
 
-    def format(
-        self, paddingTop=20, paddingRight=None, paddingBottom=None, paddingLeft=None
-    ):
+    def format(self, paddingTop=20, paddingRight=None, paddingBottom=None, paddingLeft=None):
         if paddingRight is None:
             paddingRight = paddingTop
         if paddingBottom is None:
@@ -223,9 +219,7 @@ class Stack(DiagramItem):
         DiagramItem.__init__(self, "g")
         self.items = [wrapString(item) for item in items]
         self.needsSpace = True
-        self.width = max(
-            item.width + (20 if item.needsSpace else 0) for item in self.items
-        )
+        self.width = max(item.width + (20 if item.needsSpace else 0) for item in self.items)
         # pretty sure that space calc is totes wrong
         if len(self.items) > 1:
             self.width += ARC_RADIUS * 2
@@ -311,8 +305,7 @@ class OptionalSequence(DiagramItem):
                 self.down = (
                     max(
                         self.height + self.down,
-                        heightSoFar
-                        + max(ARC_RADIUS * 2, item.down + VERTICAL_SEPARATION),
+                        heightSoFar + max(ARC_RADIUS * 2, item.down + VERTICAL_SEPARATION),
                     )
                     - self.height
                 )
@@ -366,20 +359,12 @@ class OptionalSequence(DiagramItem):
                 # Straight line
                 (Path(x, y).right(ARC_RADIUS * 2).addTo(self))
                 item.format(x + ARC_RADIUS * 2, y, item.width).addTo(self)
-                (
-                    Path(x + item.width + ARC_RADIUS * 2, y + item.height)
-                    .right(itemSpace + ARC_RADIUS)
-                    .addTo(self)
-                )
+                (Path(x + item.width + ARC_RADIUS * 2, y + item.height).right(itemSpace + ARC_RADIUS).addTo(self))
                 # Lower skip
                 (
                     Path(x, y)
                     .arc("ne")
-                    .down(
-                        item.height
-                        + max(item.down + VERTICAL_SEPARATION, ARC_RADIUS * 2)
-                        - ARC_RADIUS * 2
-                    )
+                    .down(item.height + max(item.down + VERTICAL_SEPARATION, ARC_RADIUS * 2) - ARC_RADIUS * 2)
                     .arc("ws")
                     .right(itemWidth - ARC_RADIUS)
                     .arc("se")
@@ -393,20 +378,12 @@ class OptionalSequence(DiagramItem):
                 # Straight line
                 (Path(x, y).right(ARC_RADIUS * 2).addTo(self))
                 item.format(x + ARC_RADIUS * 2, y, item.width).addTo(self)
-                (
-                    Path(x + ARC_RADIUS * 2 + item.width, y + item.height)
-                    .right(itemSpace + ARC_RADIUS)
-                    .addTo(self)
-                )
+                (Path(x + ARC_RADIUS * 2 + item.width, y + item.height).right(itemSpace + ARC_RADIUS).addTo(self))
                 # Lower skip
                 (
                     Path(x, y)
                     .arc("ne")
-                    .down(
-                        item.height
-                        + max(item.down + VERTICAL_SEPARATION, ARC_RADIUS * 2)
-                        - ARC_RADIUS * 2
-                    )
+                    .down(item.height + max(item.down + VERTICAL_SEPARATION, ARC_RADIUS * 2) - ARC_RADIUS * 2)
                     .arc("ws")
                     .right(itemWidth - ARC_RADIUS)
                     .arc("se")
@@ -435,20 +412,14 @@ class Choice(DiagramItem):
             if i < default:
                 self.up += max(
                     arcs,
-                    item.height
-                    + item.down
-                    + VERTICAL_SEPARATION
-                    + self.items[i + 1].up,
+                    item.height + item.down + VERTICAL_SEPARATION + self.items[i + 1].up,
                 )
             elif i == default:
                 continue
             else:
                 self.down += max(
                     arcs,
-                    item.up
-                    + VERTICAL_SEPARATION
-                    + self.items[i - 1].down
-                    + self.items[i - 1].height,
+                    item.up + VERTICAL_SEPARATION + self.items[i - 1].down + self.items[i - 1].height,
                 )
         self.down -= self.items[default].height  # already counted in self.height
         if DEBUG:
@@ -474,32 +445,21 @@ class Choice(DiagramItem):
                 default.up + VERTICAL_SEPARATION + above[0].down + above[0].height,
             )
         for i, ni, item in doubleenumerate(above):
-            Path(x, y).arc("se").up(distanceFromY - ARC_RADIUS * 2).arc("wn").addTo(
-                self
-            )
+            Path(x, y).arc("se").up(distanceFromY - ARC_RADIUS * 2).arc("wn").addTo(self)
             item.format(x + ARC_RADIUS * 2, y - distanceFromY, innerWidth).addTo(self)
-            Path(x + ARC_RADIUS * 2 + innerWidth, y - distanceFromY + item.height).arc(
-                "ne"
-            ).down(distanceFromY - item.height + default.height - ARC_RADIUS * 2).arc(
-                "ws"
-            ).addTo(
-                self
-            )
+            Path(x + ARC_RADIUS * 2 + innerWidth, y - distanceFromY + item.height).arc("ne").down(
+                distanceFromY - item.height + default.height - ARC_RADIUS * 2
+            ).arc("ws").addTo(self)
             if ni < -1:
                 distanceFromY += max(
                     ARC_RADIUS,
-                    item.up
-                    + VERTICAL_SEPARATION
-                    + above[i + 1].down
-                    + above[i + 1].height,
+                    item.up + VERTICAL_SEPARATION + above[i + 1].down + above[i + 1].height,
                 )
 
         # Do the straight-line path.
         Path(x, y).right(ARC_RADIUS * 2).addTo(self)
         self.items[self.default].format(x + ARC_RADIUS * 2, y, innerWidth).addTo(self)
-        Path(x + ARC_RADIUS * 2 + innerWidth, y + self.height).right(
-            ARC_RADIUS * 2
-        ).addTo(self)
+        Path(x + ARC_RADIUS * 2 + innerWidth, y + self.height).right(ARC_RADIUS * 2).addTo(self)
 
         # Do the elements that curve below
         below = self.items[self.default + 1 :]
@@ -509,23 +469,14 @@ class Choice(DiagramItem):
                 default.height + default.down + VERTICAL_SEPARATION + below[0].up,
             )
         for i, item in enumerate(below):
-            Path(x, y).arc("ne").down(distanceFromY - ARC_RADIUS * 2).arc("ws").addTo(
-                self
-            )
+            Path(x, y).arc("ne").down(distanceFromY - ARC_RADIUS * 2).arc("ws").addTo(self)
             item.format(x + ARC_RADIUS * 2, y + distanceFromY, innerWidth).addTo(self)
-            Path(x + ARC_RADIUS * 2 + innerWidth, y + distanceFromY + item.height).arc(
-                "se"
-            ).up(distanceFromY - ARC_RADIUS * 2 + item.height - default.height).arc(
-                "wn"
-            ).addTo(
-                self
-            )
+            Path(x + ARC_RADIUS * 2 + innerWidth, y + distanceFromY + item.height).arc("se").up(
+                distanceFromY - ARC_RADIUS * 2 + item.height - default.height
+            ).arc("wn").addTo(self)
             distanceFromY += max(
                 ARC_RADIUS,
-                item.height
-                + item.down
-                + VERTICAL_SEPARATION
-                + (below[i + 1].up if i + 1 < len(below) else 0),
+                item.height + item.down + VERTICAL_SEPARATION + (below[i + 1].up if i + 1 < len(below) else 0),
             )
         return self
 
@@ -552,20 +503,14 @@ class MultipleChoice(DiagramItem):
             if i < default:
                 self.up += max(
                     minimum,
-                    item.height
-                    + item.down
-                    + VERTICAL_SEPARATION
-                    + self.items[i + 1].up,
+                    item.height + item.down + VERTICAL_SEPARATION + self.items[i + 1].up,
                 )
             elif i == default:
                 continue
             else:
                 self.down += max(
                     minimum,
-                    item.up
-                    + VERTICAL_SEPARATION
-                    + self.items[i - 1].down
-                    + self.items[i - 1].height,
+                    item.up + VERTICAL_SEPARATION + self.items[i - 1].down + self.items[i - 1].height,
                 )
         self.down -= self.items[default].height  # already counted in self.height
         if DEBUG:
@@ -591,9 +536,7 @@ class MultipleChoice(DiagramItem):
             )
         for i, ni, item in doubleenumerate(above):
             (Path(x + 30, y).up(distanceFromY - ARC_RADIUS).arc("wn").addTo(self))
-            item.format(x + 30 + ARC_RADIUS, y - distanceFromY, self.innerWidth).addTo(
-                self
-            )
+            item.format(x + 30 + ARC_RADIUS, y - distanceFromY, self.innerWidth).addTo(self)
             (
                 Path(
                     x + 30 + ARC_RADIUS + self.innerWidth,
@@ -606,20 +549,13 @@ class MultipleChoice(DiagramItem):
             if ni < -1:
                 distanceFromY += max(
                     ARC_RADIUS,
-                    item.up
-                    + VERTICAL_SEPARATION
-                    + above[i + 1].down
-                    + above[i + 1].height,
+                    item.up + VERTICAL_SEPARATION + above[i + 1].down + above[i + 1].height,
                 )
 
         # Do the straight-line path.
         Path(x + 30, y).right(ARC_RADIUS).addTo(self)
-        self.items[self.default].format(x + 30 + ARC_RADIUS, y, self.innerWidth).addTo(
-            self
-        )
-        Path(x + 30 + ARC_RADIUS + self.innerWidth, y + self.height).right(
-            ARC_RADIUS
-        ).addTo(self)
+        self.items[self.default].format(x + 30 + ARC_RADIUS, y, self.innerWidth).addTo(self)
+        Path(x + 30 + ARC_RADIUS + self.innerWidth, y + self.height).right(ARC_RADIUS).addTo(self)
 
         # Do the elements that curve below
         below = self.items[self.default + 1 :]
@@ -630,9 +566,7 @@ class MultipleChoice(DiagramItem):
             )
         for i, item in enumerate(below):
             (Path(x + 30, y).down(distanceFromY - ARC_RADIUS).arc("ws").addTo(self))
-            item.format(x + 30 + ARC_RADIUS, y + distanceFromY, self.innerWidth).addTo(
-                self
-            )
+            item.format(x + 30 + ARC_RADIUS, y + distanceFromY, self.innerWidth).addTo(self)
             (
                 Path(
                     x + 30 + ARC_RADIUS + self.innerWidth,
@@ -644,10 +578,7 @@ class MultipleChoice(DiagramItem):
             )
             distanceFromY += max(
                 ARC_RADIUS,
-                item.height
-                + item.down
-                + VERTICAL_SEPARATION
-                + (below[i + 1].up if i + 1 < len(below) else 0),
+                item.height + item.down + VERTICAL_SEPARATION + (below[i + 1].up if i + 1 < len(below) else 0),
             )
         text = DiagramItem("g", attrs={"class": "diagram-text"}).addTo(self)
         DiagramItem(
@@ -698,11 +629,7 @@ class OneOrMore(DiagramItem):
         self.up = self.item.up
         self.down = max(
             ARC_RADIUS * 2,
-            self.item.down
-            + VERTICAL_SEPARATION
-            + self.rep.up
-            + self.rep.height
-            + self.rep.down,
+            self.item.down + VERTICAL_SEPARATION + self.rep.up + self.rep.height + self.rep.down,
         )
         self.needsSpace = True
         if DEBUG:
@@ -727,19 +654,11 @@ class OneOrMore(DiagramItem):
             ARC_RADIUS * 2,
             self.item.height + self.item.down + VERTICAL_SEPARATION + self.rep.up,
         )
-        Path(x + ARC_RADIUS, y).arc("nw").down(distanceFromY - ARC_RADIUS * 2).arc(
-            "ws"
-        ).addTo(self)
-        self.rep.format(
-            x + ARC_RADIUS, y + distanceFromY, self.width - ARC_RADIUS * 2
-        ).addTo(self)
-        Path(x + self.width - ARC_RADIUS, y + distanceFromY + self.rep.height).arc(
-            "se"
-        ).up(distanceFromY - ARC_RADIUS * 2 + self.rep.height - self.item.height).arc(
-            "en"
-        ).addTo(
-            self
-        )
+        Path(x + ARC_RADIUS, y).arc("nw").down(distanceFromY - ARC_RADIUS * 2).arc("ws").addTo(self)
+        self.rep.format(x + ARC_RADIUS, y + distanceFromY, self.width - ARC_RADIUS * 2).addTo(self)
+        Path(x + self.width - ARC_RADIUS, y + distanceFromY + self.rep.height).arc("se").up(
+            distanceFromY - ARC_RADIUS * 2 + self.rep.height - self.item.height
+        ).arc("en").addTo(self)
 
         return self
 
@@ -885,9 +804,7 @@ class Comment(DiagramItem):
         Path(x, y).h(leftGap).addTo(self)
         Path(x + leftGap + self.width, y).h(rightGap).addTo(self)
 
-        text = DiagramItem(
-            "text", {"x": x + width / 2, "y": y + 5, "class": "comment"}, self.text
-        )
+        text = DiagramItem("text", {"x": x + width / 2, "y": y + 5, "class": "comment"}, self.text)
         if self.href is not None:
             a = DiagramItem("a", {"xlink:href": self.href}, text).addTo(self)
             text.addTo(a)

@@ -94,9 +94,7 @@ def fixupDataFiles():
         for filename in os.listdir(remotePath()):
             copyanything(remotePath(filename), localPath(filename))
     except Exception as err:
-        warn(
-            "Couldn't update datafiles from cache. Bikeshed may be unstable.\n{0}", err
-        )
+        warn("Couldn't update datafiles from cache. Bikeshed may be unstable.\n{0}", err)
         return
 
 

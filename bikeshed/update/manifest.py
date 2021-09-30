@@ -46,9 +46,7 @@ if sys.platform.startswith("win") and sys.version_info >= (3, 8):
     except ImportError:
         pass
     else:
-        if not isinstance(
-            asyncio.get_event_loop_policy(), WindowsSelectorEventLoopPolicy
-        ):
+        if not isinstance(asyncio.get_event_loop_policy(), WindowsSelectorEventLoopPolicy):
             asyncio.set_event_loop_policy(WindowsSelectorEventLoopPolicy())
 
 
@@ -136,9 +134,7 @@ def updateByManifest(path, dryRun=False):
         return False
 
     if remoteDt is None:
-        die(
-            "Something's gone wrong with the remote data; I can't read its timestamp. Please report this!"
-        )
+        die("Something's gone wrong with the remote data; I can't read its timestamp. Please report this!")
         return
 
     if localDt == "error":
@@ -178,17 +174,11 @@ def updateByManifest(path, dryRun=False):
     if not dryRun:
         deletedPaths = []
         for filePath in localFiles:
-            if filePath not in remoteFiles and os.path.exists(
-                localizePath(path, filePath)
-            ):
+            if filePath not in remoteFiles and os.path.exists(localizePath(path, filePath)):
                 os.remove(localizePath(path, filePath))
                 deletedPaths.append(filePath)
         if deletedPaths:
-            print(
-                "Deleted {} old data file{}.".format(
-                    len(deletedPaths), "s" if len(deletedPaths) > 1 else ""
-                )
-            )
+            print("Deleted {} old data file{}.".format(len(deletedPaths), "s" if len(deletedPaths) > 1 else ""))
 
     if not dryRun:
         if newPaths:
@@ -254,9 +244,7 @@ async def updateFile(localPrefix, filePath, session):
     if res.is_ok():
         res = await saveFile(localPath, res.ok())
     else:
-        warn(
-            f"Error downloading {filePath}, full error was:\n{await errorFromAsyncErr(res)}"
-        )
+        warn(f"Error downloading {filePath}, full error was:\n{await errorFromAsyncErr(res)}")
     if res.is_err():
         res = Err(filePath)
     return res
@@ -336,9 +324,7 @@ def dtFromManifest(lines):
         return
 
 
-def createFinishedManifest(
-    manifestLines, goodPaths, badPaths
-):  # pylint: disable=unused-argument
+def createFinishedManifest(manifestLines, goodPaths, badPaths):  # pylint: disable=unused-argument
     if not badPaths:
         return "\n".join(manifestLines)
 
@@ -355,8 +341,6 @@ def createFinishedManifest(
     for i, line in enumerate(manifestLines[1:], 1):
         prefix, _, path = line.strip().rpartition(" ")
         if path in badPaths:
-            manifestLines[i] = (
-                "error" + ("-" * (len(prefix) - len("error"))) + " " + path
-            )
+            manifestLines[i] = "error" + ("-" * (len(prefix) - len("error"))) + " " + path
 
     return "\n".join(manifestLines)

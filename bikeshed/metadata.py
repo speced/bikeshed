@@ -89,9 +89,7 @@ class MetadataManager:
         self.logo = ""
         self.mailingList = None
         self.mailingListArchives = None
-        self.markupShorthands = config.BoolSet(
-            ["css", "dfn", "biblio", "markup", "idl", "algorithm"]
-        )
+        self.markupShorthands = config.BoolSet(["css", "dfn", "biblio", "markup", "idl", "algorithm"])
         self.maxToCDepth = float("inf")
         self.metadataInclude = config.BoolSet(default=True)
         self.metadataOrder = ["*", "!*"]
@@ -261,9 +259,7 @@ class MetadataManager:
             macros["spectitle"] = self.h1
         macros["shortname"] = self.displayShortname
         if self.statusText:
-            macros["statustext"] = "\n".join(
-                markdown.parse(self.statusText, self.indent)
-            )
+            macros["statustext"] = "\n".join(markdown.parse(self.statusText, self.indent))
         else:
             macros["statustext"] = ""
         macros["level"] = str(self.level)
@@ -289,26 +285,20 @@ class MetadataManager:
         if self.abstract:
             abstractLines = datablocks.transformDataBlocks(doc, self.abstract)
             macros["abstract"] = "\n".join(markdown.parse(abstractLines, self.indent))
-            macros["abstractattr"] = escapeAttr(
-                "  ".join(abstractLines).replace("<<", "<").replace(">>", ">")
-            )
+            macros["abstractattr"] = escapeAttr("  ".join(abstractLines).replace("<<", "<").replace(">>", ">"))
         elif self.noAbstract:
             macros["abstract"] = ""
             macros["abstractattr"] = ""
         macros["year"] = self.date.year
         macros["date"] = self.date.strftime(f"{self.date.day} %B %Y")
-        macros["date-dmmy"] = self.date.strftime(
-            f"{self.date.day} %B %Y"
-        )  # same as plain 'date'
+        macros["date-dmmy"] = self.date.strftime(f"{self.date.day} %B %Y")  # same as plain 'date'
         macros["cdate"] = self.date.strftime("%Y%m%d")
         macros["isodate"] = self.date.strftime("%Y-%m-%d")
         macros["date-my"] = self.date.strftime("%b %Y")
         macros["date-mmy"] = self.date.strftime("%B %Y")
         if isinstance(self.expires, date):
             macros["expires"] = self.expires.strftime(f"{self.expires.day} %B %Y")
-            macros["expires-dmmy"] = self.expires.strftime(
-                f"{self.expires.day} %B %Y"
-            )  # same as plain 'expires'
+            macros["expires-dmmy"] = self.expires.strftime(f"{self.expires.day} %B %Y")  # same as plain 'expires'
             macros["cexpires"] = self.expires.strftime("%Y%m%d")
             macros["isoexpires"] = self.expires.strftime("%Y-%m-%d")
             macros["expires-my"] = self.expires.strftime("%b %Y")
@@ -317,11 +307,7 @@ class MetadataManager:
             macros["deadline"] = self.deadline.strftime(f"{self.deadline.day} %B %Y")
             macros["isodeadline"] = self.deadline.strftime("%Y-%m-%d")
         if self.status in config.snapshotStatuses:
-            macros[
-                "version"
-            ] = "https://www.w3.org/TR/{year}/{status}-{vshortname}-{cdate}/".format(
-                **macros
-            )
+            macros["version"] = "https://www.w3.org/TR/{year}/{status}-{vshortname}-{cdate}/".format(**macros)
         elif self.ED:
             macros["version"] = self.ED
         macros["annotations"] = constants.testAnnotationURL
@@ -342,38 +328,22 @@ class MetadataManager:
         if self.mailingListArchives:
             macros["mailinglistarchives"] = self.mailingListArchives
         if self.status in ("w3c/FPWD", "w3c/NOTE-FPWD", "w3c/NOTE-WD"):
-            macros[
-                "w3c-stylesheet-url"
-            ] = "https://www.w3.org/StyleSheets/TR/2016/W3C-WD"
+            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/W3C-WD"
         elif self.status == "FINDING":
-            macros[
-                "w3c-stylesheet-url"
-            ] = "https://www.w3.org/StyleSheets/TR/2016/W3C-NOTE"
+            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/W3C-NOTE"
         elif self.status == "w3c/CG-DRAFT":
-            macros[
-                "w3c-stylesheet-url"
-            ] = "https://www.w3.org/StyleSheets/TR/2016/cg-draft"
+            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/cg-draft"
         elif self.status == "w3c/CG-FINAL":
-            macros[
-                "w3c-stylesheet-url"
-            ] = "https://www.w3.org/StyleSheets/TR/2016/cg-final"
+            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/cg-final"
         elif self.status == "w3c/NOTE-ED":
-            macros[
-                "w3c-stylesheet-url"
-            ] = "https://www.w3.org/StyleSheets/TR/2016/W3C-ED"
+            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/W3C-ED"
         else:
             shortStatus = (
-                self.rawStatus.partition("/")[2]
-                if (self.rawStatus and "/" in str(self.rawStatus))
-                else self.rawStatus
+                self.rawStatus.partition("/")[2] if (self.rawStatus and "/" in str(self.rawStatus)) else self.rawStatus
             )
-            macros[
-                "w3c-stylesheet-url"
-            ] = f"https://www.w3.org/StyleSheets/TR/2016/W3C-{shortStatus}"
+            macros["w3c-stylesheet-url"] = f"https://www.w3.org/StyleSheets/TR/2016/W3C-{shortStatus}"
         if self.customWarningText is not None:
-            macros["customwarningtext"] = "\n".join(
-                markdown.parse(self.customWarningText, self.indent)
-            )
+            macros["customwarningtext"] = "\n".join(markdown.parse(self.customWarningText, self.indent))
         if self.customWarningTitle is not None:
             macros["customwarningtitle"] = self.customWarningTitle
         # Custom macros
@@ -532,11 +502,7 @@ def parseEditor(key, val, lineNum):
             data["w3cid"] = piece[6:]
         else:
             ambiguousPieces.append(piece)
-    if (
-        len(ambiguousPieces) == 3
-        and looksLinkish(ambiguousPieces[1])
-        and looksLinkish(ambiguousPieces[2])
-    ):
+    if len(ambiguousPieces) == 3 and looksLinkish(ambiguousPieces[1]) and looksLinkish(ambiguousPieces[2]):
         # [org, email, url] or [org, url, email]
         data["org"] = ambiguousPieces[0]
         if looksEmailish(ambiguousPieces[1]):
@@ -545,11 +511,7 @@ def parseEditor(key, val, lineNum):
         else:
             data["link"] = ambiguousPieces[1]
             data["email"] = ambiguousPieces[2]
-    elif (
-        len(ambiguousPieces) == 2
-        and looksLinkish(ambiguousPieces[0])
-        and looksLinkish(ambiguousPieces[1])
-    ):
+    elif len(ambiguousPieces) == 2 and looksLinkish(ambiguousPieces[0]) and looksLinkish(ambiguousPieces[1]):
         # [email, url] or [url, email]
         if looksEmailish(ambiguousPieces[0]):
             data["email"] = ambiguousPieces[0]
@@ -584,11 +546,7 @@ def parseEditor(key, val, lineNum):
         )
         return []
     # Check if the org ends with a link
-    if (
-        data["org"] is not None
-        and " " in str(data["org"])
-        and looksLinkish(data["org"].split()[-1])
-    ):
+    if data["org"] is not None and " " in str(data["org"]) and looksLinkish(data["org"].split()[-1]):
         pieces = data["org"].split()
         data["orglink"] = pieces[-1]
         data["org"] = " ".join(pieces[:-1])
@@ -695,12 +653,8 @@ def parseRefStatus(key, val, lineNum):
 
 
 def parseComplainAbout(key, val, lineNum):
-    validLabels = frozenset(
-        ["missing-example-ids", "broken-links", "accidental-2119", "missing-exposed"]
-    )
-    ret = parseBoolishList(
-        key, val.lower(), default=False, validLabels=validLabels, lineNum=lineNum
-    )
+    validLabels = frozenset(["missing-example-ids", "broken-links", "accidental-2119", "missing-exposed"])
+    ret = parseBoolishList(key, val.lower(), default=False, validLabels=validLabels, lineNum=lineNum)
     return ret
 
 
@@ -714,9 +668,7 @@ def parseExternalInfotrees(key, val, lineNum):
     )
 
 
-def parseBoolishList(
-    key, val, default=None, validLabels=None, extraValues=None, lineNum=None
-):
+def parseBoolishList(key, val, default=None, validLabels=None, extraValues=None, lineNum=None):
     # Parses anything defined as "label <boolish>, label <boolish>" into a passed BoolSet
     # Supply a list of valid labels if you want to have them checked,
     # and a dict of {value=>bool} pairs you want in addition to the standard boolish values
@@ -776,9 +728,7 @@ def parseMarkupShorthands(key, val, lineNum):  # pylint: disable=unused-argument
     # Output is a dict of the shorthand categories with boolean values.
     vals = [v.strip() for v in val.lower().split(",")]
     ret = config.BoolSet(default=False)
-    validCategories = frozenset(
-        ["css", "markup", "dfn", "biblio", "idl", "markdown", "algorithm"]
-    )
+    validCategories = frozenset(["css", "markup", "dfn", "biblio", "idl", "markdown", "algorithm"])
     for v in vals:
         pieces = v.split()
         if len(pieces) != 2:
@@ -941,9 +891,7 @@ def parseTranslation(key, val, lineNum):  # pylint: disable=unused-argument
                 piece,
                 lineNum=lineNum,
             )
-    return [
-        {"lang-code": langCode, "url": url, "name": name, "native-name": nativeName}
-    ]
+    return [{"lang-code": langCode, "url": url, "name": name, "native-name": nativeName}]
 
 
 def parseAudience(key, val, lineNum):  # pylint: disable=unused-argument
@@ -1066,9 +1014,7 @@ def parse(lines):
     endTag = None
     md = MetadataManager()
     for line in lines:
-        if not inMetadata and re.match(
-            r"<(pre|xmp) [^>]*class=[^>]*metadata[^>]*>", line.text
-        ):
+        if not inMetadata and re.match(r"<(pre|xmp) [^>]*class=[^>]*metadata[^>]*>", line.text):
             inMetadata = True
             md.hasMetadata = True
             if line.text.startswith("<pre"):
@@ -1166,9 +1112,7 @@ def getSpecRepository(doc):
         try:
             with open(os.devnull, "wb") as fnull:
                 remotes = str(
-                    subprocess.check_output(
-                        ["git", "remote", "-v"], stderr=fnull, cwd=source_dir
-                    ),
+                    subprocess.check_output(["git", "remote", "-v"], stderr=fnull, cwd=source_dir),
                     encoding="utf-8",
                 )
             searches = [
@@ -1283,64 +1227,34 @@ def parseLiteralList(key, val, lineNum):  # pylint: disable=unused-argument
 
 knownKeys = {
     "Abstract": Metadata("Abstract", "abstract", joinList, parseLiteralList),
-    "Advisement Class": Metadata(
-        "Advisement Class", "advisementClass", joinValue, parseLiteral
-    ),
-    "Assertion Class": Metadata(
-        "Assertion Class", "assertionClass", joinValue, parseLiteral
-    ),
-    "Assume Explicit For": Metadata(
-        "Assume Explicit For", "assumeExplicitFor", joinValue, parseBoolean
-    ),
+    "Advisement Class": Metadata("Advisement Class", "advisementClass", joinValue, parseLiteral),
+    "Assertion Class": Metadata("Assertion Class", "assertionClass", joinValue, parseLiteral),
+    "Assume Explicit For": Metadata("Assume Explicit For", "assumeExplicitFor", joinValue, parseBoolean),
     "At Risk": Metadata("At Risk", "atRisk", joinList, parseLiteralList),
     "Audience": Metadata("Audience", "audience", joinList, parseAudience),
-    "Block Elements": Metadata(
-        "Block Elements", "blockElements", joinList, parseCommaSeparated
-    ),
-    "Boilerplate": Metadata(
-        "Boilerplate", "boilerplate", joinBoolSet, parseBoilerplate
-    ),
-    "Can I Use Url": Metadata(
-        "Can I Use URL", "canIUseURLs", joinList, parseLiteralList
-    ),
+    "Block Elements": Metadata("Block Elements", "blockElements", joinList, parseCommaSeparated),
+    "Boilerplate": Metadata("Boilerplate", "boilerplate", joinBoolSet, parseBoilerplate),
+    "Can I Use Url": Metadata("Can I Use URL", "canIUseURLs", joinList, parseLiteralList),
     "Canonical Url": Metadata("Canonical URL", "canonicalURL", joinValue, parseLiteral),
-    "Complain About": Metadata(
-        "Complain About", "complainAbout", joinBoolSet, parseComplainAbout
-    ),
-    "Custom Warning Text": Metadata(
-        "Custom Warning Text", "customWarningText", joinList, parseLiteralList
-    ),
-    "Custom Warning Title": Metadata(
-        "Custom Warning Title", "customWarningTitle", joinValue, parseLiteral
-    ),
+    "Complain About": Metadata("Complain About", "complainAbout", joinBoolSet, parseComplainAbout),
+    "Custom Warning Text": Metadata("Custom Warning Text", "customWarningText", joinList, parseLiteralList),
+    "Custom Warning Title": Metadata("Custom Warning Title", "customWarningTitle", joinValue, parseLiteral),
     "Date": Metadata("Date", "date", joinValue, parseDate),
     "Deadline": Metadata("Deadline", "deadline", joinValue, parseDate),
-    "Default Biblio Display": Metadata(
-        "Default Biblio Display", "defaultBiblioDisplay", joinValue, parseBiblioDisplay
-    ),
+    "Default Biblio Display": Metadata("Default Biblio Display", "defaultBiblioDisplay", joinValue, parseBiblioDisplay),
     "Default Biblio Status": Metadata(
         "Default Biblio Status", "defaultRefStatus", joinValue, parseRefStatus
     ),  # synonym of "Default Ref Status"
-    "Default Highlight": Metadata(
-        "Default Highlight", "defaultHighlight", joinValue, parseLiteral
-    ),
-    "Default Ref Status": Metadata(
-        "Default Ref Status", "defaultRefStatus", joinValue, parseRefStatus
-    ),
+    "Default Highlight": Metadata("Default Highlight", "defaultHighlight", joinValue, parseLiteral),
+    "Default Ref Status": Metadata("Default Ref Status", "defaultRefStatus", joinValue, parseRefStatus),
     "ED": Metadata("ED", "ED", joinValue, parseLiteral),
     "Editor": Metadata("Editor", "editors", joinList, parseEditor),
     "Editor Term": Metadata("Editor Term", "editorTerm", joinValue, parseEditorTerm),
     "Expires": Metadata("Expires", "expires", joinValue, parseDateOrDuration),
-    "External Infotrees": Metadata(
-        "External Infotrees", "externalInfotrees", joinBoolSet, parseExternalInfotrees
-    ),
+    "External Infotrees": Metadata("External Infotrees", "externalInfotrees", joinBoolSet, parseExternalInfotrees),
     "Favicon": Metadata("Favicon", "favicon", joinValue, parseLiteral),
-    "Force Crossorigin": Metadata(
-        "Force Crossorigin", "forceCrossorigin", joinValue, parseBoolean
-    ),
-    "Former Editor": Metadata(
-        "Former Editor", "previousEditors", joinList, parseEditor
-    ),
+    "Force Crossorigin": Metadata("Force Crossorigin", "forceCrossorigin", joinValue, parseBoolean),
+    "Former Editor": Metadata("Former Editor", "previousEditors", joinList, parseEditor),
     "Group": Metadata("Group", "group", joinValue, parseLiteral),
     "H1": Metadata("H1", "h1", joinValue, parseLiteral),
     "Ignore Can I Use Url Failure": Metadata(
@@ -1349,47 +1263,23 @@ knownKeys = {
         joinList,
         parseLiteralList,
     ),
-    "Ignored Terms": Metadata(
-        "Ignored Terms", "ignoredTerms", joinList, parseCommaSeparated
-    ),
-    "Ignored Vars": Metadata(
-        "Ignored Vars", "ignoredVars", joinList, parseCommaSeparated
-    ),
-    "Image Auto Size": Metadata(
-        "Image Auto Size", "imgAutoSize", joinValue, parseBoolean
-    ),
-    "Implementation Report": Metadata(
-        "Implementation Report", "implementationReport", joinValue, parseLiteral
-    ),
-    "Include Can I Use Panels": Metadata(
-        "Include Can I Use Panels", "includeCanIUsePanels", joinValue, parseBoolean
-    ),
-    "Include Mdn Panels": Metadata(
-        "Include Mdn Panels", "includeMdnPanels", joinValue, parseSoftBoolean
-    ),
+    "Ignored Terms": Metadata("Ignored Terms", "ignoredTerms", joinList, parseCommaSeparated),
+    "Ignored Vars": Metadata("Ignored Vars", "ignoredVars", joinList, parseCommaSeparated),
+    "Image Auto Size": Metadata("Image Auto Size", "imgAutoSize", joinValue, parseBoolean),
+    "Implementation Report": Metadata("Implementation Report", "implementationReport", joinValue, parseLiteral),
+    "Include Can I Use Panels": Metadata("Include Can I Use Panels", "includeCanIUsePanels", joinValue, parseBoolean),
+    "Include Mdn Panels": Metadata("Include Mdn Panels", "includeMdnPanels", joinValue, parseSoftBoolean),
     "Indent": Metadata("Indent", "indent", joinValue, parseInteger),
-    "Infer Css Dfns": Metadata(
-        "Infer Css Dfns", "inferCSSDfns", joinValue, parseBoolean
-    ),
-    "Informative Classes": Metadata(
-        "Informative Classes", "informativeClasses", joinList, parseCommaSeparated
-    ),
-    "Inline Github Issues": Metadata(
-        "Inline Github Issues", "inlineGithubIssues", joinValue, parseInlineGithubIssues
-    ),
-    "Inline Tag Command": Metadata(
-        "Inline Tag Command", "inlineTagCommands", joinDict, parseInlineTagCommand
-    ),
+    "Infer Css Dfns": Metadata("Infer Css Dfns", "inferCSSDfns", joinValue, parseBoolean),
+    "Informative Classes": Metadata("Informative Classes", "informativeClasses", joinList, parseCommaSeparated),
+    "Inline Github Issues": Metadata("Inline Github Issues", "inlineGithubIssues", joinValue, parseInlineGithubIssues),
+    "Inline Tag Command": Metadata("Inline Tag Command", "inlineTagCommands", joinDict, parseInlineTagCommand),
     "Issue Class": Metadata("Issue Class", "issueClass", joinValue, parseLiteral),
-    "Issue Tracker Template": Metadata(
-        "Issue Tracker Template", "issueTrackerTemplate", joinValue, parseLiteral
-    ),
+    "Issue Tracker Template": Metadata("Issue Tracker Template", "issueTrackerTemplate", joinValue, parseLiteral),
     "Issue Tracking": Metadata("Issue Tracking", "issues", joinList, parseLinkedText),
     "Level": Metadata("Level", "level", joinValue, parseLevel),
     "Line Numbers": Metadata("Line Numbers", "lineNumbers", joinValue, parseBoolean),
-    "Link Defaults": Metadata(
-        "Link Defaults", "linkDefaults", joinDdList, parseLinkDefaults
-    ),
+    "Link Defaults": Metadata("Link Defaults", "linkDefaults", joinDdList, parseLinkDefaults),
     "Local Boilerplate": Metadata(
         "Local Boilerplate",
         "localBoilerplate",
@@ -1397,45 +1287,29 @@ knownKeys = {
         partial(parseBoolishList, default=False),
     ),
     "Logo": Metadata("Logo", "logo", joinValue, parseLiteral),
-    "Mailing List Archives": Metadata(
-        "Mailing List Archives", "mailingListArchives", joinValue, parseLiteral
-    ),
+    "Mailing List Archives": Metadata("Mailing List Archives", "mailingListArchives", joinValue, parseLiteral),
     "Mailing List": Metadata("Mailing List", "mailingList", joinValue, parseLiteral),
-    "Markup Shorthands": Metadata(
-        "Markup Shorthands", "markupShorthands", joinBoolSet, parseMarkupShorthands
-    ),
-    "Max Toc Depth": Metadata(
-        "Max ToC Depth", "maxToCDepth", joinValue, parseMaxToCDepth
-    ),
+    "Markup Shorthands": Metadata("Markup Shorthands", "markupShorthands", joinBoolSet, parseMarkupShorthands),
+    "Max Toc Depth": Metadata("Max ToC Depth", "maxToCDepth", joinValue, parseMaxToCDepth),
     "Metadata Include": Metadata(
         "Metadata Include",
         "metadataInclude",
         joinBoolSet,
         partial(parseBoolishList, default=True),
     ),
-    "Metadata Order": Metadata(
-        "Metadata Order", "metadataOrder", joinValue, parseMetadataOrder
-    ),
+    "Metadata Order": Metadata("Metadata Order", "metadataOrder", joinValue, parseMetadataOrder),
     "No Abstract": Metadata("No Abstract", "noAbstract", joinValue, parseBoolean),
     "No Editor": Metadata("No Editor", "noEditor", joinValue, parseBoolean),
     "Note Class": Metadata("Note Class", "noteClass", joinValue, parseLiteral),
-    "Opaque Elements": Metadata(
-        "Opaque Elements", "opaqueElements", joinList, parseCommaSeparated
-    ),
+    "Opaque Elements": Metadata("Opaque Elements", "opaqueElements", joinList, parseCommaSeparated),
     "Prepare For Tr": Metadata("Prepare For Tr", "prepTR", joinValue, parseBoolean),
-    "Previous Version": Metadata(
-        "Previous Version", "previousVersions", joinList, parsePreviousVersion
-    ),
-    "Remove Multiple Links": Metadata(
-        "Remove Multiple Links", "removeMultipleLinks", joinValue, parseBoolean
-    ),
+    "Previous Version": Metadata("Previous Version", "previousVersions", joinList, parsePreviousVersion),
+    "Remove Multiple Links": Metadata("Remove Multiple Links", "removeMultipleLinks", joinValue, parseBoolean),
     "Repository": Metadata("Repository", "repository", joinValue, parseRepository),
     "Required Ids": Metadata("Required Ids", "requiredIDs", joinList, parseIdList),
     "Revision": Metadata("Revision", "level", joinValue, parseLevel),
     "Shortname": Metadata("Shortname", "displayShortname", joinValue, parseLiteral),
-    "Slim Build Artifact": Metadata(
-        "Slim Build Artifact", "slimBuildArtifact", joinValue, parseBoolean
-    ),
+    "Slim Build Artifact": Metadata("Slim Build Artifact", "slimBuildArtifact", joinValue, parseBoolean),
     "Status Text": Metadata("Status Text", "statusText", joinList, parseLiteralList),
     "Status": Metadata("Status", "rawStatus", joinValue, parseLiteral),
     "Test Suite": Metadata("Test Suite", "testSuite", joinValue, parseLiteral),
@@ -1443,12 +1317,8 @@ knownKeys = {
     "Title": Metadata("Title", "title", joinValue, parseLiteral),
     "Toggle Diffs": Metadata("Toggle Diffs", "toggleDiffs", joinValue, parseBoolean),
     "TR": Metadata("TR", "TR", joinValue, parseLiteral),
-    "Tracking Vector Class": Metadata(
-        "Tracking Vector Class", "trackingVectorClass", joinValue, parseLiteralOrNone
-    ),
-    "Tracking Vector Image": Metadata(
-        "Tracking Vector Image", "trackingVectorImage", joinValue, parseLiteralOrNone
-    ),
+    "Tracking Vector Class": Metadata("Tracking Vector Class", "trackingVectorClass", joinValue, parseLiteralOrNone),
+    "Tracking Vector Image": Metadata("Tracking Vector Image", "trackingVectorImage", joinValue, parseLiteralOrNone),
     "Tracking Vector Image Width": Metadata(
         "Tracking Vector Image Width",
         "trackingVectorImageWidth",
@@ -1461,30 +1331,16 @@ knownKeys = {
         joinValue,
         parseLiteral,
     ),
-    "Tracking Vector Alt Text": Metadata(
-        "Tracking Vector Alt Text", "trackingVectorAltText", joinValue, parseLiteral
-    ),
-    "Tracking Vector Title": Metadata(
-        "Tracking Vector Title", "trackingVectorTitle", joinValue, parseLiteral
-    ),
-    "Translate Ids": Metadata(
-        "Translate Ids", "translateIDs", joinDdList, parseTranslateIDs
-    ),
+    "Tracking Vector Alt Text": Metadata("Tracking Vector Alt Text", "trackingVectorAltText", joinValue, parseLiteral),
+    "Tracking Vector Title": Metadata("Tracking Vector Title", "trackingVectorTitle", joinValue, parseLiteral),
+    "Translate Ids": Metadata("Translate Ids", "translateIDs", joinDdList, parseTranslateIDs),
     "Translation": Metadata("Translation", "translations", joinList, parseTranslation),
     "URL": Metadata("URL", "ED", joinValue, parseLiteral),  # URL is a synonym for ED
-    "Use <I> Autolinks": Metadata(
-        "Use <I> Autolinks", "useIAutolinks", joinValue, parseBoolean
-    ),
-    "Use Dfn Panels": Metadata(
-        "Use Dfn Panels", "useDfnPanels", joinValue, parseBoolean
-    ),
-    "Version History": Metadata(
-        "Version History", "versionHistory", joinList, parseLiteralList
-    ),
+    "Use <I> Autolinks": Metadata("Use <I> Autolinks", "useIAutolinks", joinValue, parseBoolean),
+    "Use Dfn Panels": Metadata("Use Dfn Panels", "useDfnPanels", joinValue, parseBoolean),
+    "Version History": Metadata("Version History", "versionHistory", joinList, parseLiteralList),
     "Warning": Metadata("Warning", "warning", joinValue, parseWarning),
     "Work Status": Metadata("Work Status", "workStatus", joinValue, parseWorkStatus),
     "Wpt Display": Metadata("Wpt Display", "wptDisplay", joinValue, parseWptDisplay),
-    "Wpt Path Prefix": Metadata(
-        "Wpt Path Prefix", "wptPathPrefix", joinValue, parseLiteral
-    ),
+    "Wpt Path Prefix": Metadata("Wpt Path Prefix", "wptPathPrefix", joinValue, parseLiteral),
 }

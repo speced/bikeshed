@@ -38,9 +38,7 @@ def addSyntaxHighlighting(doc):
         # Find whether to add line numbers
         addLineNumbers, lineStart, lineHighlights = determineLineNumbers(doc, el)
         if addLineNumbers or lineHighlights:
-            addLineWrappers(
-                el, numbers=addLineNumbers, start=lineStart, highlights=lineHighlights
-            )
+            addLineWrappers(el, numbers=addLineNumbers, start=lineStart, highlights=lineHighlights)
             if addLineNumbers:
                 lineWrappingOccurred = True
             if lineHighlights:
@@ -233,9 +231,7 @@ def coloredTextFromWidlStack(widlText):
                 continue
             currentText += char
             continue
-    assert (
-        len(colors) == 0
-    ), r"Colors stack wasn't empty at end, \1 and \3s aren't balanced?"
+    assert len(colors) == 0, r"Colors stack wasn't empty at end, \1 and \3s aren't balanced?"
     if currentText:
         coloredTexts.append(ColoredText(currentText, None))
     return coloredTexts

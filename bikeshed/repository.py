@@ -40,12 +40,8 @@ class GithubRepository(Repository):
 
     def formatIssueUrl(self, id=None):
         if id is None:
-            return "https://github.{}/{}/{}/issues/".format(
-                self.ns, self.user, self.repo
-            )
-        return "https://github.{}/{}/{}/issues/{}".format(
-            self.ns, self.user, self.repo, id
-        )
+            return "https://github.{}/{}/{}/issues/".format(self.ns, self.user, self.repo)
+        return "https://github.{}/{}/{}/issues/{}".format(self.ns, self.user, self.repo, id)
 
     def __str__(self):
         return f"{self.user}/{self.repo}"

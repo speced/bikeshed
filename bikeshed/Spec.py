@@ -151,9 +151,7 @@ class Spec:
             data=config.retrieveBoilerplateFile(self, "defaults", error=True),
             source="defaults",
         )
-        self.md = metadata.join(
-            self.mdBaseline, self.mdDefaults, self.mdDocument, self.mdCommandLine
-        )
+        self.md = metadata.join(self.mdBaseline, self.mdDefaults, self.mdDocument, self.mdCommandLine)
         # Using all of that, load up the text macros so I can sub them into the computed-metadata file.
         self.md.fillTextMacros(self.macros, doc=self)
         jsonEscapedMacros = {k: json.dumps(v)[1:-1] for k, v in self.macros.items()}
@@ -161,9 +159,7 @@ class Spec:
             config.retrieveBoilerplateFile(self, "computed-metadata", error=True),
             macros=jsonEscapedMacros,
         )
-        self.mdOverridingDefaults = metadata.fromJson(
-            data=computedMdText, source="computed-metadata"
-        )
+        self.mdOverridingDefaults = metadata.fromJson(data=computedMdText, source="computed-metadata")
         self.md = metadata.join(
             self.mdBaseline,
             self.mdDefaults,
@@ -293,14 +289,10 @@ class Spec:
             # Ensure that all W3C links are https.
             for el in findAll("a", self):
                 href = el.get("href", "")
-                if href.startswith("http://www.w3.org") or href.startswith(
-                    "http://lists.w3.org"
-                ):
+                if href.startswith("http://www.w3.org") or href.startswith("http://lists.w3.org"):
                     el.set("href", "https" + href[4:])
                 text = el.text or ""
-                if text.startswith("http://www.w3.org") or text.startswith(
-                    "http://lists.w3.org"
-                ):
+                if text.startswith("http://www.w3.org") or text.startswith("http://lists.w3.org"):
                     el.text = "https" + text[4:]
             # Loaded from .include files
             extensions.BSPrepTR(self)  # pylint: disable=no-member
@@ -309,9 +301,7 @@ class Spec:
 
     def serialize(self):
         try:
-            rendered = h.Serializer(
-                self.md.opaqueElements, self.md.blockElements
-            ).serialize(self.document)
+            rendered = h.Serializer(self.md.opaqueElements, self.md.blockElements).serialize(self.document)
         except Exception as e:
             die("{0}", e)
             return
@@ -340,9 +330,7 @@ class Spec:
                 if outputFilename == "-":
                     sys.stdout.write(rendered)
                 else:
-                    with open(
-                        outputFilename, "w", encoding="utf-8", newline=newline
-                    ) as f:
+                    with open(outputFilename, "w", encoding="utf-8", newline=newline) as f:
                         f.write(rendered)
             except Exception as e:
                 die(
@@ -389,9 +377,7 @@ class Spec:
                     pass
 
             socketserver.TCPServer.allow_reuse_address = True
-            server = socketserver.TCPServer(
-                ("localhost" if localhost else "", port), SilentServer
-            )
+            server = socketserver.TCPServer(("localhost" if localhost else "", port), SilentServer)
 
             print(f"Serving at port {port}")
             thread = threading.Thread(target=server.serve_forever)
@@ -405,28 +391,21 @@ class Spec:
         try:
             self.preprocess()
             self.finish(outputFilename)
-            lastInputModified = {
-                dep: dep.mtime() for dep in self.transitiveDependencies
-            }
+            lastInputModified = {dep: dep.mtime() for dep in self.transitiveDependencies}
             p("==============DONE==============")
             try:
                 while True:
                     # Comparing mtimes with "!=" handles when a file starts or
                     # stops existing, and it's fine to rebuild if an mtime
                     # somehow gets older.
-                    if any(
-                        input.mtime() != lastModified
-                        for input, lastModified in lastInputModified.items()
-                    ):
+                    if any(input.mtime() != lastModified for input, lastModified in lastInputModified.items()):
                         resetSeenMessages()
                         p("Source file modified. Rebuilding...")
                         self.initializeState()
                         self.mdCommandLine = mdCommandLine
                         self.preprocess()
                         self.finish(outputFilename)
-                        lastInputModified = {
-                            dep: dep.mtime() for dep in self.transitiveDependencies
-                        }
+                        lastInputModified = {dep: dep.mtime() for dep in self.transitiveDependencies}
                         p("==============DONE==============")
                     time.sleep(1)
             except KeyboardInterrupt:

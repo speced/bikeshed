@@ -126,9 +126,7 @@ def runMatcher(shClass, match, text, restNodes):
                     # set it up for the next round of this inner loop
                     text = restNodes.pop(0)
         else:
-            raise Exception(
-                f"{type(sh)}.respond() returned an unknown value '{result}'; this is a programming error."
-            )
+            raise Exception(f"{type(sh)}.respond() returned an unknown value '{result}'; this is a programming error.")
 
     # I've hit a Succeed result!
     # Now to return the nodes that should be put back into the parent element

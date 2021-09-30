@@ -61,16 +61,10 @@ def linkerror(msg, *formatArgs, **namedArgs):
             if el.get("bs-autolink-syntax"):
                 suffix = "\n{}".format(el.get("bs-autolink-syntax"))
             else:
-                suffix = "\n{}".format(
-                    lxml.html.tostring(
-                        namedArgs["el"], with_tail=False, encoding="unicode"
-                    )
-                )
+                suffix = "\n{}".format(lxml.html.tostring(namedArgs["el"], with_tail=False, encoding="unicode"))
     elif namedArgs.get("lineNum", None):
         lineNum = namedArgs["lineNum"]
-    msg = formatMessage(
-        "link", msg.format(*formatArgs, **namedArgs) + suffix, lineNum=lineNum
-    )
+    msg = formatMessage("link", msg.format(*formatArgs, **namedArgs) + suffix, lineNum=lineNum)
     if msg not in messages:
         messageCounts["linkerror"] += 1
         messages.add(msg)
@@ -86,9 +80,7 @@ def warn(msg, *formatArgs, **namedArgs):
         lineNum = namedArgs["el"].get("line-number")
     elif namedArgs.get("lineNum", None):
         lineNum = namedArgs["lineNum"]
-    msg = formatMessage(
-        "warning", msg.format(*formatArgs, **namedArgs), lineNum=lineNum
-    )
+    msg = formatMessage("warning", msg.format(*formatArgs, **namedArgs), lineNum=lineNum)
     if msg not in messages:
         messageCounts["warning"] += 1
         messages.add(msg)

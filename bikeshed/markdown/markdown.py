@@ -204,9 +204,7 @@ def tokenizeLines(
             # h2 underline
             match = re.match(r"-{3,}\s*$", lineText)
             token = {"type": "dash-line"}
-        elif "headings" in features and re.match(
-            r"(#{1,5})\s+(.+?)(\1\s*\{#[^ }]+\})?\s*$", lineText
-        ):
+        elif "headings" in features and re.match(r"(#{1,5})\s+(.+?)(\1\s*\{#[^ }]+\})?\s*$", lineText):
             # single-line heading
             match = re.match(r"(#{1,5})\s+(.+?)(\1\s*\{#[^ }]+\})?\s*$", lineText)
             level = len(match.group(1)) + 1
@@ -271,9 +269,7 @@ def stripComments(lines):
     inComment = False
     for line in lines:
         text, inComment = stripCommentsFromLine(line.text, inComment)
-        if (line.text != text and text.strip() == "") or (
-            line.text.strip() == "" and inComment
-        ):
+        if (line.text != text and text.strip() == "") or (line.text.strip() == "" and inComment):
             # First covers the entire line being stripped away by comment-removal.
             # Second covers an empty line that was fully inside a comment.
             # (If a comment started or ended on that line, it wouldn't start out empty.)
@@ -346,10 +342,7 @@ def stripPrefix(token, numSpacesForIndentation, len):
     for _ in range(len):
         if text[offset] == "\t":
             offset += 1
-        elif (
-            text[offset : offset + numSpacesForIndentation]
-            == " " * numSpacesForIndentation
-        ):
+        elif text[offset : offset + numSpacesForIndentation] == " " * numSpacesForIndentation:
             offset += numSpacesForIndentation
         else:
             die(
@@ -498,9 +491,7 @@ def parseParagraph(stream):
         matchNote = re.match(r"(note[:,])(\s*)(.*)", line, re.I)
         if matchNote:
             line = matchNote.group(3)
-            p += "<span>{note}</span>{ws}".format(
-                note=matchNote.group(1), ws=matchNote.group(2)
-            )
+            p += "<span>{note}</span>{ws}".format(note=matchNote.group(1), ws=matchNote.group(2))
     elif line.lower().startswith("issue:"):
         line = line[6:]
         p = f"<p line-number={i} class='replace-with-issue-class'>"
@@ -522,10 +513,7 @@ def parseParagraph(stream):
     lines = [lineFromStream(stream, f"{p}{line}\n")]
     while True:
         stream.advance()
-        if (
-            stream.currtype() not in ["text"]
-            or stream.currprefixlen() < initialPrefixLen
-        ):
+        if stream.currtype() not in ["text"] or stream.currprefixlen() < initialPrefixLen:
             lines[-1].text = lines[-1].text.rstrip() + endTag + "\n"
             return lines
         lines.append(stream.currline())
@@ -549,11 +537,7 @@ def parseBulleted(stream):
                 return lines, i
             if stream.currprefixlen() < prefixLen:
                 return lines, i
-            if (
-                stream.currtype() == "blank"
-                and stream.nexttype() != "bulleted"
-                and stream.nextprefixlen() <= prefixLen
-            ):
+            if stream.currtype() == "blank" and stream.nexttype() != "bulleted" and stream.nextprefixlen() <= prefixLen:
                 return lines, i
             if stream.currtype() == "eof":
                 return lines, i
@@ -570,11 +554,7 @@ def parseBulleted(stream):
             # The conditions that indicate we're past the end of the list itself
             if stream.currtype() == "eof":
                 return
-            if (
-                stream.currtype() == "blank"
-                and stream.nexttype() != "bulleted"
-                and stream.nextprefixlen() <= prefixLen
-            ):
+            if stream.currtype() == "blank" and stream.nexttype() != "bulleted" and stream.nextprefixlen() <= prefixLen:
                 return
             if stream.currprefixlen() < prefixLen:
                 return
@@ -609,11 +589,7 @@ def parseNumbered(stream, start=1):
                 return lines, i
             if stream.currprefixlen() < prefixLen:
                 return lines, i
-            if (
-                stream.currtype() == "blank"
-                and stream.nexttype() != "numbered"
-                and stream.nextprefixlen() <= prefixLen
-            ):
+            if stream.currtype() == "blank" and stream.nexttype() != "numbered" and stream.nextprefixlen() <= prefixLen:
                 return lines, i
             if stream.currtype() == "eof":
                 return lines, i
@@ -630,11 +606,7 @@ def parseNumbered(stream, start=1):
             # The conditions that indicate we're past the end of the list itself
             if stream.currtype() == "eof":
                 return
-            if (
-                stream.currtype() == "blank"
-                and stream.nexttype() != "numbered"
-                and stream.nextprefixlen() <= prefixLen
-            ):
+            if stream.currtype() == "blank" and stream.nexttype() != "numbered" and stream.nextprefixlen() <= prefixLen:
                 return
             if stream.currprefixlen() < prefixLen:
                 return
@@ -668,10 +640,7 @@ def parseDl(stream):
         while True:
             stream.advance()
             # All the conditions that indicate we're *past* the end of the item.
-            if (
-                stream.currtype() in ("dt", "dd")
-                and stream.currprefixlen() == prefixLen
-            ):
+            if stream.currtype() in ("dt", "dd") and stream.currprefixlen() == prefixLen:
                 return type, lines, i
             if stream.currprefixlen() < prefixLen:
                 return type, lines, i

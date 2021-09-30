@@ -46,9 +46,7 @@ def parse(string):
     lastIndent = 0
     tree = {"command": "Diagram", "prelude": "", "children": []}
     activeCommands = {"0": tree}
-    blockNames = (
-        "And|Seq|Sequence|Stack|Or|Choice|Opt|Optional|Plus|OneOrMore|Star|ZeroOrMore"
-    )
+    blockNames = "And|Seq|Sequence|Stack|Or|Choice|Opt|Optional|Plus|OneOrMore|Star|ZeroOrMore"
     textNames = "T|Terminal|N|NonTerminal|C|Comment|S|Skip"
     for i, line in enumerate(lines, 1):
         indent = 0
@@ -184,18 +182,14 @@ def _createDiagram(command, prelude, children, text=None, line=-1):
         if prelude:
             return die("Line {0} - OneOrMore commands cannot have preludes.", line)
         if 0 == len(children) > 2:
-            return die(
-                "Line {0} - OneOrMore commands must have one or two children.", line
-            )
+            return die("Line {0} - OneOrMore commands must have one or two children.", line)
         children = [_f for _f in [_createDiagram(**child) for child in children] if _f]
         return rr.OneOrMore(*children)
     if command in ("Star", "ZeroOrMore"):
         if prelude:
             return die("Line {0} - ZeroOrMore commands cannot have preludes.", line)
         if 0 == len(children) > 2:
-            return die(
-                "Line {0} - ZeroOrMore commands must have one or two children.", line
-            )
+            return die("Line {0} - ZeroOrMore commands must have one or two children.", line)
         children = [_f for _f in [_createDiagram(**child) for child in children] if _f]
         return rr.ZeroOrMore(*children)
     return die("Line {0} - Unknown command '{1}'.", line, command)

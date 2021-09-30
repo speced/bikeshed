@@ -8,9 +8,7 @@ from ..messages import *
 def processTags(doc):
     for el in findAll("[data-span-tag]", doc):
         if not constants.executeCode:
-            die(
-                "Found an inline code tag, but arbitrary code execution isn't allowed. See the --allow-execute flag."
-            )
+            die("Found an inline code tag, but arbitrary code execution isn't allowed. See the --allow-execute flag.")
             return
         tag = el.get("data-span-tag")
         if tag not in doc.md.inlineTagCommands:

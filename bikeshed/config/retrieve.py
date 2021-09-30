@@ -62,9 +62,7 @@ class DataFileRequester:
         raise OSError(f"Couldn't find file '{location}'")
 
 
-defaultRequester = DataFileRequester(
-    type="latest", fallback=DataFileRequester(type="readonly")
-)
+defaultRequester = DataFileRequester(type="latest", fallback=DataFileRequester(type="readonly"))
 
 
 def retrieveBoilerplateFile(
@@ -121,12 +119,8 @@ def retrieveBoilerplateFile(
         sources.append(InputSource(boilerplatePath(group, statusFile), chroot=False))
         sources.append(InputSource(boilerplatePath(group, genericFile), chroot=False))
     if megaGroup:
-        sources.append(
-            InputSource(boilerplatePath(megaGroup, statusFile), chroot=False)
-        )
-        sources.append(
-            InputSource(boilerplatePath(megaGroup, genericFile), chroot=False)
-        )
+        sources.append(InputSource(boilerplatePath(megaGroup, statusFile), chroot=False))
+        sources.append(InputSource(boilerplatePath(megaGroup, genericFile), chroot=False))
     sources.append(InputSource(boilerplatePath(statusFile), chroot=False))
     sources.append(InputSource(boilerplatePath(genericFile), chroot=False))
 

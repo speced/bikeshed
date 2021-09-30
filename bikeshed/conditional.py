@@ -70,10 +70,7 @@ def evalConditions(doc, el, conditionString):
             else:
                 yield False
         elif cond["type"] == "boilerplate":
-            yield (
-                find(f'[boilerplate="{escapeCSSIdent(cond["value"])}"]', doc)
-                is not None
-            )
+            yield (find(f'[boilerplate="{escapeCSSIdent(cond["value"])}"]', doc) is not None)
         else:
             die(
                 f"Program error, some type of include/exclude-if condition wasn't handled: '{repr(cond)}'. Please report!",

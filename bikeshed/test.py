@@ -47,9 +47,7 @@ def sortTests(tests):
     return sorted(tests, key=lambda x: ("/" in testNameForPath(x), x))
 
 
-def runAllTests(
-    patterns=None, manualOnly=False, md=None
-):  # pylint: disable=unused-argument
+def runAllTests(patterns=None, manualOnly=False, md=None):  # pylint: disable=unused-argument
     paths = testPaths(patterns)
     if len(paths) == 0:
         p("No tests were found")
@@ -90,9 +88,7 @@ def processTest(path, md=None, fileRequester=config.DataFileRequester(type="read
 def compare(suspect, golden):
     if suspect == golden:
         return True
-    for line in difflib.unified_diff(
-        golden.split("\n"), suspect.split("\n"), fromfile="golden", tofile="suspect"
-    ):
+    for line in difflib.unified_diff(golden.split("\n"), suspect.split("\n"), fromfile="golden", tofile="suspect"):
         if line[0] == "-":
             p(printColor(line, color="red"))
         elif line[0] == "+":
@@ -126,20 +122,13 @@ def testPaths(patterns=None):
     # otherwise, glob the provided paths, rooted at the test dir
     if not patterns:
         return list(sortTests(findTestFiles()))
-    return [
-        path
-        for pattern in patterns
-        for path in glob.glob(os.path.join(TEST_DIR, pattern))
-        if path.endswith(".bs")
-    ]
+    return [path for pattern in patterns for path in glob.glob(os.path.join(TEST_DIR, pattern)) if path.endswith(".bs")]
 
 
 def addTestMetadata(doc):
     from . import metadata
 
-    doc.mdBaseline.addData(
-        "Boilerplate", "omit feedback-header, omit generator, omit document-revision"
-    )
+    doc.mdBaseline.addData("Boilerplate", "omit feedback-header, omit generator, omit document-revision")
     doc.mdBaseline.addData("Repository", "test/test")
     _, md = metadata.parse(lines=doc.lines)
     if "Date" not in md.manuallySetKeys:

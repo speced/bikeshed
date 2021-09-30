@@ -106,28 +106,20 @@ class ReferenceManager:
         initSpecs()
 
         def initMethods():
-            self.foreignRefs.methods.update(
-                json.loads(self.dataFile.fetch("methods.json", str=True))
-            )
+            self.foreignRefs.methods.update(json.loads(self.dataFile.fetch("methods.json", str=True)))
 
         initMethods()
 
         def initFors():
-            self.foreignRefs.fors.update(
-                json.loads(self.dataFile.fetch("fors.json", str=True))
-            )
+            self.foreignRefs.fors.update(json.loads(self.dataFile.fetch("fors.json", str=True)))
 
         initFors()
         if doc and doc.inputSource and doc.inputSource.hasDirectory:
-            datablocks.transformInfo(
-                self.dataFile.fetch("link-defaults.infotree", str=True).split("\n"), doc
-            )
+            datablocks.transformInfo(self.dataFile.fetch("link-defaults.infotree", str=True).split("\n"), doc)
 
             # Get local anchor data
             shouldGetLocalAnchorData = doc.md.externalInfotrees["anchors.bsdata"]
-            if not shouldGetLocalAnchorData and doc.inputSource.cheaplyExists(
-                "anchors.bsdata"
-            ):
+            if not shouldGetLocalAnchorData and doc.inputSource.cheaplyExists("anchors.bsdata"):
                 warn(
                     "Found anchors.bsdata next to the specification without a matching\n"
                     + "External Infotrees: anchors.bsdata yes\n"
@@ -137,21 +129,13 @@ class ReferenceManager:
                 shouldGetLocalAnchorData = True
             if shouldGetLocalAnchorData:
                 try:
-                    datablocks.transformAnchors(
-                        doc.inputSource.relative("anchors.bsdata").read().rawLines, doc
-                    )
+                    datablocks.transformAnchors(doc.inputSource.relative("anchors.bsdata").read().rawLines, doc)
                 except OSError:
-                    warn(
-                        "anchors.bsdata not found despite being listed in the External Infotrees metadata."
-                    )
+                    warn("anchors.bsdata not found despite being listed in the External Infotrees metadata.")
 
             # Get local link defaults
-            shouldGetLocalLinkDefaults = doc.md.externalInfotrees[
-                "link-defaults.infotree"
-            ]
-            if not shouldGetLocalLinkDefaults and doc.inputSource.cheaplyExists(
-                "link-defaults.infotree"
-            ):
+            shouldGetLocalLinkDefaults = doc.md.externalInfotrees["link-defaults.infotree"]
+            if not shouldGetLocalLinkDefaults and doc.inputSource.cheaplyExists("link-defaults.infotree"):
                 warn(
                     "Found link-defaults.infotree next to the specification without a matching\n"
                     + "External Infotrees: link-defaults.infotree yes\n"
@@ -162,22 +146,16 @@ class ReferenceManager:
             if shouldGetLocalLinkDefaults:
                 try:
                     datablocks.transformInfo(
-                        doc.inputSource.relative("link-defaults.infotree")
-                        .read()
-                        .rawLines,
+                        doc.inputSource.relative("link-defaults.infotree").read().rawLines,
                         doc,
                     )
                 except OSError:
-                    warn(
-                        "link-defaults.infotree not found despite being listed in the External Infotrees metadata."
-                    )
+                    warn("link-defaults.infotree not found despite being listed in the External Infotrees metadata.")
 
     def fetchHeadings(self, spec):
         if spec in self.headings:
             return self.headings[spec]
-        with self.dataFile.fetch(
-            "headings", f"headings-{spec}.json", okayToFail=True
-        ) as fh:
+        with self.dataFile.fetch("headings", f"headings-{spec}.json", okayToFail=True) as fh:
             try:
                 data = json.load(fh)
             except ValueError:
@@ -187,12 +165,8 @@ class ReferenceManager:
             return data
 
     def initializeBiblio(self):
-        self.biblioKeys.update(
-            json.loads(self.dataFile.fetch("biblio-keys.json", str=True))
-        )
-        self.biblioNumericSuffixes.update(
-            json.loads(self.dataFile.fetch("biblio-numeric-suffixes.json", str=True))
-        )
+        self.biblioKeys.update(json.loads(self.dataFile.fetch("biblio-keys.json", str=True)))
+        self.biblioNumericSuffixes.update(json.loads(self.dataFile.fetch("biblio-numeric-suffixes.json", str=True)))
 
         # Get local bibliography data
         try:
@@ -251,10 +225,7 @@ class ReferenceManager:
         # TODO: This is dumb.
         for _, refs in self.foreignRefs.refs.items():
             for ref in refs:
-                if (
-                    ref["status"] != "local"
-                    and ref["shortname"].rstrip() == self.shortname
-                ):
+                if ref["status"] != "local" and ref["shortname"].rstrip() == self.shortname:
                     ref["export"] = False
 
     def addLocalDfns(self, dfns):
@@ -288,9 +259,9 @@ class ReferenceManager:
                 dfnFor = treeAttr(el, "data-dfn-for")
                 if dfnFor is None:
                     dfnFor = set()
-                    existingRefs = self.localRefs.queryRefs(
-                        linkType=linkType, text=linkText, linkFor="/", exact=True
-                    )[0]
+                    existingRefs = self.localRefs.queryRefs(linkType=linkType, text=linkText, linkFor="/", exact=True)[
+                        0
+                    ]
                     if existingRefs and existingRefs[0].el is not el:
                         die(
                             "Multiple local '{1}' <dfn>s have the same linking text '{0}'.",
@@ -450,13 +421,9 @@ class ReferenceManager:
 
         # Take defaults into account
         if not spec or not status or not linkFor:
-            variedTexts = [
-                v for v in linkTextVariations(text, linkType) if v in self.defaultSpecs
-            ]
+            variedTexts = [v for v in linkTextVariations(text, linkType) if v in self.defaultSpecs]
             if variedTexts:
-                for dfnSpec, dfnType, dfnStatus, dfnFor in reversed(
-                    self.defaultSpecs[variedTexts[0]]
-                ):
+                for dfnSpec, dfnType, dfnStatus, dfnFor in reversed(self.defaultSpecs[variedTexts[0]]):
                     if not config.linkTypeIn(dfnType, linkType):
                         continue
                     if linkFor and dfnFor:
@@ -481,9 +448,7 @@ class ReferenceManager:
             el=el,
         )
         if blockRefs and linkFor is None and any(x.for_ for x in blockRefs):
-            forlessRefs, _ = self.foreignRefs.queryRefs(
-                linkType=linkType, text=text, linkFor="/", export=True, el=el
-            )
+            forlessRefs, _ = self.foreignRefs.queryRefs(linkType=linkType, text=text, linkFor="/", export=True, el=el)
             forlessRefs = self.filterObsoletes(forlessRefs)
             if forlessRefs:
                 reportAmbiguousForlessLink(el, text, forlessRefs, blockRefs)
@@ -589,14 +554,8 @@ class ReferenceManager:
 
             # Allow foo(bar) to be for'd to with just foo() if it's completely unambiguous.
             methodPrefix = methodName[:-1]
-            candidates, _ = self.localRefs.queryRefs(
-                linkType="functionish", linkFor=interfaceName
-            )
-            methodRefs = list(
-                {
-                    c.url: c for c in candidates if c.text.startswith(methodPrefix)
-                }.values()
-            )
+            candidates, _ = self.localRefs.queryRefs(linkType="functionish", linkFor=interfaceName)
+            methodRefs = list({c.url: c for c in candidates if c.text.startswith(methodPrefix)}.values())
             if not methodRefs:
                 # Look for non-locals, then
                 c1, _ = self.anchorBlockRefs.queryRefs(
@@ -618,11 +577,7 @@ class ReferenceManager:
                     ignoreObsoletes=True,
                 )
                 candidates = c1 + c2
-                methodRefs = list(
-                    {
-                        c.url: c for c in candidates if c.text.startswith(methodPrefix)
-                    }.values()
-                )
+                methodRefs = list({c.url: c for c in candidates if c.text.startswith(methodPrefix)}.values())
             if zeroRefsError and len(methodRefs) > 1:
                 # More than one possible foo() overload, can't tell which to link to
                 linkerror(
@@ -635,9 +590,7 @@ class ReferenceManager:
             # Otherwise
 
         if failure in ("text", "type"):
-            if linkType in ("property", "propdesc", "descriptor") and text.startswith(
-                "--"
-            ):
+            if linkType in ("property", "propdesc", "descriptor") and text.startswith("--"):
                 # Custom properties/descriptors aren't ever defined anywhere
                 return None
             if zeroRefsError:
@@ -807,9 +760,7 @@ class ReferenceManager:
             bib = biblio.StringBiblioEntry(**candidate)
         elif candidate["biblioFormat"] == "alias":
             # Follow the chain to the real candidate
-            bib = self.getBiblioRef(
-                candidate["aliasOf"], status=status, el=el, quiet=True, depth=depth + 1
-            )
+            bib = self.getBiblioRef(candidate["aliasOf"], status=status, el=el, quiet=True, depth=depth + 1)
             if bib is None:
                 die(
                     "Biblio ref [{0}] claims to be an alias of [{1}], which doesn't exist.",
@@ -856,9 +807,7 @@ class ReferenceManager:
             # Try to load the group up, if necessary
             group = key[0:2]
             if group not in self.loadedBiblioGroups:
-                with self.dataFile.fetch(
-                    "biblio", f"biblio-{group}.data", okayToFail=True
-                ) as lines:
+                with self.dataFile.fetch("biblio", f"biblio-{group}.data", okayToFail=True) as lines:
                     biblio.loadBiblioDataFile(lines, self.biblios)
             self.loadedBiblioGroups.add(group)
         return self.biblios.get(key, [])
@@ -920,9 +869,7 @@ def simplifyPossibleRefs(refs, alwaysShowFor=False):
         if len(fors) >= 2 or alwaysShowFor:
             # Needs for-based disambiguation
             for for_, url in fors:
-                retRefs.append(
-                    {"text": text, "type": type, "spec": spec, "for_": for_, "url": url}
-                )
+                retRefs.append({"text": text, "type": type, "spec": spec, "for_": for_, "url": url})
         else:
             retRefs.append(
                 {
@@ -943,9 +890,7 @@ def refToText(ref):
         return "spec:{spec}; type:{type}; text:{text}".format(**ref)
 
 
-def reportMultiplePossibleRefs(
-    possibleRefs, linkText, linkType, linkFor, defaultRef, el
-):
+def reportMultiplePossibleRefs(possibleRefs, linkText, linkType, linkFor, defaultRef, el):
     # Sometimes a badly-written spec has indistinguishable dfns.
     # Detect this by seeing if more than one stringify to the same thing.
     allRefs = defaultdict(list)
@@ -960,9 +905,7 @@ def reportMultiplePossibleRefs(
             mergedRefs.append(refs)
 
     if linkFor:
-        error = "Multiple possible '{}' {} refs for '{}'.".format(
-            linkText, linkType, linkFor
-        )
+        error = "Multiple possible '{}' {} refs for '{}'.".format(linkText, linkType, linkFor)
     else:
         error = f"Multiple possible '{linkText}' {linkType} refs."
     error += f"\nArbitrarily chose {defaultRef.url}"
@@ -982,17 +925,7 @@ def reportAmbiguousForlessLink(el, text, forlessRefs, localRefs):
     linkerror(
         "Ambiguous for-less link for '{0}', please see <https://tabatkins.github.io/bikeshed/#ambi-for> for instructions:\nLocal references:\n{1}\nfor-less references:\n{2}",
         text,
-        "\n".join(
-            [
-                refToText(ref)
-                for ref in simplifyPossibleRefs(localRefs, alwaysShowFor=True)
-            ]
-        ),
-        "\n".join(
-            [
-                refToText(ref)
-                for ref in simplifyPossibleRefs(forlessRefs, alwaysShowFor=True)
-            ]
-        ),
+        "\n".join([refToText(ref) for ref in simplifyPossibleRefs(localRefs, alwaysShowFor=True)]),
+        "\n".join([refToText(ref) for ref in simplifyPossibleRefs(forlessRefs, alwaysShowFor=True)]),
         el=el,
     )
