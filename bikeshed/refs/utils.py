@@ -53,14 +53,21 @@ def filterOldVersions(refs, status=None):
 def linkTextVariations(str, linkType):
     # Generate intelligent variations of the provided link text,
     # so explicitly adding an lt attr isn't usually necessary.
+    str = str.strip()
     yield str
+
+    if len(str) == 0:
+        # empty string got thru somehow, no use conjugating
+        return
 
     if linkType is None:
         return
     elif linkType == "dfn":
-        last1 = str[-1] if len(str) >= 1 else None
-        last2 = str[-2:] if len(str) >= 2 else None
-        last3 = str[-3:] if len(str) >= 3 else None
+
+        last1 = str[-1]
+        last2 = str[-2:]
+        last3 = str[-3:]
+
         # Berries <-> Berry
         if last3 == "ies":
             yield str[:-3] + "y"
@@ -153,7 +160,7 @@ def linkTextVariations(str, linkType):
 
     if config.linkTypeIn(linkType, "idl"):
         # _or <-> or
-        if str[:1] == "_":
+        if str[0] == "_":
             yield str[1:]
         else:
             yield "_" + str
@@ -164,9 +171,9 @@ def linkTextVariations(str, linkType):
             yield str + "()"
 
         # Allow linking to an enum-value with or without quotes
-        if str[:1] == '"':
+        if str[0] == '"':
             yield str[1:-1]
-        if str[:1] != '"':
+        if str[0] != '"':
             yield '"' + str + '"'
 
 
