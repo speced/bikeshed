@@ -1193,7 +1193,9 @@ def addIssuesSection(doc):
         if el.tag not in ("pre", "xmp"):
             el.tag = "div"
         appendChild(container, el)
-        appendChild(el, E.a({"href": "#" + issue.get("id")}, " ↵ "))
+        appendChild(
+            el, " ", E.a({"href": "#" + issue.get("id"), "class": "issue-return", "title": "Jump to section"}, "↵")
+        )
     for idel in findAll("[id]", container):
         del idel.attrib["id"]
     for dfnel in findAll(config.dfnElementsSelector, container):

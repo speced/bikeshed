@@ -108,6 +108,7 @@ class Spec:
         self.extraStyles["style-autolinks"] = styleAutolinks
         self.extraStyles["style-selflinks"] = styleSelflinks
         self.extraStyles["style-counters"] = styleCounters
+        self.extraStyles["style-issues"] = styleIssues
         self.extraScripts = defaultdict(str)
 
         try:
@@ -867,3 +868,13 @@ figcaption {
 figcaption:not(.no-marker)::before {
     content: "Figure " counter(figure) " ";
 }"""
+
+styleIssues = """
+a[href].issue-return {
+    float: right;
+    float: inline-end;
+    color: var(--issueheading-text);
+    font-weight: bold;
+    text-decoration: none;
+}
+"""
