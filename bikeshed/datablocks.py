@@ -336,8 +336,10 @@ def transformPropdef(
             th = f"<th><a href='https://www.w3.org/TR/css-cascade/#computed'>{key}:</a>"
         elif key in ("Animatable", "Animation type"):
             th = f"<th><a href='https://www.w3.org/TR/web-animations/#animation-type'>{key}:</a>"
-        elif key == "Applies to" and val.lower() == "all elements":
-            td = "<td><a href='https://www.w3.org/TR/css-pseudo/#generated-content' title='Includes ::before and ::after pseudo-elements.'>all elements</a>"
+        elif key == "Applies to":
+            th = f"<th><a href='https://www.w3.org/TR/css-cascade/#applies-to'>{key}:</a>"
+            if val.lower() == "all elements":
+                td = "<td><a href='https://www.w3.org/TR/css-pseudo/#generated-content' title='Includes ::before and ::after pseudo-elements.'>all elements</a>"
         ret.append(tr + th + td)
     ret.append("</table>")
 
