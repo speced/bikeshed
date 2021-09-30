@@ -32,6 +32,7 @@ class ReferenceManager:
         "shortname",
         "specLevel",
         "spec",
+        "isDelta",
         "testing",
     ]
 
@@ -93,6 +94,7 @@ class ReferenceManager:
         self.shortname = None
         self.specLevel = None
         self.spec = None
+        self.isDelta = False
 
     def initializeRefs(self, doc=None):
         """
@@ -236,6 +238,7 @@ class ReferenceManager:
         self.shortname = md.shortname
         self.specLevel = md.level
         self.spec = md.vshortname
+        self.isDelta = md.deltaSpec
 
         for term, defaults in md.linkDefaults.items():
             for default in defaults:
@@ -506,6 +509,7 @@ class ReferenceManager:
             export = True
         else:
             export = None
+
         refs, failure = self.foreignRefs.queryRefs(
             text=text,
             linkType=linkType,
@@ -518,6 +522,21 @@ class ReferenceManager:
             export=export,
             ignoreObsoletes=True,
         )
+
+        if failure and self.isDelta:
+            refs, failure = self.foreignRefs.queryRefs(
+                text=text,
+                linkType=linkType,
+                spec=self.shortname,
+                status=status,
+                statusHint=statusHint,
+                linkFor=linkFor,
+                linkForHint=linkForHint,
+                explicitFor=explicitFor,
+                export=False,
+                ignoreObsoletes=True,
+                latestOnly=False,
+            )
 
         if (
             failure
