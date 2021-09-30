@@ -54,9 +54,7 @@ def getData():
                 storage.append(path)
             elif type == "file":
                 if plusMinus == "+":
-                    raise Exception(
-                        f"Line {i} has a +file, which isn't currently supported."
-                    )
+                    raise Exception(f"Line {i} has a +file, which isn't currently supported.")
                 else:
                     storage = data["skipFiles"]
                 storage.append(path)
@@ -125,17 +123,11 @@ def main():
         g = Github()
 
     initial_rate_limit = g.rate_limiting
-    print(
-        "Initial rate limit is {0[1]} requests per hour ({0[0]} remaining)".format(
-            initial_rate_limit
-        )
-    )
+    print("Initial rate limit is {0[1]} requests per hour ({0[0]} remaining)".format(initial_rate_limit))
 
     def throttle():
         if g.get_rate_limit().core.remaining == 1:
-            sleep_time = (
-                g.get_rate_limit().core.reset - datetime.utcnow()
-            ).total_seconds() + 1
+            sleep_time = (g.get_rate_limit().core.reset - datetime.utcnow()).total_seconds() + 1
             print(f"Sleeping {sleep_time}s to stay under rate limit.")
             time.sleep(sleep_time)
 

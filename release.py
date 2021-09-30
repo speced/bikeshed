@@ -10,14 +10,9 @@ def createRelease():
         print("Run this command from inside the bikeshed root folder.")
         sys.exit(1)
 
-    treeDirty = (
-        subprocess.check_output("git diff --stat", shell=True).decode(encoding="utf-8")
-        != ""
-    )
+    treeDirty = subprocess.check_output("git diff --stat", shell=True).decode(encoding="utf-8") != ""
     if treeDirty:
-        print(
-            "Working tree is dirty. Finish committing files or stash, then try again."
-        )
+        print("Working tree is dirty. Finish committing files or stash, then try again.")
         sys.exit(1)
 
     with open("semver.txt") as fh:
@@ -31,9 +26,7 @@ def createRelease():
         print("Error trying to load the secrets.json file.")
         raise
 
-    args = argparse.ArgumentParser(
-        description="Releases a new Bikeshed version to pypi.org."
-    )
+    args = argparse.ArgumentParser(description="Releases a new Bikeshed version to pypi.org.")
     args.add_argument(
         "bump",
         choices=["break", "feature", "bugfix"],
@@ -62,9 +55,7 @@ def createRelease():
 
     # Update the hash-version
     bikeshedVersion = (
-        subprocess.check_output(
-            r"git log -1 --format='Bikeshed version %h, updated %cd'", shell=True
-        )
+        subprocess.check_output(r"git log -1 --format='Bikeshed version %h, updated %cd'", shell=True)
         .decode(encoding="utf-8")
         .strip()
     )
@@ -125,9 +116,7 @@ def createRelease():
 def inBikeshedRoot():
     # Checks whether the cwd is in the Bikeshed root
     try:
-        remotes = subprocess.check_output(
-            "git remote -v", stderr=subprocess.DEVNULL, shell=True
-        ).decode("utf-8")
+        remotes = subprocess.check_output("git remote -v", stderr=subprocess.DEVNULL, shell=True).decode("utf-8")
         if "bikeshed" in remotes:
             return os.path.isdir(".git")
         else:
