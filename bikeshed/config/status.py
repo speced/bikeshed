@@ -80,6 +80,10 @@ shortToLongStatus = {
     "fido/PS": "Proposed Standard",
     "fido/FD": "Final Document",
     "khronos/ED": "Editor's Draft",
+    "aom/PD": "Pre-Draft",
+    "aom/WGD": "AOM Working Group Draft",
+    "aom/WGA": "AOM Working Group Approved Draft",
+    "aom/FD": "AOM Final Deliverable",
 }
 snapshotStatuses = [
     "w3c/WD",
@@ -263,6 +267,7 @@ megaGroups = {
         ]
     ),
     "khronos": frozenset(["webgl"]),
+    "aom": frozenset(["aom"]),
 }
 # Community and business groups within the W3C:
 w3cCgs = frozenset(
