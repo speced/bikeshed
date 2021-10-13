@@ -127,7 +127,7 @@ def appendTestList(blockEl, pathPrefix, testNames, testData, title=None, titleLa
             liveTestScheme = "https"
         else:
             liveTestScheme = "http"
-        lastNameFragment = testName[len(pathPrefix):]
+        lastNameFragment = testName[len(pathPrefix) if pathPrefix else 0:]
         testType = testData[testName]
         if testType in ["crashtest", "print-reftest", "reftest", "testharness"]:
             singleTestEl = E.li(
@@ -419,6 +419,7 @@ def getWptScript(path):
     const wptPath = "{path}";
     """ + """
     document.addEventListener("DOMContentLoaded", async ()=>{
+        if(wptPath == "/") return;
         const runsUrl = "https://wpt.fyi/api/runs?label=master&label=stable&max-count=1&product=chrome&product=firefox&product=safari&product=edge";
         const runs = await (await fetch(runsUrl)).json();
 
