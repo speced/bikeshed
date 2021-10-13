@@ -75,7 +75,7 @@ def update(path, dryRun=False):
             with open(p, "w", encoding="utf-8") as f:
                 f.write(json.dumps(specs, ensure_ascii=False, indent=2, sort_keys=True))
         except Exception as e:
-            die("Couldn't save spec database to disk.\n{0}", e)
+            die(f"Couldn't save spec database to disk.\n{e}")
             return
         try:
             for spec, specHeadings in headings.items():
@@ -84,12 +84,12 @@ def update(path, dryRun=False):
                 with open(p, "w", encoding="utf-8") as f:
                     f.write(json.dumps(specHeadings, ensure_ascii=False, indent=2, sort_keys=True))
         except Exception as e:
-            die("Couldn't save headings database to disk.\n{0}", e)
+            die(f"Couldn't save headings database to disk.\n{e}")
             return
         try:
             writtenPaths.update(writeAnchorsFile(anchors, path))
         except Exception as e:
-            die("Couldn't save anchor database to disk.\n{0}", e)
+            die(f"Couldn't save anchor database to disk.\n{e}")
             return
         try:
             p = os.path.join(path, "methods.json")
@@ -97,7 +97,7 @@ def update(path, dryRun=False):
             with open(p, "w", encoding="utf-8") as f:
                 f.write(json.dumps(methods, ensure_ascii=False, indent=2, sort_keys=True))
         except Exception as e:
-            die("Couldn't save methods database to disk.\n{0}", e)
+            die(f"Couldn't save methods database to disk.\n{e}")
             return
         try:
             p = os.path.join(path, "fors.json")
@@ -105,7 +105,7 @@ def update(path, dryRun=False):
             with open(p, "w", encoding="utf-8") as f:
                 f.write(json.dumps(fors, ensure_ascii=False, indent=2, sort_keys=True))
         except Exception as e:
-            die("Couldn't save fors database to disk.\n{0}", e)
+            die(f"Couldn't save fors database to disk.\n{e}")
             return
 
     say("Success!")
@@ -241,9 +241,7 @@ def addToHeadings(rawAnchor, specHeadings, spec):
             match = re.match(r"([\w-]+).*?(#.*)", uri)
             if not match:
                 die(
-                    "Unexpected URI pattern '{0}' for spec '{1}'. Please report this to the Bikeshed maintainer.",
-                    uri,
-                    spec["vshortname"],
+                    f"Unexpected URI pattern '{uri}' for spec '{spec['vshortname']}'. Please report this to the Bikeshed maintainer.",
                 )
                 return
             page, fragment = match.groups()

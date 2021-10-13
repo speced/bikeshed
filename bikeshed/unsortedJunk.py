@@ -285,8 +285,9 @@ def checkVarHygiene(doc):
                 varLines.append(f"  '{var}'")
     if varLines:
         warn(
-            "The following <var>s were only used once in the document:\n{0}\nIf these are not typos, please add an ignore='' attribute to the <var>.",
-            "\n".join(varLines),
+            f"The following <var>s were only used once in the document:\n"
+            + "\n".join(varLines)
+            + "\nIf these are not typos, please add an ignore='' attribute to the <var>."
         )
 
     if atLeastOneAlgo:
@@ -422,15 +423,10 @@ def fixIntraDocumentReferences(doc):
     for el in findAll("a[href^='#']:not([href='#']):not(.self-link):not([data-link-type])", doc):
         targetID = parse.unquote(el.get("href")[1:])
         if el.get("data-section") is not None and targetID not in headingIDs:
-            die(
-                "Couldn't find target document section {0}:\n{1}",
-                targetID,
-                outerHTML(el),
-                el=el,
-            )
+            die(f"Couldn't find target document section {targetID}:\n{outerHTML(el)}", el=el)
             continue
         if targetID not in ids:
-            die("Couldn't find target anchor {0}:\n{1}", targetID, outerHTML(el), el=el)
+            die(f"Couldn't find target anchor {targetID}:\n{outerHTML(el)}", el=el)
             continue
         if isEmpty(el):
             # TODO Allow this to respect "safe" markup (<sup>, etc) in the title
@@ -438,14 +434,14 @@ def fixIntraDocumentReferences(doc):
             content = find(".content", target)
             if content is None:
                 die(
-                    "Tried to generate text for a section link, but the target isn't a heading:\n{0}",
+                    f"Tried to generate text for a section link, but the target isn't a heading:\n{outerHTML(el)}",
                     outerHTML(el),
                     el=el,
                 )
                 continue
             text = textContent(content).strip()
             if target.get("data-level") is not None:
-                text = "§\u202f{1} {0}".format(text, target.get("data-level"))
+                text = f"§\u202f{target.get('data-level')} {text}"
             appendChild(el, text)
 
 
@@ -455,15 +451,13 @@ def fixInterDocumentReferences(doc):
         section = el.get("spec-section", "")
         if spec is None:
             die(
-                "Spec-section autolink doesn't have a 'spec' attribute:\n{0}",
-                outerHTML(el),
+                f"Spec-section autolink doesn't have a 'spec' attribute:\n{outerHTML(el)}",
                 el=el,
             )
             continue
         if section is None:
             die(
-                "Spec-section autolink doesn't have a 'spec-section' attribute:\n{0}",
-                outerHTML(el),
+                f"Spec-section autolink doesn't have a 'spec-section' attribute:\n{outerHTML(el)}",
                 el=el,
             )
             continue
@@ -478,12 +472,9 @@ def fixInterDocumentReferences(doc):
                 fillInterDocumentReferenceFromShepherd(doc, el, vNames[0], section)
                 if len(vNames) > 1:
                     die(
-                        "Section autolink {2} attempts to link to unversioned spec name '{0}', "
-                        + "but that spec is versioned as {1}. "
+                        f"Section autolink {outerHTML(el)} attempts to link to unversioned spec name '{spec}', "
+                        + "but that spec is versioned as {}. ".format(config.englishFromList(f"'{x}'" for x in vNames))
                         + "Please choose a versioned spec name.",
-                        spec,
-                        config.englishFromList(f"'{x}'" for x in vNames),
-                        outerHTML(el),
                         el=el,
                     )
                 continue
@@ -493,9 +484,7 @@ def fixInterDocumentReferences(doc):
             continue
         # Unknown spec
         die(
-            "Spec-section autolink tried to link to non-existent '{0}' spec:\n{1}",
-            spec,
-            outerHTML(el),
+            f"Spec-section autolink tried to link to non-existent '{spec}' spec:\n{outerHTML(el)}",
             el=el,
         )
 
@@ -506,10 +495,7 @@ def fillInterDocumentReferenceFromShepherd(doc, el, spec, section):
         heading = specData[section]
     else:
         die(
-            "Couldn't find section '{0}' in spec '{1}':\n{2}",
-            section,
-            spec,
-            outerHTML(el),
+            f"Couldn't find section '{section}' in spec '{spec}':\n{outerHTML(el)}",
             el=el,
         )
         return
@@ -521,10 +507,8 @@ def fillInterDocumentReferenceFromShepherd(doc, el, spec, section):
         else:
             # multiple headings of this id, user needs to disambiguate
             die(
-                "Multiple headings with id '{0}' for spec '{1}'. Please specify:\n{2}",
-                section,
-                spec,
-                "\n".join("  [[{}]]".format(spec + x) for x in heading),
+                f"Multiple headings with id '{section}' for spec '{spec}'. Please specify:\n"
+                + "\n".join("  [[{}]]".format(spec + x) for x in heading),
                 el=el,
             )
             return
@@ -549,11 +533,7 @@ def fillInterDocumentReferenceFromShepherd(doc, el, spec, section):
 def fillInterDocumentReferenceFromSpecref(doc, el, spec, section):
     bib = doc.refs.getBiblioRef(spec)
     if isinstance(bib, biblio.StringBiblioEntry):
-        die(
-            "Can't generate a cross-spec section ref for '{0}', because the biblio entry has no url.",
-            spec,
-            el=el,
-        )
+        die(f"Can't generate a cross-spec section ref for '{spec}', because the biblio entry has no url.", el=el)
         return
     el.tag = "a"
     el.set("href", bib.url + section)
@@ -610,27 +590,23 @@ def classifyDfns(doc, dfns):
     for el in dfns:
         dfnType = determineDfnType(el, inferCSS=doc.md.inferCSSDfns)
         if dfnType not in config.dfnTypes:
-            die("Unknown dfn type '{0}' on:\n{1}", dfnType, outerHTML(el), el=el)
+            die(f"Unknown dfn type '{dfnType}':\n{outerHTML(el)}", el=el)
             continue
         dfnFor = treeAttr(el, "data-dfn-for")
         primaryDfnText = config.firstLinkTextFromElement(el)
         if primaryDfnText is None:
-            die("Dfn has no linking text:\n{0}", outerHTML(el), el=el)
+            die(f"Dfn has no linking text:\n{outerHTML(el)}", el=el)
             continue
         if len(primaryDfnText) > 300:
             # Almost certainly accidentally missed the end tag
             warn(
-                "Dfn has extremely long text - did you forget the </dfn> tag?\n{0}",
-                outerHTML(el),
+                f"Dfn has extremely long text - did you forget the </dfn> tag?\n{outerHTML(el)}",
                 el=el,
             )
         # Check for invalid fors, as it's usually some misnesting.
         if dfnFor and dfnType in config.typesNotUsingFor:
             die(
-                "'{0}' definitions don't use a 'for' attribute, but this one claims it's for '{1}' (perhaps inherited from an ancestor). This is probably a markup error.\n{2}",
-                dfnType,
-                dfnFor,
-                outerHTML(el),
+                f"'{dfnType}' definitions don't use a 'for' attribute, but this one claims it's for '{dfnFor}' (perhaps inherited from an ancestor). This is probably a markup error.\n{outerHTML(el)}",
                 el=el,
             )
         # Push the dfn type down to the <dfn> itself.
@@ -641,9 +617,7 @@ def classifyDfns(doc, dfns):
             el.set("data-dfn-for", dfnFor)
         elif dfnType in config.typesUsingFor:
             die(
-                "'{0}' definitions need to specify what they're for.\nAdd a 'for' attribute to {1}, or add 'dfn-for' to an ancestor.",
-                dfnType,
-                outerHTML(el),
+                f"'{dfnType}' definitions need to specify what they're for.\nAdd a 'for' attribute to {outerHTML(el)}, or add 'dfn-for' to an ancestor.",
                 el=el,
             )
             continue
@@ -651,15 +625,13 @@ def classifyDfns(doc, dfns):
         if dfnType in config.functionishTypes:
             if not re.search(r"\(.*\)$", primaryDfnText):
                 die(
-                    "Function/methods must end with a () arglist in their linking text. Got '{0}'.",
-                    primaryDfnText,
+                    f"Function/methods must end with a () arglist in their linking text. Got '{primaryDfnText}'.\n{outerHTML(el)}",
                     el=el,
                 )
                 continue
             if not re.match(r"^[\w\[\]-]+\s*\(", primaryDfnText):
                 die(
-                    "Function/method names can only contain alphanums, underscores, dashes, or []. Got '{0}'.",
-                    primaryDfnText,
+                    f"Function/method names can only contain alphanums, underscores, dashes, or []. Got '{primaryDfnText}'.\n{outerHTML(el)}",
                     el=el,
                 )
                 continue
@@ -676,8 +648,7 @@ def classifyDfns(doc, dfns):
                     el.set("data-lt", "|".join(names))
                 else:
                     die(
-                        "BIKESHED ERROR: Unhandled functionish type '{0}' in classifyDfns. Please report this to Bikeshed's maintainer.",
-                        dfnType,
+                        f"BIKESHED ERROR: Unhandled functionish type '{dfnType}' in classifyDfns. Please report this to Bikeshed's maintainer.",
                         el=el,
                     )
         # If type=argument, try to infer what it's for.
@@ -690,8 +661,7 @@ def classifyDfns(doc, dfns):
                 )
             elif treeAttr(el, "data-dfn-for") is None:
                 die(
-                    "'argument' dfns need to specify what they're for, or have it be inferrable from their parent. Got:\n{0}",
-                    outerHTML(el),
+                    f"'argument' dfns need to specify what they're for, or have it be inferrable from their parent. Got:\n{outerHTML(el)}",
                     el=el,
                 )
                 continue
@@ -771,7 +741,7 @@ def determineLinkType(el):
     if linkType:
         if linkType in config.linkTypes:
             return linkType
-        die("Unknown link type '{0}' on:\n{1}", linkType, outerHTML(el), el=el)
+        die(f"Unknown link type '{linkType}':\n{outerHTML(el)}", el=el)
         return "unknown-type"
     # 2. Introspect on the text
     text = textContent(el)
@@ -800,7 +770,7 @@ def determineLinkText(el):
         linkText = contents
     linkText = foldWhitespace(linkText)
     if len(linkText) == 0:
-        die("Autolink {0} has no linktext.", outerHTML(el), el=el)
+        die(f"Autolink {outerHTML(el)} has no linktext.", el=el)
     return linkText
 
 
@@ -836,9 +806,7 @@ def processBiblioLinks(doc):
             storage = doc.informativeRefs
         else:
             die(
-                "Unknown data-biblio-type value '{0}' on {1}. Only 'normative' and 'informative' allowed.",
-                biblioType,
-                outerHTML(el),
+                f"Unknown data-biblio-type value '{biblioType}' on {outerHTML(el)}. Only 'normative' and 'informative' allowed.",
                 el=el,
             )
             continue
@@ -865,9 +833,8 @@ def processBiblioLinks(doc):
             if not okayToFail:
                 closeBiblios = biblio.findCloseBiblios(doc.refs.biblioKeys, linkText)
                 die(
-                    "Couldn't find '{0}' in bibliography data. Did you mean:\n{1}",
-                    linkText,
-                    "\n".join("  " + b for b in closeBiblios),
+                    f"Couldn't find '{linkText}' in bibliography data. Did you mean:\n"
+                    + "\n".join("  " + b for b in closeBiblios),
                     el=el,
                 )
             el.tag = "span"
@@ -883,10 +850,7 @@ def processBiblioLinks(doc):
             else:
                 # Oh no! I'm using two different names to refer to the same biblio!
                 die(
-                    "The biblio refs [[{0}]] and [[{1}]] are both aliases of the same base reference [[{2}]]. Please choose one name and use it consistently.",
-                    linkText,
-                    ref.linkText,
-                    ref.originalLinkText,
+                    f"The biblio refs [[{linkText}]] and [[{ref.linkText}]] are both aliases of the same base reference [[{ref.originalLinkText}]]. Please choose one name and use it consistently.",
                     el=el,
                 )
                 # I can keep going, tho - no need to skip this ref
@@ -928,8 +892,8 @@ def verifyUsageOfAllLocalBiblios(doc):
             unusedBiblioKeys.append(b)
     if unusedBiblioKeys:
         warn(
-            "The following locally-defined biblio entries are unused and can be removed:\n{0}",
-            "\n".join(f"  * {b}" for b in unusedBiblioKeys),
+            f"The following locally-defined biblio entries are unused and can be removed:\n"
+            + "\n".join(f"  * {b}" for b in unusedBiblioKeys),
         )
 
 
@@ -971,7 +935,7 @@ def processAutolinks(doc):
         elif status in config.linkStatuses or status is None:
             pass
         else:
-            die("Unknown link status '{0}' on {1}", status, outerHTML(el))
+            die(f"Unknown link status '{status}' on {outerHTML(el)}")
             continue
 
         ref = doc.refs.getRef(
@@ -1140,8 +1104,7 @@ def addSelfLinks(doc):
         for el in dfnElements:
             if list(el.iterancestors("a")):
                 warn(
-                    "Found <a> ancestor, skipping self-link. Swap <dfn>/<a> order?\n  {0}",
-                    outerHTML(el),
+                    f"Found <a> ancestor, skipping self-link. Swap <dfn>/<a> order?\n  {outerHTML(el)}",
                     el=el,
                 )
                 continue
@@ -1256,8 +1219,7 @@ def cleanupHTML(doc):
         # Look for nested <a> elements, and warn about them.
         if el.tag == "a" and hasAncestor(el, lambda x: x.tag == "a"):
             warn(
-                "The following (probably auto-generated) link is illegally nested in another link:\n{0}",
-                outerHTML(el),
+                f"The following (probably auto-generated) link is illegally nested in another link:\n{outerHTML(el)}",
                 el=el,
             )
 
@@ -1386,8 +1348,7 @@ def formatElementdefTables(doc):
             )
             if len(groupAttrs) == 0:
                 die(
-                    "The element-attr group '{0}' doesn't have any attributes defined for it.",
-                    groupName,
+                    f"The element-attr group '{groupName}' doesn't have any attributes defined for it.",
                     el=el,
                 )
                 continue
@@ -1420,7 +1381,7 @@ def formatArgumentdefTables(doc):
         forMethod = doc.widl.normalized_method_names(table.get("data-dfn-for"))
         method = doc.widl.find(table.get("data-dfn-for"))
         if not method:
-            die("Can't find method '{0}'.", forMethod, el=table)
+            die(f"Can't find method '{forMethod}'.", el=table)
             continue
         for tr in findAll("tbody > tr", table):
             tds = findAll("td", tr)
@@ -1488,7 +1449,7 @@ def inlineRemoteIssues(doc):
             if key in responses:
                 data = responses[key]
             else:
-                warn("Connection error fetching issue #{0}", issue.num)
+                warn(f"Connection error fetching issue #{issue.num}")
                 continue
         if res is None:
             # Already handled in the except block
@@ -1503,14 +1464,10 @@ def inlineRemoteIssues(doc):
         elif res.status_code == 401:
             error = res.json()
             if error["message"] == "Bad credentials":
-                die(
-                    "'{0}' is not a valid GitHub OAuth token. See https://github.com/settings/tokens",
-                    doc.token,
-                )
+                die(f"'{doc.token}' is not a valid GitHub OAuth token. See https://github.com/settings/tokens")
             else:
                 die(
-                    "401 error when fetching GitHub Issues:\n{0}",
-                    config.printjson(error),
+                    "401 error when fetching GitHub Issues:\n" + config.printjson(error),
                 )
             continue
         elif res.status_code == 403:
@@ -1521,8 +1478,7 @@ def inlineRemoteIssues(doc):
                 )
             else:
                 die(
-                    "403 error when fetching GitHub Issues:\n{0}",
-                    config.printjson(error),
+                    "403 error when fetching GitHub Issues:\n" + config.printjson(error),
                 )
             continue
         elif res.status_code >= 400:
@@ -1530,7 +1486,7 @@ def inlineRemoteIssues(doc):
                 error = config.printjson(res.json())
             except ValueError:
                 error = "First 100 characters of error:\n" + res.text[0:100]
-            die("{0} error when fetching GitHub Issues:\n{1}", res.status_code, error)
+            die(f"{res.status_code} error when fetching GitHub Issues:\n" + error)
             continue
         responses[key] = data
         # Put the issue data into the DOM
@@ -1552,7 +1508,7 @@ def inlineRemoteIssues(doc):
                 el,
                 E.a(
                     {"href": href, "class": "marker"},
-                    "Issue #{} on GitHub: “{}”".format(data["number"], data["title"]),
+                    f"Issue #{data['number']} on GitHub: “{data['title']}”",
                 ),
                 *parseHTML(data["body_html"]),
             )
@@ -1564,7 +1520,7 @@ def inlineRemoteIssues(doc):
         with open(config.scriptPath("spec-data", "github-issues.json"), "w", encoding="utf-8") as f:
             f.write(json.dumps(responses, ensure_ascii=False, indent=2, sort_keys=True))
     except Exception as e:
-        warn("Couldn't save GitHub Issues cache to disk.\n{0}", e)
+        warn(f"Couldn't save GitHub Issues cache to disk.\n{e}")
     return
 
 
@@ -1625,9 +1581,8 @@ def addImageSize(doc):
             m = re.match(r"^[ \t\n]*([^ \t\n]+)[ \t\n]+(\d+)x[ \t\n]*$", srcset)
             if m is None:
                 die(
-                    "Couldn't parse 'srcset' attribute: \"{0}\"\n"
+                    f"Couldn't parse 'srcset' attribute: \"{srcset}\"\n"
                     + "Bikeshed only supports a single image followed by an integer resolution. If not targeting Bikeshed specifically, HTML requires a 'src' attribute (and probably a 'width' and 'height' attribute too). This warning can also be suppressed by adding a 'no-autosize' attribute.",
-                    srcset,
                     el=el,
                 )
                 continue
@@ -1639,15 +1594,13 @@ def addImageSize(doc):
             # If the input source can't tell whether a file cheaply exists,
             # PIL very likely can't use it either.
             warn(
-                "At least one <img> doesn't have its size set ({0}), but given the type of input document, Bikeshed can't figure out what the size should be.\nEither set 'width'/'height' manually, or opt out of auto-detection by setting the 'no-autosize' attribute.",
-                outerHTML(el),
+                f"At least one <img> doesn't have its size set ({outerHTML(el)}), but given the type of input document, Bikeshed can't figure out what the size should be.\nEither set 'width'/'height' manually, or opt out of auto-detection by setting the 'no-autosize' attribute.",
                 el=el,
             )
             return
         if re.match(r"^(https?:/)?/", src):
             warn(
-                "Autodetection of image dimensions is only supported for local files, skipping this image: {0}\nConsider setting 'width' and 'height' manually or opting out of autodetection by setting the 'no-autosize' attribute.",
-                outerHTML(el),
+                f"Autodetection of image dimensions is only supported for local files, skipping this image: {outerHTML(el)}\nConsider setting 'width' and 'height' manually or opting out of autodetection by setting the 'no-autosize' attribute.",
                 el=el,
             )
             continue
@@ -1657,9 +1610,7 @@ def addImageSize(doc):
             w, h = im.size
         except Exception as e:
             warn(
-                "Couldn't determine width and height of this image: {0}\n{1}",
-                src,
-                e,
+                f"Couldn't determine width and height of this image: {src}\n{e}",
                 el=el,
             )
             continue
@@ -1667,19 +1618,13 @@ def addImageSize(doc):
             el.set("width", str(int(w / res)))
         else:
             warn(
-                "The width ({0}px) of this image is not a multiple of the declared resolution ({1}): {2}\nConsider fixing the image so its width is a multiple of the resolution, or setting its 'width' and 'height' attribute manually.",
-                w,
-                res,
-                src,
+                f"The width ({w}px) of this image is not a multiple of the declared resolution ({res}): {src}\nConsider fixing the image so its width is a multiple of the resolution, or setting its 'width' and 'height' attribute manually.",
                 el=el,
             )
         if h % res == 0:
             el.set("height", str(int(h / res)))
         else:
             warn(
-                "The height ({0}px) of this image is not a multiple of the declared resolution ({1}): {2}\nConsider fixing the image so its height is a multiple of the resolution, or setting its 'width' and 'height' attribute manually.",
-                h,
-                res,
-                src,
+                f"The height ({h}px) of this image is not a multiple of the declared resolution ({res}): {src}\nConsider fixing the image so its height is a multiple of the resolution, or setting its 'width' and 'height' attribute manually.",
                 el=el,
             )

@@ -117,13 +117,10 @@ class Spec:
             if inputContent.date is not None:
                 self.mdBaseline.addParsedData("Date", inputContent.date)
         except FileNotFoundError:
-            die(
-                "Couldn't find the input file at the specified location '{0}'.",
-                self.inputSource,
-            )
+            die(f"Couldn't find the input file at the specified location '{self.inputSource}'.")
             return False
         except OSError:
-            die("Couldn't open the input file '{0}'.", self.inputSource)
+            die(f"Couldn't open the input file '{self.inputSource}'.")
             return False
 
         return True
@@ -304,7 +301,7 @@ class Spec:
         try:
             rendered = h.Serializer(self.md.opaqueElements, self.md.blockElements).serialize(self.document)
         except Exception as e:
-            die("{0}", e)
+            die(str(e))
             return
         rendered = finalHackyCleanup(rendered)
         return rendered
@@ -334,11 +331,7 @@ class Spec:
                     with open(outputFilename, "w", encoding="utf-8", newline=newline) as f:
                         f.write(rendered)
             except Exception as e:
-                die(
-                    "Something prevented me from saving the output document to {0}:\n{1}",
-                    outputFilename,
-                    e,
-                )
+                die(f"Something prevented me from saving the output document to {outputFilename}:\n{e}")
 
     def printResultMessage(self):
         # If I reach this point, I've succeeded, but maybe with reservations.
@@ -351,7 +344,7 @@ class Spec:
             success("Successfully generated, but fatal errors were suppressed")
             return
         if links:
-            success("Successfully generated, with {0} linking errors", links)
+            success(f"Successfully generated, with {links} linking errors")
             return
         if warnings:
             success("Successfully generated, with warnings")
@@ -416,7 +409,7 @@ class Spec:
                     thread.join()
                 sys.exit(0)
         except Exception as e:
-            die("Something went wrong while watching the file:\n{0}", e)
+            die(f"Something went wrong while watching the file:\n{e}")
 
     def fixText(self, text, moreMacros={}):
         # Do several textual replacements that need to happen *before* the document is parsed as h.

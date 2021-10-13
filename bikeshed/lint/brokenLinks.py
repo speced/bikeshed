@@ -26,16 +26,8 @@ def brokenLinks(doc):
         try:
             res = requests.get(href, verify=False)
         except Exception as e:
-            warn(
-                "The following link caused an error when I tried to request it:\n{0}\n{1}",
-                outerHTML(el),
-                e,
-            )
+            warn(f"The following link caused an error when I tried to request it:\n{outerHTML(el)}\n{e}")
             continue
         if res.status_code >= 400:
-            warn(
-                "Got a {0} status when fetching the link for:\n{1}",
-                res.status_code,
-                outerHTML(el),
-            )
+            warn(f"Got a {res.status_code} status when fetching the link for:\n{outerHTML(el)}")
     say("Done checking links!")

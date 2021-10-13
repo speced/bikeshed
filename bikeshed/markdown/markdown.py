@@ -346,11 +346,7 @@ def stripPrefix(token, numSpacesForIndentation, len):
             offset += numSpacesForIndentation
         else:
             die(
-                'Line {i} isn\'t indented enough (needs {0} indent{plural}) to be valid Markdown:\n"{1}"',
-                len,
-                text[:-1],
-                plural="" if len == 1 else "s",
-                i=token["line"].i,
+                f'Line {token["line"].i} isn\'t indented enough (needs {len} indent{"" if len == 1 else "s"}) to be valid Markdown:\n"{text[:-1]}"'
             )
     return text[offset:]
 
@@ -406,7 +402,7 @@ def parseTokens(tokens, numSpacesForIndentation):
             stream.advance()
 
     # for line in lines:
-    #    print "«{0}»".format(line.text.rstrip())
+    #    print f"«{line.text.rstrip()}»"
 
     return lines
 
@@ -447,10 +443,10 @@ def parseMultiLineHeading(stream):
         level = 3
     else:
         die(
-            "Markdown parser error: tried to parse a multiline heading from:\n{0}{1}{2}",
-            stream.prevraw(),
-            stream.currraw(),
-            stream.nextraw(),
+            "Markdown parser error: tried to parse a multiline heading from:\n"
+            + stream.prevraw()
+            + stream.currraw()
+            + stream.nextraw()
         )
     match = re.search(r"(.*?)\s*\{\s*#([^ }]+)\s*\}\s*$", stream.currtext())
     if match:

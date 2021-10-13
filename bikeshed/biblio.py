@@ -223,7 +223,7 @@ def processReferBiblioFile(lines, storage, order):
         if match:
             letter, value = match.groups()
         else:
-            die("Biblio line in unexpected format:\n{0}", line)
+            die(f"Biblio line in unexpected format:\n{line}")
             continue
 
         if letter in singularReferCodes:
@@ -233,7 +233,7 @@ def processReferBiblioFile(lines, storage, order):
         elif letter in unusedReferCodes:
             pass
         else:
-            die("Unknown line type ")
+            die(f"Unknown line type {letter}:\n{line}")
     if biblio is not None:
         storage[biblio["linkText"].lower()] = biblio
     return storage
@@ -277,7 +277,7 @@ def processSpecrefBiblioFile(text, storage, order):
     try:
         datas = json.loads(text)
     except Exception as e:
-        die("Couldn't read the local JSON file:\n{0}", str(e))
+        die(f"Couldn't read the local JSON file:\n{e}")
         return storage
 
     # JSON field name: BiblioEntry name
@@ -372,7 +372,7 @@ def loadBiblioDataFile(lines, storage):
                 }
                 line = next(lines)  # Eat the -
             else:
-                die("Unknown biblio prefix '{0}' on key '{1}'", prefix, fullKey)
+                die(f"Unknown biblio prefix '{prefix}' on key '{fullKey}'")
                 continue
             storage[key].append(b)
     except StopIteration:

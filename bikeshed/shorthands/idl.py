@@ -55,11 +55,7 @@ class IdlShorthand:
         self.bsAutolink += "}}"
 
         if self.linkType not in config.idlTypes:
-            die(
-                "Shorthand {0} gives type as '{1}', but only IDL types are allowed.",
-                self.bsAutolink,
-                self.linkType,
-            )
+            die(f"Shorthand {self.bsAutolink} gives type as '{self.linkType}', but only IDL types are allowed.")
             return steps.Success(E.span({}, self.bsAutolink))
 
         if not self.linkText:

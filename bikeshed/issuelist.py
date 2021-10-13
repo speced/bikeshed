@@ -53,7 +53,7 @@ def printIssueList(infilename=None, outfilename=None):
         try:
             outfile = open(outfilename, "w", encoding="utf-8")
         except Exception as e:
-            die("Couldn't write to outfile:\n{0}", str(e))
+            die(f"Couldn't write to outfile:\n{e}")
             return
 
     printHeader(outfile, headerInfo)
@@ -109,10 +109,7 @@ def extractHeaderInfo(lines, infilename):
                 date = match.group(2).rstrip()
                 cdate = date
                 if not re.match(r"(\d{4})-(\d\d)-(\d\d)$", date):
-                    die(
-                        "Incorrect Date format. Expected YYYY-MM-DD, but got:\n{0}",
-                        date,
-                    )
+                    die(f"Incorrect Date format. Expected YYYY-MM-DD, but got:\n{date}")
             elif match.group(1) == "ED":
                 ed = match.group(2).rstrip()
     if url is None:
@@ -137,8 +134,7 @@ def extractHeaderInfo(lines, infilename):
             date = "{}-{}-{}".format(*re.match(r"(\d{4})(\d\d)(\d\d)", cdate).groups())
     else:
         warn(
-            "Autodetection of Shortname, Date, and Status failed; draft url does not match the format /status-shortname-date/. Got:\n{0}",
-            url,
+            f"Autodetection of Shortname, Date, and Status failed; draft url does not match the format /status-shortname-date/. Got:\n{url}"
         )
 
     if date is None:
@@ -255,7 +251,7 @@ def printIssues(outfile, lines):
         if match:
             index = match.group(1)
         else:
-            die("Issues must contain a line like 'Issue 1.'. Got:\n{0}", originaltext)
+            die(f"Issues must contain a line like 'Issue 1.'. Got:\n{originalText}")
 
         # Color coding
         if re.search(r"\nVerified:\s*\S+", issue):
@@ -268,11 +264,7 @@ def printIssues(outfile, lines):
             else:
                 code = ""
                 if match.group(1) == "Closed":
-                    warn(
-                        "Unknown status value found for issue #{num}: “{code}”",
-                        code=code,
-                        num=index,
-                    )
+                    warn(f"Unknown status value found for issue #{index}: “{code}”")
         else:
             code = ""
         if re.search(r"\nOpen", issue):

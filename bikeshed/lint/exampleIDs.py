@@ -9,4 +9,4 @@ def exampleIDs(doc):
     if not doc.md.complainAbout["missing-example-ids"]:
         return
     for el in findAll(".example:not([id])", doc):
-        warn("Example needs ID:\n{0}", outerHTML(el)[0:100], el=el)
+        warn(f"Example needs ID:\n{outerHTML(el)[0:100]}", el=el)

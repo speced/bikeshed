@@ -41,7 +41,7 @@ def handleBikeshedInclude(el, doc):
         try:
             lines = includedInputSource.read().rawLines
         except Exception as err:
-            die("Couldn't find include file '{0}'. Error was:\n{1}", path, err, el=el)
+            die(f"Couldn't find include file '{path}'. Error was:\n{err}", el=el)
             removeNode(el)
             return
         # hash the content + path together for identity
@@ -53,7 +53,7 @@ def handleBikeshedInclude(el, doc):
             # This came from another included file, check if it's a loop-include
             if hash in el.get("hash"):
                 # WHOOPS
-                die("Include loop detected - “{0}” is included in itself.", path, el=el)
+                die(f"Include loop detected - “{path}” is included in itself.", el=el)
                 removeNode(el)
                 return
             hash += " " + el.get("hash")
@@ -95,7 +95,7 @@ def handleCodeInclude(el, doc):
     try:
         lines = includedInputSource.read().rawLines
     except Exception as err:
-        die("Couldn't find include-code file '{0}'. Error was:\n{1}", path, err, el=el)
+        die(f"Couldn't find include-code file '{path}'. Error was:\n{err}", el=el)
         removeNode(el)
         return
     if el.get("data-code-show"):
@@ -103,11 +103,7 @@ def handleCodeInclude(el, doc):
         if len(showLines) == 0:
             pass
         elif len(showLines) >= 2:
-            die(
-                "Can only have one include-code 'show' segment, got '{0}'.",
-                el.get("data-code-show"),
-                el=el,
-            )
+            die(f"Can only have one include-code 'show' segment, got '{el.get('data-code-show')}'.", el=el)
             return
         else:
             start, end = showLines[0]
@@ -136,7 +132,7 @@ def handleRawInclude(el, doc):
     try:
         content = includedInputSource.read().content
     except Exception as err:
-        die("Couldn't find include-raw file '{0}'. Error was:\n{1}", path, err, el=el)
+        die(f"Couldn't find include-raw file '{path}'. Error was:\n{err}", el=el)
         removeNode(el)
         return
     subtree = parseHTML(content)
@@ -158,10 +154,7 @@ def parseSingleRange(item):
             try:
                 low = int(low)
             except ValueError:
-                die(
-                    "Error parsing include-code 'show' range '{0}' - must be `int-int`.",
-                    item,
-                )
+                die(f"Error parsing include-code 'show' range '{item}' - must be `int-int`.")
                 return
         if high == "*":
             high = None
@@ -169,16 +162,10 @@ def parseSingleRange(item):
             try:
                 high = int(high)
             except ValueError:
-                die(
-                    "Error parsing include-code 'show' range '{0}' - must be `int-int`.",
-                    item,
-                )
+                die(f"Error parsing include-code 'show' range '{item}' - must be `int-int`.")
                 return
         if low >= high:
-            die(
-                "include-code 'show' ranges must be well-formed lo-hi - got '{0}'.",
-                item,
-            )
+            die(f"include-code 'show' ranges must be well-formed lo-hi - got '{item}'.")
             return
         return [low, high]
     if item == "*":
@@ -187,7 +174,4 @@ def parseSingleRange(item):
         val = int(item)
         return [val, val]
     except ValueError:
-        die(
-            "Error parsing include-code 'show' value '{0}' - must be an int or *.",
-            item,
-        )
+        die(f"Error parsing include-code 'show' value '{item}' - must be an int or *.")

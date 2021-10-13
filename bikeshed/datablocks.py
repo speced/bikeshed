@@ -78,9 +78,9 @@ def transformDataBlocks(doc, lines):
                 blockType = seenClasses[0]
             else:
                 die(
-                    "Found {0} classes on the <{1}>, so can't tell which to process the block as. Please use only one.",
-                    config.englishFromList((f"'{x}'" for x in seenClasses), "and"),
-                    tagName,
+                    "Found {} classes on the <{}>, so can't tell which to process the block as. Please use only one.".format(
+                        config.englishFromList((f"'{x}'" for x in seenClasses), "and"), tagName
+                    ),
                     lineNum=line.i,
                 )
                 blockType = "pre"
@@ -92,11 +92,7 @@ def transformDataBlocks(doc, lines):
                 # Single-line <pre>.
                 match = re.match(r"(\s*<{0}[^>]*>)(.*)</{0}>(.*)".format(tagName), line.text, re.I)
                 if not match:
-                    die(
-                        "Can't figure out how to parse this datablock line:\n{0}",
-                        line.text,
-                        lineNum=line.i,
-                    )
+                    die(f"Can't figure out how to parse this datablock line:\n{line.text}", lineNum=line.i)
                     blockLines = []
                     continue
                 repl = blockTypes[blockType](
@@ -280,12 +276,7 @@ def transformPropdef(lines, doc, firstLine, lineNum=None, **kwargs):  # pylint: 
             val = parsedAttrs[key]
         elif val is None:
             # Required key, not provided
-            die(
-                "The propdef for '{0}' is missing a '{1}' line.",
-                parsedAttrs.get("Name", "???"),
-                key,
-                lineNum=lineNum,
-            )
+            die(f"The propdef for '{parsedAttrs.get('Name', '???')}' is missing a '{key}' line.", lineNum=lineNum)
             continue
         else:
             # Optional key, just use default
@@ -364,12 +355,7 @@ def transformDescdef(lines, doc, firstLine, lineNum=None, **kwargs):  # pylint: 
         elif key in vals:
             ret.append("<tr><th>{}:<td>{}".format(key, vals.get(key, "")))
         else:
-            die(
-                "The descdef for '{0}' is missing a '{1}' line.",
-                vals.get("Name", "???"),
-                key,
-                lineNum=lineNum,
-            )
+            die(f"The descdef for '{vals.get('Name', '???')}' is missing a '{key}' line.", lineNum=lineNum)
             continue
     for key, val in vals.items():
         if key in requiredKeys:
@@ -450,12 +436,7 @@ def transformElementdef(lines, doc, firstLine, lineNum=None, **kwargs):  # pylin
             else:
                 ret.append(f"<tr><th>{key}:<td>{val}")
         else:
-            die(
-                "The elementdef for '{0}' is missing a '{1}' line.",
-                parsedAttrs.get("Name", "???"),
-                key,
-                lineNum=lineNum,
-            )
+            die(f"The elementdef for '{parsedAttrs.get('Name', '???')}' is missing a '{key}' line.", lineNum=lineNum)
             continue
     for key, val in parsedAttrs.items():
         if key in attrs:
@@ -481,18 +462,11 @@ def transformArgumentdef(lines, firstLine, lineNum=None, **kwargs):  # pylint: d
         if "/" in forValue:
             interface, method = forValue.split("/")
         else:
-            die(
-                "Argumentdef for='' values need to specify interface/method(). Got '{0}'.",
-                forValue,
-                lineNum=lineNum,
-            )
+            die(f"Argumentdef for='' values need to specify interface/method(). Got '{forValue}'.", lineNum=lineNum)
             return []
         removeAttr(el, "for")
     else:
-        die(
-            "Argumentdef blocks need a for='' attribute specifying their method.",
-            lineNum=lineNum,
-        )
+        die("Argumentdef blocks need a for='' attribute specifying their method.", lineNum=lineNum)
         return []
     addClass(el, "data")
     rootAttrs = " ".join("{}='{}'".format(k, escapeAttr(v)) for k, v in el.attrib.items())
@@ -544,13 +518,7 @@ def parseDefBlock(lines, type, capitalizeKeys=True, lineNum=None):
                 key = lastKey
                 val = line.strip()
             else:
-                die(
-                    "Incorrectly formatted {2} line for '{0}':\n{1}",
-                    vals.get("Name", "???"),
-                    line,
-                    type,
-                    lineNum=lineNum,
-                )
+                die(f"Incorrectly formatted {type} line for '{vals.get('Name', '???')}':\n{line}", lineNum=lineNum)
                 continue
         else:
             key = match.group(1).strip()
@@ -647,23 +615,14 @@ def transformAnchors(lines, doc, lineNum=None, **kwargs):  # pylint: disable=unu
 def processAnchors(anchors, doc, lineNum=None):
     for anchor in anchors:
         if "type" not in anchor or len(anchor["type"]) != 1:
-            die(
-                "Each anchor needs exactly one type. Got:\n{0}",
-                config.printjson(anchor),
-                lineNum=lineNum,
-            )
+            die(f"Each anchor needs exactly one type. Got:\n{config.printjson(anchor)}", lineNum=lineNum)
             continue
         if "text" not in anchor or len(anchor["text"]) != 1:
-            die(
-                "Each anchor needs exactly one text. Got:\n{0}",
-                config.printjson(anchor),
-                lineNum=lineNum,
-            )
+            die(f"Each anchor needs exactly one text. Got:\n{config.printjson(anchor)}", lineNum=lineNum)
             continue
         if "url" not in anchor and "urlPrefix" not in anchor:
             die(
-                "Each anchor needs a url and/or at least one urlPrefix. Got:\n{0}",
-                config.printjson(anchor),
+                f"Each anchor needs a url and/or at least one urlPrefix. Got:\n{config.printjson(anchor)}",
                 lineNum=lineNum,
             )
             continue
@@ -702,9 +661,7 @@ def processAnchors(anchors, doc, lineNum=None):
                 pass
             else:
                 die(
-                    "Anchor statuses must be {1}. Got '{0}'.",
-                    status,
-                    config.englishFromList(config.linkStatuses),
+                    f"Anchor statuses must be {config.englishFromList(config.linkStatuses)}. Got '{status}'.",
                     lineNum=lineNum,
                 )
                 continue
@@ -739,31 +696,19 @@ def transformLinkDefaults(lines, doc, lineNum=None, **kwargs):  # pylint: disabl
 def processLinkDefaults(lds, doc, lineNum=None):
     for ld in lds:
         if len(ld.get("type", [])) != 1:
-            die(
-                "Every link default needs exactly one type. Got:\n{0}",
-                config.printjson(ld),
-                lineNum=lineNum,
-            )
+            die(f"Every link default needs exactly one type. Got:\n{config.printjson(ld)}", lineNum=lineNum)
             continue
 
         type = ld["type"][0]
 
         if len(ld.get("spec", [])) != 1:
-            die(
-                "Every link default needs exactly one spec. Got:\n{0}",
-                config.printjson(ld),
-                lineNum=lineNum,
-            )
+            die(f"Every link default needs exactly one spec. Got:\n{config.printjson(ld)}", lineNum=lineNum)
             continue
 
         spec = ld["spec"][0]
 
         if len(ld.get("text", [])) != 1:
-            die(
-                "Every link default needs exactly one text. Got:\n{0}",
-                config.printjson(ld),
-                lineNum=lineNum,
-            )
+            die(f"Every link default needs exactly one text. Got:\n{config.printjson(ld)}", lineNum=lineNum)
             continue
 
         text = ld["text"][0]
@@ -785,16 +730,14 @@ def processIgnoredSpecs(specs, doc, lineNum=None):
     for spec in specs:
         if len(spec.get("spec", [])) == 0:
             die(
-                "Every ignored spec line needs at least one 'spec' value. Got:\n{0}",
-                config.printjson(spec),
+                f"Every ignored spec line needs at least one 'spec' value. Got:\n{config.printjson(spec)}",
                 lineNum=lineNum,
             )
             continue
         specNames = spec.get("spec")
         if len(spec.get("replacedBy", [])) > 1:
             die(
-                "Every ignored spec line needs at most one 'replacedBy' value. Got:\n{0}",
-                config.printjson(spec),
+                f"Every ignored spec line needs at most one 'replacedBy' value. Got:\n{config.printjson(spec)}",
                 lineNum=lineNum,
             )
             continue
@@ -824,15 +767,11 @@ def processInfo(infos, doc, lineNum=None):
     infoCollections = defaultdict(list)
     for info in infos:
         if len(info.get("info", [])) != 1:
-            die(
-                "Every info-block line needs exactly one 'info' type. Got:\n{0}",
-                config.printjson(info),
-                lineNum=lineNum,
-            )
+            die(f"Every info-block line needs exactly one 'info' type. Got:\n{config.printjson(info)}", lineNum=lineNum)
             continue
         infoType = info.get("info")[0].lower()
         if infoType not in knownInfoTypes:
-            die("Unknown info-block type '{0}'", infoType, lineNum=lineNum)
+            die(f"Unknown info-block type '{infoType}'", lineNum=lineNum)
             continue
         infoCollections[infoType].append(info)
     for infoType, info in infoCollections.items():
@@ -860,8 +799,7 @@ def transformInclude(lines, doc, firstLine, lineNum=None, **kwargs):  # pylint: 
                     macros[k] = v[0]
                 else:
                     die(
-                        "Include block defines the '{0}' local macro more than once.",
-                        k,
+                        f"Include block defines the '{k}' local macro more than once.",
                         lineNum=lineNum,
                     )
     if path:
@@ -1010,18 +948,13 @@ def parseInfoTree(lines, indent=4, lineNum=0):
         if wsLen % indent != 0:
             visibleWs = ws.replace("\t", "\\t").replace(" ", "\\s")
             die(
-                "Line has inconsistent indentation; use tabs or {1} spaces:\n{0}",
-                visibleWs + text,
-                indent,
-                lineNum=thisLine,
+                f"Line has inconsistent indentation; use tabs or {indent} spaces:\n{visibleWS + text}", lineNum=thisLine
             )
             return []
         wsLen = wsLen // indent
         if wsLen >= lastIndent + 2:
             die(
-                "Line jumps {1} indent levels:\n{0}",
-                text,
-                wsLen - lastIndent,
+                f"Line jumps {wsLen - lastIndent} indent levels:\n{text}",
                 lineNum=thisLine,
             )
             return []
@@ -1035,11 +968,7 @@ def parseInfoTree(lines, indent=4, lineNum=0):
                 continue
             match = re.match(r"([^:]+):\s*(.*)", piece)
             if not match:
-                die(
-                    "Line doesn't match the grammar `k:v; k:v; k:v`:\n{0}",
-                    line,
-                    lineNum=thisLine,
-                )
+                die(f"Line doesn't match the grammar `k:v; k:v; k:v`:\n{line}", lineNum=thisLine)
                 return []
             key = match.group(1).strip()
             val = match.group(2).strip()
@@ -1078,11 +1007,7 @@ def parseTag(text, lineNumber):
 
     def parseerror(index, state):
         die(
-            "Tried to parse a start tag from '{0}', but failed at character {1} '{2}' and parse-state '{3}'.",
-            text,
-            index,
-            text[index],
-            state,
+            f"Tried to parse a start tag from '{text}', but failed at character {index} '{text[index]}' and parse-state '{state}'.",
             lineNum=lineNumber,
         )
 

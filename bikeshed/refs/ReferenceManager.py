@@ -236,9 +236,7 @@ class ReferenceManager:
                 linkTexts = config.linkTextsFromElement(el)
             except config.DuplicatedLinkText as e:
                 die(
-                    "The term '{0}' is in both lt and local-lt of the element {1}.",
-                    e.offendingText,
-                    outerHTML(e.el),
+                    f"The term '{e.offendingText}' is in both lt and local-lt of the element {outerHTML(e.el)}.",
                     el=e.el,
                 )
                 linkTexts = e.allTexts
@@ -247,12 +245,7 @@ class ReferenceManager:
                 linkText = re.sub(r"\s+", " ", linkText)
                 linkType = treeAttr(el, "data-dfn-type")
                 if linkType not in config.dfnTypes:
-                    die(
-                        "Unknown local dfn type '{0}':\n  {1}",
-                        linkType,
-                        outerHTML(el),
-                        el=el,
-                    )
+                    die(f"Unknown local dfn type '{linkType}':\n  {outerHTML(el)}", el=el)
                     continue
                 if linkType in config.lowercaseTypes:
                     linkText = linkText.lower()
@@ -263,12 +256,7 @@ class ReferenceManager:
                         0
                     ]
                     if existingRefs and existingRefs[0].el is not el:
-                        die(
-                            "Multiple local '{1}' <dfn>s have the same linking text '{0}'.",
-                            linkText,
-                            linkType,
-                            el=el,
-                        )
+                        die(f"Multiple local '{linkType}' <dfn>s have the same linking text '{linkText}'.", el=el)
                         continue
                 else:
                     dfnFor = set(config.splitForValues(dfnFor))
@@ -283,10 +271,7 @@ class ReferenceManager:
                         if existingRefs and existingRefs[0].el is not el:
                             encounteredError = True
                             die(
-                                "Multiple local '{1}' <dfn>s for '{2}' have the same linking text '{0}'.",
-                                linkText,
-                                linkType,
-                                singleFor,
+                                f"Multiple local '{linkType}' <dfn>s for '{singleFor}' have the same linking text '{linkText}'.",
                                 el=el,
                             )
                             break
@@ -366,9 +351,7 @@ class ReferenceManager:
         if status not in config.linkStatuses and status is not None:
             if error:
                 die(
-                    "Unknown spec status '{0}'. Status must be {1}.",
-                    status,
-                    config.englishFromList(config.linkStatuses),
+                    f"Unknown spec status '{status}'. Status must be {config.englishFromList(config.linkStatuses)}.",
                     el=el,
                 )
             return None
@@ -524,9 +507,7 @@ class ReferenceManager:
                 if len(possibleMethods) > 1:
                     # Too many to disambiguate.
                     linkerror(
-                        "The argument autolink '{0}' for '{1}' has too many possible overloads to disambiguate. Please specify the full method signature this argument is for.",
-                        text,
-                        linkFor,
+                        f"The argument autolink '{text}' for '{linkFor}' has too many possible overloads to disambiguate. Please specify the full method signature this argument is for.",
                         el=el,
                     )
                 # Try out all the combinations of interface/status/signature
@@ -581,9 +562,7 @@ class ReferenceManager:
             if zeroRefsError and len(methodRefs) > 1:
                 # More than one possible foo() overload, can't tell which to link to
                 linkerror(
-                    "Too many possible method targets to disambiguate '{0}/{1}'. Please specify the names of the required args, like 'foo(bar, baz)', in the 'for' attribute.",
-                    linkFor,
-                    text,
+                    f"Too many possible method targets to disambiguate '{linkFor}/{text}'. Please specify the names of the required args, like 'foo(bar, baz)', in the 'for' attribute.",
                     el=el,
                 )
                 return
@@ -594,83 +573,39 @@ class ReferenceManager:
                 # Custom properties/descriptors aren't ever defined anywhere
                 return None
             if zeroRefsError:
-                linkerror("No '{0}' refs found for '{1}'.", linkType, text, el=el)
+                linkerror(f"No '{linkType}' refs found for '{text}'.", el=el)
             return None
         elif failure == "export":
             if zeroRefsError:
-                linkerror(
-                    "No '{0}' refs found for '{1}' that are marked for export.",
-                    linkType,
-                    text,
-                    el=el,
-                )
+                linkerror(f"No '{linkType}' refs found for '{text}' that are marked for export.", el=el)
             return None
         elif failure == "spec":
             if zeroRefsError:
-                linkerror(
-                    "No '{0}' refs found for '{1}' with spec '{2}'.",
-                    linkType,
-                    text,
-                    spec,
-                    el=el,
-                )
+                linkerror(f"No '{linkType}' refs found for '{text}' with spec '{spec}'.", el=el)
             return None
         elif failure == "for":
             if zeroRefsError:
                 if spec is None:
-                    linkerror(
-                        "No '{0}' refs found for '{1}' with for='{2}'.",
-                        linkType,
-                        text,
-                        linkFor,
-                        el=el,
-                    )
+                    linkerror(f"No '{linkType}' refs found for '{text}' with for='{linkFor}'.", el=el)
                 else:
-                    linkerror(
-                        "No '{0}' refs found for '{1}' with for='{2}' in spec '{3}'.",
-                        linkType,
-                        text,
-                        linkFor,
-                        spec,
-                        el=el,
-                    )
+                    linkerror(f"No '{linkType}' refs found for '{text}' with for='{linkFor}' in spec '{spec}'.", el=el)
             return None
         elif failure == "status":
             if zeroRefsError:
                 if spec is None:
-                    linkerror(
-                        "No '{0}' refs found for '{1}' compatible with status '{2}'.",
-                        linkType,
-                        text,
-                        status,
-                        el=el,
-                    )
+                    linkerror(f"No '{linkType}' refs found for '{text}' compatible with status '{status}'.", el=el)
                 else:
                     linkerror(
-                        "No '{0}' refs found for '{1}' compatible with status '{2}' in spec '{3}'.",
-                        linkType,
-                        text,
-                        status,
-                        spec,
+                        f"No '{linkType}' refs found for '{text}' compatible with status '{status}' in spec '{spec}'.",
                         el=el,
                     )
             return None
         elif failure == "ignored-specs":
             if zeroRefsError:
-                linkerror(
-                    "The only '{0}' refs for '{1}' were in ignored specs:\n{2}",
-                    linkType,
-                    text,
-                    outerHTML(el),
-                    el=el,
-                )
+                linkerror(f"The only '{linkType}' refs for '{text}' were in ignored specs:\n{outerHTML(el)}", el=el)
             return None
         elif failure:
-            die(
-                "Programming error - I'm not catching '{0}'-type link failures. Please report!",
-                failure,
-                el=el,
-            )
+            die(f"Programming error - I'm not catching '{failure}'-type link failures. Please report!", el=el)
             return None
 
         if len(refs) == 1:
@@ -708,10 +643,7 @@ class ReferenceManager:
         depth=0,
     ):
         if depth > 100:
-            die(
-                "Data error in biblio files; infinitely recursing trying to find [{0}].",
-                text,
-            )
+            die(f"Data error in biblio files; infinitely recursing trying to find [{text}].")
             return
         key = text.lower()
         while True:
@@ -746,27 +678,21 @@ class ReferenceManager:
             if failFromWrongSuffix and not quiet:
                 numericSuffixes = self.biblioNumericSuffixes[unversionedKey]
                 die(
-                    "A biblio link references {0}, but only {1} exists in SpecRef.",
-                    text,
-                    config.englishFromList(numericSuffixes),
+                    f"A biblio link references {text}, but only {config.englishFromList(numericSuffixes)} exists in SpecRef."
                 )
             return None
 
         candidate = self._bestCandidateBiblio(candidates)
         # TODO: When SpecRef definitely has all the CSS specs, turn on this code.
         # if candidates[0]['order'] > 3: # 3 is SpecRef level
-        #    warn("Bibliography term '{0}' wasn't found in SpecRef.\n         Please find the equivalent key in SpecRef, or submit a PR to SpecRef.", text)
+        #    warn(f"Bibliography term '{text}' wasn't found in SpecRef.\n         Please find the equivalent key in SpecRef, or submit a PR to SpecRef.")
         if candidate["biblioFormat"] == "string":
             bib = biblio.StringBiblioEntry(**candidate)
         elif candidate["biblioFormat"] == "alias":
             # Follow the chain to the real candidate
             bib = self.getBiblioRef(candidate["aliasOf"], status=status, el=el, quiet=True, depth=depth + 1)
             if bib is None:
-                die(
-                    "Biblio ref [{0}] claims to be an alias of [{1}], which doesn't exist.",
-                    text,
-                    candidate["aliasOf"],
-                )
+                die(f"Biblio ref [{text}] claims to be an alias of [{candidate['aliasOf']}], which doesn't exist.")
                 return None
         elif candidate.get("obsoletedBy", "").strip():
             # Obsoleted by something. Unless otherwise indicated, follow the chain.
@@ -782,9 +708,7 @@ class ReferenceManager:
                 )
                 if not quiet:
                     die(
-                        "Obsolete biblio ref: [{0}] is replaced by [{1}]. Either update the reference, or use [{0} obsolete] if this is an intentionally-obsolete reference.",
-                        candidate["linkText"],
-                        bib.linkText,
+                        f"Obsolete biblio ref: [{candidate['linkText']}] is replaced by [{bib.linkText}]. Either update the reference, or use [{candidate['linkText']} obsolete] if this is an intentionally-obsolete reference."
                     )
         else:
             bib = biblio.BiblioEntry(preferredURL=status, **candidate)
@@ -905,7 +829,7 @@ def reportMultiplePossibleRefs(possibleRefs, linkText, linkType, linkFor, defaul
             mergedRefs.append(refs)
 
     if linkFor:
-        error = "Multiple possible '{}' {} refs for '{}'.".format(linkText, linkType, linkFor)
+        error = f"Multiple possible '{linkText}' {linkType} refs for '{linkFor}'."
     else:
         error = f"Multiple possible '{linkText}' {linkType} refs."
     error += f"\nArbitrarily chose {defaultRef.url}"
@@ -922,10 +846,9 @@ def reportMultiplePossibleRefs(possibleRefs, linkText, linkType, linkFor, defaul
 
 
 def reportAmbiguousForlessLink(el, text, forlessRefs, localRefs):
+    localRefText = "\n".join([refToText(ref) for ref in simplifyPossibleRefs(localRefs, alwaysShowFor=True)])
+    forlessRefText = "\n".join([refToText(ref) for ref in simplifyPossibleRefs(forlessRefs, alwaysShowFor=True)])
     linkerror(
-        "Ambiguous for-less link for '{0}', please see <https://tabatkins.github.io/bikeshed/#ambi-for> for instructions:\nLocal references:\n{1}\nfor-less references:\n{2}",
-        text,
-        "\n".join([refToText(ref) for ref in simplifyPossibleRefs(localRefs, alwaysShowFor=True)]),
-        "\n".join([refToText(ref) for ref in simplifyPossibleRefs(forlessRefs, alwaysShowFor=True)]),
+        f"Ambiguous for-less link for '{text}', please see <https://tabatkins.github.io/bikeshed/#ambi-for> for instructions:\nLocal references:\n{localRefText}\nfor-less references:\n{forlessRefText}",
         el=el,
     )

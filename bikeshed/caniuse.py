@@ -33,7 +33,7 @@ def addCanIUsePanels(doc):
 
         featId = featId.lower()
         if not doc.canIUse.hasFeature(featId):
-            die("Unrecognized Can I Use feature ID: {0}", featId, el=dfn)
+            die(f"Unrecognized Can I Use feature ID: {featId}", el=dfn)
         feature = doc.canIUse.getFeature(featId)
 
         addClass(dfn, "caniuse-paneled")
@@ -45,11 +45,7 @@ def addCanIUsePanels(doc):
         )
         dfnId = dfn.get("id")
         if not dfnId:
-            die(
-                "Elements with `caniuse` attribute need to have an ID as well. Got:\n{0}",
-                serializeTag(dfn),
-                el=dfn,
-            )
+            die(f"Elements with `caniuse` attribute need to have an ID as well. Got:\n{serializeTag(dfn)}", el=dfn)
             continue
         panel.set("data-dfn-id", dfnId)
         appendChild(doc.body, panel)
@@ -207,9 +203,9 @@ def validateCanIUseURLs(doc, elements):
 
     unusedFeatures = urlFeatures - docFeatures
     if unusedFeatures:
+        featureList = "\n".join(" * {0} - https://caniuse.com/#feat={0}".format(x) for x in sorted(unusedFeatures))
         warn(
-            "The following Can I Use features are associated with your URLs, but don't show up in your spec:\n{0}",
-            "\n".join(" * {0} - https://caniuse.com/#feat={0}".format(x) for x in sorted(unusedFeatures)),
+            f"The following Can I Use features are associated with your URLs, but don't show up in your spec:\n{featureList}"
         )
 
 

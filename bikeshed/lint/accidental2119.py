@@ -28,8 +28,7 @@ def accidental2119(doc):
                 match = re.search(keywords, el.text)
                 if match:
                     warn(
-                        "RFC2119 keyword in non-normative section (use: might, can, has to, or override with <span class=allow-2119>): {0}",
-                        el.text,
+                        f"RFC2119 keyword in non-normative section (use: might, can, has to, or override with <span class=allow-2119>): {el.text}",
                         el=el,
                     )
             for child in el:
@@ -37,8 +36,7 @@ def accidental2119(doc):
                     match = re.search(keywords, child.tail)
                     if match:
                         warn(
-                            "RFC2119 keyword in non-normative section (use: might, can, has to, or override with <span class=allow-2119>): {0}",
-                            child.tail,
+                            f"RFC2119 keyword in non-normative section (use: might, can, has to, or override with <span class=allow-2119>): {child.tail}",
                             el=el,
                         )
         for child in el:

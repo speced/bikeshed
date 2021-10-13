@@ -113,7 +113,7 @@ def updateByManifest(path, dryRun=False):
             localDt = dtFromManifest(fh.readlines())
     except Exception as e:
         localDt = "error"
-        warn("Couldn't find local manifest file.\n{0}", e)
+        warn(f"Couldn't find local manifest file.\n{e}")
 
     # Get the actual file data by regenerating the local manifest,
     # to guard against mistakes or shenanigans
@@ -127,8 +127,7 @@ def updateByManifest(path, dryRun=False):
         remoteFiles = dictFromManifest(remoteManifest)
     except Exception as e:
         warn(
-            "Couldn't download remote manifest file, so can't update. Please report this!\n{0}",
-            e,
+            f"Couldn't download remote manifest file, so can't update. Please report this!\n{e}",
         )
         warn("Update manually with `bikeshed update --skip-manifest`.")
         return False
@@ -147,17 +146,12 @@ def updateByManifest(path, dryRun=False):
                 "Remote data is more than two days old; the update process has probably fallen over. Please report this!"
             )
         if localDt == remoteDt and localDt != 0:
-            say(
-                "Local data is already up-to-date with remote ({0})",
-                localDt.strftime("%Y-%m-%d %H:%M:%S"),
-            )
+            say(f"Local data is already up-to-date with remote ({localDt.strftime('%Y-%m-%d %H:%M:%S')})")
             return True
         elif localDt > remoteDt:
             # No need to update, local data is more recent.
             say(
-                "Local data is fresher ({0}) than remote ({1}), so nothing to update.",
-                localDt.strftime("%Y-%m-%d %H:%M:%S"),
-                remoteDt.strftime("%Y-%m-%d %H:%M:%S"),
+                f"Local data is fresher ({localDt.strftime('%Y-%m-%d %H:%M:%S')}) than remote ({remoteDt.strftime('%Y-%m-%d %H:%M:%S')}), so nothing to update.",
             )
             return True
 
@@ -182,17 +176,13 @@ def updateByManifest(path, dryRun=False):
 
     if not dryRun:
         if newPaths:
-            say(
-                "Updating {0} file{1}...",
-                len(newPaths),
-                "s" if len(newPaths) > 1 else "",
-            )
+            say(f"Updating {len(newPaths)} file{'s' if len(newPaths) > 1 else ''}...")
         goodPaths, badPaths = asyncio.run(updateFiles(path, newPaths))
         try:
             with open(os.path.join(path, "manifest.txt"), "w", encoding="utf-8") as fh:
                 fh.write(createFinishedManifest(remoteManifest, goodPaths, badPaths))
         except Exception as e:
-            warn("Couldn't save new manifest file.\n{0}", e)
+            warn(f"Couldn't save new manifest file.\n{e}")
             return False
     if not badPaths:
         say("Done!")
@@ -225,14 +215,9 @@ async def updateFiles(localPrefix, newPaths):
             currFileTime = time.time()
             if (currFileTime - lastMsgTime) >= messageDelta:
                 if not badPaths:
-                    say("Updated {0}/{1}...", len(goodPaths), len(newPaths))
+                    say(f"Updated {len(goodPaths)}/{len(newPaths)}...")
                 else:
-                    say(
-                        "Updated {0}/{1}, {2} errors...",
-                        len(goodPaths),
-                        len(newPaths),
-                        len(badPaths),
-                    )
+                    say(f"Updated {len(goodPaths)}/{len(newPaths)}, {len(badPaths)} errors...")
                 lastMsgTime = currFileTime
     return goodPaths, badPaths
 

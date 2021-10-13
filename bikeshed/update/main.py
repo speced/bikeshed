@@ -80,7 +80,7 @@ def fixupDataFiles():
         with open(remotePath("version.txt")) as fh:
             remoteVersion = int(fh.read())
     except OSError as err:
-        warn("Couldn't check the datafile version. Bikeshed may be unstable.\n{0}", err)
+        warn(f"Couldn't check the datafile version. Bikeshed may be unstable.\n{err}")
         return
 
     if localVersion == remoteVersion:
@@ -94,7 +94,7 @@ def fixupDataFiles():
         for filename in os.listdir(remotePath()):
             copyanything(remotePath(filename), localPath(filename))
     except Exception as err:
-        warn("Couldn't update datafiles from cache. Bikeshed may be unstable.\n{0}", err)
+        warn(f"Couldn't update datafiles from cache. Bikeshed may be unstable.\n{err}")
         return
 
 
@@ -111,7 +111,7 @@ def updateReadonlyDataFiles():
                 continue
             copyanything(localPath(filename), remotePath(filename))
     except Exception as err:
-        warn("Error copying over the datafiles:\n{0}", err)
+        warn(f"Error copying over the datafiles:\n{err}")
         return
 
 
@@ -148,7 +148,7 @@ def cleanupFiles(root, touchedPaths, dryRun=False):
             os.remove(absPath)
             oldPaths.append(relPath)
     if oldPaths:
-        say("Success! Deleted {} old files.".format(len(oldPaths)))
+        say(f"Success! Deleted {len(oldPaths)} old files.")
     else:
         say("Success! Nothing to delete.")
 

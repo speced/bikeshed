@@ -28,8 +28,7 @@ def missingExposed(doc):
                     break
             if not good:
                 warn(
-                    "The '{0}' namespace is missing an [Exposed] extended attribute. Does it need [Exposed=Window], or something more?",
-                    construct.name,
+                    f"The '{construct.name}' namespace is missing an [Exposed] extended attribute. Does it need [Exposed=Window], or something more?"
                 )
         elif construct.idl_type == "interface":
             good = False
@@ -42,8 +41,7 @@ def missingExposed(doc):
                     break
             if not good:
                 warn(
-                    "The '{0}' interface is missing an [Exposed] extended attribute. Does it need [Exposed=Window], or something more?",
-                    construct.name,
+                    f"The '{construct.name}' interface is missing an [Exposed] extended attribute. Does it need [Exposed=Window], or something more?"
                 )
         elif construct.idl_type == "callback":
             if not hasattr(construct, "interface"):

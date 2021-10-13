@@ -34,13 +34,10 @@ def p(msg, sep=None, end=None):
             print(msg.encode("ascii", "xmlcharrefreplace"), sep=sep, end=end)
 
 
-def die(msg, *formatArgs, **namedArgs):
-    lineNum = None
-    if "el" in namedArgs and namedArgs["el"].get("line-number"):
-        lineNum = namedArgs["el"].get("line-number")
-    elif namedArgs.get("lineNum", None):
-        lineNum = namedArgs["lineNum"]
-    msg = formatMessage("fatal", msg.format(*formatArgs, **namedArgs), lineNum=lineNum)
+def die(msg, el=None, lineNum=None):
+    if lineNum is None and el is not None and el.get("line-number"):
+        lineNum = el.get("line-number")
+    msg = formatMessage("fatal", msg, lineNum=lineNum)
     if msg not in messages:
         messageCounts["fatal"] += 1
         messages.add(msg)
@@ -50,21 +47,16 @@ def die(msg, *formatArgs, **namedArgs):
         errorAndExit()
 
 
-def linkerror(msg, *formatArgs, **namedArgs):
-    lineNum = None
+def linkerror(msg, el=None, lineNum=None):
+    if lineNum is None and el is not None and el.get("line-number"):
+        lineNum = el.get("line-number")
     suffix = ""
-    if "el" in namedArgs:
-        el = namedArgs["el"]
-        if el.get("line-number"):
-            lineNum = el.get("line-number")
+    if el is not None:
+        if el.get("bs-autolink-syntax"):
+            suffix = "\n" + el.get("bs-autolink-syntax")
         else:
-            if el.get("bs-autolink-syntax"):
-                suffix = "\n{}".format(el.get("bs-autolink-syntax"))
-            else:
-                suffix = "\n{}".format(lxml.html.tostring(namedArgs["el"], with_tail=False, encoding="unicode"))
-    elif namedArgs.get("lineNum", None):
-        lineNum = namedArgs["lineNum"]
-    msg = formatMessage("link", msg.format(*formatArgs, **namedArgs) + suffix, lineNum=lineNum)
+            suffix = "\n" + lxml.html.tostring(el, with_tail=False, encoding="unicode")
+    msg = formatMessage("link", msg + suffix, lineNum=lineNum)
     if msg not in messages:
         messageCounts["linkerror"] += 1
         messages.add(msg)
@@ -74,13 +66,10 @@ def linkerror(msg, *formatArgs, **namedArgs):
         errorAndExit()
 
 
-def warn(msg, *formatArgs, **namedArgs):
-    lineNum = None
-    if "el" in namedArgs and namedArgs["el"].get("line-number"):
-        lineNum = namedArgs["el"].get("line-number")
-    elif namedArgs.get("lineNum", None):
-        lineNum = namedArgs["lineNum"]
-    msg = formatMessage("warning", msg.format(*formatArgs, **namedArgs), lineNum=lineNum)
+def warn(msg, el=None, lineNum=None):
+    if lineNum is None and el is not None and el.get("line-number"):
+        lineNum = el.get("line-number")
+    msg = formatMessage("warning", msg, lineNum=lineNum)
     if msg not in messages:
         messageCounts["warning"] += 1
         messages.add(msg)
@@ -90,21 +79,19 @@ def warn(msg, *formatArgs, **namedArgs):
         errorAndExit()
 
 
-def say(msg, *formatArgs, **namedArgs):
+def say(msg):
     if constants.quiet < 1:
-        p(formatMessage("message", msg.format(*formatArgs, **namedArgs)))
+        p(formatMessage("message", msg))
 
 
-def success(msg, *formatArgs, **namedArgs):
+def success(msg):
     if constants.quiet < 4:
-        msg = formatMessage("success", msg.format(*formatArgs, **namedArgs))
-        p(msg)
+        p(formatMessage("success", msg))
 
 
-def failure(msg, *formatArgs, **namedArgs):
+def failure(msg):
     if constants.quiet < 4:
-        msg = formatMessage("failure", msg.format(*formatArgs, **namedArgs))
-        p(msg)
+        p(formatMessage("failure", msg))
 
 
 def resetSeenMessages():

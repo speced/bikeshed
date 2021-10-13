@@ -66,7 +66,7 @@ class Font:
             with open(fontfilename, encoding="utf-8") as fh:
                 lines = fh.readlines()
         except Exception as e:
-            die("Couldn't find font file “{0}”:\n{1}", fontfilename, e)
+            die(f"Couldn't find font file “{fontfilename}”:\n{e}")
         self.metadata, lines = parseMetadata(lines)
         self.characters = parseCharacters(self.metadata, lines)
 
@@ -79,7 +79,7 @@ class Font:
                         output[i] += " "
                     output[i] += line
             else:
-                die("The character “{0}” doesn't appear in the specified font.", letter)
+                die(f"The character “{letter}” doesn't appear in the specified font.")
         output = [line + "\n" for line in output]
         return output
 
@@ -101,7 +101,7 @@ def parseMetadata(lines):
         if key in nameMapping:
             key = nameMapping[key]
         else:
-            die("Unrecognized font metadata “{0}”", key)
+            die(f"Unrecognized font metadata “{key}”")
         if key in valProcessors:
             val = valProcessors[key](val)
         md[key] = val
@@ -176,13 +176,10 @@ def getInputLines(inputFilename):
             with open(inputFilename, encoding="utf-8") as fh:
                 lines = fh.readlines()
     except FileNotFoundError:
-        die(
-            "Couldn't find the input file at the specified location '{0}'.",
-            inputFilename,
-        )
+        die(f"Couldn't find the input file at the specified location '{inputFilename}'.")
         return []
     except OSError:
-        die("Couldn't open the input file '{0}'.", inputFilename)
+        die(f"Couldn't open the input file '{inputFilename}'.")
         return []
     return lines, inputFilename
 
@@ -197,11 +194,7 @@ def writeOutputLines(outputFilename, inputFilename, lines):
             with open(outputFilename, "w", encoding="utf-8") as f:
                 f.write("".join(lines))
     except Exception as e:
-        die(
-            "Something prevented me from saving the output document to {0}:\n{1}",
-            outputFilename,
-            e,
-        )
+        die(f"Something prevented me from saving the output document to {outputFilename}:\n{e}")
 
 
 if __name__ == "__main__":

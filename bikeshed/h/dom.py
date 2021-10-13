@@ -31,7 +31,7 @@ def findAll(sel, context):
     try:
         return CSSSelector(sel, namespaces={"svg": "http://www.w3.org/2000/svg"})(context)
     except Exception as e:
-        die("The selector '{0}' returned an error:\n{1}", sel, e)
+        die(f"The selector '{sel}' returned an error:\n{e}")
         return []
 
 
@@ -51,7 +51,7 @@ def escapeCSSIdent(val):
     firstCode = val[0]
     for i, code in enumerate(ord(x) for x in val):
         if code == 0:
-            die("Invalid character: the string '{0}' somehow has a NUL in it.", val)
+            die(f"Invalid character: the string '{val}' somehow has a NUL in it.")
             return ""
         if (
             0x1 <= code <= 0x1F
@@ -726,10 +726,7 @@ def replaceMacros(text, macros):
         # Nothing has matched, so start failing the macros.
         if optional:
             return ""
-        die(
-            "Found unmatched text macro {0}. Correct the macro, or escape it with a leading backslash.",
-            fullText,
-        )
+        die(f"Found unmatched text macro {fullText}. Correct the macro, or escape it with a leading backslash.")
         return fullText
 
     return re.sub(r"(\\|\[)?\[([A-Z0-9-]+)(\??)\]", macroReplacer, text)
@@ -816,8 +813,7 @@ def dedupIDs(doc):
             # Try to de-dup the id by appending an integer after it.
             if warnAboutDupes:
                 warn(
-                    "Multiple elements have the same ID '{0}'.\nDeduping, but this ID may not be stable across revisions.",
-                    dupeId,
+                    f"Multiple elements have the same ID '{dupeId}'.\nDeduping, but this ID may not be stable across revisions.",
                     el=el,
                 )
             for x in ints:

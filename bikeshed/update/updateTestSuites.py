@@ -25,11 +25,11 @@ def update(path, dryRun=False):
             die("This version of the test suite API is no longer supported. Please update Bikeshed.")
             return
         if res.content_type not in testSuiteDataContentTypes:
-            die("Unrecognized test suite content-type '{0}'.", res.content_type)
+            die(f"Unrecognized test suite content-type '{res.content_type}'.")
             return
         rawTestSuiteData = res.data
     except Exception as e:
-        die("Couldn't download test suite data.  Error was:\n{0}", str(e))
+        die(f"Couldn't download test suite data.  Error was:\n{e}")
         return
 
     testSuites = dict()
@@ -53,5 +53,5 @@ def update(path, dryRun=False):
             with open(os.path.join(path, "test-suites.json"), "w", encoding="utf-8") as f:
                 f.write(json.dumps(testSuites, ensure_ascii=False, indent=2, sort_keys=True))
         except Exception as e:
-            die("Couldn't save test-suite database to disk.\n{0}", e)
+            die(f"Couldn't save test-suite database to disk.\n{e}")
     say("Success!")

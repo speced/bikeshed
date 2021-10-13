@@ -35,9 +35,7 @@ def transformProductionPlaceholders(doc):
                 linkType = match.group(2)
             else:
                 die(
-                    "Shorthand <<{0}>> gives type as '{1}', but only 'property' and 'descriptor' are allowed.",
-                    match.group(0),
-                    match.group(3),
+                    f"Shorthand <<{match.group(0)}>> gives type as '{match.group(3)}', but only 'property' and 'descriptor' are allowed.",
                     el=el,
                 )
                 el.tag = "span"
@@ -80,12 +78,11 @@ def transformProductionPlaceholders(doc):
                 rangeStart = formatValue(rangeStart)
                 rangeEnd = formatValue(rangeEnd)
                 if rangeStart is None or rangeEnd is None:
-                    die("Shorthand <<{0}>> has an invalid range.", text, el=el)
+                    die(f"Shorthand <<{text}>> has an invalid range.", el=el)
                 try:
                     if not correctlyOrderedRange(rangeStart, rangeEnd):
                         die(
-                            "Shorthand <<{0}>> has a range whose start is not less than its end.",
-                            text,
+                            f"Shorthand <<{text}>> has a range whose start is not less than its end.",
                             el=el,
                         )
                 except:
@@ -95,11 +92,7 @@ def transformProductionPlaceholders(doc):
                 el.set("data-lt", f"<{term}>")
             el.text = f"<{interior}>"
             continue
-        die(
-            "Shorthand <<{0}>> does not match any recognized shorthand grammar.",
-            text,
-            el=el,
-        )
+        die(f"Shorthand <<{text}>> does not match any recognized shorthand grammar.", el=el)
         el.tag = "span"
         el.text = el.get("bs-autolink-syntax")
         continue
@@ -165,9 +158,7 @@ def transformMaybePlaceholders(doc):
                 linkType = match.group(3)
             else:
                 die(
-                    "Shorthand ''{0}'' gives type as '{1}', but only “maybe” types are allowed.",
-                    match.group(0),
-                    match.group(3),
+                    f"Shorthand ''{match.group(0)}'' gives type as '{match.group(3)}', but only “maybe” types are allowed.",
                     el=el,
                 )
                 el.tag = "css"
@@ -281,11 +272,7 @@ def transformShorthandElements(doc):
             continue
         if replacer(varRe, varReplacer, el, text):
             continue
-        die(
-            "<l> element doesn't contain a recognized autolinking syntax:\n{0}",
-            outerHTML(el),
-            el=el,
-        )
+        die(f"<l> element doesn't contain a recognized autolinking syntax:\n{outerHTML(el)}", el=el)
         el.tag = "span"
 
 
@@ -482,9 +469,7 @@ def propdescReplacer(match):
         pass
     else:
         die(
-            "Shorthand {0} gives type as '{1}', but only 'property' and 'descriptor' are allowed.",
-            match.group(0),
-            linkType,
+            f"Shorthand {match.group(0)} gives type as '{linkType}', but only 'property' and 'descriptor' are allowed.",
         )
         return E.span(match.group(0))
     if linkText is None:
@@ -526,9 +511,7 @@ def idlReplacer(match):
         pass
     else:
         die(
-            "Shorthand {0} gives type as '{1}', but only IDL types are allowed.",
-            match.group(0),
-            linkType,
+            f"Shorthand {match.group(0)} gives type as '{linkType}', but only IDL types are allowed.",
         )
         return E.span(match.group(0))
     if linkText is None:

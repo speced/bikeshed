@@ -160,7 +160,7 @@ class RefSource:
                 linkTypes = list(config.linkTypeToDfnType[linkType])
             else:
                 if error:
-                    linkerror("Unknown link type '{0}'.", linkType)
+                    linkerror(f"Unknown link type '{linkType}'.")
                 return [], "type"
             refs = [x for x in refs if x.type in linkTypes]
         if not refs:

@@ -91,11 +91,7 @@ def determineLineNumbers(doc, el):
         try:
             lineStart = int(lineStart)
         except ValueError:
-            die(
-                "line-start attribute must have an integer value. Got '{0}'.",
-                lineStart,
-                el=el,
-            )
+            die(f"line-start attribute must have an integer value. Got '{lineStart}'.", el=el)
             lineStart = 1
 
     lh = el.get("line-highlight")
@@ -112,29 +108,17 @@ def determineLineNumbers(doc, el):
                     low = int(low)
                     high = int(high)
                 except ValueError:
-                    die(
-                        "Error parsing line-highlight range '{0}' - must be `int-int`.",
-                        item,
-                        el=el,
-                    )
+                    die(f"Error parsing line-highlight range '{item}' - must be `int-int`.", el=el)
                     continue
                 if low >= high:
-                    die(
-                        "line-highlight ranges must be well-formed lo-hi - got '{0}'.",
-                        item,
-                        el=el,
-                    )
+                    die(f"line-highlight ranges must be well-formed lo-hi - got '{item}'.", el=el)
                     continue
                 lineHighlights.update(list(range(low, high + 1)))
             else:
                 try:
                     item = int(item)
                 except ValueError:
-                    die(
-                        "Error parsing line-highlight value '{0}' - must be integers.",
-                        item,
-                        el=el,
-                    )
+                    die(f"Error parsing line-highlight value '{item}' - must be integers.", el=el)
                     continue
                 lineHighlights.add(item)
 
@@ -165,7 +149,7 @@ def highlightWithWebIDL(text, el):
 
     class IDLUI:
         def warn(self, msg):
-            die("{0}", msg.rstrip())
+            die(msg.rstrip())
 
     class HighlightMarker:
         # Just applies highlighting classes to IDL stuff.
@@ -244,9 +228,8 @@ def highlightWithPygments(text, lang, el):
     lexer = lexerFromLang(lang)
     if lexer is None:
         die(
-            "'{0}' isn't a known syntax-highlighting language. See http://pygments.org/docs/lexers/. Seen on:\n{1}",
-            lang,
-            outerHTML(el),
+            f"'{lang}' isn't a known syntax-highlighting language. See http://pygments.org/docs/lexers/. Seen on:\n"
+            + outerHTML(el),
             el=el,
         )
         return

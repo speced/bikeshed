@@ -71,22 +71,10 @@ def getTargetInfo(doc, el):
         )
 
     if len(targets) == 0:
-        die(
-            "Couldn't find target {1} '{0}':\n{2}",
-            referencedAttribute,
-            refType,
-            h.outerHTML(el),
-            el=el,
-        )
+        die(f"Couldn't find target {referencedAttribute} '{refType}':\n{h.outerHTML(el)}", el=el)
         return
     elif len(targets) > 1:
-        die(
-            "Multiple potential target {1}s '{0}':\n{2}",
-            referencedAttribute,
-            refType,
-            h.outerHTML(el),
-            el=el,
-        )
+        die(f"Multiple potential target {referencedAttribute}s '{refType}':\n{h.outerHTML(el)}", el=el)
         return
 
     target = targets[0]

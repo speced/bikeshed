@@ -107,11 +107,9 @@ def retrieveBoilerplateFile(
         for f in (statusFile, genericFile):
             if doc.inputSource.cheaplyExists(f):
                 warn(
-                    (
-                        "Found {0} next to the specification without a matching\n"
-                        + "Local Boilerplate: {1} yes\n"
-                        + "in the metadata. This include won't be found when building via a URL."
-                    ).format(f, name)
+                    f"Found {f} next to the specification without a matching\n"
+                    + f"Local Boilerplate: {name} yes\n"
+                    + "in the metadata. This include won't be found when building via a URL."
                 )
                 # We should remove this after giving specs time to react to the warning:
                 sources.append(doc.inputSource.relative(f))
@@ -138,9 +136,6 @@ def retrieveBoilerplateFile(
     else:
         if error:
             die(
-                "Couldn't find an appropriate include file for the {0} inclusion, given group='{1}' and status='{2}'.",
-                name,
-                group,
-                status,
+                f"Couldn't find an appropriate include file for the {name} inclusion, given group='{group}' and status='{status}'."
             )
         return ""

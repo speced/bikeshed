@@ -27,7 +27,7 @@ def update(path, dryRun=False):
                 with open(p, "w", encoding="utf-8") as fh:
                     writeBiblioFile(fh, biblios)
             except Exception as e:
-                die("Couldn't save biblio database to disk.\n{0}", e)
+                die(f"Couldn't save biblio database to disk.\n{e}")
                 return
 
         # biblio-keys is used to help correct typos,
@@ -74,7 +74,7 @@ def update(path, dryRun=False):
             with open(p, "w", encoding="utf-8") as fh:
                 fh.write(str(json.dumps(reducedNames, indent=0, ensure_ascii=False, sort_keys=True)))
         except Exception as e:
-            die("Couldn't save biblio database to disk.\n{0}", e)
+            die(f"Couldn't save biblio database to disk.\n{e}")
             return
 
         # Collect all the number-suffix names which also exist un-numbered
@@ -85,7 +85,7 @@ def update(path, dryRun=False):
             with open(p, "w", encoding="utf-8") as fh:
                 fh.write(str(json.dumps(numberedNames, indent=0, ensure_ascii=False, sort_keys=True)))
         except Exception as e:
-            die("Couldn't save biblio numeric-suffix information to disk.\n{0}", e)
+            die(f"Couldn't save biblio numeric-suffix information to disk.\n{e}")
     say("Success!")
     return writtenPaths
 
@@ -94,7 +94,7 @@ def getSpecrefData():
     try:
         return requests.get("https://api.specref.org/bibrefs").text
     except Exception as e:
-        die("Couldn't download the SpecRef biblio data.\n{0}", e)
+        die(f"Couldn't download the SpecRef biblio data.\n{e}")
         return "{}"
 
 
@@ -102,7 +102,7 @@ def getWG21Data():
     try:
         return requests.get("https://wg21.link/specref.json").text
     except Exception as e:
-        die("Couldn't download the WG21 biblio data.\n{0}", e)
+        die(f"Couldn't download the WG21 biblio data.\n{e}")
         return "{}"
 
 
@@ -110,7 +110,7 @@ def getCSSWGData():
     try:
         return requests.get("https://raw.githubusercontent.com/w3c/csswg-drafts/master/biblio.ref").text.splitlines()
     except Exception as e:
-        die("Couldn't download the CSSWG biblio data.\n{0}", e)
+        die(f"Couldn't download the CSSWG biblio data.\n{e}")
         return []
 
 
@@ -173,7 +173,7 @@ def writeBiblioFile(fh, biblios):
             fh.write(b["linkText"] + "\n")
             fh.write(b["aliasOf"] + "\n")
         else:
-            die("The biblio key '{0}' has an unknown biblio type '{1}'.", key, format)
+            die(f"The biblio key '{key}' has an unknown biblio type '{format}'.")
             continue
         fh.write("-" + "\n")
 

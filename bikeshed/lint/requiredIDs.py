@@ -10,4 +10,4 @@ def requiredIDs(doc):
         if id.startswith("#"):
             id = id[1:]
         if id not in doc_ids:
-            die("Required ID '{0}' was not found in the document.", id)
+            die(f"Required ID '{id}' was not found in the document.")

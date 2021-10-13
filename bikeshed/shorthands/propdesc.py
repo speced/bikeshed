@@ -59,9 +59,7 @@ class PropdescShorthand:
 
         if self.linkType not in ["property", "descriptor", "propdesc"]:
             die(
-                "Shorthand {0} gives type as '{1}', but only 'property' and 'descriptor' are allowed.",
-                self.bsAutolink,
-                self.linkType,
+                f"Shorthand {self.bsAutolink} gives type as '{self.linkType}', but only 'property' and 'descriptor' are allowed.",
             )
             return steps.Success(E.span(self.bsAutolink))
 

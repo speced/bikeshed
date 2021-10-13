@@ -10,7 +10,7 @@ from .unsortedJunk import classifyDfns
 
 class IDLUI:
     def warn(self, msg):
-        die("{0}", msg.rstrip())
+        die(msg.rstrip())
 
 
 class IDLSilent:
@@ -203,10 +203,7 @@ class IDLMarker:
             elif hasattr(construct.member, "attribute"):
                 rest = construct.member.attribute
             else:
-                die(
-                    "Can't figure out how to construct attribute-info from:\n  {0}",
-                    construct,
-                )
+                die("Can't figure out how to construct attribute-info from:\n  " + construct)
             if rest.readonly is not None:
                 readonly = "data-readonly"
             else:

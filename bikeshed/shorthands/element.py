@@ -64,10 +64,7 @@ class ElementShorthand:
 
         if self.linkType not in config.markupTypes and self.linkType != "element-sub":
             die(
-                "Shorthand {0} gives type as '{1}', but only markup types ({2}) are allowed.",
-                self.bsAutolink,
-                self.linkType,
-                config.englishFromList(config.idlTypes),
+                f"Shorthand {self.bsAutolink} gives type as '{self.linkType}', but only markup types ({config.englishFromList(config.markupTypes)}) are allowed."
             )
             return steps.Success(E.span({}, self.bsAutolink))
 

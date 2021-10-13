@@ -18,16 +18,14 @@ def update(path, dryRun=False):
         say("Downloading boilerplates...")
         data = requests.get(ghPrefix + "manifest.txt").text
     except Exception as e:
-        die("Couldn't download boilerplates manifest.\n{0}", e)
+        die(f"Couldn't download boilerplates manifest.\n{e}")
         return
 
     newPaths = pathsFromManifest(data)
 
     if not dryRun:
         say(
-            "Updating {0} file{1}...",
-            len(newPaths),
-            "s" if len(newPaths) > 1 else "",
+            f"Updating {len(newPaths)} file{'s' if len(newPaths) > 1 else ''}...",
         )
         goodPaths, badPaths = asyncio.run(updateFiles(path, newPaths))
     if not badPaths:
@@ -66,14 +64,9 @@ async def updateFiles(localPrefix, newPaths):
             currFileTime = time.time()
             if (currFileTime - lastMsgTime) >= messageDelta:
                 if not badPaths:
-                    say("Updated {0}/{1}...", len(goodPaths), len(newPaths))
+                    say(f"Updated {len(goodPaths)}/{len(newPaths)}...")
                 else:
-                    say(
-                        "Updated {0}/{1}, {2} errors...",
-                        len(goodPaths),
-                        len(newPaths),
-                        len(badPaths),
-                    )
+                    say(f"Updated {len(goodPaths)}/{len(newPaths)}, {len(badPaths)} errors...")
                 lastMsgTime = currFileTime
     return goodPaths, badPaths
 

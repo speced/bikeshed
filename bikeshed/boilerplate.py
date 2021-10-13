@@ -359,9 +359,7 @@ def addExplicitIndexes(doc):
         status = el.get("status")
         if status and status not in config.specStatuses:
             die(
-                "<index> has unknown value '{0}' for status. Must be {1}.",
-                status,
-                config.englishFromList(config.specStatuses),
+                f"<index> has unknown value '{status}' for status. Must be {config.englishFromList(config.specStatuses)}.",
                 el=el,
             )
             continue
@@ -371,7 +369,7 @@ def addExplicitIndexes(doc):
             for t in types:
                 if t not in config.dfnTypes:
                     die(
-                        "Unknown type value '{}' on {}".format(t, outerHTML(el)),
+                        f"Unknown type value '{t}' on {outerHTML(el)}",
                         el=el,
                     )
                     types.remove(t)
@@ -383,7 +381,7 @@ def addExplicitIndexes(doc):
             specs = {x.strip() for x in el.get("data-link-spec").split(",")}
             for s in list(specs):
                 if s not in doc.refs.specs:
-                    die("Unknown spec name '{}' on {}".format(s, outerHTML(el)), el=el)
+                    die(f"Unknown spec name '{s}' on {outerHTML(el)}", el=el)
                     specs.remove(s)
         else:
             specs = None
@@ -401,7 +399,7 @@ def addExplicitIndexes(doc):
                 export = False
             else:
                 die(
-                    "Unknown export value '{}' (should be boolish) on {}".format(exportVal, outerHTML(el)),
+                    f"Unknown export value '{exportVal}' (should be boolish) on {outerHTML(el)}",
                     el=el,
                 )
                 export = None
@@ -599,8 +597,7 @@ def addPropertyIndex(doc):
         result = re.match(r"(.*):", textContent(row[0]).strip())
         if result is None:
             die(
-                "Propdef row headers must be a word followed by a colon. Got:\n{0}",
-                textContent(row[0]).strip(),
+                f"Propdef row headers must be a word followed by a colon. Got:\n{textContent(row[0]).strip()}",
                 el=table,
             )
             return "", ""
@@ -802,20 +799,14 @@ def addTOCSection(doc):
         if isinstance(container, int):
             # Saw a low-level heading without first seeing a higher heading.
             die(
-                "Saw an <h{0}> without seeing an <h{1}> first. Please order your headings properly.\n{2}",
-                level,
-                level - 1,
-                outerHTML(header),
+                f"Saw an <h{level}> without seeing an <h{level-1}> first. Please order your headings properly.\n{outerHTML(header)}",
                 el=header,
             )
             return
         if level > previousLevel + 1:
             # Jumping two levels is a no-no.
             die(
-                "Heading level jumps more than one level, from h{0} to h{1}:\n  {2}",
-                previousLevel,
-                level,
-                textContent(header).replace("\n", " "),
+                f"Heading level jumps more than one level, from h{previousLevel} to h{level}:\n{outerHTML(el)}",
                 el=header,
             )
             return
@@ -920,8 +911,7 @@ def addSpecMetadataSection(doc):
                 missingInfo = True
         if missingInfo:
             warn(
-                "Bikeshed doesn't have all the translation info for '{0}'. Please add to bikeshed/spec-data/readonly/languages.json and submit a PR!",
-                lang,
+                f"Bikeshed doesn't have all the translation info for '{lang}'. Please add to bikeshed/spec-data/readonly/languages.json and submit a PR!"
             )
         if nativeName:
             return E.span(

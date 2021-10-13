@@ -30,7 +30,7 @@ def processWptElements(doc):
         for testName in testNames:
             if testName not in testData:
                 die(
-                    "Couldn't find WPT test '{0}' - did you misspell something?",
+                    f"Couldn't find WPT test '{testName}' - did you misspell something?",
                     testName,
                     el=el,
                 )
@@ -54,10 +54,7 @@ def processWptElements(doc):
     if wptRestElements and testData is None:
         testData = loadTestData(doc)
     if len(wptRestElements) > 1:
-        die(
-            "Only one <wpt-rest> element allowed per document, you have {0}.",
-            len(wptRestElements),
-        )
+        die(f"Only one <wpt-rest> element allowed per document, you have {len(wptRestElements)}.")
         wptRestElements = wptRestElements[0:1]
     elif len(wptRestElements) == 1:
         localPrefix = wptRestElements[0].get("pathprefix")
@@ -69,7 +66,7 @@ def processWptElements(doc):
         atLeastOneElement = True
         prefixedNames = [p for p in testData if prefixInPath(pathPrefix, p) and p not in seenTestNames]
         if len(prefixedNames) == 0:
-            die("Couldn't find any tests with the path prefix '{0}'.", pathPrefix)
+            die(f"Couldn't find any tests with the path prefix '{pathPrefix}'.")
             return
         createHTML(doc, wptRestElements[0], prefixedNames, testData)
         warn(
@@ -249,10 +246,8 @@ def checkForOmittedTests(pathPrefix, testData, seenTestNames):
         numTests = len(unseenTests)
         if numTests < 10:
             warn(
-                "There are {} WPT tests underneath your path prefix '{}' that aren't in your document and must be added:\n{}",
-                numTests,
-                pathPrefix,
-                "\n".join("  " + path for path in sorted(unseenTests)),
+                f"There are {numTests} WPT tests underneath your path prefix '{pathPrefix}' that aren't in your document and must be added:\n"
+                + "\n".join("  " + path for path in sorted(unseenTests)),
             )
         else:
             warn(
