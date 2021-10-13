@@ -42,7 +42,6 @@ def processWptElements(doc):
             title = el.get("title")
             titleLang = el.get("lang")
             titleDir = el.get("dir")
-            #createHTML(doc, el, pathPrefix, testNames, testData, title, titleLang, titleDir)
             if prevEl is not None and prevEl.getnext() is el and (prevEl.tail is None or prevEl.tail.strip() == ""):
                 appendTestList(prevEl, pathPrefix, testNames, testData, title, titleLang, titleDir)
                 removeNode(el)
@@ -84,7 +83,7 @@ def processWptElements(doc):
 
     if atLeastOneElement and doc.md.wptDisplay != "none":
         doc.extraStyles["style-wpt"] = wptStyle
-        doc.extraScripts["script-wpt"] = getWptScript(pathPrefix);
+        doc.extraScripts["script-wpt"] = getWptScript(pathPrefix)
 
 
 def createHTML(doc, blockEl, pathPrefix, testNames, testData, title=None, titleLang=None, titleDir=None):
@@ -127,7 +126,7 @@ def appendTestList(blockEl, pathPrefix, testNames, testData, title=None, titleLa
             liveTestScheme = "https"
         else:
             liveTestScheme = "http"
-        _,_,lastNameFragment = testName.rpartition("/")
+        _, _, lastNameFragment = testName.rpartition("/")
         testType = testData[testName]
         if testType in ["crashtest", "print-reftest", "reftest", "testharness"]:
             singleTestEl = E.li(
@@ -410,6 +409,8 @@ dd:not(:last-child) > .wpt-tests-block:not([open]):last-child {
     position: relative;
 }
 """
+
+
 def getWptScript(path):
     if path is None:
         return ""
@@ -417,9 +418,11 @@ def getWptScript(path):
         path = "/" + path
     if not path.endswith("/"):
         path = path + "/"
-    return f"""
+    return (
+        f"""
     const wptPath = "{path}";
-    """ + """
+    """
+        + """
     document.addEventListener("DOMContentLoaded", async ()=>{
         const runsUrl = "https://wpt.fyi/api/runs?label=master&label=stable&max-count=1&product=chrome&product=firefox&product=safari&product=edge";
         const runs = await (await fetch(runsUrl)).json();
@@ -470,3 +473,4 @@ def getWptScript(path):
     }
 
     """
+    )
