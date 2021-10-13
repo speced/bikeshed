@@ -72,7 +72,7 @@ def processWptElements(doc):
         if len(prefixedNames) == 0:
             die("Couldn't find any tests with the path prefix '{0}'.", pathPrefix)
             return
-        createHTML(doc, wptRestElements[0], prefixedNames, testData)
+        createHTML(doc, wptRestElements[0], pathPrefix, prefixedNames, testData)
         warn(
             "<wpt-rest> is intended for debugging only. Move the tests to <wpt> elements next to what they're testing."
         )
@@ -411,6 +411,8 @@ dd:not(:last-child) > .wpt-tests-block:not([open]):last-child {
 }
 """
 def getWptScript(path):
+    if path is None:
+        return ""
     if not path.startswith("/"):
         path = "/" + path
     if not path.endswith("/"):
@@ -419,7 +421,6 @@ def getWptScript(path):
     const wptPath = "{path}";
     """ + """
     document.addEventListener("DOMContentLoaded", async ()=>{
-        if(wptPath == "/") return;
         const runsUrl = "https://wpt.fyi/api/runs?label=master&label=stable&max-count=1&product=chrome&product=firefox&product=safari&product=edge";
         const runs = await (await fetch(runsUrl)).json();
 
@@ -471,59 +472,3 @@ def getWptScript(path):
     }
 
     """
-'''
-    {
-    "results": [
-        {
-            "test": "/css/css-easing/step-timing-functions-syntax.html",
-            "legacy_status": [
-                {
-                    "passes": 13,
-                    "total": 15
-                },
-                {
-                    "passes": 15,
-                    "total": 15
-                },
-                {
-                    "passes": 15,
-                    "total": 15
-                }
-            ]
-        },
-        {
-            "test": "/css/css-easing/cubic-bezier-timing-functions-output.html",
-            "legacy_status": [
-                {
-                    "passes": 5,
-                    "total": 5
-                },
-                {
-                    "passes": 5,
-                    "total": 5
-                },
-                {
-                    "passes": 1,
-                    "total": 5
-                }
-            ]
-        },
-        {
-            "test": "/css/css-easing/step-timing-functions-output.html",
-            "legacy_status": [
-                {
-                    "passes": 14,
-                    "total": 14
-                },
-                {
-                    "passes": 14,
-                    "total": 14
-                },
-                {
-                    "passes": 14,
-                    "total": 14
-                }
-            ]
-        }
-    ]
-}'''
