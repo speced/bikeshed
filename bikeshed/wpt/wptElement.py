@@ -43,10 +43,10 @@ def processWptElements(doc):
             titleLang = el.get("lang")
             titleDir = el.get("dir")
             if prevEl is not None and prevEl.getnext() is el and (prevEl.tail is None or prevEl.tail.strip() == ""):
-                appendTestList(prevEl, pathPrefix, testNames, testData, title, titleLang, titleDir)
+                appendTestList(prevEl, testNames, testData, title, titleLang, titleDir)
                 removeNode(el)
             else:
-                createHTML(doc, el, pathPrefix, testNames, testData, title, titleLang, titleDir)
+                createHTML(doc, el, testNames, testData, title, titleLang, titleDir)
                 prevEl = el
 
     # <wpt-rest> elements
@@ -71,7 +71,7 @@ def processWptElements(doc):
         if len(prefixedNames) == 0:
             die("Couldn't find any tests with the path prefix '{0}'.", pathPrefix)
             return
-        createHTML(doc, wptRestElements[0], pathPrefix, prefixedNames, testData)
+        createHTML(doc, wptRestElements[0], prefixedNames, testData)
         warn(
             "<wpt-rest> is intended for debugging only. Move the tests to <wpt> elements next to what they're testing."
         )
@@ -86,7 +86,7 @@ def processWptElements(doc):
         doc.extraScripts["script-wpt"] = getWptScript(pathPrefix)
 
 
-def createHTML(doc, blockEl, pathPrefix, testNames, testData, title=None, titleLang=None, titleDir=None):
+def createHTML(doc, blockEl, testNames, testData, title=None, titleLang=None, titleDir=None):
     if doc.md.wptDisplay == "none":
         removeNode(blockEl)
     elif doc.md.wptDisplay in ("inline", "open", "closed"):
@@ -101,12 +101,12 @@ def createHTML(doc, blockEl, pathPrefix, testNames, testData, title=None, titleL
         clearContents(blockEl)
         testSummaryEl = E.summary("Tests")
         appendChild(blockEl, testSummaryEl)
-        appendTestList(blockEl, pathPrefix, testNames, testData, title, titleLang, titleDir)
+        appendTestList(blockEl, testNames, testData, title, titleLang, titleDir)
     else:
         die("Programming error, uncaught WPT Display value in createHTML.")
 
 
-def appendTestList(blockEl, pathPrefix, testNames, testData, title=None, titleLang=None, titleDir=None):
+def appendTestList(blockEl, testNames, testData, title=None, titleLang=None, titleDir=None):
     if title:
         titleEl = E.p(
             {
