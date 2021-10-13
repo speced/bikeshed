@@ -42,12 +42,12 @@ def processWptElements(doc):
             title = el.get("title")
             titleLang = el.get("lang")
             titleDir = el.get("dir")
-            createHTML(doc, el, testNames, testData, title, titleLang, titleDir)
+            #createHTML(doc, el, pathPrefix, testNames, testData, title, titleLang, titleDir)
             if prevEl is not None and prevEl.getnext() is el and (prevEl.tail is None or prevEl.tail.strip() == ""):
-                appendTestList(prevEl, testNames, testData, title, titleLang, titleDir)
+                appendTestList(prevEl, pathPrefix, testNames, testData, title, titleLang, titleDir)
                 removeNode(el)
             else:
-                createHTML(doc, el, testNames, testData, title, titleLang, titleDir)
+                createHTML(doc, el, pathPrefix, testNames, testData, title, titleLang, titleDir)
                 prevEl = el
 
     # <wpt-rest> elements
@@ -84,9 +84,10 @@ def processWptElements(doc):
 
     if atLeastOneElement and doc.md.wptDisplay != "none":
         doc.extraStyles["style-wpt"] = wptStyle
+        doc.extraScripts["script-wpt"] = getWptScript(pathPrefix);
 
 
-def createHTML(doc, blockEl, testNames, testData, title=None, titleLang=None, titleDir=None):
+def createHTML(doc, blockEl, pathPrefix, testNames, testData, title=None, titleLang=None, titleDir=None):
     if doc.md.wptDisplay == "none":
         removeNode(blockEl)
     elif doc.md.wptDisplay in ("inline", "open", "closed"):
@@ -101,12 +102,12 @@ def createHTML(doc, blockEl, testNames, testData, title=None, titleLang=None, ti
         clearContents(blockEl)
         testSummaryEl = E.summary("Tests")
         appendChild(blockEl, testSummaryEl)
-        appendTestList(blockEl, testNames, testData, title, titleLang, titleDir)
+        appendTestList(blockEl, pathPrefix, testNames, testData, title, titleLang, titleDir)
     else:
         die("Programming error, uncaught WPT Display value in createHTML.")
 
 
-def appendTestList(blockEl, testNames, testData, title=None, titleLang=None, titleDir=None):
+def appendTestList(blockEl, pathPrefix, testNames, testData, title=None, titleLang=None, titleDir=None):
     if title:
         titleEl = E.p(
             {
@@ -126,7 +127,7 @@ def appendTestList(blockEl, testNames, testData, title=None, titleLang=None, tit
             liveTestScheme = "https"
         else:
             liveTestScheme = "http"
-        _, _, lastNameFragment = testName.rpartition("/")
+        lastNameFragment = testName[len(pathPrefix):]
         testType = testData[testName]
         if testType in ["crashtest", "print-reftest", "reftest", "testharness"]:
             singleTestEl = E.li(
@@ -379,7 +380,7 @@ dd:not(:last-child) > .wpt-tests-block:not([open]):last-child {
     display: grid;
     margin: 0;
     padding: 0;
-    grid-template-columns: 1fr auto auto;
+    grid-template-columns: 1fr max-content auto auto;
     grid-column-gap: .5em;
 }
 .wpt-tests-block hr:last-child {
@@ -393,6 +394,135 @@ dd:not(:last-child) > .wpt-tests-block:not([open]):last-child {
     border: none;
 }
 .wpt-test > .wpt-name { grid-column: 1; }
-.wpt-test > .wpt-live { grid-column: 2; }
-.wpt-test > .wpt-source { grid-column: 3; }
+.wpt-test > .wpt-results { grid-column: 2; }
+.wpt-test > .wpt-live { grid-column: 3; }
+.wpt-test > .wpt-source { grid-column: 4; }
+
+.wpt-test > .wpt-results {
+    display: flex;
+    gap: .1em;
+}
+.wpt-test .wpt-result {
+    display: inline-block;
+    height: 1em;
+    width: 1em;
+    border-radius: 50%;
+    position: relative;
+}
 """
+def getWptScript(path):
+    if not path.startswith("/"):
+        path = "/" + path
+    if not path.endswith("/"):
+        path = path + "/"
+    return f"""
+    const wptPath = "{path}";
+    """ + """
+    document.addEventListener("DOMContentLoaded", async ()=>{
+        const runsUrl = "https://wpt.fyi/api/runs?label=master&label=stable&max-count=1&product=chrome&product=firefox&product=safari&product=edge";
+        const runs = await (await fetch(runsUrl)).json();
+
+        const testResults = await( await fetch("https://wpt.fyi/api/search", {
+            method:"POST",
+            headers:{
+                "Content-Type":"application/json",
+            },
+            body: JSON.stringify({
+                "run_ids": runs.map(x=>x.id),
+                "query": {"path": wptPath},
+            })
+        })).json();
+
+        const browsers = runs.map(x=>x.browser_name)
+        const resultsFromPath = new Map(testResults.results.map(result=>{
+            const testPath = result.test;
+            const passes = result.legacy_status.map(x=>[x.passes, x.total]);
+            return [testPath, passes];
+        }));
+        console.log(resultsFromPath);
+        document.querySelectorAll(".wpt-name").forEach(nameEl=>{
+            const passData = resultsFromPath.get(wptPath + nameEl.textContent);
+            console.log(wptPath + nameEl.textContent, passData);
+            if(passData == undefined) return;
+            const resultsEl = el("span",{"class":"wpt-results"},
+                ...passData.map((p,i) => el("span",
+                {
+                    "title": `${browsers[i]} ${p[0]}/${p[1]}`,
+                    "class": "wpt-result",
+                    "style": `background: conic-gradient(forestgreen ${p[0]/p[1]*360}deg, darkred 0deg);`,
+                })),
+            );
+            nameEl.insertAdjacentElement("afterend", resultsEl);
+        })
+    });
+    function el(name, attrs, ...content) {
+        const x = document.createElement(name);
+        for(const [k,v] of Object.entries(attrs)) {
+            x.setAttribute(k, v);
+        }
+        for(let child of content) {
+            if(typeof child == "string") child = document.createTextNode(child);
+            try {
+            x.appendChild(child);
+            } catch(e) { console.log({x, child}); }
+        }
+        return x;
+    }
+
+    """
+'''
+    {
+    "results": [
+        {
+            "test": "/css/css-easing/step-timing-functions-syntax.html",
+            "legacy_status": [
+                {
+                    "passes": 13,
+                    "total": 15
+                },
+                {
+                    "passes": 15,
+                    "total": 15
+                },
+                {
+                    "passes": 15,
+                    "total": 15
+                }
+            ]
+        },
+        {
+            "test": "/css/css-easing/cubic-bezier-timing-functions-output.html",
+            "legacy_status": [
+                {
+                    "passes": 5,
+                    "total": 5
+                },
+                {
+                    "passes": 5,
+                    "total": 5
+                },
+                {
+                    "passes": 1,
+                    "total": 5
+                }
+            ]
+        },
+        {
+            "test": "/css/css-easing/step-timing-functions-output.html",
+            "legacy_status": [
+                {
+                    "passes": 14,
+                    "total": 14
+                },
+                {
+                    "passes": 14,
+                    "total": 14
+                },
+                {
+                    "passes": 14,
+                    "total": 14
+                }
+            ]
+        }
+    ]
+}'''
