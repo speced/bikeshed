@@ -127,13 +127,14 @@ def appendTestList(blockEl, pathPrefix, testNames, testData, title=None, titleLa
             liveTestScheme = "https"
         else:
             liveTestScheme = "http"
-        lastNameFragment = testName[len(pathPrefix) if pathPrefix else 0:]
+        _,_,lastNameFragment = testName.rpartition("/")
         testType = testData[testName]
         if testType in ["crashtest", "print-reftest", "reftest", "testharness"]:
             singleTestEl = E.li(
                 {"class": "wpt-test"},
                 E.a(
                     {
+                        "title": testName,
                         "href": "https://wpt.fyi/results/" + testName,
                         "class": "wpt-name",
                     },
@@ -142,7 +143,6 @@ def appendTestList(blockEl, pathPrefix, testNames, testData, title=None, titleLa
                 " ",
                 E.a(
                     {
-                        "title": testName,
                         "href": f"{liveTestScheme}://wpt.live/{testName}",
                         "class": "wpt-live",
                     },
@@ -441,10 +441,8 @@ def getWptScript(path):
             const passes = result.legacy_status.map(x=>[x.passes, x.total]);
             return [testPath, passes];
         }));
-        console.log(resultsFromPath);
         document.querySelectorAll(".wpt-name").forEach(nameEl=>{
-            const passData = resultsFromPath.get(wptPath + nameEl.textContent);
-            console.log(wptPath + nameEl.textContent, passData);
+            const passData = resultsFromPath.get("/" + nameEl.getAttribute("title"));
             if(passData == undefined) return;
             const resultsEl = el("span",{"class":"wpt-results"},
                 ...passData.map((p,i) => el("span",
