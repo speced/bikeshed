@@ -31,8 +31,7 @@ def processWptElements(doc):
             if testName not in testData:
                 die(
                     f"Couldn't find WPT test '{testName}' - did you misspell something?",
-                    testName,
-                    el=el,
+                    el=el
                 )
                 continue
             seenTestNames.add(testName)
