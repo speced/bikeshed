@@ -29,10 +29,7 @@ def processWptElements(doc):
         testNames = testNamesFromEl(el, pathPrefix=pathPrefix)
         for testName in testNames:
             if testName not in testData:
-                die(
-                    f"Couldn't find WPT test '{testName}' - did you misspell something?",
-                    el=el
-                )
+                die(f"Couldn't find WPT test '{testName}' - did you misspell something?", el=el)
                 continue
             seenTestNames.add(testName)
         if el.get("hidden") is not None:
