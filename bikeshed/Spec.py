@@ -1,4 +1,5 @@
 import glob
+import json
 import os
 import sys
 from collections import defaultdict
@@ -24,16 +25,15 @@ from . import (
     lint,
     markdown,
     mdnspeclinks,
+    messages as m,
     metadata,
     shorthands,
+    unsortedJunk as u,
     wpt,
 )
 from .func import Functor
-from .h import *
 from .InputSource import FileInputSource, InputSource
-from .messages import *
 from .refs import ReferenceManager
-from .unsortedJunk import *
 
 
 class Spec:
@@ -54,7 +54,7 @@ class Spec:
         if inputFilename is None:
             inputFilename = findImplicitInputFile()
         if inputFilename is None:  # still
-            die(
+            m.die(
                 "No input file specified, and no *.bs or *.src.html files found in current directory.\nPlease specify an input file, or use - to pipe from STDIN."
             )
             return
@@ -117,10 +117,10 @@ class Spec:
             if inputContent.date is not None:
                 self.mdBaseline.addParsedData("Date", inputContent.date)
         except FileNotFoundError:
-            die(f"Couldn't find the input file at the specified location '{self.inputSource}'.")
+            m.die(f"Couldn't find the input file at the specified location '{self.inputSource}'.")
             return False
         except OSError:
-            die(f"Couldn't open the input file '{self.inputSource}'.")
+            m.die(f"Couldn't open the input file '{self.inputSource}'.")
             return False
 
         return True
@@ -135,7 +135,7 @@ class Spec:
 
     def assembleDocument(self):
         # Textual hacks
-        stripBOM(self)
+        u.stripBOM(self)
         if self.lineNumbers:
             self.lines = hackyLineNumbers(self.lines)
         self.lines = markdown.stripComments(self.lines)
@@ -153,7 +153,7 @@ class Spec:
         # Using all of that, load up the text macros so I can sub them into the computed-metadata file.
         self.md.fillTextMacros(self.macros, doc=self)
         jsonEscapedMacros = {k: json.dumps(v)[1:-1] for k, v in self.macros.items()}
-        computedMdText = replaceMacros(
+        computedMdText = h.replaceMacros(
             config.retrieveBoilerplateFile(self, "computed-metadata", error=True),
             macros=jsonEscapedMacros,
         )
@@ -194,17 +194,17 @@ class Spec:
         self.html = self.fixText(self.html)
 
         # Build the document
-        self.document = parseDocument(self.html)
-        self.head = find("head", self)
-        self.body = find("body", self)
-        correctH1(self)
+        self.document = h.parseDocument(self.html)
+        self.head = h.find("head", self)
+        self.body = h.find("body", self)
+        u.correctH1(self)
         includes.processInclusions(self)
         metadata.parseDoc(self)
 
     def processDocument(self):
         # Fill in and clean up a bunch of data
         conditional.processConditionals(self)
-        self.fillContainers = locateFillContainers(self)
+        self.fillContainers = u.locateFillContainers(self)
         lint.exampleIDs(self)
         boilerplate.addBikeshedVersion(self)
         boilerplate.addCanonicalURL(self)
@@ -218,31 +218,31 @@ class Spec:
         boilerplate.addExpiryNotice(self)
         boilerplate.addObsoletionNotice(self)
         boilerplate.addAtRisk(self)
-        addNoteHeaders(self)
+        u.addNoteHeaders(self)
         boilerplate.removeUnwantedBoilerplate(self)
         wpt.processWptElements(self)
         shorthands.run(self)
         inlineTags.processTags(self)
-        canonicalizeShortcuts(self)
-        addImplicitAlgorithms(self)
-        fixManualDefTables(self)
+        u.canonicalizeShortcuts(self)
+        u.addImplicitAlgorithms(self)
+        u.fixManualDefTables(self)
         headings.processHeadings(self)
-        checkVarHygiene(self)
-        processIssuesAndExamples(self)
+        u.checkVarHygiene(self)
+        u.processIssuesAndExamples(self)
         idl.markupIDL(self)
-        inlineRemoteIssues(self)
-        addImageSize(self)
+        u.inlineRemoteIssues(self)
+        u.addImageSize(self)
 
         # Handle all the links
-        processBiblioLinks(self)
-        processDfns(self)
+        u.processBiblioLinks(self)
+        u.processDfns(self)
         idl.processIDL(self)
         dfns.annotateDfns(self)
-        formatArgumentdefTables(self)
-        formatElementdefTables(self)
-        processAutolinks(self)
+        u.formatArgumentdefTables(self)
+        u.formatElementdefTables(self)
+        u.processAutolinks(self)
         biblio.dedupBiblioReferences(self)
-        verifyUsageOfAllLocalBiblios(self)
+        u.verifyUsageOfAllLocalBiblios(self)
         caniuse.addCanIUsePanels(self)
         boilerplate.addIndexSection(self)
         boilerplate.addExplicitIndexes(self)
@@ -255,8 +255,8 @@ class Spec:
         headings.processHeadings(self, "all")  # again
         boilerplate.removeUnwantedBoilerplate(self)
         boilerplate.addTOCSection(self)
-        addSelfLinks(self)
-        processAutolinks(self)
+        u.addSelfLinks(self)
+        u.processAutolinks(self)
         boilerplate.addAnnotations(self)
         boilerplate.removeUnwantedBoilerplate(self)
         # Add MDN panels after all IDs/anchors have been added
@@ -264,10 +264,10 @@ class Spec:
         highlight.addSyntaxHighlighting(self)
         boilerplate.addBikeshedBoilerplate(self)
         fingerprinting.addTrackingVector(self)
-        fixIntraDocumentReferences(self)
-        fixInterDocumentReferences(self)
-        removeMultipleLinks(self)
-        forceCrossorigin(self)
+        u.fixIntraDocumentReferences(self)
+        u.fixInterDocumentReferences(self)
+        u.removeMultipleLinks(self)
+        u.forceCrossorigin(self)
         lint.brokenLinks(self)
         lint.accidental2119(self)
         lint.missingExposed(self)
@@ -275,7 +275,7 @@ class Spec:
         lint.unusedInternalDfns(self)
 
         # Any final HTML cleanups
-        cleanupHTML(self)
+        u.cleanupHTML(self)
         if self.md.prepTR:
             # Don't try and override the W3C's icon.
             for el in findAll("[rel ~= 'icon']", self):
@@ -301,9 +301,9 @@ class Spec:
         try:
             rendered = h.Serializer(self.md.opaqueElements, self.md.blockElements).serialize(self.document)
         except Exception as e:
-            die(str(e))
+            m.die(str(e))
             return
-        rendered = finalHackyCleanup(rendered)
+        rendered = u.finalHackyCleanup(rendered)
         return rendered
 
     def fixMissingOutputFilename(self, outputFilename):
@@ -331,23 +331,23 @@ class Spec:
                     with open(outputFilename, "w", encoding="utf-8", newline=newline) as f:
                         f.write(rendered)
             except Exception as e:
-                die(f"Something prevented me from saving the output document to {outputFilename}:\n{e}")
+                m.die(f"Something prevented me from saving the output document to {outputFilename}:\n{e}")
 
     def printResultMessage(self):
         # If I reach this point, I've succeeded, but maybe with reservations.
-        fatals = messageCounts["fatal"]
-        links = messageCounts["linkerror"]
-        warnings = messageCounts["warning"]
+        fatals = m.messageCounts["fatal"]
+        links = m.messageCounts["linkerror"]
+        warnings = m.messageCounts["warning"]
         if self.lineNumbers:
-            warn("Because --line-numbers was used, no output was saved.")
+            m.warn("Because --line-numbers was used, no output was saved.")
         if fatals:
-            success("Successfully generated, but fatal errors were suppressed")
+            m.success("Successfully generated, but fatal errors were suppressed")
             return
         if links:
-            success(f"Successfully generated, with {links} linking errors")
+            m.success(f"Successfully generated, with {links} linking errors")
             return
         if warnings:
-            success("Successfully generated, with warnings")
+            m.success("Successfully generated, with warnings")
             return
 
     def watch(self, outputFilename, port=None, localhost=False):
@@ -355,9 +355,9 @@ class Spec:
 
         outputFilename = self.fixMissingOutputFilename(outputFilename)
         if self.inputSource.mtime() is None:
-            die(f"Watch mode doesn't support {self.inputSource}")
+            m.die(f"Watch mode doesn't support {self.inputSource}")
         if outputFilename == "-":
-            die("Watch mode doesn't support streaming to STDOUT.")
+            m.die("Watch mode doesn't support streaming to STDOUT.")
             return
 
         if port:
@@ -386,7 +386,7 @@ class Spec:
             self.preprocess()
             self.finish(outputFilename)
             lastInputModified = {dep: dep.mtime() for dep in self.transitiveDependencies}
-            p("==============DONE==============")
+            m.p("==============DONE==============")
             try:
                 while True:
                     # Comparing mtimes with "!=" handles when a file starts or
@@ -394,22 +394,22 @@ class Spec:
                     # somehow gets older.
                     if any(input.mtime() != lastModified for input, lastModified in lastInputModified.items()):
                         resetSeenMessages()
-                        p("Source file modified. Rebuilding...")
+                        m.p("Source file modified. Rebuilding...")
                         self.initializeState()
                         self.mdCommandLine = mdCommandLine
                         self.preprocess()
                         self.finish(outputFilename)
                         lastInputModified = {dep: dep.mtime() for dep in self.transitiveDependencies}
-                        p("==============DONE==============")
+                        m.p("==============DONE==============")
                     time.sleep(1)
             except KeyboardInterrupt:
-                p("Exiting~")
+                m.p("Exiting~")
                 if server:
                     server.shutdown()
                     thread.join()
                 sys.exit(0)
         except Exception as e:
-            die(f"Something went wrong while watching the file:\n{e}")
+            m.die(f"Something went wrong while watching the file:\n{e}")
 
     def fixText(self, text, moreMacros={}):
         # Do several textual replacements that need to happen *before* the document is parsed as h.
@@ -423,10 +423,10 @@ class Spec:
             textFunctor = Functor(text)
 
         macros = dict(self.macros, **moreMacros)
-        textFunctor = textFunctor.map(curry(replaceMacros, macros=macros))
-        textFunctor = textFunctor.map(fixTypography)
+        textFunctor = textFunctor.map(curry(h.replaceMacros, macros=macros))
+        textFunctor = textFunctor.map(h.fixTypography)
         if "css" in self.md.markupShorthands:
-            textFunctor = textFunctor.map(replaceAwkwardCSSShorthands)
+            textFunctor = textFunctor.map(h.replaceAwkwardCSSShorthands)
 
         return textFunctor.extract()
 
@@ -434,11 +434,11 @@ class Spec:
         p("Exported terms:")
         for el in findAll("[data-export]", self):
             for term in config.linkTextsFromElement(el):
-                p("  " + term)
+                m.p("  " + term)
         p("Unexported terms:")
         for el in findAll("[data-noexport]", self):
             for term in config.linkTextsFromElement(el):
-                p("  " + term)
+                m.p("  " + term)
 
     def isOpaqueElement(self, el):
         if el.tag in self.md.opaqueElements:

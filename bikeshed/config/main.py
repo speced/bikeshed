@@ -5,6 +5,7 @@ import re
 import lxml
 
 from .. import messages
+from .. import t
 
 
 def englishFromList(items, conjunction="or"):
@@ -149,6 +150,7 @@ def groupFromKey(key, length=2):
         return group
 
 
+_groupFromKeyCache: t.Dict[str, str]
 _groupFromKeyCache = {}
 
 

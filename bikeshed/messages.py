@@ -4,8 +4,12 @@ from collections import Counter
 import lxml.html
 
 from . import constants
+from . import t
 
+messages: t.Set[str]
 messages = set()
+
+messageCounts: t.Dict[str, int]
 messageCounts = Counter()
 
 

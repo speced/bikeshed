@@ -1,6 +1,8 @@
 import re
 from collections import defaultdict
 
+from .. import t
+
 dfnClassToType = {
     "abstract-opdef": "abstract-op",
     "propdef": "property",
@@ -170,6 +172,7 @@ dfnElementsSelector = "dfn:not([data-var-ignore]), h2[data-dfn-type], h3[data-df
 
 # Some of the more significant types and their patterns
 trivialPattern = re.compile(r".+")
+typeRe: t.Dict[str, re.Pattern]
 typeRe = defaultdict(lambda: trivialPattern)
 typeRe["property"] = re.compile(r"^[\w-]+$")
 typeRe["at-rule"] = re.compile(r"^@[\w-]+$")

@@ -7,6 +7,7 @@ from lxml import etree
 from lxml.cssselect import CSSSelector
 from lxml.html import tostring
 
+from .. import t
 from ..DefaultOrderedDict import DefaultOrderedDict
 from ..messages import *
 
@@ -549,10 +550,11 @@ def addClass(el, cls):
         el.set("class", "{} {}".format(el.get("class"), cls))
 
 
+_classMap: t.Dict[t.Tuple[str, str], bool]
 _classMap = {}
 
 
-def hasClass(el, cls, classMap=_classMap):
+def hasClass(el, cls: str, classMap=_classMap):
     elClass = el.get("class")
     if elClass is None:
         return False
@@ -621,6 +623,7 @@ def isNormative(el, doc):
     return norm
 
 
+_normativeElCache: t.Dict[t.Any, bool]
 _normativeElCache = {}
 
 

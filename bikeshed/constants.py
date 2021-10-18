@@ -1,4 +1,5 @@
 from .stringEnum import StringEnum
+from . import t
 
 dryRun = False
 errorLevel = ["fatal"]
@@ -7,6 +8,7 @@ quiet = True
 asciiOnly = False
 refStatus = StringEnum("current", "snapshot")
 biblioDisplay = StringEnum("index", "inline")
+specClass: t.Optional[t.Spec]
 specClass = None
 testAnnotationURL = "https://test.csswg.org/harness/annotate.js"
 chroot = True
