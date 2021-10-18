@@ -435,7 +435,6 @@ def fixIntraDocumentReferences(doc):
             if content is None:
                 die(
                     f"Tried to generate text for a section link, but the target isn't a heading:\n{outerHTML(el)}",
-                    outerHTML(el),
                     el=el,
                 )
                 continue

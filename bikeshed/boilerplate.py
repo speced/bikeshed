@@ -806,7 +806,7 @@ def addTOCSection(doc):
         if level > previousLevel + 1:
             # Jumping two levels is a no-no.
             die(
-                f"Heading level jumps more than one level, from h{previousLevel} to h{level}:\n{outerHTML(el)}",
+                f"Heading level jumps more than one level, from h{previousLevel} to h{level}:\n{outerHTML(header)}",
                 el=header,
             )
             return

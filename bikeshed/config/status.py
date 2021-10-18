@@ -310,7 +310,9 @@ def canonicalizeStatus(rawStatus, group):
             )
 
         if group == "tag" and status not in w3cTAGStatuses:
-            warn(msg, rawStatus, "the TAG is", formatStatusSet(w3cTAGStatuses))
+            warn(
+                f"You used Status: {rawStatus}, but the TAG is are limited to these statuses: {formatStatusSet(w3cTAGStatuses)}"
+            )
 
         if group in w3cCgs and status not in w3cCommunityStatuses:
             warn(
