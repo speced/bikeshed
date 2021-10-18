@@ -285,7 +285,7 @@ def checkVarHygiene(doc):
                 varLines.append(f"  '{var}'")
     if varLines:
         warn(
-            f"The following <var>s were only used once in the document:\n"
+            "The following <var>s were only used once in the document:\n"
             + "\n".join(varLines)
             + "\nIf these are not typos, please add an ignore='' attribute to the <var>."
         )
@@ -892,7 +892,7 @@ def verifyUsageOfAllLocalBiblios(doc):
             unusedBiblioKeys.append(b)
     if unusedBiblioKeys:
         warn(
-            f"The following locally-defined biblio entries are unused and can be removed:\n"
+            "The following locally-defined biblio entries are unused and can be removed:\n"
             + "\n".join(f"  * {b}" for b in unusedBiblioKeys),
         )
 

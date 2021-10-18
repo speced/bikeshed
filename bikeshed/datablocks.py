@@ -948,7 +948,7 @@ def parseInfoTree(lines, indent=4, lineNum=0):
         if wsLen % indent != 0:
             visibleWs = ws.replace("\t", "\\t").replace(" ", "\\s")
             die(
-                f"Line has inconsistent indentation; use tabs or {indent} spaces:\n{visibleWS + text}", lineNum=thisLine
+                f"Line has inconsistent indentation; use tabs or {indent} spaces:\n{visibleWs + text}", lineNum=thisLine
             )
             return []
         wsLen = wsLen // indent

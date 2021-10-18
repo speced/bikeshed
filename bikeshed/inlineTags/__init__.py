@@ -20,11 +20,11 @@ def processTags(doc):
             try:
                 out = out.decode("utf-8")
             except UnicodeDecodeError as e:
-                die(f"When trying to process {outerHTML(el)}, got invalid unicode in stdout:\n{err}", el=el)
+                die(f"When trying to process {outerHTML(el)}, got invalid unicode in stdout:\n{e}", el=el)
             try:
                 err = err.decode("utf-8")
             except UnicodeDecodeError as e:
-                die(f"When trying to process {outerHTML(el)}, got invalid unicode in stderr:\n{err}", el=el)
+                die(f"When trying to process {outerHTML(el)}, got invalid unicode in stderr:\n{e}", el=el)
             if p.returncode:
                 die(
                     f"When trying to process {outerHTML(el)}, got return code {p.returncode} and the following stderr:\n{err}",

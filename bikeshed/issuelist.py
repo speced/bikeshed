@@ -243,7 +243,7 @@ def printIssues(outfile, lines):
         issue = issue.strip().replace("&", "&amp;").replace("<", "&lt;")
         if issue == "":
             continue
-        originaltext = issue[:]
+        originalText = issue[:]
 
         # Issue number
         issue = re.sub(r"Issue (\d+)\.", r"Issue \1. <a href='#issue-\1'>#</a>", issue)
