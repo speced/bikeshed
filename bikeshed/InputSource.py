@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+import datetime
 import email.utils
 import errno
 import os
 import sys
 import urllib.parse
 from abc import abstractmethod
-from datetime import datetime, date
 from typing import List, Optional
 
 import attr
@@ -20,7 +20,7 @@ from .Line import Line
 @attr.s(auto_attribs=True)
 class InputContent:
     rawLines: List[str]
-    date: Optional[date]
+    date: Optional[datetime.date]
 
     @property
     def lines(self) -> List[Line]:
@@ -176,7 +176,7 @@ class FileInputSource(InputSource):
         with open(self.sourceName, encoding="utf-8") as f:
             return InputContent(
                 f.readlines(),
-                datetime.fromtimestamp(os.path.getmtime(self.sourceName)).date(),
+                datetime.datetime.fromtimestamp(os.path.getmtime(self.sourceName)).date(),
             )
 
     def hasDirectory(self) -> bool:
