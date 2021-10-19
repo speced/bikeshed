@@ -61,13 +61,13 @@ def digestTree(root, nested=False):
 
 
 def textLength(el):
-    l = 0
+    length = 0
     for node in dom.childNodes(el):
         if isinstance(node, str):
-            l += len(node)
+            length += len(node)
         else:
-            l += textLength(node)
-    return l
+            length += textLength(node)
+    return length
 
 
 def mergeStreams(s1, s2):
