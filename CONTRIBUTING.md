@@ -17,6 +17,20 @@ when you're making small changes to an active project;
 you'll save yourself a lot of future pain
 if you follow those steps.
 
+Linting
+-------
+
+Bikeshed uses a number of services to lint its codebase.
+If you don't run these beforehand,
+your contributions might fail just due to violating the linting rules.
+
+To lint everything, first install `flake8`, `pylint`, and `black` from `pypi`.
+Then, from the root directory of the project, run `flake8 bikeshed`, `pylint bikeshed`, and `black .`.
+Fix anything that any of these are complaining about;
+if they are all happy, you're good.
+
+(mypy will also become part of this, but it's in-progress currently.)
+
 Running Tests
 -------------
 
