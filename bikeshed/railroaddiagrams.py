@@ -874,5 +874,5 @@ if __name__ == "__main__":
         </style>
         """
     )
-    with open("css-example.py-js") as fh:
+    with open("css-example.py-js", encoding="utf-8") as fh:
         exec(fh.read())

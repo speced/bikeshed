@@ -37,7 +37,7 @@ def verify_requirements():
     )
     if os.path.exists(requirements_file_path):
         requirements_met = True
-        with open(requirements_file_path) as requirements_file:
+        with open(requirements_file_path, encoding="utf-8") as requirements_file:
             requirements = [line for line in requirements_file.read().split("\n") if (not line.strip().startswith("-"))]
             for requirement in pkg_resources.parse_requirements(requirements):
                 try:

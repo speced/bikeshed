@@ -137,7 +137,7 @@ class Spec:
         # Textual hacks
         u.stripBOM(self)
         if self.lineNumbers:
-            self.lines = hackyLineNumbers(self.lines)
+            self.lines = u.hackyLineNumbers(self.lines)
         self.lines = markdown.stripComments(self.lines)
         self.recordDependencies(self.inputSource)
         # Extract and process metadata
@@ -278,14 +278,14 @@ class Spec:
         u.cleanupHTML(self)
         if self.md.prepTR:
             # Don't try and override the W3C's icon.
-            for el in findAll("[rel ~= 'icon']", self):
-                removeNode(el)
+            for el in u.findAll("[rel ~= 'icon']", self):
+                h.removeNode(el)
             # Make sure the W3C stylesheet is after all other styles.
-            for el in findAll("link", self):
+            for el in u.findAll("link", self):
                 if el.get("href").startswith("https://www.w3.org/StyleSheets/TR"):
-                    appendChild(find("head", self), el)
+                    h.appendChild(u.find("head", self), el)
             # Ensure that all W3C links are https.
-            for el in findAll("a", self):
+            for el in u.findAll("a", self):
                 href = el.get("href", "")
                 if href.startswith("http://www.w3.org") or href.startswith("http://lists.w3.org"):
                     el.set("href", "https" + href[4:])
@@ -393,7 +393,7 @@ class Spec:
                     # stops existing, and it's fine to rebuild if an mtime
                     # somehow gets older.
                     if any(input.mtime() != lastModified for input, lastModified in lastInputModified.items()):
-                        resetSeenMessages()
+                        m.resetSeenMessages()
                         m.p("Source file modified. Rebuilding...")
                         self.initializeState()
                         self.mdCommandLine = mdCommandLine
@@ -418,7 +418,7 @@ class Spec:
         # so their contents don't accidentally trigger other stuff.
         # Also handle markdown escapes.
         if "markdown" in self.md.markupShorthands:
-            textFunctor = MarkdownCodeSpans(text)
+            textFunctor = u.MarkdownCodeSpans(text)
         else:
             textFunctor = Functor(text)
 
@@ -431,12 +431,12 @@ class Spec:
         return textFunctor.extract()
 
     def printTargets(self):
-        p("Exported terms:")
-        for el in findAll("[data-export]", self):
+        m.p("Exported terms:")
+        for el in u.findAll("[data-export]", self):
             for term in config.linkTextsFromElement(el):
                 m.p("  " + term)
-        p("Unexported terms:")
-        for el in findAll("[data-noexport]", self):
+        m.p("Unexported terms:")
+        for el in u.findAll("[data-noexport]", self):
             for term in config.linkTextsFromElement(el):
                 m.p("  " + term)
 

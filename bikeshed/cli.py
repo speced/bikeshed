@@ -14,7 +14,7 @@ def main():
         sys.argv.append("spec")
 
     try:
-        with open(config.scriptPath("..", "semver.txt")) as fh:
+        with open(config.scriptPath("..", "semver.txt"), encoding="utf-8") as fh:
             semver = fh.read().strip()
             semverText = f"Bikeshed v{semver}: "
     except FileNotFoundError:
