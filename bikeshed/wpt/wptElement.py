@@ -404,17 +404,20 @@ dd:not(:last-child) > .wpt-tests-block:not([open]):last-child {
 
 def getWptScript(path):
     if path is None:
-        return ""
+        path = "/"
     if not path.startswith("/"):
         path = "/" + path
     if not path.endswith("/"):
         path = path + "/"
     return (
         f"""
-    const wptPath = "{path}";
+    let wptPath = "{path}";
     """
         + """
     document.addEventListener("DOMContentLoaded", async ()=>{
+        if(wptPath == "/") wptPath = commonPathPrefix();
+        if(wptPath == "/") return;
+
         const runsUrl = "https://wpt.fyi/api/runs?label=master&label=stable&max-count=1&product=chrome&product=firefox&product=safari&product=edge";
         const runs = await (await fetch(runsUrl)).json();
 
@@ -449,6 +452,24 @@ def getWptScript(path):
             nameEl.insertAdjacentElement("afterend", resultsEl);
         })
     });
+    function commonPathPrefix() {
+        const paths = [...document.querySelectorAll(".wpt-name")].map(x=>x.getAttribute("title").split("/").slice(0, -1));
+        let commonPrefix = paths[0];
+        for(const path of paths.slice(1)) {
+            // can't have a common prefix longer than the shortest path
+            if(path.length < commonPrefix.length) commonPrefix.length = path.length;
+            // now compare the remaining segments
+            for(var i = 0; i < Math.min(commonPrefix.length, path.length); i++) {
+                if(path[i] != commonPrefix[i]) {
+                    commonPrefix.length = i;
+                    break;
+                }
+            }
+        }
+        console.log(commonPrefix)
+        if(commonPrefix.length >= 1) return "/" + commonPrefix.join("/") + "/";
+        return "/";
+    }
     function el(name, attrs, ...content) {
         const x = document.createElement(name);
         for(const [k,v] of Object.entries(attrs)) {
@@ -462,6 +483,7 @@ def getWptScript(path):
         }
         return x;
     }
+
 
     """
     )
