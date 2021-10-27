@@ -305,6 +305,8 @@ def transformPropdef(lines, doc, firstLine, lineNum=None, **kwargs):  # pylint: 
             th = f"<th><a href='https://www.w3.org/TR/css-cascade/#computed'>{key}:</a>"
         elif key in ("Animatable", "Animation type"):
             th = f"<th><a href='https://www.w3.org/TR/web-animations/#animation-type'>{key}:</a>"
+        elif key == "Canonical order":
+            th = f"<th><a href='https://www.w3.org/TR/cssom/#serializing-css-values'>{key}:</a>"
         elif key == "Applies to":
             th = f"<th><a href='https://www.w3.org/TR/css-cascade/#applies-to'>{key}:</a>"
             if val.lower() == "all elements":
