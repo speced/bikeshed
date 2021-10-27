@@ -1,4 +1,4 @@
-import collections
+import collections.abc
 import os
 import re
 
@@ -156,7 +156,7 @@ _groupFromKeyCache = {}
 
 def flatten(arr):
     for el in arr:
-        if isinstance(el, collections.Iterable) and not isinstance(el, str) and not lxml.etree.iselement(el):
+        if isinstance(el, collections.abc.Iterable) and not isinstance(el, str) and not lxml.etree.iselement(el):
             yield from flatten(el)
         else:
             yield el

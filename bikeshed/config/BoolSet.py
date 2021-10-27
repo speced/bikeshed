@@ -1,7 +1,7 @@
-import collections
+import collections.abc
 
 
-class BoolSet(collections.MutableMapping):
+class BoolSet(collections.abc.MutableMapping):
     """
     Implements a "boolean set",
     where keys can be explicitly set to True or False,
@@ -12,10 +12,10 @@ class BoolSet(collections.MutableMapping):
 
     def __init__(self, values=None, default=False):
         self._internal = {}
-        if isinstance(values, collections.Mapping):
+        if isinstance(values, collections.abc.Mapping):
             for k, v in values.items():
                 self._internal[k] = bool(v)
-        elif isinstance(values, collections.Iterable):
+        elif isinstance(values, collections.abc.Iterable):
             for k in values:
                 self._internal[k] = True
         self.default = bool(default)
