@@ -643,7 +643,7 @@ def handleTemplate():
 Title: Your Spec Title
 Shortname: your-spec
 Level: 1
-Status: ED
+Status: w3c/UD
 Group: WGNAMEORWHATEVER
 URL: http://example.com/url-this-spec-will-live-at
 Editor: Your Name, Your Company http://example.com/your-company, your-email@example.com, http://example.com/your-personal-website
