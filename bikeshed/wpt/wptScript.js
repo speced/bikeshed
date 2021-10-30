@@ -24,6 +24,11 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     }));
     document.querySelectorAll(".wpt-name").forEach(nameEl=>{
         const passData = resultsFromPath.get("/" + nameEl.getAttribute("title"));
+        const numTests = passData[0][1];
+        if(numTests > 1) {
+            nameEl.insertAdjacentElement("beforeend",
+                el("small", {}, ` (${numTests} tests)`));
+        }
         if(passData == undefined) return;
         const resultsEl = el("span",{"class":"wpt-results"},
             ...passData.map((p,i) => el("span",
