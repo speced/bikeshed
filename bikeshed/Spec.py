@@ -31,7 +31,6 @@ from . import (
     unsortedJunk as u,
     wpt,
 )
-from .DefaultOrderedDict import DefaultOrderedDict
 from .func import Functor
 from .InputSource import FileInputSource, InputSource
 from .refs import ReferenceManager

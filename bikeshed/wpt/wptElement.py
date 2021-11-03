@@ -82,7 +82,11 @@ def processWptElements(doc):
             pathPrefix = "/" + pathPrefix
         if pathPrefix != "/":
             doc.md.otherMetadata["Test Suite"].append(
-                E.a({"href": f"https://wpt.fyi/results{pathPrefix}", "class":"wpt-overview"}, f"https://wpt.fyi/results{pathPrefix}"))
+                E.a(
+                    {"href": f"https://wpt.fyi/results{pathPrefix}", "class": "wpt-overview"},
+                    f"https://wpt.fyi/results{pathPrefix}",
+                )
+            )
 
     if atLeastOneElement and doc.md.wptDisplay != "none":
         doc.extraStyles["style-wpt"] = wptStyle
@@ -279,16 +283,15 @@ def commonPathPrefix(paths):
     for path in paths[1:]:
         # can't have a common prefix longer than the shortest path
         if len(path) < len(commonPrefix):
-            commonPrefix = commonPrefix[:len(path)]
+            commonPrefix = commonPrefix[: len(path)]
         # now compare the remaining segments
         for i in range(0, min(len(commonPrefix), len(path))):
             if path[i] != commonPrefix[i]:
                 commonPrefix = commonPrefix[:i]
                 break
-    if len(commonPrefix)>= 1:
-        return "/" + "/".join(commonPrefix) + "/";
-    return None;
-
+    if len(commonPrefix) >= 1:
+        return "/" + "/".join(commonPrefix) + "/"
+    return None
 
 
 wptStyle = """
