@@ -31,6 +31,7 @@ from . import (
     unsortedJunk as u,
     wpt,
 )
+from .DefaultOrderedDict import DefaultOrderedDict
 from .func import Functor
 from .InputSource import FileInputSource, InputSource
 from .refs import ReferenceManager
@@ -206,6 +207,8 @@ class Spec:
         conditional.processConditionals(self)
         self.fillContainers = u.locateFillContainers(self)
         lint.exampleIDs(self)
+        wpt.processWptElements(self)
+
         boilerplate.addBikeshedVersion(self)
         boilerplate.addCanonicalURL(self)
         boilerplate.addFavicon(self)
@@ -220,7 +223,6 @@ class Spec:
         boilerplate.addAtRisk(self)
         u.addNoteHeaders(self)
         boilerplate.removeUnwantedBoilerplate(self)
-        wpt.processWptElements(self)
         shorthands.run(self)
         inlineTags.processTags(self)
         u.canonicalizeShortcuts(self)

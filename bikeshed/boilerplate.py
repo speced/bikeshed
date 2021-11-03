@@ -1055,12 +1055,16 @@ def addSpecMetadataSection(doc):
         return ret
 
     # Merge "custom" metadata into non-custom, when they match up
+    # and upgrade html-text values into real elements
     otherMd = OrderedDict()
     for k, vs in doc.md.otherMetadata.items():
+        for i, v in enumerate(vs):
+            if isinstance(v, str):
+                vs[i] = parseHTML(doc.fixText(v))
         if k in md:
-            md[k].extend(parseHTML(doc.fixText(v)) for v in vs)
+            md[k].extend(vs)
         else:
-            otherMd[k] = [parseHTML(doc.fixText(v)) for v in vs]
+            otherMd[k] = vs
 
     dl = E.dl()
     for key in doc.md.metadataOrder:
