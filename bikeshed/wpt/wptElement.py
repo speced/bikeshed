@@ -82,9 +82,12 @@ def processWptElements(doc):
             pathPrefix = "/" + pathPrefix
         if pathPrefix != "/":
             doc.md.otherMetadata["Test Suite"].append(
-                E.a(
-                    {"href": f"https://wpt.fyi/results{pathPrefix}", "class": "wpt-overview"},
-                    f"https://wpt.fyi/results{pathPrefix}",
+                E.dd(
+                    {"class": "wpt-overview"},
+                    E.a(
+                        {"href": f"https://wpt.fyi/results{pathPrefix}"},
+                        f"https://wpt.fyi/results{pathPrefix}",
+                    ),
                 )
             )
 
