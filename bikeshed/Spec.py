@@ -3,6 +3,7 @@ import json
 import os
 import sys
 from collections import defaultdict
+from datetime import datetime
 from functools import partial as curry
 
 from . import (
@@ -387,7 +388,7 @@ class Spec:
             self.preprocess()
             self.finish(outputFilename)
             lastInputModified = {dep: dep.mtime() for dep in self.transitiveDependencies}
-            m.p("==============DONE==============")
+            printDone()
             try:
                 while True:
                     # Comparing mtimes with "!=" handles when a file starts or
@@ -395,13 +396,13 @@ class Spec:
                     # somehow gets older.
                     if any(input.mtime() != lastModified for input, lastModified in lastInputModified.items()):
                         m.resetSeenMessages()
-                        m.p("Source file modified. Rebuilding...")
+                        m.p("\nSource file modified. Rebuilding...")
                         self.initializeState()
                         self.mdCommandLine = mdCommandLine
                         self.preprocess()
                         self.finish(outputFilename)
                         lastInputModified = {dep: dep.mtime() for dep in self.transitiveDependencies}
-                        m.p("==============DONE==============")
+                        printDone()
                     time.sleep(1)
             except KeyboardInterrupt:
                 m.p("Exiting~")
@@ -447,6 +448,21 @@ class Spec:
         if el.get("data-opaque") is not None:
             return True
         return False
+
+
+def printDone():
+    contents = f"Finished at {datetime.now().strftime('%H:%M:%S %b-%d-%Y')}"
+    contentLen = len(contents) + 2
+    if not constants.asciiOnly:
+        m.p(f"╭{'─'*contentLen}╮")
+        m.p(f"│ {contents} │")
+        m.p(f"╰{'─'*contentLen}╯")
+        m.p("")
+    else:
+        m.p(f"/{'-'*contentLen}\\")
+        m.p(f"| {contents} |")
+        m.p(f"\\{'-'*contentLen}/")
+        m.p("")
 
 
 def findImplicitInputFile():
