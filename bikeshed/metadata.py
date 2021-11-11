@@ -196,6 +196,9 @@ class MetadataManager:
             die("The document requires at least one <pre class=metadata> block.")
             return
 
+        if self.status in ("w3c/IG-NOTE", "w3c/WG-NOTE"):
+            die(f"Under Process2021, {self.status} is no longer a valid status. Use NOTE (or one of its variants NOTE-ED, NOTE-FPWD, NOTE-WD) instead.")
+
         # { MetadataManager attr : metadata name (for printing) }
         requiredSingularKeys = {
             "status": "Status",
