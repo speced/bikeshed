@@ -988,7 +988,10 @@ def addSpecMetadataSection(doc):
         url = doc.testSuites[doc.md.vshortname]["url"]
         md["Test Suite"].append(E.a({"href": url}, url))
     if doc.md.issues:
-        md["Issue Tracking"] = [E.a({"href": href}, text) for text, href in doc.md.issues]
+        if doc.md.TR:
+            md["Feedback"].extend([E.a({"href": href}, text) for text, href in doc.md.issues])
+        else:
+            md["Issue Tracking"] = [E.a({"href": href}, text) for text, href in doc.md.issues]
     if doc.md.editors:
         md["Editor"] = list(map(printEditor, doc.md.editors))
     if doc.md.previousEditors:
