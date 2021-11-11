@@ -948,8 +948,11 @@ def addSpecMetadataSection(doc):
         md["Editor's Draft"].append(E.a({"href": doc.md.ED}, doc.md.ED))
     if doc.md.previousVersions:
         md["Previous Versions"] = [printPreviousVersion(ver) for ver in doc.md.previousVersions]
-    if doc.md.versionHistory:
-        md["Version History"] = [E.a({"href": vh}, vh) for vh in doc.md.versionHistory]
+    if "history" in mac:
+        md["History"] = [E.a({"href": mac["history"], "class": "u-url"}, mac["history"])]
+    else:
+        if doc.md.versionHistory:
+            md["Version History"] = [E.a({"href": vh}, vh) for vh in doc.md.versionHistory]
     if doc.md.mailingList:
         span = E.span(
             E.a(
