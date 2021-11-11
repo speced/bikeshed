@@ -304,6 +304,7 @@ class MetadataManager:
             macros["isodeadline"] = self.deadline.strftime("%Y-%m-%d")
         if self.status in config.snapshotStatuses:
             macros["version"] = "https://www.w3.org/TR/{year}/{status}-{vshortname}-{cdate}/".format(**macros)
+            macros["history"] = f"https://www.w3.org/standards/history/{self.displayVshortname}"
         elif self.ED:
             macros["version"] = self.ED
         macros["annotations"] = constants.testAnnotationURL
@@ -323,21 +324,30 @@ class MetadataManager:
             macros["mailinglist"] = self.mailingList
         if self.mailingListArchives:
             macros["mailinglistarchives"] = self.mailingListArchives
-        if self.status in ("w3c/FPWD", "w3c/NOTE-FPWD", "w3c/NOTE-WD"):
+        if self.status == "w3c/FPWD":
             macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/W3C-WD"
+            macros["w3c-status-url"] = "https://www.w3.org/standards/types#FPWD"
+        elif self.status in ("w3c/NOTE-FPWD", "w3c/NOTE-WD"):
+            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/W3C-DNOTE"
+            macros["w3c-status-url"] = "https://www.w3.org/standards/types#DNOTE"
         elif self.status == "FINDING":
             macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/W3C-NOTE"
+            macros["w3c-status-url"] = "https://www.w3.org/standards/types#FINDING"
         elif self.status == "w3c/CG-DRAFT":
             macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/cg-draft"
+            macros["w3c-status-url"] = "https://www.w3.org/standards/types#CG-DRAFT"
         elif self.status == "w3c/CG-FINAL":
             macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/cg-final"
+            macros["w3c-status-url"] = "https://www.w3.org/standards/types#CG-FINAL"
         elif self.status == "w3c/NOTE-ED":
             macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2021/W3C-ED"
+            macros["w3c-status-url"] = "https://www.w3.org/standards/types#ED"
         else:
             shortStatus = (
                 self.rawStatus.partition("/")[2] if (self.rawStatus and "/" in str(self.rawStatus)) else self.rawStatus
             )
             macros["w3c-stylesheet-url"] = f"https://www.w3.org/StyleSheets/TR/2021/W3C-{shortStatus}"
+            macros["w3c-status-url"] = f"https://www.w3.org/standards/types#{shortStatus}"
         if self.customWarningText is not None:
             macros["customwarningtext"] = "\n".join(markdown.parse(self.customWarningText, self.indent))
         if self.customWarningTitle is not None:

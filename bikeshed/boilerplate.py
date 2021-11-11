@@ -948,8 +948,11 @@ def addSpecMetadataSection(doc):
         md["Editor's Draft"].append(E.a({"href": doc.md.ED}, doc.md.ED))
     if doc.md.previousVersions:
         md["Previous Versions"] = [printPreviousVersion(ver) for ver in doc.md.previousVersions]
-    if doc.md.versionHistory:
-        md["Version History"] = [E.a({"href": vh}, vh) for vh in doc.md.versionHistory]
+    if "history" in mac:
+        md["History"] = [E.a({"href": mac["history"], "class": "u-url"}, mac["history"])]
+    else:
+        if doc.md.versionHistory:
+            md["Version History"] = [E.a({"href": vh}, vh) for vh in doc.md.versionHistory]
     if doc.md.mailingList:
         span = E.span(
             E.a(
@@ -985,7 +988,10 @@ def addSpecMetadataSection(doc):
         url = doc.testSuites[doc.md.vshortname]["url"]
         md["Test Suite"].append(E.a({"href": url}, url))
     if doc.md.issues:
-        md["Issue Tracking"] = [E.a({"href": href}, text) for text, href in doc.md.issues]
+        if doc.md.TR:
+            md["Feedback"].extend([E.a({"href": href}, text) for text, href in doc.md.issues])
+        else:
+            md["Issue Tracking"] = [E.a({"href": href}, text) for text, href in doc.md.issues]
     if doc.md.editors:
         md["Editor"] = list(map(printEditor, doc.md.editors))
     if doc.md.previousEditors:
