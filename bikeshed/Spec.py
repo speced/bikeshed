@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import glob
 import json
+import kdl
 import os
 import re
 import sys
@@ -108,6 +109,7 @@ class Spec:
         self.widl: widlparser.Parser = idl.getParser()
 
         self.languages: dict[str, language.Language] = fetchLanguages(self.dataFile)
+        self.statuses = kdl.parse(self.dataFile.fetch("statuses.kdl", str=True))
 
         self.extraJC = stylescript.JCManager()
         self.extraJC.addColors()
