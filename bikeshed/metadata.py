@@ -271,8 +271,10 @@ class MetadataManager:
             macros["longstatus"] = config.shortToLongStatus[self.status]
         else:
             macros["longstatus"] = ""
-        if self.status in ("w3c/LCWD", "w3c/FPWD", "w3c/NOTE-FPWD", "w3c/NOTE-WD"):
+        if self.status in ("w3c/LCWD", "w3c/FPWD"):
             macros["status"] = "WD"
+        elif self.status in ("w3c/NOTE-FPWD", "w3c/NOTE-WD"):
+            macros["status"] = "DNOTE"
         elif self.status in ("w3c/WG-NOTE", "w3c/IG-NOTE"):
             macros["status"] = "NOTE"
         elif self.status == "w3c/NOTE-ED":
