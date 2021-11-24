@@ -26,6 +26,10 @@ shortToLongStatus = {
     "w3c/NOTE-ED": "Editor's Draft",
     "w3c/NOTE-WD": "W3C Group Draft Note",
     "w3c/NOTE-FPWD": "W3C Group Draft Note",
+    "w3c/DRY": "W3C Draft Registry",
+    "w3c/CRYD": "W3C Candidate Registry Draft",
+    "w3c/CRY": "W3C Candidate Registry",
+    "w3c/RY": "W3C Registry",
     "w3c/MO": "W3C Member-only Draft",
     "w3c/UD": "Unofficial Proposal Draft",
     "w3c/CG-DRAFT": "Draft Community Group Report",
@@ -99,6 +103,10 @@ snapshotStatuses = [
     "w3c/NOTE",
     "w3c/NOTE-WD",
     "w3c/NOTE-FPWD",
+    "w3c/DRY",
+    "w3c/CRYD",
+    "w3c/CRY",
+    "w3c/RY",
     "w3c/MO",
 ]
 datedStatuses = [
@@ -115,6 +123,10 @@ datedStatuses = [
     "w3c/NOTE",
     "w3c/NOTE-WD",
     "w3c/NOTE-FPWD",
+    "w3c/DRY",
+    "w3c/CRYD",
+    "w3c/CRY",
+    "w3c/RY",
     "w3c/MO",
     "whatwg/RD",
 ]
@@ -174,6 +186,10 @@ w3cWGStatuses = frozenset(
         "w3c/REC",
         "w3c/PER",
         "w3c/WG-NOTE",
+        "w3c/DRY",
+        "w3c/CRYD",
+        "w3c/CRY",
+        "w3c/RY",
     ]
 ).union(w3cProcessDocumentStatuses)
 # The TAG is limited to these statuses
