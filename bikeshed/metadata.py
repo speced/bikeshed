@@ -86,7 +86,7 @@ class MetadataManager:
         self.lineNumbers = False
         self.linkDefaults = defaultdict(list)
         self.localBoilerplate = config.BoolSet(default=False)
-        self.logo = ""
+        self.logo = None
         self.mailingList = None
         self.mailingListArchives = None
         self.markupShorthands = config.BoolSet(["css", "dfn", "biblio", "markup", "idl", "algorithm"])
@@ -323,7 +323,8 @@ class MetadataManager:
             macros["snapshotid"] = self.warning[2]
         if self.warning and len(self.warning) >= 4:
             macros["snapshoturl"] = self.warning[3]
-        macros["logo"] = self.logo
+        if self.logo:
+            macros["logo"] = self.logo
         if self.repository:
             macros["repository"] = self.repository.name
             macros["repositoryurl"] = self.repository.url

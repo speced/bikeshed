@@ -1,3 +1,4 @@
+import itertools
 import re
 
 from . import config
@@ -63,8 +64,8 @@ def evalConditions(doc, el, conditionString):
         if cond["type"] == "status":
             yield config.looselyMatch(cond["value"], doc.md.status)
         elif cond["type"] == "text macro":
-            for k, _ in doc.md.customTextMacros:
-                if k == cond["value"]:
+            for k in doc.macros.keys():
+                if k.upper() == cond["value"]:
                     yield True
                     break
             else:
