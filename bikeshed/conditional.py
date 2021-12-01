@@ -1,4 +1,3 @@
-import itertools
 import re
 
 from . import config
