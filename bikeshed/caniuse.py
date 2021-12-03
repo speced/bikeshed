@@ -78,10 +78,10 @@ def addCanIUsePanels(doc):
                 --caniuse-partialsupport-text: #666;
             }
             .caniuse-status { font: 1em sans-serif; width: 9em; padding: 0.3em; position: absolute; z-index: 8; top: auto; right: 0.3em; background: var(--borderedblock-bg, #EEE); color: var(--text, black); box-shadow: 0 0 3px var(--caniuse-shadow, #999); overflow: hidden; border-collapse: initial; border-spacing: initial; }
-            .caniuse-status.wrapped { width: 1em; height: 1em; }
+            .caniuse-status.wrapped { width: auto; height: 1em; }
             .caniuse-status.wrapped > :not(input) { display: none; }
-            .caniuse-status > input { position: absolute; right: 0; top: 0; width: 1em; height: 1em; border: none; background: transparent; padding: 0; margin: 0; }
-            .caniuse-status > p { font-size: 0.6em; margin: 0; padding: 0; }
+            .caniuse-status > input { float: right; border: none; background: transparent; padding: 0; margin: 0; }
+            .caniuse-status > p { font-size: 0.6em; margin: 0; padding: 0; clear: both; }
             .caniuse-status > p + p { padding-top: 0.5em; }
             .caniuse-status > .support { display: block; }
             .caniuse-status > .support > span { padding: 0.2em 0; display: block; display: table; }
@@ -131,8 +131,8 @@ def addCanIUsePanels(doc):
 
 def canIUsePanelFor(id, data, update, classFromBrowser):
     panel = E.aside(
-        {"class": "caniuse-status", "data-deco": ""},
-        E.input({"value": "\u22F0", "type": "button", "class": "caniuse-panel-btn"}),
+        {"class": "caniuse-status wrapped", "data-deco": ""},
+        E.input({"value": "CanIUse", "type": "button", "class": "caniuse-panel-btn"}),
     )
     mainPara = E.p({"class": "support"}, E.b({}, "Support:"))
     appendChild(panel, mainPara)
