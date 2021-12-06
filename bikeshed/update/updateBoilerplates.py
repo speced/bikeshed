@@ -10,7 +10,7 @@ from result import Err, Ok
 
 from ..messages import *
 
-ghPrefix = "https://raw.githubusercontent.com/tabatkins/bikeshed-boilerplate/master/"
+ghPrefix = "https://raw.githubusercontent.com/tabatkins/bikeshed-boilerplate/main/"
 
 
 def update(path, dryRun=False):
