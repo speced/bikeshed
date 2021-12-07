@@ -164,7 +164,6 @@ def updateByManifest(path, dryRun=False):
     for filePath, hash in remoteFiles.items():
         if hash != localFiles.get(filePath):
             newPaths.append(filePath)
-
     if not dryRun:
         deletedPaths = []
         for filePath in localFiles:
@@ -174,25 +173,30 @@ def updateByManifest(path, dryRun=False):
         if deletedPaths:
             print("Deleted {} old data file{}.".format(len(deletedPaths), "s" if len(deletedPaths) > 1 else ""))
 
+    newManifest = None
     if not dryRun:
         if newPaths:
             say(f"Updating {len(newPaths)} file{'s' if len(newPaths) > 1 else ''}...")
         goodPaths, badPaths = asyncio.run(updateFiles(path, newPaths))
+        newManifest = createFinishedManifest(remoteManifest, goodPaths, badPaths)
         try:
             with open(os.path.join(path, "manifest.txt"), "w", encoding="utf-8") as fh:
-                fh.write(createFinishedManifest(remoteManifest, goodPaths, badPaths))
+                fh.write(newManifest)
         except Exception as e:
             warn(f"Couldn't save new manifest file.\n{e}")
             return False
+    if newManifest is None:
+        newManifest = createManifest(path, dryRun=True)
+
     if not badPaths:
         say("Done!")
-        return True
+        return newManifest
     else:
         phrase = f"were {len(badPaths)} errors" if len(badPaths) > 1 else "was 1 error"
         die(
             f"Done, but there {phrase} (of {len(newPaths)} total) in downloading or saving. Run `bikeshed update` again to retry."
         )
-        return True
+        return newManifest
 
 
 async def updateFiles(localPrefix, newPaths):

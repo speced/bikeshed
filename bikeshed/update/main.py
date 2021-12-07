@@ -62,7 +62,7 @@ def update(
         # fmt: on
 
         cleanupFiles(path, touchedPaths=touchedPaths, dryRun=dryRun)
-        manifest.createManifest(path=path, dryRun=dryRun)
+        return manifest.createManifest(path=path, dryRun=dryRun)
 
 
 def fixupDataFiles():
@@ -136,6 +136,9 @@ def cleanupFiles(root, touchedPaths, dryRun=False):
     if touchedPaths["mdn"] is not None:
         deletableFolders.extend(["mdn"])
         paths.update(touchedPaths["mdn"])
+    if touchedPaths["boilerplate"] is not None:
+        deletableFolders.extend(["boilerplate"])
+        paths.update(touchedPaths["boilerplate"])
 
     say("Cleaning up old data files...")
     oldPaths = []
