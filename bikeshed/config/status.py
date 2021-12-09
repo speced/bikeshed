@@ -11,7 +11,6 @@ shortToLongStatus = {
     "DRAFT-FINDING": "Draft Finding",
     "FINDING": "Finding",
     "whatwg/RD": "Review Draft",
-
     "w3c/ED": "Editor's Draft",
     "w3c/WD": "W3C Working Draft",
     "w3c/FPWD": "W3C First Public Working Draft",
@@ -31,7 +30,6 @@ shortToLongStatus = {
     "w3c/UD": "Unofficial Proposal Draft",
     "w3c/CG-DRAFT": "Draft Community Group Report",
     "w3c/CG-FINAL": "Final Community Group Report",
-
     "tc39/STAGE0": "Stage 0: Strawman",
     "tc39/STAGE1": "Stage 1: Proposal",
     "tc39/STAGE2": "Stage 2: Draft",
