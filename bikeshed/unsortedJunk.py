@@ -871,6 +871,7 @@ def processBiblioLinks(doc):
             ):  # False if it's already been replaced by an author supplied text using the [[FOOBAR inline|custom text]] syntax.
                 clearContents(el)
                 appendChild(el, E.cite(ref.title))
+        if biblioDisplay in ("inline", "direct"):
             if ref.url is not None:
                 el.set("href", ref.url)
 

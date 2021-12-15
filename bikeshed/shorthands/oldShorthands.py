@@ -345,7 +345,7 @@ biblioRe = re.compile(
                         \[\[
                         (!)?
                         ([\w.+-]+)
-                        (\s+(?:current|snapshot|inline|index|obsolete)\s*)*
+                        (\s+(?:current|snapshot|inline|index|direct|obsolete)\s*)*
                         (?:\|([^\]]+))?
                         \]\]""",
     re.X,
@@ -380,10 +380,17 @@ def biblioReplacer(match):
 
     displayInline = "inline" in modifiers
     displayIndex = "index" in modifiers
-    if displayInline and displayIndex:
-        die(f"Biblio shorthand {match.group(0)} contains *both* 'inline' and 'index', please pick one.")
-    elif displayInline or displayIndex:
-        attrs["data-biblio-display"] = "inline" if displayInline else "index"
+    displayDirect = "direct" in modifiers
+    if (displayInline + displayIndex + displayDirect) > 1:
+        die(
+            f"Biblio shorthand {match.group(0)} contains more than one of 'inline', 'index' and 'direct', please pick one."
+        )
+    elif displayInline:
+        attrs["data-biblio-display"] = "inline"
+    elif displayIndex:
+        attrs["data-biblio-display"] = "index"
+    elif displayDirect:
+        attrs["data-biblio-display"] = "direct"
 
     if "obsolete" in modifiers:
         attrs["data-biblio-obsolete"] = ""

@@ -618,7 +618,7 @@ def parseBiblioDisplay(key, val, lineNum):
     val = val.strip().lower()
     if val in constants.biblioDisplay:
         return val
-    die(f"'{key}' must be either 'inline' or 'index'. Got '{val}'", lineNum=lineNum)
+    die(f"'{key}' must be either 'inline', 'index', or 'direct'. Got '{val}'", lineNum=lineNum)
     return constants.biblioDisplay.index
 
 

@@ -7,7 +7,7 @@ printMode = "console"
 quiet = True
 asciiOnly = False
 refStatus = StringEnum("current", "snapshot")
-biblioDisplay = StringEnum("index", "inline")
+biblioDisplay = StringEnum("index", "inline", "direct")
 specClass: t.Optional[t.Spec]
 specClass = None
 testAnnotationURL = "https://test.csswg.org/harness/annotate.js"
