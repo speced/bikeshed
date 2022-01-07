@@ -65,8 +65,12 @@ def checkPrivacySecurityHeadings(headings):
             security = True
         if "privacy" in text and "considerations" in text:
             privacy = True
+        if "security" in text and "privacy" in text and "considerations" in text:
+            warn(
+                "W3C policy requires Privacy Considerations and Security Considerations to be separate sections, but you appear to have them combined into one.",
+                el=header,
+            )
         if security and privacy:
-            # No need to look any further!
             return
     if not security and not privacy:
         warn(
