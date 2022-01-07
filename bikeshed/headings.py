@@ -49,10 +49,15 @@ def addHeadingIds(doc, headings):
                 id = simplifyText(textContent(find(".content", header)))
                 header.set("id", safeID(doc, id))
     addOldIDs(headings)
-    if len(neededIds) > 0:
+    if len(neededIds) == 0:
+        pass
+    elif 1 <= len(neededIds) <= 5:
+        for el in neededIds:
+            warn(f"The heading '{textContent(el)}' needs a manually-specified ID.", el=el)
+    else:
         warn(
             "You should manually provide IDs for your headings:\n"
-            + "\n".join("  " + outerHTML(el) for el in neededIds),
+            + "\n".join("  " + textContent(el) for el in neededIds)
         )
 
 
