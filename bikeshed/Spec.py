@@ -198,7 +198,7 @@ class Spec:
         self.document = h.parseDocument(self.html)
         self.head = h.find("head", self)
         self.body = h.find("body", self)
-        u.correctH1(self)
+        u.correctFrontMatter(self)
         includes.processInclusions(self)
         metadata.parseDoc(self)
 

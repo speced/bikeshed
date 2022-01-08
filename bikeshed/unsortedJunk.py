@@ -1329,7 +1329,9 @@ def hackyLineNumbers(lines):
     return lines
 
 
-def correctH1(doc):
+def correctFrontMatter(doc):
+    # Detect and move around some bits of information,
+    # if you provided them in your
     # If you provided an <h1> manually, use that element rather than whatever the boilerplate contains.
     h1s = [h1 for h1 in findAll("h1", doc) if isNormative(h1, doc)]
     if len(h1s) == 2:
