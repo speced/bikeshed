@@ -47,6 +47,7 @@ class Spec:
         fileRequester=None,
         testing=False,
     ):
+        catchArgparseBug(inputFilename)
         self.valid = False
         self.lineNumbers = lineNumbers
         if lineNumbers:
@@ -322,6 +323,7 @@ class Spec:
         return outputFilename
 
     def finish(self, outputFilename=None, newline=None):
+        catchArgparseBug(outputFilename)
         self.printResultMessage()
         outputFilename = self.fixMissingOutputFilename(outputFilename)
         rendered = self.serialize()
@@ -490,6 +492,24 @@ def findImplicitInputFile():
         return allHtml[0]
 
     return None
+
+
+def catchArgparseBug(string):
+    # Argparse has had a long-standing bug
+    # https://bugs.python.org/issue22433
+    # about spaces in the values of unknown optional arguments
+    # (even when the space is in a quoted string!).
+    # I can't fix this without doing a lot of work myself,
+    # but I *can* discover when it has been tripped,
+    # as the input or output filename will look like
+    # a command-line flag, very unlikely on its own.
+
+    if isinstance(string, str) and string.startswith("--") and "=" in string:
+        m.die(
+            "You're hitting a bug with Python's argparse library. Please specify both the input and output filenames manually, and move all command-line flags with spaces in their values to after those arguments.\nSee <https://tabatkins.github.io/bikeshed/#md-issues> for details."
+        )
+        return False
+    return True
 
 
 constants.specClass = Spec
