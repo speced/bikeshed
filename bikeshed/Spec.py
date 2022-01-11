@@ -186,7 +186,6 @@ class Spec:
             opaqueElements=self.md.opaqueElements,
             blockElements=self.md.blockElements,
         )
-        # Note that, currently, markdown.parse returns an array of strings, not of Line objects.
 
         self.refs.setSpecData(self.md)
 
