@@ -300,6 +300,12 @@ def main():
         action="store_true",
         help="Clobbers the readonly data files with the mutable ones.",
     )
+    debugCommands.add_argument(
+        "--print-metadata",
+        dest="printMetadata",
+        action="store_true",
+        help="Prints all the metadata parsed for the spec as JSON. Top-level keys are presented in increasing order of importance; second-level keys are in order of first appearance in each context.",
+    )
 
     refParser = subparsers.add_parser("refs", help="Search Bikeshed's ref database.")
     refParser.add_argument("infile", nargs="?", default=None, help="Path to the source file.")
@@ -554,6 +560,17 @@ def handleDebug(options, extras):
         constants.quiet = 0
         update.updateReadonlyDataFiles()
         warn("Don't forget to bump the version number!")
+    elif options.printMetadata:
+        doc = Spec(inputFilename=options.infile)
+        doc.mdCommandLine = metadata.fromCommandLine(extras)
+        doc.preprocess()
+        md = {
+            "defaults.include": doc.mdDefaults.allData,
+            "computed-metadata.include": doc.mdOverridingDefaults.allData,
+            "document": doc.mdDocument.allData,
+            "command-line": doc.mdCommandLine.allData,
+        }
+        print(json.dumps(md, indent=2, default=getjson))
 
 
 def handleRefs(options, extras):

@@ -33,6 +33,9 @@ class MetadataManager:
     def __init__(self):
         self.hasMetadata = False
 
+        # All metadata ever passed to .addData()
+        self.allData = defaultdict(list)
+
         # required metadata
         self.abstract = []
         self.ED = None
@@ -139,12 +142,14 @@ class MetadataManager:
                 val = val.strip()
 
         if key.startswith("!"):
+            self.allData[key].append(val)
             key = key[1:]
             self.otherMetadata[key].append(val)
             return
 
         if key not in ("ED", "TR", "URL"):
             key = key.title()
+        self.allData[key].append(val)
 
         if key not in knownKeys:
             die(f'Unknown metadata key "{key}". Prefix custom keys with "!".', lineNum=lineNum)
