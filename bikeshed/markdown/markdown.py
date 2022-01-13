@@ -1,3 +1,4 @@
+import functools
 import re
 from itertools import *
 
@@ -110,7 +111,7 @@ def tokenizeLines(
     opaqueElements += ["pre", "xmp", "script", "style"]
     rawElements = "|".join(re.escape(x) for x in opaqueElements)
 
-    for line in lines:
+    for i, line in enumerate(lines):
 
         # Three kinds of "raw" elements, which prevent markdown processing inside of them.
         # 1. <pre> and manual opaque elements, which can contain markup and so can nest.
@@ -120,19 +121,16 @@ def tokenizeLines(
         # The rawStack holds tokens like
         # {"type":"fenced", "tag":"````", "nest":False}
 
+        # TODO: when i pop the last rawstack, collect all the raw tokens in sequence and remove their indentation. gonna need to track the index explicitly, since a raw might end on one line and start on the next again, so i can't just walk backwards.
         if rawStack:
             # Inside at least one raw element that turns off markdown.
             # First see if this line will *end* the raw element.
             endTag = rawStack[-1]
-            if endTag["type"] == "element" and re.search(endTag["tag"], line.text):
+            if lineEndsRawBlock(line, endTag):
                 rawStack.pop()
-                tokens.append({"type": "raw", "prefixlen": float("inf"), "line": line})
-                continue
-            elif endTag["type"] == "fenced" and re.match(
-                r"\s*{}{}*\s*$".format(endTag["tag"], endTag["tag"][0]), line.text
-            ):
-                rawStack.pop()
-                line.text = "</xmp>"
+                if endTag["type"] == "fenced":
+                    stripCommonWsPrefix(tokens[endTag["start"]+1:])
+                    line.text = "</xmp>"
                 tokens.append({"type": "raw", "prefixlen": float("inf"), "line": line})
                 continue
             elif not endTag["nest"]:
@@ -146,7 +144,7 @@ def tokenizeLines(
         match = re.match(r"(\s*)(`{3,}|~{3,})([^`]*)$", line.text)
         if match:
             ws, tag, infoString = match.groups()
-            rawStack.append({"type": "fenced", "tag": tag, "nest": False})
+            rawStack.append({"type": "fenced", "tag": tag, "nest": False, "start":i})
             infoString = infoString.strip()
             if infoString:
                 # For now, I only care about lang
@@ -349,6 +347,40 @@ def stripPrefix(token, numSpacesForIndentation, len):
                 f'Line {token["line"].i} isn\'t indented enough (needs {len} indent{"" if len == 1 else "s"}) to be valid Markdown:\n"{text[:-1]}"'
             )
     return text[offset:]
+
+
+def lineEndsRawBlock(line, rawToken):
+    return (rawToken["type"] == "element" and re.search(rawToken["tag"], line.text)) or (rawToken["type"] == "fenced" and re.match(
+        r"\s*{}{}*\s*$".format(rawToken["tag"], rawToken["tag"][0]), line.text
+    ))
+
+
+def stripCommonWsPrefix(tokens):
+    # Remove the longest common whitespace prefix from the lines.
+    if not tokens:
+        return tokens
+    ws = [getWsPrefix(t['line'].text) for t in tokens]
+    prefix = functools.reduce(commonPrefix, ws)
+    prefixLen = len(prefix)
+    for token in tokens:
+        token['line'].text = token['line'].text[prefixLen:]
+    return tokens
+
+
+def commonPrefix(line1, line2):
+    prefixSoFar = ""
+    for i, char in enumerate(line1):
+        if i == len(line2):
+            break
+        if char == line2[i]:
+            prefixSoFar += char
+        else:
+            break
+    return prefixSoFar
+
+
+def getWsPrefix(line):
+    return re.match(r"(\s*)", line).group(1)
 
 
 def parseTokens(tokens, numSpacesForIndentation):
