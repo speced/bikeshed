@@ -129,7 +129,7 @@ def tokenizeLines(
             if lineEndsRawBlock(line, endTag):
                 rawStack.pop()
                 if endTag["type"] == "fenced":
-                    stripCommonWsPrefix(tokens[endTag["start"]+1:])
+                    stripCommonWsPrefix(tokens[endTag["start"] + 1 :])
                     line.text = "</xmp>"
                 tokens.append({"type": "raw", "prefixlen": float("inf"), "line": line})
                 continue
@@ -144,7 +144,7 @@ def tokenizeLines(
         match = re.match(r"(\s*)(`{3,}|~{3,})([^`]*)$", line.text)
         if match:
             ws, tag, infoString = match.groups()
-            rawStack.append({"type": "fenced", "tag": tag, "nest": False, "start":i})
+            rawStack.append({"type": "fenced", "tag": tag, "nest": False, "start": i})
             infoString = infoString.strip()
             if infoString:
                 # For now, I only care about lang
@@ -350,20 +350,21 @@ def stripPrefix(token, numSpacesForIndentation, len):
 
 
 def lineEndsRawBlock(line, rawToken):
-    return (rawToken["type"] == "element" and re.search(rawToken["tag"], line.text)) or (rawToken["type"] == "fenced" and re.match(
-        r"\s*{}{}*\s*$".format(rawToken["tag"], rawToken["tag"][0]), line.text
-    ))
+    return (rawToken["type"] == "element" and re.search(rawToken["tag"], line.text)) or (
+        rawToken["type"] == "fenced"
+        and re.match(r"\s*{}{}*\s*$".format(rawToken["tag"], rawToken["tag"][0]), line.text)
+    )
 
 
 def stripCommonWsPrefix(tokens):
     # Remove the longest common whitespace prefix from the lines.
     if not tokens:
         return tokens
-    ws = [getWsPrefix(t['line'].text) for t in tokens]
+    ws = [getWsPrefix(t["line"].text) for t in tokens]
     prefix = functools.reduce(commonPrefix, ws)
     prefixLen = len(prefix)
     for token in tokens:
-        token['line'].text = token['line'].text[prefixLen:]
+        token["line"].text = token["line"].text[prefixLen:]
     return tokens
 
 
