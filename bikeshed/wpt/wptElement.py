@@ -8,6 +8,7 @@ from ..h import (
     removeAttr,
     textContent,
     parseHTML,
+    serializeTag,
 )
 from ..messages import *
 from .. import config
@@ -23,8 +24,6 @@ def processWptElements(doc):
     seenTestNames = set()
     prevEl = None
     for el in wptElements:
-        if el.get("hidden") is None:
-            atLeastOneElement = True
         if testData is None:
             testData = loadTestData(doc)
         testNames = testNamesFromEl(el, pathPrefix=pathPrefix)
@@ -33,6 +32,8 @@ def processWptElements(doc):
                 die(f"Couldn't find WPT test '{testName}' - did you misspell something?", el=el)
                 continue
             seenTestNames.add(testName)
+            if atLeastOneElement is False and el.get("hidden") is None:
+                atLeastOneElement = True
         if el.get("hidden") is not None:
             removeNode(el)
         else:
@@ -60,11 +61,11 @@ def processWptElements(doc):
         if pathPrefix is None:
             die("Can't use <wpt-rest> without either a pathprefix=" " attribute or a 'WPT Path Prefix' metadata.")
             return
-        atLeastOneElement = True
         prefixedNames = [p for p in testData if prefixInPath(pathPrefix, p) and p not in seenTestNames]
         if len(prefixedNames) == 0:
             die(f"Couldn't find any tests with the path prefix '{pathPrefix}'.")
             return
+        atLeastOneElement = True
         createHTML(doc, wptRestElements[0], prefixedNames, testData)
         warn(
             "<wpt-rest> is intended for debugging only. Move the tests to <wpt> elements next to what they're testing."
@@ -75,7 +76,7 @@ def processWptElements(doc):
                 testData = loadTestData(doc)
             checkForOmittedTests(pathPrefix, testData, seenTestNames)
 
-    if seenTestNames:
+    if atLeastOneElement:
         if pathPrefix is None:
             pathPrefix = commonPathPrefix(seenTestNames)
         if not pathPrefix.startswith("/"):
