@@ -8,7 +8,6 @@ from ..h import (
     removeAttr,
     textContent,
     parseHTML,
-    serializeTag,
 )
 from ..messages import *
 from .. import config
