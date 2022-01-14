@@ -29,10 +29,16 @@ def transformProductionPlaceholders(doc):
         clearContents(el)
         match = propdescRe.match(text)
         if match:
-            if match.group(3) is None:
-                linkType = "propdesc"
-            elif match.group(3) in ("property", "descriptor"):
-                linkType = match.group(2)
+            linkFor, lt, linkType = match.groups()
+            if linkFor == "":
+                linkFor = "/"
+            if linkType is None:
+                if linkFor is None:
+                    linkType = "property"
+                else:
+                    linkType = "propdesc"
+            elif linkType in ("property", "descriptor"):
+                pass
             else:
                 die(
                     f"Shorthand <<{match.group(0)}>> gives type as '{match.group(3)}', but only 'property' and 'descriptor' are allowed.",
@@ -43,10 +49,10 @@ def transformProductionPlaceholders(doc):
                 continue
             el.tag = "a"
             el.set("data-link-type", linkType)
-            el.set("data-lt", match.group(2))
-            if match.group(1) is not None:
-                el.set("for", match.group(1))
-            el.text = "<'" + match.group(2) + "'>"
+            el.set("data-lt", lt)
+            if linkFor is not None:
+                el.set("for", linkFor)
+            el.text = "<'" + lt + "'>"
             continue
         match = funcRe.match(text)
         if match:
@@ -471,7 +477,10 @@ def propdescReplacer(match):
         # Not a valid property actually.
         return "'-'"
     if linkType is None:
-        linkType = "propdesc"
+        if linkFor is None:
+            linkType = "property"
+        else:
+            linkType = "propdesc"
     elif linkType in ("property", "descriptor"):
         pass
     else:
