@@ -17,12 +17,15 @@ def processWptElements(doc):
     pathPrefix = doc.md.wptPathPrefix
 
     atLeastOneElement = False
+    atLeastOneVisibleTest = False
     testData = None
     # <wpt> elements
     wptElements = findAll("wpt", doc)
     seenTestNames = set()
     prevEl = None
     for el in wptElements:
+        if atLeastOneElement is False and el.get("hidden") is None:
+            atLeastOneElement = True
         if testData is None:
             testData = loadTestData(doc)
         testNames = testNamesFromEl(el, pathPrefix=pathPrefix)
@@ -31,8 +34,8 @@ def processWptElements(doc):
                 die(f"Couldn't find WPT test '{testName}' - did you misspell something?", el=el)
                 continue
             seenTestNames.add(testName)
-            if atLeastOneElement is False and el.get("hidden") is None:
-                atLeastOneElement = True
+            if atLeastOneVisibleTest is False and el.get("hidden") is None:
+                atLeastOneVisibleTest = True
         if el.get("hidden") is not None:
             removeNode(el)
         else:
@@ -65,6 +68,7 @@ def processWptElements(doc):
             die(f"Couldn't find any tests with the path prefix '{pathPrefix}'.")
             return
         atLeastOneElement = True
+        atLeastOneVisibleTest = True
         createHTML(doc, wptRestElements[0], prefixedNames, testData)
         warn(
             "<wpt-rest> is intended for debugging only. Move the tests to <wpt> elements next to what they're testing."
@@ -75,7 +79,7 @@ def processWptElements(doc):
                 testData = loadTestData(doc)
             checkForOmittedTests(pathPrefix, testData, seenTestNames)
 
-    if atLeastOneElement:
+    if atLeastOneVisibleTest:
         if pathPrefix is None:
             pathPrefix = commonPathPrefix(seenTestNames)
         if not pathPrefix.startswith("/"):
@@ -91,9 +95,12 @@ def processWptElements(doc):
                 )
             )
 
-    if atLeastOneElement and doc.md.wptDisplay != "none":
+    if doc.md.wptDisplay != "none" and atLeastOneElement:
+        # Empty <wpt> blocks still need styles
         doc.extraStyles["style-wpt"] = wptStyle
-        doc.extraScripts["script-wpt"] = getWptScript(pathPrefix)
+        if atLeastOneVisibleTest:
+            # But I only need script if there's actually some tests.
+            doc.extraScripts["script-wpt"] = getWptScript(pathPrefix)
 
 
 def createHTML(doc, blockEl, testNames, testData, title=None, titleLang=None, titleDir=None):
