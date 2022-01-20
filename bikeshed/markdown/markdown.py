@@ -252,8 +252,9 @@ def tokenizeLines(
         token["line"] = line
         tokens.append(token)
 
-    # for token in tokens:
-    #    print(f"{' ' * (11 - len(token['type']))}{token['type']}: {token['line'].text.rstrip()}")
+    if False:
+        for i,token in enumerate(tokens):
+            print(f"{' '*(2-len(str(i)))}{i} {' ' * (11 - len(token['type']))}{token['type']}: {token['line'].text.rstrip()}")
 
     return tokens
 
@@ -369,6 +370,10 @@ def stripCommonWsPrefix(tokens):
 
 
 def commonPrefix(line1, line2):
+    if line1 is None:
+        return line2
+    if line2 is None:
+        return line1
     prefixSoFar = ""
     for i, char in enumerate(line1):
         if i == len(line2):
@@ -381,6 +386,8 @@ def commonPrefix(line1, line2):
 
 
 def getWsPrefix(line):
+    if line.strip() == "":
+        return None
     return re.match(r"(\s*)", line).group(1)
 
 
