@@ -252,7 +252,7 @@ def tokenizeLines(
         token["line"] = line
         tokens.append(token)
 
-    if False:
+    if False:  # pylint: disable=using-constant-test
         for i, token in enumerate(tokens):
             print(
                 f"{' '*(2-len(str(i)))}{i} {' ' * (11 - len(token['type']))}{token['type']}: {token['line'].text.rstrip()}"
