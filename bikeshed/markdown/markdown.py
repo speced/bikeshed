@@ -365,7 +365,12 @@ def stripCommonWsPrefix(tokens):
     prefix = functools.reduce(commonPrefix, ws)
     prefixLen = len(prefix)
     for token in tokens:
-        token["line"].text = token["line"].text[prefixLen:]
+        stripped = token["line"].text
+        if len(token["line"].text) > prefixLen:
+            # Don't remove from blank lines,
+            # or else you'll eat the newline!
+            stripped = token["line"].text[prefixLen:]
+        token["line"].text = stripped
     return tokens
 
 
