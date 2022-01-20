@@ -253,8 +253,10 @@ def tokenizeLines(
         tokens.append(token)
 
     if False:
-        for i,token in enumerate(tokens):
-            print(f"{' '*(2-len(str(i)))}{i} {' ' * (11 - len(token['type']))}{token['type']}: {token['line'].text.rstrip()}")
+        for i, token in enumerate(tokens):
+            print(
+                f"{' '*(2-len(str(i)))}{i} {' ' * (11 - len(token['type']))}{token['type']}: {token['line'].text.rstrip()}"
+            )
 
     return tokens
 
