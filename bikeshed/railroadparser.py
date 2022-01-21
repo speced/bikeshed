@@ -1,5 +1,4 @@
-from . import railroaddiagrams as rr
-from .messages import *
+from . import railroaddiagrams as rr, messages as m
 
 
 def parse(string):
@@ -27,7 +26,7 @@ def parse(string):
         if line.startswith(initialIndent):
             lines[i] = line[len(initialIndent) :]
         else:
-            die(f"Inconsistent indentation: line {i} is indented less than the first line.")
+            m.die(f"Inconsistent indentation: line {i} is indented less than the first line.")
             return rr.Diagram()
 
     # Determine subsequent indentation
@@ -51,13 +50,13 @@ def parse(string):
             indent += 1
             line = line[len(indentText) :]
         if indent > lastIndent + 1:
-            die(f"Line {i} jumps more than 1 indent level from the previous line:\n{line.strip()}")
+            m.die(f"Line {i} jumps more than 1 indent level from the previous line:\n{line.strip()}")
             return rr.Diagram()
         lastIndent = indent
         if re.match(fr"\s*({blockNames})\W", line):
             match = re.match(r"\s*(\w+)\s*:\s*(.*)", line)
             if not match:
-                die(f"Line {i} doesn't match the grammar 'Command: optional-prelude'. Got:\n{line.strip()}")
+                m.die(f"Line {i} doesn't match the grammar 'Command: optional-prelude'. Got:\n{line.strip()}")
                 return rr.Diagram()
             command = match.group(1)
             prelude = match.group(2).strip()
@@ -65,7 +64,7 @@ def parse(string):
         elif re.match(fr"\s*({textNames})\W", line):
             match = re.match(r"\s*(\w+)(\s[\w\s]+)?:\s*(.*)", line)
             if not match:
-                die(f"Line {i} doesn't match the grammar 'Command [optional prelude]: text'. Got:\n{line.strip()},")
+                m.die(f"Line {i} doesn't match the grammar 'Command [optional prelude]: text'. Got:\n{line.strip()},")
                 return rr.Diagram()
             command = match.group(1)
             if match.group(2):
@@ -81,7 +80,7 @@ def parse(string):
                 "line": i,
             }
         else:
-            die(
+            m.die(
                 f"Line {i} doesn't contain a valid railroad-diagram command. Got:\n{line.strip()}",
             )
             return
@@ -103,34 +102,34 @@ def _createDiagram(command, prelude, children, text=None, line=-1):
         return rr.Diagram(*children)
     if command in ("T", "Terminal"):
         if children:
-            return die(f"Line {line} - Terminal commands cannot have children.")
+            return m.die(f"Line {line} - Terminal commands cannot have children.")
         return rr.Terminal(text, prelude)
     if command in ("N", "NonTerminal"):
         if children:
-            return die(f"Line {line} - NonTerminal commands cannot have children.")
+            return m.die(f"Line {line} - NonTerminal commands cannot have children.")
         return rr.NonTerminal(text, prelude)
     if command in ("C", "Comment"):
         if children:
-            return die(f"Line {line} - Comment commands cannot have children.")
+            return m.die(f"Line {line} - Comment commands cannot have children.")
         return rr.Comment(text, prelude)
     if command in ("S", "Skip"):
         if children:
-            return die(f"Line {line} - Skip commands cannot have children.")
+            return m.die(f"Line {line} - Skip commands cannot have children.")
         if text:
-            return die(f"Line {line} - Skip commands cannot have text.")
+            return m.die(f"Line {line} - Skip commands cannot have text.")
         return rr.Skip()
     if command in ("And", "Seq", "Sequence"):
         if prelude:
-            return die(f"Line {line} - Sequence commands cannot have preludes.")
+            return m.die(f"Line {line} - Sequence commands cannot have preludes.")
         if not children:
-            return die(f"Line {line} - Sequence commands need at least one child.")
+            return m.die(f"Line {line} - Sequence commands need at least one child.")
         children = [_f for _f in [_createDiagram(**child) for child in children] if _f]
         return rr.Sequence(*children)
     if command in ("Stack",):
         if prelude:
-            return die(f"Line {line} - Stack commands cannot have preludes.")
+            return m.die(f"Line {line} - Stack commands cannot have preludes.")
         if not children:
-            return die(f"Line {line} - Stack commands need at least one child.")
+            return m.die(f"Line {line} - Stack commands need at least one child.")
         children = [_f for _f in [_createDiagram(**child) for child in children] if _f]
         return rr.Stack(*children)
     if command in ("Or", "Choice"):
@@ -140,31 +139,31 @@ def _createDiagram(command, prelude, children, text=None, line=-1):
             try:
                 default = int(prelude)
             except ValueError:
-                die(f"Line {line} - Choice preludes must be an integer. Got:\n{prelude}")
+                m.die(f"Line {line} - Choice preludes must be an integer. Got:\n{prelude}")
                 default = 0
         if not children:
-            return die(f"Line {line} - Choice commands need at least one child.")
+            return m.die(f"Line {line} - Choice commands need at least one child.")
         children = [_f for _f in [_createDiagram(**child) for child in children] if _f]
         return rr.Choice(default, *children)
     if command in ("Opt", "Optional"):
         if prelude not in ("", "skip"):
-            return die(f"Line {line} - Optional preludes must be nothing or 'skip'. Got:\n{prelude}")
+            return m.die(f"Line {line} - Optional preludes must be nothing or 'skip'. Got:\n{prelude}")
         if len(children) != 1:
-            return die(f"Line {line} - Optional commands need exactly one child.")
+            return m.die(f"Line {line} - Optional commands need exactly one child.")
         children = [_f for _f in [_createDiagram(**child) for child in children] if _f]
         return rr.Optional(*children, skip=(prelude == "skip"))
     if command in ("Plus", "OneOrMore"):
         if prelude:
-            return die(f"Line {line} - OneOrMore commands cannot have preludes.")
+            return m.die(f"Line {line} - OneOrMore commands cannot have preludes.")
         if 0 == len(children) > 2:
-            return die(f"Line {line} - OneOrMore commands must have one or two children.")
+            return m.die(f"Line {line} - OneOrMore commands must have one or two children.")
         children = [_f for _f in [_createDiagram(**child) for child in children] if _f]
         return rr.OneOrMore(*children)
     if command in ("Star", "ZeroOrMore"):
         if prelude:
-            return die(f"Line {line} - ZeroOrMore commands cannot have preludes.")
+            return m.die(f"Line {line} - ZeroOrMore commands cannot have preludes.")
         if 0 == len(children) > 2:
-            return die(f"Line {line} - ZeroOrMore commands must have one or two children.")
+            return m.die(f"Line {line} - ZeroOrMore commands must have one or two children.")
         children = [_f for _f in [_createDiagram(**child) for child in children] if _f]
         return rr.ZeroOrMore(*children)
-    return die(f"Line {line} - Unknown command '{command}'.")
+    return m.die(f"Line {line} - Unknown command '{command}'.")

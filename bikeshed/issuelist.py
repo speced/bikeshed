@@ -4,7 +4,7 @@ import glob
 import re
 import sys
 
-from .messages import *
+from . import messages as m
 
 statusStyle = {
     "accepted": "a",
@@ -34,7 +34,7 @@ def printIssueList(infilename=None, outfilename=None):
             except Exception:
                 pass
         else:
-            die("Couldn't read from the infile(s)")
+            m.die("Couldn't read from the infile(s)")
             return
 
     lines = infile.readlines()
@@ -53,7 +53,7 @@ def printIssueList(infilename=None, outfilename=None):
         try:
             outfile = open(outfilename, "w", encoding="utf-8")
         except Exception as e:
-            die(f"Couldn't write to outfile:\n{e}")
+            m.die(f"Couldn't write to outfile:\n{e}")
             return
 
     printHeader(outfile, headerInfo)
@@ -70,7 +70,7 @@ def findIssuesFile():
 
     possibleFiles = [*glob.glob("issues*.txt"), *glob.glob("*.bsi")]
     if len(possibleFiles) == 0:
-        die("Can't find an 'issues*.txt' or '*.bsi' file in this folder. Explicitly pass a filename.")
+        m.die("Can't find an 'issues*.txt' or '*.bsi' file in this folder. Explicitly pass a filename.")
         return
     if len(possibleFiles) == 1:
         return possibleFiles[0]
@@ -83,7 +83,7 @@ def findIssuesFile():
 
     possibleFiles.sort(reverse=True)
     if len(possibleFiles) == 0 or possibleFiles[0][0] == possibleFiles[1][0]:
-        die("Can't tell which issues-list file is the most recent. Explicitly pass a filename.")
+        m.die("Can't tell which issues-list file is the most recent. Explicitly pass a filename.")
         return
     return possibleFiles[0][1]
 
@@ -109,14 +109,14 @@ def extractHeaderInfo(lines, infilename):
                 date = match.group(2).rstrip()
                 cdate = date
                 if not re.match(r"(\d{4})-(\d\d)-(\d\d)$", date):
-                    die(f"Incorrect Date format. Expected YYYY-MM-DD, but got:\n{date}")
+                    m.die(f"Incorrect Date format. Expected YYYY-MM-DD, but got:\n{date}")
             elif match.group(1) == "ED":
                 ed = match.group(2).rstrip()
     if url is None:
-        die("Missing 'Draft' metadata.")
+        m.die("Missing 'Draft' metadata.")
         return
     if title is None:
-        die("Missing 'Title' metadata.")
+        m.die("Missing 'Title' metadata.")
         return
 
     match = re.search(r"([A-Z]{2,})-([a-z0-9-]+)-(\d{8})", url)
@@ -133,18 +133,18 @@ def extractHeaderInfo(lines, infilename):
             cdate = match.group(3)
             date = "{}-{}-{}".format(*re.match(r"(\d{4})(\d\d)(\d\d)", cdate).groups())
     else:
-        warn(
+        m.warn(
             f"Autodetection of Shortname, Date, and Status failed; draft url does not match the format /status-shortname-date/. Got:\n{url}"
         )
 
     if date is None:
-        die("Missing 'Date' metadata.")
+        m.die("Missing 'Date' metadata.")
         return
     if status is None:
-        die("Missing 'Status' metadata.")
+        m.die("Missing 'Status' metadata.")
         return
     if ed is None:
-        die("Missing 'ED' metadata.")
+        m.die("Missing 'ED' metadata.")
         return
 
     match = re.search(r"^Intro:\s*(.*(\n^$|\n[ \t]+.*)*)", "".join(lines), re.M)
@@ -163,7 +163,7 @@ def extractHeaderInfo(lines, infilename):
 
 
 def printHelpMessage():
-    say(
+    m.say(
         """Draft:    http://www.w3.org/TR/2013/WD-css-foo-3-20130103/ (Mandatory)
 Title:    CSS Foo Level 3 (Mandatory)
 Date:     YYYY-MM-DD (Optional if can be autodetected from the Draft's URL)
@@ -251,7 +251,7 @@ def printIssues(outfile, lines):
         if match:
             index = match.group(1)
         else:
-            die(f"Issues must contain a line like 'Issue 1.'. Got:\n{originalText}")
+            m.die(f"Issues must contain a line like 'Issue 1.'. Got:\n{originalText}")
 
         # Color coding
         if re.search(r"\nVerified:\s*\S+", issue):
@@ -264,7 +264,7 @@ def printIssues(outfile, lines):
             else:
                 code = ""
                 if match.group(1) == "Closed":
-                    warn(f"Unknown status value found for issue #{index}: “{code}”")
+                    m.warn(f"Unknown status value found for issue #{index}: “{code}”")
         else:
             code = ""
         if re.search(r"\nOpen", issue):

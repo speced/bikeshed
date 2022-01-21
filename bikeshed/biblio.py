@@ -5,8 +5,8 @@ import html5lib
 import attr
 
 from . import constants
-from .h import *
-from .messages import *
+from . import h
+from . import messages as m
 
 
 @attr.s(slots=True)
@@ -96,10 +96,10 @@ class BiblioEntry:
         ret.append(str)
 
         if self.url:
-            ret.append(E.a({"href": self.url}, E.cite(self.title)))
+            ret.append(h.E.a({"href": self.url}, h.E.cite(self.title)))
             ret.append(". ")
         else:
-            ret.append(E.cite(self.title))
+            ret.append(h.E.cite(self.title))
             ret.append(". ")
 
         str = ""
@@ -116,7 +116,7 @@ class BiblioEntry:
 
         if self.url:
             ret.append("URL: ")
-            ret.append(E.a({"href": self.url}, self.url))
+            ret.append(h.E.a({"href": self.url}, self.url))
 
         return ret
 
@@ -154,7 +154,7 @@ class SpecBasedBiblioEntry(BiblioEntry):
         return self._valid
 
     def toHTML(self):
-        return [self.spec["description"], " URL: ", E.a({"href": self.url}, self.url)]
+        return [self.spec["description"], " URL: ", h.E.a({"href": self.url}, self.url)]
 
 
 @attr.s(slots=True)
@@ -170,17 +170,17 @@ class StringBiblioEntry(BiblioEntry):
 
     def __attrs_post_init__(self):
         doc = html5lib.parse(self.data, treebuilder="lxml", namespaceHTMLElements=False)
-        title = find("cite", doc)
+        title = h.find("cite", doc)
         if title is not None:
-            self.title = textContent(title)
+            self.title = h.textContent(title)
         else:
-            self.title = textContent(doc.getroot())
+            self.title = h.textContent(doc.getroot())
 
     def valid(self):
         return True
 
     def toHTML(self):
-        return parseHTML(self.data)
+        return h.parseHTML(self.data)
 
     def __str__(self):
         return self.data
@@ -223,7 +223,7 @@ def processReferBiblioFile(lines, storage, order):
         if match:
             letter, value = match.groups()
         else:
-            die(f"Biblio line in unexpected format:\n{line}")
+            m.die(f"Biblio line in unexpected format:\n{line}")
             continue
 
         if letter in singularReferCodes:
@@ -233,7 +233,7 @@ def processReferBiblioFile(lines, storage, order):
         elif letter in unusedReferCodes:
             pass
         else:
-            die(f"Unknown line type {letter}:\n{line}")
+            m.die(f"Unknown line type {letter}:\n{line}")
     if biblio is not None:
         storage[biblio["linkText"].lower()] = biblio
     return storage
@@ -277,7 +277,7 @@ def processSpecrefBiblioFile(text, storage, order):
     try:
         datas = json.loads(text)
     except Exception as e:
-        die(f"Couldn't read the local JSON file:\n{e}")
+        m.die(f"Couldn't read the local JSON file:\n{e}")
         return storage
 
     # JSON field name: BiblioEntry name
@@ -372,7 +372,7 @@ def loadBiblioDataFile(lines, storage):
                 }
                 line = next(lines)  # Eat the -
             else:
-                die(f"Unknown biblio prefix '{prefix}' on key '{fullKey}'")
+                m.die(f"Unknown biblio prefix '{prefix}' on key '{fullKey}'")
                 continue
             storage[key].append(b)
     except StopIteration:

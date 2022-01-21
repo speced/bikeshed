@@ -7,16 +7,15 @@ import certifi
 import tenacity
 from json_home_client import Client as APIClient
 
-from .. import config
-from ..messages import *
+from .. import config, messages as m
 
 
 def progressMessager(index, total):
-    return lambda: say(f"Downloading data for spec {index}/{total}...")
+    return lambda: m.say(f"Downloading data for spec {index}/{total}...")
 
 
 def update(path, dryRun=False):
-    say("Downloading anchor data...")
+    m.say("Downloading anchor data...")
     shepherd = APIClient(
         "https://api.csswg.org/shepherd/",
         version="vnd.csswg.shepherd.v1",
@@ -75,7 +74,7 @@ def update(path, dryRun=False):
             with open(p, "w", encoding="utf-8") as f:
                 f.write(json.dumps(specs, ensure_ascii=False, indent=2, sort_keys=True))
         except Exception as e:
-            die(f"Couldn't save spec database to disk.\n{e}")
+            m.die(f"Couldn't save spec database to disk.\n{e}")
             return
         try:
             for spec, specHeadings in headings.items():
@@ -84,12 +83,12 @@ def update(path, dryRun=False):
                 with open(p, "w", encoding="utf-8") as f:
                     f.write(json.dumps(specHeadings, ensure_ascii=False, indent=2, sort_keys=True))
         except Exception as e:
-            die(f"Couldn't save headings database to disk.\n{e}")
+            m.die(f"Couldn't save headings database to disk.\n{e}")
             return
         try:
             writtenPaths.update(writeAnchorsFile(anchors, path))
         except Exception as e:
-            die(f"Couldn't save anchor database to disk.\n{e}")
+            m.die(f"Couldn't save anchor database to disk.\n{e}")
             return
         try:
             p = os.path.join(path, "methods.json")
@@ -97,7 +96,7 @@ def update(path, dryRun=False):
             with open(p, "w", encoding="utf-8") as f:
                 f.write(json.dumps(methods, ensure_ascii=False, indent=2, sort_keys=True))
         except Exception as e:
-            die(f"Couldn't save methods database to disk.\n{e}")
+            m.die(f"Couldn't save methods database to disk.\n{e}")
             return
         try:
             p = os.path.join(path, "fors.json")
@@ -105,10 +104,10 @@ def update(path, dryRun=False):
             with open(p, "w", encoding="utf-8") as f:
                 f.write(json.dumps(fors, ensure_ascii=False, indent=2, sort_keys=True))
         except Exception as e:
-            die(f"Couldn't save fors database to disk.\n{e}")
+            m.die(f"Couldn't save fors database to disk.\n{e}")
             return
 
-    say("Success!")
+    m.say("Success!")
     return writtenPaths
 
 
@@ -240,7 +239,7 @@ def addToHeadings(rawAnchor, specHeadings, spec):
             # url to a heading in the page, like "foo.html#bar"
             match = re.match(r"([\w-]+).*?(#.*)", uri)
             if not match:
-                die(
+                m.die(
                     f"Unexpected URI pattern '{uri}' for spec '{spec['vshortname']}'. Please report this to the Bikeshed maintainer.",
                 )
                 return

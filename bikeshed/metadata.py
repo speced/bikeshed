@@ -10,11 +10,8 @@ from functools import partial
 import attr
 from isodate import Duration, parse_duration
 
-from . import config, constants, datablocks, markdown
+from . import config, constants, datablocks, markdown, h, messages as m, repository
 from .DefaultOrderedDict import DefaultOrderedDict
-from .h import *
-from .messages import *
-from .repository import *
 
 
 class MetadataManager:
@@ -152,7 +149,7 @@ class MetadataManager:
         self.allData[key].append(val)
 
         if key not in knownKeys:
-            die(f'Unknown metadata key "{key}". Prefix custom keys with "!".', lineNum=lineNum)
+            m.die(f'Unknown metadata key "{key}". Prefix custom keys with "!".', lineNum=lineNum)
             return
         md = knownKeys[key]
 
@@ -198,11 +195,11 @@ class MetadataManager:
             return True
 
         if not self.hasMetadata:
-            die("The document requires at least one <pre class=metadata> block.")
+            m.die("The document requires at least one <pre class=metadata> block.")
             return
 
         if self.status in ("w3c/IG-NOTE", "w3c/WG-NOTE"):
-            die(
+            m.die(
                 f"Under Process2021, {self.status} is no longer a valid status. Use NOTE (or one of its variants NOTE-ED, NOTE-FPWD, NOTE-WD) instead."
             )
 
@@ -229,7 +226,7 @@ class MetadataManager:
         if self.status not in config.unlevelledStatuses:
             requiredSingularKeys["level"] = "Level"
         if self.status not in config.shortToLongStatus:
-            die(f"Unknown Status '{self.status}' used.")
+            m.die(f"Unknown Status '{self.status}' used.")
         if not self.noEditor:
             requiredMultiKeys["editors"] = "Editor"
         if not self.noAbstract:
@@ -251,9 +248,9 @@ class MetadataManager:
             if len(getattr(self, attrName)) == 0:
                 errors.append(f"    Must provide at least one '{name}' entry.")
         if warnings:
-            warn("Some recommended metadata is missing:\n" + "\n".join(warnings))
+            m.warn("Some recommended metadata is missing:\n" + "\n".join(warnings))
         if errors:
-            die("Not all required metadata was provided:\n" + "\n".join(errors))
+            m.die("Not all required metadata was provided:\n" + "\n".join(errors))
             return
 
     def fillTextMacros(self, macros, doc):
@@ -293,7 +290,7 @@ class MetadataManager:
         if self.abstract:
             abstractLines = datablocks.transformDataBlocks(doc, self.abstract)
             macros["abstract"] = "\n".join(markdown.parse(abstractLines, self.indent))
-            macros["abstractattr"] = escapeAttr("  ".join(abstractLines).replace("<<", "<").replace(">>", ">"))
+            macros["abstractattr"] = h.escapeAttr("  ".join(abstractLines).replace("<<", "<").replace(">>", ">"))
         elif self.noAbstract:
             macros["abstract"] = ""
             macros["abstractattr"] = ""
@@ -376,7 +373,7 @@ def parseDate(key, val, lineNum):
     try:
         return datetime.strptime(val, "%Y-%m-%d").date()
     except ValueError:
-        die(f'The {key} field must be in the format YYYY-MM-DD - got "{val}" instead.', lineNum=lineNum)
+        m.die(f'The {key} field must be in the format YYYY-MM-DD - got "{val}" instead.', lineNum=lineNum)
         return None
 
 
@@ -390,7 +387,7 @@ def parseDateOrDuration(key, val, lineNum):
             return parse_duration(val)
         return datetime.strptime(val, "%Y-%m-%d").date()
     except ValueError:
-        die(
+        m.die(
             f"The {key} field must be an ISO 8601 duration, a date in the format YYYY-MM-DD, now, never, false, no, n, or off. Got '{val}' instead.",
             lineNum=lineNum,
         )
@@ -408,7 +405,7 @@ def canonicalizeExpiryDate(base, expires):
         return expires.date()
     if isinstance(expires, date):
         return expires
-    die(f"Unexpected expiry type: canonicalizeExpiryDate({base}, {expires})", base, expires)
+    m.die(f"Unexpected expiry type: canonicalizeExpiryDate({base}, {expires})", base, expires)
     return None
 
 
@@ -426,7 +423,7 @@ def parseInteger(key, val, lineNum):  # pylint: disable=unused-argument
 def parseBoolean(key, val, lineNum):
     b = boolish(val)
     if b is None:
-        die(f"The {key} field must be true/false, yes/no, y/n, or on/off. Got '{val}' instead.", lineNum=lineNum)
+        m.die(f"The {key} field must be true/false, yes/no, y/n, or on/off. Got '{val}' instead.", lineNum=lineNum)
     return b
 
 
@@ -436,7 +433,7 @@ def parseSoftBoolean(key, val, lineNum):
         return b
     if val.lower() in ["maybe", "if possible", "if needed"]:
         return "maybe"
-    die(f"The {key} field must be boolish, or 'maybe'. Got '{val}' instead.", lineNum=lineNum)
+    m.die(f"The {key} field must be boolish, or 'maybe'. Got '{val}' instead.", lineNum=lineNum)
 
 
 def boolish(val):
@@ -466,7 +463,7 @@ def parseWarning(key, val, lineNum):
     match = re.match(r"New Version +(.+)", val, re.I)
     if match:
         return "warning-new-version", match.group(1)
-    die(
+    m.die(
         f"""Unknown value "{val}" for "{key}" metadata. Expected one of:
   obsolete
   not ready
@@ -481,7 +478,7 @@ def parseWarning(key, val, lineNum):
 
 
 def parseEditor(key, val, lineNum):
-    pieces = [unescape(piece.strip()) for piece in val.split(",")]
+    pieces = [h.unescape(piece.strip()) for piece in val.split(",")]
 
     def looksLinkish(string):
         return re.match(r"\w+:", string) or looksEmailish(string)
@@ -540,7 +537,7 @@ def parseEditor(key, val, lineNum):
     elif len(ambiguousPieces) == 0:
         pass
     else:
-        die(
+        m.die(
             f"'{key}' format is '<name>, <company>?, <email-or-contact-page>?'. Got:\n{val}",
             lineNum=lineNum,
         )
@@ -586,7 +583,7 @@ def parseLinkDefaults(key, val, lineNum):
             for term in terms:
                 defaultSpecs[term.strip()].append((spec, type, status, dfnFor))
         else:
-            die(
+            m.die(
                 f"'{key}' is a comma-separated list of '<spec> (<dfn-type>) <terms>'. Got:\n{default}",
                 lineNum=lineNum,
             )
@@ -599,7 +596,7 @@ def parseBoilerplate(key, val, lineNum):  # pylint: disable=unused-argument
     for command in val.split(","):
         pieces = command.lower().strip().split()
         if len(pieces) != 2:
-            die(
+            m.die(
                 f"Boilerplate metadata pieces are a boilerplate label and a boolean. Got:\n{command}",
                 lineNum=lineNum,
             )
@@ -610,7 +607,7 @@ def parseBoilerplate(key, val, lineNum):  # pylint: disable=unused-argument
         else:
             onoff = boolish(pieces[1])
             if onoff is None:
-                die(
+                m.die(
                     f"Boilerplate metadata pieces are a boilerplate label and a boolean. Got:\n{command}",
                     lineNum=lineNum,
                 )
@@ -623,7 +620,7 @@ def parseBiblioDisplay(key, val, lineNum):
     val = val.strip().lower()
     if val in constants.biblioDisplay:
         return val
-    die(f"'{key}' must be either 'inline', 'index', or 'direct'. Got '{val}'", lineNum=lineNum)
+    m.die(f"'{key}' must be either 'inline', 'index', or 'direct'. Got '{val}'", lineNum=lineNum)
     return constants.biblioDisplay.index
 
 
@@ -634,7 +631,7 @@ def parseRefStatus(key, val, lineNum):
         val = "snapshot"
     if val in constants.refStatus:
         return val
-    die(f"'{key}' must be either 'current' or 'snapshot'. Got '{val}'", lineNum=lineNum)
+    m.die(f"'{key}' must be either 'current' or 'snapshot'. Got '{val}'", lineNum=lineNum)
     return constants.refStatus.current
 
 
@@ -663,17 +660,17 @@ def parseBoolishList(key, val, default=None, validLabels=None, extraValues=None,
     elif default in (True, False):
         boolset = config.BoolSet(default=default)
     else:
-        die(f"Programming error - parseBoolishList() got a non-bool default value: '{default}'")
+        m.die(f"Programming error - parseBoolishList() got a non-bool default value: '{default}'")
     if extraValues is None:
         extraValues = {}
     vals = [v.strip() for v in val.split(",")]
     for v in vals:
         name, _, boolstring = v.strip().rpartition(" ")
         if not name or not boolstring:
-            die(f"{key} metadata pieces are a label and a boolean. Got:\n{v}", lineNum=lineNum)
+            m.die(f"{key} metadata pieces are a label and a boolean. Got:\n{v}", lineNum=lineNum)
             continue
         if validLabels and name not in validLabels:
-            die(f"Unknown {key} label '{name}'.", lineNum=lineNum)
+            m.die(f"Unknown {key} label '{name}'.", lineNum=lineNum)
             continue
         if boolstring in extraValues:
             boolset[name] = extraValues[boolstring]
@@ -682,7 +679,7 @@ def parseBoolishList(key, val, default=None, validLabels=None, extraValues=None,
             if isinstance(onoff, bool):
                 boolset[name] = onoff
             else:
-                die(f"{key} metadata pieces are a shorthand category and a boolean. Got:\n{v}", lineNum=lineNum)
+                m.die(f"{key} metadata pieces are a shorthand category and a boolean. Got:\n{v}", lineNum=lineNum)
                 continue
     return boolset
 
@@ -705,15 +702,15 @@ def parseMarkupShorthands(key, val, lineNum):  # pylint: disable=unused-argument
     for v in vals:
         pieces = v.split()
         if len(pieces) != 2:
-            die(f"Markup Shorthand metadata pieces are a shorthand category and a boolean. Got:\n{v}", lineNum=lineNum)
+            m.die(f"Markup Shorthand metadata pieces are a shorthand category and a boolean. Got:\n{v}", lineNum=lineNum)
             continue
         name, boolstring = pieces
         if name not in validCategories:
-            die(f"Unknown Markup Shorthand category '{name}'.", lineNum=lineNum)
+            m.die(f"Unknown Markup Shorthand category '{name}'.", lineNum=lineNum)
             continue
         onoff = boolish(boolstring)
         if onoff is None:
-            die(
+            m.die(
                 f"Markup Shorthand metadata pieces are a shorthand category and a boolean. Got:\n{v}",
                 lineNum=lineNum,
             )
@@ -728,7 +725,7 @@ def parseInlineGithubIssues(key, val, lineNum):  # pylint: disable=unused-argume
         return val
     b = boolish(val)
     if b is None:
-        die(f"Inline Github Issues must be 'title', 'full' or a boolish value. Got: '{val}'", lineNum=lineNum)
+        m.die(f"Inline Github Issues must be 'title', 'full' or a boolish value. Got: '{val}'", lineNum=lineNum)
         return False
     if b is True:
         return "full"
@@ -741,10 +738,10 @@ def parseTextMacro(key, val, lineNum):  # pylint: disable=unused-argument
     try:
         name, text = val.lstrip().split(None, 1)
     except ValueError:
-        die(f"Text Macro lines must contain a macro name followed by the macro text. Got:\n{val}", lineNum=lineNum)
+        m.die(f"Text Macro lines must contain a macro name followed by the macro text. Got:\n{val}", lineNum=lineNum)
         return []
     if not re.match(r"[A-Z0-9-]+$", name):
-        die(f"Text Macro names must be all-caps and alphanumeric. Got '{name}'", lineNum=lineNum)
+        m.die(f"Text Macro names must be all-caps and alphanumeric. Got '{name}'", lineNum=lineNum)
         return []
     return [(name, text)]
 
@@ -762,7 +759,7 @@ def parseWorkStatus(key, val, lineNum):  # pylint: disable=unused-argument
         "rewriting",
         "abandoned",
     ):
-        die(
+        m.die(
             f"Work Status must be one of (completed, stable, testing, refining, revising, exploring, rewriting, abandoned). Got '{val}'. See http://fantasai.inkedblade.net/weblog/2011/inside-csswg/process for details.",
             lineNum=lineNum,
         )
@@ -776,20 +773,20 @@ def parseRepository(key, val, lineNum):  # pylint: disable=unused-argument
     val = val.strip()
     pieces = val.split(None, 1)
     if len(pieces) == 2:
-        return Repository(url=pieces[0], name=pieces[1])
+        return repository.Repository(url=pieces[0], name=pieces[1])
     if len(pieces) == 1:
         # Try to recognize a GitHub url
         match = re.match(r"https://github\.([\w.-]+)/([\w-]+)/([\w-]+)/?$", val)
         if match:
-            return GithubRepository(*match.groups())
+            return repository.GithubRepository(*match.groups())
         # If you just provide a user/repo pair, assume it's a github.com repo.
         # Will provide ways to opt into other repos when people care.
         match = re.match(r"([\w-]+)/([\w-]+)$", val)
         if match:
-            return GithubRepository("com", *match.groups())
+            return repository.GithubRepository("com", *match.groups())
         # Otherwise just use the url as the shortname
-        return Repository(url=val)
-    die(f"Repository must be a url, optionally followed by a shortname. Got '{val}'", lineNum=lineNum)
+        return repository.Repository(url=val)
+    m.die(f"Repository must be a url, optionally followed by a shortname. Got '{val}'", lineNum=lineNum)
     return config.Nil()
 
 
@@ -798,7 +795,7 @@ def parseTranslateIDs(key, val, lineNum):  # pylint: disable=unused-argument
     for v in val.split(","):
         pieces = v.strip().split()
         if len(pieces) != 2:
-            die(f"‘Translate IDs’ values must be an old ID followed by a new ID. Got '{v}'", lineNum=lineNum)
+            m.die(f"‘Translate IDs’ values must be an old ID followed by a new ID. Got '{v}'", lineNum=lineNum)
             continue
         old, new = pieces
         translations[old] = new
@@ -809,14 +806,14 @@ def parseTranslation(key, val, lineNum):  # pylint: disable=unused-argument
     # Format is <lang-code> <url> [ [ , name <name-in-spec-lang> ] || [ , native-name <name-in-the-lang> ] ]?
     pieces = val.split(",")
     if not (1 <= len(pieces) <= 3):
-        die(
+        m.die(
             f"Format of a Translation line is <lang-code> <url> [ [ , name <name-in-spec-lang> ] || [ , native-name <name-in-the-lang> ] ]?. Got:\n{val}",
             lineNum=lineNum,
         )
         return
     firstParts = pieces[0].split()
     if len(firstParts) != 2:
-        die(
+        m.die(
             f"First part of a Translation line must be a lang-code followed by a url. Got:\n{pieces[0]}",
             lineNum=lineNum,
         )
@@ -831,7 +828,7 @@ def parseTranslation(key, val, lineNum):  # pylint: disable=unused-argument
         elif k.lower() == "native-name":
             nativeName = v
         else:
-            die(
+            m.die(
                 f"Later parts of a Translation line must start with 'name' or 'native-name'. Got:\n{piece}",
                 lineNum=lineNum,
             )
@@ -842,7 +839,7 @@ def parseAudience(key, val, lineNum):  # pylint: disable=unused-argument
     # WG21 value
     values = [x.strip().upper() for x in val.strip().split(",")]
     if not values:
-        die("Audience metadata must have at least one value if specified.")
+        m.die("Audience metadata must have at least one value if specified.")
         return []
     if len(values) == 1 and values[0] == "ALL":
         return ["all"]
@@ -876,7 +873,7 @@ def parseAudience(key, val, lineNum):  # pylint: disable=unused-argument
             elif re.match(r"WG\d+|SG\d+", v):
                 ret.append(v)
             else:
-                die(f"Unknown 'Audience' value '{v}'.", lineNum=lineNum)
+                m.die(f"Unknown 'Audience' value '{v}'.", lineNum=lineNum)
                 continue
         return ret
 
@@ -885,7 +882,7 @@ def parseEditorTerm(key, val, lineNum):  # pylint: disable=unused-argument
     values = [x.strip() for x in val.strip().split(",")]
     if len(values) == 2:
         return {"singular": values[0], "plural": values[1]}
-    die(
+    m.die(
         f"Editor Term metadata must be two comma-separated terms, giving the singular and plural term for editors. Got '{val}'.",
         lineNum=lineNum,
     )
@@ -898,13 +895,13 @@ def parseMaxToCDepth(key, val, lineNum):  # pylint: disable=unused-argument
     try:
         v = int(val)
     except ValueError:
-        die(
+        m.die(
             f"Max ToC Depth metadata must be 'none' or an integer 1-5. Got '{val}'.",
             lineNum=lineNum,
         )
         return float("inf")
     if not (1 <= v <= 5):
-        die(
+        m.die(
             f"Max ToC Depth metadata must be 'none' or an integer 1-5. Got '{val}'.",
             lineNum=lineNum,
         )
@@ -921,7 +918,7 @@ def parseWptDisplay(key, val, lineNum):  # pylint: disable=unused-argument
     val = val.lower()
     if val in ("none", "inline", "open", "closed"):
         return val
-    die(
+    m.die(
         f"WPT Display metadata only accepts the values 'none', 'closed', 'open', or 'inline'. Got '{val}'.",
         lineNum=lineNum,
     )
@@ -978,7 +975,7 @@ def parse(lines):
                 md.addData(match.group(1), match.group(2), lineNum=line.i)
                 lastKey = match.group(1)
             else:
-                die(
+                m.die(
                     f"Incorrectly formatted metadata line:\n{line.text}",
                     lineNum=line.i,
                 )
@@ -1019,11 +1016,11 @@ def fromJson(data, source=""):
     except Exception as e:
         if data != "":
             if source == "computed-metadata":
-                die(
+                m.die(
                     f"Error loading computed-metadata JSON.\nCheck if you need to JSON-escape some characters in a text macro?\n{e}",
                 )
             else:
-                die(f"Error loading {source} JSON:\n{e}")
+                m.die(f"Error loading {source} JSON:\n{e}")
         return md
     for key, val in defaults.items():
         if isinstance(val, str):
@@ -1032,7 +1029,7 @@ def fromJson(data, source=""):
             for indivVal in val:
                 md.addData(key, indivVal)
         else:
-            die(f"JSON metadata values must be strings or arrays of strings. '{key}' is something else.")
+            m.die(f"JSON metadata values must be strings or arrays of strings. '{key}' is something else.")
             return md
     return md
 
@@ -1059,7 +1056,7 @@ def getSpecRepository(doc):
             for search_re in searches:
                 search = re.search(search_re, remotes)
                 if search:
-                    return GithubRepository(*search.groups())
+                    return repository.GithubRepository(*search.groups())
             return config.Nil()
         except subprocess.CalledProcessError:
             # check_output will throw CalledProcessError when not in a git repo
@@ -1070,23 +1067,23 @@ def getSpecRepository(doc):
 def parseDoc(doc):
     # Look through the doc for any additional metadata information that might be needed.
 
-    for el in findAll(".replace-with-note-class", doc):
-        removeClass(el, "replace-with-note-class")
-        addClass(el, doc.md.noteClass)
-    for el in findAll(".replace-with-issue-class", doc):
-        removeClass(el, "replace-with-issue-class")
-        addClass(el, doc.md.issueClass)
-    for el in findAll(".replace-with-assertion-class", doc):
-        removeClass(el, "replace-with-assertion-class")
-        addClass(el, doc.md.assertionClass)
-    for el in findAll(".replace-with-advisement-class", doc):
-        removeClass(el, "replace-with-advisement-class")
-        addClass(el, doc.md.advisementClass)
+    for el in h.findAll(".replace-with-note-class", doc):
+        h.removeClass(el, "replace-with-note-class")
+        h.addClass(el, doc.md.noteClass)
+    for el in h.findAll(".replace-with-issue-class", doc):
+        h.removeClass(el, "replace-with-issue-class")
+        h.addClass(el, doc.md.issueClass)
+    for el in h.findAll(".replace-with-assertion-class", doc):
+        h.removeClass(el, "replace-with-assertion-class")
+        h.addClass(el, doc.md.assertionClass)
+    for el in h.findAll(".replace-with-advisement-class", doc):
+        h.removeClass(el, "replace-with-advisement-class")
+        h.addClass(el, doc.md.advisementClass)
 
     if (
         "feedback-header" in doc.md.boilerplate
         and "issues-index" in doc.md.boilerplate
-        and find("." + doc.md.issueClass, doc) is not None
+        and h.find("." + doc.md.issueClass, doc) is not None
     ):
         # There's at least one inline issue.
         doc.md.issues.append(("Inline In Spec", "#issues-index"))

@@ -1,5 +1,4 @@
-from ..h import *
-from ..messages import *
+from .. import h, messages as m
 
 
 def missingExposed(doc):
@@ -27,7 +26,7 @@ def missingExposed(doc):
                     good = True
                     break
             if not good:
-                warn(
+                m.warn(
                     f"The '{construct.name}' namespace is missing an [Exposed] extended attribute. Does it need [Exposed=Window], or something more?"
                 )
         elif construct.idl_type == "interface":
@@ -40,11 +39,11 @@ def missingExposed(doc):
                     good = True
                     break
             if not good:
-                warn(
+                m.warn(
                     f"The '{construct.name}' interface is missing an [Exposed] extended attribute. Does it need [Exposed=Window], or something more?"
                 )
         elif construct.idl_type == "callback":
-            if not hasattr(construct, "interface"):
+            if not h.hasAttr(construct, "interface"):
                 # Just a callback function, it's fine
                 continue
             for _ in construct.interface.members:

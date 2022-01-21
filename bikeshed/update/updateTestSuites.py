@@ -4,7 +4,7 @@ import os
 import certifi
 from json_home_client import Client as APIClient
 
-from ..messages import *
+from .. import messages as m
 
 testSuiteDataContentTypes = [
     "application/json",
@@ -14,7 +14,7 @@ testSuiteDataContentTypes = [
 
 def update(path, dryRun=False):
     try:
-        say("Downloading test suite data...")
+        m.say("Downloading test suite data...")
         shepherd = APIClient(
             "https://api.csswg.org/shepherd/",
             version="vnd.csswg.shepherd.v1",
@@ -22,14 +22,14 @@ def update(path, dryRun=False):
         )
         res = shepherd.get("test_suites")
         if (not res) or (res.status_code == 406):
-            die("This version of the test suite API is no longer supported. Please update Bikeshed.")
+            m.die("This version of the test suite API is no longer supported. Please update Bikeshed.")
             return
         if res.content_type not in testSuiteDataContentTypes:
-            die(f"Unrecognized test suite content-type '{res.content_type}'.")
+            m.die(f"Unrecognized test suite content-type '{res.content_type}'.")
             return
         rawTestSuiteData = res.data
     except Exception as e:
-        die(f"Couldn't download test suite data.  Error was:\n{e}")
+        m.die(f"Couldn't download test suite data.  Error was:\n{e}")
         return
 
     testSuites = dict()
@@ -53,5 +53,5 @@ def update(path, dryRun=False):
             with open(os.path.join(path, "test-suites.json"), "w", encoding="utf-8") as f:
                 f.write(json.dumps(testSuites, ensure_ascii=False, indent=2, sort_keys=True))
         except Exception as e:
-            die(f"Couldn't save test-suite database to disk.\n{e}")
-    say("Success!")
+            m.die(f"Couldn't save test-suite database to disk.\n{e}")
+    m.say("Success!")

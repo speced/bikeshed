@@ -1,12 +1,11 @@
 import re
-from itertools import *
+import sys
+import itertools
 
 if __name__ == "__main__":
-    from bikeshed import config
-    from bikeshed.messages import *
+    from bikeshed import config, messages as m
 else:
-    from . import config
-    from .messages import *
+    from . import config, messages as m
 
 
 class Font:
@@ -66,7 +65,7 @@ class Font:
             with open(fontfilename, encoding="utf-8") as fh:
                 lines = fh.readlines()
         except Exception as e:
-            die(f"Couldn't find font file “{fontfilename}”:\n{e}")
+            m.die(f"Couldn't find font file “{fontfilename}”:\n{e}")
         self.metadata, lines = parseMetadata(lines)
         self.characters = parseCharacters(self.metadata, lines)
 
@@ -79,7 +78,7 @@ class Font:
                         output[i] += " "
                     output[i] += line
             else:
-                die(f"The character “{letter}” doesn't appear in the specified font.")
+                m.die(f"The character “{letter}” doesn't appear in the specified font.")
         output = [line + "\n" for line in output]
         return output
 
@@ -101,7 +100,7 @@ def parseMetadata(lines):
         if key in nameMapping:
             key = nameMapping[key]
         else:
-            die(f"Unrecognized font metadata “{key}”")
+            m.die(f"Unrecognized font metadata “{key}”")
         if key in valProcessors:
             val = valProcessors[key](val)
         md[key] = val
@@ -153,7 +152,7 @@ def grouper(iterable, n, fillvalue=None):
     "Collect data into fixed-length chunks or blocks"
     # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx
     args = [iter(iterable)] * n
-    return (list(x) for x in zip_longest(fillvalue=fillvalue, *args))
+    return (list(x) for x in itertools.zip_longest(fillvalue=fillvalue, *args))
 
 
 def getInputLines(inputFilename):
@@ -176,10 +175,10 @@ def getInputLines(inputFilename):
             with open(inputFilename, encoding="utf-8") as fh:
                 lines = fh.readlines()
     except FileNotFoundError:
-        die(f"Couldn't find the input file at the specified location '{inputFilename}'.")
+        m.die(f"Couldn't find the input file at the specified location '{inputFilename}'.")
         return []
     except OSError:
-        die(f"Couldn't open the input file '{inputFilename}'.")
+        m.die(f"Couldn't open the input file '{inputFilename}'.")
         return []
     return lines, inputFilename
 
@@ -194,7 +193,7 @@ def writeOutputLines(outputFilename, inputFilename, lines):
             with open(outputFilename, "w", encoding="utf-8") as f:
                 f.write("".join(lines))
     except Exception as e:
-        die(f"Something prevented me from saving the output document to {outputFilename}:\n{e}")
+        m.die(f"Something prevented me from saving the output document to {outputFilename}:\n{e}")
 
 
 if __name__ == "__main__":

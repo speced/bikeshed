@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import os
+import sys
 import time
 from datetime import datetime
 
@@ -10,7 +11,7 @@ import requests
 import tenacity
 from result import Err, Ok
 
-from ..messages import *
+from .. import messages as m
 
 # Manifest creation relies on these data structures.
 # Add to them whenever new types of data files are created.
@@ -104,61 +105,61 @@ def updateByManifest(path, dryRun=False):
     Returns False if updating failed and a full update should be performed;
     returns True if updating was a success.
     """
-    say("Updating via manifest...")
+    m.say("Updating via manifest...")
 
-    say("Gathering local manifest data...")
+    m.say("Gathering local manifest data...")
     # Get the last-update time from the local manifest
     try:
         with open(os.path.join(path, "manifest.txt"), encoding="utf-8") as fh:
             localDt = dtFromManifest(fh.readlines())
     except Exception as e:
         localDt = "error"
-        warn(f"Couldn't find local manifest file.\n{e}")
+        m.warn(f"Couldn't find local manifest file.\n{e}")
 
     # Get the actual file data by regenerating the local manifest,
     # to guard against mistakes or shenanigans
     localManifest = createManifest(path, dryRun=True).split("\n")
     localFiles = dictFromManifest(localManifest)
 
-    say("Fetching remote manifest data...")
+    m.say("Fetching remote manifest data...")
     try:
         remoteManifest = requests.get(ghPrefix + "manifest.txt").text.splitlines()
         remoteDt = dtFromManifest(remoteManifest)
         remoteFiles = dictFromManifest(remoteManifest)
     except Exception as e:
-        warn(
+        m.warn(
             f"Couldn't download remote manifest file, so can't update. Please report this!\n{e}",
         )
-        warn("Update manually with `bikeshed update --skip-manifest`.")
+        m.warn("Update manually with `bikeshed update --skip-manifest`.")
         return False
 
     if remoteDt is None:
-        die("Something's gone wrong with the remote data; I can't read its timestamp. Please report this!")
+        m.die("Something's gone wrong with the remote data; I can't read its timestamp. Please report this!")
         return
 
     if localDt == "error":
         # A previous update run didn't complete successfully,
         # so I definitely need to try again.
-        warn("Previous update had some download errors, so re-running...")
+        m.warn("Previous update had some download errors, so re-running...")
     elif localDt is not None:
         if (remoteDt - datetime.utcnow()).days >= 2:
-            warn(
+            m.warn(
                 "Remote data is more than two days old; the update process has probably fallen over. Please report this!"
             )
         if localDt == remoteDt and localDt != 0:
-            say(f"Local data is already up-to-date with remote ({localDt.strftime('%Y-%m-%d %H:%M:%S')})")
+            m.say(f"Local data is already up-to-date with remote ({localDt.strftime('%Y-%m-%d %H:%M:%S')})")
             return True
         elif localDt > remoteDt:
             # No need to update, local data is more recent.
-            say(
+            m.say(
                 f"Local data is fresher ({localDt.strftime('%Y-%m-%d %H:%M:%S')}) than remote ({remoteDt.strftime('%Y-%m-%d %H:%M:%S')}), so nothing to update.",
             )
             return True
 
     if len(localFiles) == 0:
-        say("The local manifest is borked or missing; re-downloading everything...")
+        m.say("The local manifest is borked or missing; re-downloading everything...")
     if len(remoteFiles) == 0:
-        die("The remote data doesn't have any data in it. Please report this!")
+        m.die("The remote data doesn't have any data in it. Please report this!")
         return
     newPaths = []
     for filePath, hash in remoteFiles.items():
@@ -176,24 +177,24 @@ def updateByManifest(path, dryRun=False):
     newManifest = None
     if not dryRun:
         if newPaths:
-            say(f"Updating {len(newPaths)} file{'s' if len(newPaths) > 1 else ''}...")
+            m.say(f"Updating {len(newPaths)} file{'s' if len(newPaths) > 1 else ''}...")
         goodPaths, badPaths = asyncio.run(updateFiles(path, newPaths))
         newManifest = createFinishedManifest(remoteManifest, goodPaths, badPaths)
         try:
             with open(os.path.join(path, "manifest.txt"), "w", encoding="utf-8") as fh:
                 fh.write(newManifest)
         except Exception as e:
-            warn(f"Couldn't save new manifest file.\n{e}")
+            m.warn(f"Couldn't save new manifest file.\n{e}")
             return False
     if newManifest is None:
         newManifest = createManifest(path, dryRun=True)
 
     if not badPaths:
-        say("Done!")
+        m.say("Done!")
         return newManifest
     else:
         phrase = f"were {len(badPaths)} errors" if len(badPaths) > 1 else "was 1 error"
-        die(
+        m.die(
             f"Done, but there {phrase} (of {len(newPaths)} total) in downloading or saving. Run `bikeshed update` again to retry."
         )
         return newManifest
@@ -219,9 +220,9 @@ async def updateFiles(localPrefix, newPaths):
             currFileTime = time.time()
             if (currFileTime - lastMsgTime) >= messageDelta:
                 if not badPaths:
-                    say(f"Updated {len(goodPaths)}/{len(newPaths)}...")
+                    m.say(f"Updated {len(goodPaths)}/{len(newPaths)}...")
                 else:
-                    say(f"Updated {len(goodPaths)}/{len(newPaths)}, {len(badPaths)} errors...")
+                    m.say(f"Updated {len(goodPaths)}/{len(newPaths)}, {len(badPaths)} errors...")
                 lastMsgTime = currFileTime
     return goodPaths, badPaths
 
@@ -233,7 +234,7 @@ async def updateFile(localPrefix, filePath, session):
     if res.is_ok():
         res = await saveFile(localPath, res.ok())
     else:
-        warn(f"Error downloading {filePath}, full error was:\n{await errorFromAsyncErr(res)}")
+        m.warn(f"Error downloading {filePath}, full error was:\n{await errorFromAsyncErr(res)}")
     if res.is_err():
         res = Err(filePath)
     return res

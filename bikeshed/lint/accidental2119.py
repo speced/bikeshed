@@ -1,7 +1,6 @@
 import re
 
-from ..h import *
-from ..messages import *
+from .. import h, messages as m
 
 
 def accidental2119(doc):
@@ -16,10 +15,10 @@ def accidental2119(doc):
     keywords = r"\b(may|must|should|shall|optional|recommended|required)\b"
 
     def searchFor2119(el):
-        if isNormative(el, doc):
+        if h.isNormative(el, doc):
             # 2119 is fine, just look at children
             pass
-        elif hasClass(el, "allow-2119"):
+        elif h.hasClass(el, "allow-2119"):
             # Override 2119 detection on this element's text specifically,
             # so you can use the keywords in examples *describing* the keywords.
             pass
@@ -27,7 +26,7 @@ def accidental2119(doc):
             if el.text is not None:
                 match = re.search(keywords, el.text)
                 if match:
-                    warn(
+                    m.warn(
                         f"RFC2119 keyword in non-normative section (use: might, can, has to, or override with <span class=allow-2119>): {el.text}",
                         el=el,
                     )
@@ -35,7 +34,7 @@ def accidental2119(doc):
                 if child.tail is not None:
                     match = re.search(keywords, child.tail)
                     if match:
-                        warn(
+                        m.warn(
                             f"RFC2119 keyword in non-normative section (use: might, can, has to, or override with <span class=allow-2119>): {child.tail}",
                             el=el,
                         )

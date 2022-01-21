@@ -1,5 +1,5 @@
+from . import h
 from .DefaultOrderedDict import DefaultOrderedDict
-from .h import *
 
 
 def addDfnPanels(doc, dfns):
@@ -7,7 +7,7 @@ def addDfnPanels(doc, dfns):
     atLeastOnePanel = False
     # Gather all the <a href>s together
     allRefs = DefaultOrderedDict(list)
-    for a in findAll("a", doc):
+    for a in h.findAll("a", doc):
         href = a.get("href")
         if href is None:
             continue
@@ -21,54 +21,54 @@ def addDfnPanels(doc, dfns):
             continue
         refs = DefaultOrderedDict(list)
         for link in allRefs[id]:
-            section = sectionName(link)
+            section = h.sectionName(link)
             if section is not None:
                 refs[section].append(link)
         if not refs:
             # Just insert a self-link instead
             # unless it already has a self-link, of course
-            if find(".self-link", dfn) is None:
-                appendChild(dfn, E.a({"href": "#" + escapeUrlFrag(id), "class": "self-link"}))
+            if h.find(".self-link", dfn) is None:
+                h.appendChild(dfn, h.E.a({"href": "#" + h.escapeUrlFrag(id), "class": "self-link"}))
             continue
-        addClass(dfn, "dfn-paneled")
+        h.addClass(dfn, "dfn-paneled")
         atLeastOnePanel = True
-        panel = E.aside(
+        panel = h.E.aside(
             {"class": "dfn-panel", "data-for": id},
-            E.b(E.a({"href": "#" + escapeUrlFrag(id)}, "#" + id)),
-            E.b("Referenced in:"),
+            h.E.b(h.E.a({"href": "#" + h.escapeUrlFrag(id)}, "#" + id)),
+            h.E.b("Referenced in:"),
         )
-        ul = appendChild(panel, E.ul())
+        ul = h.appendChild(panel, h.E.ul())
         for text, els in refs.items():
-            li = appendChild(ul, E.li())
+            li = h.appendChild(ul, h.E.li())
             for i, el in enumerate(els):
                 refID = el.get("id")
                 if refID is None:
                     refID = f"ref-for-{id}"
-                    el.set("id", safeID(doc, refID))
+                    el.set("id", h.safeID(doc, refID))
                 if i == 0:
-                    appendChild(
+                    h.appendChild(
                         li,
-                        E.a(
+                        h.E.a(
                             {
-                                "href": "#" + escapeUrlFrag(refID),
+                                "href": "#" + h.escapeUrlFrag(refID),
                                 "data-silently-dedup": "",
                             },
                             text,
                         ),
                     )
                 else:
-                    appendChild(
+                    h.appendChild(
                         li,
                         " ",
-                        E.a(
+                        h.E.a(
                             {
-                                "href": "#" + escapeUrlFrag(refID),
+                                "href": "#" + h.escapeUrlFrag(refID),
                                 "data-silently-dedup": "",
                             },
                             "(" + str(i + 1) + ")",
                         ),
                     )
-        appendChild(doc.body, panel)
+        h.appendChild(doc.body, panel)
     if atLeastOnePanel:
         doc.extraScripts["script-dfn-panel"] = dfnPanelScript
         doc.extraStyles["style-dfn-panel"] = dfnPanelStyle
@@ -79,52 +79,52 @@ def addExternalDfnPanel(termEl, ref, elsFromHref, doc):
     # Gather all the <a href>s together
     refs = DefaultOrderedDict(list)
     for el in elsFromHref[ref.url]:
-        section = sectionName(el) or "Unnumbered Section"
+        section = h.sectionName(el) or "Unnumbered Section"
         refs[section].append(el)
     if len(refs) > 0:
-        addClass(termEl, "dfn-paneled")
+        h.addClass(termEl, "dfn-paneled")
         _, _, refID = ref.url.partition("#")
         termID = f"term-for-{refID}"
         termEl.set("id", termID)
         termEl.set("data-silently-dedup", "")
-        panel = E.aside(
+        panel = h.E.aside(
             {"class": "dfn-panel", "data-for": termID},
-            E.a({"href": ref.url}, ref.url),
-            E.b("Referenced in:"),
+            h.E.a({"href": ref.url}, ref.url),
+            h.E.b("Referenced in:"),
         )
-        ul = appendChild(panel, E.ul())
+        ul = h.appendChild(panel, h.E.ul())
         for text, els in refs.items():
-            li = appendChild(ul, E.li())
+            li = h.appendChild(ul, h.E.li())
             for i, el in enumerate(els):
                 linkID = el.get("id")
                 if linkID is None:
                     linkID = f"termref-for-{refID}"
-                    el.set("id", safeID(doc, linkID))
+                    el.set("id", h.safeID(doc, linkID))
                     el.set("data-silently-dedup", "")
                 if i == 0:
-                    appendChild(
+                    h.appendChild(
                         li,
-                        E.a(
+                        h.E.a(
                             {
-                                "href": "#" + escapeUrlFrag(linkID),
+                                "href": "#" + h.escapeUrlFrag(linkID),
                                 "data-silently-dedup": "",
                             },
                             text,
                         ),
                     )
                 else:
-                    appendChild(
+                    h.appendChild(
                         li,
                         " ",
-                        E.a(
+                        h.E.a(
                             {
-                                "href": "#" + escapeUrlFrag(linkID),
+                                "href": "#" + h.escapeUrlFrag(linkID),
                                 "data-silently-dedup": "",
                             },
                             "(" + str(i + 1) + ")",
                         ),
                     )
-        appendChild(doc.body, panel)
+        h.appendChild(doc.body, panel)
 
 
 def addExternalDfnPanelStyles(doc):

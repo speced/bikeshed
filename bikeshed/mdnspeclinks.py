@@ -1,8 +1,7 @@
 import json
 from collections import OrderedDict
 
-from .h import *  # noqa
-from .messages import *
+from . import h, messages as m
 
 
 def addMdnPanels(doc):
@@ -21,12 +20,12 @@ def addMdnPanels(doc):
                 # if "maybe", failure is fine, don't complain
                 pass
             else:
-                die(f"Couldn't find the MDN data for '{doc.md.vshortname}' nor '{doc.md.shortname}'.")
+                m.die(f"Couldn't find the MDN data for '{doc.md.vshortname}' nor '{doc.md.shortname}'.")
             return
     try:
         data = json.loads(datafile, object_pairs_hook=OrderedDict)
     except Exception as e:
-        die(f"Couldn't load MDN Spec Links data for this spec.\n{e}")
+        m.die(f"Couldn't load MDN Spec Links data for this spec.\n{e}")
         return
 
     panels = panelsFromData(doc, data)
@@ -100,7 +99,7 @@ def addMdnPanels(doc):
 
 
 def createAnno(className, mdnButton, featureDivs):
-    return E.div({"class": className}, mdnButton, featureDivs)
+    return h.E.div({"class": className}, mdnButton, featureDivs)
 
 
 def panelsFromData(doc, data):
@@ -144,9 +143,9 @@ def panelsFromData(doc, data):
         onlyTwoEngines = 0
         allEngines = 0
         featureDivs = []
-        targetElement = find(f"[id='{elementId}']", doc)
+        targetElement = h.find(f"[id='{elementId}']", doc)
         if targetElement is None:
-            warn(f"No '{elementId}' ID found, skipping MDN features that would target it.")
+            m.warn(f"No '{elementId}' ID found, skipping MDN features that would target it.")
             continue
 
         panels = True
@@ -195,11 +194,11 @@ def panelsFromData(doc, data):
                 )
             )
 
-        mdnButton = E.button({"class": "mdn-anno-btn"})
+        mdnButton = h.E.button({"class": "mdn-anno-btn"})
         if lessThanTwoEngines > 0:
-            appendChild(
+            h.appendChild(
                 mdnButton,
-                E.b(
+                h.E.b(
                     {
                         "class": "less-than-two-engines-flag",
                         "title": "This feature is in less than two current engines.",
@@ -208,9 +207,9 @@ def panelsFromData(doc, data):
                 ),
             )
         elif allEngines > 0 and lessThanTwoEngines == 0 and onlyTwoEngines == 0:
-            appendChild(
+            h.appendChild(
                 mdnButton,
-                E.b(
+                h.E.b(
                     {
                         "class": "all-engines-flag",
                         "title": "This feature is in all current engines.",
@@ -218,42 +217,42 @@ def panelsFromData(doc, data):
                     "\u2714",
                 ),
             )
-        appendChild(mdnButton, E.span("MDN"))
+        h.appendChild(mdnButton, h.E.span("MDN"))
 
         className = "mdn-anno wrapped"
         if isAnnoForListItemOrTableContent:
-            if targetElement.getchildren() and hasClass(targetElement.getchildren()[0], "mdn-anno"):
+            if targetElement.getchildren() and h.hasClass(targetElement.getchildren()[0], "mdn-anno"):
                 # If there's already an annotation at the point where we want
                 # this, just re-use it (instead of creating another one).
-                appendChild(targetElement.getchildren()[0], featureDivs)
+                h.appendChild(targetElement.getchildren()[0], featureDivs)
             else:
                 # For elements we're annotating inside a dt, dd, li, or td, we
                 # prepend the annotation to the dt, dd, li, or td — because in
                 # cases where we have a long table or list, all the annotations
                 # for everything in it otherwise ends up being merged into a
                 # single annotation way up at the top of the table or list.
-                prependChild(targetElement, createAnno(className, mdnButton, featureDivs))
+                h.prependChild(targetElement, createAnno(className, mdnButton, featureDivs))
         elif isAnnoForHeadingContent:
             className = "mdn-anno wrapped after"
             if targetElement.getnext() is not None and targetElement.getnext().get("class") == className:
                 # If there's already an annotation at the point where we want
                 # this, just re-use it (instead of creating another one).
-                appendChild(targetElement.getnext(), featureDivs)
+                h.appendChild(targetElement.getnext(), featureDivs)
             else:
                 # For elements we're annotating inside an h1-h6 heading, we
                 # insert the annotation as the next sibling of the heading.
-                insertAfter(targetElement, createAnno(className, mdnButton, featureDivs))
+                h.insertAfter(targetElement, createAnno(className, mdnButton, featureDivs))
         else:
             if targetElement.getprevious() is not None and targetElement.getprevious().get("class") == className:
                 # If there's already an annotation at the point where we want
                 # this, just re-use it (instead of creating another one) —
                 # unless it's a class=after annotation (following a heading).
-                appendChild(targetElement.getprevious(), featureDivs)
+                h.appendChild(targetElement.getprevious(), featureDivs)
             else:
                 # For elements we're annotating that aren't inside a table or
                 # list or heading, we insert the annotation as the previous
                 # sibling of whatever block-level element holds the element.
-                insertBefore(targetElement, createAnno(className, mdnButton, featureDivs))
+                h.insertBefore(targetElement, createAnno(className, mdnButton, featureDivs))
     return panels
 
 
@@ -326,7 +325,7 @@ def addSupportRow(browserCodeName, nameFromCodeName, support, supportData):
             else:
                 minVersion = "None"
     browserFullName = nameFromCodeName[browserCodeName]
-    appendChild(
+    h.appendChild(
         supportData,
         browserCompatSpan(browserCodeName, browserFullName, statusCode, minVersion, needsFlag),
     )
@@ -341,40 +340,40 @@ def mdnPanelFor(
     browsersWithRetiredEngines,
     browsersForMobileDevices,
 ):
-    featureDiv = E.div({"class": "feature"})
+    featureDiv = h.E.div({"class": "feature"})
     if "slug" in feature:
         slug = feature["slug"]
         displaySlug = slug.split("/", 1)[1]
         title = feature.get("summary", "")
         mdnURL = mdnBaseUrl + slug
-        appendChild(featureDiv, E.p({}, E.a({"href": mdnURL, "title": title}, displaySlug)))
+        h.appendChild(featureDiv, h.E.p({}, h.E.a({"href": mdnURL, "title": title}, displaySlug)))
     if "engines" in feature:
         engines = len(feature["engines"])
         enginesPara = None
         if engines == 0:
-            enginesPara = E.p({"class": "less-than-two-engines-text"}, "In no current engines.")
+            enginesPara = h.E.p({"class": "less-than-two-engines-text"}, "In no current engines.")
         elif engines == 1:
-            enginesPara = E.p({"class": "less-than-two-engines-text"}, "In only one current engine.")
+            enginesPara = h.E.p({"class": "less-than-two-engines-text"}, "In only one current engine.")
         elif engines >= len(browsersProvidingCurrentEngines):
-            enginesPara = E.p({"class": "all-engines-text"}, "In all current engines.")
+            enginesPara = h.E.p({"class": "all-engines-text"}, "In all current engines.")
         if enginesPara is not None:
-            appendChild(featureDiv, enginesPara)
-    supportData = E.div({"class": "support"})
-    appendChild(featureDiv, supportData)
+            h.appendChild(featureDiv, enginesPara)
+    supportData = h.E.div({"class": "support"})
+    h.appendChild(featureDiv, supportData)
     support = feature["support"]
     for browserCodeName in browsersProvidingCurrentEngines:
         addSupportRow(browserCodeName, nameFromCodeName, support, supportData)
-    appendChild(supportData, E.hr())
+    h.appendChild(supportData, h.E.hr())
     for browserCodeName in browsersWithBorrowedEngines:
         addSupportRow(browserCodeName, nameFromCodeName, support, supportData)
-    appendChild(supportData, E.hr())
+    h.appendChild(supportData, h.E.hr())
     for browserCodeName in browsersWithRetiredEngines:
         addSupportRow(browserCodeName, nameFromCodeName, support, supportData)
-    appendChild(supportData, E.hr())
+    h.appendChild(supportData, h.E.hr())
     for browserCodeName in browsersForMobileDevices:
         addSupportRow(browserCodeName, nameFromCodeName, support, supportData)
     if "nodejs" in support:
-        appendChild(supportData, E.hr())
+        h.appendChild(supportData, h.E.hr())
         addSupportRow("nodejs", nameFromCodeName, support, supportData)
     return featureDiv
 
@@ -388,7 +387,7 @@ def browserCompatSpan(browserCodeName, browserFullName, statusCode, minVersion, 
         flagSymbol = "\U0001f530 "
         minVersionAttributes["title"] = "Requires setting a user preference or runtime flag."
     statusClass = {"y": "yes", "n": "no"}[statusCode]
-    outer = E.span({"class": browserCodeName + " " + statusClass})
-    appendChild(outer, E.span({}, browserFullName))
-    appendChild(outer, E.span(minVersionAttributes, flagSymbol + minVersion))
+    outer = h.E.span({"class": browserCodeName + " " + statusClass})
+    h.appendChild(outer, h.E.span({}, browserFullName))
+    h.appendChild(outer, h.E.span(minVersionAttributes, flagSymbol + minVersion))
     return outer

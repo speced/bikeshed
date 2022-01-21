@@ -1,8 +1,6 @@
 import re
 
-from .. import config
-from ..h import *
-from ..messages import *
+from .. import config, h, messages as m
 
 
 def transformProductionPlaceholders(doc):
@@ -23,10 +21,10 @@ def transformProductionPlaceholders(doc):
         """,
         re.X,
     )
-    for el in findAll("fake-production-placeholder", doc):
+    for el in h.findAll("fake-production-placeholder", doc):
         addLineNumber(el)
-        text = textContent(el)
-        clearContents(el)
+        text = h.textContent(el)
+        h.clearContents(el)
         match = propdescRe.match(text)
         if match:
             linkFor, lt, linkType = match.groups()
@@ -40,7 +38,7 @@ def transformProductionPlaceholders(doc):
             elif linkType in ("property", "descriptor"):
                 pass
             else:
-                die(
+                m.die(
                     f"Shorthand <<{match.group(0)}>> gives type as '{match.group(3)}', but only 'property' and 'descriptor' are allowed.",
                     el=el,
                 )
@@ -84,10 +82,10 @@ def transformProductionPlaceholders(doc):
                 rangeStart = formatValue(rangeStart)
                 rangeEnd = formatValue(rangeEnd)
                 if rangeStart is None or rangeEnd is None:
-                    die(f"Shorthand <<{text}>> has an invalid range.", el=el)
+                    m.die(f"Shorthand <<{text}>> has an invalid range.", el=el)
                 try:
                     if not correctlyOrderedRange(rangeStart, rangeEnd):
-                        die(
+                        m.die(
                             f"Shorthand <<{text}>> has a range whose start is not less than its end.",
                             el=el,
                         )
@@ -98,7 +96,7 @@ def transformProductionPlaceholders(doc):
                 el.set("data-lt", f"<{term}>")
             el.text = f"<{interior}>"
             continue
-        die(f"Shorthand <<{text}>> does not match any recognized shorthand grammar.", el=el)
+        m.die(f"Shorthand <<{text}>> does not match any recognized shorthand grammar.", el=el)
         el.tag = "span"
         el.text = el.get("bs-autolink-syntax")
         continue
@@ -144,10 +142,10 @@ def numFromRangeVal(val):
 def transformMaybePlaceholders(doc):
     propRe = re.compile(r"^([\w-]+): .+")
     valRe = re.compile(r"^(?:(\S*)/)?(\S[^!]*)(?:!!([\w-]+))?$")
-    for el in findAll("fake-maybe-placeholder", doc):
+    for el in h.findAll("fake-maybe-placeholder", doc):
         addLineNumber(el)
-        text = textContent(el)
-        clearContents(el)
+        text = h.textContent(el)
+        h.clearContents(el)
         match = propRe.match(text)
         if match:
             el.tag = "a"
@@ -163,7 +161,7 @@ def transformMaybePlaceholders(doc):
             elif match.group(3) in config.maybeTypes:
                 linkType = match.group(3)
             else:
-                die(
+                m.die(
                     f"Shorthand ''{match.group(0)}'' gives type as '{match.group(3)}', but only “maybe” types are allowed.",
                     el=el,
                 )
@@ -187,18 +185,18 @@ def transformAutolinkShortcuts(doc):
     addedNodes = []
 
     def transformElement(parentEl):
-        processContents = isElement(parentEl) and not doc.isOpaqueElement(parentEl)
+        processContents = h.isElement(parentEl) and not doc.isOpaqueElement(parentEl)
         if not processContents:
             return
-        children = childNodes(parentEl, clear=True)
+        children = h.childNodes(parentEl, clear=True)
         newChildren = []
         for el in children:
             if isinstance(el, str):
                 newChildren.extend(transformText(el))
-            elif isElement(el):
+            elif h.isElement(el):
                 transformElement(el)
                 newChildren.append(el)
-        appendChild(parentEl, *newChildren)
+        h.appendChild(parentEl, *newChildren)
 
     def transformText(text):
         nodes = [text]
@@ -222,17 +220,17 @@ def transformAutolinkShortcuts(doc):
             config.processTextNodes(nodes, emRe, emReplacer)
             config.processTextNodes(nodes, escapedRe, escapedReplacer)
         for node in nodes:
-            if isElement(node):
+            if h.isElement(node):
                 addedNodes.append(node)
         return nodes
 
     transformElement(doc.document.getroot())
     for node in addedNodes:
-        if isElement(node):
+        if h.isElement(node):
             addLineNumber(node)
 
-    for el in findAll("var", doc):
-        fixSurroundingTypography(el)
+    for el in h.findAll("var", doc):
+        h.fixSurroundingTypography(el)
 
 
 def transformShorthandElements(doc):
@@ -246,24 +244,24 @@ def transformShorthandElements(doc):
         match = reg.match(text)
         if match:
             result = rep(match)
-            replaceNode(el, result)
+            h.replaceNode(el, result)
             if result.tag == "a":
                 attrTarget = result
             else:
-                attrTarget = find("a", result)
+                attrTarget = h.find("a", result)
             for k, v in el.attrib.items():
                 attrTarget.set(k, v)
             return True
         return False
 
-    for el in findAll("l", doc):
+    for el in h.findAll("l", doc):
         # Autolinks that aren't HTML-parsing-compatible
         # are already specially handled by fixAwkwardCSSShorthands().
-        child = hasOnlyChild(el)
+        child = h.hasOnlyChild(el)
         if child is not None and child.get("bs-autolink-syntax") is not None:
             continue
 
-        text = textContent(el)
+        text = h.textContent(el)
         if replacer(propdescRe, propdescReplacer, el, text):
             continue
         if replacer(dfnRe, dfnReplacer, el, text):
@@ -278,7 +276,7 @@ def transformShorthandElements(doc):
             continue
         if replacer(varRe, varReplacer, el, text):
             continue
-        die(f"<l> element doesn't contain a recognized autolinking syntax:\n{outerHTML(el)}", el=el)
+        m.die(f"<l> element doesn't contain a recognized autolinking syntax:\n{h.outerHTML(el)}", el=el)
         el.tag = "span"
 
 
@@ -290,23 +288,23 @@ def transformProductionGrammars(doc):
     hashMultRe = re.compile(r"#{\s*\d+(\s*,(\s*\d+)?)?\s*}")
 
     def hashMultReplacer(match):
-        return E.a({"data-link-type": "grammar", "data-lt": "#", "for": ""}, match.group(0))
+        return h.E.a({"data-link-type": "grammar", "data-lt": "#", "for": ""}, match.group(0))
 
     multRe = re.compile(r"{\s*\d+\s*}")
 
     def multReplacer(match):
-        return E.a({"data-link-type": "grammar", "data-lt": "{A}", "for": ""}, match.group(0))
+        return h.E.a({"data-link-type": "grammar", "data-lt": "{A}", "for": ""}, match.group(0))
 
     multRangeRe = re.compile(r"{\s*\d+\s*,(\s*\d+)?\s*}")
 
     def multRangeReplacer(match):
-        return E.a({"data-link-type": "grammar", "data-lt": "{A,B}", "for": ""}, match.group(0))
+        return h.E.a({"data-link-type": "grammar", "data-lt": "{A,B}", "for": ""}, match.group(0))
 
     simpleRe = re.compile(r"(\?|!|#|\*|\+|\|\||\||&amp;&amp;|&&|,)(?!')")
     # Note the negative-lookahead, to avoid matching delim tokens.
 
     def simpleReplacer(match):
-        return E.a(
+        return h.E.a(
             {"data-link-type": "grammar", "data-lt": match.group(0), "for": ""},
             match.group(0),
         )
@@ -314,17 +312,17 @@ def transformProductionGrammars(doc):
     addedNodes = []
 
     def transformElement(parentEl):
-        children = childNodes(parentEl, clear=True)
+        children = h.childNodes(parentEl, clear=True)
         newChildren = []
         for el in children:
             if isinstance(el, str):
                 newChildren.extend(transformText(el))
-            elif isElement(el):
+            elif h.isElement(el):
                 if el.tag != "a":
                     # Transforms all add links, which aren't allowed in <a>...
                     transformElement(el)
                 newChildren.append(el)
-        appendChild(parentEl, *newChildren)
+        h.appendChild(parentEl, *newChildren)
 
     def transformText(text):
         nodes = [text]
@@ -333,15 +331,15 @@ def transformProductionGrammars(doc):
         config.processTextNodes(nodes, multRangeRe, multRangeReplacer)
         config.processTextNodes(nodes, simpleRe, simpleReplacer)
         for node in nodes:
-            if isElement(node):
+            if h.isElement(node):
                 addedNodes.append(node)
         return nodes
 
-    for el in findAll(".prod", doc):
+    for el in h.findAll(".prod", doc):
         transformElement(el)
 
     for node in addedNodes:
-        if isElement(node):
+        if h.isElement(node):
             addLineNumber(node)
 
 
@@ -380,7 +378,7 @@ def biblioReplacer(match):
     statusCurrent = "current" in modifiers
     statusSnapshot = "snapshot" in modifiers
     if statusCurrent and statusSnapshot:
-        die(f"Biblio shorthand {match.group(0)} contains *both* 'current' and 'snapshot', please pick one.")
+        m.die(f"Biblio shorthand {match.group(0)} contains *both* 'current' and 'snapshot', please pick one.")
     elif statusCurrent or statusSnapshot:
         attrs["data-biblio-status"] = "current" if statusCurrent else "snapshot"
 
@@ -388,7 +386,7 @@ def biblioReplacer(match):
     displayIndex = "index" in modifiers
     displayDirect = "direct" in modifiers
     if (displayInline + displayIndex + displayDirect) > 1:
-        die(
+        m.die(
             f"Biblio shorthand {match.group(0)} contains more than one of 'inline', 'index' and 'direct', please pick one."
         )
     elif displayInline:
@@ -401,7 +399,7 @@ def biblioReplacer(match):
     if "obsolete" in modifiers:
         attrs["data-biblio-obsolete"] = ""
 
-    return E.a(attrs, linkText)
+    return h.E.a(attrs, linkText)
 
 
 sectionRe = re.compile(
@@ -428,13 +426,13 @@ def sectionReplacer(match):
 
     if spec is None:
         # local section link
-        return E.a(
+        return h.E.a(
             {"section": "", "href": section, "bs-autolink-syntax": match.group(0)},
             linkText,
         )
     elif justPage is not None:
         # foreign link, to an actual page from a multipage spec
-        return E.span(
+        return h.E.span(
             {
                 "spec-section": justPage + "#",
                 "spec": spec,
@@ -444,7 +442,7 @@ def sectionReplacer(match):
         )
     else:
         # foreign link
-        return E.span(
+        return h.E.span(
             {
                 "spec-section": section,
                 "spec": spec,
@@ -484,13 +482,13 @@ def propdescReplacer(match):
     elif linkType in ("property", "descriptor"):
         pass
     else:
-        die(
+        m.die(
             f"Shorthand {match.group(0)} gives type as '{linkType}', but only 'property' and 'descriptor' are allowed.",
         )
-        return E.span(match.group(0))
+        return h.E.span(match.group(0))
     if linkText is None:
         linkText = lt
-    return E.a(
+    return h.E.a(
         {
             "data-link-type": linkType,
             "class": "property",
@@ -526,19 +524,19 @@ def idlReplacer(match):
     elif linkType in config.idlTypes:
         pass
     else:
-        die(
+        m.die(
             f"Shorthand {match.group(0)} gives type as '{linkType}', but only IDL types are allowed.",
         )
-        return E.span(match.group(0))
+        return h.E.span(match.group(0))
     if linkText is None:
         if lt.startswith("constructor(") and linkFor and linkFor != "/":
             # make {{Foo/constructor()}} output as "Foo()" so you know what it's linking to.
             linkText = linkFor + lt[11:]
         else:
             linkText = lt
-    return E.code(
+    return h.E.code(
         {"class": "idl", "nohighlight": ""},
-        E.a(
+        h.E.a(
             {
                 "data-link-type": linkType,
                 "for": linkFor,
@@ -570,7 +568,7 @@ def dfnReplacer(match):
         linkFor = "/"
     if linkText is None:
         linkText = lt
-    return E.a(
+    return h.E.a(
         {
             "data-link-type": "dfn",
             "for": linkFor,
@@ -601,7 +599,7 @@ def abstractReplacer(match):
         linkFor = "/"
     if linkText is None:
         linkText = lt
-    return E.a(
+    return h.E.a(
         {
             "data-link-type": "abstract-op",
             "for": linkFor,
@@ -649,9 +647,9 @@ def elementReplacer(match):
         linkText = groupdict["linkText"]
     else:
         linkText = lt
-    return E.code(
+    return h.E.code(
         {},
-        E.a(
+        h.E.a(
             {
                 "data-link-type": linkType,
                 "for": linkFor,
@@ -677,7 +675,7 @@ def varReplacer(match):
     escape, varText = match.groups()
     if escape:
         return match.group(0)[1:]
-    return E.var({"bs-autolink-syntax": match.group(0)}, varText)
+    return h.E.var({"bs-autolink-syntax": match.group(0)}, varText)
 
 
 inlineLinkRe = re.compile(
@@ -699,7 +697,7 @@ def inlineLinkReplacer(match):
     else:
         attrs = {"href": href}
     attrs["bs-autolink-syntax"] = match.group(0)
-    return E.a(attrs, text)
+    return h.E.a(attrs, text)
 
 
 strongRe = re.compile(
@@ -713,7 +711,7 @@ strongRe = re.compile(
 
 
 def strongReplacer(match):
-    return E.strong({"bs-autolink-syntax": match.group(0)}, match.group(1))
+    return h.E.strong({"bs-autolink-syntax": match.group(0)}, match.group(1))
 
 
 emRe = re.compile(
@@ -727,7 +725,7 @@ emRe = re.compile(
 
 
 def emReplacer(match):
-    return E.em({"bs-autolink-syntax": match.group(0)}, match.group(1))
+    return h.E.em({"bs-autolink-syntax": match.group(0)}, match.group(1))
 
 
 escapedRe = re.compile(r"\\\*")
@@ -740,6 +738,6 @@ def escapedReplacer(match):  # pylint: disable=unused-argument
 def addLineNumber(el):
     if el.get("line-number"):
         return
-    line = approximateLineNumber(el)
+    line = h.approximateLineNumber(el)
     if line is not None:
         el.set("line-number", line)

@@ -2,9 +2,7 @@ import hashlib
 import itertools
 import re
 
-from . import datablocks, markdown
-from .h import *
-from .messages import *
+from . import datablocks, markdown, h, messages as m
 
 
 def processInclusions(doc):
@@ -13,26 +11,26 @@ def processInclusions(doc):
         # Loop because an include can contain more includes.
         iters += 1
         if iters > 1000:
-            die("Looked for include-blocks more than 1000 times, something is wrong.")
+            m.die("Looked for include-blocks more than 1000 times, something is wrong.")
             return
-        els = findAll("pre.include", doc)
+        els = h.findAll("pre.include", doc)
         if not els:
             break
         for el in els:
             handleBikeshedInclude(el, doc)
-    for el in findAll("pre.include-code", doc):
+    for el in h.findAll("pre.include-code", doc):
         handleCodeInclude(el, doc)
-    for el in findAll("pre.include-raw", doc):
+    for el in h.findAll("pre.include-raw", doc):
         handleRawInclude(el, doc)
 
 
 def handleBikeshedInclude(el, doc):
     macros = {}
     for i in itertools.count(0):
-        m = el.get("macro-" + str(i))
-        if m is None:
+        macroLine = el.get("macro-" + str(i))
+        if macroLine is None:
             break
-        k, _, v = m.partition(" ")
+        k, _, v = macroLine.partition(" ")
         macros[k.lower()] = v
     if el.get("path"):
         path = el.get("path")
@@ -41,8 +39,8 @@ def handleBikeshedInclude(el, doc):
         try:
             lines = includedInputSource.read().rawLines
         except Exception as err:
-            die(f"Couldn't find include file '{path}'. Error was:\n{err}", el=el)
-            removeNode(el)
+            m.die(f"Couldn't find include file '{path}'. Error was:\n{err}", el=el)
+            h.removeNode(el)
             return
         # hash the content + path together for identity
         # can't use just path, because they're relative; including "foo/bar.txt" might use "foo/bar.txt" further nested
@@ -53,41 +51,41 @@ def handleBikeshedInclude(el, doc):
             # This came from another included file, check if it's a loop-include
             if hash in el.get("hash"):
                 # WHOOPS
-                die(f"Include loop detected - “{path}” is included in itself.", el=el)
-                removeNode(el)
+                m.die(f"Include loop detected - “{path}” is included in itself.", el=el)
+                h.removeNode(el)
                 return
             hash += " " + el.get("hash")
         depth = int(el.get("depth")) if el.get("depth") is not None else 0
         if depth > 100:
             # Just in case you slip past the nesting restriction
-            die("Nesting depth > 100, literally wtf are you doing.", el=el)
-            removeNode(el)
+            m.die("Nesting depth > 100, literally wtf are you doing.", el=el)
+            h.removeNode(el)
             return
         lines = datablocks.transformDataBlocks(doc, lines)
         lines = markdown.parse(lines, doc.md.indent, opaqueElements=doc.md.opaqueElements)
         text = "".join(lines)
         text = doc.fixText(text, moreMacros=macros)
-        subtree = parseHTML(text)
-        for childInclude in findAll("pre.include", E.div({}, *subtree)):
+        subtree = h.parseHTML(text)
+        for childInclude in h.findAll("pre.include", h.E.div({}, *subtree)):
             childInclude.set("hash", hash)
             childInclude.set("depth", str(depth + 1))
-        replaceNode(el, *subtree)
+        h.replaceNode(el, *subtree)
     else:
-        die(
+        m.die(
             "Whoops, an include block didn't get parsed correctly, so I can't include anything.",
             el=el,
         )
-        removeNode(el)
+        h.removeNode(el)
         return
 
 
 def handleCodeInclude(el, doc):
     if not el.get("path"):
-        die(
+        m.die(
             "Whoops, an include-code block didn't get parsed correctly, so I can't include anything.",
             el=el,
         )
-        removeNode(el)
+        h.removeNode(el)
         return
     path = el.get("path")
     includedInputSource = doc.inputSource.relative(path)
@@ -95,15 +93,15 @@ def handleCodeInclude(el, doc):
     try:
         lines = includedInputSource.read().rawLines
     except Exception as err:
-        die(f"Couldn't find include-code file '{path}'. Error was:\n{err}", el=el)
-        removeNode(el)
+        m.die(f"Couldn't find include-code file '{path}'. Error was:\n{err}", el=el)
+        h.removeNode(el)
         return
     if el.get("data-code-show"):
         showLines = parseRangeString(el.get("data-code-show"))
         if len(showLines) == 0:
             pass
         elif len(showLines) >= 2:
-            die(f"Can only have one include-code 'show' segment, got '{el.get('data-code-show')}'.", el=el)
+            m.die(f"Can only have one include-code 'show' segment, got '{el.get('data-code-show')}'.", el=el)
             return
         else:
             start, end = showLines[0]
@@ -115,16 +113,16 @@ def handleCodeInclude(el, doc):
                     # If manually overridden, leave it alone,
                     # but otherwise DWIM.
                     el.set("line-start", str(start))
-    appendChild(el, *lines)
+    h.appendChild(el, *lines)
 
 
 def handleRawInclude(el, doc):
     if not el.get("path"):
-        die(
+        m.die(
             "Whoops, an include-raw block didn't get parsed correctly, so I can't include anything.",
             el=el,
         )
-        removeNode(el)
+        h.removeNode(el)
         return
     path = el.get("path")
     includedInputSource = doc.inputSource.relative(path)
@@ -132,11 +130,11 @@ def handleRawInclude(el, doc):
     try:
         content = includedInputSource.read().content
     except Exception as err:
-        die(f"Couldn't find include-raw file '{path}'. Error was:\n{err}", el=el)
-        removeNode(el)
+        m.die(f"Couldn't find include-raw file '{path}'. Error was:\n{err}", el=el)
+        h.removeNode(el)
         return
-    subtree = parseHTML(content)
-    replaceNode(el, *subtree)
+    subtree = h.parseHTML(content)
+    h.replaceNode(el, *subtree)
 
 
 def parseRangeString(rangeStr):
@@ -154,7 +152,7 @@ def parseSingleRange(item):
             try:
                 low = int(low)
             except ValueError:
-                die(f"Error parsing include-code 'show' range '{item}' - must be `int-int`.")
+                m.die(f"Error parsing include-code 'show' range '{item}' - must be `int-int`.")
                 return
         if high == "*":
             high = None
@@ -162,10 +160,10 @@ def parseSingleRange(item):
             try:
                 high = int(high)
             except ValueError:
-                die(f"Error parsing include-code 'show' range '{item}' - must be `int-int`.")
+                m.die(f"Error parsing include-code 'show' range '{item}' - must be `int-int`.")
                 return
         if low >= high:
-            die(f"include-code 'show' ranges must be well-formed lo-hi - got '{item}'.")
+            m.die(f"include-code 'show' ranges must be well-formed lo-hi - got '{item}'.")
             return
         return [low, high]
     if item == "*":
@@ -174,4 +172,4 @@ def parseSingleRange(item):
         val = int(item)
         return [val, val]
     except ValueError:
-        die(f"Error parsing include-code 'show' value '{item}' - must be an int or *.")
+        m.die(f"Error parsing include-code 'show' value '{item}' - must be an int or *.")

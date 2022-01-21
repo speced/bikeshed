@@ -3,8 +3,7 @@ from collections import Counter
 
 import lxml.html
 
-from . import constants
-from . import t
+from . import constants, t
 
 messages: t.Set[str]
 messages = set()

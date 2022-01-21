@@ -1,8 +1,6 @@
 import re
 
-from . import config
-from .h import *
-from .messages import *
+from . import config, h, messages as m
 
 # Any element can have an include-if or exclude-if attribute,
 # containing a comma-separated list of conditions (described below).
@@ -27,35 +25,35 @@ from .messages import *
 def processConditionals(container, doc=None):
     if doc is None:
         doc = container
-    for el in findAll("[include-if], [exclude-if], if-wrapper", container):
-        if el.tag == "if-wrapper" and not hasAttr(el, "include-if", "exclude-if"):
-            die(
+    for el in h.findAll("[include-if], [exclude-if], if-wrapper", container):
+        if el.tag == "if-wrapper" and not h.hasAttr(el, "include-if", "exclude-if"):
+            m.die(
                 "<if-wrapper> elements must have an include-if and/or exclude-if attribute.",
                 el=el,
             )
-            removeNode(el)
+            h.removeNode(el)
             continue
 
         removeEl = False
-        if hasAttr(el, "include-if"):
+        if h.hasAttr(el, "include-if"):
             if not any(evalConditions(doc, el, el.get("include-if"))):
                 removeEl = True
-        if not removeEl and hasAttr(el, "exclude-if"):
+        if not removeEl and h.hasAttr(el, "exclude-if"):
             if any(evalConditions(doc, el, el.get("exclude-if"))):
                 removeEl = True
 
         if removeEl:
-            removeNode(el)
+            h.removeNode(el)
             continue
 
         if el.tag == "if-wrapper":
             # Passed the tests, so just remove the wrapper
-            replaceNode(el, *childNodes(el, clear=True))
+            h.replaceNode(el, *h.childNodes(el, clear=True))
             continue
 
         # Otherwise, go ahead and just remove the include/exclude-if attributes,
         # since they're non-standard
-        removeAttr(el, "include-if", "exclude-if")
+        h.removeAttr(el, "include-if", "exclude-if")
 
 
 def evalConditions(doc, el, conditionString):
@@ -70,9 +68,9 @@ def evalConditions(doc, el, conditionString):
             else:
                 yield False
         elif cond["type"] == "boilerplate":
-            yield (find(f'[boilerplate="{escapeCSSIdent(cond["value"])}"]', doc) is not None)
+            yield (h.find(f'[boilerplate="{h.escapeCSSIdent(cond["value"])}"]', doc) is not None)
         else:
-            die(
+            m.die(
                 f"Program error, some type of include/exclude-if condition wasn't handled: '{repr(cond)}'. Please report!",
                 el,
             )
@@ -95,5 +93,5 @@ def parseConditions(s, el=None):
         if match:
             yield {"type": "boilerplate", "value": match.group(1).strip()}
             continue
-        die(f"Unknown include/exclude-if condition '{sub}'", el=el)
+        m.die(f"Unknown include/exclude-if condition '{sub}'", el=el)
         continue

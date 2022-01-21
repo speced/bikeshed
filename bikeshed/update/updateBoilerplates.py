@@ -8,32 +8,32 @@ import requests
 import tenacity
 from result import Err, Ok
 
-from ..messages import *
+from .. import messages as m
 
 ghPrefix = "https://raw.githubusercontent.com/tabatkins/bikeshed-boilerplate/main/"
 
 
 def update(path, dryRun=False):
     try:
-        say("Downloading boilerplates...")
+        m.say("Downloading boilerplates...")
         data = requests.get(ghPrefix + "manifest.txt").text
     except Exception as e:
-        die(f"Couldn't download boilerplates manifest.\n{e}")
+        m.die(f"Couldn't download boilerplates manifest.\n{e}")
         return
 
     newPaths = pathsFromManifest(data)
 
     if not dryRun:
-        say(
+        m.say(
             f"Updating {len(newPaths)} file{'s' if len(newPaths) > 1 else ''}...",
         )
         goodPaths, badPaths = asyncio.run(updateFiles(path, newPaths))
     if not badPaths:
-        say("Done!")
+        m.say("Done!")
         return set(goodPaths)
     else:
         phrase = f"were {len(badPaths)} errors" if len(badPaths) > 1 else "was 1 error"
-        die(
+        m.die(
             f"Done, but there {phrase} (of {len(newPaths)} total) in downloading or saving. Run `bikeshed update` again to retry."
         )
         return set(goodPaths)
@@ -64,9 +64,9 @@ async def updateFiles(localPrefix, newPaths):
             currFileTime = time.time()
             if (currFileTime - lastMsgTime) >= messageDelta:
                 if not badPaths:
-                    say(f"Updated {len(goodPaths)}/{len(newPaths)}...")
+                    m.say(f"Updated {len(goodPaths)}/{len(newPaths)}...")
                 else:
-                    say(f"Updated {len(goodPaths)}/{len(newPaths)}, {len(badPaths)} errors...")
+                    m.say(f"Updated {len(goodPaths)}/{len(newPaths)}, {len(badPaths)} errors...")
                 lastMsgTime = currFileTime
     return goodPaths, badPaths
 
@@ -78,7 +78,7 @@ async def updateFile(localPrefix, filePath, session):
     if res.is_ok():
         res = await saveFile(localPath, res.ok())
     else:
-        warn(f"Error downloading {filePath}, full error was:\n{await errorFromAsyncErr(res)}")
+        m.warn(f"Error downloading {filePath}, full error was:\n{await errorFromAsyncErr(res)}")
     if res.is_err():
         res = Err(filePath)
     return res

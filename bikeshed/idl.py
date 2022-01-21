@@ -2,15 +2,12 @@ import re
 
 from widlparser import parser
 
-from . import config
-from .h import *
-from .messages import *
-from .unsortedJunk import classifyDfns
+from . import config, h, messages as m, unsortedJunk as u
 
 
 class IDLUI:
     def warn(self, msg):
-        die(msg.rstrip())
+        m.die(msg.rstrip())
 
 
 class IDLSilent:
@@ -178,7 +175,7 @@ class IDLMarker:
 
         if idlType == "constructor":
             # the [Constructor] extended attr, now deprecated
-            die(
+            m.die(
                 f"The [Constructor] extended attribute (on {construct.parent.name}) is deprecated, please switch to a constructor() method."
             )
             return (None, None)
@@ -203,7 +200,7 @@ class IDLMarker:
             elif hasattr(construct.member, "attribute"):
                 rest = construct.member.attribute
             else:
-                die("Can't figure out how to construct attribute-info from:\n  " + construct)
+                m.die("Can't figure out how to construct attribute-info from:\n  " + construct)
             if rest.readonly is not None:
                 readonly = "data-readonly"
             else:
@@ -217,7 +214,7 @@ class IDLMarker:
                     value = "[]"
                 elif value.startswith("}"):
                     value = "{}"
-                extraParameters += ' data-default="{}"'.format(escapeAttr(value))
+                extraParameters += ' data-default="{}"'.format(h.escapeAttr(value))
         elif idlType in ["interface", "namespace", "dictionary"]:
             if construct.partial:
                 refType = "link"
@@ -251,13 +248,13 @@ class IDLMarker:
     def markup_enum_value(self, text, construct):
         return (
             "<idl data-idl-type=enum-value data-idl-for='{}' data-lt='{}'>".format(
-                escapeAttr(construct.name), escapeAttr(text)
+                h.escapeAttr(construct.name), h.escapeAttr(text)
             ),
             "</idl>",
         )
 
     def encode(self, text):
-        return escapeHTML(text)
+        return h.escapeHTML(text)
 
     def methodLinkingTexts(self, method):
         """
@@ -294,37 +291,37 @@ class IDLMarker:
 
 def markupIDL(doc):
     highlightingOccurred = False
-    idlEls = findAll("pre.idl:not([data-no-idl]), xmp.idl:not([data-no-idl])", doc)
-    for el in findAll("script[type=idl]", doc):
+    idlEls = h.findAll("pre.idl:not([data-no-idl]), xmp.idl:not([data-no-idl])", doc)
+    for el in h.findAll("script[type=idl]", doc):
         # To help with syntax-highlighting, <script type=idl> is also allowed here.
         idlEls.append(el)
         el.tag = "pre"
-        removeAttr(el, "type")
-        addClass(el, "idl")
+        h.removeAttr(el, "type")
+        h.addClass(el, "idl")
     # One pass with a silent parser to collect the symbol table.
     symbolTable = None
     for el in idlEls:
-        p = parser.Parser(textContent(el), ui=IDLSilent(), symbol_table=symbolTable)
+        p = parser.Parser(h.textContent(el), ui=IDLSilent(), symbol_table=symbolTable)
         symbolTable = p.symbol_table
     # Then a real pass to actually mark up the IDL,
     # and collect it for the index.
     for el in idlEls:
-        if isNormative(el, doc):
-            text = textContent(el)
+        if h.isNormative(el, doc):
+            text = h.textContent(el)
             # Parse once with a fresh parser, so I can spit out just this <pre>'s markup.
             widl = parser.Parser(text, ui=IDLUI(), symbol_table=symbolTable)
             marker = DebugMarker() if doc.debug else IDLMarker()
-            replaceContents(el, parseHTML(str(widl.markup(marker))))
+            h.replaceContents(el, h.parseHTML(str(widl.markup(marker))))
             # Parse a second time with the global one, which collects all data in the doc.
             doc.widl.parse(text)
-        addClass(el, "highlight")
+        h.addClass(el, "highlight")
         highlightingOccurred = True
     if doc.md.slimBuildArtifact:
         # Remove the highlight-only spans
         for el in idlEls:
-            for span in findAll("span", el):
-                contents = childNodes(span, clear=True)
-                replaceNode(span, *contents)
+            for span in h.findAll("span", el):
+                contents = h.childNodes(span, clear=True)
+                h.replaceNode(span, *contents)
         return
     if highlightingOccurred:
         doc.extraStyles[
@@ -338,18 +335,18 @@ def markupIDL(doc):
 
 def processIDL(doc):
     localDfns = set()
-    for pre in findAll("pre.idl, xmp.idl", doc):
+    for pre in h.findAll("pre.idl, xmp.idl", doc):
         if pre.get("data-no-idl") is not None:
             continue
-        if not isNormative(pre, doc):
+        if not h.isNormative(pre, doc):
             continue
         forcedInterfaces = []
-        for x in (treeAttr(pre, "data-dfn-force") or "").split():
+        for x in (h.treeAttr(pre, "data-dfn-force") or "").split():
             x = x.strip()
             if x.endswith("<interface>"):
                 x = x[:-11]
             forcedInterfaces.append(x)
-        for el in findAll("idl", pre):
+        for el in h.findAll("idl", pre):
             idlType = el.get("data-idl-type")
             url = None
             forceDfn = False
@@ -381,7 +378,7 @@ def processIDL(doc):
                     del el.attrib["data-idl-for"]
             else:
                 # Copy over the auto-generated linking text to the manual dfn.
-                dfn = find(url, doc)
+                dfn = h.find(url, doc)
                 lts = combineIdlLinkingTexts(el.get("data-lt"), dfn.get("data-lt"))
                 dfn.set("data-lt", lts)
                 localDfns.add(dfn)
@@ -398,9 +395,9 @@ def processIDL(doc):
                     # ID was defensively added by the Marker.
                     del el.attrib["id"]
 
-    dfns = findAll("pre.idl:not([data-no-idl]) dfn, xmp.idl:not([data-no-idl]) dfn", doc) + list(localDfns)
-    classifyDfns(doc, dfns)
-    fixupIDs(doc, dfns)
+    dfns = h.findAll("pre.idl:not([data-no-idl]) dfn, xmp.idl:not([data-no-idl]) dfn", doc) + list(localDfns)
+    u.classifyDfns(doc, dfns)
+    h.fixupIDs(doc, dfns)
     doc.refs.addLocalDfns(dfn for dfn in dfns if dfn.get("id") is not None)
 
 

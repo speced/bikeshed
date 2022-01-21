@@ -1,7 +1,7 @@
 import re
 
 from .. import config, h
-from ..messages import *
+from ..messages import die
 
 
 def addAttributeInfoSpans(doc):

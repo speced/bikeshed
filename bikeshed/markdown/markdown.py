@@ -1,10 +1,8 @@
 import functools
 import re
-from itertools import *
 
-from .. import Line
+from .. import Line, messages as m
 from ..h import escapeAttr
-from ..messages import *
 
 
 def parse(
@@ -346,7 +344,7 @@ def stripPrefix(token, numSpacesForIndentation, len):
         elif text[offset : offset + numSpacesForIndentation] == " " * numSpacesForIndentation:
             offset += numSpacesForIndentation
         else:
-            die(
+            m.die(
                 f'Line {token["line"].i} isn\'t indented enough (needs {len} indent{"" if len == 1 else "s"}) to be valid Markdown:\n"{text[:-1]}"'
             )
     return text[offset:]
@@ -489,7 +487,7 @@ def parseMultiLineHeading(stream):
     elif stream.nexttype() == "dash-line":
         level = 3
     else:
-        die(
+        m.die(
             "Markdown parser error: tried to parse a multiline heading from:\n"
             + stream.prevraw()
             + stream.currraw()

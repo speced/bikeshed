@@ -1,7 +1,6 @@
 import logging
 
-from ..h import *
-from ..messages import *
+from .. import h, messages as m
 
 
 def brokenLinks(doc):
@@ -13,9 +12,9 @@ def brokenLinks(doc):
         return
     import requests
 
-    say("Checking links, this may take a while...")
+    m.say("Checking links, this may take a while...")
     logging.captureWarnings(True)  # Silence the requests library :/
-    for el in findAll("a", doc):
+    for el in h.findAll("a", doc):
         href = el.get("href")
         if not href or href[0] == "#":
             # Local link
@@ -26,8 +25,8 @@ def brokenLinks(doc):
         try:
             res = requests.get(href, verify=False)
         except Exception as e:
-            warn(f"The following link caused an error when I tried to request it:\n{outerHTML(el)}\n{e}")
+            m.warn(f"The following link caused an error when I tried to request it:\n{h.outerHTML(el)}\n{e}")
             continue
         if res.status_code >= 400:
-            warn(f"Got a {res.status_code} status when fetching the link for:\n{outerHTML(el)}")
-    say("Done checking links!")
+            m.warn(f"Got a {res.status_code} status when fetching the link for:\n{h.outerHTML(el)}")
+    m.say("Done checking links!")

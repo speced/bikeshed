@@ -2,8 +2,7 @@ import collections
 import itertools
 import re
 
-from .h import *
-from .messages import *
+from . import h, messages as m
 
 
 def loadCSSLexer():
@@ -26,7 +25,7 @@ def addSyntaxHighlighting(doc):
     highlightingOccurred = False
     lineWrappingOccurred = False
     lineHighlightingOccurred = False
-    for el in findAll("xmp, pre, code", doc):
+    for el in h.findAll("xmp, pre, code", doc):
         # Find whether to highlight, and what the lang is
         lang = determineHighlightLang(doc, el)
         if lang is False:
@@ -59,9 +58,9 @@ def determineHighlightLang(doc, el):
     # Either returns a normalized highlight lang,
     # False indicating the element was already highlighted,
     # or None indicating the element shouldn't be highlighted.
-    attr, lang = closestAttr(el, "nohighlight", "highlight")
+    attr, lang = h.closestAttr(el, "nohighlight", "highlight")
     lang = normalizeLanguageName(lang)
-    if lang == "webidl" and el.tag == "code" and parentElement(el).tag == "dfn":
+    if lang == "webidl" and el.tag == "code" and h.parentElement(el).tag == "dfn":
         # No such thing as a dfn that needs to be WebIDL-highlighted.
         # This is probably happening from a <dfn idl-type> inside a <pre highlight=idl>.
         return None
@@ -70,13 +69,13 @@ def determineHighlightLang(doc, el):
     if attr == "highlight":
         return lang
     # Highlight-by-default, if applicable.
-    if el.tag in ["pre", "xmp"] and hasClass(el, "idl"):
+    if el.tag in ["pre", "xmp"] and h.hasClass(el, "idl"):
         return "webidl"
     return doc.md.defaultHighlight
 
 
 def determineLineNumbers(doc, el):
-    lAttr, _ = closestAttr(el, "no-line-numbers", "line-numbers")
+    lAttr, _ = h.closestAttr(el, "no-line-numbers", "line-numbers")
     if lAttr == "no-line-numbers" or el.tag == "code":
         addLineNumbers = False
     elif lAttr == "line-numbers":
@@ -91,7 +90,7 @@ def determineLineNumbers(doc, el):
         try:
             lineStart = int(lineStart)
         except ValueError:
-            die(f"line-start attribute must have an integer value. Got '{lineStart}'.", el=el)
+            m.die(f"line-start attribute must have an integer value. Got '{lineStart}'.", el=el)
             lineStart = 1
 
     lh = el.get("line-highlight")
@@ -108,17 +107,17 @@ def determineLineNumbers(doc, el):
                     low = int(low)
                     high = int(high)
                 except ValueError:
-                    die(f"Error parsing line-highlight range '{item}' - must be `int-int`.", el=el)
+                    m.die(f"Error parsing line-highlight range '{item}' - must be `int-int`.", el=el)
                     continue
                 if low >= high:
-                    die(f"line-highlight ranges must be well-formed lo-hi - got '{item}'.", el=el)
+                    m.die(f"line-highlight ranges must be well-formed lo-hi - got '{item}'.", el=el)
                     continue
                 lineHighlights.update(list(range(low, high + 1)))
             else:
                 try:
                     item = int(item)
                 except ValueError:
-                    die(f"Error parsing line-highlight value '{item}' - must be integers.", el=el)
+                    m.die(f"Error parsing line-highlight value '{item}' - must be integers.", el=el)
                     continue
                 lineHighlights.add(item)
 
@@ -126,13 +125,13 @@ def determineLineNumbers(doc, el):
 
 
 def highlightEl(el, lang):
-    text = textContent(el)
+    text = h.textContent(el)
     if lang == "webidl":
         coloredText = highlightWithWebIDL(text, el=el)
     else:
         coloredText = highlightWithPygments(text, lang, el=el)
     mergeHighlighting(el, coloredText)
-    addClass(el, "highlight")
+    h.addClass(el, "highlight")
 
 
 def highlightWithWebIDL(text, el):
@@ -149,7 +148,7 @@ def highlightWithWebIDL(text, el):
 
     class IDLUI:
         def warn(self, msg):
-            die(msg.rstrip())
+            m.die(msg.rstrip())
 
     class HighlightMarker:
         # Just applies highlighting classes to IDL stuff.
@@ -166,7 +165,7 @@ def highlightWithWebIDL(text, el):
             return ("\1s\2", "\3")
 
     if "\1" in text or "\2" in text or "\3" in text:
-        die(
+        m.die(
             "WebIDL text contains some U+0001-0003 characters, which are used by the highlighter. This block can't be highlighted. :(",
             el=el,
         )
@@ -227,9 +226,9 @@ def highlightWithPygments(text, lang, el):
 
     lexer = lexerFromLang(lang)
     if lexer is None:
-        die(
+        m.die(
             f"'{lang}' isn't a known syntax-highlighting language. See http://pygments.org/docs/lexers/. Seen on:\n"
-            + outerHTML(el),
+            + h.outerHTML(el),
             el=el,
         )
         return
@@ -249,14 +248,14 @@ def mergeHighlighting(el, coloredText):
     # the markup structure is a flat list of sibling elements containing raw text
     # (and maybe some un-highlighted raw text between them).
     def createEl(color, text):
-        return createElement("c-", {color: ""}, text)
+        return h.createElement("c-", {color: ""}, text)
 
     def colorizeEl(el, coloredText):
-        for node in childNodes(el, clear=True):
-            if isElement(node):
-                appendChild(el, colorizeEl(node, coloredText))
+        for node in h.childNodes(el, clear=True):
+            if h.isElement(node):
+                h.appendChild(el, colorizeEl(node, coloredText))
             else:
-                appendChild(el, *colorizeText(node, coloredText))
+                h.appendChild(el, *colorizeText(node, coloredText))
         return el
 
     def colorizeText(text, coloredText):
@@ -390,7 +389,7 @@ def normalizeLanguageName(lang):
 
 def normalizeHighlightMarkers(doc):
     # Translate Prism-style highlighting into Pygment-style
-    for el in findAll("[class*=language-], [class*=lang-]", doc):
+    for el in h.findAll("[class*=language-], [class*=lang-]", doc):
         match = re.search(r"(?:lang|language)-(\w+)", el.get("class"))
         if match:
             el.set("highlight", match.group(1))
@@ -413,52 +412,52 @@ def addLineWrappers(el, numbers=True, start=1, highlights=None):
     # Add an attr for the line number, and if needed, the end line.
     if highlights is None:
         highlights = set()
-    lineWrapper = E.span({"class": "line"})
-    for node in childNodes(el, clear=True):
-        if isElement(node):
-            appendChild(lineWrapper, node)
+    lineWrapper = h.E.span({"class": "line"})
+    for node in h.childNodes(el, clear=True):
+        if h.isElement(node):
+            h.appendChild(lineWrapper, node)
         else:
             while True:
                 if "\n" in node:
                     pre, _, post = node.partition("\n")
-                    appendChild(lineWrapper, pre)
-                    appendChild(el, E.span({"class": "line-no"}))
-                    appendChild(el, lineWrapper)
-                    lineWrapper = E.span({"class": "line"})
+                    h.appendChild(lineWrapper, pre)
+                    h.appendChild(el, h.E.span({"class": "line-no"}))
+                    h.appendChild(el, lineWrapper)
+                    lineWrapper = h.E.span({"class": "line"})
                     node = post
                 else:
-                    appendChild(lineWrapper, node)
+                    h.appendChild(lineWrapper, node)
                     break
     if len(lineWrapper) > 0:
-        appendChild(el, E.span({"class": "line-no"}))
-        appendChild(el, lineWrapper)
+        h.appendChild(el, h.E.span({"class": "line-no"}))
+        h.appendChild(el, lineWrapper)
     # Number the lines
     lineNumber = start
-    for lineNo, node in grouper(childNodes(el), 2):
+    for lineNo, node in grouper(h.childNodes(el), 2):
         if numbers or lineNumber in highlights:
             lineNo.set("data-line", str(lineNumber))
         if lineNumber in highlights:
-            addClass(node, "highlight-line")
-            addClass(lineNo, "highlight-line")
+            h.addClass(node, "highlight-line")
+            h.addClass(lineNo, "highlight-line")
         internalNewlines = countInternalNewlines(node)
         if internalNewlines:
             for i in range(1, internalNewlines + 1):
                 if (lineNumber + i) in highlights:
-                    addClass(lineNo, "highlight-line")
-                    addClass(node, "highlight-line")
+                    h.addClass(lineNo, "highlight-line")
+                    h.addClass(node, "highlight-line")
                     lineNo.set("data-line", str(lineNumber))
             lineNumber += internalNewlines
             if numbers:
                 lineNo.set("data-line-end", str(lineNumber))
         lineNumber += 1
-    addClass(el, "line-numbered")
+    h.addClass(el, "line-numbered")
     return el
 
 
 def countInternalNewlines(el):
     count = 0
-    for node in childNodes(el):
-        if isElement(node):
+    for node in h.childNodes(el):
+        if h.isElement(node):
             count += countInternalNewlines(node)
         else:
             count += node.count("\n")

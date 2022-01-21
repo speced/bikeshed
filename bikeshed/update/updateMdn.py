@@ -4,22 +4,22 @@ from collections import OrderedDict
 
 import requests
 
-from ..messages import *  # noqa
+from .. import messages as m
 
 
 def update(path, dryRun=False):
-    say("Downloading MDN Spec Links data...")
+    m.say("Downloading MDN Spec Links data...")
     specMapURL = "https://w3c.github.io/mdn-spec-links/SPECMAP.json"
     try:
         response = requests.get(specMapURL)
     except Exception as e:
-        die(f"Couldn't download the MDN Spec Links data.\n{e}")
+        m.die(f"Couldn't download the MDN Spec Links data.\n{e}")
         return
 
     try:
         data = response.json(encoding="utf-8", object_pairs_hook=OrderedDict)
     except Exception as e:
-        die(f"The MDN Spec Links data wasn't valid JSON for some reason. Try downloading again?\n{e}")
+        m.die(f"The MDN Spec Links data wasn't valid JSON for some reason. Try downloading again?\n{e}")
         return
     writtenPaths = set()
     if not dryRun:
@@ -45,12 +45,12 @@ def update(path, dryRun=False):
                 try:
                     fileContents = requests.get(mdnSpecLinksBaseURL + specFilename).text
                 except Exception as e:
-                    die(f"Couldn't download the MDN Spec Links {specFilename} file.\n{e}")
+                    m.die(f"Couldn't download the MDN Spec Links {specFilename} file.\n{e}")
                     return
                 with open(p, "w", encoding="utf-8") as fh:
                     fh.write(fileContents)
         except Exception as e:
-            die(f"Couldn't save MDN Spec Links data to disk.\n{e}")
+            m.die(f"Couldn't save MDN Spec Links data to disk.\n{e}")
             return
-    say("Success!")
+    m.say("Success!")
     return writtenPaths

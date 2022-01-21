@@ -5,7 +5,7 @@ from collections import defaultdict
 from .. import config, constants
 from ..messages import linkerror
 from .RefWrapper import RefWrapper
-from .utils import *
+from . import utils
 
 
 class RefSource:
@@ -140,7 +140,7 @@ class RefSource:
             if exact:
                 refs = list(textRefsIterator([text]))
             else:
-                textsToSearch = list(linkTextVariations(text, linkType))
+                textsToSearch = list(utils.linkTextVariations(text, linkType))
                 if text.endswith("()") and text in self.methods:
                     textsToSearch += list(self.methods[text].keys())
                 if (linkType is None or linkType in config.lowercaseTypes) and text.lower() != text:
@@ -258,7 +258,7 @@ class RefSource:
         if ignoreObsoletes and not spec:
             # Remove any ignored or obsoleted specs
             # If you specified the spec, don't filter things - you know what you're doing.
-            refs = filterObsoletes(refs, replacedSpecs=self.replacedSpecs, ignoredSpecs=self.ignoredSpecs)
+            refs = utils.filterObsoletes(refs, replacedSpecs=self.replacedSpecs, ignoredSpecs=self.ignoredSpecs)
         if not refs:
             return refs, "ignored-specs"
 
@@ -279,7 +279,7 @@ class RefSource:
             # only use the latest level.
             # If generating for a snapshot, prefer the latest snapshot level,
             # unless that doesn't exist, in which case just prefer the latest level.
-            refs = filterOldVersions(refs, status=status or statusHint)
+            refs = utils.filterOldVersions(refs, status=status or statusHint)
 
         return refs, None
 

@@ -2,25 +2,25 @@ import os
 
 import requests
 
-from ..messages import *
+from .. import messages as m
 
 
 def update(path, dryRun=False):
     try:
-        say("Downloading web-platform-tests data...")
+        m.say("Downloading web-platform-tests data...")
         response = requests.get("https://wpt.fyi/api/manifest")
         sha = response.headers["x-wpt-sha"]
         jsonData = response.json()
     except Exception as e:
-        die(f"Couldn't download web-platform-tests data.\n{e}")
+        m.die(f"Couldn't download web-platform-tests data.\n{e}")
         return
 
     if "version" not in jsonData:
-        die("Can't figure out the WPT data version. Please report this to the maintainer!")
+        m.die("Can't figure out the WPT data version. Please report this to the maintainer!")
         return
 
     if jsonData["version"] != 8:
-        die(
+        m.die(
             f"Bikeshed currently only knows how to handle WPT v8 manifest data, but got v{jsonData['version']}. Please report this to the maintainer!"
         )
         return
@@ -44,9 +44,9 @@ def update(path, dryRun=False):
                 for ordered_path in sorted(paths):
                     f.write(ordered_path + "\n")
         except Exception as e:
-            die(f"Couldn't save web-platform-tests data to disk.\n{e}")
+            m.die(f"Couldn't save web-platform-tests data to disk.\n{e}")
             return
-    say("Success!")
+    m.say("Success!")
 
 
 def collectPaths(pathListSoFar, pathTrie, pathPrefix):

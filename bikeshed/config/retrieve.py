@@ -4,7 +4,7 @@ import io
 import os
 
 from ..InputSource import InputSource
-from ..messages import *
+from ..messages import die, warn
 from .main import scriptPath
 from .status import splitStatus
 

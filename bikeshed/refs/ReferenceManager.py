@@ -4,11 +4,9 @@ import re
 from collections import defaultdict
 from operator import itemgetter
 
-from .. import biblio, config, constants, datablocks
-from ..h import *
-from ..messages import *
+from .. import biblio, config, constants, datablocks, h, messages as m
 from .RefSource import RefSource
-from .utils import *
+from . import utils
 
 
 class ReferenceManager:
@@ -120,7 +118,7 @@ class ReferenceManager:
             # Get local anchor data
             shouldGetLocalAnchorData = doc.md.externalInfotrees["anchors.bsdata"]
             if not shouldGetLocalAnchorData and doc.inputSource.cheaplyExists("anchors.bsdata"):
-                warn(
+                m.warn(
                     "Found anchors.bsdata next to the specification without a matching\n"
                     + "External Infotrees: anchors.bsdata yes\n"
                     + "in the metadata. This data won't be found when building via a URL."
@@ -131,12 +129,12 @@ class ReferenceManager:
                 try:
                     datablocks.transformAnchors(doc.inputSource.relative("anchors.bsdata").read().rawLines, doc)
                 except OSError:
-                    warn("anchors.bsdata not found despite being listed in the External Infotrees metadata.")
+                    m.warn("anchors.bsdata not found despite being listed in the External Infotrees metadata.")
 
             # Get local link defaults
             shouldGetLocalLinkDefaults = doc.md.externalInfotrees["link-defaults.infotree"]
             if not shouldGetLocalLinkDefaults and doc.inputSource.cheaplyExists("link-defaults.infotree"):
-                warn(
+                m.warn(
                     "Found link-defaults.infotree next to the specification without a matching\n"
                     + "External Infotrees: link-defaults.infotree yes\n"
                     + "in the metadata. This data won't be found when building via a URL."
@@ -150,7 +148,7 @@ class ReferenceManager:
                         doc,
                     )
                 except OSError:
-                    warn("link-defaults.infotree not found despite being listed in the External Infotrees metadata.")
+                    m.warn("link-defaults.infotree not found despite being listed in the External Infotrees metadata.")
 
     def fetchHeadings(self, spec):
         if spec in self.headings:
@@ -230,33 +228,33 @@ class ReferenceManager:
 
     def addLocalDfns(self, dfns):
         for el in dfns:
-            if hasClass(el, "no-ref"):
+            if h.hasClass(el, "no-ref"):
                 continue
             try:
                 linkTexts = config.linkTextsFromElement(el)
             except config.DuplicatedLinkText as e:
-                die(
-                    f"The term '{e.offendingText}' is in both lt and local-lt of the element {outerHTML(e.el)}.",
+                m.die(
+                    f"The term '{e.offendingText}' is in both lt and local-lt of the element {h.outerHTML(e.el)}.",
                     el=e.el,
                 )
                 linkTexts = e.allTexts
             for linkText in linkTexts:
-                linkText = unfixTypography(linkText)
+                linkText = h.unfixTypography(linkText)
                 linkText = re.sub(r"\s+", " ", linkText)
-                linkType = treeAttr(el, "data-dfn-type")
+                linkType = h.treeAttr(el, "data-dfn-type")
                 if linkType not in config.dfnTypes:
-                    die(f"Unknown local dfn type '{linkType}':\n  {outerHTML(el)}", el=el)
+                    m.die(f"Unknown local dfn type '{linkType}':\n  {h.outerHTML(el)}", el=el)
                     continue
                 if linkType in config.lowercaseTypes:
                     linkText = linkText.lower()
-                dfnFor = treeAttr(el, "data-dfn-for")
+                dfnFor = h.treeAttr(el, "data-dfn-for")
                 if dfnFor is None:
                     dfnFor = set()
                     existingRefs = self.localRefs.queryRefs(linkType=linkType, text=linkText, linkFor="/", exact=True)[
                         0
                     ]
                     if existingRefs and existingRefs[0].el is not el:
-                        die(f"Multiple local '{linkType}' <dfn>s have the same linking text '{linkText}'.", el=el)
+                        m.die(f"Multiple local '{linkType}' <dfn>s have the same linking text '{linkText}'.", el=el)
                         continue
                 else:
                     dfnFor = set(config.splitForValues(dfnFor))
@@ -270,7 +268,7 @@ class ReferenceManager:
                         )[0]
                         if existingRefs and existingRefs[0].el is not el:
                             encounteredError = True
-                            die(
+                            m.die(
                                 f"Multiple local '{linkType}' <dfn>s for '{singleFor}' have the same linking text '{linkText}'.",
                                 el=el,
                             )
@@ -304,7 +302,7 @@ class ReferenceManager:
                     self.localRefs.addMethodVariants(linkText, dfnFor, ref["shortname"])
 
     def filterObsoletes(self, refs):
-        return filterObsoletes(
+        return utils.filterObsoletes(
             refs,
             replacedSpecs=self.replacedSpecs,
             ignoredSpecs=self.ignoredSpecs,
@@ -341,7 +339,7 @@ class ReferenceManager:
         # The relevent errors are gated by this variable.
         zeroRefsError = error and linkType not in ["maybe", "extended-attribute"]
 
-        text = unfixTypography(text)
+        text = h.unfixTypography(text)
         if linkType in config.lowercaseTypes:
             text = text.lower()
         if spec is not None:
@@ -350,7 +348,7 @@ class ReferenceManager:
             statusHint = self.defaultStatus
         if status not in config.linkStatuses and status is not None:
             if error:
-                die(
+                m.die(
                     f"Unknown spec status '{status}'. Status must be {config.englishFromList(config.linkStatuses)}.",
                     el=el,
                 )
@@ -392,7 +390,7 @@ class ReferenceManager:
                     # CHAOS MODE (so you're less likely to rely on it)
                     chosenRef = random.choice(localRefs)
                 if error:
-                    linkerror(
+                    m.linkerror(
                         f"Multiple possible '{linkType}' local refs for '{text}'.\nRandomly chose one of them; other instances might get a different random choice.",
                         el=el,
                     )
@@ -404,7 +402,7 @@ class ReferenceManager:
 
         # Take defaults into account
         if not spec or not status or not linkFor:
-            variedTexts = [v for v in linkTextVariations(text, linkType) if v in self.defaultSpecs]
+            variedTexts = [v for v in utils.linkTextVariations(text, linkType) if v in self.defaultSpecs]
             if variedTexts:
                 for dfnSpec, dfnType, dfnStatus, dfnFor in reversed(self.defaultSpecs[variedTexts[0]]):
                     if not config.linkTypeIn(dfnType, linkType):
@@ -506,22 +504,22 @@ class ReferenceManager:
                     break
                 if len(possibleMethods) > 1:
                     # Too many to disambiguate.
-                    linkerror(
+                    m.linkerror(
                         f"The argument autolink '{text}' for '{linkFor}' has too many possible overloads to disambiguate. Please specify the full method signature this argument is for.",
                         el=el,
                     )
                 # Try out all the combinations of interface/status/signature
-                linkForPatterns = ["{i}/{m}", "{m}"]
+                linkForPatterns = ["{interface}/{method}", "{method}"]
                 statuses = ["local", status]
                 for p in linkForPatterns:
                     for s in statuses:
-                        for m in possibleMethods[0]:
+                        for method in possibleMethods[0]:
                             refs, failure = self.foreignRefs.queryRefs(
                                 text=text,
                                 linkType=linkType,
                                 spec=spec,
                                 status=s,
-                                linkFor=p.format(i=interfaceName, m=m),
+                                linkFor=p.format(interface=interfaceName, method=method),
                                 ignoreObsoletes=True,
                             )
                             if refs:
@@ -561,7 +559,7 @@ class ReferenceManager:
                 methodRefs = list({c.url: c for c in candidates if c.text.startswith(methodPrefix)}.values())
             if zeroRefsError and len(methodRefs) > 1:
                 # More than one possible foo() overload, can't tell which to link to
-                linkerror(
+                m.linkerror(
                     f"Too many possible method targets to disambiguate '{linkFor}/{text}'. Please specify the names of the required args, like 'foo(bar, baz)', in the 'for' attribute.",
                     el=el,
                 )
@@ -573,39 +571,39 @@ class ReferenceManager:
                 # Custom properties/descriptors aren't ever defined anywhere
                 return None
             if zeroRefsError:
-                linkerror(f"No '{linkType}' refs found for '{text}'.", el=el)
+                m.linkerror(f"No '{linkType}' refs found for '{text}'.", el=el)
             return None
         elif failure == "export":
             if zeroRefsError:
-                linkerror(f"No '{linkType}' refs found for '{text}' that are marked for export.", el=el)
+                m.linkerror(f"No '{linkType}' refs found for '{text}' that are marked for export.", el=el)
             return None
         elif failure == "spec":
             if zeroRefsError:
-                linkerror(f"No '{linkType}' refs found for '{text}' with spec '{spec}'.", el=el)
+                m.linkerror(f"No '{linkType}' refs found for '{text}' with spec '{spec}'.", el=el)
             return None
         elif failure == "for":
             if zeroRefsError:
                 if spec is None:
-                    linkerror(f"No '{linkType}' refs found for '{text}' with for='{linkFor}'.", el=el)
+                    m.linkerror(f"No '{linkType}' refs found for '{text}' with for='{linkFor}'.", el=el)
                 else:
-                    linkerror(f"No '{linkType}' refs found for '{text}' with for='{linkFor}' in spec '{spec}'.", el=el)
+                    m.linkerror(f"No '{linkType}' refs found for '{text}' with for='{linkFor}' in spec '{spec}'.", el=el)
             return None
         elif failure == "status":
             if zeroRefsError:
                 if spec is None:
-                    linkerror(f"No '{linkType}' refs found for '{text}' compatible with status '{status}'.", el=el)
+                    m.linkerror(f"No '{linkType}' refs found for '{text}' compatible with status '{status}'.", el=el)
                 else:
-                    linkerror(
+                    m.linkerror(
                         f"No '{linkType}' refs found for '{text}' compatible with status '{status}' in spec '{spec}'.",
                         el=el,
                     )
             return None
         elif failure == "ignored-specs":
             if zeroRefsError:
-                linkerror(f"The only '{linkType}' refs for '{text}' were in ignored specs:\n{outerHTML(el)}", el=el)
+                m.linkerror(f"The only '{linkType}' refs for '{text}' were in ignored specs:\n{h.outerHTML(el)}", el=el)
             return None
         elif failure:
-            die(f"Programming error - I'm not catching '{failure}'-type link failures. Please report!", el=el)
+            m.die(f"Programming error - I'm not catching '{failure}'-type link failures. Please report!", el=el)
             return None
 
         if len(refs) == 1:
@@ -643,7 +641,7 @@ class ReferenceManager:
         depth=0,
     ):
         if depth > 100:
-            die(f"Data error in biblio files; infinitely recursing trying to find [{text}].")
+            m.die(f"Data error in biblio files; infinitely recursing trying to find [{text}].")
             return
         key = text.lower()
         while True:
@@ -677,7 +675,7 @@ class ReferenceManager:
 
             if failFromWrongSuffix and not quiet:
                 numericSuffixes = self.biblioNumericSuffixes[unversionedKey]
-                die(
+                m.die(
                     f"A biblio link references {text}, but only {config.englishFromList(numericSuffixes)} exists in SpecRef."
                 )
             return None
@@ -685,14 +683,14 @@ class ReferenceManager:
         candidate = self._bestCandidateBiblio(candidates)
         # TODO: When SpecRef definitely has all the CSS specs, turn on this code.
         # if candidates[0]['order'] > 3: # 3 is SpecRef level
-        #    warn(f"Bibliography term '{text}' wasn't found in SpecRef.\n         Please find the equivalent key in SpecRef, or submit a PR to SpecRef.")
+        #    m.warn(f"Bibliography term '{text}' wasn't found in SpecRef.\n         Please find the equivalent key in SpecRef, or submit a PR to SpecRef.")
         if candidate["biblioFormat"] == "string":
             bib = biblio.StringBiblioEntry(**candidate)
         elif candidate["biblioFormat"] == "alias":
             # Follow the chain to the real candidate
             bib = self.getBiblioRef(candidate["aliasOf"], status=status, el=el, quiet=True, depth=depth + 1)
             if bib is None:
-                die(f"Biblio ref [{text}] claims to be an alias of [{candidate['aliasOf']}], which doesn't exist.")
+                m.die(f"Biblio ref [{text}] claims to be an alias of [{candidate['aliasOf']}], which doesn't exist.")
                 return None
         elif candidate.get("obsoletedBy", "").strip():
             # Obsoleted by something. Unless otherwise indicated, follow the chain.
@@ -707,7 +705,7 @@ class ReferenceManager:
                     depth=depth + 1,
                 )
                 if not quiet:
-                    die(
+                    m.die(
                         f"Obsolete biblio ref: [{candidate['linkText']}] is replaced by [{bib.linkText}]. Either update the reference, or use [{candidate['linkText']} obsolete] if this is an intentionally-obsolete reference."
                     )
         else:
@@ -737,7 +735,7 @@ class ReferenceManager:
         return self.biblios.get(key, [])
 
     def _bestCandidateBiblio(self, candidates):
-        return stripLineBreaks(sorted(candidates, key=itemgetter("order"))[0])
+        return utils.stripLineBreaks(sorted(candidates, key=itemgetter("order"))[0])
 
     def getLatestBiblioRef(self, key):
         # Takes a biblio reference name,
@@ -842,13 +840,13 @@ def reportMultiplePossibleRefs(possibleRefs, linkText, linkType, linkFor, defaul
             error += "\n" + refToText(refs[0])
             for ref in refs:
                 error += "\n  " + ref["url"]
-    linkerror(error, el=el)
+    m.linkerror(error, el=el)
 
 
 def reportAmbiguousForlessLink(el, text, forlessRefs, localRefs):
     localRefText = "\n".join([refToText(ref) for ref in simplifyPossibleRefs(localRefs, alwaysShowFor=True)])
     forlessRefText = "\n".join([refToText(ref) for ref in simplifyPossibleRefs(forlessRefs, alwaysShowFor=True)])
-    linkerror(
+    m.linkerror(
         f"Ambiguous for-less link for '{text}', please see <https://tabatkins.github.io/bikeshed/#ambi-for> for instructions:\nLocal references:\n{localRefText}\nfor-less references:\n{forlessRefText}",
         el=el,
     )

@@ -5,18 +5,16 @@ import subprocess
 from collections import OrderedDict, defaultdict
 from datetime import datetime
 
-from . import conditional, config, dfnpanels
+from . import conditional, config, dfnpanels, h, messages as m
 from .DefaultOrderedDict import DefaultOrderedDict
-from .h import *
-from .messages import *
 from .refs import utils as refUtils
 
 
 def boilerplateFromHtml(doc, htmlString):
     htmlString = doc.fixText(htmlString)
-    bp = E.div({}, parseHTML(htmlString))
+    bp = h.E.div({}, h.parseHTML(htmlString))
     conditional.processConditionals(bp, doc)
-    return childNodes(bp, clear=True)
+    return h.childNodes(bp, clear=True)
 
 
 def loadBoilerplate(doc, filename, bpname=None):
@@ -58,19 +56,19 @@ def addBikeshedVersion(doc):
     except Exception:
         # Not in Bikeshed's repo, so instead grab from the datafile.
         bikeshedVersion = doc.dataFile.fetch("bikeshed-version.txt", type="readonly", str=True).strip()
-    appendChild(doc.head, E.meta({"name": "generator", "content": bikeshedVersion}))
+    h.appendChild(doc.head, h.E.meta({"name": "generator", "content": bikeshedVersion}))
 
 
 def addCanonicalURL(doc):
     # Adds a <link rel=canonical> to the configured canonical url
     if doc.md.canonicalURL:
-        appendChild(doc.head, E.link({"rel": "canonical", "href": doc.md.canonicalURL}))
+        h.appendChild(doc.head, h.E.link({"rel": "canonical", "href": doc.md.canonicalURL}))
 
 
 def addFavicon(doc):
     # Adds a <link rel=icon> to the configured favicon url
     if doc.md.favicon:
-        appendChild(doc.head, E.link({"rel": "icon", "href": doc.md.favicon}))
+        h.appendChild(doc.head, h.E.link({"rel": "icon", "href": doc.md.favicon}))
 
 
 def addSpecVersion(doc):
@@ -108,7 +106,7 @@ def addSpecVersion(doc):
         except subprocess.CalledProcessError:
             pass
     if revision:
-        appendChild(doc.head, E.meta({"name": "document-revision", "content": revision}))
+        h.appendChild(doc.head, h.E.meta({"name": "document-revision", "content": revision}))
 
 
 def addHeaderFooter(doc):
@@ -120,7 +118,7 @@ def addHeaderFooter(doc):
 
 def fillWith(tag, newElements, doc):
     for el in doc.fillContainers[tag]:
-        replaceContents(el, newElements)
+        h.replaceContents(el, newElements)
 
 
 def getFillContainer(tag, doc, default=False):
@@ -165,7 +163,7 @@ def addAbstract(doc):
     else:
         container = getFillContainer("abstract", doc, default=False)
         if container is not None:
-            removeNode(container)
+            h.removeNode(container)
 
 
 def addStatusSection(doc):
@@ -181,7 +179,7 @@ def addExpiryNotice(doc):
         boilerplate = "warning-expires"
         doc.extraScripts["script-expires"] = expiryScript
     loadBoilerplate(doc, boilerplate, "warning")
-    addClass(doc.body, boilerplate)
+    h.addClass(doc.body, boilerplate)
 
 
 expiryScript = """
@@ -214,7 +212,7 @@ def addAtRisk(doc):
         "and marking it as such allows the WG to drop the feature if necessary when transitioning to the Proposed Rec stage, "
         "without having to publish a new Candidate Rec without the feature first."
     )
-    fillWith("at-risk", parseHTML(html), doc=doc)
+    fillWith("at-risk", h.parseHTML(html), doc=doc)
 
 
 def addStyles(doc):
@@ -224,25 +222,25 @@ def addStyles(doc):
 
 
 def addCustomBoilerplate(doc):
-    for el in findAll("[boilerplate]", doc):
+    for el in h.findAll("[boilerplate]", doc):
         tag = el.get("boilerplate")
         if doc.fillContainers[tag]:
-            replaceContents(doc.fillContainers[tag][0], el)
-            removeNode(el)
+            h.replaceContents(doc.fillContainers[tag][0], el)
+            h.removeNode(el)
 
 
 def removeUnwantedBoilerplate(doc):
     for tag, els in doc.fillContainers.items():
         if tag not in doc.md.boilerplate:
             for el in els:
-                removeNode(el)
+                h.removeNode(el)
 
 
 def addAnnotations(doc):
     if doc.md.vshortname in doc.testSuites:
         html = config.retrieveBoilerplateFile(doc, "annotations")
         el = boilerplateFromHtml(doc, html)
-        appendContents(find("head", doc), el)
+        h.appendContents(h.find("head", doc), el)
 
 
 def w3cStylesheetInUse(doc):
@@ -271,7 +269,7 @@ def addBikeshedBoilerplate(doc):
         if container is None:
             container = getFillContainer("bs-styles", doc, default=True)
         if container is not None:
-            appendChild(container, E.style(f"/* {k} */\n{v}"))
+            h.appendChild(container, h.E.style(f"/* {k} */\n{v}"))
     for k, v in sorted(doc.extraScripts.items()):
         if k not in doc.md.boilerplate:
             continue
@@ -279,18 +277,18 @@ def addBikeshedBoilerplate(doc):
         if container is None:
             container = getFillContainer("bs-scripts", doc, default=True)
         if container is not None:
-            appendChild(container, E.script(f"/* {k} */\n{v}"))
+            h.appendChild(container, h.E.script(f"/* {k} */\n{v}"))
 
 
 def addIndexSection(doc):
-    if len(findAll(config.dfnElementsSelector, doc)) == 0 and len(list(doc.externalRefsUsed.keys())) == 0:
+    if len(h.findAll(config.dfnElementsSelector, doc)) == 0 and len(list(doc.externalRefsUsed.keys())) == 0:
         return
     container = getFillContainer("index", doc=doc, default=True)
     if container is None:
         return
-    appendChild(container, E.h2({"class": "no-num no-ref", "id": safeID(doc, "index")}, "Index"))
+    h.appendChild(container, h.E.h2({"class": "no-num no-ref", "id": h.safeID(doc, "index")}, "Index"))
 
-    if len(findAll(config.dfnElementsSelector, doc)) > 0:
+    if len(h.findAll(config.dfnElementsSelector, doc)) > 0:
         addIndexOfLocallyDefinedTerms(doc, container)
 
     if len(list(doc.externalRefsUsed.keys())) > 0:
@@ -298,20 +296,20 @@ def addIndexSection(doc):
 
 
 def addIndexOfLocallyDefinedTerms(doc, container):
-    appendChild(
+    h.appendChild(
         container,
-        E.h3(
-            {"class": "no-num no-ref", "id": safeID(doc, "index-defined-here")},
+        h.E.h3(
+            {"class": "no-num no-ref", "id": h.safeID(doc, "index-defined-here")},
             "Terms defined by this specification",
         ),
     )
 
     indexEntries = defaultdict(list)
-    for el in findAll(config.dfnElementsSelector, doc):
+    for el in h.findAll(config.dfnElementsSelector, doc):
         if el.get("id") is None or el.get("data-dfn-type") is None:
             continue
         linkTexts = config.linkTextsFromElement(el)
-        headingLevel = headingLevelOfElement(el) or "Unnumbered section"
+        headingLevel = h.headingLevelOfElement(el) or "Unnumbered section"
         type = el.get("data-dfn-type")
         if type == "argument":
             # Don't generate index entries for arguments.
@@ -337,7 +335,7 @@ def addIndexOfLocallyDefinedTerms(doc, container):
 
     # Now print the indexes
     indexHTML = htmlFromIndexTerms(indexEntries)
-    appendChild(container, indexHTML)
+    h.appendChild(container, indexHTML)
 
 
 def disambiguator(ref, types, specs):
@@ -354,11 +352,11 @@ def disambiguator(ref, types, specs):
 def addExplicitIndexes(doc):
     # Explicit indexes can be requested for specs with <index spec="example-spec-1"></index>
 
-    for el in findAll("index", doc):
+    for el in h.findAll("index", doc):
 
         status = el.get("status")
         if status and status not in config.specStatuses:
-            die(
+            m.die(
                 f"<index> has unknown value '{status}' for status. Must be {config.englishFromList(config.specStatuses)}.",
                 el=el,
             )
@@ -368,8 +366,8 @@ def addExplicitIndexes(doc):
             types = {x.strip() for x in el.get("type").split(",")}
             for t in types:
                 if t not in config.dfnTypes:
-                    die(
-                        f"Unknown type value '{t}' on {outerHTML(el)}",
+                    m.die(
+                        f"Unknown type value '{t}' on {h.outerHTML(el)}",
                         el=el,
                     )
                     types.remove(t)
@@ -381,7 +379,7 @@ def addExplicitIndexes(doc):
             specs = {x.strip() for x in el.get("data-link-spec").split(",")}
             for s in list(specs):
                 if s not in doc.refs.specs:
-                    die(f"Unknown spec name '{s}' on {outerHTML(el)}", el=el)
+                    m.die(f"Unknown spec name '{s}' on {h.outerHTML(el)}", el=el)
                     specs.remove(s)
         else:
             specs = None
@@ -398,8 +396,8 @@ def addExplicitIndexes(doc):
             elif exportVal in ["no", "n", "false", "off"]:
                 export = False
             else:
-                die(
-                    f"Unknown export value '{exportVal}' (should be boolish) on {outerHTML(el)}",
+                m.die(
+                    f"Unknown export value '{exportVal}' (should be boolish) on {h.outerHTML(el)}",
                     el=el,
                 )
                 export = None
@@ -467,9 +465,9 @@ def addExplicitIndexes(doc):
                     {"url": ref.url, "disambiguator": disambiguator(ref, types, specs)} for ref in refs
                 )
 
-        appendChild(el, htmlFromIndexTerms(filteredRefs))
+        h.appendChild(el, htmlFromIndexTerms(filteredRefs))
         el.tag = "div"
-        removeAttr(el, "export", "for", "spec", "status", "type")
+        h.removeAttr(el, "export", "for", "spec", "status", "type")
 
 
 def htmlFromIndexTerms(entries):
@@ -488,26 +486,26 @@ def htmlFromIndexTerms(entries):
 
     entries = OrderedDict(sorted(entries.items(), key=entryKey))
 
-    topList = E.ul({"class": "index"})
+    topList = h.E.ul({"class": "index"})
     for text, items in entries.items():
         if len(items) == 1:
             item = items[0]
-            li = appendChild(
+            li = h.appendChild(
                 topList,
-                E.li(
-                    E.a({"href": item["url"]}, text),
-                    E.span(", in ", item["label"]) if item.get("label") else "",
+                h.E.li(
+                    h.E.a({"href": item["url"]}, text),
+                    h.E.span(", in ", item["label"]) if item.get("label") else "",
                 ),
             )
         else:
-            li = appendChild(topList, E.li(text))
-            ul = appendChild(li, E.ul())
+            li = h.appendChild(topList, h.E.li(text))
+            ul = h.appendChild(li, h.E.ul())
             for item in sorted(items, key=lambda x: x["disambiguator"]):
-                appendChild(
+                h.appendChild(
                     ul,
-                    E.li(
-                        E.a({"href": item["url"]}, item["disambiguator"]),
-                        E.span(", in ", item["label"]) if item.get("label") else "",
+                    h.E.li(
+                        h.E.a({"href": item["url"]}, item["disambiguator"]),
+                        h.E.span(", in ", item["label"]) if item.get("label") else "",
                     ),
                 )
     return topList
@@ -518,12 +516,12 @@ def addIndexOfExternallyDefinedTerms(doc, container):
         return
 
     def makeLink(*contents):
-        return E.span({}, *contents)
+        return h.E.span({}, *contents)
 
-    ul = E.ul({"class": "index"})
+    ul = h.E.ul({"class": "index"})
     # Gather all the <a href> in the document, for use in the dfn-panels
     elsFromHref = DefaultOrderedDict(list)
-    for a in findAll("a", doc):
+    for a in h.findAll("a", doc):
         href = a.get("href")
         if href is None:
             continue
@@ -545,11 +543,11 @@ def addIndexOfExternallyDefinedTerms(doc, container):
             "data-biblio-type": "informative",
             "data-okay-to-fail": "true",
         }
-        specLi = appendChild(
+        specLi = h.appendChild(
             ul,
-            E.li(E.a(attrs, "[", printableSpec, "]"), " defines the following terms:"),
+            h.E.li(h.E.a(attrs, "[", printableSpec, "]"), " defines the following terms:"),
         )
-        termsUl = appendChild(specLi, E.ul())
+        termsUl = h.appendChild(specLi, h.E.ul())
         for _, refs in sorted(refGroups.items(), key=lambda x: x[0]):
             if len(refs) == 1:
                 ref = list(refs.values())[0]
@@ -557,18 +555,18 @@ def addIndexOfExternallyDefinedTerms(doc, container):
             else:
                 for key, ref in sorted(refs.items(), key=lambda x: x[0]):
                     if key:
-                        link = makeLink(ref.text, " ", E.small({}, f"(for {key})"))
+                        link = makeLink(ref.text, " ", h.E.small({}, f"(for {key})"))
                     else:
                         link = makeLink(ref.text)
-            appendChild(termsUl, E.li(link))
+            h.appendChild(termsUl, h.E.li(link))
             atLeastOnePanel = True
             dfnpanels.addExternalDfnPanel(link, ref, elsFromHref, doc)
     if atLeastOnePanel:
         dfnpanels.addExternalDfnPanelStyles(doc)
-    appendChild(
+    h.appendChild(
         container,
-        E.h3(
-            {"class": "no-num no-ref", "id": safeID(doc, "index-defined-elsewhere")},
+        h.E.h3(
+            {"class": "no-num no-ref", "id": h.safeID(doc, "index-defined-elsewhere")},
             "Terms defined by reference",
         ),
         ul,
@@ -578,43 +576,43 @@ def addIndexOfExternallyDefinedTerms(doc, container):
 def addPropertyIndex(doc):
     # Extract all the data from the propdef and descdef tables
 
-    if len(findAll("table.propdef, table.descdef", doc)) == 0:
+    if len(h.findAll("table.propdef, table.descdef", doc)) == 0:
         return
     html = getFillContainer("property-index", doc=doc, default=True)
     if html is None:
         return
 
-    appendChild(
+    h.appendChild(
         html,
-        E.h2(
-            {"class": "no-num no-ref", "id": safeID(doc, "property-index")},
+        h.E.h2(
+            {"class": "no-num no-ref", "id": h.safeID(doc, "property-index")},
             "Property Index",
         ),
     )
 
     def extractKeyValFromRow(row, table):
         # Extract the key, minus the trailing :
-        result = re.match(r"(.*):", textContent(row[0]).strip())
+        result = re.match(r"(.*):", h.textContent(row[0]).strip())
         if result is None:
-            die(
-                f"Propdef row headers must be a word followed by a colon. Got:\n{textContent(row[0]).strip()}",
+            m.die(
+                f"Propdef row headers must be a word followed by a colon. Got:\n{h.textContent(row[0]).strip()}",
                 el=table,
             )
             return "", ""
         key = result.group(1).strip().capitalize()
         # Extract the value from the second cell
-        val = textContent(row[1]).strip()
+        val = h.textContent(row[1]).strip()
         return key, val
 
     # Extract propdef info
     props = []
-    for table in findAll("table.propdef", doc):
+    for table in h.findAll("table.propdef", doc):
         prop = {}
         names = []
-        for row in findAll("tr", table):
+        for row in h.findAll("tr", table):
             key, val = extractKeyValFromRow(row, table)
             if key == "Name":
-                names = [textContent(x) for x in findAll("dfn", row[1])]
+                names = [h.textContent(x) for x in h.findAll("dfn", row[1])]
             else:
                 prop[key] = val
         for name in names:
@@ -624,14 +622,14 @@ def addPropertyIndex(doc):
     props.sort(key=lambda x: x["Name"])
     # Extract descdef info
     atRules = defaultdict(list)
-    for table in findAll("table.descdef", doc):
+    for table in h.findAll("table.descdef", doc):
         desc = {}
         names = []
         atRule = ""
-        for row in findAll("tr", table):
+        for row in h.findAll("tr", table):
             key, val = extractKeyValFromRow(row, table)
             if key == "Name":
-                names = [textContent(x) for x in findAll("dfn", row[1])]
+                names = [h.textContent(x) for x in h.findAll("dfn", row[1])]
             elif key == "For":
                 atRule = val
             else:
@@ -647,9 +645,9 @@ def addPropertyIndex(doc):
         attrs = {"data-link-type": linkType}
         if for_:
             attrs["data-link-for"] = for_
-        return E.tr(
-            E.th({"scope": "row"}, E.a(attrs, prop["Name"])),
-            *[E.td(prop.get(column, "")) for column in columns[1:]],
+        return h.E.tr(
+            h.E.th({"scope": "row"}, h.E.a(attrs, prop["Name"])),
+            *[h.E.td(prop.get(column, "")) for column in columns[1:]],
         )
 
     if len(props) > 0:
@@ -675,19 +673,19 @@ def addPropertyIndex(doc):
                 return "Com\xadputed value"
             return name
 
-        appendChild(
+        h.appendChild(
             html,
-            E.div(
+            h.E.div(
                 {"class": "big-element-wrapper"},
-                E.table(
+                h.E.table(
                     {"class": "index"},
-                    E.thead(E.tr(*[E.th({"scope": "col"}, formatColumnName(column)) for column in columns])),
-                    E.tbody(*[createRow(prop, "property") for prop in props]),
+                    h.E.thead(h.E.tr(*[h.E.th({"scope": "col"}, formatColumnName(column)) for column in columns])),
+                    h.E.tbody(*[createRow(prop, "property") for prop in props]),
                 ),
             ),
         )
     else:
-        appendChild(html, E.p("No properties defined."))
+        h.appendChild(html, h.E.p("No properties defined."))
 
     if len(atRules) > 0:
         atRuleNames = sorted(atRules.keys())
@@ -702,71 +700,71 @@ def addPropertyIndex(doc):
             columns.extend(sorted(allKeys - set(columns)))
             id = config.simplifyText(atRuleName) + "-descriptor-table"
             if atRuleName:
-                appendChild(
+                h.appendChild(
                     html,
-                    E.h3(
-                        {"class": "no-num no-ref", "id": safeID(doc, id)},
-                        E.a({"data-link-type": "at-rule"}, atRuleName),
+                    h.E.h3(
+                        {"class": "no-num no-ref", "id": h.safeID(doc, id)},
+                        h.E.a({"data-link-type": "at-rule"}, atRuleName),
                         " Descriptors",
                     ),
                 )
             else:
-                appendChild(
+                h.appendChild(
                     html,
-                    E.h3(
-                        {"class": "no-num no-ref", "id": safeID(doc, id)},
+                    h.E.h3(
+                        {"class": "no-num no-ref", "id": h.safeID(doc, id)},
                         "Miscellaneous Descriptors",
                     ),
                 )
-            appendChild(
+            h.appendChild(
                 html,
-                E.div(
+                h.E.div(
                     {"class": "big-element-wrapper"},
-                    E.table(
+                    h.E.table(
                         {"class": "index"},
-                        E.thead(E.tr(*[E.th({"scope": "col"}, column) for column in columns])),
-                        E.tbody(*[createRow(desc, "descriptor", for_=atRuleName) for desc in descs]),
+                        h.E.thead(h.E.tr(*[h.E.th({"scope": "col"}, column) for column in columns])),
+                        h.E.tbody(*[createRow(desc, "descriptor", for_=atRuleName) for desc in descs]),
                     ),
                 ),
             )
 
 
 def addIDLSection(doc):
-    idlBlocks = [x for x in findAll("pre.idl, xmp.idl", doc) if isNormative(x, doc)]
+    idlBlocks = [x for x in h.findAll("pre.idl, xmp.idl", doc) if h.isNormative(x, doc)]
     if len(idlBlocks) == 0:
         return
     html = getFillContainer("idl-index", doc=doc, default=True)
     if html is None:
         return
 
-    appendChild(
+    h.appendChild(
         html,
-        E.h2({"class": "no-num no-ref", "id": safeID(doc, "idl-index")}, "IDL Index"),
+        h.E.h2({"class": "no-num no-ref", "id": h.safeID(doc, "idl-index")}, "IDL Index"),
     )
 
-    container = appendChild(html, E.pre({"class": "idl"}))
+    container = h.appendChild(html, h.E.pre({"class": "idl"}))
     for block in idlBlocks:
-        if hasClass(block, "extract"):
+        if h.hasClass(block, "extract"):
             continue
         blockCopy = copy.deepcopy(block)
-        appendContents(container, blockCopy)
-        appendChild(container, "\n")
-    for el in findAll("[id]", container):
+        h.appendContents(container, blockCopy)
+        h.appendChild(container, "\n")
+    for el in h.findAll("[id]", container):
         if el.tag == "dfn":
             el.tag = "a"
             el.set("href", "#" + el.get("id"))
         del el.attrib["id"]
-    addClass(container, "highlight")
+    h.addClass(container, "highlight")
 
 
 def addTOCSection(doc):
     toc = getFillContainer("table-of-contents", doc=doc, default=False)
     if toc is None:
         return
-    appendChild(
+    h.appendChild(
         toc,
-        E.h2(
-            {"class": "no-num no-toc no-ref", "id": safeID(doc, "contents")},
+        h.E.h2(
+            {"class": "no-num no-toc no-ref", "id": h.safeID(doc, "contents")},
             "Table of Contents",
         ),
     )
@@ -792,27 +790,27 @@ def addTOCSection(doc):
     previousLevel = 1
     containers = [0, 1, 2, 3, 4, 5, 6, 7]
     containers[1] = toc
-    containers[2] = appendChild(containers[1], E.ol({"class": "toc", "role": "directory"}))
-    for header in findAll("h2, h3, h4, h5, h6", doc):
+    containers[2] = h.appendChild(containers[1], h.E.ol({"class": "toc", "role": "directory"}))
+    for header in h.findAll("h2, h3, h4, h5, h6", doc):
         level = int(header.tag[-1])
         container = containers[level]
         if isinstance(container, int):
             # Saw a low-level heading without first seeing a higher heading.
-            die(
-                f"Saw an <h{level}> without seeing an <h{level-1}> first. Please order your headings properly.\n{outerHTML(header)}",
+            m.die(
+                f"Saw an <h{level}> without seeing an <h{level-1}> first. Please order your headings properly.\n{h.outerHTML(header)}",
                 el=header,
             )
             return
         if level > previousLevel + 1:
             # Jumping two levels is a no-no.
-            die(
-                f"Heading level jumps more than one level, from h{previousLevel} to h{level}:\n{outerHTML(header)}",
+            m.die(
+                f"Heading level jumps more than one level, from h{previousLevel} to h{level}:\n{h.outerHTML(header)}",
                 el=header,
             )
             return
 
         addToTOC = True
-        if hasClass(header, "no-toc"):
+        if h.hasClass(header, "no-toc"):
             # Hit a no-toc, suppress the entire section.
             addToTOC = False
         elif container is None:
@@ -821,50 +819,50 @@ def addTOCSection(doc):
             addToTOC = False
 
         if addToTOC:
-            li = appendChild(
+            li = h.appendChild(
                 container,
-                E.li(
-                    E.a(
+                h.E.li(
+                    h.E.a(
                         {"href": "#" + header.get("id")},
-                        E.span({"class": "secno"}, header.get("data-level", "")),
+                        h.E.span({"class": "secno"}, header.get("data-level", "")),
                         " ",
-                        copy.deepcopy(find(".content", header)),
+                        copy.deepcopy(h.find(".content", header)),
                     )
                 ),
             )
-            containers[level + 1] = appendChild(li, E.ol({"class": "toc"}))
+            containers[level + 1] = h.appendChild(li, h.E.ol({"class": "toc"}))
         else:
             containers[level + 1] = None
         previousLevel = level
 
     container = containers[1]
-    for el in findAll(".content a, .content dfn", container):
+    for el in h.findAll(".content a, .content dfn", container):
         el.tag = "span"
         if "href" in el.attrib:
             del el.attrib["href"]
-    for el in findAll(".content [id]", container):
+    for el in h.findAll(".content [id]", container):
         del el.attrib["id"]
-    for el in findAll("ol:empty", container):
-        removeNode(el)
+    for el in h.findAll("ol:empty", container):
+        h.removeNode(el)
 
 
 def addSpecMetadataSection(doc):
     def printEditor(editor):
-        dd = E.dd({"class": "editor p-author h-card vcard"})
+        dd = h.E.dd({"class": "editor p-author h-card vcard"})
         if editor["w3cid"]:
             dd.attrib["data-editor-id"] = editor["w3cid"]
         if editor["link"]:
-            appendChild(
+            h.appendChild(
                 dd,
-                E.a(
+                h.E.a(
                     {"class": "p-name fn u-url url", "href": editor["link"]},
                     editor["name"],
                 ),
             )
         elif editor["email"]:
-            appendChild(
+            h.appendChild(
                 dd,
-                E.a(
+                h.E.a(
                     {
                         "class": "p-name fn u-email email",
                         "href": "mailto:" + editor["email"],
@@ -873,18 +871,18 @@ def addSpecMetadataSection(doc):
                 ),
             )
         else:
-            appendChild(dd, E.span({"class": "p-name fn"}, editor["name"]))
+            h.appendChild(dd, h.E.span({"class": "p-name fn"}, editor["name"]))
         if editor["org"]:
             if editor["orglink"]:
-                el = E.a({"class": "p-org org", "href": editor["orglink"]}, editor["org"])
+                el = h.E.a({"class": "p-org org", "href": editor["orglink"]}, editor["org"])
             else:
-                el = E.span({"class": "p-org org"}, editor["org"])
-            appendChild(dd, " (", el, ")")
+                el = h.E.span({"class": "p-org org"}, editor["org"])
+            h.appendChild(dd, " (", el, ")")
         if editor["email"] and editor["link"]:
-            appendChild(
+            h.appendChild(
                 dd,
                 " ",
-                E.a(
+                h.E.a(
                     {"class": "u-email email", "href": "mailto:" + editor["email"]},
                     editor["email"],
                 ),
@@ -910,52 +908,52 @@ def addSpecMetadataSection(doc):
             else:
                 missingInfo = True
         if missingInfo:
-            warn(
+            m.warn(
                 f"Bikeshed doesn't have all the translation info for '{lang}'. Please add to bikeshed/spec-data/readonly/languages.json and submit a PR!"
             )
         if nativeName:
-            return E.span(
+            return h.E.span(
                 {"title": name or lang},
-                E.a(
+                h.E.a(
                     {"href": url, "hreflang": lang, "rel": "alternate", "lang": lang},
                     nativeName,
                 ),
             )
         if name:
-            return E.a({"href": url, "hreflang": lang, "rel": "alternate", "title": lang}, name)
-        return E.a({"href": url, "hreflang": lang, "rel": "alternate"}, lang)
+            return h.E.a({"href": url, "hreflang": lang, "rel": "alternate", "title": lang}, name)
+        return h.E.a({"href": url, "hreflang": lang, "rel": "alternate"}, lang)
 
     def printPreviousVersion(v):
         if v["type"] == "url":
-            return E.a({"href": v["value"], "rel": "prev"}, v["value"])
+            return h.E.a({"href": v["value"], "rel": "prev"}, v["value"])
         if v["type"] == "from-biblio":
             key = v["value"]
         else:  # "from-biblio-implicit"
             key = doc.md.vshortname
         dated = doc.refs.getLatestBiblioRef(key)
         if not dated:
-            die(f"While trying to generate a Previous Version line, couldn't find a dated biblio reference for {key}.")
+            m.die(f"While trying to generate a Previous Version line, couldn't find a dated biblio reference for {key}.")
             return
-        return E.a({"href": dated.url, "rel": "prev"}, dated.url)
+        return h.E.a({"href": dated.url, "rel": "prev"}, dated.url)
 
     md = DefaultOrderedDict(list)
     mac = doc.macros
     if "version" in mac:
-        md["This version"].append(E.a({"href": mac["version"], "class": "u-url"}, mac["version"]))
+        md["This version"].append(h.E.a({"href": mac["version"], "class": "u-url"}, mac["version"]))
     if doc.md.TR:
-        md["Latest published version"].append(E.a({"href": doc.md.TR}, doc.md.TR))
+        md["Latest published version"].append(h.E.a({"href": doc.md.TR}, doc.md.TR))
     if doc.md.ED and doc.md.status in config.snapshotStatuses:
-        md["Editor's Draft"].append(E.a({"href": doc.md.ED}, doc.md.ED))
+        md["Editor's Draft"].append(h.E.a({"href": doc.md.ED}, doc.md.ED))
     if doc.md.previousVersions:
         md["Previous Versions"] = [printPreviousVersion(ver) for ver in doc.md.previousVersions]
     if "history" in mac:
-        md["History"] = [E.a({"href": mac["history"], "class": "u-url"}, mac["history"])]
+        md["History"] = [h.E.a({"href": mac["history"], "class": "u-url"}, mac["history"])]
     else:
         if doc.md.versionHistory:
-            md["Version History"] = [E.a({"href": vh}, vh) for vh in doc.md.versionHistory]
+            md["Version History"] = [h.E.a({"href": vh}, vh) for vh in doc.md.versionHistory]
     if doc.md.mailingList:
-        span = E.span(
-            E.a(
+        span = h.E.span(
+            h.E.a(
                 {
                     "href": "mailto:"
                     + doc.md.mailingList
@@ -966,14 +964,14 @@ def addSpecMetadataSection(doc):
                 doc.md.mailingList,
             ),
             " with subject line “",
-            E.kbd("[", mac["shortname"], "] ", E.i({"lt": ""}, "… message topic …")),
+            h.E.kbd("[", mac["shortname"], "] ", h.E.i({"lt": ""}, "… message topic …")),
             "”",
         )
         if doc.md.mailingListArchives:
-            appendChild(
+            h.appendChild(
                 span,
                 " (",
-                E.a(
+                h.E.a(
                     {"rel": "discussion", "href": doc.md.mailingListArchives},
                     "archives",
                 ),
@@ -981,17 +979,17 @@ def addSpecMetadataSection(doc):
             )
         md["Feedback"].append(span)
     if doc.md.implementationReport is not None:
-        md["Implementation Report"].append(E.a({"href": doc.md.implementationReport}, doc.md.implementationReport))
+        md["Implementation Report"].append(h.E.a({"href": doc.md.implementationReport}, doc.md.implementationReport))
     if doc.md.testSuite is not None:
-        md["Test Suite"].append(E.a({"href": doc.md.testSuite}, doc.md.testSuite))
+        md["Test Suite"].append(h.E.a({"href": doc.md.testSuite}, doc.md.testSuite))
     elif (doc.md.vshortname in doc.testSuites) and (doc.testSuites[doc.md.vshortname]["url"] is not None):
         url = doc.testSuites[doc.md.vshortname]["url"]
-        md["Test Suite"].append(E.a({"href": url}, url))
+        md["Test Suite"].append(h.E.a({"href": url}, url))
     if doc.md.issues:
         if doc.md.TR:
-            md["Feedback"].extend([E.a({"href": href}, text) for text, href in doc.md.issues])
+            md["Feedback"].extend([h.E.a({"href": href}, text) for text, href in doc.md.issues])
         else:
-            md["Issue Tracking"] = [E.a({"href": href}, text) for text, href in doc.md.issues]
+            md["Issue Tracking"] = [h.E.a({"href": href}, text) for text, href in doc.md.issues]
     if doc.md.editors:
         md["Editor"] = list(map(printEditor, doc.md.editors))
     if doc.md.previousEditors:
@@ -1002,17 +1000,17 @@ def addSpecMetadataSection(doc):
         md["Audience"] = [", ".join(doc.md.audience)]
     if doc.md.toggleDiffs:
         md["Toggle Diffs"] = [
-            E.label(
-                {"for": safeID(doc, "hidedel"), "id": safeID(doc, "hidedel-label")},
+            h.E.label(
+                {"for": h.safeID(doc, "hidedel"), "id": h.safeID(doc, "hidedel-label")},
                 "Hide deleted text",
             )
         ]
-        prependChild(
+        h.prependChild(
             doc.body,
-            E.input(
+            h.E.input(
                 {
                     "type": "checkbox",
-                    "id": safeID(doc, "hidedel"),
+                    "id": h.safeID(doc, "hidedel"),
                     "style": "display:none",
                 }
             ),
@@ -1047,17 +1045,17 @@ def addSpecMetadataSection(doc):
             displayKey = pluralization[displayKey]
         # Handle some custom <dt> structures
         if key in ("Editor", "Former Editor"):
-            ret = [E.dt({"class": "editor"}, displayKey, ":")]
+            ret = [h.E.dt({"class": "editor"}, displayKey, ":")]
         elif key == "Translations":
-            ret = [E.dt(displayKey, " ", E.small("(non-normative)"), ":")]
+            ret = [h.E.dt(displayKey, " ", h.E.small("(non-normative)"), ":")]
         else:
-            ret = [E.dt(displayKey, ":")]
+            ret = [h.E.dt(displayKey, ":")]
         # Add all the values, wrapping in a <dd> if necessary.
         for val in vals:
-            if isElement(val) and val.tag == "dd":
+            if h.isElement(val) and val.tag == "dd":
                 ret.append(val)
             else:
-                ret.append(E.dd({}, val))
+                ret.append(h.E.dd({}, val))
         return ret
 
     # Merge "custom" metadata into non-custom, when they match up
@@ -1066,13 +1064,13 @@ def addSpecMetadataSection(doc):
     for k, vs in doc.md.otherMetadata.items():
         for i, v in enumerate(vs):
             if isinstance(v, str):
-                vs[i] = parseHTML(doc.fixText(v))
+                vs[i] = h.parseHTML(doc.fixText(v))
         if k in md:
             md[k].extend(vs)
         else:
             otherMd[k] = vs
 
-    dl = E.dl()
+    dl = h.E.dl()
     for key in doc.md.metadataOrder:
         if key == "*":
             # Do all the non-explicit non-custom keys
@@ -1083,7 +1081,7 @@ def addSpecMetadataSection(doc):
                 if k not in doc.md.metadataInclude:
                     # Explicitly excluded
                     continue
-                appendChild(dl, *createMdEntry(k, vs))
+                h.appendChild(dl, *createMdEntry(k, vs))
         elif key == "!*":
             # Do all the non-explicit custom keys
             for k, vs in otherMd.items():
@@ -1091,15 +1089,15 @@ def addSpecMetadataSection(doc):
                     continue
                 if k not in doc.md.metadataInclude:
                     continue
-                appendChild(dl, *createMdEntry(k, vs))
+                h.appendChild(dl, *createMdEntry(k, vs))
         elif key not in doc.md.metadataInclude:
             # Key explicitly excluded
             continue
         elif key in md:
-            appendChild(dl, *createMdEntry(key, md[key]))
+            h.appendChild(dl, *createMdEntry(key, md[key]))
         elif key in otherMd:
-            appendChild(dl, *createMdEntry(key, otherMd[key]))
-    fillWith("spec-metadata", E.div(dl), doc=doc)
+            h.appendChild(dl, *createMdEntry(key, otherMd[key]))
+    fillWith("spec-metadata", h.E.div(dl), doc=doc)
 
 
 def addReferencesSection(doc):
@@ -1119,31 +1117,31 @@ def addReferencesSection(doc):
             return linkText.upper()
         return linkText
 
-    appendChild(
+    h.appendChild(
         container,
-        E.h2({"class": "no-num no-ref", "id": safeID(doc, "references")}, "References"),
+        h.E.h2({"class": "no-num no-ref", "id": h.safeID(doc, "references")}, "References"),
     )
 
     normRefs = sorted(doc.normativeRefs.values(), key=lambda r: r.linkText.lower())
     if len(normRefs) > 0:
-        dl = appendChild(
+        dl = h.appendChild(
             container,
-            E.h3(
-                {"class": "no-num no-ref", "id": safeID(doc, "normative")},
+            h.E.h3(
+                {"class": "no-num no-ref", "id": h.safeID(doc, "normative")},
                 "Normative References",
             ),
-            E.dl(),
+            h.E.dl(),
         )
         for ref in normRefs:
             id = "biblio-" + config.simplifyText(ref.linkText)
-            appendChild(
+            h.appendChild(
                 dl,
-                E.dt(
-                    {"id": safeID(doc, id), "data-no-self-link": ""},
+                h.E.dt(
+                    {"id": h.safeID(doc, id), "data-no-self-link": ""},
                     "[" + formatBiblioTerm(ref.linkText) + "]",
                 ),
             )
-            appendChild(dl, E.dd(*ref.toHTML()))
+            h.appendChild(dl, h.E.dd(*ref.toHTML()))
 
     informRefs = [
         x
@@ -1151,52 +1149,52 @@ def addReferencesSection(doc):
         if x.linkText not in doc.normativeRefs
     ]
     if len(informRefs) > 0:
-        dl = appendChild(
+        dl = h.appendChild(
             container,
-            E.h3(
-                {"class": "no-num no-ref", "id": safeID(doc, "informative")},
+            h.E.h3(
+                {"class": "no-num no-ref", "id": h.safeID(doc, "informative")},
                 "Informative References",
             ),
-            E.dl(),
+            h.E.dl(),
         )
         for ref in informRefs:
             id = "biblio-" + config.simplifyText(ref.linkText)
-            appendChild(
+            h.appendChild(
                 dl,
-                E.dt(
-                    {"id": safeID(doc, id), "data-no-self-link": ""},
+                h.E.dt(
+                    {"id": h.safeID(doc, id), "data-no-self-link": ""},
                     "[" + formatBiblioTerm(ref.linkText) + "]",
                 ),
             )
-            appendChild(dl, E.dd(*ref.toHTML()))
+            h.appendChild(dl, h.E.dd(*ref.toHTML()))
 
 
 def addIssuesSection(doc):
-    issues = findAll(".issue", doc)
+    issues = h.findAll(".issue", doc)
     if len(issues) == 0:
         return
     container = getFillContainer("issues-index", doc=doc, default=True)
     if container is None:
         return
 
-    appendChild(
+    h.appendChild(
         container,
-        E.h2(
-            {"class": "no-num no-ref", "id": safeID(doc, "issues-index")},
+        h.E.h2(
+            {"class": "no-num no-ref", "id": h.safeID(doc, "issues-index")},
             "Issues Index",
         ),
     )
-    container = appendChild(container, E.div({"style": "counter-reset:issue"}))
+    container = h.appendChild(container, h.E.div({"style": "counter-reset:issue"}))
     for issue in issues:
         el = copy.deepcopy(issue)
         el.tail = None
         if el.tag not in ("pre", "xmp"):
             el.tag = "div"
-        appendChild(container, el)
-        appendChild(
-            el, " ", E.a({"href": "#" + issue.get("id"), "class": "issue-return", "title": "Jump to section"}, "↵")
+        h.appendChild(container, el)
+        h.appendChild(
+            el, " ", h.E.a({"href": "#" + issue.get("id"), "class": "issue-return", "title": "Jump to section"}, "↵")
         )
-    for idel in findAll("[id]", container):
+    for idel in h.findAll("[id]", container):
         del idel.attrib["id"]
-    for dfnel in findAll(config.dfnElementsSelector, container):
+    for dfnel in h.findAll(config.dfnElementsSelector, container):
         dfnel.tag = "span"

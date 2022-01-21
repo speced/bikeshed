@@ -4,21 +4,21 @@ from collections import OrderedDict
 
 import requests
 
-from ..messages import *
+from .. import messages as m
 
 
 def update(path, dryRun=False):
-    say("Downloading Can I Use data...")
+    m.say("Downloading Can I Use data...")
     try:
         response = requests.get("https://raw.githubusercontent.com/Fyrd/caniuse/master/fulldata-json/data-2.0.json")
     except Exception as e:
-        die(f"Couldn't download the Can I Use data.\n{e}")
+        m.die(f"Couldn't download the Can I Use data.\n{e}")
         return
 
     try:
         data = response.json(encoding="utf-8", object_pairs_hook=OrderedDict)
     except Exception as e:
-        die(f"The Can I Use data wasn't valid JSON for some reason. Try downloading again?\n{e}")
+        m.die(f"The Can I Use data wasn't valid JSON for some reason. Try downloading again?\n{e}")
         return
 
     basicData = {"agents": [], "features": {}, "updated": data["updated"]}
@@ -42,7 +42,7 @@ def update(path, dryRun=False):
         elif "u" in s:
             return "u"
         else:
-            die(f"Unknown CanIUse Status '{s}' for {'/'.join(rest)}. Please report this as a Bikeshed issue.")
+            m.die(f"Unknown CanIUse Status '{s}' for {'/'.join(rest)}. Please report this as a Bikeshed issue.")
             return None
 
     def simplifyVersion(v):
@@ -97,7 +97,7 @@ def update(path, dryRun=False):
                 with open(p, "w", encoding="utf-8") as fh:
                     fh.write(json.dumps(feature, indent=1, ensure_ascii=False, sort_keys=True))
         except Exception as e:
-            die(f"Couldn't save Can I Use database to disk.\n{e}")
+            m.die(f"Couldn't save Can I Use database to disk.\n{e}")
             return
-    say("Success!")
+    m.say("Success!")
     return writtenPaths

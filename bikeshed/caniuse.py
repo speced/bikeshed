@@ -2,8 +2,7 @@ import json
 from collections import OrderedDict
 from datetime import datetime
 
-from .h import *
-from .messages import *
+from . import h, messages as m
 
 
 def addCanIUsePanels(doc):
@@ -21,7 +20,7 @@ def addCanIUsePanels(doc):
     classFromBrowser = doc.canIUse.agents
 
     atLeastOnePanel = False
-    elements = findAll("[caniuse]", doc)
+    elements = h.findAll("[caniuse]", doc)
     if not elements:
         return
     validateCanIUseURLs(doc, elements)
@@ -33,10 +32,10 @@ def addCanIUsePanels(doc):
 
         featId = featId.lower()
         if not doc.canIUse.hasFeature(featId):
-            die(f"Unrecognized Can I Use feature ID: {featId}", el=dfn)
+            m.die(f"Unrecognized Can I Use feature ID: {featId}", el=dfn)
         feature = doc.canIUse.getFeature(featId)
 
-        addClass(dfn, "caniuse-paneled")
+        h.addClass(dfn, "caniuse-paneled")
         panel = canIUsePanelFor(
             id=featId,
             data=feature,
@@ -45,10 +44,10 @@ def addCanIUsePanels(doc):
         )
         dfnId = dfn.get("id")
         if not dfnId:
-            die(f"Elements with `caniuse` attribute need to have an ID as well. Got:\n{serializeTag(dfn)}", el=dfn)
+            m.die(f"Elements with `caniuse` attribute need to have an ID as well. Got:\n{h.serializeTag(dfn)}", el=dfn)
             continue
         panel.set("data-dfn-id", dfnId)
-        appendChild(doc.body, panel)
+        h.appendChild(doc.body, panel)
         atLeastOnePanel = True
 
     if atLeastOnePanel:
@@ -130,27 +129,27 @@ def addCanIUsePanels(doc):
 
 
 def canIUsePanelFor(id, data, update, classFromBrowser):
-    panel = E.aside(
+    panel = h.E.aside(
         {"class": "caniuse-status wrapped", "data-deco": ""},
-        E.input({"value": "CanIUse", "type": "button", "class": "caniuse-panel-btn"}),
+        h.E.input({"value": "CanIUse", "type": "button", "class": "caniuse-panel-btn"}),
     )
-    mainPara = E.p({"class": "support"}, E.b({}, "Support:"))
-    appendChild(panel, mainPara)
+    mainPara = h.E.p({"class": "support"}, h.E.b({}, "Support:"))
+    h.appendChild(panel, mainPara)
     for browser, support in data["support"].items():
         statusCode = support[0]
         if statusCode == "u":
             continue
         minVersion = support[2:]
-        appendChild(
+        h.appendChild(
             mainPara,
             browserCompatSpan(classFromBrowser[browser], browser, statusCode, minVersion),
         )
-    appendChild(
+    h.appendChild(
         panel,
-        E.p(
+        h.E.p(
             {"class": "caniuse"},
             "Source: ",
-            E.a({"href": "https://caniuse.com/#feat=" + id}, "caniuse.com"),
+            h.E.a({"href": "https://caniuse.com/#feat=" + id}, "caniuse.com"),
             " as of " + update,
         ),
     )
@@ -167,12 +166,12 @@ def browserCompatSpan(browserCodeName, browserFullName, statusCode, minVersion=N
     # browserCodeName: e.g. and_chr, ios_saf, ie, etc...
     # browserFullName: e.g. "Chrome for Android"
     statusClass = {"y": "yes", "n": "no", "a": "partial"}[statusCode]
-    outer = E.span({"class": browserCodeName + " " + statusClass})
+    outer = h.E.span({"class": browserCodeName + " " + statusClass})
     if statusCode == "a":
-        appendChild(outer, E.span({}, E.span({}, browserFullName, " (limited)")))
+        h.appendChild(outer, h.E.span({}, h.E.span({}, browserFullName, " (limited)")))
     else:
-        appendChild(outer, E.span({}, browserFullName))
-    appendChild(outer, E.span({}, minVersion))
+        h.appendChild(outer, h.E.span({}, browserFullName))
+    h.appendChild(outer, h.E.span({}, minVersion))
     return outer
 
 
@@ -187,7 +186,7 @@ def validateCanIUseURLs(doc, elements):
                 sawTheURL = True
                 urlFeatures.add(featureID)
         if not sawTheURL and url not in doc.md.ignoreCanIUseUrlFailure:
-            warn(
+            m.warn(
                 f"The Can I Use URL '{url}' isn't associated with any of the Can I Use features."
                 "Please check Can I Use for the correct spec url, and either correct your spec or correct Can I Use."
                 "If the URL is correct and you'd like to keep it in pre-emptively, add the URL to a 'Ignore Can I Use URL Failure' metadata."
@@ -204,7 +203,7 @@ def validateCanIUseURLs(doc, elements):
     unusedFeatures = urlFeatures - docFeatures
     if unusedFeatures:
         featureList = "\n".join(" * {0} - https://caniuse.com/#feat={0}".format(x) for x in sorted(unusedFeatures))
-        warn(
+        m.warn(
             f"The following Can I Use features are associated with your URLs, but don't show up in your spec:\n{featureList}"
         )
 

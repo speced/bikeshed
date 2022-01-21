@@ -9,8 +9,7 @@ from ..h import (
     textContent,
     parseHTML,
 )
-from ..messages import *
-from .. import config
+from .. import config, messages as m
 
 
 def processWptElements(doc):
@@ -31,7 +30,7 @@ def processWptElements(doc):
         testNames = testNamesFromEl(el, pathPrefix=pathPrefix)
         for testName in testNames:
             if testName not in testData:
-                die(f"Couldn't find WPT test '{testName}' - did you misspell something?", el=el)
+                m.die(f"Couldn't find WPT test '{testName}' - did you misspell something?", el=el)
                 continue
             seenTestNames.add(testName)
             if atLeastOneVisibleTest is False and el.get("hidden") is None:
@@ -54,23 +53,23 @@ def processWptElements(doc):
     if wptRestElements and testData is None:
         testData = loadTestData(doc)
     if len(wptRestElements) > 1:
-        die(f"Only one <wpt-rest> element allowed per document, you have {len(wptRestElements)}.")
+        m.die(f"Only one <wpt-rest> element allowed per document, you have {len(wptRestElements)}.")
         wptRestElements = wptRestElements[0:1]
     elif len(wptRestElements) == 1:
         localPrefix = wptRestElements[0].get("pathprefix")
         if localPrefix is not None:
             pathPrefix = localPrefix
         if pathPrefix is None:
-            die("Can't use <wpt-rest> without either a pathprefix=" " attribute or a 'WPT Path Prefix' metadata.")
+            m.die("Can't use <wpt-rest> without either a pathprefix=" " attribute or a 'WPT Path Prefix' metadata.")
             return
         prefixedNames = [p for p in testData if prefixInPath(pathPrefix, p) and p not in seenTestNames]
         if len(prefixedNames) == 0:
-            die(f"Couldn't find any tests with the path prefix '{pathPrefix}'.")
+            m.die(f"Couldn't find any tests with the path prefix '{pathPrefix}'.")
             return
         atLeastOneElement = True
         atLeastOneVisibleTest = True
         createHTML(doc, wptRestElements[0], prefixedNames, testData)
-        warn(
+        m.warn(
             "<wpt-rest> is intended for debugging only. Move the tests to <wpt> elements next to what they're testing."
         )
     else:
@@ -120,7 +119,7 @@ def createHTML(doc, blockEl, testNames, testData, title=None, titleLang=None, ti
         appendChild(blockEl, testSummaryEl)
         appendTestList(blockEl, testNames, testData, title, titleLang, titleDir)
     else:
-        die("Programming error, uncaught WPT Display value in createHTML.")
+        m.die("Programming error, uncaught WPT Display value in createHTML.")
 
 
 def appendTestList(blockEl, testNames, testData, title=None, titleLang=None, titleDir=None):
@@ -137,7 +136,7 @@ def appendTestList(blockEl, testNames, testData, title=None, titleLang=None, tit
     appendChild(blockEl, testListEl)
     for testName in testNames:
         if testName not in testData:
-            warn(f"Cannot find '{testName}' in the test data.")
+            m.warn(f"Cannot find '{testName}' in the test data.")
             continue
         if ".https." in testName or ".serviceworker." in testName:
             liveTestScheme = "https"
@@ -205,7 +204,7 @@ def appendTestList(blockEl, testNames, testData, title=None, titleLang=None, tit
                 ),
             )
         else:
-            warn(
+            m.warn(
                 f"Programming error, the test {testName} is of type {testType}, which I don't know how to render. Please report this!"
             )
             continue
@@ -264,7 +263,7 @@ def checkForOmittedTests(pathPrefix, testData, seenTestNames):
                 unseenTests.append(testPath)
     if unseenTests:
         numTests = len(unseenTests)
-        warn(
+        m.warn(
             f"There are {numTests} WPT tests underneath your path prefix '{pathPrefix}' that aren't in your document and must be added. (Use a <wpt hidden> if you don't actually want them in your document.)\n"
             + "\n".join("  " + path for path in sorted(unseenTests)),
         )

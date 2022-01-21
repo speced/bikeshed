@@ -1,4 +1,4 @@
-from .h import *
+from . import h
 
 trackingVectorId = "b732b3fe"  # hashlib.md5("tracking-vector").hexdigest()[0:8], to minimize chance of collision
 
@@ -7,20 +7,20 @@ def addTrackingVector(doc):
     if doc.md.trackingVectorClass is None:
         return
 
-    els = findAll("[tracking-vector]", doc)
+    els = h.findAll("[tracking-vector]", doc)
 
     if len(els) == 0:
         return
 
     if doc.md.trackingVectorImage is None:
         # Generate an SVG and <use> it in all the individual spots
-        appendChild(
+        h.appendChild(
             doc.body,
-            E.svg(
+            h.E.svg(
                 {"viewBox": "0 0 46 64", "style": "display:none"},
-                E.defs(
+                h.E.defs(
                     {},
-                    E.path(
+                    h.E.path(
                         {
                             "id": trackingVectorId,
                             "stroke": "black",
@@ -36,10 +36,10 @@ def addTrackingVector(doc):
         )
 
     for el in els:
-        prependChild(el, " ")  # The space is to separate from the following text.
-        prependChild(
+        h.prependChild(el, " ")  # The space is to separate from the following text.
+        h.prependChild(
             el,
-            E.a(
+            h.E.a(
                 {
                     "class": doc.md.trackingVectorClass,
                     "href": "https://infra.spec.whatwg.org/#tracking-vector",
@@ -53,18 +53,18 @@ def addTrackingVector(doc):
                 ),
             ),
         )
-        removeAttr(el, "tracking-vector")
+        h.removeAttr(el, "tracking-vector")
 
 
 def trackingVectorImage(imageURL, imageWidth, imageHeight, altText, title):
     if imageURL is None:
 
-        return E.svg(
+        return h.E.svg(
             {"width": "46", "height": "64", "role": "img", "aria-label": altText},
-            E.title({}, title),
-            E.use({"href": "#" + trackingVectorId}),
+            h.E.title({}, title),
+            h.E.use({"href": "#" + trackingVectorId}),
         )
-    return E.img(
+    return h.E.img(
         {
             "title": title,
             "alt": altText,

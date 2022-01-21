@@ -2,10 +2,8 @@ import difflib
 import glob
 import os
 import re
-from itertools import *
 
-from . import config
-from .messages import *
+from . import config, messages as m
 from .Spec import Spec
 
 TEST_DIR = os.path.abspath(os.path.join(config.scriptPath(), "..", "tests"))
@@ -50,14 +48,14 @@ def sortTests(tests):
 def runAllTests(patterns=None, manualOnly=False, md=None):  # pylint: disable=unused-argument
     paths = testPaths(patterns)
     if len(paths) == 0:
-        p("No tests were found")
+        m.p("No tests were found")
         return True
     numPassed = 0
     total = 0
     fails = []
     for i, path in enumerate(paths, 1):
         testName = testNameForPath(path)
-        p(f"{ratio(i,len(paths))}: {testName}")
+        m.p(f"{ratio(i,len(paths))}: {testName}")
         total += 1
         doc = processTest(path, md)
         outputText = doc.serialize()
@@ -68,12 +66,12 @@ def runAllTests(patterns=None, manualOnly=False, md=None):  # pylint: disable=un
         else:
             fails.append(testName)
     if numPassed == total:
-        p(printColor("✔ All tests passed.", color="green"))
+        m.p(m.printColor("✔ All tests passed.", color="green"))
         return True
-    p(printColor(f"✘ {numPassed}/{total} tests passed.", color="red"))
-    p(printColor("Failed Tests:", color="red"))
+    m.p(m.printColor(f"✘ {numPassed}/{total} tests passed.", color="red"))
+    m.p(m.printColor("Failed Tests:", color="red"))
     for fail in fails:
-        p("* " + fail)
+        m.p("* " + fail)
 
 
 def processTest(path, md=None, fileRequester=config.DataFileRequester(type="readonly")):
@@ -90,24 +88,24 @@ def compare(suspect, golden):
         return True
     for line in difflib.unified_diff(golden.split("\n"), suspect.split("\n"), fromfile="golden", tofile="suspect"):
         if line[0] == "-":
-            p(printColor(line, color="red"))
+            m.p(m.printColor(line, color="red"))
         elif line[0] == "+":
-            p(printColor(line, color="green"))
+            m.p(m.printColor(line, color="green"))
         else:
-            p(line)
-    p("")
+            m.p(line)
+    m.p("")
     return False
 
 
 def rebase(patterns=None, md=None):
     paths = testPaths(patterns)
     if len(paths) == 0:
-        p("No tests were found.")
+        m.p("No tests were found.")
         return True
     for i, path in enumerate(paths, 1):
         name = testNameForPath(path)
-        resetSeenMessages()
-        p(f"{ratio(i,len(paths))}: Rebasing {name}")
+        m.resetSeenMessages()
+        m.p(f"{ratio(i,len(paths))}: Rebasing {name}")
         doc = processTest(path, md)
         doc.finish(newline="\n")
 

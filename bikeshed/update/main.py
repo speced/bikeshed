@@ -1,7 +1,6 @@
 import os
 
-from .. import config
-from ..messages import *
+from .. import config, messages as m
 from . import (
     manifest,
     updateBackRefs,
@@ -39,7 +38,7 @@ def update(
     if not force:
         success = manifest.updateByManifest(path=path, dryRun=dryRun)
         if not success:
-            say("Falling back to a manual update...")
+            m.say("Falling back to a manual update...")
             force = True
     if force:
         # fmt: off
@@ -80,7 +79,7 @@ def fixupDataFiles():
         with open(remotePath("version.txt"), encoding="utf-8") as fh:
             remoteVersion = int(fh.read())
     except OSError as err:
-        warn(f"Couldn't check the datafile version. Bikeshed may be unstable.\n{err}")
+        m.warn(f"Couldn't check the datafile version. Bikeshed may be unstable.\n{err}")
         return
 
     if localVersion == remoteVersion:
@@ -94,7 +93,7 @@ def fixupDataFiles():
         for filename in os.listdir(remotePath()):
             copyanything(remotePath(filename), localPath(filename))
     except Exception as err:
-        warn(f"Couldn't update datafiles from cache. Bikeshed may be unstable.\n{err}")
+        m.warn(f"Couldn't update datafiles from cache. Bikeshed may be unstable.\n{err}")
         return
 
 
@@ -111,7 +110,7 @@ def updateReadonlyDataFiles():
                 continue
             copyanything(localPath(filename), remotePath(filename))
     except Exception as err:
-        warn(f"Error copying over the datafiles:\n{err}")
+        m.warn(f"Error copying over the datafiles:\n{err}")
         return
 
 
@@ -140,7 +139,7 @@ def cleanupFiles(root, touchedPaths, dryRun=False):
         deletableFolders.extend(["boilerplate"])
         paths.update(touchedPaths["boilerplate"])
 
-    say("Cleaning up old data files...")
+    m.say("Cleaning up old data files...")
     oldPaths = []
     for absPath, relPath in getDatafilePaths(root):
         if "/" not in relPath and relPath not in deletableFiles:
@@ -151,9 +150,9 @@ def cleanupFiles(root, touchedPaths, dryRun=False):
             os.remove(absPath)
             oldPaths.append(relPath)
     if oldPaths:
-        say(f"Success! Deleted {len(oldPaths)} old files.")
+        m.say(f"Success! Deleted {len(oldPaths)} old files.")
     else:
-        say("Success! Nothing to delete.")
+        m.say("Success! Nothing to delete.")
 
 
 def copyanything(src, dst):

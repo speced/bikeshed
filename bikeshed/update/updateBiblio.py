@@ -5,13 +5,12 @@ from collections import defaultdict
 
 import requests
 
-from .. import biblio
+from .. import biblio, messages as m
 from ..DefaultOrderedDict import DefaultOrderedDict
-from ..messages import *
 
 
 def update(path, dryRun=False):
-    say("Downloading biblio data...")
+    m.say("Downloading biblio data...")
     biblios = defaultdict(list)
     biblio.processSpecrefBiblioFile(getSpecrefData(), biblios, order=3)
     biblio.processSpecrefBiblioFile(getWG21Data(), biblios, order=3)
@@ -27,7 +26,7 @@ def update(path, dryRun=False):
                 with open(p, "w", encoding="utf-8") as fh:
                     writeBiblioFile(fh, biblios)
             except Exception as e:
-                die(f"Couldn't save biblio database to disk.\n{e}")
+                m.die(f"Couldn't save biblio database to disk.\n{e}")
                 return
 
         # biblio-keys is used to help correct typos,
@@ -74,7 +73,7 @@ def update(path, dryRun=False):
             with open(p, "w", encoding="utf-8") as fh:
                 fh.write(str(json.dumps(reducedNames, indent=0, ensure_ascii=False, sort_keys=True)))
         except Exception as e:
-            die(f"Couldn't save biblio database to disk.\n{e}")
+            m.die(f"Couldn't save biblio database to disk.\n{e}")
             return
 
         # Collect all the number-suffix names which also exist un-numbered
@@ -85,8 +84,8 @@ def update(path, dryRun=False):
             with open(p, "w", encoding="utf-8") as fh:
                 fh.write(str(json.dumps(numberedNames, indent=0, ensure_ascii=False, sort_keys=True)))
         except Exception as e:
-            die(f"Couldn't save biblio numeric-suffix information to disk.\n{e}")
-    say("Success!")
+            m.die(f"Couldn't save biblio numeric-suffix information to disk.\n{e}")
+    m.say("Success!")
     return writtenPaths
 
 
@@ -94,7 +93,7 @@ def getSpecrefData():
     try:
         return requests.get("https://api.specref.org/bibrefs").text
     except Exception as e:
-        die(f"Couldn't download the SpecRef biblio data.\n{e}")
+        m.die(f"Couldn't download the SpecRef biblio data.\n{e}")
         return "{}"
 
 
@@ -102,7 +101,7 @@ def getWG21Data():
     try:
         return requests.get("https://wg21.link/specref.json").text
     except Exception as e:
-        die(f"Couldn't download the WG21 biblio data.\n{e}")
+        m.die(f"Couldn't download the WG21 biblio data.\n{e}")
         return "{}"
 
 
@@ -110,7 +109,7 @@ def getCSSWGData():
     try:
         return requests.get("https://raw.githubusercontent.com/w3c/csswg-drafts/master/biblio.ref").text.splitlines()
     except Exception as e:
-        die(f"Couldn't download the CSSWG biblio data.\n{e}")
+        m.die(f"Couldn't download the CSSWG biblio data.\n{e}")
         return []
 
 
@@ -173,7 +172,7 @@ def writeBiblioFile(fh, biblios):
             fh.write(b["linkText"] + "\n")
             fh.write(b["aliasOf"] + "\n")
         else:
-            die(f"The biblio key '{key}' has an unknown biblio type '{format}'.")
+            m.die(f"The biblio key '{key}' has an unknown biblio type '{format}'.")
             continue
         fh.write("-" + "\n")
 

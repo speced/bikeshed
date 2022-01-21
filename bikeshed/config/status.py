@@ -1,4 +1,4 @@
-from ..messages import *
+from ..messages import die, warn
 from .main import englishFromList
 
 shortToLongStatus = {

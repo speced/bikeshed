@@ -1,6 +1,4 @@
-from ..h import *
-from ..messages import *
-
+from .. import h, messages as m
 
 def exampleIDs(doc):
     """
@@ -8,5 +6,5 @@ def exampleIDs(doc):
     """
     if not doc.md.complainAbout["missing-example-ids"]:
         return
-    for el in findAll(".example:not([id])", doc):
-        warn(f"Example needs ID:\n{outerHTML(el)[0:100]}", el=el)
+    for el in h.findAll(".example:not([id])", doc):
+        m.warn(f"Example needs ID:\n{h.outerHTML(el)[0:100]}", el=el)

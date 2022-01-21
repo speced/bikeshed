@@ -3,9 +3,8 @@ import json
 import os
 import sys
 
-from . import config, constants, update
+from . import config, constants, update, messages as m
 from .config.printjson import getjson
-from .messages import *
 
 
 def main():
@@ -551,15 +550,15 @@ def handleDebug(options, extras):
         refs = doc.refs[options.linkText] + doc.refs[options.linkText + "\n"]
         constants.quiet = options.quiet
         if not constants.quiet:
-            p(f"Refs for '{options.linkText}':")
+            m.p(f"Refs for '{options.linkText}':")
         # Get ready for JSONing
         for ref in refs:
             ref["level"] = str(ref["level"])
-        p(config.printjson(refs))
+        m.p(config.printjson(refs))
     elif options.refreshData:
         constants.quiet = 0
         update.updateReadonlyDataFiles()
-        warn("Don't forget to bump the version number!")
+        m.warn("Don't forget to bump the version number!")
     elif options.printMetadata:
         doc = Spec(inputFilename=options.infile)
         doc.mdCommandLine = metadata.fromCommandLine(extras)
@@ -600,9 +599,9 @@ def handleRefs(options, extras):
         exact=options.exact,
     )
     if constants.printMode == "json":
-        p(json.dumps(refs, indent=2, default=getjson))
+        m.p(json.dumps(refs, indent=2, default=getjson))
     else:
-        p(config.printjson(refs))
+        m.p(config.printjson(refs))
 
 
 def handleIssuesList(options):
@@ -655,7 +654,7 @@ def handleProfile(options):
 
 
 def handleTemplate():
-    p(
+    m.p(
         """<pre class='metadata'>
 Title: Your Spec Title
 Shortname: your-spec
@@ -677,7 +676,7 @@ Introduction here.
 
 def handleWpt(options):
     if options.template:
-        p(
+        m.p(
             """
 <!DOCTYPE html>
 <meta charset=utf-8>
