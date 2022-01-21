@@ -22,4 +22,6 @@ def unusedInternalDfns(doc):
 
     for el in noexportDfns:
         if el.get("id") not in localHrefs:
-            m.warn(f"Unexported dfn that's not referenced locally - did you mean to export it?\n{h.outerHTML(el)}", el=el)
+            m.warn(
+                f"Unexported dfn that's not referenced locally - did you mean to export it?\n{h.outerHTML(el)}", el=el
+            )

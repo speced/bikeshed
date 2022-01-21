@@ -932,7 +932,9 @@ def addSpecMetadataSection(doc):
             key = doc.md.vshortname
         dated = doc.refs.getLatestBiblioRef(key)
         if not dated:
-            m.die(f"While trying to generate a Previous Version line, couldn't find a dated biblio reference for {key}.")
+            m.die(
+                f"While trying to generate a Previous Version line, couldn't find a dated biblio reference for {key}."
+            )
             return
         return h.E.a({"href": dated.url, "rel": "prev"}, dated.url)
 

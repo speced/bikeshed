@@ -1,5 +1,6 @@
 from .. import h, messages as m
 
+
 def exampleIDs(doc):
     """
     Checks that every example in the document has an ID.

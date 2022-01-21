@@ -702,7 +702,9 @@ def parseMarkupShorthands(key, val, lineNum):  # pylint: disable=unused-argument
     for v in vals:
         pieces = v.split()
         if len(pieces) != 2:
-            m.die(f"Markup Shorthand metadata pieces are a shorthand category and a boolean. Got:\n{v}", lineNum=lineNum)
+            m.die(
+                f"Markup Shorthand metadata pieces are a shorthand category and a boolean. Got:\n{v}", lineNum=lineNum
+            )
             continue
         name, boolstring = pieces
         if name not in validCategories:

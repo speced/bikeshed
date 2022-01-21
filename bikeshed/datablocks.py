@@ -767,7 +767,9 @@ def processInfo(infos, doc, lineNum=None):
     infoCollections = defaultdict(list)
     for info in infos:
         if len(info.get("info", [])) != 1:
-            m.die(f"Every info-block line needs exactly one 'info' type. Got:\n{config.printjson(info)}", lineNum=lineNum)
+            m.die(
+                f"Every info-block line needs exactly one 'info' type. Got:\n{config.printjson(info)}", lineNum=lineNum
+            )
             continue
         infoType = info.get("info")[0].lower()
         if infoType not in knownInfoTypes:

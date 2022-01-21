@@ -586,7 +586,9 @@ class ReferenceManager:
                 if spec is None:
                     m.linkerror(f"No '{linkType}' refs found for '{text}' with for='{linkFor}'.", el=el)
                 else:
-                    m.linkerror(f"No '{linkType}' refs found for '{text}' with for='{linkFor}' in spec '{spec}'.", el=el)
+                    m.linkerror(
+                        f"No '{linkType}' refs found for '{text}' with for='{linkFor}' in spec '{spec}'.", el=el
+                    )
             return None
         elif failure == "status":
             if zeroRefsError:

@@ -1,5 +1,6 @@
 # pylint: disable=wrong-import-position
 
+
 def verify_python_version():
     import platform
     import sys
