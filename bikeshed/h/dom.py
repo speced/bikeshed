@@ -554,7 +554,7 @@ _classMap: t.Dict[t.Tuple[str, str], bool]
 _classMap = {}
 
 
-def hasClass(el, cls: str, classMap=_classMap):
+def hasClass(el, cls: str, classMap=_classMap):  # pylint: disable=dangerous-default-value
     elClass = el.get("class")
     if elClass is None:
         return False
@@ -869,7 +869,9 @@ def nextIter(it, default=None):
         return default
 
 
-def createElement(tag, attrs={}, *children):
+def createElement(tag, attrs=None, *children):
+    if attrs is None:
+        attrs = {}
     el = etree.Element(tag, {n: v for n, v in attrs.items() if v is not None})
     for child in children:
         appendChild(el, child)

@@ -414,12 +414,14 @@ class Spec:
         except Exception as e:
             m.die(f"Something went wrong while watching the file:\n{e}")
 
-    def fixText(self, text, moreMacros={}):
+    def fixText(self, text, moreMacros=None):
         # Do several textual replacements that need to happen *before* the document is parsed as h.
 
         # If markdown shorthands are on, remove all `foo`s while processing,
         # so their contents don't accidentally trigger other stuff.
         # Also handle markdown escapes.
+        if moreMacros is None:
+            moreMacros = {}
         if "markdown" in self.md.markupShorthands:
             textFunctor = u.MarkdownCodeSpans(text)
         else:

@@ -751,14 +751,20 @@ class TokenStream:
         self,
         tokens,
         numSpacesForIndentation,
-        before={"type": "blank", "prefixlen": 0},
-        after={"type": "eof", "prefixlen": 0},
+        before=None,
+        after=None,
     ):
         self.tokens = tokens
         self.i = 0
         self.numSpacesForIndentation = numSpacesForIndentation
-        self.before = before
-        self.after = after
+        if before is None:
+            self.before = {"type": "blank", "prefixlen": 0}
+        else:
+            self.before = before
+        if after is None:
+            self.after = {"type": "eof", "prefixlen": 0}
+        else:
+            self.after = after
 
     def __len__(self):
         return len(self.tokens)
