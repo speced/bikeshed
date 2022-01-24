@@ -434,7 +434,7 @@ def addExplicitIndexes(doc):
                             break
                         if ref.status == status:
                             # New entry matches status, update and don't re-add it.
-                            refsFromText[text][i] = ref
+                            refsFromText[ref.text][i] = ref
                             break
                     else:
                         # Default to preferring current specs
