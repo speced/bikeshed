@@ -1323,7 +1323,7 @@ def hackyLineNumbers(lines):
     for line in lines:
         line.text = re.sub(
             r"(^|[^<])(<[\w-]+)([ >])",
-            fr"\1\2 line-number={line.i}\3",
+            rf"\1\2 line-number={line.i}\3",
             line.text,
         )
     return lines

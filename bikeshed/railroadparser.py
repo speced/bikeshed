@@ -53,7 +53,7 @@ def parse(string):
             m.die(f"Line {i} jumps more than 1 indent level from the previous line:\n{line.strip()}")
             return rr.Diagram()
         lastIndent = indent
-        if re.match(fr"\s*({blockNames})\W", line):
+        if re.match(rf"\s*({blockNames})\W", line):
             match = re.match(r"\s*(\w+)\s*:\s*(.*)", line)
             if not match:
                 m.die(f"Line {i} doesn't match the grammar 'Command: optional-prelude'. Got:\n{line.strip()}")
@@ -61,7 +61,7 @@ def parse(string):
             command = match.group(1)
             prelude = match.group(2).strip()
             node = {"command": command, "prelude": prelude, "children": [], "line": i}
-        elif re.match(fr"\s*({textNames})\W", line):
+        elif re.match(rf"\s*({textNames})\W", line):
             match = re.match(r"\s*(\w+)(\s[\w\s]+)?:\s*(.*)", line)
             if not match:
                 m.die(f"Line {i} doesn't match the grammar 'Command [optional prelude]: text'. Got:\n{line.strip()},")

@@ -60,7 +60,7 @@ def escapeCSSIdent(val):
             or (i == 0 and 0x30 <= code <= 0x39)
             or (i == 1 and 0x30 <= code <= 0x39 and firstCode == 0x2D)
         ):
-            ident += fr"\{code:x} "
+            ident += rf"\{code:x} "
         elif (
             code >= 0x80
             or code == 0x2D

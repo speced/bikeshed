@@ -159,7 +159,7 @@ def tokenizeLines(
                 }
             )
             continue
-        match = re.match(fr"\s*<({rawElements})[ >]", line.text)
+        match = re.match(rf"\s*<({rawElements})[ >]", line.text)
         if match:
             tokens.append(
                 {
