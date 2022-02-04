@@ -13,7 +13,7 @@ import attr
 import requests
 import tenacity
 
-from . import config
+from .config import main as config
 from .Line import Line
 
 

@@ -1,15 +1,4 @@
-from ..h import (
-    E,
-    addClass,
-    appendChild,
-    clearContents,
-    findAll,
-    removeNode,
-    removeAttr,
-    textContent,
-    parseHTML,
-)
-from .. import config, messages as m
+from .. import config, h, messages as m
 
 
 def processWptElements(doc):
@@ -19,7 +8,7 @@ def processWptElements(doc):
     atLeastOneVisibleTest = False
     testData = None
     # <wpt> elements
-    wptElements = findAll("wpt", doc)
+    wptElements = h.findAll("wpt", doc)
     seenTestNames = set()
     prevEl = None
     for el in wptElements:
@@ -36,20 +25,20 @@ def processWptElements(doc):
             if atLeastOneVisibleTest is False and el.get("hidden") is None:
                 atLeastOneVisibleTest = True
         if el.get("hidden") is not None:
-            removeNode(el)
+            h.removeNode(el)
         else:
             title = el.get("title")
             titleLang = el.get("lang")
             titleDir = el.get("dir")
             if prevEl is not None and prevEl.getnext() is el and (prevEl.tail is None or prevEl.tail.strip() == ""):
                 appendTestList(prevEl, testNames, testData, title, titleLang, titleDir)
-                removeNode(el)
+                h.removeNode(el)
             else:
                 createHTML(doc, el, testNames, testData, title, titleLang, titleDir)
                 prevEl = el
 
     # <wpt-rest> elements
-    wptRestElements = findAll("wpt-rest", doc)
+    wptRestElements = h.findAll("wpt-rest", doc)
     if wptRestElements and testData is None:
         testData = loadTestData(doc)
     if len(wptRestElements) > 1:
@@ -85,9 +74,9 @@ def processWptElements(doc):
             pathPrefix = "/" + pathPrefix
         if pathPrefix != "/":
             doc.md.otherMetadata["Test Suite"].append(
-                E.dd(
+                h.E.dd(
                     {"class": "wpt-overview"},
-                    E.a(
+                    h.E.a(
                         {"href": f"https://wpt.fyi/results{pathPrefix}"},
                         f"https://wpt.fyi/results{pathPrefix}",
                     ),
@@ -104,19 +93,19 @@ def processWptElements(doc):
 
 def createHTML(doc, blockEl, testNames, testData, title=None, titleLang=None, titleDir=None):
     if doc.md.wptDisplay == "none":
-        removeNode(blockEl)
+        h.removeNode(blockEl)
     elif doc.md.wptDisplay in ("inline", "open", "closed"):
         blockEl.tag = "details"
-        addClass(blockEl, "wpt-tests-block")
-        removeAttr(blockEl, "pathprefix")
-        removeAttr(blockEl, "title")
+        h.addClass(blockEl, "wpt-tests-block")
+        h.removeAttr(blockEl, "pathprefix")
+        h.removeAttr(blockEl, "title")
         blockEl.set("lang", "en")
         blockEl.set("dir", "ltr")
         if doc.md.wptDisplay in ("open", "inline"):
             blockEl.set("open", "")
-        clearContents(blockEl)
-        testSummaryEl = E.summary("Tests")
-        appendChild(blockEl, testSummaryEl)
+        h.clearContents(blockEl)
+        testSummaryEl = h.E.summary("Tests")
+        h.appendChild(blockEl, testSummaryEl)
         appendTestList(blockEl, testNames, testData, title, titleLang, titleDir)
     else:
         m.die("Programming error, uncaught WPT Display value in createHTML.")
@@ -124,16 +113,16 @@ def createHTML(doc, blockEl, testNames, testData, title=None, titleLang=None, ti
 
 def appendTestList(blockEl, testNames, testData, title=None, titleLang=None, titleDir=None):
     if title:
-        titleEl = E.p(
+        titleEl = h.E.p(
             {
                 "lang": titleLang,
                 "dir": titleDir,
             },
-            parseHTML(title),
+            h.parseHTML(title),
         )
-        appendChild(blockEl, titleEl)
-    testListEl = E.ul({"class": "wpt-tests-list"})
-    appendChild(blockEl, testListEl)
+        h.appendChild(blockEl, titleEl)
+    testListEl = h.E.ul({"class": "wpt-tests-list"})
+    h.appendChild(blockEl, testListEl)
     for testName in testNames:
         if testName not in testData:
             m.warn(f"Cannot find '{testName}' in the test data.")
@@ -145,9 +134,9 @@ def appendTestList(blockEl, testNames, testData, title=None, titleLang=None, tit
         _, _, lastNameFragment = testName.rpartition("/")
         testType = testData[testName]
         if testType in ["crashtest", "print-reftest", "reftest", "testharness"]:
-            singleTestEl = E.li(
+            singleTestEl = h.E.li(
                 {"class": "wpt-test"},
-                E.a(
+                h.E.a(
                     {
                         "title": testName,
                         "href": "https://wpt.fyi/results/" + testName,
@@ -156,38 +145,38 @@ def appendTestList(blockEl, testNames, testData, title=None, titleLang=None, tit
                     lastNameFragment,
                 ),
                 " ",
-                E.a(
+                h.E.a(
                     {
                         "href": f"{liveTestScheme}://wpt.live/{testName}",
                         "class": "wpt-live",
                     },
-                    E.small("(live test)"),
+                    h.E.small("(live test)"),
                 ),
                 " ",
-                E.a(
+                h.E.a(
                     {
                         "href": "https://github.com/web-platform-tests/wpt/blob/master/" + testName,
                         "class": "wpt-source",
                     },
-                    E.small("(source)"),
+                    h.E.small("(source)"),
                 ),
             )
         elif testType in ["manual", "visual"]:
-            singleTestEl = E.li(
+            singleTestEl = h.E.li(
                 {"class": "wpt-test"},
-                E.span({"class": "wpt-name"}, lastNameFragment, f" ({testType} test) "),
-                E.a(
+                h.E.span({"class": "wpt-name"}, lastNameFragment, f" ({testType} test) "),
+                h.E.a(
                     {
                         "href": "https://github.com/web-platform-tests/wpt/blob/master/" + testName,
                         "class": "wpt-source",
                     },
-                    E.small("(source)"),
+                    h.E.small("(source)"),
                 ),
             )
         elif testType in ["wdspec"]:
-            singleTestEl = E.li(
+            singleTestEl = h.E.li(
                 {"class": "wpt-test"},
-                E.a(
+                h.E.a(
                     {
                         "href": "https://wpt.fyi/results/" + testName,
                         "class": "wpt-name",
@@ -195,12 +184,12 @@ def appendTestList(blockEl, testNames, testData, title=None, titleLang=None, tit
                     lastNameFragment,
                 ),
                 " ",
-                E.a(
+                h.E.a(
                     {
                         "href": "https://github.com/web-platform-tests/wpt/blob/master/" + testName,
                         "class": "wpt-source",
                     },
-                    E.small("(source)"),
+                    h.E.small("(source)"),
                 ),
             )
         else:
@@ -208,9 +197,9 @@ def appendTestList(blockEl, testNames, testData, title=None, titleLang=None, tit
                 f"Programming error, the test {testName} is of type {testType}, which I don't know how to render. Please report this!"
             )
             continue
-        appendChild(testListEl, singleTestEl)
+        h.appendChild(testListEl, singleTestEl)
     if title:
-        appendChild(blockEl, E.hr())
+        h.appendChild(blockEl, h.E.hr())
 
 
 def testNamesFromEl(el, pathPrefix=None):
@@ -218,7 +207,7 @@ def testNamesFromEl(el, pathPrefix=None):
     localPrefix = el.get("pathprefix")
     if localPrefix is not None:
         pathPrefix = localPrefix
-    for name in [x.strip() for x in textContent(el).split("\n")]:
+    for name in [x.strip() for x in h.textContent(el).split("\n")]:
         if name == "":
             continue
         testName = prefixPlusPath(pathPrefix, name)

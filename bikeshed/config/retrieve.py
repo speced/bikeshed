@@ -3,10 +3,8 @@
 import io
 import os
 
-from ..InputSource import InputSource
-from ..messages import die, warn
-from .main import scriptPath
-from .status import splitStatus
+from .. import InputSource, messages as m
+from . import main, status as stat
 
 
 class DataFileRequester:
@@ -49,9 +47,9 @@ class DataFileRequester:
         if fileType is None:
             fileType = self.type
         if fileType == "readonly":
-            return scriptPath("spec-data", "readonly", *segs)
+            return main.scriptPath("spec-data", "readonly", *segs)
         else:
-            return scriptPath("spec-data", *segs)
+            return main.scriptPath("spec-data", *segs)
 
     def _fail(self, location, str, okayToFail):
         if okayToFail:
@@ -90,7 +88,7 @@ def retrieveBoilerplateFile(
             status = doc.md.status
         elif doc.md.rawStatus is not None:
             status = doc.md.rawStatus
-    megaGroup, status = splitStatus(status)
+    megaGroup, status = stat.splitStatus(status)
 
     searchLocally = allowLocal and doc.md.localBoilerplate[name]
 
@@ -106,7 +104,7 @@ def retrieveBoilerplateFile(
     else:
         for f in (statusFile, genericFile):
             if doc.inputSource.cheaplyExists(f):
-                warn(
+                m.warn(
                     f"Found {f} next to the specification without a matching\n"
                     + f"Local Boilerplate: {name} yes\n"
                     + "in the metadata. This include won't be found when building via a URL."
@@ -114,13 +112,13 @@ def retrieveBoilerplateFile(
                 # We should remove this after giving specs time to react to the warning:
                 sources.append(doc.inputSource.relative(f))
     if group:
-        sources.append(InputSource(boilerplatePath(group, statusFile), chroot=False))
-        sources.append(InputSource(boilerplatePath(group, genericFile), chroot=False))
+        sources.append(InputSource.InputSource(boilerplatePath(group, statusFile), chroot=False))
+        sources.append(InputSource.InputSource(boilerplatePath(group, genericFile), chroot=False))
     if megaGroup:
-        sources.append(InputSource(boilerplatePath(megaGroup, statusFile), chroot=False))
-        sources.append(InputSource(boilerplatePath(megaGroup, genericFile), chroot=False))
-    sources.append(InputSource(boilerplatePath(statusFile), chroot=False))
-    sources.append(InputSource(boilerplatePath(genericFile), chroot=False))
+        sources.append(InputSource.InputSource(boilerplatePath(megaGroup, statusFile), chroot=False))
+        sources.append(InputSource.InputSource(boilerplatePath(megaGroup, genericFile), chroot=False))
+    sources.append(InputSource.InputSource(boilerplatePath(statusFile), chroot=False))
+    sources.append(InputSource.InputSource(boilerplatePath(genericFile), chroot=False))
 
     # Watch all the possible sources, not just the one that got used, because if
     # an earlier one appears, we want to rebuild.
@@ -135,7 +133,7 @@ def retrieveBoilerplateFile(
                 pass
     else:
         if error:
-            die(
+            m.die(
                 f"Couldn't find an appropriate include file for the {name} inclusion, given group='{group}' and status='{status}'."
             )
         return ""
