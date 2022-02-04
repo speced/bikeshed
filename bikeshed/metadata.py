@@ -89,7 +89,7 @@ class MetadataManager:
         self.logo = None
         self.mailingList = None
         self.mailingListArchives = None
-        self.markupShorthands = config.BoolSet(["css", "dfn", "biblio", "markup", "idl", "algorithm"])
+        self.markupShorthands = config.BoolSet(["css", "dfn", "biblio", "markup", "http", "idl", "algorithm"])
         self.maxToCDepth = float("inf")
         self.metadataInclude = config.BoolSet(default=True)
         self.metadataOrder = ["*", "!*"]
@@ -698,7 +698,7 @@ def parseMarkupShorthands(key, val, lineNum):  # pylint: disable=unused-argument
     # Output is a dict of the shorthand categories with boolean values.
     vals = [v.strip() for v in val.lower().split(",")]
     ret = config.BoolSet(default=False)
-    validCategories = frozenset(["css", "markup", "dfn", "biblio", "idl", "markdown", "algorithm"])
+    validCategories = frozenset(["css", "markup", "dfn", "biblio", "http", "idl", "markdown", "algorithm"])
     for v in vals:
         pieces = v.split()
         if len(pieces) != 2:

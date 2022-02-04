@@ -205,6 +205,8 @@ def transformAutolinkShortcuts(doc):
         if "dfn" in doc.md.markupShorthands:
             config.processTextNodes(nodes, dfnRe, dfnReplacer)
             config.processTextNodes(nodes, abstractRe, abstractReplacer)
+        if "http" in doc.md.markupShorthands:
+            config.processTextNodes(nodes, headerRe, headerReplacer)
         if "idl" in doc.md.markupShorthands:
             config.processTextNodes(nodes, idlRe, idlReplacer)
         if "markup" in doc.md.markupShorthands:
@@ -733,6 +735,34 @@ escapedRe = re.compile(r"\\\*")
 
 def escapedReplacer(match):  # pylint: disable=unused-argument
     return "*"
+
+
+headerRe = re.compile(
+    r"""
+                    (\\)?
+                    \[:
+                    (:?[^()<>@,;:\\"/\[\]?={}\s|]+)
+                    (?:\|((?:(?!:\]).)+))?
+                    :\]""",
+    re.X,
+)
+
+
+def headerReplacer(match):
+    escape, lt, linkText = match.groups()
+    if escape:
+        return match.group(0)[1:]
+    if linkText is None:
+        linkText = lt
+    return h.E.a(
+        {
+            "data-link-type": "http-header",
+            "for": "/",
+            "lt": lt,
+            "bs-autolink-syntax": match.group(0),
+        },
+        linkText,
+    )
 
 
 def addLineNumber(el):
