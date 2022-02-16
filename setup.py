@@ -5,7 +5,7 @@ with open("README.md", encoding="utf-8") as fh:
 with open("semver.txt", encoding="utf-8") as fh:
     semver = fh.read().strip()
 with open("requirements.txt", encoding="utf-8") as fh:
-    install_requires = [x.strip() for x in fh.read().strip().split("\n")]
+    install_requires = [x.strip() for x in fh.read().strip().split("\n") if len(x) and x[0].isalpha()]
 
 setup(
     name="bikeshed",
