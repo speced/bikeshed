@@ -5,7 +5,7 @@ import subprocess
 from collections import OrderedDict, defaultdict
 from datetime import datetime
 
-from . import conditional, config, dfnpanels, h, messages as m
+from . import biblio, conditional, config, dfnpanels, h, messages as m
 from .DefaultOrderedDict import DefaultOrderedDict
 from .refs import utils as refUtils
 
@@ -532,7 +532,10 @@ def addIndexOfExternallyDefinedTerms(doc, container):
     for spec, refGroups in sorted(doc.externalRefsUsed.items(), key=lambda x: x[0].upper()):
         # ref.spec is always lowercase; if the same string shows up in biblio data,
         # use its casing instead.
-        biblioRef = doc.refs.getBiblioRef(spec, quiet=True)
+        if "_biblio" in refGroups:
+            biblioRef = refGroups["_biblio"]
+        else:
+            biblioRef = doc.refs.getBiblioRef(spec, quiet=True)
         if biblioRef:
             printableSpec = biblioRef.linkText
         else:
@@ -548,7 +551,10 @@ def addIndexOfExternallyDefinedTerms(doc, container):
             h.E.li(h.E.a(attrs, "[", printableSpec, "]"), " defines the following terms:"),
         )
         termsUl = h.appendChild(specLi, h.E.ul())
-        for _, refs in sorted(refGroups.items(), key=lambda x: x[0]):
+        for tempkey, refs in sorted(refGroups.items(), key=lambda x: x[0]):
+            if isinstance(refs, biblio.BiblioEntry):
+                # Not a refGroup, just some metadata
+                continue
             if len(refs) == 1:
                 ref = list(refs.values())[0]
                 link = makeLink(ref.text)

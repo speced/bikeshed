@@ -957,19 +957,27 @@ def processAutolinks(doc):
         if ref and ref.spec and doc.refs.spec and ref.spec.lower() != doc.refs.spec.lower():
             spec = ref.spec.lower()
             key = ref.for_[0] if ref.for_ else ""
+
             if isNormative(el, doc):
                 biblioStorage = doc.normativeRefs
             else:
                 biblioStorage = doc.informativeRefs
+
+            # If the ref is from an anchor block, it knows what it's doing.
+            # Don't follow obsoletion chains.
+            allowObsolete = ref.status == "anchor-block"
+
             biblioRef = doc.refs.getBiblioRef(
                 ref.spec,
                 status=doc.md.defaultRefStatus,
                 generateFakeRef=True,
-                quiet=True,
+                quiet=False,
+                allowObsolete=allowObsolete,
             )
             if biblioRef:
                 biblioStorage[biblioRef.linkText] = biblioRef
                 spec = biblioRef.linkText.lower()
+                doc.externalRefsUsed[spec]["_biblio"] = biblioRef
             doc.externalRefsUsed[spec][ref.text][key] = ref
 
         if ref:
