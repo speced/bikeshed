@@ -551,7 +551,7 @@ def addIndexOfExternallyDefinedTerms(doc, container):
             h.E.li(h.E.a(attrs, "[", printableSpec, "]"), " defines the following terms:"),
         )
         termsUl = h.appendChild(specLi, h.E.ul())
-        for tempkey, refs in sorted(refGroups.items(), key=lambda x: x[0]):
+        for _, refs in sorted(refGroups.items(), key=lambda x: x[0]):
             if isinstance(refs, biblio.BiblioEntry):
                 # Not a refGroup, just some metadata
                 continue
