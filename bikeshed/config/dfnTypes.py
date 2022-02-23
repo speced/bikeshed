@@ -125,7 +125,9 @@ typesNotUsingFor = frozenset(
 )
 assert not (typesUsingFor & typesNotUsingFor)
 lowercaseTypes = (
-    cssTypes | markupTypes | frozenset(["propdesc", "element-sub", "maybe", "dfn", "grammar", "http-header", "permission"])
+    cssTypes
+    | markupTypes
+    | frozenset(["propdesc", "element-sub", "maybe", "dfn", "grammar", "http-header", "permission"])
 )
 
 
