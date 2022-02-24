@@ -1,8 +1,7 @@
 import functools
 import re
 
-from .. import Line, messages as m
-from ..h import escapeAttr
+from .. import Line, messages as m, h
 
 
 def parse(
@@ -147,7 +146,7 @@ def tokenizeLines(
             if infoString:
                 # For now, I only care about lang
                 lang = infoString.split(" ")[0]
-                classAttr = " class='language-{}'".format(escapeAttr(lang))
+                classAttr = f" class='language-{h.escapeAttr(lang)}'"
             else:
                 classAttr = ""
             line.text = f"{ws}<xmp{classAttr}>"

@@ -513,8 +513,6 @@ def catchArgparseBug(string):
     return True
 
 
-constants.specClass = Spec
-
 styleColors = """
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {

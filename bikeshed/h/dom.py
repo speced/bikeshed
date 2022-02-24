@@ -7,7 +7,7 @@ from lxml import etree
 from lxml.cssselect import CSSSelector
 from lxml.html import tostring
 
-from .. import t, constants
+from .. import t, constants, Spec
 from ..DefaultOrderedDict import DefaultOrderedDict
 from ..messages import die, warn
 
@@ -27,7 +27,7 @@ def unescape(string):
 
 
 def findAll(sel, context):
-    if isinstance(context, constants.specClass):
+    if isinstance(context, Spec.Spec):
         context = context.document
     try:
         return CSSSelector(sel, namespaces={"svg": "http://www.w3.org/2000/svg"})(context)
