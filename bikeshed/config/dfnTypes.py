@@ -44,6 +44,7 @@ dfnClassToType = {
     "contextdef": "context",
     "facetdef": "facet",
     "http-headerdef": "http-header",
+    "permissiondef": "permission",
 }
 
 
@@ -74,6 +75,7 @@ idlTypes = frozenset(
         "iterator",
         "maplike",
         "setlike",
+        "permission",
     ]
 )
 idlNameTypes = frozenset(["interface", "namespace", "dictionary", "enum", "typedef", "callback"])
@@ -118,11 +120,14 @@ typesNotUsingFor = frozenset(
         "exception",
         "typedef",
         "http-header",
+        "permission",
     ]
 )
 assert not (typesUsingFor & typesNotUsingFor)
 lowercaseTypes = (
-    cssTypes | markupTypes | frozenset(["propdesc", "element-sub", "maybe", "dfn", "grammar", "http-header"])
+    cssTypes
+    | markupTypes
+    | frozenset(["propdesc", "element-sub", "maybe", "dfn", "grammar", "http-header", "permission"])
 )
 
 
