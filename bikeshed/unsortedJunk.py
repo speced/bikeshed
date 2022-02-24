@@ -221,11 +221,11 @@ def checkVarHygiene(doc: Spec.Spec):
         return f"'{algoName}'" + (f" for {algoFor}" if algoFor else "")
 
     # Look for vars that only show up once. These are probably typos.
-    varCounts:t.DefaultDict[t.Tuple[str, str], int] = defaultdict(lambda: 0)
+    varCounts: t.DefaultDict[t.Tuple[str, str], int] = defaultdict(lambda: 0)
     for el in h.findAll("var:not([data-var-ignore])", doc):
         key = (h.foldWhitespace(h.textContent(el)).strip(), algoName(el))
         varCounts[key] += 1
-    foldedVarCounts:t.DefaultDict[t.Tuple[str, str], int] = defaultdict(lambda: 0)
+    foldedVarCounts: t.DefaultDict[t.Tuple[str, str], int] = defaultdict(lambda: 0)
     atLeastOneAlgo = False
     for (var, algo), count in varCounts.items():
         if algo:
@@ -532,7 +532,12 @@ def determineDfnType(dfn, inferCSS=False):
         text = h.textContent(dfn)
         if text[0:1] == "@":
             return "at-rule"
-        if len(dfn) == 1 and dfn[0].get("data-link-type") == "maybe" and h.emptyText(dfn.text) and h.emptyText(dfn[0].tail):
+        if (
+            len(dfn) == 1
+            and dfn[0].get("data-link-type") == "maybe"
+            and h.emptyText(dfn.text)
+            and h.emptyText(dfn[0].tail)
+        ):
             return "value"
         if text[0:1] == "<" and text[-1:] == ">":
             return "type"
@@ -617,7 +622,8 @@ def classifyDfns(doc: Spec.Spec, dfns):
             parentFor = parent.get("data-dfn-for")
             if parent.get("data-dfn-type") in config.functionishTypes and parentFor is not None:
                 dfnFor = ", ".join(
-                    parentFor + "/" + name for name in doc.widl.normalized_method_names(h.textContent(parent), parentFor)
+                    parentFor + "/" + name
+                    for name in doc.widl.normalized_method_names(h.textContent(parent), parentFor)
                 )
             elif h.treeAttr(el, "data-dfn-for") is None:
                 die(
