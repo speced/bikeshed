@@ -12,7 +12,6 @@ from .h import (
     addClass,
     appendChild,
     childElements,
-    childNodes,
     clearContents,
     closestAncestor,
     closestAttr,
@@ -1171,11 +1170,7 @@ def cleanupHTML(doc):
         if el.tag in ["ol", "ul", "dl"] and el.get("data-md") is None:
             if el.tag in ["ol", "ul"]:
                 onlyChild = hasOnlyChild(el)
-                if (
-                    onlyChild is not None
-                    and el.tag == onlyChild.tag
-                    and onlyChild.get("data-md") is not None
-                ):
+                if onlyChild is not None and el.tag == onlyChild.tag and onlyChild.get("data-md") is not None:
                     # The md-generated list container is featureless,
                     # so we can just throw it away and move its children into its parent.
                     nestedLists.append(onlyChild)
@@ -1202,11 +1197,10 @@ def cleanupHTML(doc):
             and el.get("data-md") is not None
             and parentElement(el).tag == "div"
             and parentElement(parentElement(el)).tag == "dl"
-            ):
+        ):
             # Also featureless and can be safely thrown away
             # with its children merged into the parent div
             nestedLists.append(el)
-
 
         # Remove any lingering data-md attributes on lists
         if el.tag in ["ol", "ul", "dl"] and el.get("data-md") is not None:
