@@ -11,6 +11,7 @@ from .h import (
     E,
     addClass,
     appendChild,
+    childElements,
     childNodes,
     clearContents,
     closestAncestor,
@@ -40,6 +41,7 @@ from .h import (
     relevantHeadings,
     removeAttr,
     replaceContents,
+    replaceWithContents,
     replaceNode,
     safeID,
     textContent,
@@ -1166,20 +1168,49 @@ def cleanupHTML(doc):
 
         # Allow MD-generated lists to be surrounded by HTML list containers,
         # so you can add classes/etc without an extraneous wrapper.
-        if el.tag in ["ol", "ul", "dl"]:
-            onlyChild = hasOnlyChild(el)
-            if (
-                onlyChild is not None
-                and el.tag == onlyChild.tag
-                and el.get("data-md") is None
-                and onlyChild.get("data-md") is not None
-            ):
-                # The md-generated list container is featureless,
-                # so we can just throw it away and move its children into its parent.
-                nestedLists.append(onlyChild)
+        if el.tag in ["ol", "ul", "dl"] and el.get("data-md") is None:
+            if el.tag in ["ol", "ul"]:
+                onlyChild = hasOnlyChild(el)
+                if (
+                    onlyChild is not None
+                    and el.tag == onlyChild.tag
+                    and onlyChild.get("data-md") is not None
+                ):
+                    # The md-generated list container is featureless,
+                    # so we can just throw it away and move its children into its parent.
+                    nestedLists.append(onlyChild)
             else:
-                # Remove any lingering data-md attributes on lists that weren't using this container replacement thing.
-                removeAttr(el, "data-md")
+                # dls can contain both dt/dds
+                # (which'll make an md-generated dl)
+                # and divs, so I need to account for multiple children
+                for child in childElements(el):
+                    if child.tag == "dl" and child.get("data-md") is not None:
+                        nestedLists.append(child)
+                    elif child.tag == "div":
+                        pass
+                    elif child.tag in ["dt", "dd"]:
+                        pass
+                    else:
+                        # misnested element; leave alone for now
+                        pass
+
+        # HTML allows dt/dd to be grouped by a div, so recognize
+        # when a markdown-generated dl has a div parent and dl grandparent
+        # and remove it.
+        if (
+            el.tag == "dl"
+            and el.get("data-md") is not None
+            and parentElement(el).tag == "div"
+            and parentElement(parentElement(el)).tag == "dl"
+            ):
+            # Also featureless and can be safely thrown away
+            # with its children merged into the parent div
+            nestedLists.append(el)
+
+
+        # Remove any lingering data-md attributes on lists
+        if el.tag in ["ol", "ul", "dl"] and el.get("data-md") is not None:
+            removeAttr(el, "data-md")
 
         # Mark pre.idl blocks as .def, for styling
         if el.tag == "pre" and hasClass(el, "idl") and not hasClass(el, "def"):
@@ -1311,10 +1342,7 @@ def cleanupHTML(doc):
         parent = parentElement(el)
         prependChild(parent, el)
     for el in nestedLists:
-        children = childNodes(el, clear=True)
-        parent = parentElement(el)
-        clearContents(parent)
-        appendChild(parent, *children)
+        replaceWithContents(el)
     for el in flattenEls:
         moveContents(fromEl=el[0], toEl=el)
 

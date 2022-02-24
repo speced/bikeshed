@@ -208,6 +208,19 @@ def parentElement(el):
     return el.getparent()
 
 
+def nextSiblingNode(el):
+    return el.getnext()
+
+
+def nextSiblingElement(el):
+    while True:
+        next = nextSiblingNode(el)
+        if next is None:
+            return None
+        if isElement(next):
+            return next
+
+
 def appendChild(parent, *children):
     # Appends either text or an element.
     children = list(flatten(children))
@@ -251,7 +264,7 @@ def insertBefore(target, *els):
     parent = target.getparent()
     index = parent.index(target)
     prevSibling = parent[index - 1] if index > 0 else None
-    for el in els:
+    for el in flatten(els):
         if isinstance(el, str):
             if prevSibling is not None:
                 prevSibling.tail = (prevSibling.tail or "") + el
@@ -266,7 +279,7 @@ def insertBefore(target, *els):
 
 def insertAfter(target, *els):
     parent = target.getparent()
-    for el in els:
+    for el in flatten(els):
         if isinstance(el, str):
             target.tail = (target.tail or "") + el
         else:
@@ -309,6 +322,10 @@ def appendContents(el, container):
 def replaceContents(el, newElements):
     clearContents(el)
     return appendContents(el, newElements)
+
+
+def replaceWithContents(el):
+    return replaceNode(el, childNodes(el, clear=True))
 
 
 def moveContents(toEl, fromEl):

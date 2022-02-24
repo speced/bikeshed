@@ -1,4 +1,5 @@
 import io
+import itertools
 
 from . import dom
 
@@ -100,16 +101,18 @@ class Serializer:
         return n
 
     def groupIntoBlocks(self, nodes):
-        collect = []
+        nonBlockNodes = []
         for node in nodes:
             if self.isElement(node) and self.isBlockElement(node.tag):
-                yield collect
-                collect = []
+                if nonBlockNodes:
+                    yield nonBlockNodes
+                    nonBlockNodes = []
                 yield node
                 continue
             else:
-                collect.append(node)
-        yield collect
+                nonBlockNodes.append(node)
+        if nonBlockNodes:
+            yield nonBlockNodes
 
     def fixWS(self, text):
         import string
@@ -164,6 +167,16 @@ class Serializer:
     def isBlockElement(self, tag):
         return not self.isInlineElement(tag)
 
+    def needsEndTag(self, el, nextEl=None):
+        if el.tag not in self.omitEndTagEls:
+            return True
+        if el.tag in ["dt", "dd"]:
+            if nextEl is None:
+                return False
+            if self.isElement(nextEl) and nextEl.tag in ["dt", "dd"]:
+                return False
+            return True
+
     def justWS(self, block):
         if self.isElement(block):
             return False
@@ -216,7 +229,7 @@ class Serializer:
                 return "blocks", self._blocksFromChildren(children)
         return "inlines", children
 
-    def _writeBlockElement(self, tag, el, write, indent):
+    def _writeBlockElement(self, tag, el, write, indent, nextEl):
         # Dropping pure-WS anonymous blocks.
         # This maintains whitespace between *inline* elements, which is required.
         # It just avoids serializing a line of "inline content" that's just WS.
@@ -226,21 +239,21 @@ class Serializer:
             # Empty of text and children
             write(" " * indent)
             self.startTag(tag, el, write)
-            if el.tag not in self.omitEndTagEls:
+            if self.needsEndTag(el, nextEl):
                 self.endTag(tag, write)
         elif contentsType == "inlines":
             # Contains only inlines, print accordingly
             write(" " * indent)
             self.startTag(tag, el, write)
             self._serializeEl(contents, write, inline=True)
-            if el.tag not in self.omitEndTagEls:
+            if self.needsEndTag(el, nextEl):
                 self.endTag(tag, write)
             return
         else:
             # Otherwise I'm a block that contains at least one block
             write(" " * indent)
             self.startTag(tag, el, write)
-            for block in contents:
+            for block, nextBlock in pairwise(contents):
                 if isinstance(block, list):
                     # is an array of inlines
                     if len(block) > 0:
@@ -248,12 +261,12 @@ class Serializer:
                         self._serializeEl(block, write, inline=True)
                 else:
                     write("\n")
-                    self._serializeEl(block, write, indent=indent + 1)
-            if tag not in self.omitEndTagEls:
+                    self._serializeEl(block, write, indent=indent + 1, nextEl=nextBlock)
+            if self.needsEndTag(el, nextEl):
                 write("\n" + (" " * indent))
                 self.endTag(tag, write)
 
-    def _serializeEl(self, el, write, indent=0, pre=False, inline=False):
+    def _serializeEl(self, el, write, indent=0, pre=False, inline=False, nextEl=None):
         if isinstance(el, list):
             tag = "[]"
         else:
@@ -268,4 +281,11 @@ class Serializer:
         elif inline or self.isInlineElement(el):
             self._writeInlineElement(tag, el, write, inline)
         else:
-            self._writeBlockElement(tag, el, write, indent)
+            self._writeBlockElement(tag, el, write, indent, nextEl)
+
+
+def pairwise(iterable):
+    # pairwise('ABCDEFG') --> AB BC CD DE EF FG GNone
+    a, b = itertools.tee(iterable)
+    next(b, None)
+    return itertools.zip_longest(a, b)
