@@ -1,6 +1,6 @@
-from . import config, constants
+from . import constants, retrieve
 
 
 def load(doc):
-    code = config.retrieveBoilerplateFile(doc, "bs-extensions", allowLocal=constants.executeCode)
+    code = retrieve.retrieveBoilerplateFile(doc, "bs-extensions", allowLocal=constants.executeCode)
     exec(code, globals())

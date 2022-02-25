@@ -1,5 +1,4 @@
-from ..h import isElement, outerHTML
-from ..messages import printColor
+from .. import h, messages as m
 
 
 def printjson(x, indent=2, level=0):
@@ -39,7 +38,7 @@ def printjsonobject(x, indent, level):
         ret += (
             "\n"
             + (indent * level)
-            + printColor((k + ": ").ljust(maxKeyLength + 2), "cyan")
+            + m.printColor((k + ": ").ljust(maxKeyLength + 2), "cyan")
             + printjson(v, indent, level + 1)
         )
     return ret
@@ -51,19 +50,19 @@ def printjsonobjectarray(x, indent, level):
     ret = ""
     for i, v in enumerate(x):
         if i != 0:
-            ret += "\n" + (indent * level) + printColor("=" * 10, "blue")
+            ret += "\n" + (indent * level) + m.printColor("=" * 10, "blue")
         ret += printjsonobject(v, indent, level)
     return ret
 
 
 def printjsonsimplearray(x, indent, level):  # pylint: disable=unused-argument
     x = getjson(x)
-    ret = printColor("[", "blue")
+    ret = m.printColor("[", "blue")
     for i, v in enumerate(x):
         if i != 0:
-            ret += printColor(", ", "blue")
+            ret += m.printColor(", ", "blue")
         ret += printjsonprimitive(v)
-    ret += printColor("]", "blue")
+    ret += m.printColor("]", "blue")
     return ret
 
 
@@ -77,6 +76,6 @@ def printjsonprimitive(x):
         return str(x)
     if x is None:
         return "null"
-    if isElement(x):
-        return repr(x) + ":" + outerHTML(x)
+    if h.isElement(x):
+        return repr(x) + ":" + h.outerHTML(x)
     raise ValueError(f"Could not print value: {x}")

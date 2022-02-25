@@ -2,7 +2,7 @@ import copy
 
 import attr
 
-from .utils import stripLineBreaks
+from . import utils
 
 
 @attr.s(slots=True)
@@ -80,7 +80,7 @@ class RefWrapper:
     def __json__(self):
         refCopy = copy.copy(self._ref)
         refCopy["text"] = self.text
-        return stripLineBreaks(refCopy)
+        return utils.stripLineBreaks(refCopy)
 
 
 def decode(s):

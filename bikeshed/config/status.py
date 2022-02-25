@@ -1,5 +1,5 @@
-from ..messages import die, warn
-from .main import englishFromList
+from .. import messages as m
+from . import main
 
 shortToLongStatus = {
     "DREAM": "A Collection of Interesting Ideas",
@@ -313,7 +313,7 @@ def canonicalizeStatus(rawStatus, group):
 
     def validateW3Cstatus(group, status, rawStatus):
         if status == "DREAM":
-            warn("You used Status: DREAM for a W3C document. Consider UD instead.")
+            m.warn("You used Status: DREAM for a W3C document. Consider UD instead.")
             return
 
         if "w3c/" + status in shortToLongStatus:
@@ -323,17 +323,17 @@ def canonicalizeStatus(rawStatus, group):
             return ", ".join(sorted({status.split("/")[-1] for status in statuses}))
 
         if group in w3cIgs and status not in w3cIGStatuses:
-            warn(
+            m.warn(
                 f"You used Status: {rawStatus}, but W3C Interest Groups are limited to these statuses: {formatStatusSet(w3cIGStatuses)}."
             )
 
         if group == "tag" and status not in w3cTAGStatuses:
-            warn(
+            m.warn(
                 f"You used Status: {rawStatus}, but the TAG is are limited to these statuses: {formatStatusSet(w3cTAGStatuses)}"
             )
 
         if group in w3cCgs and status not in w3cCommunityStatuses:
-            warn(
+            m.warn(
                 f"You used Status: {rawStatus}, but W3C Community and Business Groups are limited to these statuses: {formatStatusSet(w3cCommunityStatuses)}."
             )
 
@@ -388,14 +388,14 @@ def canonicalizeStatus(rawStatus, group):
                 else:
                     msg += " That status can only be used with the org{} {}, or without an org at all.".format(
                         "s" if len(possibleMgs) > 1 else "",
-                        englishFromList(f"'{x}'" for x in possibleMgs if x != ""),
+                        main.englishFromList(f"'{x}'" for x in possibleMgs if x != ""),
                     )
             else:
                 if len(possibleMgs) == 1:
                     msg += f" That status can only be used with the org '{possibleMgs[0]}', like `Status: {possibleMgs[0]}/{status}`"
                 else:
                     msg += " That status can only be used with the orgs {}.".format(
-                        englishFromList(f"'{x}'" for x in possibleMgs)
+                        main.englishFromList(f"'{x}'" for x in possibleMgs)
                     )
 
         else:
@@ -403,7 +403,7 @@ def canonicalizeStatus(rawStatus, group):
                 msg = f"Unknown Status metadata '{canonStatus}'. Check the docs for valid Status values."
             else:
                 msg = f"Status '{status}' can't be used with the org '{megaGroup}'. Check the docs for valid Status values."
-        die(msg)
+        m.die(msg)
         return canonStatus
 
     # Otherwise, they provided a bare status.
@@ -422,7 +422,7 @@ def canonicalizeStatus(rawStatus, group):
     if possibleMgs:
         msg = "You used Status: {}, but that's limited to the {} org{}".format(
             rawStatus,
-            englishFromList(f"'{mg}'" for mg in possibleMgs),
+            main.englishFromList(f"'{mg}'" for mg in possibleMgs),
             "s" if len(possibleMgs) > 1 else "",
         )
         if group:
@@ -435,7 +435,7 @@ def canonicalizeStatus(rawStatus, group):
             msg += ", and you don't have a Group metadata. Please declare your Group, or check the docs for statuses that can be used by anyone."
     else:
         msg = f"Unknown Status metadata '{canonStatus}'. Check the docs for valid Status values."
-    die(msg)
+    m.die(msg)
     return canonStatus
 
 

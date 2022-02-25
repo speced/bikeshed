@@ -2,10 +2,8 @@ import copy
 import re
 from collections import defaultdict
 
-from .. import config, constants
-from ..messages import linkerror
-from .RefWrapper import RefWrapper
-from . import utils
+from .. import config, constants, messages as m, retrieve
+from . import utils, RefWrapper
 
 
 class RefSource:
@@ -27,7 +25,7 @@ class RefSource:
 
     def __init__(self, source, specs=None, ignored=None, replaced=None, fileRequester=None):
         if fileRequester is None:
-            self.dataFile = config.defaultRequester
+            self.dataFile = retrieve.defaultRequester
         else:
             self.dataFile = fileRequester
 
@@ -118,13 +116,13 @@ class RefSource:
             # Turns a dict of arrays of refs into an iterator of refs
             for key, group in self.fetchAllRefs():
                 for ref in group:
-                    yield RefWrapper(key, ref)
+                    yield RefWrapper.RefWrapper(key, ref)
 
         def textRefsIterator(texts):
             # Same as above, but only grabs those keyed to a given text
             for text in texts:
                 for ref in self.fetchRefs(text):
-                    yield RefWrapper(text, ref)
+                    yield RefWrapper.RefWrapper(text, ref)
 
         def forRefsIterator(targetFors):
             # Same as above, but only grabs those for certain values
@@ -133,7 +131,7 @@ class RefSource:
             for for_ in targetFors:
                 for text in self.fors[for_]:
                     for ref in self.fetchRefs(text):
-                        yield RefWrapper(text, ref)
+                        yield RefWrapper.RefWrapper(text, ref)
 
         # Set up the initial list of refs to query
         if text:
@@ -160,7 +158,7 @@ class RefSource:
                 linkTypes = list(config.linkTypeToDfnType[linkType])
             else:
                 if error:
-                    linkerror(f"Unknown link type '{linkType}'.")
+                    m.linkerror(f"Unknown link type '{linkType}'.")
                 return [], "type"
             refs = [x for x in refs if x.type in linkTypes]
         if not refs:

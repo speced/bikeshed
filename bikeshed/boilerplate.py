@@ -5,9 +5,8 @@ import subprocess
 from collections import OrderedDict, defaultdict
 from datetime import datetime
 
-from . import biblio, conditional, config, dfnpanels, h, messages as m
+from . import biblio, conditional, config, dfnpanels, h, messages as m, refs as r, retrieve
 from .DefaultOrderedDict import DefaultOrderedDict
-from .refs import utils as refUtils
 
 
 def boilerplateFromHtml(doc, htmlString):
@@ -20,7 +19,7 @@ def boilerplateFromHtml(doc, htmlString):
 def loadBoilerplate(doc, filename, bpname=None):
     if bpname is None:
         bpname = filename
-    html = config.retrieveBoilerplateFile(doc, filename)
+    html = retrieve.retrieveBoilerplateFile(doc, filename)
     el = boilerplateFromHtml(doc, html)
     fillWith(bpname, el, doc=doc)
 
@@ -110,8 +109,8 @@ def addSpecVersion(doc):
 
 
 def addHeaderFooter(doc):
-    header = config.retrieveBoilerplateFile(doc, "header") if "header" in doc.md.boilerplate else ""
-    footer = config.retrieveBoilerplateFile(doc, "footer") if "footer" in doc.md.boilerplate else ""
+    header = retrieve.retrieveBoilerplateFile(doc, "header") if "header" in doc.md.boilerplate else ""
+    footer = retrieve.retrieveBoilerplateFile(doc, "footer") if "footer" in doc.md.boilerplate else ""
 
     doc.html = "\n".join([header, doc.html, footer])
 
@@ -218,7 +217,7 @@ def addAtRisk(doc):
 def addStyles(doc):
     el = getFillContainer("stylesheet", doc)
     if el is not None:
-        el.text = config.retrieveBoilerplateFile(doc, "stylesheet")
+        el.text = retrieve.retrieveBoilerplateFile(doc, "stylesheet")
 
 
 def addCustomBoilerplate(doc):
@@ -238,7 +237,7 @@ def removeUnwantedBoilerplate(doc):
 
 def addAnnotations(doc):
     if doc.md.vshortname in doc.testSuites:
-        html = config.retrieveBoilerplateFile(doc, "annotations")
+        html = retrieve.retrieveBoilerplateFile(doc, "annotations")
         el = boilerplateFromHtml(doc, html)
         h.appendContents(h.find("head", doc), el)
 
@@ -459,7 +458,7 @@ def addExplicitIndexes(doc):
         filteredRefs = defaultdict(list)
         for ttf, refs in list(refsFromTtf.items()):
             refs = doc.refs.filterObsoletes(refs)
-            refs = refUtils.filterOldVersions(refs)
+            refs = r.utils.filterOldVersions(refs)
             if refs:
                 filteredRefs[ttf[0]].extend(
                     {"url": ref.url, "disambiguator": disambiguator(ref, types, specs)} for ref in refs

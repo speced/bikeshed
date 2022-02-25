@@ -1,5 +1,4 @@
 from .stringEnum import StringEnum
-from . import t
 
 dryRun = False
 errorLevel = ["fatal"]

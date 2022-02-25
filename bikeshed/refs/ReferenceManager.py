@@ -4,9 +4,8 @@ import re
 from collections import defaultdict
 from operator import itemgetter
 
-from .. import biblio, config, constants, datablocks, h, messages as m
-from .RefSource import RefSource
-from . import utils
+from .. import biblio, config, constants, datablocks, h, messages as m, retrieve
+from . import utils, RefSource
 
 
 class ReferenceManager:
@@ -35,7 +34,7 @@ class ReferenceManager:
 
     def __init__(self, defaultStatus=None, fileRequester=None, testing=False):
         if fileRequester is None:
-            self.dataFile = config.defaultRequester
+            self.dataFile = retrieve.defaultRequester
         else:
             self.dataFile = fileRequester
 
@@ -79,9 +78,9 @@ class ReferenceManager:
         else:
             self.defaultStatus = constants.refStatus[defaultStatus]
 
-        self.localRefs = RefSource("local", fileRequester=fileRequester)
-        self.anchorBlockRefs = RefSource("anchor-block", fileRequester=fileRequester)
-        self.foreignRefs = RefSource(
+        self.localRefs = RefSource.RefSource("local", fileRequester=fileRequester)
+        self.anchorBlockRefs = RefSource.RefSource("anchor-block", fileRequester=fileRequester)
+        self.foreignRefs = RefSource.RefSource(
             "foreign",
             specs=self.specs,
             ignored=self.ignoredSpecs,

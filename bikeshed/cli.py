@@ -4,7 +4,6 @@ import os
 import sys
 
 from . import config, constants, update, messages as m
-from .config.printjson import getjson
 
 
 def main():
@@ -569,7 +568,7 @@ def handleDebug(options, extras):
             "document": doc.mdDocument.allData,
             "command-line": doc.mdCommandLine.allData,
         }
-        print(json.dumps(md, indent=2, default=getjson))
+        print(json.dumps(md, indent=2, default=config.getjson))
 
 
 def handleRefs(options, extras):
@@ -599,7 +598,7 @@ def handleRefs(options, extras):
         exact=options.exact,
     )
     if constants.printMode == "json":
-        m.p(json.dumps(refs, indent=2, default=getjson))
+        m.p(json.dumps(refs, indent=2, default=config.getjson))
     else:
         m.p(config.printjson(refs))
 

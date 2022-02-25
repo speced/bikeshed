@@ -7,12 +7,15 @@ from lxml import etree
 from lxml.cssselect import CSSSelector
 from lxml.html import tostring
 
-from .. import t, constants, Spec
+from .. import t
 from ..DefaultOrderedDict import DefaultOrderedDict
 from ..messages import die, warn
 
+T = t.TypeVar("T")
+ElementType = t.Union[etree.ElementBase]
 
-def flatten(arr):
+
+def flatten(arr: t.Iterable) -> t.Iterator:
     for el in arr:
         if isinstance(el, collections.abc.Iterable) and not isinstance(el, str) and not etree.iselement(el):
             yield from flatten(el)
@@ -20,14 +23,14 @@ def flatten(arr):
             yield el
 
 
-def unescape(string):
+def unescape(string: str) -> str:
     import html
 
     return html.unescape(string)
 
 
-def findAll(sel, context):
-    if isinstance(context, Spec.Spec):
+def findAll(sel: str, context: t.Union["t.SpecType", ElementType]) -> t.List[ElementType]:
+    if hasattr(context, "document"):
         context = context.document
     try:
         return CSSSelector(sel, namespaces={"svg": "http://www.w3.org/2000/svg"})(context)
@@ -36,7 +39,7 @@ def findAll(sel, context):
         return []
 
 
-def find(sel, context=None):
+def find(sel: str, context=None) -> ElementType:
     result = findAll(sel, context)
     if result:
         return result[0]
@@ -44,7 +47,7 @@ def find(sel, context=None):
         return None
 
 
-def escapeCSSIdent(val):
+def escapeCSSIdent(val: str) -> str:
     if len(val) == 0:
         die("Programming error: can't escape an empty ident.")
         return ""
@@ -75,7 +78,7 @@ def escapeCSSIdent(val):
     return ident
 
 
-def escapeUrlFrag(val):
+def escapeUrlFrag(val: str) -> str:
     result = ""
     for char in val:
         if validUrlUnit(char):
@@ -86,7 +89,7 @@ def escapeUrlFrag(val):
     return result
 
 
-def validUrlUnit(char):
+def validUrlUnit(char: str) -> bool:
     c = ord(char)
     if c < 0xA0:
         # ASCII range
@@ -112,7 +115,7 @@ def validUrlUnit(char):
         return True
 
 
-def textContent(el, exact=False):
+def textContent(el: ElementType, exact: bool = False) -> str:
     # If exact is False, then any elements with data-deco attribute
     # get ignored in the textContent.
     # This allows me to ignore things added by Bikeshed by default.
@@ -124,7 +127,7 @@ def textContent(el, exact=False):
         return textContentIgnoringDecorative(el)
 
 
-def textContentIgnoringDecorative(el):
+def textContentIgnoringDecorative(el: ElementType) -> str:
     str = el.text or ""
     for child in childElements(el):
         if child.get("data-deco") is None:
@@ -133,13 +136,13 @@ def textContentIgnoringDecorative(el):
     return str
 
 
-def innerHTML(el):
+def innerHTML(el: t.Optional[ElementType]) -> str:
     if el is None:
         return ""
     return (el.text or "") + "".join(tostring(x, encoding="unicode") for x in el)
 
 
-def outerHTML(el, literal=False, with_tail=False):
+def outerHTML(el: t.Optional[ElementType], literal: bool = False, with_tail: bool = False) -> str:
     if el is None:
         return ""
     if isinstance(el, str):
@@ -151,7 +154,7 @@ def outerHTML(el, literal=False, with_tail=False):
     return tostring(el, with_tail=with_tail, encoding="unicode")
 
 
-def serializeTag(el):
+def serializeTag(el: ElementType) -> str:
     # Serialize *just* the opening tag for the element.
     # Use when you want to output the HTML,
     # but it might be a container with a lot of content.
@@ -162,11 +165,11 @@ def serializeTag(el):
     return tag
 
 
-def foldWhitespace(text):
+def foldWhitespace(text: str) -> str:
     return re.sub(r"(\s|\xa0)+", " ", text)
 
 
-def parseHTML(text):
+def parseHTML(text: str) -> t.List[ElementType]:
     doc = html5lib.parse(text, treebuilder="lxml", namespaceHTMLElements=False)
     head = doc.getroot()[0]
     body = doc.getroot()[1]
@@ -184,7 +187,7 @@ def parseHTML(text):
         return []
 
 
-def parseDocument(text):
+def parseDocument(text: str):
     doc = html5lib.parse(text, treebuilder="lxml", namespaceHTMLElements=False)
     return doc
 

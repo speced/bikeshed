@@ -17,24 +17,25 @@ from . import (
     dfns,
     extensions,
     fingerprinting,
+    func,
     h,
     headings,
     highlight,
     idl,
     includes,
     inlineTags,
+    InputSource,
     lint,
     markdown,
     mdnspeclinks,
     messages as m,
     metadata,
+    refs,
+    retrieve,
     shorthands,
     unsortedJunk as u,
     wpt,
 )
-from .func import Functor
-from .InputSource import FileInputSource, InputSource
-from .refs import ReferenceManager
 
 
 class Spec:
@@ -60,13 +61,13 @@ class Spec:
                 "No input file specified, and no *.bs or *.src.html files found in current directory.\nPlease specify an input file, or use - to pipe from STDIN."
             )
             return
-        self.inputSource = InputSource(inputFilename, chroot=constants.chroot)
+        self.inputSource = InputSource.InputSource(inputFilename, chroot=constants.chroot)
         self.transitiveDependencies = set()
         self.debug = debug
         self.token = token
         self.testing = testing
         if fileRequester is None:
-            self.dataFile = config.defaultRequester
+            self.dataFile = retrieve.defaultRequester
         else:
             self.dataFile = fileRequester
 
@@ -87,7 +88,7 @@ class Spec:
     def initializeState(self):
         self.normativeRefs = {}
         self.informativeRefs = {}
-        self.refs = ReferenceManager(fileRequester=self.dataFile, testing=self.testing)
+        self.refs = refs.ReferenceManager(fileRequester=self.dataFile, testing=self.testing)
         self.externalRefsUsed = defaultdict(lambda: defaultdict(dict))
         self.md = None
         self.mdBaseline = metadata.MetadataManager()
@@ -148,7 +149,7 @@ class Spec:
         self.md = metadata.join(self.mdBaseline, self.mdDocument, self.mdCommandLine)
         # Using that to determine the Group and Status, load the correct defaults.include boilerplate
         self.mdDefaults = metadata.fromJson(
-            data=config.retrieveBoilerplateFile(self, "defaults", error=True),
+            data=retrieve.retrieveBoilerplateFile(self, "defaults", error=True),
             source="defaults",
         )
         self.md = metadata.join(self.mdBaseline, self.mdDefaults, self.mdDocument, self.mdCommandLine)
@@ -156,7 +157,7 @@ class Spec:
         self.md.fillTextMacros(self.macros, doc=self)
         jsonEscapedMacros = {k: json.dumps(v)[1:-1] for k, v in self.macros.items()}
         computedMdText = h.replaceMacros(
-            config.retrieveBoilerplateFile(self, "computed-metadata", error=True),
+            retrieve.retrieveBoilerplateFile(self, "computed-metadata", error=True),
             macros=jsonEscapedMacros,
         )
         self.mdOverridingDefaults = metadata.fromJson(data=computedMdText, source="computed-metadata")
@@ -280,14 +281,14 @@ class Spec:
         u.cleanupHTML(self)
         if self.md.prepTR:
             # Don't try and override the W3C's icon.
-            for el in u.findAll("[rel ~= 'icon']", self):
+            for el in h.findAll("[rel ~= 'icon']", self):
                 h.removeNode(el)
             # Make sure the W3C stylesheet is after all other styles.
-            for el in u.findAll("link", self):
+            for el in h.findAll("link", self):
                 if el.get("href").startswith("https://www.w3.org/StyleSheets/TR"):
-                    h.appendChild(u.find("head", self), el)
+                    h.appendChild(h.find("head", self), el)
             # Ensure that all W3C links are https.
-            for el in u.findAll("a", self):
+            for el in h.findAll("a", self):
                 href = el.get("href", "")
                 if href.startswith("http://www.w3.org") or href.startswith("http://lists.w3.org"):
                     el.set("href", "https" + href[4:])
@@ -311,7 +312,7 @@ class Spec:
     def fixMissingOutputFilename(self, outputFilename):
         if outputFilename is None:
             # More sensible defaults!
-            if not isinstance(self.inputSource, FileInputSource):
+            if not isinstance(self.inputSource, InputSource.FileInputSource):
                 outputFilename = "-"
             elif self.inputSource.sourceName.endswith(".bs"):
                 outputFilename = self.inputSource.sourceName[0:-3] + ".html"
@@ -425,7 +426,7 @@ class Spec:
         if "markdown" in self.md.markupShorthands:
             textFunctor = u.MarkdownCodeSpans(text)
         else:
-            textFunctor = Functor(text)
+            textFunctor = func.Functor(text)
 
         macros = dict(self.macros, **moreMacros)
         textFunctor = textFunctor.map(curry(h.replaceMacros, macros=macros))
@@ -437,11 +438,11 @@ class Spec:
 
     def printTargets(self):
         m.p("Exported terms:")
-        for el in u.findAll("[data-export]", self):
+        for el in h.findAll("[data-export]", self):
             for term in config.linkTextsFromElement(el):
                 m.p("  " + term)
         m.p("Unexported terms:")
-        for el in u.findAll("[data-noexport]", self):
+        for el in h.findAll("[data-noexport]", self):
             for term in config.linkTextsFromElement(el):
                 m.p("  " + term)
 

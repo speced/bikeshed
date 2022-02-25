@@ -5,8 +5,7 @@ from collections import Counter, defaultdict, namedtuple
 from urllib import parse
 from PIL import Image
 
-from . import biblio, config, dfnpanels, h, func, Spec, t
-from .messages import die, say, warn
+from . import biblio, config, dfnpanels, h, func, t, messages as m
 
 
 class MarkdownCodeSpans(func.Functor):
@@ -84,16 +83,16 @@ class MarkdownCodeSpans(func.Functor):
         return self.__val__
 
 
-def stripBOM(doc: Spec.Spec):
+def stripBOM(doc: "t.SpecType"):
     if len(doc.lines) >= 1 and doc.lines[0].text[0:1] == "\ufeff":
         doc.lines[0].text = doc.lines[0].text[1:]
-        warn("Your document has a BOM. There's no need for that, please re-save it without a BOM.")
+        m.warn("Your document has a BOM. There's no need for that, please re-save it without a BOM.")
 
 
 # Definitions and the like
 
 
-def fixManualDefTables(doc: Spec.Spec):
+def fixManualDefTables(doc: "t.SpecType"):
     # Def tables generated via datablocks are guaranteed correct,
     # but manually-written ones often don't link up the names in the first row.
     for table in h.findAll("table.propdef, table.descdef, table.elementdef", doc):
@@ -116,7 +115,7 @@ def fixManualDefTables(doc: Spec.Spec):
         h.replaceContents(cell, newContents)
 
 
-def canonicalizeShortcuts(doc: Spec.Spec):
+def canonicalizeShortcuts(doc: "t.SpecType"):
     # Take all the invalid-HTML shortcuts and fix them.
 
     attrFixup = {
@@ -171,7 +170,7 @@ def canonicalizeShortcuts(doc: Spec.Spec):
         del el.attrib["for"]
 
 
-def addImplicitAlgorithms(doc: Spec.Spec):
+def addImplicitAlgorithms(doc: "t.SpecType"):
     # If a container has an empty `algorithm` attribute,
     # but it contains only a single `<dfn>`,
     # assume that the dfn is a description of the algorithm.
@@ -184,18 +183,18 @@ def addImplicitAlgorithms(doc: Spec.Spec):
             if dfnFor:
                 el.set("data-algorithm-for", dfnFor)
         elif len(dfns) == 0:
-            die(
+            m.die(
                 "Algorithm container has no name, and there is no <dfn> to infer one from.",
                 el=el,
             )
         else:
-            die(
+            m.die(
                 "Algorithm container has no name, and there are too many <dfn>s to choose which to infer a name from.",
                 el=el,
             )
 
 
-def checkVarHygiene(doc: Spec.Spec):
+def checkVarHygiene(doc: "t.SpecType"):
     def isAlgo(el):
         return el.get("data-algorithm") is not None
 
@@ -244,7 +243,7 @@ def checkVarHygiene(doc: Spec.Spec):
             else:
                 varLines.append(f"  '{var}'")
     if varLines:
-        warn(
+        m.warn(
             "The following <var>s were only used once in the document:\n"
             + "\n".join(varLines)
             + "\nIf these are not typos, please add an ignore='' attribute to the <var>."
@@ -256,11 +255,11 @@ def checkVarHygiene(doc: Spec.Spec):
     # Look for algorithms that show up twice; these are errors.
     for algo, count in Counter(algoName(el) for el in h.findAll("[data-algorithm]", doc)).items():
         if count > 1:
-            die(f"Multiple declarations of the {algo} algorithm.")
+            m.die(f"Multiple declarations of the {algo} algorithm.")
             return
 
 
-def addVarClickHighlighting(doc: Spec.Spec):
+def addVarClickHighlighting(doc: "t.SpecType"):
     if doc.md.slimBuildArtifact:
         return
     doc.extraStyles[
@@ -377,23 +376,23 @@ def addVarClickHighlighting(doc: Spec.Spec):
     """
 
 
-def fixIntraDocumentReferences(doc: Spec.Spec):
+def fixIntraDocumentReferences(doc: "t.SpecType"):
     ids = {el.get("id"): el for el in h.findAll("[id]", doc)}
     headingIDs = {el.get("id"): el for el in h.findAll("[id].heading", doc)}
     for el in h.findAll("a[href^='#']:not([href='#']):not(.self-link):not([data-link-type])", doc):
         targetID = parse.unquote(el.get("href")[1:])
         if el.get("data-section") is not None and targetID not in headingIDs:
-            die(f"Couldn't find target document section {targetID}:\n{h.outerHTML(el)}", el=el)
+            m.die(f"Couldn't find target document section {targetID}:\n{h.outerHTML(el)}", el=el)
             continue
         if targetID not in ids:
-            die(f"Couldn't find target anchor {targetID}:\n{h.outerHTML(el)}", el=el)
+            m.die(f"Couldn't find target anchor {targetID}:\n{h.outerHTML(el)}", el=el)
             continue
         if h.isEmpty(el):
             # TODO Allow this to respect "safe" markup (<sup>, etc) in the title
             target = ids[targetID]
             content = h.find(".content", target)
             if content is None:
-                die(
+                m.die(
                     f"Tried to generate text for a section link, but the target isn't a heading:\n{h.outerHTML(el)}",
                     el=el,
                 )
@@ -404,18 +403,18 @@ def fixIntraDocumentReferences(doc: Spec.Spec):
             h.appendChild(el, text)
 
 
-def fixInterDocumentReferences(doc: Spec.Spec):
+def fixInterDocumentReferences(doc: "t.SpecType"):
     for el in h.findAll("[spec-section]", doc):
         spec = el.get("data-link-spec").lower()
         section = el.get("spec-section", "")
         if spec is None:
-            die(
+            m.die(
                 f"Spec-section autolink doesn't have a 'spec' attribute:\n{h.outerHTML(el)}",
                 el=el,
             )
             continue
         if section is None:
-            die(
+            m.die(
                 f"Spec-section autolink doesn't have a 'spec-section' attribute:\n{h.outerHTML(el)}",
                 el=el,
             )
@@ -430,7 +429,7 @@ def fixInterDocumentReferences(doc: Spec.Spec):
             if len(vNames) > 0:
                 fillInterDocumentReferenceFromShepherd(doc, el, vNames[0], section)
                 if len(vNames) > 1:
-                    die(
+                    m.die(
                         f"Section autolink {h.outerHTML(el)} attempts to link to unversioned spec name '{spec}', "
                         + "but that spec is versioned as {}. ".format(config.englishFromList(f"'{x}'" for x in vNames))
                         + "Please choose a versioned spec name.",
@@ -442,18 +441,18 @@ def fixInterDocumentReferences(doc: Spec.Spec):
             fillInterDocumentReferenceFromSpecref(doc, el, spec, section)
             continue
         # Unknown spec
-        die(
+        m.die(
             f"Spec-section autolink tried to link to non-existent '{spec}' spec:\n{h.outerHTML(el)}",
             el=el,
         )
 
 
-def fillInterDocumentReferenceFromShepherd(doc: Spec.Spec, el, spec, section):
+def fillInterDocumentReferenceFromShepherd(doc: "t.SpecType", el, spec, section):
     specData = doc.refs.fetchHeadings(spec)
     if section in specData:
         heading = specData[section]
     else:
-        die(
+        m.die(
             f"Couldn't find section '{section}' in spec '{spec}':\n{h.outerHTML(el)}",
             el=el,
         )
@@ -465,7 +464,7 @@ def fillInterDocumentReferenceFromShepherd(doc: Spec.Spec, el, spec, section):
             heading = specData[heading[0]]
         else:
             # multiple headings of this id, user needs to disambiguate
-            die(
+            m.die(
                 f"Multiple headings with id '{section}' for spec '{spec}'. Please specify:\n"
                 + "\n".join("  [[{}]]".format(spec + x) for x in heading),
                 el=el,
@@ -489,10 +488,10 @@ def fillInterDocumentReferenceFromShepherd(doc: Spec.Spec, el, spec, section):
     h.removeAttr(el, "data-link-spec", "spec-section")
 
 
-def fillInterDocumentReferenceFromSpecref(doc: Spec.Spec, el, spec, section):
+def fillInterDocumentReferenceFromSpecref(doc: "t.SpecType", el, spec, section):
     bib = doc.refs.getBiblioRef(spec)
     if isinstance(bib, biblio.StringBiblioEntry):
-        die(f"Can't generate a cross-spec section ref for '{spec}', because the biblio entry has no url.", el=el)
+        m.die(f"Can't generate a cross-spec section ref for '{spec}', because the biblio entry has no url.", el=el)
         return
     el.tag = "a"
     el.set("href", bib.url + section)
@@ -501,7 +500,7 @@ def fillInterDocumentReferenceFromSpecref(doc: Spec.Spec, el, spec, section):
     h.removeAttr(el, "data-link-spec", "spec-section")
 
 
-def processDfns(doc: Spec.Spec):
+def processDfns(doc: "t.SpecType"):
     dfns = h.findAll(config.dfnElementsSelector, doc)
     classifyDfns(doc, dfns)
     h.fixupIDs(doc, dfns)
@@ -549,27 +548,27 @@ def determineDfnType(dfn, inferCSS=False):
     return "dfn"
 
 
-def classifyDfns(doc: Spec.Spec, dfns):
+def classifyDfns(doc: "t.SpecType", dfns):
     dfnTypeToPrefix = {v: k for k, v in config.dfnClassToType.items()}
     for el in dfns:
         dfnType = determineDfnType(el, inferCSS=doc.md.inferCSSDfns)
         if dfnType not in config.dfnTypes:
-            die(f"Unknown dfn type '{dfnType}':\n{h.outerHTML(el)}", el=el)
+            m.die(f"Unknown dfn type '{dfnType}':\n{h.outerHTML(el)}", el=el)
             continue
         dfnFor = h.treeAttr(el, "data-dfn-for")
         primaryDfnText = config.firstLinkTextFromElement(el)
         if primaryDfnText is None:
-            die(f"Dfn has no linking text:\n{h.outerHTML(el)}", el=el)
+            m.die(f"Dfn has no linking text:\n{h.outerHTML(el)}", el=el)
             continue
         if len(primaryDfnText) > 300:
             # Almost certainly accidentally missed the end tag
-            warn(
+            m.warn(
                 f"Dfn has extremely long text - did you forget the </dfn> tag?\n{h.outerHTML(el)}",
                 el=el,
             )
         # Check for invalid fors, as it's usually some misnesting.
         if dfnFor and dfnType in config.typesNotUsingFor:
-            die(
+            m.die(
                 f"'{dfnType}' definitions don't use a 'for' attribute, but this one claims it's for '{dfnFor}' (perhaps inherited from an ancestor). This is probably a markup error.\n{h.outerHTML(el)}",
                 el=el,
             )
@@ -580,7 +579,7 @@ def classifyDfns(doc: Spec.Spec, dfns):
         if dfnFor:
             el.set("data-dfn-for", dfnFor)
         elif dfnType in config.typesUsingFor:
-            die(
+            m.die(
                 f"'{dfnType}' definitions need to specify what they're for.\nAdd a 'for' attribute to {h.outerHTML(el)}, or add 'dfn-for' to an ancestor.",
                 el=el,
             )
@@ -588,13 +587,13 @@ def classifyDfns(doc: Spec.Spec, dfns):
         # Some error checking
         if dfnType in config.functionishTypes:
             if not re.search(r"\(.*\)$", primaryDfnText):
-                die(
+                m.die(
                     f"Function/methods must end with a () arglist in their linking text. Got '{primaryDfnText}'.\n{h.outerHTML(el)}",
                     el=el,
                 )
                 continue
             if not re.match(r"^[\w\[\]-]+\s*\(", primaryDfnText):
-                die(
+                m.die(
                     f"Function/method names can only contain alphanums, underscores, dashes, or []. Got '{primaryDfnText}'.\n{h.outerHTML(el)}",
                     el=el,
                 )
@@ -612,7 +611,7 @@ def classifyDfns(doc: Spec.Spec, dfns):
                     primaryDfnText = names[0]
                     el.set("data-lt", "|".join(names))
                 else:
-                    die(
+                    m.die(
                         f"BIKESHED ERROR: Unhandled functionish type '{dfnType}' in classifyDfns. Please report this to Bikeshed's maintainer.",
                         el=el,
                     )
@@ -626,7 +625,7 @@ def classifyDfns(doc: Spec.Spec, dfns):
                     for name in doc.widl.normalized_method_names(h.textContent(parent), parentFor)
                 )
             elif h.treeAttr(el, "data-dfn-for") is None:
-                die(
+                m.die(
                     f"'argument' dfns need to specify what they're for, or have it be inferrable from their parent. Got:\n{h.outerHTML(el)}",
                     el=el,
                 )
@@ -712,7 +711,7 @@ def determineLinkType(el):
     if linkType:
         if linkType in config.linkTypes:
             return linkType
-        die(f"Unknown link type '{linkType}':\n{h.outerHTML(el)}", el=el)
+        m.die(f"Unknown link type '{linkType}':\n{h.outerHTML(el)}", el=el)
         return "unknown-type"
     # 2. Introspect on the text
     text = h.textContent(el)
@@ -741,7 +740,7 @@ def determineLinkText(el):
         linkText = contents
     linkText = h.foldWhitespace(linkText)
     if len(linkText) == 0:
-        die(f"Autolink {h.outerHTML(el)} has no linktext.", el=el)
+        m.die(f"Autolink {h.outerHTML(el)} has no linktext.", el=el)
     return linkText
 
 
@@ -767,7 +766,7 @@ def classifyLink(el):
 # Additional Processing
 
 
-def processBiblioLinks(doc: Spec.Spec):
+def processBiblioLinks(doc: "t.SpecType"):
     biblioLinks = h.findAll("a[data-link-type='biblio']", doc)
     for el in biblioLinks:
         biblioType = el.get("data-biblio-type")
@@ -776,7 +775,7 @@ def processBiblioLinks(doc: Spec.Spec):
         elif biblioType == "informative":
             storage = doc.informativeRefs
         else:
-            die(
+            m.die(
                 f"Unknown data-biblio-type value '{biblioType}' on {h.outerHTML(el)}. Only 'normative' and 'informative' allowed.",
                 el=el,
             )
@@ -803,7 +802,7 @@ def processBiblioLinks(doc: Spec.Spec):
         if not ref:
             if not okayToFail:
                 closeBiblios = biblio.findCloseBiblios(doc.refs.biblioKeys, linkText)
-                die(
+                m.die(
                     f"Couldn't find '{linkText}' in bibliography data. Did you mean:\n"
                     + "\n".join("  " + b for b in closeBiblios),
                     el=el,
@@ -820,7 +819,7 @@ def processBiblioLinks(doc: Spec.Spec):
                 pass
             else:
                 # Oh no! I'm using two different names to refer to the same biblio!
-                die(
+                m.die(
                     f"The biblio refs [[{linkText}]] and [[{ref.linkText}]] are both aliases of the same base reference [[{ref.originalLinkText}]]. Please choose one name and use it consistently.",
                     el=el,
                 )
@@ -848,7 +847,7 @@ def processBiblioLinks(doc: Spec.Spec):
                 el.set("href", ref.url)
 
 
-def verifyUsageOfAllLocalBiblios(doc: Spec.Spec):
+def verifyUsageOfAllLocalBiblios(doc: "t.SpecType"):
     """
     Verifies that all the locally-declared biblios
     (those written inline in a <pre class=biblio> block,
@@ -863,19 +862,19 @@ def verifyUsageOfAllLocalBiblios(doc: Spec.Spec):
         if b not in usedBiblioKeys:
             unusedBiblioKeys.append(b)
     if unusedBiblioKeys:
-        warn(
+        m.warn(
             "The following locally-defined biblio entries are unused and can be removed:\n"
             + "\n".join(f"  * {b}" for b in unusedBiblioKeys),
         )
 
 
-def processAutolinks(doc: Spec.Spec):
+def processAutolinks(doc: "t.SpecType"):
     # An <a> without an href is an autolink.
     # <i> is a legacy syntax for term autolinks. If it links up, we change it into an <a>.
     # We exclude bibliographical links, as those are processed in `processBiblioLinks`.
     query = "a:not([href]):not([data-link-type='biblio'])"
     if doc.md.useIAutolinks:
-        warn("Use <i> Autolinks is deprecated and will be removed. Please switch to using <a> elements.")
+        m.warn("Use <i> Autolinks is deprecated and will be removed. Please switch to using <a> elements.")
         query += ", i"
     autolinks = h.findAll(query, doc)
     for el in autolinks:
@@ -907,7 +906,7 @@ def processAutolinks(doc: Spec.Spec):
         elif status in config.linkStatuses or status is None:
             pass
         else:
-            die(f"Unknown link status '{status}' on {h.outerHTML(el)}")
+            m.die(f"Unknown link status '{status}' on {h.outerHTML(el)}")
             continue
 
         ref = doc.refs.getRef(
@@ -966,7 +965,7 @@ def processAutolinks(doc: Spec.Spec):
     h.dedupIDs(doc)
 
 
-def decorateAutolink(doc: Spec.Spec, el, linkType, linkText, ref):
+def decorateAutolink(doc: "t.SpecType", el, linkType, linkText, ref):
     # Add additional effects to autolinks.
     if doc.md.slimBuildArtifact:
         return
@@ -993,7 +992,7 @@ def decorateAutolink(doc: Spec.Spec, el, linkType, linkText, ref):
             el.set("title", titleText)
 
 
-def removeMultipleLinks(doc: Spec.Spec):
+def removeMultipleLinks(doc: "t.SpecType"):
     # If there are multiple autolinks to the same thing in a paragraph,
     # only keep the first.
     if not doc.md.removeMultipleLinks:
@@ -1013,7 +1012,7 @@ def removeMultipleLinks(doc: Spec.Spec):
                     h.removeAttr(el, "href", "data-link-type")
 
 
-def processIssuesAndExamples(doc: Spec.Spec):
+def processIssuesAndExamples(doc: "t.SpecType"):
     # Add an auto-genned and stable-against-changes-elsewhere id to all issues and
     # examples, and link to remote issues if possible:
     for el in h.findAll(".issue:not([id])", doc):
@@ -1053,7 +1052,7 @@ def processIssuesAndExamples(doc: Spec.Spec):
     h.fixupIDs(doc, h.findAll(".issue, .example", doc))
 
 
-def addSelfLinks(doc: Spec.Spec):
+def addSelfLinks(doc: "t.SpecType"):
     if doc.md.slimBuildArtifact:
         return
 
@@ -1084,7 +1083,7 @@ def addSelfLinks(doc: Spec.Spec):
     else:
         for el in dfnElements:
             if list(el.iterancestors("a")):
-                warn(
+                m.warn(
                     f"Found <a> ancestor, skipping self-link. Swap <dfn>/<a> order?\n  {h.outerHTML(el)}",
                     el=el,
                 )
@@ -1092,7 +1091,7 @@ def addSelfLinks(doc: Spec.Spec):
             h.appendChild(el, makeSelfLink(el))
 
 
-def cleanupHTML(doc: Spec.Spec):
+def cleanupHTML(doc: "t.SpecType"):
     # Cleanup done immediately before serialization.
 
     head = None
@@ -1113,7 +1112,7 @@ def cleanupHTML(doc: Spec.Spec):
             strayHeadEls.append(el)
 
         if el.tag == "style" and el.get("scoped") is not None:
-            die(
+            m.die(
                 "<style scoped> is no longer part of HTML. Ensure your styles can apply document-globally and remove the scoped attribute.",
                 el=el,
             )
@@ -1223,7 +1222,7 @@ def cleanupHTML(doc: Spec.Spec):
 
         # Look for nested <a> elements, and warn about them.
         if el.tag == "a" and h.hasAncestor(el, lambda x: x.tag == "a"):
-            warn(
+            m.warn(
                 f"The following (probably auto-generated) link is illegally nested in another link:\n{h.outerHTML(el)}",
                 el=el,
             )
@@ -1332,7 +1331,7 @@ def hackyLineNumbers(lines):
     return lines
 
 
-def correctFrontMatter(doc: Spec.Spec):
+def correctFrontMatter(doc: "t.SpecType"):
     # Detect and move around some bits of information,
     # if you provided them in your
     # If you provided an <h1> manually, use that element rather than whatever the boilerplate contains.
@@ -1341,7 +1340,7 @@ def correctFrontMatter(doc: Spec.Spec):
         h.replaceNode(h1s[0], h1s[1])
 
 
-def formatElementdefTables(doc: Spec.Spec):
+def formatElementdefTables(doc: "t.SpecType"):
     for table in h.findAll("table.elementdef", doc):
         elements = h.findAll("tr:first-child dfn", table)
         elementsFor = " ".join(h.textContent(x) for x in elements)
@@ -1352,7 +1351,7 @@ def formatElementdefTables(doc: Spec.Spec):
                 key=lambda x: x.text,
             )
             if len(groupAttrs) == 0:
-                die(
+                m.die(
                     f"The element-attr group '{groupName}' doesn't have any attributes defined for it.",
                     el=el,
                 )
@@ -1381,12 +1380,12 @@ def formatElementdefTables(doc: Spec.Spec):
                 )
 
 
-def formatArgumentdefTables(doc: Spec.Spec):
+def formatArgumentdefTables(doc: "t.SpecType"):
     for table in h.findAll("table.argumentdef", doc):
         forMethod = doc.widl.normalized_method_names(table.get("data-dfn-for"))
         method = doc.widl.find(table.get("data-dfn-for"))
         if not method:
-            die(f"Can't find method '{forMethod}'.", el=table)
+            m.die(f"Can't find method '{forMethod}'.", el=table)
             continue
         for tr in h.findAll("tbody > tr", table):
             tds = h.findAll("td", tr)
@@ -1403,14 +1402,14 @@ def formatArgumentdefTables(doc: Spec.Spec):
                 else:
                     h.appendChild(tds[3], h.E.span({"class": "no"}, "✘"))
             else:
-                die(
+                m.die(
                     f"Can't find the '{argName}' argument of method '{method.full_name}' in the argumentdef block.",
                     el=table,
                 )
                 continue
 
 
-def inlineRemoteIssues(doc: Spec.Spec):
+def inlineRemoteIssues(doc: "t.SpecType"):
     # Finds properly-marked-up "remote issues",
     # and inlines their contents into the issue.
 
@@ -1437,7 +1436,7 @@ def inlineRemoteIssues(doc: Spec.Spec):
         key = f"{issueUserRepo}/{issue.num}"
         href = "https://github.{}/{}/issues/{}".format(doc.md.repository.ns, issueUserRepo, issue.num)
         url = "{}/repos/{}/issues/{}".format(doc.md.repository.api, issueUserRepo, issue.num)
-        say("Fetching issue {:-3d}/{:d}: {:s}".format(i + 1, len(inlineIssues), key))
+        m.say("Fetching issue {:-3d}/{:d}: {:s}".format(i + 1, len(inlineIssues), key))
 
         # Fetch the issues
         headers = {"Accept": "application/vnd.github.v3.html+json"}
@@ -1455,7 +1454,7 @@ def inlineRemoteIssues(doc: Spec.Spec):
             if key in responses:
                 data = responses[key]
             else:
-                warn(f"Connection error fetching issue #{issue.num}")
+                m.warn(f"Connection error fetching issue #{issue.num}")
                 continue
         if res is None:
             # Already handled in the except block
@@ -1470,20 +1469,20 @@ def inlineRemoteIssues(doc: Spec.Spec):
         elif res.status_code == 401:
             error = res.json()
             if error["message"] == "Bad credentials":
-                die(f"'{doc.token}' is not a valid GitHub OAuth token. See https://github.com/settings/tokens")
+                m.die(f"'{doc.token}' is not a valid GitHub OAuth token. See https://github.com/settings/tokens")
             else:
-                die(
+                m.die(
                     "401 error when fetching GitHub Issues:\n" + config.printjson(error),
                 )
             continue
         elif res.status_code == 403:
             error = res.json()
             if error["message"].startswith("API rate limit exceeded"):
-                die(
+                m.die(
                     "GitHub Issues API rate limit exceeded. Get an OAuth token from https://github.com/settings/tokens to increase your limit, or just wait an hour for your limit to refresh; Bikeshed has cached all the issues so far and will resume from where it left off."
                 )
             else:
-                die(
+                m.die(
                     "403 error when fetching GitHub Issues:\n" + config.printjson(error),
                 )
             continue
@@ -1492,7 +1491,7 @@ def inlineRemoteIssues(doc: Spec.Spec):
                 error = config.printjson(res.json())
             except ValueError:
                 error = "First 100 characters of error:\n" + res.text[0:100]
-            die(f"{res.status_code} error when fetching GitHub Issues:\n" + error)
+            m.die(f"{res.status_code} error when fetching GitHub Issues:\n" + error)
             continue
         responses[key] = data
         # Put the issue data into the DOM
@@ -1526,11 +1525,11 @@ def inlineRemoteIssues(doc: Spec.Spec):
         with open(config.scriptPath("spec-data", "github-issues.json"), "w", encoding="utf-8") as f:
             f.write(json.dumps(responses, ensure_ascii=False, indent=2, sort_keys=True))
     except Exception as e:
-        warn(f"Couldn't save GitHub Issues cache to disk.\n{e}")
+        m.warn(f"Couldn't save GitHub Issues cache to disk.\n{e}")
     return
 
 
-def addNoteHeaders(doc: Spec.Spec):
+def addNoteHeaders(doc: "t.SpecType"):
     # Finds <foo heading="bar"> and turns it into a marker-heading
     for el in h.findAll("[heading]", doc):
         h.addClass(el, "no-marker")
@@ -1546,14 +1545,14 @@ def addNoteHeaders(doc: Spec.Spec):
         h.removeAttr(el, "heading")
 
 
-def locateFillContainers(doc: Spec.Spec):
+def locateFillContainers(doc: "t.SpecType"):
     fillContainers = defaultdict(list)
     for el in h.findAll("[data-fill-with]", doc):
         fillContainers[el.get("data-fill-with")].append(el)
     return fillContainers
 
 
-def forceCrossorigin(doc: Spec.Spec):
+def forceCrossorigin(doc: "t.SpecType"):
     if not doc.md.forceCrossorigin:
         return
     for el in h.findAll("link, script[src], audio, video, img", doc):
@@ -1562,7 +1561,7 @@ def forceCrossorigin(doc: Spec.Spec):
         el.set("crossorigin", "")
 
 
-def addImageSize(doc: Spec.Spec):
+def addImageSize(doc: "t.SpecType"):
     if doc.md.imgAutoSize is False:
         return
     imgElements = h.findAll("img", doc)
@@ -1576,7 +1575,7 @@ def addImageSize(doc: Spec.Spec):
         srcset = el.get("srcset")
         res = 1
         if src is None and srcset is None:
-            warn(
+            m.warn(
                 "<img> elements must have at least one of src or srcset.",
                 el=el,
             )
@@ -1584,28 +1583,28 @@ def addImageSize(doc: Spec.Spec):
         elif src is not None and srcset is not None:
             continue
         elif src is None:
-            m = re.match(r"^[ \t\n]*([^ \t\n]+)[ \t\n]+(\d+)x[ \t\n]*$", srcset)
-            if m is None:
-                die(
+            match = re.match(r"^[ \t\n]*([^ \t\n]+)[ \t\n]+(\d+)x[ \t\n]*$", srcset)
+            if match is None:
+                m.die(
                     f"Couldn't parse 'srcset' attribute: \"{srcset}\"\n"
                     + "Bikeshed only supports a single image followed by an integer resolution. If not targeting Bikeshed specifically, HTML requires a 'src' attribute (and probably a 'width' and 'height' attribute too). This warning can also be suppressed by adding a 'no-autosize' attribute.",
                     el=el,
                 )
                 continue
             else:
-                src = m.group(1)
+                src = match.group(1)
                 el.set("src", src)
-                res = int(m.group(2))
+                res = int(match.group(2))
         if not doc.inputSource.cheaplyExists(""):
             # If the input source can't tell whether a file cheaply exists,
             # PIL very likely can't use it either.
-            warn(
+            m.warn(
                 f"At least one <img> doesn't have its size set ({h.outerHTML(el)}), but given the type of input document, Bikeshed can't figure out what the size should be.\nEither set 'width'/'height' manually, or opt out of auto-detection by setting the 'no-autosize' attribute.",
                 el=el,
             )
             return
         if re.match(r"^(https?:/)?/", src):
-            warn(
+            m.warn(
                 f"Autodetection of image dimensions is only supported for local files, skipping this image: {h.outerHTML(el)}\nConsider setting 'width' and 'height' manually or opting out of autodetection by setting the 'no-autosize' attribute.",
                 el=el,
             )
@@ -1615,7 +1614,7 @@ def addImageSize(doc: Spec.Spec):
             im = Image.open(imgPath)
             width, height = im.size
         except Exception as e:
-            warn(
+            m.warn(
                 f"Couldn't determine width and height of this image: {src}\n{e}",
                 el=el,
             )
@@ -1623,14 +1622,14 @@ def addImageSize(doc: Spec.Spec):
         if width % res == 0:
             el.set("width", str(int(width / res)))
         else:
-            warn(
+            m.warn(
                 f"The width ({width}px) of this image is not a multiple of the declared resolution ({res}): {src}\nConsider fixing the image so its width is a multiple of the resolution, or setting its 'width' and 'height' attribute manually.",
                 el=el,
             )
         if height % res == 0:
             el.set("height", str(int(height / res)))
         else:
-            warn(
+            m.warn(
                 f"The height ({height}px) of this image is not a multiple of the declared resolution ({res}): {src}\nConsider fixing the image so its height is a multiple of the resolution, or setting its 'width' and 'height' attribute manually.",
                 el=el,
             )

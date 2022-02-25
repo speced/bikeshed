@@ -3,8 +3,7 @@
 import io
 import os
 
-from .. import InputSource, messages as m
-from . import main, status as stat
+from . import config, InputSource, messages as m
 
 
 class DataFileRequester:
@@ -47,9 +46,9 @@ class DataFileRequester:
         if fileType is None:
             fileType = self.type
         if fileType == "readonly":
-            return main.scriptPath("spec-data", "readonly", *segs)
+            return config.scriptPath("spec-data", "readonly", *segs)
         else:
-            return main.scriptPath("spec-data", *segs)
+            return config.scriptPath("spec-data", *segs)
 
     def _fail(self, location, str, okayToFail):
         if okayToFail:
@@ -88,7 +87,7 @@ def retrieveBoilerplateFile(
             status = doc.md.status
         elif doc.md.rawStatus is not None:
             status = doc.md.rawStatus
-    megaGroup, status = stat.splitStatus(status)
+    megaGroup, status = config.splitStatus(status)
 
     searchLocally = allowLocal and doc.md.localBoilerplate[name]
 

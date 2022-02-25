@@ -1,7 +1,6 @@
 import re
 
-from .. import config, h
-from ..messages import die
+from .. import config, h, messages as m
 
 
 def addAttributeInfoSpans(doc):
@@ -56,7 +55,7 @@ def getTargetInfo(doc, el):
 
     referencedAttribute = el.get("for")
     if not referencedAttribute:
-        die("Missing for='' reference in attribute info span.", el=el)
+        m.die("Missing for='' reference in attribute info span.", el=el)
         return
     if "/" in referencedAttribute:
         interface, referencedAttribute = referencedAttribute.split("/")
@@ -71,10 +70,10 @@ def getTargetInfo(doc, el):
         )
 
     if len(targets) == 0:
-        die(f"Couldn't find target {referencedAttribute} '{refType}':\n{h.outerHTML(el)}", el=el)
+        m.die(f"Couldn't find target {referencedAttribute} '{refType}':\n{h.outerHTML(el)}", el=el)
         return
     elif len(targets) > 1:
-        die(f"Multiple potential target {referencedAttribute}s '{refType}':\n{h.outerHTML(el)}", el=el)
+        m.die(f"Multiple potential target {referencedAttribute}s '{refType}':\n{h.outerHTML(el)}", el=el)
         return
 
     target = targets[0]
