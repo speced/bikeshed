@@ -19,32 +19,32 @@ class MarkdownCodeSpans(func.Functor):
         mode = "text"
         indexSoFar = 0
         backtickCount = 0
-        for m in re.finditer(r"(\\`)|([\w-]*)(`+)", text):
+        for match in re.finditer(r"(\\`)|([\w-]*)(`+)", text):
             if mode == "text":
-                if m.group(1):
-                    newText += text[indexSoFar : m.start()] + m.group(1)[1]
-                    indexSoFar = m.end()
-                elif m.group(3):
+                if match.group(1):
+                    newText += text[indexSoFar : match.start()] + match.group(1)[1]
+                    indexSoFar = match.end()
+                elif match.group(3):
                     mode = "code"
-                    newText += text[indexSoFar : m.start()]
-                    indexSoFar = m.end()
-                    backtickCount = len(m.group(3))
-                    tag = m.group(2)
-                    literalStart = m.group(0)
+                    newText += text[indexSoFar : match.start()]
+                    indexSoFar = match.end()
+                    backtickCount = len(match.group(3))
+                    tag = match.group(2)
+                    literalStart = match.group(0)
             elif mode == "code":
-                if m.group(1):
+                if match.group(1):
                     pass
-                elif m.group(3):
-                    if len(m.group(3)) != backtickCount:
+                elif match.group(3):
+                    if len(match.group(3)) != backtickCount:
                         pass
                     else:
                         mode = "text"
-                        innerText = text[indexSoFar : m.start()] + m.group(2)
-                        fullText = literalStart + text[indexSoFar : m.start()] + m.group(0)
+                        innerText = text[indexSoFar : match.start()] + match.group(2)
+                        fullText = literalStart + text[indexSoFar : match.start()] + match.group(0)
                         replacement = (tag, innerText, fullText)
                         self.__codeSpanReplacements__.append(replacement)
                         newText += "\ue0ff"
-                        indexSoFar = m.end()
+                        indexSoFar = match.end()
         if mode == "text":
             newText += text[indexSoFar:]
         elif mode == "code":
