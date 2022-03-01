@@ -382,13 +382,13 @@ def scopingElements(startEl, *tags):
     # Maps to the things that can establish a counter scope.
     tagFilter = set(tags)
 
-    for el in startEl.itersiblings(preceding=True, *tags):
-        yield el
-    for el in startEl.iterancestors():
-        if el.tag in tagFilter:
-            yield el
-        for el in el.itersiblings(preceding=True, *tags):
-            yield el
+    for sib in startEl.itersiblings(preceding=True, *tags):
+        yield sib
+    for ancestor in startEl.iterancestors():
+        if ancestor.tag in tagFilter:
+            yield ancestor
+        for sib in ancestor.itersiblings(preceding=True, *tags):
+            yield sib
 
 
 def previousElements(startEl, tag=None, *tags):

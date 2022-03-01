@@ -130,9 +130,8 @@ def retrieveBoilerplateFile(
             except OSError:
                 # That input doesn't exist.
                 pass
-    else:
-        if error:
-            m.die(
-                f"Couldn't find an appropriate include file for the {name} inclusion, given group='{group}' and status='{status}'."
-            )
-        return ""
+    if error:
+        m.die(
+            f"Couldn't find an appropriate include file for the {name} inclusion, given group='{group}' and status='{status}'."
+        )
+    return ""

@@ -381,7 +381,7 @@ def loadBiblioDataFile(lines, storage):
 
 def levenshtein(a, b):
     "Calculates the Levenshtein distance between a and b."
-    n, m = len(a), len(b)
+    n, m = len(a), len(b)  # pylint: disable=redefined-outer-name
     if n > m:
         # Make sure n <= m, to use O(min(n,m)) space
         a, b = b, a

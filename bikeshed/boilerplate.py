@@ -314,21 +314,21 @@ def addIndexOfLocallyDefinedTerms(doc, container):
             # Don't generate index entries for arguments.
             continue
         if el.get("data-dfn-for") is not None:
-            disambiguator = "{} for {}".format(
+            disamb = "{} for {}".format(
                 el.get("data-dfn-type"),
                 ", ".join(config.splitForValues(el.get("data-dfn-for"))),
             )
         elif type == "dfn":
-            disambiguator = "definition of"
+            disamb = "definition of"
         else:
-            disambiguator = "({})".format(el.get("data-dfn-type"))
+            disamb = "({})".format(el.get("data-dfn-type"))
 
         id = el.get("id")
         for linkText in linkTexts:
             entry = {
                 "url": "#" + id,
                 "label": "§\u202f" + headingLevel,
-                "disambiguator": disambiguator,
+                "disambiguator": disamb,
             }
             indexEntries[linkText].append(entry)
 

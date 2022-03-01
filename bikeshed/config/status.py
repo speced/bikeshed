@@ -339,12 +339,12 @@ def canonicalizeStatus(rawStatus, group):
 
     def megaGroupsForStatus(status):
         # Returns a list of megagroups that recognize the given status
-        megaGroups = []
+        mgs = []
         for key in shortToLongStatus:
             mg, _, s = key.partition("/")
             if s == status:
-                megaGroups.append(mg)
-        return megaGroups
+                mgs.append(mg)
+        return mgs
 
     # Canonicalize the rawStatus that was passed in, into a known form.
     # Might be foo/BAR, or just BAR.

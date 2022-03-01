@@ -151,22 +151,22 @@ specStatuses = frozenset(["current", "snapshot"])
 linkStatuses = frozenset(["current", "snapshot", "local", "anchor-block"])
 
 
-def linkTypeIn(linkTypes, targetTypes="all"):
+def linkTypeIn(startTypes, targetTypes="all"):
     # Tests if two link/dfn types are "compatible",
     # such that they share at least one base type when expanded.
     # (All dfn types are "base"; link types like "idl" are shorthand,
     #  and expand into one or more base types.)
     # Called with no arguments,
     # tests if the passed type is a valid dfn/link type.
-    if isinstance(linkTypes, str):
-        linkTypes = linkTypeToDfnType[linkTypes]
+    if isinstance(startTypes, str):
+        startTypes = linkTypeToDfnType[startTypes]
     else:
-        linkTypes = set(linkTypes)
+        startTypes = set(startTypes)
     if isinstance(targetTypes, str):
         targetTypes = linkTypeToDfnType[targetTypes]
     else:
         targetTypes = set(targetTypes)
-    return bool(linkTypes & targetTypes)
+    return bool(startTypes & targetTypes)
 
 
 # Elements that are allowed to provide definitions to Shepherd

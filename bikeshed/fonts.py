@@ -196,7 +196,7 @@ def writeOutputLines(outputFilename, inputFilename, lines):
         m.die(f"Something prevented me from saving the output document to {outputFilename}:\n{e}")
 
 
-if __name__ == "__main__":
+def main():
     import argparse
 
     argparser = argparse.ArgumentParser(description="Outputs text as giant ASCII art.")
@@ -211,3 +211,7 @@ if __name__ == "__main__":
     font = Font(options.fontPath)
     for line in font.write(options.text):
         print(line, end="")
+
+
+if __name__ == "__main__":
+    main()

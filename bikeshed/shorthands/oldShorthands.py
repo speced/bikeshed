@@ -4,7 +4,7 @@ from .. import config, h, messages as m
 
 
 def transformProductionPlaceholders(doc):
-    propdescRe = re.compile(r"^'(?:(\S*)/)?([\w*-]+)(?:!!([\w-]+))?'$")
+    propdescRe = re.compile(r"^'(?:(\S*)/)?([\w*-]+)(?:!!([\w-]+))?'$")  # pylint: disable=redefined-outer-name
     funcRe = re.compile(r"^(?:(\S*)/)?([\w*-]+\(\))$")
     atruleRe = re.compile(r"^(?:(\S*)/)?(@[\w*-]+)$")
     typeRe = re.compile(

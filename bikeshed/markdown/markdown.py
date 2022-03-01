@@ -153,7 +153,7 @@ def tokenizeLines(
             tokens.append(
                 {
                     "type": "raw",
-                    "prefixlen": prefixLen(ws, numSpacesForIndentation),
+                    "prefixlen": prefixCount(ws, numSpacesForIndentation),
                     "line": line,
                 }
             )
@@ -163,7 +163,7 @@ def tokenizeLines(
             tokens.append(
                 {
                     "type": "raw",
-                    "prefixlen": prefixLen(line.text, numSpacesForIndentation),
+                    "prefixlen": prefixCount(line.text, numSpacesForIndentation),
                     "line": line,
                 }
             )
@@ -245,7 +245,7 @@ def tokenizeLines(
         if token["type"] == "blank":
             token["prefixlen"] = float("inf")
         else:
-            token["prefixlen"] = prefixLen(line.text, numSpacesForIndentation)
+            token["prefixlen"] = prefixCount(line.text, numSpacesForIndentation)
         token["line"] = line
         tokens.append(token)
 
@@ -308,7 +308,7 @@ def stripCommentsFromLine(line, inComment=False):
             return pre + res, inComment
 
 
-def prefixLen(text, numSpacesForIndentation):
+def prefixCount(text, numSpacesForIndentation):
     i = 0
     prefixLen = 0
     while i < len(text):

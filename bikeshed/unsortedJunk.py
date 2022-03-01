@@ -70,16 +70,12 @@ class MarkdownCodeSpans(func.Functor):
                     # Markdown code span, so massage per CommonMark rules.
                     import string
 
-                    t = h.escapeHTML(repl[1]).strip(string.whitespace)
-                    t = re.sub("[" + string.whitespace + "]{2,}", " ", t)
-                    return "{2}<code data-opaque bs-autolink-syntax='{1}'>{0}</code>".format(
-                        t, h.escapeAttr(repl[2]), repl[0]
-                    )
-                return "<code data-opaque data-span-tag={0} bs-autolink-syntax='{2}'>{1}</code>".format(
-                    repl[0], h.escapeHTML(repl[1]), h.escapeAttr(repl[2])
-                )
+                    text = h.escapeHTML(repl[1]).strip(string.whitespace)
+                    text = re.sub("[" + string.whitespace + "]{2,}", " ", text)
+                    return f"{repl[0]}<code data-opaque bs-autolink-syntax='{h.escapeAttr(repl[2])}'>{text}</code>"
+                return f"<code data-opaque data-span-tag={repl[0]} bs-autolink-syntax='{h.escapeAttr(repl[2])}'>{h.escapeHTML(repl[1])}</code>"
 
-            return re.sub("\ue0ff", codeSpanReviver, self.__val__)
+            return re.sub(r"\ue0ff", codeSpanReviver, self.__val__)
         return self.__val__
 
 

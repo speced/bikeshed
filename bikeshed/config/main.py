@@ -19,10 +19,11 @@ def englishFromList(items, conjunction="or"):
 
 
 def intersperse(iterable, delimiter):
-    it = iter(iterable)
-    yield next(it)
-    for x in it:
-        yield delimiter
+    first = True
+    for x in iterable:
+        if not first:
+            yield delimiter
+        first = False
         yield x
 
 
@@ -144,10 +145,9 @@ def groupFromKey(key, length=2):
             return group
         if char in safeChars:
             group += char
-    else:
-        group = group.ljust(length, "_")
-        _groupFromKeyCache[key] = group
-        return group
+    group = group.ljust(length, "_")
+    _groupFromKeyCache[key] = group
+    return group
 
 
 _groupFromKeyCache: t.Dict[str, str]
@@ -168,12 +168,12 @@ def scriptPath(*pathSegs):
     return path
 
 
-def chrootPath(chrootPath, path):
-    chrootPath = os.path.abspath(chrootPath)
+def chrootPath(rootPath, path):
+    rootPath = os.path.abspath(rootPath)
     path = os.path.abspath(path)
-    if not path.startswith(chrootPath):
+    if not path.startswith(rootPath):
         messages.die(
-            f"Attempted to access a file ({path}) outside the source document's directory ({chrootPath}). See --allow-nonlocal-files."
+            f"Attempted to access a file ({path}) outside the source document's directory ({rootPath}). See --allow-nonlocal-files."
         )
         raise Exception()
     else:

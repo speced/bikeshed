@@ -281,11 +281,6 @@ def main():
         action="store_true",
         help="Prints those terms that will be exported for cross-ref purposes.",
     )
-    debugCommands.add_argument(
-        "--print-refs-for",
-        dest="linkText",
-        help="Prints the ref data for a given link text.",
-    )
     debugCommands.add_argument("--print", dest="code", help="Runs the specified code and prints it.")
     debugCommands.add_argument(
         "--print-json",
@@ -542,18 +537,6 @@ def handleDebug(options, extras):
         doc.mdCommandLine = metadata.fromCommandLine(extras)
         doc.preprocess()
         exec(f"print({options.code})")
-    elif options.linkText:
-        doc = Spec(inputFilename=options.infile)
-        doc.mdCommandLine = metadata.fromCommandLine(extras)
-        doc.preprocess()
-        refs = doc.refs[options.linkText] + doc.refs[options.linkText + "\n"]
-        constants.quiet = options.quiet
-        if not constants.quiet:
-            m.p(f"Refs for '{options.linkText}':")
-        # Get ready for JSONing
-        for ref in refs:
-            ref["level"] = str(ref["level"])
-        m.p(config.printjson(refs))
     elif options.refreshData:
         constants.quiet = 0
         update.updateReadonlyDataFiles()
