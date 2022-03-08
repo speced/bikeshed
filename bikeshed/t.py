@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import sys
-
 from typing import (
     Any,
     DefaultDict,
@@ -11,6 +10,7 @@ from typing import (
     Iterable,
     Iterator,
     List,
+    Literal,
     Mapping,
     Optional,
     Sequence,
@@ -19,7 +19,20 @@ from typing import (
     TypeVar,
     Union,
     TYPE_CHECKING,
+    cast,
+    overload,
 )
+
+from lxml import etree
+
+
+ElementT = etree._Element  # pylint: disable=protected-access
+DocumentT = etree._ElementTree  # pylint: disable=protected-access
+NodeT = Union[str, ElementT]
+
+# Can't actually do recursive types yet :(
+# Get as close as possible, but let lists be Any
+NodesT = Union[NodeT, List]
 
 
 if TYPE_CHECKING:

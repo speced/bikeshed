@@ -139,7 +139,7 @@ def canonicalizeShortcuts(doc: "t.SpecType"):
     for el in h.findAll(",".join(f"[{attr}]" for attr in attrFixup), doc):
         for attr, fixedAttr in attrFixup.items():
             if el.get(attr) is not None:
-                el.set(fixedAttr, el.get(attr))
+                el.set(fixedAttr, t.cast(str, el.get(attr)))
                 del el.attrib[attr]
 
     # The next two aren't in the above dict because some of the words conflict with existing attributes on some elements.
@@ -159,11 +159,12 @@ def canonicalizeShortcuts(doc: "t.SpecType"):
     for el in h.findAll(config.dfnElementsSelector + ", a", doc):
         if el.get("for") is None:
             continue
-        if el.tag == "a":
-            el.set("data-link-for", el.get("for"))
-        else:
-            el.set("data-dfn-for", el.get("for"))
+        _for = t.cast(str, el.get("for"))
         del el.attrib["for"]
+        if el.tag == "a":
+            el.set("data-link-for", _for)
+        else:
+            el.set("data-dfn-for", _for)
 
 
 def addImplicitAlgorithms(doc: "t.SpecType"):
@@ -376,7 +377,8 @@ def fixIntraDocumentReferences(doc: "t.SpecType"):
     ids = {el.get("id"): el for el in h.findAll("[id]", doc)}
     headingIDs = {el.get("id"): el for el in h.findAll("[id].heading", doc)}
     for el in h.findAll("a[href^='#']:not([href='#']):not(.self-link):not([data-link-type])", doc):
-        targetID = parse.unquote(el.get("href")[1:])
+        href = t.cast(str, el.get("href"))
+        targetID = parse.unquote(href[1:])
         if el.get("data-section") is not None and targetID not in headingIDs:
             m.die(f"Couldn't find target document section {targetID}:\n{h.outerHTML(el)}", el=el)
             continue
@@ -401,20 +403,20 @@ def fixIntraDocumentReferences(doc: "t.SpecType"):
 
 def fixInterDocumentReferences(doc: "t.SpecType"):
     for el in h.findAll("[spec-section]", doc):
-        spec = el.get("data-link-spec").lower()
-        section = el.get("spec-section", "")
-        if spec is None:
+        if el.get("data-link-spec") is None:
             m.die(
                 f"Spec-section autolink doesn't have a 'spec' attribute:\n{h.outerHTML(el)}",
                 el=el,
             )
             continue
-        if section is None:
+        spec = el.get("data-link-spec", "").lower()
+        if el.get("spec-section") is None:
             m.die(
                 f"Spec-section autolink doesn't have a 'spec-section' attribute:\n{h.outerHTML(el)}",
                 el=el,
             )
             continue
+        section = el.get("spec-section", "")
         if spec in doc.refs.specs:
             # Bikeshed recognizes the spec
             fillInterDocumentReferenceFromShepherd(doc, el, spec, section)
@@ -879,8 +881,8 @@ def processAutolinks(doc: "t.SpecType"):
             continue
 
         classifyLink(el)
-        linkType = el.get("data-link-type")
-        linkText = el.get("data-lt")
+        linkType = t.cast(str, el.get("data-link-type"))
+        linkText = t.cast(str, el.get("data-lt"))
 
         # Properties and descriptors are often written like 'foo-*'. Just ignore these.
         if linkType in ("property", "descriptor", "propdesc") and "*" in linkText:
@@ -999,7 +1001,7 @@ def removeMultipleLinks(doc: "t.SpecType"):
         if h.hasAncestor(el, lambda x: x.tag in ["pre", "xmp"]):
             # Don't strip out repeated links from opaque elements
             continue
-        paras[h.parentElement(el)][el.get("href")].append(el)
+        paras[h.parentElement(el)][el.get("href", "")].append(el)
     for linkGroups in paras.values():
         for _, links in linkGroups.items():
             if len(links) > 1:
@@ -1160,10 +1162,10 @@ def cleanupHTML(doc: "t.SpecType"):
         # when a markdown-generated dl has a div parent and dl grandparent
         # and remove it.
         if (
-            el.tag == "dl"
+            h.tagName(el) == "dl"
             and el.get("data-md") is not None
-            and h.parentElement(el).tag == "div"
-            and h.parentElement(h.parentElement(el)).tag == "dl"
+            and h.tagName(h.parentElement(el)) == "div"
+            and h.tagName(h.parentElement(el, 2)) == "dl"
         ):
             # Also featureless and can be safely thrown away
             # with its children merged into the parent div
@@ -1302,7 +1304,8 @@ def cleanupHTML(doc: "t.SpecType"):
             head.append(el)
     for el in styleScoped:
         parent = h.parentElement(el)
-        h.prependChild(parent, el)
+        if parent is not None:
+            h.prependChild(parent, el)
     for el in nestedLists:
         h.replaceWithContents(el)
     for el in flattenEls:
@@ -1416,7 +1419,7 @@ def inlineRemoteIssues(doc: "t.SpecType"):
     inlineIssues = []
     GitHubIssue = namedtuple("GitHubIssue", ["user", "repo", "num", "el"])
     for el in h.findAll("[data-inline-github]", doc):
-        user, repo, num = el.get("data-inline-github").split()
+        user, repo, num = el.get("data-inline-github", "").split()
         inlineIssues.append(GitHubIssue(user, repo, num, el=el))
         h.removeAttr(el, "data-inline-github")
     if not inlineIssues:
@@ -1537,7 +1540,7 @@ def addNoteHeaders(doc: "t.SpecType"):
             preText = "EXAMPLE: "
         else:
             preText = ""
-        h.prependChild(el, h.E.div({"class": "marker"}, preText, *h.parseHTML(el.get("heading"))))
+        h.prependChild(el, h.E.div({"class": "marker"}, preText, *h.parseHTML(el.get("heading", ""))))
         h.removeAttr(el, "heading")
 
 
@@ -1579,7 +1582,7 @@ def addImageSize(doc: "t.SpecType"):
         elif src is not None and srcset is not None:
             continue
         elif src is None:
-            match = re.match(r"^[ \t\n]*([^ \t\n]+)[ \t\n]+(\d+)x[ \t\n]*$", srcset)
+            match = re.match(r"^[ \t\n]*([^ \t\n]+)[ \t\n]+(\d+)x[ \t\n]*$", srcset or "")
             if match is None:
                 m.die(
                     f"Couldn't parse 'srcset' attribute: \"{srcset}\"\n"
@@ -1590,7 +1593,8 @@ def addImageSize(doc: "t.SpecType"):
             else:
                 src = match.group(1)
                 el.set("src", src)
-                res = int(match.group(2))
+                res = int(match.group(2) or "1")
+        assert src is not None
         if not doc.inputSource.cheaplyExists(""):
             # If the input source can't tell whether a file cheaply exists,
             # PIL very likely can't use it either.

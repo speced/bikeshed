@@ -255,7 +255,7 @@ def mergeHighlighting(el, coloredText):
             if h.isElement(node):
                 h.appendChild(el, colorizeEl(node, coloredText))
             else:
-                h.appendChild(el, *colorizeText(node, coloredText))
+                h.appendChild(el, *colorizeText(node, coloredText), allowEmpty=True)
         return el
 
     def colorizeText(text, coloredText):

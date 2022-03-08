@@ -113,7 +113,7 @@ def handleCodeInclude(el, doc):
                     # If manually overridden, leave it alone,
                     # but otherwise DWIM.
                     el.set("line-start", str(start))
-    h.appendChild(el, *lines)
+    h.appendChild(el, *lines, allowEmpty=True)
 
 
 def handleRawInclude(el, doc):

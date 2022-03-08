@@ -334,7 +334,7 @@ def addIndexOfLocallyDefinedTerms(doc, container):
 
     # Now print the indexes
     indexHTML = htmlFromIndexTerms(indexEntries)
-    h.appendChild(container, indexHTML)
+    h.appendChild(container, indexHTML, allowEmpty=True)
 
 
 def disambiguator(ref, types, specs):
@@ -464,7 +464,7 @@ def addExplicitIndexes(doc):
                     {"url": ref.url, "disambiguator": disambiguator(ref, types, specs)} for ref in refs
                 )
 
-        h.appendChild(el, htmlFromIndexTerms(filteredRefs))
+        h.appendChild(el, htmlFromIndexTerms(filteredRefs), allowEmpty=True)
         el.tag = "div"
         h.removeAttr(el, "export", "for", "spec", "status", "type")
 
@@ -1088,7 +1088,7 @@ def addSpecMetadataSection(doc):
                 if k not in doc.md.metadataInclude:
                     # Explicitly excluded
                     continue
-                h.appendChild(dl, *createMdEntry(k, vs))
+                h.appendChild(dl, *createMdEntry(k, vs), allowEmpty=True)
         elif key == "!*":
             # Do all the non-explicit custom keys
             for k, vs in otherMd.items():
@@ -1096,14 +1096,14 @@ def addSpecMetadataSection(doc):
                     continue
                 if k not in doc.md.metadataInclude:
                     continue
-                h.appendChild(dl, *createMdEntry(k, vs))
+                h.appendChild(dl, *createMdEntry(k, vs), allowEmpty=True)
         elif key not in doc.md.metadataInclude:
             # Key explicitly excluded
             continue
         elif key in md:
-            h.appendChild(dl, *createMdEntry(key, md[key]))
+            h.appendChild(dl, *createMdEntry(key, md[key]), allowEmpty=True)
         elif key in otherMd:
-            h.appendChild(dl, *createMdEntry(key, otherMd[key]))
+            h.appendChild(dl, *createMdEntry(key, otherMd[key]), allowEmpty=True)
     fillWith("spec-metadata", h.E.div(dl), doc=doc)
 
 

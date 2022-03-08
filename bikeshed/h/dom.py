@@ -11,9 +11,6 @@ from .. import t
 from ..DefaultOrderedDict import DefaultOrderedDict
 from ..messages import die, warn
 
-T = t.TypeVar("T")
-ElementType = t.Union[etree.ElementBase]
-
 
 def flatten(arr: t.Iterable) -> t.Iterator:
     for el in arr:
@@ -29,17 +26,16 @@ def unescape(string: str) -> str:
     return html.unescape(string)
 
 
-def findAll(sel: str, context: t.Union["t.SpecType", ElementType]) -> t.List[ElementType]:
-    if hasattr(context, "document"):
-        context = context.document
+def findAll(sel: str, context: t.Union["t.SpecType", t.ElementT]) -> t.List[t.ElementT]:
+    context = t.cast(t.ElementT, getattr(context, "document", context))
     try:
-        return CSSSelector(sel, namespaces={"svg": "http://www.w3.org/2000/svg"})(context)
+        return t.cast(t.List[t.ElementT], CSSSelector(sel, namespaces={"svg": "http://www.w3.org/2000/svg"})(context))
     except Exception as e:
         die(f"The selector '{sel}' returned an error:\n{e}")
         return []
 
 
-def find(sel: str, context=None) -> ElementType:
+def find(sel: str, context=None) -> t.Optional[t.ElementT]:
     result = findAll(sel, context)
     if result:
         return result[0]
@@ -115,7 +111,7 @@ def validUrlUnit(char: str) -> bool:
         return True
 
 
-def textContent(el: ElementType, exact: bool = False) -> str:
+def textContent(el: t.ElementT, exact: bool = False) -> str:
     # If exact is False, then any elements with data-deco attribute
     # get ignored in the textContent.
     # This allows me to ignore things added by Bikeshed by default.
@@ -127,7 +123,7 @@ def textContent(el: ElementType, exact: bool = False) -> str:
         return textContentIgnoringDecorative(el)
 
 
-def textContentIgnoringDecorative(el: ElementType) -> str:
+def textContentIgnoringDecorative(el: t.ElementT) -> str:
     str = el.text or ""
     for child in childElements(el):
         if child.get("data-deco") is None:
@@ -136,13 +132,13 @@ def textContentIgnoringDecorative(el: ElementType) -> str:
     return str
 
 
-def innerHTML(el: t.Optional[ElementType]) -> str:
+def innerHTML(el: t.Optional[t.ElementT]) -> str:
     if el is None:
         return ""
     return (el.text or "") + "".join(tostring(x, encoding="unicode") for x in el)
 
 
-def outerHTML(el: t.Optional[ElementType], literal: bool = False, with_tail: bool = False) -> str:
+def outerHTML(el: t.Optional[t.ElementT], literal: bool = False, with_tail: bool = False) -> str:
     if el is None:
         return ""
     if isinstance(el, str):
@@ -150,26 +146,34 @@ def outerHTML(el: t.Optional[ElementType], literal: bool = False, with_tail: boo
     if isinstance(el, list):
         return "".join(outerHTML(x) for x in el)
     if el.get("bs-autolink-syntax") is not None and not literal:
-        return el.get("bs-autolink-syntax")
+        return el.get("bs-autolink-syntax") or ""
     return tostring(el, with_tail=with_tail, encoding="unicode")
 
 
-def serializeTag(el: ElementType) -> str:
+def serializeTag(el: t.ElementT) -> str:
     # Serialize *just* the opening tag for the element.
     # Use when you want to output the HTML,
     # but it might be a container with a lot of content.
     tag = "<" + el.tag
     for n, v in el.attrib.items():
-        tag += ' {n}="{v}"'.format(n=n, v=escapeAttr(v))
+        tag += ' {n}="{v}"'.format(n=str(n), v=escapeAttr(str(v)))
     tag += ">"
     return tag
+
+
+def tagName(el: t.Optional[t.ElementT]) -> t.Optional[str]:
+    # Returns the tagname, or None if passed None
+    # Iow, safer version of el.tagName
+    if el is None:
+        return None
+    return el.tag
 
 
 def foldWhitespace(text: str) -> str:
     return re.sub(r"(\s|\xa0)+", " ", text)
 
 
-def parseHTML(text: str) -> t.List[ElementType]:
+def parseHTML(text: str) -> t.List[t.ElementT]:
     doc = html5lib.parse(text, treebuilder="lxml", namespaceHTMLElements=False)
     head = doc.getroot()[0]
     body = doc.getroot()[1]
@@ -187,35 +191,39 @@ def parseHTML(text: str) -> t.List[ElementType]:
         return []
 
 
-def parseDocument(text: str):
+def parseDocument(text: str) -> t.DocumentT:
     doc = html5lib.parse(text, treebuilder="lxml", namespaceHTMLElements=False)
     return doc
 
 
-def escapeHTML(text):
+def escapeHTML(text: str) -> str:
     # Escape HTML
     return text.replace("&", "&amp;").replace("<", "&lt;")
 
 
-def escapeAttr(text):
+def escapeAttr(text: str) -> str:
     return text.replace("&", "&amp;").replace("'", "&apos;").replace('"', "&quot;")
 
 
-def clearContents(el):
+def clearContents(el: t.ElementT) -> t.ElementT:
     del el[:]
     el.text = ""
     return el
 
 
-def parentElement(el):
-    return el.getparent()
+def parentElement(el: t.Optional[t.ElementT], depth: int = 1) -> t.Optional[t.ElementT]:
+    for _ in range(depth):
+        if el is None:
+            return None
+        el = el.getparent()
+    return el
 
 
-def nextSiblingNode(el):
+def nextSiblingNode(el: t.ElementT) -> t.Optional[t.ElementT]:
     return el.getnext()
 
 
-def nextSiblingElement(el):
+def nextSiblingElement(el: t.ElementT) -> t.Optional[t.ElementT]:
     while True:
         next = nextSiblingNode(el)
         if next is None:
@@ -224,10 +232,20 @@ def nextSiblingElement(el):
             return next
 
 
-def appendChild(parent, *children):
+@t.overload
+def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: t.Literal[False] = False) -> t.ElementT:
+    ...
+
+
+@t.overload
+def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: bool) -> t.Optional[t.ElementT]:
+    ...
+
+
+def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty=False) -> t.Optional[t.ElementT]:
     # Appends either text or an element.
-    children = list(flatten(children))
-    for child in children:
+    child = None
+    for child in flatten(els):
         if isinstance(child, str):
             if len(parent) > 0:
                 parent[-1].tail = (parent[-1].tail or "") + child
@@ -245,22 +263,25 @@ def appendChild(parent, *children):
                 # when the parent already has children; the last child's tail
                 # doesn't get moved into the appended child or anything.
                 parent.append(child)
-    return children[-1] if len(children) > 0 else None
+    if child is None and not allowEmpty:
+        raise Exception("Empty child list appended without allowEmpty=True")
+    return child
 
 
-def prependChild(parent, child):
+def prependChild(parent: t.ElementT, *children: t.NodesT) -> None:
     # Prepends either text or an element to the parent.
-    if isinstance(child, str):
-        if parent.text is None:
-            parent.text = child
+    for child in reversed(list(flatten(children))):
+        if isinstance(child, str):
+            if parent.text is None:
+                parent.text = child
+            else:
+                parent.text = child + parent.text
         else:
-            parent.text = child + parent.text
-    else:
-        removeNode(child)
-        parent.insert(0, child)
-        if parent.text is not None:
-            child.tail = (child.tail or "") + parent.text
-            parent.text = None
+            removeNode(child)
+            parent.insert(0, child)
+            if parent.text is not None:
+                child.tail = (child.tail or "") + parent.text
+                parent.text = None
 
 
 def insertBefore(target, *els):
@@ -318,7 +339,7 @@ def appendContents(el, container):
     # Accepts either an iterable *or* a container element
     if isElement(container):
         container = childNodes(container, clear=True)
-    appendChild(el, *container)
+    appendChild(el, *container, allowEmpty=True)
     return el
 
 
@@ -338,7 +359,7 @@ def moveContents(toEl, fromEl):
 
 def wrapContents(parentEl, wrapperEl):
     appendContents(wrapperEl, parentEl)
-    appendChild(parentEl, wrapperEl)
+    appendChild(parentEl, wrapperEl, allowEmpty=True)
     return parentEl
 
 
@@ -422,7 +443,7 @@ def childNodes(parentEl, clear=False, skipOddNodes=True):
     In other words, the following is a no-op:
 
     ```
-    appendChild(parentEl, *childNodes(parentEl, clear=True))
+    appendChild(parentEl, *childNodes(parentEl, clear=True), allowEmpty=True)
     ```
 
     Using clear=True is required if you're going to be modifying the element or its children,
@@ -479,7 +500,7 @@ def nodeIter(el, clear=False, skipOddNodes=True):
     if isinstance(el, str):
         yield el
         return
-    if isinstance(el, etree.ElementTree):
+    if isinstance(el, etree.t.ElementTree):
         el = el.getroot()
     text = el.text
     tail = el.tail
@@ -893,8 +914,8 @@ def createElement(tag, attrs=None, *children):
     if attrs is None:
         attrs = {}
     el = etree.Element(tag, {n: v for n, v in attrs.items() if v is not None})
-    for child in children:
-        appendChild(el, child)
+    if children:
+        appendChild(el, children, allowEmpty=True)
     return el
 
 

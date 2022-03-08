@@ -196,7 +196,7 @@ def transformAutolinkShortcuts(doc):
             elif h.isElement(el):
                 transformElement(el)
                 newChildren.append(el)
-        h.appendChild(parentEl, *newChildren)
+        h.appendChild(parentEl, *newChildren, allowEmpty=True)
 
     def transformText(text):
         nodes = [text]
@@ -324,7 +324,7 @@ def transformProductionGrammars(doc):
                     # Transforms all add links, which aren't allowed in <a>...
                     transformElement(el)
                 newChildren.append(el)
-        h.appendChild(parentEl, *newChildren)
+        h.appendChild(parentEl, *newChildren, allowEmpty=True)
 
     def transformText(text):
         nodes = [text]
