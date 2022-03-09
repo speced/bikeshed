@@ -10,7 +10,6 @@ from typing import (
     Iterable,
     Iterator,
     List,
-    Literal,
     Mapping,
     Optional,
     Sequence,
@@ -24,6 +23,7 @@ from typing import (
 )
 
 from lxml import etree
+from typing_extensions import Literal
 
 
 ElementT = etree._Element  # pylint: disable=protected-access
