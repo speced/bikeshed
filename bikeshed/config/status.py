@@ -254,6 +254,7 @@ megaGroups = {
             "webvr",
             "wecg",
             "wicg",
+            "wintercg",
         ]
     ),
     "whatwg": frozenset(["whatwg"]),
@@ -299,6 +300,7 @@ w3cCgs = frozenset(
         "web-bluetooth-cg",
         "wecg",
         "wicg",
+        "wintercg",
     ]
 )
 assert w3cCgs.issubset(megaGroups["w3c"])
