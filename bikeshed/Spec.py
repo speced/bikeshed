@@ -61,7 +61,7 @@ class Spec:
                 "No input file specified, and no *.bs or *.src.html files found in current directory.\nPlease specify an input file, or use - to pipe from STDIN."
             )
             return
-        self.inputSource = InputSource.InputSource(inputFilename, chroot=constants.chroot)
+        self.inputSource = InputSource.InputSource(inputFilename, chroot=constants.chroot, tarFile=constants.tarFile)
         self.transitiveDependencies = set()
         self.debug = debug
         self.token = token
@@ -314,6 +314,9 @@ class Spec:
             # More sensible defaults!
             if not isinstance(self.inputSource, InputSource.FileInputSource):
                 outputFilename = "-"
+            elif constants.tarFile:
+                # Source file path is inside the tarfile, so can't guess an output file path
+                outputFilename = "-"
             elif self.inputSource.sourceName.endswith(".bs"):
                 outputFilename = self.inputSource.sourceName[0:-3] + ".html"
             elif self.inputSource.sourceName.endswith(".src.html"):
@@ -478,7 +481,19 @@ def findImplicitInputFile():
     2. Overview.bs
     3. the first file with a .bs extension
     4. the first file with a .src.html extension
+
+    When using a tarFile, scan only for index.bs and Overview.bs, because this is
+    meant for use with multi-file specs (using `pre class=include`).
+    Other filenames must be specified like `bikeshed spec --tar-file=myTar.tar custom.bs`.
     """
+
+    if constants.tarFile:
+        filenames = constants.tarFile.getnames()
+        if "index.bs" in filenames:
+            return "index.bs"
+        if "Overview.bs" in filenames:
+            return "Overview.bs"
+        return None
 
     if os.path.isfile("index.bs"):
         return "index.bs"

@@ -1,7 +1,9 @@
 import argparse
 import json
 import os
+import re
 import sys
+import tarfile
 
 from . import config, constants, update, messages as m
 
@@ -113,6 +115,11 @@ def main():
         dest="lineNumbers",
         action="store_true",
         help="Hacky support for outputting line numbers on all error messages. Disables output, as this is hacky and might mess up your source.",
+    )
+    specParser.add_argument(
+        "--tar-file",
+        dest="tarFile",
+        help="If specified, Bikeshed gets all source files from this (compressed or uncompressed) tarfile instead of the filesystem. Also enabled implicitly by passing a .tar/.tar.anything/.tgz file directly as the infile.",
     )
 
     echidnaParser = subparsers.add_parser(
@@ -454,6 +461,18 @@ def handleUpdate(options):
 def handleSpec(options, extras):
     from . import metadata
     from .Spec import Spec
+
+    # If the filename indicates a tar (.tar/.tar.whatever/.tgz), use it as a
+    # --tar-file and clear the infile (so it defaults to findImplicitInputFile).
+    tarFilenameRegex = r".*\.(tar(\.\w+)?|tgz)$"
+    if not options.tarFile and options.infile and re.match(tarFilenameRegex, options.infile):
+        options.tarFile = options.infile
+        options.infile = None
+    if options.tarFile:
+        constants.chroot = False
+        # Open for the lifetime of the program. May be any supported (compressed/uncompressed) format.
+        # pylint: disable=consider-using-with
+        constants.tarFile = tarfile.open(options.tarFile, mode="r:*", encoding="utf-8")
 
     doc = Spec(
         inputFilename=options.infile,

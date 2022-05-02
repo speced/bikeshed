@@ -1,3 +1,6 @@
+import tarfile
+from typing import Optional
+
 from .stringEnum import StringEnum
 
 dryRun = False
@@ -10,6 +13,7 @@ biblioDisplay = StringEnum("index", "inline", "direct")
 testAnnotationURL = "https://test.csswg.org/harness/annotate.js"
 chroot = True
 executeCode = False
+tarFile: Optional[tarfile.TarFile] = None
 
 
 def errorLevelAt(target):
