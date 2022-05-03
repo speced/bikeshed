@@ -91,7 +91,7 @@ def main():
         "infile",
         nargs="?",
         default=None,
-        help='Path to the source file: stdin ("-"), an https URL, a .bs or.src.html file, or a .tar archive containing an index.bs file.',
+        help='Path to the source file: stdin ("-"), an https URL, a .bs or.src.html file, or a tar archive containing an index.bs file.',
     )
     specParser.add_argument(
         "outfile",

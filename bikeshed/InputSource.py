@@ -49,7 +49,11 @@ class InputSource:
             return StdinInputSource(sourceName)
         if sourceName.startswith("https:"):
             return UrlInputSource(sourceName)
-        if sourceName.endswith(".tar"):
+        if (
+            not sourceName.endswith((".bs", ".src.html"))
+            and os.path.exists(sourceName)
+            and tarfile.is_tarfile(sourceName)
+        ):
             return TarInputSource(sourceName, **kwargs)
         return FileInputSource(sourceName, **kwargs)
 
@@ -234,6 +238,8 @@ class TarInputSource(InputSource):
         raise TypeError("{} instances don't have directories.".format(type(self)))
 
     def relative(self, relativePath) -> FileInputSource:
+        """Returns an InputSource relative to this file. Since a TarInputSource is always inside the
+        tar file, any relative InputSource is also inside the tar file."""
         memberPath = os.path.join(os.path.dirname(self.tarMemberName), relativePath)
         return TarInputSource(self.sourceName, tarMemberName=memberPath)
 

@@ -313,7 +313,7 @@ class Spec:
         if outputFilename is None:
             # More sensible defaults!
             if isinstance(self.inputSource, InputSource.TarInputSource):
-                outputFilename = self.inputSource.sourceName[0:-4] + ".html"
+                outputFilename = os.path.splitext(self.inputSource.sourceName)[0] + ".html"
             elif not isinstance(self.inputSource, InputSource.FileInputSource):
                 outputFilename = "-"
             elif self.inputSource.sourceName.endswith(".bs"):

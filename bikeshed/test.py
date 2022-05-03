@@ -60,13 +60,7 @@ def runAllTests(patterns=None, manualOnly=False, md=None):  # pylint: disable=un
         total += 1
         doc = processTest(path, md)
         outputText = doc.serialize()
-
-        if path.endswith(".tar"):
-            goldenPath = path[:-3] + "html"
-        else:
-            assert path.endswith(".bs"), "unexpected test file extension"
-            goldenPath = path[:-2] + "html"
-        with open(goldenPath, encoding="utf-8") as golden:
+        with open(os.path.splitext(path)[0] + ".html", encoding="utf-8") as golden:
             goldenText = golden.read()
         if compare(outputText, goldenText):
             numPassed += 1
