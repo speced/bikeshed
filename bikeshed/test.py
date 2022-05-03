@@ -20,7 +20,7 @@ def findTestFiles(manualOnly=False):
             if re.search(r"\d{3}-files$", pathSegs[0]):
                 # support files for a manual test
                 continue
-            if filePath.endswith((".bs", ".tar", ".tar.gz")):
+            if filePath.endswith((".bs", ".tar")):
                 yield os.path.join(root, filename)
 
 
@@ -64,10 +64,10 @@ def runAllTests(patterns=None, manualOnly=False, md=None):  # pylint: disable=un
         if constants.tarFile:
             constants.tarFile.close()
             constants.tarFile = None
-        if path.endswith((".tar", ".tar.gz")):
+        if path.endswith(".tar"):
             constants.chroot = False
             # pylint: disable=consider-using-with
-            constants.tarFile = tarfile.open(path, mode="r:*", encoding="utf-8")
+            constants.tarFile = tarfile.open(path, mode="r:", encoding="utf-8")
             goldenPath = path + ".html"
             path = "index.bs"
         else:
@@ -141,7 +141,7 @@ def testPaths(patterns=None):
         path
         for pattern in patterns
         for path in glob.glob(os.path.join(TEST_DIR, pattern))
-        if path.endswith((".bs", ".tar", ".tar.gz"))
+        if path.endswith((".bs", ".tar"))
     ]
 
 
