@@ -49,6 +49,8 @@ class InputSource:
             return StdinInputSource(sourceName)
         if sourceName.startswith("https:"):
             return UrlInputSource(sourceName)
+        if sourceName.endswith(".tar"):
+            return TarInputSource(sourceName, **kwargs)
         return FileInputSource(sourceName, **kwargs)
 
     @abstractmethod
@@ -158,17 +160,9 @@ class UrlInputSource(InputSource):
 
 
 class FileInputSource(InputSource):
-    def __init__(
-        self,
-        sourceName: str,
-        *,
-        chroot: bool,
-        chrootPath: Optional[str] = None,
-        tarFile: tarfile.TarFile = None,
-    ):
+    def __init__(self, sourceName: str, *, chroot: bool, chrootPath: Optional[str] = None):
         self.sourceName = sourceName
         self.chrootPath = chrootPath
-        self.tarFile = tarFile
         self.type = "file"
         self.content = None
 
@@ -176,28 +170,16 @@ class FileInputSource(InputSource):
             self.chrootPath = self.directory()
         if self.chrootPath is not None:
             self.sourceName = config.chrootPath(self.chrootPath, self.sourceName)
-        if tarFile:
-            assert not chroot, "with tarFile, chroot shouldn't be enabled"
-            assert not os.path.isabs(self.sourceName), "with tarFile, sourceName should be relative"
 
     def __str__(self) -> str:
         return self.sourceName
 
     def read(self) -> InputContent:
-        if self.tarFile:
-            try:
-                mtime = self.tarFile.getmember(self.sourceName).get_info()["mtime"]
-            except KeyError as e:
-                raise FileNotFoundError(errno.ENOENT, "Not found inside tar file", e.args[0]) from e
-            with self.tarFile.extractfile(self.sourceName) as f:
-                # Decode the `bytes` to a `str`. (extractfile can't read as text.)
-                file_contents = f.read().decode(encoding="utf-8").splitlines(keepends=True)
-        else:
-            with open(self.sourceName, encoding="utf-8") as f:
-                file_contents = f.readlines()
-            mtime = os.path.getmtime(self.sourceName)
-
-        return InputContent(file_contents, datetime.datetime.fromtimestamp(mtime).date())
+        with open(self.sourceName, encoding="utf-8") as f:
+            return InputContent(
+                f.readlines(),
+                datetime.datetime.fromtimestamp(os.path.getmtime(self.sourceName)).date(),
+            )
 
     def hasDirectory(self) -> bool:
         return True
@@ -206,12 +188,6 @@ class FileInputSource(InputSource):
         return os.path.dirname(os.path.abspath(self.sourceName))
 
     def relative(self, relativePath) -> FileInputSource:
-        if self.tarFile:
-            assert not os.path.isabs(self.sourceName), "with tarFile, sourceName should be relative"
-            return FileInputSource(
-                os.path.join(os.path.dirname(self.sourceName), relativePath), chroot=False, tarFile=self.tarFile
-            )
-
         return FileInputSource(
             os.path.join(self.directory(), relativePath),
             chroot=False,
@@ -227,3 +203,57 @@ class FileInputSource(InputSource):
             return os.stat(self.sourceName).st_mtime
         except FileNotFoundError:
             return None
+
+
+class TarInputSource(InputSource):
+    def __init__(self, sourceName: str, *, tarMemberName: str = "index.bs", **_):
+        self.sourceName = sourceName
+        self.tarMemberName = tarMemberName
+        self.type = "tar"
+        self.content = None
+
+    def __str__(self) -> str:
+        return self.sourceName + ":" + self.tarMemberName
+
+    def read(self) -> InputContent:
+        with self._openTarFile() as tarFile:
+            mtime = self.mtime()
+            try:
+                with tarFile.extractfile(self.tarMemberName) as f:
+                    # Decode the `bytes` to a `str`. (extractfile can't read as text.)
+                    file_contents = f.read().decode(encoding="utf-8").splitlines(keepends=True)
+                return InputContent(file_contents, datetime.datetime.fromtimestamp(mtime).date())
+            except KeyError as e:
+                raise FileNotFoundError(errno.ENOENT, "Not found inside tar file", self.tarMemberName) from e
+
+    def hasDirectory(self) -> bool:
+        return False
+
+    def directory(self) -> str:
+        # It would be possible to produce a file listing. But not a meaningful directory path.
+        raise TypeError("{} instances don't have directories.".format(type(self)))
+
+    def relative(self, relativePath) -> FileInputSource:
+        memberPath = os.path.join(os.path.dirname(self.tarMemberName), relativePath)
+        return TarInputSource(self.sourceName, tarMemberName=memberPath)
+
+    def cheaplyExists(self, relativePath) -> Optional[bool]:
+        memberPath = os.path.join(os.path.dirname(self.tarMemberName), relativePath)
+        with self._openTarFile() as tarFile:
+            members = tarFile.getnames()
+            return memberPath in members
+
+    def mtime(self) -> Optional[float]:
+        """Returns the last modification time of this file, or None if it doesn't exist."""
+        try:
+            return os.stat(self.sourceName).st_mtime
+        except FileNotFoundError:
+            return None
+
+    def _openTarFile(self) -> tarfile.TarFile:
+        """Open the tar file so archive members can be read."""
+        # The same file gets opened numerous times in a single build, but it doesn't seem to be very
+        # costly, and it's easier than trying to manually manage the TarFile resource lifetime.
+
+        # "r:" specifies the tar file must be uncompressed.
+        return tarfile.open(self.sourceName, mode="r:", encoding="utf-8")

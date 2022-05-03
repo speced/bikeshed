@@ -2,12 +2,12 @@ import difflib
 import glob
 import os
 import re
-import tarfile
 
-from . import config, constants, messages as m, retrieve
+from . import config, messages as m, retrieve
 from .Spec import Spec
 
 TEST_DIR = os.path.abspath(os.path.join(config.scriptPath(), "..", "tests"))
+TEST_FILE_EXTENSIONS = (".bs", ".tar")
 
 
 def findTestFiles(manualOnly=False):
@@ -20,7 +20,7 @@ def findTestFiles(manualOnly=False):
             if re.search(r"\d{3}-files$", pathSegs[0]):
                 # support files for a manual test
                 continue
-            if filePath.endswith((".bs", ".tar")):
+            if filePath.endswith(TEST_FILE_EXTENSIONS):
                 yield os.path.join(root, filename)
 
 
@@ -58,24 +58,14 @@ def runAllTests(patterns=None, manualOnly=False, md=None):  # pylint: disable=un
         testName = testNameForPath(path)
         m.p(f"{ratio(i,len(paths))}: {testName}")
         total += 1
+        doc = processTest(path, md)
+        outputText = doc.serialize()
 
-        # Set global state before each test
-        constants.chroot = True
-        if constants.tarFile:
-            constants.tarFile.close()
-            constants.tarFile = None
         if path.endswith(".tar"):
-            constants.chroot = False
-            # pylint: disable=consider-using-with
-            constants.tarFile = tarfile.open(path, mode="r:", encoding="utf-8")
-            goldenPath = path + ".html"
-            path = "index.bs"
+            goldenPath = path[:-3] + "html"
         else:
             assert path.endswith(".bs"), "unexpected test file extension"
             goldenPath = path[:-2] + "html"
-        doc = processTest(path, md)
-
-        outputText = doc.serialize()
         with open(goldenPath, encoding="utf-8") as golden:
             goldenText = golden.read()
         if compare(outputText, goldenText):
@@ -141,7 +131,7 @@ def testPaths(patterns=None):
         path
         for pattern in patterns
         for path in glob.glob(os.path.join(TEST_DIR, pattern))
-        if path.endswith((".bs", ".tar"))
+        if path.endswith(TEST_FILE_EXTENSIONS)
     ]
 
 

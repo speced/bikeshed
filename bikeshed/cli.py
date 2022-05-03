@@ -1,9 +1,7 @@
 import argparse
 import json
 import os
-import re
 import sys
-import tarfile
 
 from . import config, constants, update, messages as m
 
@@ -89,8 +87,18 @@ def main():
     subparsers = argparser.add_subparsers(title="Subcommands", dest="subparserName")
 
     specParser = subparsers.add_parser("spec", help="Process a spec source file into a valid output file.")
-    specParser.add_argument("infile", nargs="?", default=None, help="Path to the source file.")
-    specParser.add_argument("outfile", nargs="?", default=None, help="Path to the output file.")
+    specParser.add_argument(
+        "infile",
+        nargs="?",
+        default=None,
+        help='Path to the source file: stdin ("-"), an https URL, a .bs or.src.html file, or a .tar archive containing an index.bs file.',
+    )
+    specParser.add_argument(
+        "outfile",
+        nargs="?",
+        default=None,
+        help='Path to the output file: stdout ("-"), or a filename.',
+    )
     specParser.add_argument(
         "--debug",
         dest="debug",
@@ -115,11 +123,6 @@ def main():
         dest="lineNumbers",
         action="store_true",
         help="Hacky support for outputting line numbers on all error messages. Disables output, as this is hacky and might mess up your source.",
-    )
-    specParser.add_argument(
-        "--tar-file",
-        dest="tarFile",
-        help="If specified, Bikeshed gets all source files from this tar file instead of the filesystem. Also enabled implicitly by passing an infile ending in .tar.",
     )
 
     echidnaParser = subparsers.add_parser(
@@ -461,17 +464,6 @@ def handleUpdate(options):
 def handleSpec(options, extras):
     from . import metadata
     from .Spec import Spec
-
-    # If the filename has a .tar extension, use it as a --tar-file and
-    # clear the infile (so it defaults to findImplicitInputFile).
-    if not options.tarFile and options.infile and options.infile.endswith(".tar"):
-        options.tarFile = options.infile
-        options.infile = None
-    if options.tarFile:
-        constants.chroot = False
-        # Open for the lifetime of the process. "r:" specifies it must be uncompressed.
-        # pylint: disable=consider-using-with
-        constants.tarFile = tarfile.open(options.tarFile, mode="r:", encoding="utf-8")
 
     doc = Spec(
         inputFilename=options.infile,
