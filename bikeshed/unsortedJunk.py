@@ -1215,7 +1215,7 @@ def cleanupHTML(doc: "t.SpecType"):
             el.tag = "span"
             el.set("id", h.safeID(doc, "assert-" + h.hashContents(el)))
         # For any <div assert> elements, add a unique ID based on its contents.
-        if el.tag == "div" and "assert" in el.attrib:
+        if el.tag == "div" and el.get("assert") is not None:
             h.removeAttr(el, "assert")
             el.set("id", h.safeID(doc, "assert-" + h.hashContents(el)))
 
