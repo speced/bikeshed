@@ -5,7 +5,7 @@ from collections import Counter, defaultdict, namedtuple
 from urllib import parse
 from PIL import Image
 
-from . import biblio, config, dfnpanels, h, func, t, messages as m
+from . import biblio, config, dfnpanels, h, func, t, messages as m, idl
 
 
 class MarkdownCodeSpans(func.Functor):
@@ -1391,19 +1391,26 @@ def formatArgumentdefTables(doc: "t.SpecType"):
             m.die(f"Can't find method '{forMethod}'.", el=table)
             continue
         for tr in h.findAll("tbody > tr", table):
-            tds = h.findAll("td", tr)
-            argName = h.textContent(tds[0]).strip()
+            try:
+                argCell, typeCell, nullCell, optCell, descCell = h.findAll("td", tr)
+            except:
+                m.die(
+                    f"In the argumentdef table for '{method.full_name}', the '{argName}' line is misformatted, with {len(h.findAll('td', tr))} cells instead of 5.",
+                    el=table,
+                )
+                continue
+            argName = h.textContent(argCell).strip()
             arg = method.find_argument(argName)
             if arg:
-                h.appendChild(tds[1], str(arg.type))
+                h.appendChild(typeCell, idl.nodesFromType(arg.type)),
                 if str(arg.type).strip().endswith("?"):
-                    h.appendChild(tds[2], h.E.span({"class": "yes"}, "✔"))
+                    h.appendChild(nullCell, h.E.span({"class": "yes"}, "✔"))
                 else:
-                    h.appendChild(tds[2], h.E.span({"class": "no"}, "✘"))
+                    h.appendChild(nullCell, h.E.span({"class": "no"}, "✘"))
                 if arg.optional:
-                    h.appendChild(tds[3], h.E.span({"class": "yes"}, "✔"))
+                    h.appendChild(optCell, h.E.span({"class": "yes"}, "✔"))
                 else:
-                    h.appendChild(tds[3], h.E.span({"class": "no"}, "✘"))
+                    h.appendChild(optCell, h.E.span({"class": "no"}, "✘"))
             else:
                 m.die(
                     f"Can't find the '{argName}' argument of method '{method.full_name}' in the argumentdef block.",
