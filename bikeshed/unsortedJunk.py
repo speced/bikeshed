@@ -1392,8 +1392,8 @@ def formatArgumentdefTables(doc: "t.SpecType"):
             continue
         for tr in h.findAll("tbody > tr", table):
             try:
-                argCell, typeCell, nullCell, optCell, descCell = h.findAll("td", tr)
-            except:
+                argCell, typeCell, nullCell, optCell, _ = h.findAll("td", tr)
+            except ValueError:
                 m.die(
                     f"In the argumentdef table for '{method.full_name}', the '{argName}' line is misformatted, with {len(h.findAll('td', tr))} cells instead of 5.",
                     el=table,
@@ -1402,7 +1402,7 @@ def formatArgumentdefTables(doc: "t.SpecType"):
             argName = h.textContent(argCell).strip()
             arg = method.find_argument(argName)
             if arg:
-                h.appendChild(typeCell, idl.nodesFromType(arg.type)),
+                h.appendChild(typeCell, idl.nodesFromType(arg.type))
                 if str(arg.type).strip().endswith("?"):
                     h.appendChild(nullCell, h.E.span({"class": "yes"}, "✔"))
                 else:
@@ -1644,3 +1644,18 @@ def addImageSize(doc: "t.SpecType"):
                 f"The height ({height}px) of this image is not a multiple of the declared resolution ({res}): {src}\nConsider fixing the image so its height is a multiple of the resolution, or setting its 'width' and 'height' attribute manually.",
                 el=el,
             )
+
+
+def processIDL(doc):
+    localDfns = set()
+    for pre in h.findAll("pre.idl, xmp.idl", doc):
+        if pre.get("data-no-idl") is not None:
+            continue
+        if not h.isNormative(pre, doc):
+            continue
+        localDfns.update(idl.markupIDLBlock(pre, doc))
+
+    dfns = h.findAll("pre.idl:not([data-no-idl]) dfn, xmp.idl:not([data-no-idl]) dfn", doc) + list(localDfns)
+    classifyDfns(doc, dfns)
+    h.fixupIDs(doc, dfns)
+    doc.refs.addLocalDfns(dfn for dfn in dfns if dfn.get("id") is not None)

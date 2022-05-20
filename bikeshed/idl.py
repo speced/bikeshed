@@ -2,7 +2,7 @@ import re
 
 import widlparser
 
-from . import config, h, messages as m, unsortedJunk as u, t
+from . import config, h, messages as m, t
 
 
 class IDLUI:
@@ -333,72 +333,63 @@ def markupIDL(doc):
             """
 
 
-def processIDL(doc):
+def markupIDLBlock(pre, doc):
     localDfns = set()
-    for pre in h.findAll("pre.idl, xmp.idl", doc):
-        if pre.get("data-no-idl") is not None:
-            continue
-        if not h.isNormative(pre, doc):
-            continue
-        forcedInterfaces = []
-        for x in (h.treeAttr(pre, "data-dfn-force") or "").split():
-            x = x.strip()
-            if x.endswith("<interface>"):
-                x = x[:-11]
-            forcedInterfaces.append(x)
-        for el in h.findAll("idl", pre):
-            idlType = el.get("data-idl-type")
-            url = None
-            forceDfn = False
-            ref = None
-            idlText = None
-            for idlText in el.get("data-lt").split("|"):
-                if idlType == "interface" and idlText in forcedInterfaces:
-                    forceDfn = True
-                for linkFor in config.splitForValues(el.get("data-idl-for", "")) or [None]:
-                    ref = doc.refs.getRef(
-                        idlType,
-                        idlText,
-                        linkFor=linkFor,
-                        status="local",
-                        el=el,
-                        error=False,
-                    )
-                    if ref:
-                        url = ref.url
-                        break
+    forcedInterfaces = []
+    for x in (h.treeAttr(pre, "data-dfn-force") or "").split():
+        x = x.strip()
+        if x.endswith("<interface>"):
+            x = x[:-11]
+        forcedInterfaces.append(x)
+    for el in h.findAll("idl", pre):
+        idlType = el.get("data-idl-type")
+        url = None
+        forceDfn = False
+        ref = None
+        idlText = None
+        for idlText in el.get("data-lt").split("|"):
+            if idlType == "interface" and idlText in forcedInterfaces:
+                forceDfn = True
+            for linkFor in config.splitForValues(el.get("data-idl-for", "")) or [None]:
+                ref = doc.refs.getRef(
+                    idlType,
+                    idlText,
+                    linkFor=linkFor,
+                    status="local",
+                    el=el,
+                    error=False,
+                )
                 if ref:
+                    url = ref.url
                     break
-            if url is None or forceDfn:
-                el.tag = "dfn"
-                el.set("data-dfn-type", idlType)
-                del el.attrib["data-idl-type"]
-                if el.get("data-idl-for"):
-                    el.set("data-dfn-for", el.get("data-idl-for"))
-                    del el.attrib["data-idl-for"]
-            else:
-                # Copy over the auto-generated linking text to the manual dfn.
-                dfn = h.find(url, doc)
-                lts = combineIdlLinkingTexts(el.get("data-lt"), dfn.get("data-lt"))
-                dfn.set("data-lt", lts)
-                localDfns.add(dfn)
+            if ref:
+                break
+        if url is None or forceDfn:
+            el.tag = "dfn"
+            el.set("data-dfn-type", idlType)
+            del el.attrib["data-idl-type"]
+            if el.get("data-idl-for"):
+                el.set("data-dfn-for", el.get("data-idl-for"))
+                del el.attrib["data-idl-for"]
+        else:
+            # Copy over the auto-generated linking text to the manual dfn.
+            dfn = h.find(url, doc)
+            lts = combineIdlLinkingTexts(el.get("data-lt"), dfn.get("data-lt"))
+            dfn.set("data-lt", lts)
+            localDfns.add(dfn)
 
-                # Reset the <idl> element to be a link to the manual dfn.
-                el.tag = "a"
-                el.set("data-link-type", idlType)
-                el.set("data-lt", idlText)
-                del el.attrib["data-idl-type"]
-                if el.get("data-idl-for"):
-                    el.set("data-link-for", el.get("data-idl-for"))
-                    del el.attrib["data-idl-for"]
-                if el.get("id"):
-                    # ID was defensively added by the Marker.
-                    del el.attrib["id"]
-
-    dfns = h.findAll("pre.idl:not([data-no-idl]) dfn, xmp.idl:not([data-no-idl]) dfn", doc) + list(localDfns)
-    u.classifyDfns(doc, dfns)
-    h.fixupIDs(doc, dfns)
-    doc.refs.addLocalDfns(dfn for dfn in dfns if dfn.get("id") is not None)
+            # Reset the <idl> element to be a link to the manual dfn.
+            el.tag = "a"
+            el.set("data-link-type", idlType)
+            el.set("data-lt", idlText)
+            del el.attrib["data-idl-type"]
+            if el.get("data-idl-for"):
+                el.set("data-link-for", el.get("data-idl-for"))
+                del el.attrib["data-idl-for"]
+            if el.get("id"):
+                # ID was defensively added by the Marker.
+                del el.attrib["id"]
+    return localDfns
 
 
 def combineIdlLinkingTexts(t1, t2):
@@ -427,6 +418,7 @@ def nodesFromType(prod: widlparser.productions.Production) -> t.ElementT:
 
 
 def _nodesFromProduction(prod: widlparser.productions.Production) -> t.NodesT:
+    # pylint: disable=protected-access
     # Things that should be directly linkifiable from their text
     if isinstance(
         prod,
@@ -488,7 +480,7 @@ def _nodesFromProduction(prod: widlparser.productions.Production) -> t.NodesT:
             return [h.E.a({"data-link-type": "interface"}, "Promise"), "<", _nodesFromProduction(prod.type), ">", *tail]
         elif prod.record:
             return [
-                h.E.a({"data-link-type": "dfn", "data-link-spec":"webidl"}, "record"),
+                h.E.a({"data-link-type": "dfn", "data-link-spec": "webidl"}, "record"),
                 "<",
                 _nodesFromProduction(prod.key_type),
                 ", ",
@@ -512,20 +504,16 @@ def _nodesFromProduction(prod: widlparser.productions.Production) -> t.NodesT:
     elif isinstance(prod, widlparser.constructs.ExtendedAttribute):
         prod = prod.attribute
         if isinstance(prod, widlparser.constructs.ExtendedAttributeNoArgs):
-            return h.E.a({"data-link-type":"extended-attribute"}, str(prod))
+            return h.E.a({"data-link-type": "extended-attribute"}, str(prod))
         elif isinstance(prod, widlparser.constructs.ExtendedAttributeIdent):
-            return [
-                h.E.a({"data-link-type":"extended-attribute"}, str(prod._attribute)),
-                "=",
-                str(prod._value)
-            ]
+            return [h.E.a({"data-link-type": "extended-attribute"}, str(prod._attribute)), "=", str(prod._value)]
         elif isinstance(prod, widlparser.constructs.ExtendedAttributeIdentList):
             return [
-                h.E.a({"data-link-type":"extended-attribute"}, str(prod._attribute)),
+                h.E.a({"data-link-type": "extended-attribute"}, str(prod._attribute)),
                 "=(",
                 _nodesFromProduction(prod._value),
                 _nodesFromProduction(prod.next) if prod.next else "",
-                ")"
+                ")",
             ]
         # punt on the rest
         else:
@@ -533,11 +521,11 @@ def _nodesFromProduction(prod: widlparser.productions.Production) -> t.NodesT:
 
     # The rest of a comma-separated ident list
     elif isinstance(prod, widlparser.productions.TypeIdentifiers):
-        nodes = [", ", h.E.a({"data-link-type":"idl-name"}, str(prod._name))]
+        nodes = [", ", h.E.a({"data-link-type": "idl-name"}, str(prod._name))]
         while prod.next:
             prod = prod.next
             nodes.append(", ")
-            nodes.append(h.E.a({"data-link-type":"idl-name"}, str(prod._name)))
+            nodes.append(h.E.a({"data-link-type": "idl-name"}, str(prod._name)))
         return nodes
 
     # Things that should just be returned as text

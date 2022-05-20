@@ -239,7 +239,7 @@ class Spec:
         # Handle all the links
         u.processBiblioLinks(self)
         u.processDfns(self)
-        idl.processIDL(self)
+        u.processIDL(self)
         dfns.annotateDfns(self)
         u.formatArgumentdefTables(self)
         u.formatElementdefTables(self)
