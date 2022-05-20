@@ -478,8 +478,8 @@ def transformArgumentdef(lines, firstLine, lineNum=None, **kwargs):  # pylint: d
         <tr>
             <th>Parameter
             <th>Type
-            <th>Nullable
-            <th>Optional
+            <th style="text-align:center">Nullable
+            <th style="text-align:center">Optional
             <th>Description
     <tbody>""".format(
             attrs=rootAttrs, interface=interface, method=method, lineNumAttr=lineNumAttr
@@ -490,8 +490,8 @@ def transformArgumentdef(lines, firstLine, lineNum=None, **kwargs):  # pylint: d
         <tr>
             <td><dfn argument{lineNumAttr}>{0}</dfn>
             <td>
-            <td>
-            <td>
+            <td style="text-align:center">
+            <td style="text-align:center">
             <td>{1}""".format(
                     param, desc, lineNumAttr=lineNumAttr
                 )
