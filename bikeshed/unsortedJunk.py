@@ -907,6 +907,10 @@ def processAutolinks(doc: "t.SpecType"):
             m.die(f"Unknown link status '{status}' on {h.outerHTML(el)}")
             continue
 
+        # Some links are okay to fail, and so should do so silently.
+        okayToFail = el.get("data-okay-to-fail") is not None
+        ignorable = linkText.lower() in doc.md.ignoredTerms
+
         ref = doc.refs.getRef(
             linkType,
             linkText,
@@ -916,7 +920,7 @@ def processAutolinks(doc: "t.SpecType"):
             linkForHint=el.get("data-link-for-hint"),
             explicitFor=doc.md.assumeExplicitFor,
             el=el,
-            error=(linkText.lower() not in doc.md.ignoredTerms),
+            error=not okayToFail and not ignorable,
         )
         # Capture the reference (and ensure we add a biblio entry) if it
         # points to an external specification. We check the spec name here
