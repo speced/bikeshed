@@ -1390,12 +1390,12 @@ def formatArgumentdefTables(doc: "t.SpecType"):
         if not method:
             m.die(f"Can't find method '{forMethod}'.", el=table)
             continue
-        for tr in h.findAll("tbody > tr", table):
+        for i, tr in enumerate(h.findAll("tbody > tr", table)):
             try:
                 argCell, typeCell, nullCell, optCell, _ = h.findAll("td", tr)
             except ValueError:
                 m.die(
-                    f"In the argumentdef table for '{method.full_name}', the '{argName}' line is misformatted, with {len(h.findAll('td', tr))} cells instead of 5.",
+                    f"In the argumentdef table for '{method.full_name}', row {i} is misformatted, with {len(h.findAll('td', tr))} cells instead of 5.",
                     el=table,
                 )
                 continue
