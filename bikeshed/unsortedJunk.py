@@ -79,7 +79,7 @@ class MarkdownCodeSpans(func.Functor):
         return self.__val__
 
 
-def stripBOM(doc: "t.SpecType"):
+def stripBOM(doc: t.SpecT):
     if len(doc.lines) >= 1 and doc.lines[0].text[0:1] == "\ufeff":
         doc.lines[0].text = doc.lines[0].text[1:]
         m.warn("Your document has a BOM. There's no need for that, please re-save it without a BOM.")
@@ -88,7 +88,7 @@ def stripBOM(doc: "t.SpecType"):
 # Definitions and the like
 
 
-def fixManualDefTables(doc: "t.SpecType"):
+def fixManualDefTables(doc: t.SpecT):
     # Def tables generated via datablocks are guaranteed correct,
     # but manually-written ones often don't link up the names in the first row.
     for table in h.findAll("table.propdef, table.descdef, table.elementdef", doc):
@@ -111,7 +111,7 @@ def fixManualDefTables(doc: "t.SpecType"):
         h.replaceContents(cell, newContents)
 
 
-def canonicalizeShortcuts(doc: "t.SpecType"):
+def canonicalizeShortcuts(doc: t.SpecT):
     # Take all the invalid-HTML shortcuts and fix them.
 
     attrFixup = {
@@ -167,7 +167,7 @@ def canonicalizeShortcuts(doc: "t.SpecType"):
             el.set("data-dfn-for", _for)
 
 
-def addImplicitAlgorithms(doc: "t.SpecType"):
+def addImplicitAlgorithms(doc: t.SpecT):
     # If a container has an empty `algorithm` attribute,
     # but it contains only a single `<dfn>`,
     # assume that the dfn is a description of the algorithm.
@@ -191,7 +191,7 @@ def addImplicitAlgorithms(doc: "t.SpecType"):
             )
 
 
-def checkVarHygiene(doc: "t.SpecType"):
+def checkVarHygiene(doc: t.SpecT):
     def isAlgo(el):
         return el.get("data-algorithm") is not None
 
@@ -256,7 +256,7 @@ def checkVarHygiene(doc: "t.SpecType"):
             return
 
 
-def addVarClickHighlighting(doc: "t.SpecType"):
+def addVarClickHighlighting(doc: t.SpecT):
     if doc.md.slimBuildArtifact:
         return
     doc.extraStyles[
@@ -373,7 +373,7 @@ def addVarClickHighlighting(doc: "t.SpecType"):
     """
 
 
-def fixIntraDocumentReferences(doc: "t.SpecType"):
+def fixIntraDocumentReferences(doc: t.SpecT):
     ids = {el.get("id"): el for el in h.findAll("[id]", doc)}
     headingIDs = {el.get("id"): el for el in h.findAll("[id].heading", doc)}
     for el in h.findAll("a[href^='#']:not([href='#']):not(.self-link):not([data-link-type])", doc):
@@ -401,7 +401,7 @@ def fixIntraDocumentReferences(doc: "t.SpecType"):
             h.appendChild(el, text)
 
 
-def fixInterDocumentReferences(doc: "t.SpecType"):
+def fixInterDocumentReferences(doc: t.SpecT):
     for el in h.findAll("[spec-section]", doc):
         if el.get("data-link-spec") is None:
             m.die(
@@ -445,7 +445,7 @@ def fixInterDocumentReferences(doc: "t.SpecType"):
         )
 
 
-def fillInterDocumentReferenceFromShepherd(doc: "t.SpecType", el, specName, section):
+def fillInterDocumentReferenceFromShepherd(doc: t.SpecT, el, specName, section):
     headingData = doc.refs.fetchHeadings(specName)
     if section in headingData:
         heading = headingData[section]
@@ -492,7 +492,7 @@ def fillInterDocumentReferenceFromShepherd(doc: "t.SpecType", el, specName, sect
     registerBiblioUsage(doc, bib, el=el)
 
 
-def fillInterDocumentReferenceFromSpecref(doc: "t.SpecType", el, spec, section):
+def fillInterDocumentReferenceFromSpecref(doc: t.SpecT, el, spec, section):
     bib = doc.refs.getBiblioRef(spec)
     if isinstance(bib, biblio.StringBiblioEntry):
         m.die(f"Can't generate a cross-spec section ref for '{spec}', because the biblio entry has no url.", el=el)
@@ -507,7 +507,7 @@ def fillInterDocumentReferenceFromSpecref(doc: "t.SpecType", el, spec, section):
     registerBiblioUsage(doc, bib, el=el)
 
 
-def processDfns(doc: "t.SpecType"):
+def processDfns(doc: t.SpecT):
     dfns = h.findAll(config.dfnElementsSelector, doc)
     classifyDfns(doc, dfns)
     h.fixupIDs(doc, dfns)
@@ -555,7 +555,7 @@ def determineDfnType(dfn, inferCSS=False):
     return "dfn"
 
 
-def classifyDfns(doc: "t.SpecType", dfns):
+def classifyDfns(doc: t.SpecT, dfns):
     dfnTypeToPrefix = {v: k for k, v in config.dfnClassToType.items()}
     for el in dfns:
         dfnType = determineDfnType(el, inferCSS=doc.md.inferCSSDfns)
@@ -773,7 +773,7 @@ def classifyLink(el):
 # Additional Processing
 
 
-def processBiblioLinks(doc: "t.SpecType"):
+def processBiblioLinks(doc: t.SpecT):
     biblioLinks = h.findAll("a[data-link-type='biblio']", doc)
     for el in biblioLinks:
 
@@ -843,7 +843,7 @@ def processBiblioLinks(doc: "t.SpecType"):
                 el.set("href", ref.url)
 
 
-def verifyUsageOfAllLocalBiblios(doc: "t.SpecType"):
+def verifyUsageOfAllLocalBiblios(doc: t.SpecT):
     """
     Verifies that all the locally-declared biblios
     (those written inline in a <pre class=biblio> block,
@@ -864,7 +864,7 @@ def verifyUsageOfAllLocalBiblios(doc: "t.SpecType"):
         )
 
 
-def processAutolinks(doc: "t.SpecType"):
+def processAutolinks(doc: t.SpecT):
     # An <a> without an href is an autolink.
     # <i> is a legacy syntax for term autolinks. If it links up, we change it into an <a>.
     # We exclude bibliographical links, as those are processed in `processBiblioLinks`.
@@ -961,7 +961,7 @@ def processAutolinks(doc: "t.SpecType"):
 
 
 def registerBiblioUsage(
-    doc: "t.SpecType", ref: biblio.BiblioEntry, el: t.ElementT, type: t.Optional[str] = None
+    doc: t.SpecT, ref: biblio.BiblioEntry, el: t.ElementT, type: t.Optional[str] = None
 ) -> None:
     if type is None:
         if h.isNormative(el, doc):
@@ -978,7 +978,7 @@ def registerBiblioUsage(
     biblioStorage[ref.linkText.upper()] = ref
 
 
-def decorateAutolink(doc: "t.SpecType", el, linkType, linkText, ref):
+def decorateAutolink(doc: t.SpecT, el, linkType, linkText, ref):
     # Add additional effects to autolinks.
     if doc.md.slimBuildArtifact:
         return
@@ -1005,7 +1005,7 @@ def decorateAutolink(doc: "t.SpecType", el, linkType, linkText, ref):
             el.set("title", titleText)
 
 
-def removeMultipleLinks(doc: "t.SpecType"):
+def removeMultipleLinks(doc: t.SpecT):
     # If there are multiple autolinks to the same thing in a paragraph,
     # only keep the first.
     if not doc.md.removeMultipleLinks:
@@ -1025,7 +1025,7 @@ def removeMultipleLinks(doc: "t.SpecType"):
                     h.removeAttr(el, "href", "data-link-type")
 
 
-def processIssuesAndExamples(doc: "t.SpecType"):
+def processIssuesAndExamples(doc: t.SpecT):
     # Add an auto-genned and stable-against-changes-elsewhere id to all issues and
     # examples, and link to remote issues if possible:
     for el in h.findAll(".issue:not([id])", doc):
@@ -1065,7 +1065,7 @@ def processIssuesAndExamples(doc: "t.SpecType"):
     h.fixupIDs(doc, h.findAll(".issue, .example", doc))
 
 
-def addSelfLinks(doc: "t.SpecType"):
+def addSelfLinks(doc: t.SpecT):
     if doc.md.slimBuildArtifact:
         return
 
@@ -1104,7 +1104,7 @@ def addSelfLinks(doc: "t.SpecType"):
             h.appendChild(el, makeSelfLink(el))
 
 
-def cleanupHTML(doc: "t.SpecType"):
+def cleanupHTML(doc: t.SpecT):
     # Cleanup done immediately before serialization.
 
     head = None
@@ -1350,7 +1350,7 @@ def hackyLineNumbers(lines):
     return lines
 
 
-def correctFrontMatter(doc: "t.SpecType"):
+def correctFrontMatter(doc: t.SpecT):
     # Detect and move around some bits of information,
     # if you provided them in your
     # If you provided an <h1> manually, use that element rather than whatever the boilerplate contains.
@@ -1359,7 +1359,7 @@ def correctFrontMatter(doc: "t.SpecType"):
         h.replaceNode(h1s[0], h1s[1])
 
 
-def formatElementdefTables(doc: "t.SpecType"):
+def formatElementdefTables(doc: t.SpecT):
     for table in h.findAll("table.elementdef", doc):
         elements = h.findAll("tr:first-child dfn", table)
         elementsFor = " ".join(h.textContent(x) for x in elements)
@@ -1399,7 +1399,7 @@ def formatElementdefTables(doc: "t.SpecType"):
                 )
 
 
-def formatArgumentdefTables(doc: "t.SpecType"):
+def formatArgumentdefTables(doc: t.SpecT):
     for table in h.findAll("table.argumentdef", doc):
         forMethod = doc.widl.normalized_method_names(table.get("data-dfn-for"))
         method = doc.widl.find(table.get("data-dfn-for"))
@@ -1435,7 +1435,7 @@ def formatArgumentdefTables(doc: "t.SpecType"):
                 continue
 
 
-def inlineRemoteIssues(doc: "t.SpecType"):
+def inlineRemoteIssues(doc: t.SpecT):
     # Finds properly-marked-up "remote issues",
     # and inlines their contents into the issue.
 
@@ -1555,7 +1555,7 @@ def inlineRemoteIssues(doc: "t.SpecType"):
     return
 
 
-def addNoteHeaders(doc: "t.SpecType"):
+def addNoteHeaders(doc: t.SpecT):
     # Finds <foo heading="bar"> and turns it into a marker-heading
     for el in h.findAll("[heading]", doc):
         h.addClass(el, "no-marker")
@@ -1571,14 +1571,14 @@ def addNoteHeaders(doc: "t.SpecType"):
         h.removeAttr(el, "heading")
 
 
-def locateFillContainers(doc: "t.SpecType"):
+def locateFillContainers(doc: t.SpecT):
     fillContainers = defaultdict(list)
     for el in h.findAll("[data-fill-with]", doc):
         fillContainers[el.get("data-fill-with")].append(el)
     return fillContainers
 
 
-def forceCrossorigin(doc: "t.SpecType"):
+def forceCrossorigin(doc: t.SpecT):
     if not doc.md.forceCrossorigin:
         return
     for el in h.findAll("link, script[src], audio, video, img", doc):
@@ -1587,7 +1587,7 @@ def forceCrossorigin(doc: "t.SpecType"):
         el.set("crossorigin", "")
 
 
-def addImageSize(doc: "t.SpecType"):
+def addImageSize(doc: t.SpecT):
     if doc.md.imgAutoSize is False:
         return
     imgElements = h.findAll("img", doc)

@@ -26,7 +26,7 @@ def unescape(string: str) -> str:
     return html.unescape(string)
 
 
-def findAll(sel: str, context: t.Union["t.SpecType", t.ElementT]) -> t.List[t.ElementT]:
+def findAll(sel: str, context: t.Union[t.SpecT, t.ElementT]) -> t.List[t.ElementT]:
     context = t.cast(t.ElementT, getattr(context, "document", context))
     try:
         return t.cast(t.List[t.ElementT], CSSSelector(sel, namespaces={"svg": "http://www.w3.org/2000/svg"})(context))
