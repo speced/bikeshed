@@ -9,13 +9,22 @@ class IDLUI:
     def warn(self, msg):
         m.die(msg.rstrip())
 
+    def note(self, msg):
+        m.warn(msg.rstrip())
+
 
 class IDLSilent:
     def warn(self, msg):
         pass
 
+    def note(self, msg):
+        pass
 
-class DebugMarker:
+
+MarkupReturnT = t.Tuple[t.Optional[str], t.Optional[str]]
+
+
+class DebugMarker(widlparser.protocols.Marker):
     # Debugging tool for IDL markup
 
     def markup_construct(self, text, construct):  # pylint: disable=unused-argument
@@ -67,32 +76,32 @@ class DebugMarker:
         return ('<ENUM-VALUE for="' + construct.name + '">', "</ENUM-VALUE>")
 
 
-class IDLMarker:
-    def markup_construct(self, text, construct):  # pylint: disable=unused-argument
+class IDLMarker(widlparser.protocols.Marker):
+    def markup_construct(self, text: str, construct) -> MarkupReturnT:  # pylint: disable=unused-argument
         # Fires for every 'construct' in the WebIDL.
         # Some things are "productions", not "constructs".
         return (None, None)
 
-    def markup_type(self, text, construct):  # pylint: disable=unused-argument
+    def markup_type(self, text, construct) -> MarkupReturnT:  # pylint: disable=unused-argument
         # Fires for entire type definitions.
         # It'll contain keywords or names, or sometimes more types.
         # For example, a "type" wrapper surrounds an entire union type,
         # as well as its component types.
         return (None, None)
 
-    def markup_primitive_type(self, text, construct):  # pylint: disable=unused-argument
+    def markup_primitive_type(self, text, construct) -> MarkupReturnT:  # pylint: disable=unused-argument
         return ("<a data-link-type=interface>", "</a>")
 
-    def markup_string_type(self, text, construct):  # pylint: disable=unused-argument
+    def markup_string_type(self, text, construct) -> MarkupReturnT:  # pylint: disable=unused-argument
         return ("<a data-link-type=interface>", "</a>")
 
-    def markup_buffer_type(self, text, construct):  # pylint: disable=unused-argument
+    def markup_buffer_type(self, text, construct) -> MarkupReturnT:  # pylint: disable=unused-argument
         return ("<a data-link-type=interface>", "</a>")
 
-    def markup_object_type(self, text, construct):  # pylint: disable=unused-argument
+    def markup_object_type(self, text, construct) -> MarkupReturnT:  # pylint: disable=unused-argument
         return ("<a data-link-type=interface>", "</a>")
 
-    def markup_type_name(self, text, construct):
+    def markup_type_name(self, text, construct) -> MarkupReturnT:
         # Fires for non-defining type names, such as arg types.
 
         # The names in [Exposed=Foo] are [Global] tokens, not interface names.
@@ -132,7 +141,7 @@ class IDLMarker:
 
         return ('<a data-link-type="idl-name">', "</a>")
 
-    def markup_keyword(self, text, construct):
+    def markup_keyword(self, text, construct) -> MarkupReturnT:
         # Fires on the various "keywords" of WebIDL -
         # words that are part of the WebIDL syntax,
         # rather than names exposed to JS.
@@ -167,7 +176,7 @@ class IDLMarker:
             )
         return (None, None)
 
-    def markup_name(self, text, construct):  # pylint: disable=unused-argument
+    def markup_name(self, text, construct) -> MarkupReturnT:  # pylint: disable=unused-argument
         # Fires for defining names: method names, arg names, interface names, etc.
         idlType = construct.idl_type
         if idlType not in config.idlTypes:
@@ -245,7 +254,7 @@ class IDLMarker:
             f"</{elementName}>",
         )
 
-    def markup_enum_value(self, text, construct):
+    def markup_enum_value(self, text, construct) -> MarkupReturnT:
         return (
             "<idl data-idl-type=enum-value data-idl-for='{}' data-lt='{}'>".format(
                 h.escapeAttr(construct.name), h.escapeAttr(text)
@@ -253,10 +262,10 @@ class IDLMarker:
             "</idl>",
         )
 
-    def encode(self, text):
+    def encode(self, text: str) -> str:
         return h.escapeHTML(text)
 
-    def methodLinkingTexts(self, method):
+    def methodLinkingTexts(self, method: widlparser.constructs.InterfaceMember) -> t.List[str]:
         """
         Given a method-ish widlparser Construct,
         finds all possible linking texts.
@@ -266,6 +275,7 @@ class IDLMarker:
         "foo(bar)" and "foo()" would both also be valid linking texts.
         """
         for i, arg in enumerate(method.arguments or []):
+            assert isinstance(arg, widlparser.constructs.Argument)
             if arg.optional or arg.variadic:
                 optStart = i
                 break
@@ -289,7 +299,7 @@ class IDLMarker:
         return reversed(texts)
 
 
-def markupIDL(doc):
+def markupIDL(doc: t.SpecT) -> None:
     highlightingOccurred = False
     idlEls = h.findAll("pre.idl:not([data-no-idl]), xmp.idl:not([data-no-idl])", doc)
     for el in h.findAll("script[type=idl]", doc):
@@ -311,6 +321,7 @@ def markupIDL(doc):
             # Parse once with a fresh parser, so I can spit out just this <pre>'s markup.
             widl = widlparser.parser.Parser(text, ui=IDLUI(), symbol_table=symbolTable)
             marker = DebugMarker() if doc.debug else IDLMarker()
+
             h.replaceContents(el, h.parseHTML(str(widl.markup(marker))))
             # Parse a second time with the global one, which collects all data in the doc.
             doc.widl.parse(text)
@@ -333,7 +344,7 @@ def markupIDL(doc):
             """
 
 
-def markupIDLBlock(pre, doc):
+def markupIDLBlock(pre: t.ElementT, doc: t.SpecT) -> t.Set[t.ElementT]:
     localDfns = set()
     forcedInterfaces = []
     for x in (h.treeAttr(pre, "data-dfn-force") or "").split():
@@ -343,11 +354,12 @@ def markupIDLBlock(pre, doc):
         forcedInterfaces.append(x)
     for el in h.findAll("idl", pre):
         idlType = el.get("data-idl-type")
+        assert isinstance(idlType, str)
         url = None
         forceDfn = False
         ref = None
         idlText = None
-        for idlText in el.get("data-lt").split("|"):
+        for idlText in (el.get("data-lt") or "").split("|"):
             if idlType == "interface" and idlText in forcedInterfaces:
                 forceDfn = True
             for linkFor in config.splitForValues(el.get("data-idl-for", "")) or [None]:
@@ -369,11 +381,13 @@ def markupIDLBlock(pre, doc):
             el.set("data-dfn-type", idlType)
             del el.attrib["data-idl-type"]
             if el.get("data-idl-for"):
-                el.set("data-dfn-for", el.get("data-idl-for"))
+                el.set("data-dfn-for", el.get("data-idl-for") or "")
                 del el.attrib["data-idl-for"]
         else:
             # Copy over the auto-generated linking text to the manual dfn.
             dfn = h.find(url, doc)
+            # How in the hell does this work, the url is not a selector???
+            assert dfn is not None
             lts = combineIdlLinkingTexts(el.get("data-lt"), dfn.get("data-lt"))
             dfn.set("data-lt", lts)
             localDfns.add(dfn)
@@ -384,7 +398,7 @@ def markupIDLBlock(pre, doc):
             el.set("data-lt", idlText)
             del el.attrib["data-idl-type"]
             if el.get("data-idl-for"):
-                el.set("data-link-for", el.get("data-idl-for"))
+                el.set("data-link-for", el.get("data-idl-for") or "")
                 del el.attrib["data-idl-for"]
             if el.get("id"):
                 # ID was defensively added by the Marker.
@@ -392,7 +406,7 @@ def markupIDLBlock(pre, doc):
     return localDfns
 
 
-def combineIdlLinkingTexts(t1, t2):
+def combineIdlLinkingTexts(t1: t.Optional[str], t2: t.Optional[str]) -> str:
     t1s = [normalizeIdlWhitespace(x) for x in (t1 or "").split("|")]
     t2s = [normalizeIdlWhitespace(x) for x in (t2 or "").split("|")]
     for lt in t2s:
@@ -401,7 +415,7 @@ def combineIdlLinkingTexts(t1, t2):
     return "|".join(t1s)
 
 
-def normalizeIdlWhitespace(text):
+def normalizeIdlWhitespace(text: str) -> str:
     # Remove all whitespace...
     text = re.sub(r"\s+", "", text)
     # Then add whitespace after commas
@@ -409,7 +423,7 @@ def normalizeIdlWhitespace(text):
     return text
 
 
-def getParser():
+def getParser() -> widlparser.parser.Parser:
     return widlparser.parser.Parser(ui=IDLSilent())
 
 
