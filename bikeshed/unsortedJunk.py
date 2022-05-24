@@ -445,13 +445,13 @@ def fixInterDocumentReferences(doc: "t.SpecType"):
         )
 
 
-def fillInterDocumentReferenceFromShepherd(doc: "t.SpecType", el, spec, section):
-    specData = doc.refs.fetchHeadings(spec)
-    if section in specData:
-        heading = specData[section]
+def fillInterDocumentReferenceFromShepherd(doc: "t.SpecType", el, specName, section):
+    headingData = doc.refs.fetchHeadings(specName)
+    if section in headingData:
+        heading = headingData[section]
     else:
         m.die(
-            f"Couldn't find section '{section}' in spec '{spec}':\n{h.outerHTML(el)}",
+            f"Couldn't find section '{section}' in spec '{specName}':\n{h.outerHTML(el)}",
             el=el,
         )
         return
@@ -459,16 +459,17 @@ def fillInterDocumentReferenceFromShepherd(doc: "t.SpecType", el, spec, section)
         # Multipage spec
         if len(heading) == 1:
             # only one heading of this name, no worries
-            heading = specData[heading[0]]
+            heading = headingData[heading[0]]
         else:
             # multiple headings of this id, user needs to disambiguate
             m.die(
-                f"Multiple headings with id '{section}' for spec '{spec}'. Please specify:\n"
-                + "\n".join("  [[{}]]".format(spec + x) for x in heading),
+                f"Multiple headings with id '{section}' for spec '{specName}'. Please specify:\n"
+                + "\n".join(f"  [[{specName + x}]]" for x in heading),
                 el=el,
             )
             return
     if doc.md.status == "current":
+        # FIXME: doc.md.status is not these values
         if "current" in heading:
             heading = heading["current"]
         else:
@@ -485,6 +486,11 @@ def fillInterDocumentReferenceFromShepherd(doc: "t.SpecType", el, spec, section)
         h.appendChild(el, " §\u202f{number} {text}".format(**heading))
     h.removeAttr(el, "data-link-spec", "spec-section")
 
+    # Mark this as a used biblio ref
+    specData = doc.refs.specs[specName]
+    bib = biblio.SpecBasedBiblioEntry(specData)
+    registerBiblioUsage(doc, bib, el=el)
+
 
 def fillInterDocumentReferenceFromSpecref(doc: "t.SpecType", el, spec, section):
     bib = doc.refs.getBiblioRef(spec)
@@ -496,6 +502,9 @@ def fillInterDocumentReferenceFromSpecref(doc: "t.SpecType", el, spec, section):
     if h.isEmpty(el):
         el.text = bib.title + " §\u202f" + section[1:]
     h.removeAttr(el, "data-link-spec", "spec-section")
+
+    # Mark this as a used biblio ref
+    registerBiblioUsage(doc, bib, el=el)
 
 
 def processDfns(doc: "t.SpecType"):
@@ -767,17 +776,6 @@ def classifyLink(el):
 def processBiblioLinks(doc: "t.SpecType"):
     biblioLinks = h.findAll("a[data-link-type='biblio']", doc)
     for el in biblioLinks:
-        biblioType = el.get("data-biblio-type")
-        if biblioType == "normative":
-            storage = doc.normativeRefs
-        elif biblioType == "informative":
-            storage = doc.informativeRefs
-        else:
-            m.die(
-                f"Unknown data-biblio-type value '{biblioType}' on {h.outerHTML(el)}. Only 'normative' and 'informative' allowed.",
-                el=el,
-            )
-            continue
 
         linkText = determineLinkText(el)
         if linkText[0] == "[" and linkText[-1] == "]":
@@ -828,7 +826,7 @@ def processBiblioLinks(doc: "t.SpecType"):
             doc.refs.preferredBiblioNames[ref.linkText] = linkText
             # Use it on the current ref. Future ones will use the preferred name automatically.
             ref.linkText = linkText
-        storage[ref.linkText] = ref
+        registerBiblioUsage(doc, ref, el=el, type=el.get("data-biblio-type"))
 
         id = config.simplifyText(ref.linkText)
         el.set("href", "#biblio-" + id)
@@ -853,8 +851,8 @@ def verifyUsageOfAllLocalBiblios(doc: "t.SpecType"):
     were used in the spec,
     so you can remove entries when they're no longer necessary.
     """
-    usedBiblioKeys = {x.lower() for x in list(doc.normativeRefs.keys()) + list(doc.informativeRefs.keys())}
-    localBiblios = [b["linkText"].lower() for bs in doc.refs.biblios.values() for b in bs if b["order"] == 1]
+    usedBiblioKeys = {x.upper() for x in list(doc.normativeRefs.keys()) + list(doc.informativeRefs.keys())}
+    localBiblios = [b["linkText"].upper() for bs in doc.refs.biblios.values() for b in bs if b["order"] == 1]
     unusedBiblioKeys = []
     for b in localBiblios:
         if b not in usedBiblioKeys:
@@ -927,14 +925,9 @@ def processAutolinks(doc: "t.SpecType"):
         # rather than checking `status == "local"`, as "local" refs include
         # those defined in `<pre class="anchor">` datablocks, which we do
         # want to capture here.
-        if ref and ref.spec and doc.refs.spec and ref.spec.lower() != doc.refs.spec.lower():
-            spec = ref.spec.lower()
+        if ref and ref.spec and doc.refs.spec and ref.spec.upper() != doc.refs.spec.upper():
+            spec = ref.spec.upper()
             key = ref.for_[0] if ref.for_ else ""
-
-            if h.isNormative(el, doc):
-                biblioStorage = doc.normativeRefs
-            else:
-                biblioStorage = doc.informativeRefs
 
             # If the ref is from an anchor block, it knows what it's doing.
             # Don't follow obsoletion chains.
@@ -948,8 +941,8 @@ def processAutolinks(doc: "t.SpecType"):
                 allowObsolete=allowObsolete,
             )
             if biblioRef:
-                biblioStorage[biblioRef.linkText] = biblioRef
-                spec = biblioRef.linkText.lower()
+                spec = biblioRef.linkText.upper()
+                registerBiblioUsage(doc, biblioRef, el=el)
                 doc.externalRefsUsed[spec]["_biblio"] = biblioRef
             doc.externalRefsUsed[spec][ref.text][key] = ref
 
@@ -965,6 +958,24 @@ def processAutolinks(doc: "t.SpecType"):
                 if el.get("data-lt"):
                     del el.attrib["data-lt"]
     h.dedupIDs(doc)
+
+
+def registerBiblioUsage(
+    doc: "t.SpecType", ref: biblio.BiblioEntry, el: t.ElementT, type: t.Optional[str] = None
+) -> None:
+    if type is None:
+        if h.isNormative(el, doc):
+            type = "normative"
+        else:
+            type = "informative"
+    if type == "normative":
+        biblioStorage = doc.normativeRefs
+    elif type == "informative":
+        biblioStorage = doc.informativeRefs
+    else:
+        m.die(f"Unknown biblio type {type}.", el=el)
+        return
+    biblioStorage[ref.linkText.upper()] = ref
 
 
 def decorateAutolink(doc: "t.SpecType", el, linkType, linkText, ref):

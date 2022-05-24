@@ -525,4 +525,4 @@ def dedupBiblioReferences(doc):
         if keys["shepherd"] in doc.externalRefsUsed:
             for k, v in list(doc.externalRefsUsed[keys["shepherd"]].items()):
                 doc.externalRefsUsed[keys["specref"]][k] = v
-        del doc.externalRefsUsed[keys["shepherd"]]
+            del doc.externalRefsUsed[keys["shepherd"]]
