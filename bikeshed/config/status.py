@@ -212,6 +212,7 @@ megaGroups = {
             "browser-testing-tools",
             "csswg",
             "dap",
+            "fedidcg",
             "fxtf",
             "geolocation",
             "gpuwg",
@@ -291,13 +292,14 @@ megaGroups = {
 # Community and business groups within the W3C:
 w3cCgs = frozenset(
     [
+        "fedidcg",
         "immersivewebcg",
         "privacycg",
         "processcg",
         "ricg",
         "sacg",
-        "webml",
         "web-bluetooth-cg",
+        "webml",
         "wecg",
         "wicg",
         "wintercg",
