@@ -417,7 +417,7 @@ def nodesFromType(prod: widlparser.productions.Production) -> t.ElementT:
     return h.E.code({"class": "idl"}, _nodesFromProduction(prod))
 
 
-def _nodesFromProduction(prod: widlparser.productions.Production) -> t.NodesT:
+def _nodesFromProduction(prod: t.Union[widlparser.productions.Production, widlparser.protocols.Construct]) -> t.NodesT:
     # pylint: disable=protected-access
     # Things that should be directly linkifiable from their text
     if isinstance(
@@ -448,12 +448,31 @@ def _nodesFromProduction(prod: widlparser.productions.Production) -> t.NodesT:
         ),
     ):
         tail = []
-        if hasattr(prod, "null") and prod.null:
+        if isinstance(prod, widlparser.productions.ConstType) and prod.null is not None:
             tail.append(str(prod.null))
-        if hasattr(prod, "suffix") and prod.suffix:
+        if (
+            isinstance(
+                prod,
+                (
+                    widlparser.productions.UnionMemberType,
+                    widlparser.productions.Type,
+                    widlparser.productions.TypeWithExtendedAttributes,
+                ),
+            )
+            and prod.suffix is not None
+        ):
             tail.append(str(prod.suffix))
         head = []
-        if hasattr(prod, "_extended_attributes") and prod._extended_attributes:
+        if (
+            isinstance(
+                prod,
+                (
+                    widlparser.productions.UnionMemberType,
+                    widlparser.productions.TypeWithExtendedAttributes,
+                ),
+            )
+            and prod._extended_attributes is not None
+        ):
             head.append(_nodesFromProduction(prod._extended_attributes))
             head.append(" ")
         if head or tail:
@@ -479,6 +498,7 @@ def _nodesFromProduction(prod: widlparser.productions.Production) -> t.NodesT:
         elif prod.promise:
             return [h.E.a({"data-link-type": "interface"}, "Promise"), "<", _nodesFromProduction(prod.type), ">", *tail]
         elif prod.record:
+            assert prod.key_type is not None
             return [
                 h.E.a({"data-link-type": "dfn", "data-link-spec": "webidl"}, "record"),
                 "<",

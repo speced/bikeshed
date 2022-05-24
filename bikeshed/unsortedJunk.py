@@ -960,9 +960,7 @@ def processAutolinks(doc: t.SpecT):
     h.dedupIDs(doc)
 
 
-def registerBiblioUsage(
-    doc: t.SpecT, ref: biblio.BiblioEntry, el: t.ElementT, type: t.Optional[str] = None
-) -> None:
+def registerBiblioUsage(doc: t.SpecT, ref: biblio.BiblioEntry, el: t.ElementT, type: t.Optional[str] = None) -> None:
     if type is None:
         if h.isNormative(el, doc):
             type = "normative"
