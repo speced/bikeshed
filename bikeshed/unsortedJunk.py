@@ -1222,11 +1222,16 @@ def cleanupHTML(doc: "t.SpecType"):
             el.tag = "span"
             h.addClass(el, "css")
 
+        # Assert IDs are used to tag arbitrary sections with an ID so you can point tests at it.
+        # (The ID will be guaranteed stable across publications, but guaranteed to change when the text changes.)
+        #
         # Transform the <assert> fake tag into a span with a unique ID based on its contents.
-        # This is just used to tag arbitrary sections with an ID so you can point tests at it.
-        # (And the ID will be guaranteed stable across publications, but guaranteed to change when the text changes.)
         if el.tag == "assert":
             el.tag = "span"
+            el.set("id", h.safeID(doc, "assert-" + h.hashContents(el)))
+        # For any <div assert> elements, add a unique ID based on its contents.
+        if el.tag == "div" and el.get("assert") is not None:
+            h.removeAttr(el, "assert")
             el.set("id", h.safeID(doc, "assert-" + h.hashContents(el)))
 
         # Add ARIA role of "note" to class="note" elements
