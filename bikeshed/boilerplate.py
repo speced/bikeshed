@@ -287,12 +287,9 @@ def addIndexSection(doc):
         # but it can also have a _biblio key
         # to track biblio references.
         # Need to make sure it doesn't contain *only* _biblio
-        for k in refs.keys():
-            if k != "_biblio":
-                hasExternalDfns = True
-                break
-        else:
+        if "_biblio" in refs and len(refs) == 1:
             continue
+        hasExternalDfns = True
         break
     if not hasLocalDfns and not hasExternalDfns:
         return
@@ -554,6 +551,11 @@ def addIndexOfExternallyDefinedTerms(doc, container):
             printableSpec = biblioRef.linkText
         else:
             printableSpec = spec
+
+        # Skip entries that are *solely* a biblio entry.
+        if "_biblio" in refGroups and len(refGroups) == 1:
+            continue
+
         attrs = {
             "data-lt": spec,
             "data-link-type": "biblio",
