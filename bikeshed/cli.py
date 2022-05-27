@@ -87,8 +87,18 @@ def main():
     subparsers = argparser.add_subparsers(title="Subcommands", dest="subparserName")
 
     specParser = subparsers.add_parser("spec", help="Process a spec source file into a valid output file.")
-    specParser.add_argument("infile", nargs="?", default=None, help="Path to the source file.")
-    specParser.add_argument("outfile", nargs="?", default=None, help="Path to the output file.")
+    specParser.add_argument(
+        "infile",
+        nargs="?",
+        default=None,
+        help='Path to the source file: stdin ("-"), an https URL, a .bs or.src.html file, or a tar archive containing an index.bs file.',
+    )
+    specParser.add_argument(
+        "outfile",
+        nargs="?",
+        default=None,
+        help='Path to the output file: stdout ("-"), or a filename.',
+    )
     specParser.add_argument(
         "--debug",
         dest="debug",

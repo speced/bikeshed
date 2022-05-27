@@ -7,6 +7,7 @@ from . import config, messages as m, retrieve
 from .Spec import Spec
 
 TEST_DIR = os.path.abspath(os.path.join(config.scriptPath(), "..", "tests"))
+TEST_FILE_EXTENSIONS = (".bs", ".tar")
 
 
 def findTestFiles(manualOnly=False):
@@ -19,7 +20,7 @@ def findTestFiles(manualOnly=False):
             if re.search(r"\d{3}-files$", pathSegs[0]):
                 # support files for a manual test
                 continue
-            if os.path.splitext(filePath)[1] == ".bs":
+            if filePath.endswith(TEST_FILE_EXTENSIONS):
                 yield os.path.join(root, filename)
 
 
@@ -59,7 +60,7 @@ def runAllTests(patterns=None, manualOnly=False, md=None):  # pylint: disable=un
         total += 1
         doc = processTest(path, md)
         outputText = doc.serialize()
-        with open(path[:-2] + "html", encoding="utf-8") as golden:
+        with open(os.path.splitext(path)[0] + ".html", encoding="utf-8") as golden:
             goldenText = golden.read()
         if compare(outputText, goldenText):
             numPassed += 1
@@ -120,7 +121,12 @@ def testPaths(patterns=None):
     # otherwise, glob the provided paths, rooted at the test dir
     if not patterns:
         return list(sortTests(findTestFiles()))
-    return [path for pattern in patterns for path in glob.glob(os.path.join(TEST_DIR, pattern)) if path.endswith(".bs")]
+    return [
+        path
+        for pattern in patterns
+        for path in glob.glob(os.path.join(TEST_DIR, pattern))
+        if path.endswith(TEST_FILE_EXTENSIONS)
+    ]
 
 
 def addTestMetadata(doc):

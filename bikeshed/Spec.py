@@ -313,7 +313,9 @@ class Spec:
     def fixMissingOutputFilename(self, outputFilename):
         if outputFilename is None:
             # More sensible defaults!
-            if not isinstance(self.inputSource, InputSource.FileInputSource):
+            if isinstance(self.inputSource, InputSource.TarInputSource):
+                outputFilename = os.path.splitext(self.inputSource.sourceName)[0] + ".html"
+            elif not isinstance(self.inputSource, InputSource.FileInputSource):
                 outputFilename = "-"
             elif self.inputSource.sourceName.endswith(".bs"):
                 outputFilename = self.inputSource.sourceName[0:-3] + ".html"
