@@ -282,7 +282,7 @@ def addBikeshedBoilerplate(doc):
 def addIndexSection(doc):
     hasLocalDfns = len(h.findAll(config.dfnElementsSelector, doc)) > 0
     hasExternalDfns = False
-    for spec, refs in doc.externalRefsUsed.items():
+    for refs in doc.externalRefsUsed.values():
         # refs is a {ref text => ref} table
         # but it can also have a _biblio key
         # to track biblio references.
