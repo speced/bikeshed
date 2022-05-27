@@ -943,7 +943,6 @@ def processAutolinks(doc: t.SpecT):
             if biblioRef:
                 spec = biblioRef.linkText.upper()
                 registerBiblioUsage(doc, biblioRef, el=el)
-                doc.externalRefsUsed[spec]["_biblio"] = biblioRef
             doc.externalRefsUsed[spec][ref.text][key] = ref
 
         if ref:
@@ -973,7 +972,9 @@ def registerBiblioUsage(doc: t.SpecT, ref: biblio.BiblioEntry, el: t.ElementT, t
     else:
         m.die(f"Unknown biblio type {type}.", el=el)
         return
-    biblioStorage[ref.linkText.upper()] = ref
+    spec = ref.linkText.upper()
+    biblioStorage[spec] = ref
+    doc.externalRefsUsed[spec]["_biblio"] = ref
 
 
 def decorateAutolink(doc: t.SpecT, el, linkType, linkText, ref):

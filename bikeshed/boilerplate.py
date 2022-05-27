@@ -280,17 +280,32 @@ def addBikeshedBoilerplate(doc):
 
 
 def addIndexSection(doc):
-    if len(h.findAll(config.dfnElementsSelector, doc)) == 0 and len(list(doc.externalRefsUsed.keys())) == 0:
+    hasLocalDfns = len(h.findAll(config.dfnElementsSelector, doc)) > 0
+    hasExternalDfns = False
+    for spec, refs in doc.externalRefsUsed.items():
+        # refs is a {ref text => ref} table
+        # but it can also have a _biblio key
+        # to track biblio references.
+        # Need to make sure it doesn't contain *only* _biblio
+        for k in refs.keys():
+            if k != "_biblio":
+                hasExternalDfns = True
+                break
+        else:
+            continue
+        break
+    if not hasLocalDfns and not hasExternalDfns:
         return
+
     container = getFillContainer("index", doc=doc, default=True)
     if container is None:
         return
     h.appendChild(container, h.E.h2({"class": "no-num no-ref", "id": h.safeID(doc, "index")}, "Index"))
 
-    if len(h.findAll(config.dfnElementsSelector, doc)) > 0:
+    if hasLocalDfns:
         addIndexOfLocallyDefinedTerms(doc, container)
 
-    if len(list(doc.externalRefsUsed.keys())) > 0:
+    if hasExternalDfns:
         addIndexOfExternallyDefinedTerms(doc, container)
 
 
@@ -1130,6 +1145,7 @@ def addReferencesSection(doc):
     )
 
     normRefs = sorted(doc.normativeRefs.values(), key=lambda r: r.linkText.lower())
+    normRefKeys = set(r.linkText.lower() for r in doc.normativeRefs.values())
     if len(normRefs) > 0:
         dl = h.appendChild(
             container,
@@ -1153,7 +1169,7 @@ def addReferencesSection(doc):
     informRefs = [
         x
         for x in sorted(doc.informativeRefs.values(), key=lambda r: r.linkText.lower())
-        if x.linkText not in doc.normativeRefs
+        if x.linkText.lower() not in normRefKeys
     ]
     if len(informRefs) > 0:
         dl = h.appendChild(
