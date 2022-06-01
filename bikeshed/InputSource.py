@@ -8,22 +8,21 @@ import sys
 import tarfile
 import urllib.parse
 from abc import abstractmethod
-from typing import List, Optional
 
 import attr
 import requests
 import tenacity
 
-from . import config, Line
+from . import config, Line, t
 
 
 @attr.s(auto_attribs=True)
 class InputContent:
-    rawLines: List[str]
-    date: Optional[datetime.date]
+    rawLines: t.List[str]
+    date: t.Optional[datetime.date]
 
     @property
-    def lines(self) -> List[Line.Line]:
+    def lines(self) -> t.List[Line.Line]:
         return [Line.Line(i, line) for i, line in enumerate(self.rawLines, 1)]
 
     @property
@@ -82,7 +81,7 @@ class InputSource:
         """Suitable for passing to subprocess(cwd=)."""
         raise TypeError("{} instances don't have directories.".format(type(self)))
 
-    def relative(self, _) -> Optional[InputSource]:
+    def relative(self, _) -> t.Optional[InputSource]:
         """Resolves relativePath relative to this InputSource.
 
         For example, InputSource("/foo/bar/baz.txt").relative("quux/fuzzy.txt")
@@ -92,11 +91,11 @@ class InputSource:
         """
         return None
 
-    def mtime(self) -> Optional[float]:
+    def mtime(self) -> t.Optional[float]:
         """Returns the last modification time of this source, if that's known."""
         return None
 
-    def cheaplyExists(self, _) -> Optional[bool]:
+    def cheaplyExists(self, _) -> t.Optional[bool]:
         """If it's cheap to determine, returns whether relativePath exists.
 
         Otherwise, returns None.
@@ -164,7 +163,7 @@ class UrlInputSource(InputSource):
 
 
 class FileInputSource(InputSource):
-    def __init__(self, sourceName: str, *, chroot: bool, chrootPath: Optional[str] = None):
+    def __init__(self, sourceName: str, *, chroot: bool, chrootPath: t.Optional[str] = None):
         self.sourceName = sourceName
         self.chrootPath = chrootPath
         self.type = "file"
@@ -201,7 +200,7 @@ class FileInputSource(InputSource):
     def cheaplyExists(self, relativePath) -> bool:
         return os.access(self.relative(relativePath).sourceName, os.R_OK)
 
-    def mtime(self) -> Optional[float]:
+    def mtime(self) -> t.Optional[float]:
         """Returns the last modification time of this file, or None if it doesn't exist."""
         try:
             return os.stat(self.sourceName).st_mtime
@@ -222,11 +221,18 @@ class TarInputSource(InputSource):
     def read(self) -> InputContent:
         with self._openTarFile() as tarFile:
             mtime = self.mtime()
+            if mtime is None:
+                ts = None
+            else:
+                ts = datetime.datetime.fromtimestamp(mtime).date()
             try:
-                with tarFile.extractfile(self.tarMemberName) as f:
+                taritem = tarFile.extractfile(self.tarMemberName)
+                if taritem is None:
+                    raise FileNotFoundError(errno.ENOENT, f"{self.tarMemberName} is in the tar file, but isn't a file itself.")
+                with taritem as f:
                     # Decode the `bytes` to a `str`. (extractfile can't read as text.)
                     file_contents = f.read().decode(encoding="utf-8").splitlines(keepends=True)
-                return InputContent(file_contents, datetime.datetime.fromtimestamp(mtime).date())
+                return InputContent(file_contents, ts)
             except KeyError as e:
                 raise FileNotFoundError(errno.ENOENT, "Not found inside tar file", self.tarMemberName) from e
 
@@ -237,19 +243,19 @@ class TarInputSource(InputSource):
         # It would be possible to produce a file listing. But not a meaningful directory path.
         raise TypeError("{} instances don't have directories.".format(type(self)))
 
-    def relative(self, relativePath) -> FileInputSource:
+    def relative(self, relativePath) -> TarInputSource:
         """Returns an InputSource relative to this file. Since a TarInputSource is always inside the
         tar file, any relative InputSource is also inside the tar file."""
         memberPath = os.path.join(os.path.dirname(self.tarMemberName), relativePath)
         return TarInputSource(self.sourceName, tarMemberName=memberPath)
 
-    def cheaplyExists(self, relativePath) -> Optional[bool]:
+    def cheaplyExists(self, relativePath) -> t.Optional[bool]:
         memberPath = os.path.join(os.path.dirname(self.tarMemberName), relativePath)
         with self._openTarFile() as tarFile:
             members = tarFile.getnames()
             return memberPath in members
 
-    def mtime(self) -> Optional[float]:
+    def mtime(self) -> t.Optional[float]:
         """Returns the last modification time of this file, or None if it doesn't exist."""
         try:
             return os.stat(self.sourceName).st_mtime

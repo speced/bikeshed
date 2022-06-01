@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import hashlib
 import itertools
 import re
@@ -144,7 +146,7 @@ def handleRawInclude(el: t.ElementT, doc: t.SpecT) -> None:
     h.replaceNode(el, *subtree)
 
 
-RangeItem = "t.List[t.Optional[int]]"
+RangeItem: t.TypeAlias = "t.List[t.Optional[int]]"
 # UGH I DON'T UNDERSTAND THE ERROR HERE
 # fuck it, replace this with a tiny dataclass anyway
 
