@@ -6,7 +6,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     const runsUrl = "https://wpt.fyi/api/runs?label=master&label=stable&max-count=1&product=chrome&product=firefox&product=safari&product=edge";
     const runs = await (await fetch(runsUrl)).json();
 
-    const testResults = await( await fetch("https://wpt.fyi/api/search", {
+    const testResults = await (await fetch("https://wpt.fyi/api/search", {
         method:"POST",
         headers:{
             "Content-Type":"application/json",
@@ -25,6 +25,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     }));
     document.querySelectorAll(".wpt-name").forEach(nameEl=>{
         const passData = resultsFromPath.get("/" + nameEl.getAttribute("title"));
+        if(!passData) {
+            console.log("Couldn't find test in results:", nameEl);
+            return
+        }
         const numTests = passData[0][1];
         if(numTests > 1) {
             nameEl.insertAdjacentElement("beforeend",
