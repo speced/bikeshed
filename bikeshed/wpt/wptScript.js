@@ -23,6 +23,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         const passes = result.legacy_status.map(x=>[x.passes, x.total]);
         return [testPath, passes];
     }));
+    const seenTests = Set();
     document.querySelectorAll(".wpt-name").forEach(nameEl=>{
         const passData = resultsFromPath.get("/" + nameEl.getAttribute("title"));
         const numTests = passData[0][1];
@@ -31,10 +32,6 @@ document.addEventListener("DOMContentLoaded", async ()=>{
                 el("small", {}, ` (${numTests} tests)`));
         }
         if(passData == undefined) return;
-        passData.forEach((p,i) => {
-            browsers[i].passes += p[0];
-            browsers[i].total += p[1];
-        })
         const resultsEl = el("span",{"class":"wpt-results"},
             ...passData.map((p,i) => el("span",
             {
@@ -44,6 +41,17 @@ document.addEventListener("DOMContentLoaded", async ()=>{
             })),
         );
         nameEl.insertAdjacentElement("afterend", resultsEl);
+
+	// Only update the summary pass/total count if we haven't seen this
+	// test before, to support authors listing the same test multiple times
+	// in a spec.
+        if (!seenTests.has(nameEl.getAttribute("title"))) {
+          seenTests.add(nameEl.getAttribute("title"));
+          passData.forEach((p,i) => {
+              browsers[i].passes += p[0];
+              browsers[i].total += p[1];
+          });
+        }
     });
     const overview = document.querySelector(".wpt-overview");
     if(overview) {
