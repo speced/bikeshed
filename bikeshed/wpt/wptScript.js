@@ -23,7 +23,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         const passes = result.legacy_status.map(x=>[x.passes, x.total]);
         return [testPath, passes];
     }));
-    const seenTests = Set();
+    const seenTests = new Set();
     document.querySelectorAll(".wpt-name").forEach(nameEl=>{
         const passData = resultsFromPath.get("/" + nameEl.getAttribute("title"));
         const numTests = passData[0][1];
