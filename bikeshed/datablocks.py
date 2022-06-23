@@ -584,6 +584,7 @@ def transformRailroad(lines, doc, firstLine, **kwargs):  # pylint: disable=unuse
     code = "".join(lines)
     diagram = railroadparser.parse(code)
     if diagram:
+        diagram.css = None
         temp = io.StringIO()
         diagram.writeSvg(temp.write)
         ret.append(temp.getvalue())
