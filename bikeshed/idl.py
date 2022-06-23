@@ -287,18 +287,18 @@ class IDLMarker(widlparser.protocols.Marker):
         texts = []
 
         if optStart is not None:
-            prefixes = [method.name]
+            prefixes = [t.cast(str, method.name)]
             if method.name == "constructor":
-                prefixes.append(method.parent.name)
+                prefixes.append(t.cast(str, method.parent.name))
             for i in range(optStart, len(method.arguments)):
-                argText = ", ".join(arg.name for arg in method.arguments[:i])
+                argText = ", ".join(t.cast(str, arg.name) for arg in list(method.arguments)[:i])
                 for prefix in prefixes:
                     texts.append(prefix + "(" + argText + ")")
 
-        texts.append(method.normal_name)
+        texts.append(t.cast(str, method.normal_name))
         if method.name == "constructor":
-            texts.append(method.parent.name + method.normal_name[11:])
-        return reversed(texts)
+            texts.append(t.cast(str, method.parent.name) + t.cast(str, method.normal_name)[11:])
+        return list(reversed(texts))
 
 
 def markupIDL(doc: t.SpecT) -> None:
