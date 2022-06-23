@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 
 import widlparser
@@ -176,7 +178,7 @@ class IDLMarker(widlparser.protocols.Marker):
             )
         return (None, None)
 
-    def markup_name(self, text, construct) -> MarkupReturnT:  # pylint: disable=unused-argument
+    def markup_name(self, text: str, construct) -> MarkupReturnT:  # pylint: disable=unused-argument
         # Fires for defining names: method names, arg names, interface names, etc.
         idlType = construct.idl_type
         if idlType not in config.idlTypes:
@@ -265,7 +267,7 @@ class IDLMarker(widlparser.protocols.Marker):
     def encode(self, text: str) -> str:
         return h.escapeHTML(text)
 
-    def methodLinkingTexts(self, method: widlparser.constructs.InterfaceMember) -> t.List[str]:
+    def methodLinkingTexts(self, method: widlparser.OperationRest) -> t.List[str]:
         """
         Given a method-ish widlparser Construct,
         finds all possible linking texts.
