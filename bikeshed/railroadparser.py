@@ -181,5 +181,8 @@ def _createDiagram(command: RRCommand) -> t.Optional[rr.DiagramItem]:
         if 0 == len(command.children) > 2:
             return m.die(f"Line {command.line} - ZeroOrMore commands must have one or two children.")
         children = [_f for _f in [_createDiagram(child) for child in command.children] if _f]
-        return rr.ZeroOrMore(children[0], repeat=children[1], skip=(command.prelude == "skip"))
+        if not children:
+            return m.die(f"Line {command.line} - ZeroOrMore has no valid children.")
+        repeat = children[1] if len(children) == 2 else None
+        return rr.ZeroOrMore(children[0], repeat=repeat, skip=(command.prelude == "skip"))
     return m.die(f"Line {command.line} - Unknown command '{command.name}'.")
