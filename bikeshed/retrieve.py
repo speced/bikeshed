@@ -64,11 +64,11 @@ defaultRequester = DataFileRequester(type="latest", fallback=DataFileRequester(t
 def retrieveBoilerplateFile(
     doc: t.SpecT,
     name: str,
-    group: t.Optional[str]=None,
-    status: t.Optional[str]=None,
-    error: bool=True,
-    allowLocal: bool=True,
-    fileRequester: t.Optional[DataFileRequester]=None,
+    group: t.Optional[str] = None,
+    status: t.Optional[str] = None,
+    error: bool = True,
+    allowLocal: bool = True,
+    fileRequester: t.Optional[DataFileRequester] = None,
 ) -> str:
     # Looks in three or four locations, in order:
     # the folder the spec source is in, the group's boilerplate folder, the megagroup's boilerplate folder, and the generic boilerplate folder.
