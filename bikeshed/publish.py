@@ -1,22 +1,24 @@
 # pylint: disable=R1732
 
+from __future__ import annotations
+
 import logging
 import os
 import tarfile
 import tempfile
 
-from . import extensions
+from . import extensions, t
 
 
 def publishEchidna(
-    doc,
-    username,
-    password,
-    decision,
-    additionalDirectories=None,
-    cc=None,
-    editorial=False,
-):
+    doc: t.SpecT,
+    username: str,
+    password: str,
+    decision: str,
+    additionalDirectories: t.Optional[t.List[str]]=None,
+    cc: t.Optional[str]=None,
+    editorial: bool=False,
+) -> None:
     import requests
 
     logging.captureWarnings(True)  # Silence SNIMissingWarning
@@ -49,7 +51,7 @@ def publishEchidna(
         print(r.headers)
 
 
-def prepareTar(doc, visibleTar=False, additionalDirectories=None):
+def prepareTar(doc: t.SpecT, visibleTar: bool=False, additionalDirectories: t.Optional[t.List[str]]=None):
     if additionalDirectories is None:
         additionalDirectories = ["images", "diagrams", "examples"]
     # Finish the spec
@@ -63,7 +65,7 @@ def prepareTar(doc, visibleTar=False, additionalDirectories=None):
         tar = tarfile.open(fileobj=f, mode="w")
     tar.add(specOutput.name, arcname="Overview.html")
     # Loaded from .include files
-    additionalFiles = extensions.BSPublishAdditionalFiles(additionalDirectories)  # pylint: disable=no-member
+    additionalFiles = extensions.BSPublishAdditionalFiles(additionalDirectories) # type: ignore # pylint: disable=no-member
     for fname in additionalFiles:
         try:
             if isinstance(fname, str):
