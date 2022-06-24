@@ -5,21 +5,22 @@ from __future__ import annotations
 import sys
 from typing import (
     Any,
+    cast,
     DefaultDict,
     Dict,
+    Generator,
     Iterable,
     Iterator,
     List,
     Mapping,
     Optional,
+    overload,
     Sequence,
     Set,
     Tuple,
+    TYPE_CHECKING,
     TypeVar,
     Union,
-    TYPE_CHECKING,
-    cast,
-    overload,
 )
 
 from lxml import etree
