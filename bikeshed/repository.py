@@ -1,47 +1,49 @@
-class Repository:
+from __future__ import annotations
+
+import abc
+import dataclasses
+
+from . import t
+
+
+@dataclasses.dataclass
+class Repository(metaclass=abc.ABCMeta):
     """
     A class for representing spec repositories.
     """
 
-    def __init__(self, url, name=None, type=None):
-        self.ns = "com"
-        self.url = url
-        self.api = "https://api.github.com"
-        if name:
-            self.name = name
-        else:
-            self.name = url
+    url: str
+    type: str = "unknown"
+    name: t.Optional[str] = None
 
-        if type:
-            self.type = type
-        else:
-            self.type = "unknown"
 
-    def formatIssueUrl(self, *args, **kwargs):  # pylint: disable=unused-argument
+class UnknownRepository(Repository):
+    def formatIssueUrl(self) -> str:  # pylint: disable=unused-argument
         # Dunno how to format an arbitrary issue url,
         # so give up and just point to the repo.
         return self.url
 
 
 class GithubRepository(Repository):
-    def __init__(self, ns, user, repo):
+    def __init__(self, ns: str, user: str, repo: str):
         super().__init__(
-            f"https://github.{ns}/{user}/{repo}",
-            f"{user}/{repo}",
+            url=f"https://github.{ns}/{user}/{repo}",
+            name=f"{user}/{repo}",
+            type="github",
         )
         self.ns = ns
         self.user = user
         self.repo = repo
-        self.type = "github"
         if ns == "com":
             self.api = "https://api.github.com"
         else:
             self.api = f"https://github.{ns}/api/v3"
 
-    def formatIssueUrl(self, id=None):
+    def formatIssueUrl(self, id: t.Optional[str] = None) -> str:
         if id is None:
-            return "https://github.{}/{}/{}/issues/".format(self.ns, self.user, self.repo)
-        return "https://github.{}/{}/{}/issues/{}".format(self.ns, self.user, self.repo, id)
+            return f"https://github.{self.ns}/{self.user}/{self.repo}/issues/"
+        return f"https://github.{self.ns}/{self.user}/{self.repo}/issues/{id}"
 
-    def __str__(self):
-        return f"{self.user}/{self.repo}"
+    def __str__(self) -> str:
+        assert self.name is not None
+        return self.name
