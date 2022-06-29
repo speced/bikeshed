@@ -54,7 +54,7 @@ def addBikeshedVersion(doc):
         )
     except Exception:
         # Not in Bikeshed's repo, so instead grab from the datafile.
-        bikeshedVersion = doc.dataFile.fetch("bikeshed-version.txt", type="readonly", str=True).strip()
+        bikeshedVersion = doc.dataFile.fetch("bikeshed-version.txt", fileType="readonly", str=True).strip()
     h.appendChild(doc.head, h.E.meta({"name": "generator", "content": bikeshedVersion}))
 
 

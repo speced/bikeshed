@@ -75,7 +75,7 @@ def runAllTests(patterns=None, manualOnly=False, md=None):  # pylint: disable=un
         m.p("* " + fail)
 
 
-def processTest(path, md=None, fileRequester=retrieve.DataFileRequester(type="readonly")):
+def processTest(path, md=None, fileRequester=retrieve.DataFileRequester(fileType="readonly")):
     doc = Spec(inputFilename=path, fileRequester=fileRequester, testing=True)
     if md is not None:
         doc.mdCommandLine = md

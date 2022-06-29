@@ -9,20 +9,20 @@ from . import config, InputSource, messages as m, t
 
 
 class DataFileRequester:
-    def __init__(self, type: str = None, fallback: t.Optional[DataFileRequester] = None):
-        if type not in ("readonly", "latest"):
-            raise Exception(f"Bad value for DataFileRequester.type, got '{type}'.")
-        self.type: str = type
+    def __init__(self, fileType: str = None, fallback: t.Optional[DataFileRequester] = None):
+        if fileType not in ("readonly", "latest"):
+            raise Exception(f"Bad value for DataFileRequester.type, got '{fileType}'.")
+        self.fileType: str = fileType
         # fallback is another requester, used if the main one fails.
         self.fallback = fallback
 
     def path(self, *segs: str, fileType: t.Optional[str] = None) -> str:
-        return self._buildPath(segs=segs, fileType=fileType or self.type)
+        return self._buildPath(segs=segs, fileType=fileType or self.fileType)
 
     def fetch(
         self, *segs: str, str: bool = False, okayToFail: bool = False, fileType: t.Optional[str] = None
     ) -> t.Union[str, io.TextIOWrapper]:
-        location = self._buildPath(segs=segs, fileType=fileType or self.type)
+        location = self._buildPath(segs=segs, fileType=fileType or self.fileType)
         try:
             if str:
                 with open(location, encoding="utf-8") as fh:
@@ -38,12 +38,12 @@ class DataFileRequester:
             return self._fail(location, str, okayToFail)
 
     def walkFiles(self, *segs, fileType: t.Optional[str] = None) -> t.Generator[str, None, None]:
-        for _, _, files in os.walk(self._buildPath(segs, fileType=fileType or self.type)):
+        for _, _, files in os.walk(self._buildPath(segs, fileType=fileType or self.fileType)):
             yield from files
 
     def _buildPath(self, segs: t.Sequence[str], fileType: t.Optional[str] = None) -> str:
         if fileType is None:
-            fileType = self.type
+            fileType = self.fileType
         if fileType == "readonly":
             return config.scriptPath("spec-data", "readonly", *segs)
         else:
@@ -58,7 +58,7 @@ class DataFileRequester:
         raise OSError(f"Couldn't find file '{location}'")
 
 
-defaultRequester = DataFileRequester(type="latest", fallback=DataFileRequester(type="readonly"))
+defaultRequester = DataFileRequester(fileType="latest", fallback=DataFileRequester(fileType="readonly"))
 
 
 def retrieveBoilerplateFile(
