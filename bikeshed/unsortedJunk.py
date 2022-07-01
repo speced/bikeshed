@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import logging
 import re
@@ -445,40 +447,11 @@ def fixInterDocumentReferences(doc: t.SpecT):
         )
 
 
-def fillInterDocumentReferenceFromShepherd(doc: t.SpecT, el, specName, section):
-    headingData = doc.refs.fetchHeadings(specName)
-    if section in headingData:
-        heading = headingData[section]
-    else:
-        m.die(
-            f"Couldn't find section '{section}' in spec '{specName}':\n{h.outerHTML(el)}",
-            el=el,
-        )
+def fillInterDocumentReferenceFromShepherd(doc: t.SpecT, el: t.ElementT, specName: str, section: str) -> None:
+    heading = doc.refs.fetchHeading(specName, section, el=el)
+    if heading is None:
+        # Error message already handled in fetchHeading
         return
-    if isinstance(heading, list):
-        # Multipage spec
-        if len(heading) == 1:
-            # only one heading of this name, no worries
-            heading = headingData[heading[0]]
-        else:
-            # multiple headings of this id, user needs to disambiguate
-            m.die(
-                f"Multiple headings with id '{section}' for spec '{specName}'. Please specify:\n"
-                + "\n".join(f"  [[{specName + x}]]" for x in heading),
-                el=el,
-            )
-            return
-    if doc.md.status == "current":
-        # FIXME: doc.md.status is not these values
-        if "current" in heading:
-            heading = heading["current"]
-        else:
-            heading = heading["snapshot"]
-    else:
-        if "snapshot" in heading:
-            heading = heading["snapshot"]
-        else:
-            heading = heading["current"]
     el.tag = "a"
     el.set("href", heading["url"])
     if h.isEmpty(el):
@@ -488,14 +461,22 @@ def fillInterDocumentReferenceFromShepherd(doc: t.SpecT, el, specName, section):
 
     # Mark this as a used biblio ref
     specData = doc.refs.specs[specName]
-    bib = biblio.SpecBasedBiblioEntry(specData)
+    bib = biblio.SpecBiblioEntry(specData)
     registerBiblioUsage(doc, bib, el=el)
 
 
-def fillInterDocumentReferenceFromSpecref(doc: t.SpecT, el, spec, section):
+def fillInterDocumentReferenceFromSpecref(doc: t.SpecT, el: t.ElementT, spec: str, section: str) -> None:
     bib = doc.refs.getBiblioRef(spec)
-    if isinstance(bib, biblio.StringBiblioEntry):
+    if bib is None:
+        m.die(f"Can't find spec '{spec}' when filling in cross-spec section refs.", el=el)
+        return
+    if bib.url is None:
         m.die(f"Can't generate a cross-spec section ref for '{spec}', because the biblio entry has no url.", el=el)
+        return
+    if bib.title is None:
+        m.die(
+            f"Can't generate a cross-spec section ref for '{spec}', because the biblio entry has no spec title.", el=el
+        )
         return
     el.tag = "a"
     el.set("href", bib.url + section)
@@ -797,7 +778,7 @@ def processBiblioLinks(doc: t.SpecT):
         )
         if not ref:
             if not okayToFail:
-                closeBiblios = biblio.findCloseBiblios(doc.refs.biblioKeys, linkText)
+                closeBiblios = biblio.findCloseBiblios(list(doc.refs.biblioKeys), linkText)
                 m.die(
                     f"Couldn't find '{linkText}' in bibliography data. Did you mean:\n"
                     + "\n".join("  " + b for b in closeBiblios),
@@ -839,11 +820,11 @@ def processBiblioLinks(doc: t.SpecT):
                 h.clearContents(el)
                 h.appendChild(el, h.E.cite(ref.title))
         if biblioDisplay in ("inline", "direct"):
-            if ref.url is not None:
+            if ref.url:
                 el.set("href", ref.url)
 
 
-def verifyUsageOfAllLocalBiblios(doc: t.SpecT):
+def verifyUsageOfAllLocalBiblios(doc: t.SpecT) -> None:
     """
     Verifies that all the locally-declared biblios
     (those written inline in a <pre class=biblio> block,
@@ -852,7 +833,7 @@ def verifyUsageOfAllLocalBiblios(doc: t.SpecT):
     so you can remove entries when they're no longer necessary.
     """
     usedBiblioKeys = {x.upper() for x in list(doc.normativeRefs.keys()) + list(doc.informativeRefs.keys())}
-    localBiblios = [b["linkText"].upper() for bs in doc.refs.biblios.values() for b in bs if b["order"] == 1]
+    localBiblios = [b.linkText.upper() for bs in doc.refs.biblios.values() for b in bs if b.order == 1]
     unusedBiblioKeys = []
     for b in localBiblios:
         if b not in usedBiblioKeys:

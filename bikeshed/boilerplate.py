@@ -564,7 +564,7 @@ def addIndexOfExternallyDefinedTerms(doc, container):
         }
         specLi = h.appendChild(
             ul,
-            h.E.li(h.E.a(attrs, "[", printableSpec, "]"), " defines the following terms:"),
+            h.E.li(h.E.a(attrs, "[", formatBiblioTerm(printableSpec), "]"), " defines the following terms:"),
         )
         termsUl = h.appendChild(specLi, h.E.ul())
         for _, refs in sorted(refGroups.items(), key=lambda x: x[0]):
@@ -1131,16 +1131,6 @@ def addReferencesSection(doc):
     if container is None:
         return
 
-    def formatBiblioTerm(linkText):
-        """
-        If the term is all uppercase, leave it like that.
-        If it's all lowercase, uppercase it.
-        If it's mixed case, leave it like that.
-        """
-        if linkText.islower():
-            return linkText.upper()
-        return linkText
-
     h.appendChild(
         container,
         h.E.h2({"class": "no-num no-ref", "id": h.safeID(doc, "references")}, "References"),
@@ -1223,3 +1213,14 @@ def addIssuesSection(doc):
         del idel.attrib["id"]
     for dfnel in h.findAll(config.dfnElementsSelector, container):
         dfnel.tag = "span"
+
+
+def formatBiblioTerm(linkText: str) -> str:
+    """
+    If the term is all uppercase, leave it like that.
+    If it's all lowercase, uppercase it.
+    If it's mixed case, leave it like that.
+    """
+    if linkText.islower():
+        return linkText.upper()
+    return linkText

@@ -8,18 +8,18 @@ from . import config, h, messages as m, t
 
 
 class IDLUI:
-    def warn(self, msg):
+    def warn(self, msg: str) -> None:
         m.die(msg.rstrip())
 
-    def note(self, msg):
+    def note(self, msg: str) -> None:
         m.warn(msg.rstrip())
 
 
 class IDLSilent:
-    def warn(self, msg):
+    def warn(self, msg: str) -> None:
         pass
 
-    def note(self, msg):
+    def note(self, msg: str) -> None:
         pass
 
 

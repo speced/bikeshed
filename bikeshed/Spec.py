@@ -88,7 +88,7 @@ class Spec:
     def initializeState(self):
         self.normativeRefs = {}
         self.informativeRefs = {}
-        self.refs = refs.ReferenceManager(fileRequester=self.dataFile, testing=self.testing)
+        self.refs: refs.ReferenceManager = refs.ReferenceManager(fileRequester=self.dataFile, testing=self.testing)
         self.externalRefsUsed = defaultdict(lambda: defaultdict(dict))
         self.md = None
         self.mdBaseline = metadata.MetadataManager()

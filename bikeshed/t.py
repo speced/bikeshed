@@ -7,6 +7,7 @@ from typing import (
     Any,
     cast,
     DefaultDict,
+    Deque,
     Dict,
     Generator,
     Iterable,
@@ -40,5 +41,8 @@ if TYPE_CHECKING:
     if "Spec" not in sys.modules:
         from .Spec import Spec  # pylint: disable=cyclic-import
     SpecT = Spec
-else:
-    SpecT = None
+
+if TYPE_CHECKING:
+    from . import biblio  # pylint: disable=cyclic-import
+
+    BiblioStorageT: TypeAlias = DefaultDict[str, List[biblio.BiblioEntry]]

@@ -19,6 +19,22 @@ class DataFileRequester:
     def path(self, *segs: str, fileType: t.Optional[str] = None) -> str:
         return self._buildPath(segs=segs, fileType=fileType or self.fileType)
 
+    @t.overload
+    def fetch(
+        self, *segs: str, str: t.Literal[True], okayToFail: bool = False, fileType: t.Optional[str] = None
+    ) -> str:
+        ...
+
+    @t.overload
+    def fetch(
+        self, *segs: str, str: t.Literal[False], okayToFail: bool = False, fileType: t.Optional[str] = None
+    ) -> io.TextIOWrapper:
+        ...
+
+    @t.overload
+    def fetch(self, *segs: str, okayToFail: bool = False, fileType: t.Optional[str] = None) -> io.TextIOWrapper:
+        ...
+
     def fetch(
         self, *segs: str, str: bool = False, okayToFail: bool = False, fileType: t.Optional[str] = None
     ) -> t.Union[str, io.TextIOWrapper]:
@@ -32,9 +48,15 @@ class DataFileRequester:
         except OSError:
             if self.fallback:
                 try:
-                    return self.fallback.fetch(*segs, str=str, okayToFail=okayToFail)
+                    if str:
+                        return self.fallback.fetch(*segs, str=True, okayToFail=okayToFail)
+                    else:
+                        return self.fallback.fetch(*segs, str=False, okayToFail=okayToFail)
                 except OSError:
-                    return self._fail(location, str, okayToFail)
+                    if str:
+                        return self._fail(location, str=True, okayToFail=okayToFail)
+                    else:
+                        return self._fail(location, str=False, okayToFail=okayToFail)
             return self._fail(location, str, okayToFail)
 
     def walkFiles(self, *segs, fileType: t.Optional[str] = None) -> t.Generator[str, None, None]:
@@ -48,6 +70,18 @@ class DataFileRequester:
             return config.scriptPath("spec-data", "readonly", *segs)
         else:
             return config.scriptPath("spec-data", *segs)
+
+    @t.overload
+    def _fail(self, location: str, str: t.Literal[True], okayToFail: bool) -> str:
+        ...
+
+    @t.overload
+    def _fail(self, location: str, str: t.Literal[False], okayToFail: bool) -> io.TextIOWrapper:
+        ...
+
+    @t.overload
+    def _fail(self, location: str, str: bool, okayToFail: bool) -> t.Union[str, io.TextIOWrapper]:
+        ...
 
     def _fail(self, location: str, str: bool, okayToFail: bool) -> t.Union[str, io.TextIOWrapper]:
         if okayToFail:

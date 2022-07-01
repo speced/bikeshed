@@ -1,10 +1,11 @@
+from __future__ import annotations
+
 import json
 import random
 import re
 from collections import defaultdict
-from operator import itemgetter
 
-from .. import biblio, config, constants, datablocks, h, messages as m, retrieve
+from .. import biblio, config, constants, datablocks, h, messages as m, retrieve, t
 from . import utils, RefSource
 
 
@@ -32,7 +33,12 @@ class ReferenceManager:
         "testing",
     ]
 
-    def __init__(self, defaultStatus=None, fileRequester=None, testing=False):
+    def __init__(
+        self,
+        defaultStatus: t.Optional[str] = None,
+        fileRequester: t.Optional[retrieve.DataFileRequester] = None,
+        testing: bool = False,
+    ):
         if fileRequester is None:
             self.dataFile = retrieve.defaultRequester
         else:
@@ -41,37 +47,37 @@ class ReferenceManager:
         self.testing = testing
 
         # Dict of {spec vshortname => spec data}
-        self.specs = dict()
+        self.specs: t.Dict[str, t.Dict] = dict()
 
         # Dict of {linking text => link-defaults data}
-        self.defaultSpecs = defaultdict(list)
+        self.defaultSpecs: t.DefaultDict[str, t.List[t.Dict]] = defaultdict(list)
 
         # Set of spec vshortnames to remove from consideration when there are other possible anchors
-        self.ignoredSpecs = set()
+        self.ignoredSpecs: t.Set[str] = set()
 
         # Set of (obsolete spec vshortname, replacing spec vshortname), when both obsolete and replacing specs are possible anchors
-        self.replacedSpecs = set()
+        self.replacedSpecs: t.Set[t.Tuple[str, str]] = set()
 
         # Dict of {biblio term => biblio data}
         # Sparsely populated, with more loaded on demand
-        self.biblios = defaultdict(list)
-        self.loadedBiblioGroups = set()
+        self.biblios: t.DefaultDict[str, t.List[biblio.BiblioEntry]] = defaultdict(list)
+        self.loadedBiblioGroups: t.Set[str] = set()
 
         # Most of the biblio keys, for biblio near-miss correction
         # (Excludes dated versions, and all huge "foo\d+" groups that can't usefully correct typos.)
-        self.biblioKeys = set()
+        self.biblioKeys: t.Set[str] = set()
 
         # Dict of {suffixless key => [keys with numeric suffixes]}
         # (So you can tell when it's appropriate to default a numeric-suffix ref to a suffixless one.)
-        self.biblioNumericSuffixes = dict()
+        self.biblioNumericSuffixes: t.Dict[str, t.List[str]] = dict()
 
         # Dict of {base key name => preferred display name}
-        self.preferredBiblioNames = dict()
+        self.preferredBiblioNames: t.Dict[str, str] = dict()
 
         # Dict of {spec vshortname => headings}
         # Each heading is either {#foo => heading-dict}, {/foo#bar => heading-dict} or {#foo => [page-heading-keys]}
         # In the latter, it's a list of the heading keys (of the form /foo#bar) that collide for that id.
-        self.headings = dict()
+        self.headings: t.Dict[str, t.Union[t.Dict[str, str], t.List[str]]] = dict()
 
         if defaultStatus is None:
             self.defaultStatus = constants.refStatus.current
@@ -161,6 +167,48 @@ class ReferenceManager:
             self.headings[spec] = data
             return data
 
+    def fetchHeading(
+        self, spec: str, id: str, status: t.Optional[str] = None, el: t.Optional[t.ElementT] = None
+    ) -> t.Optional[t.Dict[str, str]]:
+        headingData = self.fetchHeadings(spec)
+        # Each heading is either {#id => heading-dict}, {/page#id => heading-dict} or {#id => ["/page#id"]}
+        # In the latter, it's a list of the heading keys (of the form /foo#bar) that collide for that id.
+        currentHeading: t.Optional[t.Dict[str, str]]
+        snapshotHeading: t.Optional[t.Dict[str, str]]
+        if id in headingData:
+            if isinstance(headingData[id], dict):
+                currentHeading = headingData[id].get("current")
+                snapshotHeading = headingData[id].get("snapshot")
+            if isinstance(headingData[id], list):
+                clashingIds = headingData[id]
+                # Multipage spec, list is "/page#id" keys
+                # that (potentially) collide for that heading ID
+                if len(clashingIds) == 1:
+                    # only one heading of this name, no worries
+                    x = headingData[clashingIds[0]]
+                    currentHeading = x.get("current")
+                    snapshotHeading = x.get("snapshot")
+                else:
+                    # multiple headings of this id, user needs to disambiguate
+                    m.die(
+                        f"Multiple headings with id '{id}' for spec '{spec}'. Please specify:\n"
+                        + "\n".join(f"  [[{spec + x}]]" for x in clashingIds),
+                        el=el,
+                    )
+                    return None
+        else:
+            m.die(
+                f"Couldn't find section '{id}' in spec '{spec}':\n{h.outerHTML(el)}",
+                el=el,
+            )
+            return None
+        if status is None:
+            status = self.defaultStatus
+        if status == "current":
+            return currentHeading or snapshotHeading
+        else:
+            return snapshotHeading or currentHeading
+
     def initializeBiblio(self):
         self.biblioKeys.update(json.loads(self.dataFile.fetch("biblio-keys.json", str=True)))
         self.biblioNumericSuffixes.update(json.loads(self.dataFile.fetch("biblio-numeric-suffixes.json", str=True)))
@@ -181,20 +229,15 @@ class ReferenceManager:
         # to avoid having to parse the entire biblio-rf.data file for this single reference.
         self.biblioKeys.add("rfc2119")
         self.biblios["rfc2119"].append(
-            {
-                "linkText": "rfc2119\n",
-                "date": "March 1997\n",
-                "status": "Best Current Practice\n",
-                "title": "Key words for use in RFCs to Indicate Requirement Levels\n",
-                "snapshot_url": "https://datatracker.ietf.org/doc/html/rfc2119\n",
-                "current_url": "\n",
-                "obsoletedBy": "\n",
-                "other": "\n",
-                "etAl": False,
-                "order": 3,
-                "biblioFormat": "dict",
-                "authors": ["S. Bradner\n"],
-            }
+            biblio.NormalBiblioEntry(
+                linkText="rfc2119",
+                date="March 1997",
+                status="Best Current Practice",
+                title="Key words for use in RFCs to Indicate Requirement Levels",
+                snapshotURL="https://datatracker.ietf.org/doc/html/rfc2119",
+                order=3,
+                authors=["S. Bradner"],
+            )
         )
 
     def setSpecData(self, md):
@@ -633,18 +676,20 @@ class ReferenceManager:
 
     def getBiblioRef(
         self,
-        text,
-        status=None,
-        generateFakeRef=False,
-        allowObsolete=False,
-        el=None,
-        quiet=False,
-        depth=0,
-    ):
+        text: str,
+        status: t.Optional[str] = None,
+        generateFakeRef: bool = False,
+        allowObsolete: bool = False,
+        el: t.Optional[t.ElementT] = None,
+        quiet: bool = False,
+        depth: int = 0,
+    ) -> t.Optional[biblio.BiblioEntry]:
         if depth > 100:
             m.die(f"Data error in biblio files; infinitely recursing trying to find [{text}].")
-            return
+            return None
         key = text.lower()
+        if status is None:
+            status = self.defaultStatus
         while True:
             candidates = self.bibliosFromKey(key)
             if candidates:
@@ -672,7 +717,7 @@ class ReferenceManager:
             # Did it fail because I only know about the spec from Shepherd?
             if key in self.specs and generateFakeRef:
                 spec = self.specs[key]
-                return biblio.SpecBasedBiblioEntry(spec, preferredURL=status)
+                return biblio.SpecBiblioEntry(spec, preferredStatus=status)
 
             if failFromWrongSuffix and not quiet:
                 numericSuffixes = self.biblioNumericSuffixes[unversionedKey]
@@ -681,36 +726,42 @@ class ReferenceManager:
                 )
             return None
 
-        candidate = self._bestCandidateBiblio(candidates)
+        bib: biblio.BiblioEntry = self._bestCandidateBiblio(candidates)
         # TODO: When SpecRef definitely has all the CSS specs, turn on this code.
-        # if candidates[0]['order'] > 3: # 3 is SpecRef level
+        # if candidates[0].order > 3: # 3 is SpecRef level
         #    m.warn(f"Bibliography term '{text}' wasn't found in SpecRef.\n         Please find the equivalent key in SpecRef, or submit a PR to SpecRef.")
-        if candidate["biblioFormat"] == "string":
-            bib = biblio.StringBiblioEntry(**candidate)
-        elif candidate["biblioFormat"] == "alias":
+        if isinstance(bib, biblio.AliasBiblioEntry):
             # Follow the chain to the real candidate
-            bib = self.getBiblioRef(candidate["aliasOf"], status=status, el=el, quiet=True, depth=depth + 1)
-            if bib is None:
-                m.die(f"Biblio ref [{text}] claims to be an alias of [{candidate['aliasOf']}], which doesn't exist.")
+            newBib = self.getBiblioRef(bib.aliasOf, status=status, el=el, quiet=True, depth=depth + 1)
+            if newBib is None:
+                if not quiet:
+                    m.die(f"Biblio ref [{text}] claims to be an alias of [{bib.aliasOf}], which doesn't exist.")
                 return None
-        elif candidate.get("obsoletedBy", "").strip():
+            else:
+                bib = newBib
+        elif bib.obsoletedBy:
             # Obsoleted by something. Unless otherwise indicated, follow the chain.
             if allowObsolete:
-                bib = biblio.BiblioEntry(preferredURL=status, **candidate)
+                pass
             else:
-                bib = self.getBiblioRef(
-                    candidate["obsoletedBy"],
+                newBib = self.getBiblioRef(
+                    bib.obsoletedBy,
                     status=status,
                     el=el,
                     quiet=True,
                     depth=depth + 1,
                 )
+                if newBib is None:
+                    if not quiet:
+                        m.die(
+                            f"[{bib.linkText}] claims to be obsoleted by [{bib.obsoletedBy}], which doesn't exist. Either change the reference, of use [{bib.linkText} obsolete] to ignore the obsoletion chain."
+                        )
+                    return None
                 if not quiet:
                     m.die(
-                        f"Obsolete biblio ref: [{candidate['linkText']}] is replaced by [{bib.linkText}]. Either update the reference, or use [{candidate['linkText']} obsolete] if this is an intentionally-obsolete reference."
+                        f"Obsolete biblio ref: [{bib.linkText}] is replaced by [{newBib.linkText}]. Either update the reference, or use [{bib.linkText} obsolete] if this is an intentionally-obsolete reference."
                     )
-        else:
-            bib = biblio.BiblioEntry(preferredURL=status, **candidate)
+                bib = newBib
 
         # If a canonical name has been established, use it.
         if bib.linkText in self.preferredBiblioNames:
@@ -719,9 +770,10 @@ class ReferenceManager:
                 self.preferredBiblioNames[bib.linkText],
             )
 
+        bib.preferredStatus = status
         return bib
 
-    def bibliosFromKey(self, key):
+    def bibliosFromKey(self, key: str) -> t.List[biblio.BiblioEntry]:
         # Load up the biblio data necessary to fetch the given key
         # and then actually fetch it.
         # If you don't call this,
@@ -730,15 +782,15 @@ class ReferenceManager:
             # Try to load the group up, if necessary
             group = key[0:2]
             if group not in self.loadedBiblioGroups:
-                with self.dataFile.fetch("biblio", f"biblio-{group}.data", okayToFail=True) as lines:
-                    biblio.loadBiblioDataFile(lines, self.biblios)
+                with self.dataFile.fetch("biblio", f"biblio-{group}.data", okayToFail=True) as fh:
+                    biblio.loadBiblioDataFile(fh, self.biblios)
             self.loadedBiblioGroups.add(group)
         return self.biblios.get(key, [])
 
-    def _bestCandidateBiblio(self, candidates):
-        return utils.stripLineBreaks(sorted(candidates, key=itemgetter("order"))[0])
+    def _bestCandidateBiblio(self, candidates: t.List[biblio.BiblioEntry]) -> biblio.BiblioEntry:
+        return sorted(candidates, key=lambda x: x.order or 0)[0].strip()
 
-    def getLatestBiblioRef(self, key):
+    def getLatestBiblioRef(self, key: str) -> t.Optional[biblio.BiblioEntry]:
         # Takes a biblio reference name,
         # returns the latest dated variant of that name
         # (names in the form FOO-19700101)
@@ -759,7 +811,7 @@ class ReferenceManager:
                 latestRefs = biblios
         if latestRefs is None:
             return None
-        return biblio.BiblioEntry(**self._bestCandidateBiblio(latestRefs))
+        return self._bestCandidateBiblio(latestRefs)
 
     def vNamesFromSpecNames(self, specName):
         # Takes an unversioned specName,
