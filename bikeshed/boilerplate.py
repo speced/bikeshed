@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import os
 import re
@@ -5,7 +7,7 @@ import subprocess
 from collections import OrderedDict, defaultdict
 from datetime import datetime
 
-from . import biblio, conditional, config, dfnpanels, h, messages as m, refs as r, retrieve
+from . import biblio, conditional, config, dfnpanels, h, messages as m, refs as r, retrieve, t
 from .DefaultOrderedDict import DefaultOrderedDict
 
 
@@ -235,7 +237,7 @@ def removeUnwantedBoilerplate(doc):
                 h.removeNode(el)
 
 
-def addAnnotations(doc):
+def addAnnotations(doc: t.SpecT) -> None:
     if doc.md.vshortname in doc.testSuites:
         html = retrieve.retrieveBoilerplateFile(doc, "annotations")
         el = boilerplateFromHtml(doc, html)
@@ -868,8 +870,8 @@ def addTOCSection(doc):
         h.removeNode(el)
 
 
-def addSpecMetadataSection(doc):
-    def printEditor(editor):
+def addSpecMetadataSection(doc: t.SpecT) -> None:
+    def printEditor(editor) -> t.Optional[t.ElementT]:
         dd = h.E.dd({"class": "editor p-author h-card vcard"})
         if editor["w3cid"]:
             dd.attrib["data-editor-id"] = editor["w3cid"]
@@ -911,7 +913,7 @@ def addSpecMetadataSection(doc):
             )
         return dd
 
-    def printTranslation(tr):
+    def printTranslation(tr) -> t.Optional[t.ElementT]:
         lang = tr["lang-code"]
         # canonicalize the lang-code structure
         lang = lang.lower().replace("_", "-")
@@ -921,12 +923,12 @@ def addSpecMetadataSection(doc):
         missingInfo = False
         if name is None:
             if lang in doc.languages:
-                name = doc.languages[lang]["name"]
+                name = doc.languages[lang].name
             else:
                 missingInfo = True
         if nativeName is None:
             if lang in doc.languages:
-                nativeName = doc.languages[lang]["native-name"]
+                nativeName = doc.languages[lang].nativeName
             else:
                 missingInfo = True
         if missingInfo:
@@ -945,7 +947,7 @@ def addSpecMetadataSection(doc):
             return h.E.a({"href": url, "hreflang": lang, "rel": "alternate", "title": lang}, name)
         return h.E.a({"href": url, "hreflang": lang, "rel": "alternate"}, lang)
 
-    def printPreviousVersion(v):
+    def printPreviousVersion(v) -> t.Optional[t.ElementT]:
         if v["type"] == "url":
             return h.E.a({"href": v["value"], "rel": "prev"}, v["value"])
         if v["type"] == "from-biblio":
@@ -957,7 +959,7 @@ def addSpecMetadataSection(doc):
             m.die(
                 f"While trying to generate a Previous Version line, couldn't find a dated biblio reference for {key}."
             )
-            return
+            return None
         return h.E.a({"href": dated.url, "rel": "prev"}, dated.url)
 
     md = DefaultOrderedDict(list)
@@ -1006,8 +1008,8 @@ def addSpecMetadataSection(doc):
         md["Implementation Report"].append(h.E.a({"href": doc.md.implementationReport}, doc.md.implementationReport))
     if doc.md.testSuite is not None:
         md["Test Suite"].append(h.E.a({"href": doc.md.testSuite}, doc.md.testSuite))
-    elif (doc.md.vshortname in doc.testSuites) and (doc.testSuites[doc.md.vshortname]["url"] is not None):
-        url = doc.testSuites[doc.md.vshortname]["url"]
+    elif (doc.md.vshortname in doc.testSuites) and (doc.testSuites[doc.md.vshortname].url is not None):
+        url = doc.testSuites[doc.md.vshortname].url
         md["Test Suite"].append(h.E.a({"href": url}, url))
     if doc.md.issues:
         if doc.md.TR:

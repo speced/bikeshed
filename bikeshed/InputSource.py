@@ -30,6 +30,16 @@ class InputContent:
         return "".join(self.rawLines)
 
 
+def inputFromName(sourceName: str, **kwargs) -> InputSource:
+    if sourceName == "-":
+        return StdinInputSource(sourceName)
+    if sourceName.startswith("https:"):
+        return UrlInputSource(sourceName)
+    if not sourceName.endswith((".bs", ".src.html")) and os.path.exists(sourceName) and tarfile.is_tarfile(sourceName):
+        return TarInputSource(sourceName, **kwargs)
+    return FileInputSource(sourceName, **kwargs)
+
+
 class InputSource:
     """Represents a thing that can produce specification input text.
 
@@ -37,24 +47,6 @@ class InputSource:
     InputSources can be found relative to URLs and files, and there's a context
     manager for temporarily switching to the directory of a file InputSource.
     """
-
-    def __new__(cls, sourceName: str, **kwargs):
-        """Dispatches to the right subclass."""
-        if cls != InputSource:
-            # Only take control of calls to InputSource(...) itself.
-            return super().__new__(cls)
-
-        if sourceName == "-":
-            return StdinInputSource(sourceName)
-        if sourceName.startswith("https:"):
-            return UrlInputSource(sourceName)
-        if (
-            not sourceName.endswith((".bs", ".src.html"))
-            and os.path.exists(sourceName)
-            and tarfile.is_tarfile(sourceName)
-        ):
-            return TarInputSource(sourceName, **kwargs)
-        return FileInputSource(sourceName, **kwargs)
 
     @abstractmethod
     def __str__(self) -> str:

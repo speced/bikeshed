@@ -38,6 +38,10 @@ def handleBikeshedInclude(el: t.ElementT, doc: t.SpecT) -> None:
         path = el.get("path")
         assert path is not None
         includedInputSource = doc.inputSource.relative(path)
+        if includedInputSource is None:
+            m.die(f"Tried to include a file at '{path}', but the current input type can't resolve relative paths.")
+            h.removeNode(el)
+            return
         doc.recordDependencies(includedInputSource)
         try:
             lines = includedInputSource.read().rawLines
@@ -95,6 +99,10 @@ def handleCodeInclude(el: t.ElementT, doc: t.SpecT) -> None:
     path = el.get("path")
     assert path is not None
     includedInputSource = doc.inputSource.relative(path)
+    if includedInputSource is None:
+        m.die(f"Tried to include a file at '{path}', but the current input type can't resolve relative paths.")
+        h.removeNode(el)
+        return
     doc.recordDependencies(includedInputSource)
     try:
         lines = includedInputSource.read().rawLines
@@ -132,9 +140,12 @@ def handleRawInclude(el: t.ElementT, doc: t.SpecT) -> None:
         )
         h.removeNode(el)
         return
-    path = el.get("path")
-    assert path is not None
+    path = el.get("path", "")
     includedInputSource = doc.inputSource.relative(path)
+    if includedInputSource is None:
+        m.die(f"Tried to include a file at '{path}', but the current input type can't resolve relative paths.")
+        h.removeNode(el)
+        return
     doc.recordDependencies(includedInputSource)
     try:
         content = includedInputSource.read().content

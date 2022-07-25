@@ -6,6 +6,7 @@ import sys
 from typing import (
     Any,
     cast,
+    Callable,
     DefaultDict,
     Deque,
     Dict,
@@ -46,3 +47,6 @@ if TYPE_CHECKING:
     from . import biblio  # pylint: disable=cyclic-import
 
     BiblioStorageT: TypeAlias = DefaultDict[str, List[biblio.BiblioEntry]]
+
+if TYPE_CHECKING:
+    FillContainersT: TypeAlias = DefaultDict[str, List[ElementT]]

@@ -10,8 +10,9 @@ from PIL import Image
 from . import biblio, config, dfnpanels, h, func, t, messages as m, idl
 
 if t.TYPE_CHECKING:
+    import widlparser  # pylint: disable=unused-import
     from . import refs
-    from . import line
+    from .line import Line
 
 
 class MarkdownCodeSpans(func.Functor):
@@ -981,9 +982,9 @@ def decorateAutolink(doc: t.SpecT, el: t.ElementT, linkType: str, linkText: str,
         if linkText in doc.typeExpansions:
             titleText = doc.typeExpansions[linkText]
         else:
-            refs = doc.refs.queryAllRefs(linkFor=linkText, ignoreObsoletes=True)
-            texts = sorted({ref.text for ref in refs})
-            if refs:
+            typeRefs = doc.refs.queryAllRefs(linkFor=linkText, ignoreObsoletes=True)
+            texts = sorted({ref.text for ref in typeRefs})
+            if typeRefs:
                 titleText = "Expands to: " + " | ".join(texts)
                 doc.typeExpansions[linkText] = titleText
         if titleText:
@@ -1302,7 +1303,7 @@ def cleanupHTML(doc: t.SpecT) -> None:
         if doc.md.slimBuildArtifact:
             # Remove *all* data- attributes.
             for attrName in el.attrib:
-                if attrName.startswith("data-"):
+                if str(attrName).startswith("data-"):
                     h.removeAttr(el, attrName)
     if head is not None:
         for el in strayHeadEls:
@@ -1323,11 +1324,7 @@ def finalHackyCleanup(text: str) -> str:
     return text
 
 
-if t.TYPE_CHECKING:
-    lineList = t.TypeVar("lineList", bound=t.Sequence[line.Line])
-
-
-def hackyLineNumbers(lines: lineList) -> lineList:
+def hackyLineNumbers(lines: t.Sequence[Line]) -> t.Sequence[Line]:
     # Hackily adds line-number information to each thing that looks like an open tag.
     # This is just regex text-munging, so potentially dangerous!
     for line in lines:
@@ -1390,8 +1387,8 @@ def formatElementdefTables(doc: t.SpecT) -> None:
 
 def formatArgumentdefTables(doc: t.SpecT) -> None:
     for table in h.findAll("table.argumentdef", doc):
-        forMethod = doc.widl.normalized_method_names(table.get("data-dfn-for"))
-        method = doc.widl.find(table.get("data-dfn-for"))
+        forMethod = doc.widl.normalized_method_names(table.get("data-dfn-for", ""))
+        method = doc.widl.find(table.get("data-dfn-for", ""))
         if not method:
             m.die(f"Can't find method '{forMethod}'.", el=table)
             continue
@@ -1405,7 +1402,7 @@ def formatArgumentdefTables(doc: t.SpecT) -> None:
                 )
                 continue
             argName = h.textContent(argCell).strip()
-            arg = method.find_argument(argName)
+            arg = t.cast("widlparser.Argument", method.find_argument(argName))
             if arg:
                 h.appendChild(typeCell, idl.nodesFromType(arg.type))
                 if str(arg.type).strip().endswith("?"):
@@ -1560,7 +1557,7 @@ def addNoteHeaders(doc: t.SpecT) -> None:
         h.removeAttr(el, "heading")
 
 
-def locateFillContainers(doc: t.SpecT) -> t.DefaultDict[str, t.List[t.ElementT]]:
+def locateFillContainers(doc: t.SpecT) -> t.FillContainersT:
     fillContainers = defaultdict(list)
     for el in h.findAll("[data-fill-with]", doc):
         fillContainers[t.cast(str, el.get("data-fill-with"))].append(el)
@@ -1625,7 +1622,10 @@ def addImageSize(doc: t.SpecT) -> None:
                 el=el,
             )
             continue
-        imgPath = doc.inputSource.relative(src).sourceName
+        localImg = doc.inputSource.relative(src)
+        if localImg is None:
+            continue
+        imgPath = localImg.sourceName
         try:
             im = Image.open(imgPath)
             width, height = im.size

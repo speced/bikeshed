@@ -1,3 +1,6 @@
+# pylint: disable=attribute-defined-outside-init
+from __future__ import annotations
+
 import glob
 import json
 import os
@@ -25,6 +28,8 @@ from . import (
     includes,
     inlineTags,
     InputSource,
+    language,
+    line,
     lint,
     markdown,
     mdnspeclinks,
@@ -33,24 +38,29 @@ from . import (
     refs,
     retrieve,
     shorthands,
+    t,
+    testsuite,
     unsortedJunk as u,
     wpt,
 )
+
+if t.TYPE_CHECKING:
+    import widlparser
 
 
 class Spec:
     def __init__(
         self,
-        inputFilename,
-        debug=False,
-        token=None,
-        lineNumbers=False,
-        fileRequester=None,
-        testing=False,
+        inputFilename: str,
+        debug: bool = False,
+        token: t.Optional[str] = None,
+        lineNumbers: bool = False,
+        fileRequester: t.Optional[retrieve.DataFileRequester] = None,
+        testing: bool = False,
     ):
         catchArgparseBug(inputFilename)
-        self.valid = False
-        self.lineNumbers = lineNumbers
+        self.valid: bool = False
+        self.lineNumbers: bool = lineNumbers
         if lineNumbers:
             # line-numbers are too hacky, so force this to be a dry run
             constants.dryRun = True
@@ -61,50 +71,46 @@ class Spec:
                 "No input file specified, and no *.bs or *.src.html files found in current directory.\nPlease specify an input file, or use - to pipe from STDIN."
             )
             return
-        self.inputSource = InputSource.InputSource(inputFilename, chroot=constants.chroot)
-        self.transitiveDependencies = set()
-        self.debug = debug
-        self.token = token
-        self.testing = testing
+        self.inputSource: InputSource.InputSource = InputSource.inputFromName(inputFilename, chroot=constants.chroot)
+        self.transitiveDependencies: t.Set[str] = set()
+        self.debug: bool = debug
+        self.token: t.Optional[str] = token
+        self.testing: bool = testing
+        self.dataFile: retrieve.DataFileRequester
         if fileRequester is None:
             self.dataFile = retrieve.defaultRequester
         else:
             self.dataFile = fileRequester
 
-        self.md = None
-        self.mdBaseline = None
-        self.mdDocument = None
-        self.mdCommandLine = None
-        self.mdDefaults = None
-        self.mdOverridingDefaults = None
-        self.lines = []
-        self.document = None
-        self.html = None
-        self.head = None
-        self.body = None
-        self.fillContainers = None
+        self.lines: t.List[line.Line] = []
         self.valid = self.initializeState()
 
-    def initializeState(self):
-        self.normativeRefs = {}
-        self.informativeRefs = {}
+    def initializeState(self) -> bool:
+        self.normativeRefs: t.Dict[str, biblio.BiblioEntry] = {}
+        self.informativeRefs: t.Dict[str, biblio.BiblioEntry] = {}
         self.refs: refs.ReferenceManager = refs.ReferenceManager(fileRequester=self.dataFile, testing=self.testing)
-        self.externalRefsUsed = defaultdict(lambda: defaultdict(dict))
-        self.md = None
-        self.mdBaseline = metadata.MetadataManager()
-        self.mdDocument = None
-        self.mdCommandLine = metadata.MetadataManager()
-        self.mdDefaults = None
-        self.mdOverridingDefaults = None
-        self.biblios = {}
-        self.typeExpansions = {}
-        self.macros = defaultdict(lambda x: "???")
-        self.canIUse = {}
-        self.mdnSpecLinks = {}
-        self.widl = idl.getParser()
-        self.testSuites = json.loads(self.dataFile.fetch("test-suites.json", str=True))
-        self.languages = json.loads(self.dataFile.fetch("languages.json", str=True))
-        self.extraStyles = defaultdict(str)
+        self.externalRefsUsed: t.Any = defaultdict(lambda: defaultdict(dict))
+
+        self.md: metadata.MetadataManager
+        self.mdBaseline: t.Optional[metadata.MetadataManager] = metadata.MetadataManager()
+        self.mdDocument: t.Optional[metadata.MetadataManager] = None
+        self.mdCommandLine: t.Optional[metadata.MetadataManager] = metadata.MetadataManager()
+        self.mdDefaults: t.Optional[metadata.MetadataManager] = None
+        self.mdOverridingDefaults: t.Optional[metadata.MetadataManager] = None
+
+        self.typeExpansions: t.Dict[str, str] = {}
+
+        defaultMacro: t.Callable[[], str] = lambda: "???"
+        self.macros: t.DefaultDict[str, str] = defaultdict(defaultMacro)
+
+        self.canIUse: t.Optional[caniuse.CanIUseManager] = None
+        self.mdnSpecLinks: t.Any = {}
+        self.widl: widlparser.Parser = idl.getParser()
+
+        self.testSuites: t.Dict[str, testsuite.TestSuite] = fetchTestSuites(self.dataFile)
+        self.languages: t.Dict[str, language.Language] = fetchLanguages(self.dataFile)
+
+        self.extraStyles: t.DefaultDict[str, str] = defaultdict(str)
         self.extraStyles["style-colors"] = styleColors
         self.extraStyles["style-darkmode"] = styleDarkMode
         self.extraStyles["style-md-lists"] = styleMdLists
@@ -112,7 +118,7 @@ class Spec:
         self.extraStyles["style-selflinks"] = styleSelflinks
         self.extraStyles["style-counters"] = styleCounters
         self.extraStyles["style-issues"] = styleIssues
-        self.extraScripts = defaultdict(str)
+        self.extraScripts: t.DefaultDict[str, str] = defaultdict(str)
 
         try:
             inputContent = self.inputSource.read()
@@ -191,7 +197,7 @@ class Spec:
         self.refs.setSpecData(self.md)
 
         # Convert to a single string of html now, for convenience.
-        self.html = "".join(line.text for line in self.lines)
+        self.html = "".join(x.text for x in self.lines)
         boilerplate.addHeaderFooter(self)
         self.html = self.fixText(self.html)
 
@@ -206,7 +212,7 @@ class Spec:
     def processDocument(self):
         # Fill in and clean up a bunch of data
         conditional.processConditionals(self)
-        self.fillContainers = u.locateFillContainers(self)
+        self.fillContainers: t.FillContainersT = u.locateFillContainers(self)
         lint.exampleIDs(self)
         wpt.processWptElements(self)
 
@@ -515,6 +521,17 @@ def catchArgparseBug(string):
         )
         return False
     return True
+
+
+def fetchTestSuites(dataFile: retrieve.DataFileRequester) -> t.Dict[str, testsuite.TestSuite]:
+    return {k: testsuite.TestSuite(**v) for k, v in json.loads(dataFile.fetch("test-suites.json", str=True)).items()}
+
+
+def fetchLanguages(dataFile: retrieve.DataFileRequester) -> t.Dict[str, language.Language]:
+    return {
+        k: language.Language(v["name"], v["native-name"])
+        for k, v in json.loads(dataFile.fetch("languages.json", str=True)).items()
+    }
 
 
 styleColors = """
