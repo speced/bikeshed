@@ -13,7 +13,7 @@ import attr
 import requests
 import tenacity
 
-from . import config, Line, t
+from . import config, line, t
 
 
 @attr.s(auto_attribs=True)
@@ -22,8 +22,8 @@ class InputContent:
     date: t.Optional[datetime.date]
 
     @property
-    def lines(self) -> t.List[Line.Line]:
-        return [Line.Line(i, line) for i, line in enumerate(self.rawLines, 1)]
+    def lines(self) -> t.List[line.Line]:
+        return [line.Line(lineNo, text) for lineNo, text in enumerate(self.rawLines, 1)]
 
     @property
     def content(self) -> str:

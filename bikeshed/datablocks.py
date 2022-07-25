@@ -4,7 +4,8 @@ from functools import reduce
 
 import attr
 
-from . import Line, biblio, config, h, messages as m
+from . import biblio, config, h, messages as m
+from .line import Line
 
 # When writing a new transformFoo function,
 # PAY ATTENTION TO THE INDENT OF THE FIRST LINE
@@ -35,7 +36,7 @@ def transformDataBlocks(doc, lines):
     fromStrings = False
     if any(isinstance(x, str) for x in lines):
         fromStrings = True
-        lines = [Line.Line(-1, x) for x in lines]
+        lines = [Line(-1, x) for x in lines]
     inBlock = False
     blockTypes = {
         "propdef": transformPropdef,
@@ -100,7 +101,7 @@ def transformDataBlocks(doc, lines):
                     lineNum=line.i,
                     doc=doc,
                 )
-                newLines.extend(Line.Line(line.i, x) for x in repl)
+                newLines.extend(Line(line.i, x) for x in repl)
                 line.text = match.group(3)
                 newLines.append(line)
             elif re.match(r"^\s*$", match.group(1)):
@@ -113,7 +114,7 @@ def transformDataBlocks(doc, lines):
                     lineNum=blockLines[0].i,
                     doc=doc,
                 )
-                newLines.extend(Line.Line(blockLines[0].i, x) for x in repl)
+                newLines.extend(Line(blockLines[0].i, x) for x in repl)
                 line.text = match.group(2)
                 newLines.append(line)
             else:
@@ -126,7 +127,7 @@ def transformDataBlocks(doc, lines):
                     lineNum=blockLines[0].i,
                     doc=doc,
                 )
-                newLines.extend(Line.Line(blockLines[0].i, x) for x in repl)
+                newLines.extend(Line(blockLines[0].i, x) for x in repl)
                 line.text = match.group(2)
                 newLines.append(line)
             tagName = ""

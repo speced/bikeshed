@@ -9,6 +9,10 @@ from PIL import Image
 
 from . import biblio, config, dfnpanels, h, func, t, messages as m, idl
 
+if t.TYPE_CHECKING:
+    from . import refs
+    from . import line
+
 
 class MarkdownCodeSpans(func.Functor):
     # Wraps a string, such that the contained text is "safe"
@@ -90,7 +94,7 @@ def stripBOM(doc: t.SpecT):
 # Definitions and the like
 
 
-def fixManualDefTables(doc: t.SpecT):
+def fixManualDefTables(doc: t.SpecT) -> None:
     # Def tables generated via datablocks are guaranteed correct,
     # but manually-written ones often don't link up the names in the first row.
     for table in h.findAll("table.propdef, table.descdef, table.elementdef", doc):
@@ -113,7 +117,7 @@ def fixManualDefTables(doc: t.SpecT):
         h.replaceContents(cell, newContents)
 
 
-def canonicalizeShortcuts(doc: t.SpecT):
+def canonicalizeShortcuts(doc: t.SpecT) -> None:
     # Take all the invalid-HTML shortcuts and fix them.
 
     attrFixup = {
@@ -193,7 +197,7 @@ def addImplicitAlgorithms(doc: t.SpecT):
             )
 
 
-def checkVarHygiene(doc: t.SpecT):
+def checkVarHygiene(doc: t.SpecT) -> None:
     def isAlgo(el):
         return el.get("data-algorithm") is not None
 
@@ -258,7 +262,7 @@ def checkVarHygiene(doc: t.SpecT):
             return
 
 
-def addVarClickHighlighting(doc: t.SpecT):
+def addVarClickHighlighting(doc: t.SpecT) -> None:
     if doc.md.slimBuildArtifact:
         return
     doc.extraStyles[
@@ -375,7 +379,7 @@ def addVarClickHighlighting(doc: t.SpecT):
     """
 
 
-def fixIntraDocumentReferences(doc: t.SpecT):
+def fixIntraDocumentReferences(doc: t.SpecT) -> None:
     ids = {el.get("id"): el for el in h.findAll("[id]", doc)}
     headingIDs = {el.get("id"): el for el in h.findAll("[id].heading", doc)}
     for el in h.findAll("a[href^='#']:not([href='#']):not(.self-link):not([data-link-type])", doc):
@@ -403,7 +407,7 @@ def fixIntraDocumentReferences(doc: t.SpecT):
             h.appendChild(el, text)
 
 
-def fixInterDocumentReferences(doc: t.SpecT):
+def fixInterDocumentReferences(doc: t.SpecT) -> None:
     for el in h.findAll("[spec-section]", doc):
         if el.get("data-link-spec") is None:
             m.die(
@@ -488,27 +492,27 @@ def fillInterDocumentReferenceFromSpecref(doc: t.SpecT, el: t.ElementT, spec: st
     registerBiblioUsage(doc, bib, el=el)
 
 
-def processDfns(doc: t.SpecT):
+def processDfns(doc: t.SpecT) -> None:
     dfns = h.findAll(config.dfnElementsSelector, doc)
     classifyDfns(doc, dfns)
     h.fixupIDs(doc, dfns)
     doc.refs.addLocalDfns(dfn for dfn in dfns if dfn.get("id") is not None)
 
 
-def determineDfnType(dfn, inferCSS=False):
+def determineDfnType(dfn: t.ElementT, inferCSS=False) -> str:
     # 1. Look at data-dfn-type
     if dfn.get("data-dfn-type"):
-        return dfn.get("data-dfn-type")
+        return t.cast(str, dfn.get("data-dfn-type"))
     # 2. Look for a prefix on the id
     if dfn.get("id"):
-        id = dfn.get("id")
+        id = t.cast(str, dfn.get("id"))
         for prefix, type in config.dfnClassToType.items():
             if id.startswith(prefix):
                 return type
     # 3. Look for a class or data-dfn-type on the ancestors
     for ancestor in dfn.iterancestors():
         if ancestor.get("data-dfn-type"):
-            return ancestor.get("data-dfn-type")
+            return t.cast(str, ancestor.get("data-dfn-type"))
         for cls, type in config.dfnClassToType.items():
             if h.hasClass(ancestor, cls):
                 return type
@@ -536,7 +540,7 @@ def determineDfnType(dfn, inferCSS=False):
     return "dfn"
 
 
-def classifyDfns(doc: t.SpecT, dfns):
+def classifyDfns(doc: t.SpecT, dfns: t.List[t.ElementT]) -> None:
     dfnTypeToPrefix = {v: k for k, v in config.dfnClassToType.items()}
     for el in dfns:
         dfnType = determineDfnType(el, inferCSS=doc.md.inferCSSDfns)
@@ -605,7 +609,8 @@ def classifyDfns(doc: t.SpecT, dfns):
                     )
         # If type=argument, try to infer what it's for.
         if dfnType == "argument" and el.get("data-dfn-for") is None:
-            parent = el.getparent()
+            parent = h.parentElement(el)
+            assert parent is not None
             parentFor = parent.get("data-dfn-for")
             if parent.get("data-dfn-type") in config.functionishTypes and parentFor is not None:
                 dfnFor = ", ".join(
@@ -693,7 +698,7 @@ def classifyDfns(doc: t.SpecT, dfns):
             h.wrapContents(el, h.E.code())
 
 
-def determineLinkType(el):
+def determineLinkType(el: t.ElementT) -> str:
     # 1. Look at data-link-type
     linkType = h.treeAttr(el, "data-link-type")
     if linkType:
@@ -714,16 +719,16 @@ def determineLinkType(el):
     return "dfn"
 
 
-def determineLinkText(el):
+def determineLinkText(el: t.ElementT) -> str:
     linkType = el.get("data-link-type")
     contents = h.textContent(el)
     if el.get("data-lt"):
-        linkText = el.get("data-lt")
+        linkText = t.cast(str, el.get("data-lt"))
     elif config.linkTypeIn(linkType, "function") and re.match(r"^[\w-]+\(.*\)$", contents):
         # Remove arguments from CSS function autolinks,
         # as they should always be defined argument-less
         # (and this allows filled-in examples to still autolink).
-        linkText = re.match(r"^([\w-]+)\(.*\)$", contents).group(1) + "()"
+        linkText = t.cast(re.Match, re.match(r"^([\w-]+)\(.*\)$", contents)).group(1) + "()"
     else:
         linkText = contents
     linkText = h.foldWhitespace(linkText)
@@ -732,7 +737,7 @@ def determineLinkText(el):
     return linkText
 
 
-def classifyLink(el):
+def classifyLink(el: t.ElementT) -> t.ElementT:
     linkType = determineLinkType(el)
     el.set("data-link-type", linkType)
 
@@ -754,7 +759,7 @@ def classifyLink(el):
 # Additional Processing
 
 
-def processBiblioLinks(doc: t.SpecT):
+def processBiblioLinks(doc: t.SpecT) -> None:
     biblioLinks = h.findAll("a[data-link-type='biblio']", doc)
     for el in biblioLinks:
 
@@ -845,7 +850,7 @@ def verifyUsageOfAllLocalBiblios(doc: t.SpecT) -> None:
         )
 
 
-def processAutolinks(doc: t.SpecT):
+def processAutolinks(doc: t.SpecT) -> None:
     # An <a> without an href is an autolink.
     # <i> is a legacy syntax for term autolinks. If it links up, we change it into an <a>.
     # We exclude bibliographical links, as those are processed in `processBiblioLinks`.
@@ -958,7 +963,7 @@ def registerBiblioUsage(doc: t.SpecT, ref: biblio.BiblioEntry, el: t.ElementT, t
     doc.externalRefsUsed[spec]["_biblio"] = ref
 
 
-def decorateAutolink(doc: t.SpecT, el, linkType, linkText, ref):
+def decorateAutolink(doc: t.SpecT, el: t.ElementT, linkType: str, linkText: str, ref: refs.RefWrapper) -> None:
     # Add additional effects to autolinks.
     if doc.md.slimBuildArtifact:
         return
@@ -985,7 +990,7 @@ def decorateAutolink(doc: t.SpecT, el, linkType, linkText, ref):
             el.set("title", titleText)
 
 
-def removeMultipleLinks(doc: t.SpecT):
+def removeMultipleLinks(doc: t.SpecT) -> None:
     # If there are multiple autolinks to the same thing in a paragraph,
     # only keep the first.
     if not doc.md.removeMultipleLinks:
@@ -1005,7 +1010,7 @@ def removeMultipleLinks(doc: t.SpecT):
                     h.removeAttr(el, "href", "data-link-type")
 
 
-def processIssuesAndExamples(doc: t.SpecT):
+def processIssuesAndExamples(doc: t.SpecT) -> None:
     # Add an auto-genned and stable-against-changes-elsewhere id to all issues and
     # examples, and link to remote issues if possible:
     for el in h.findAll(".issue:not([id])", doc):
@@ -1045,7 +1050,7 @@ def processIssuesAndExamples(doc: t.SpecT):
     h.fixupIDs(doc, h.findAll(".issue, .example", doc))
 
 
-def addSelfLinks(doc: t.SpecT):
+def addSelfLinks(doc: t.SpecT) -> None:
     if doc.md.slimBuildArtifact:
         return
 
@@ -1084,7 +1089,7 @@ def addSelfLinks(doc: t.SpecT):
             h.appendChild(el, makeSelfLink(el))
 
 
-def cleanupHTML(doc: t.SpecT):
+def cleanupHTML(doc: t.SpecT) -> None:
     # Cleanup done immediately before serialization.
 
     head = None
@@ -1312,13 +1317,17 @@ def cleanupHTML(doc: t.SpecT):
         h.moveContents(fromEl=el[0], toEl=el)
 
 
-def finalHackyCleanup(text):
+def finalHackyCleanup(text: str) -> str:
     # For hacky last-minute string-based cleanups of the rendered html.
 
     return text
 
 
-def hackyLineNumbers(lines):
+if t.TYPE_CHECKING:
+    lineList = t.TypeVar("lineList", bound=t.Sequence[line.Line])
+
+
+def hackyLineNumbers(lines: lineList) -> lineList:
     # Hackily adds line-number information to each thing that looks like an open tag.
     # This is just regex text-munging, so potentially dangerous!
     for line in lines:
@@ -1330,7 +1339,7 @@ def hackyLineNumbers(lines):
     return lines
 
 
-def correctFrontMatter(doc: t.SpecT):
+def correctFrontMatter(doc: t.SpecT) -> None:
     # Detect and move around some bits of information,
     # if you provided them in your
     # If you provided an <h1> manually, use that element rather than whatever the boilerplate contains.
@@ -1339,7 +1348,7 @@ def correctFrontMatter(doc: t.SpecT):
         h.replaceNode(h1s[0], h1s[1])
 
 
-def formatElementdefTables(doc: t.SpecT):
+def formatElementdefTables(doc: t.SpecT) -> None:
     for table in h.findAll("table.elementdef", doc):
         elements = h.findAll("tr:first-child dfn", table)
         elementsFor = " ".join(h.textContent(x) for x in elements)
@@ -1379,7 +1388,7 @@ def formatElementdefTables(doc: t.SpecT):
                 )
 
 
-def formatArgumentdefTables(doc: t.SpecT):
+def formatArgumentdefTables(doc: t.SpecT) -> None:
     for table in h.findAll("table.argumentdef", doc):
         forMethod = doc.widl.normalized_method_names(table.get("data-dfn-for"))
         method = doc.widl.find(table.get("data-dfn-for"))
@@ -1415,7 +1424,7 @@ def formatArgumentdefTables(doc: t.SpecT):
                 continue
 
 
-def inlineRemoteIssues(doc: t.SpecT):
+def inlineRemoteIssues(doc: t.SpecT) -> None:
     # Finds properly-marked-up "remote issues",
     # and inlines their contents into the issue.
 
@@ -1535,7 +1544,7 @@ def inlineRemoteIssues(doc: t.SpecT):
     return
 
 
-def addNoteHeaders(doc: t.SpecT):
+def addNoteHeaders(doc: t.SpecT) -> None:
     # Finds <foo heading="bar"> and turns it into a marker-heading
     for el in h.findAll("[heading]", doc):
         h.addClass(el, "no-marker")
@@ -1551,14 +1560,14 @@ def addNoteHeaders(doc: t.SpecT):
         h.removeAttr(el, "heading")
 
 
-def locateFillContainers(doc: t.SpecT):
+def locateFillContainers(doc: t.SpecT) -> t.DefaultDict[str, t.List[t.ElementT]]:
     fillContainers = defaultdict(list)
     for el in h.findAll("[data-fill-with]", doc):
-        fillContainers[el.get("data-fill-with")].append(el)
+        fillContainers[t.cast(str, el.get("data-fill-with"))].append(el)
     return fillContainers
 
 
-def forceCrossorigin(doc: t.SpecT):
+def forceCrossorigin(doc: t.SpecT) -> None:
     if not doc.md.forceCrossorigin:
         return
     for el in h.findAll("link, script[src], audio, video, img", doc):
@@ -1567,7 +1576,7 @@ def forceCrossorigin(doc: t.SpecT):
         el.set("crossorigin", "")
 
 
-def addImageSize(doc: t.SpecT):
+def addImageSize(doc: t.SpecT) -> None:
     if doc.md.imgAutoSize is False:
         return
     imgElements = h.findAll("img", doc)
@@ -1642,7 +1651,7 @@ def addImageSize(doc: t.SpecT):
             )
 
 
-def processIDL(doc):
+def processIDL(doc) -> None:
     localDfns = set()
     for pre in h.findAll("pre.idl, xmp.idl", doc):
         if pre.get("data-no-idl") is not None:

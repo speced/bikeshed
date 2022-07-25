@@ -6,7 +6,7 @@ import re
 from collections import defaultdict
 
 from .. import biblio, config, constants, datablocks, h, messages as m, retrieve, t
-from . import utils, RefSource
+from . import utils, source
 
 
 class ReferenceManager:
@@ -84,9 +84,9 @@ class ReferenceManager:
         else:
             self.defaultStatus = constants.refStatus[defaultStatus]
 
-        self.localRefs = RefSource.RefSource("local", fileRequester=fileRequester)
-        self.anchorBlockRefs = RefSource.RefSource("anchor-block", fileRequester=fileRequester)
-        self.foreignRefs = RefSource.RefSource(
+        self.localRefs = source.RefSource("local", fileRequester=fileRequester)
+        self.anchorBlockRefs = source.RefSource("anchor-block", fileRequester=fileRequester)
+        self.foreignRefs = source.RefSource(
             "foreign",
             specs=self.specs,
             ignored=self.ignoredSpecs,

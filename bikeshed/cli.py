@@ -566,7 +566,7 @@ def handleDebug(options, extras):
 
 def handleRefs(options, extras):
     from . import metadata
-    from .refs.ReferenceManager import ReferenceManager
+    from .refs import ReferenceManager
     from .Spec import Spec
 
     constants.setErrorLevel("nothing")

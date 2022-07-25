@@ -3,7 +3,7 @@ import re
 from collections import defaultdict
 
 from .. import config, constants, messages as m, retrieve
-from . import utils, RefWrapper
+from . import utils, wrapper
 
 
 class RefSource:
@@ -116,13 +116,13 @@ class RefSource:
             # Turns a dict of arrays of refs into an iterator of refs
             for key, group in self.fetchAllRefs():
                 for ref in group:
-                    yield RefWrapper.RefWrapper(key, ref)
+                    yield wrapper.RefWrapper(key, ref)
 
         def textRefsIterator(texts):
             # Same as above, but only grabs those keyed to a given text
             for text in texts:
                 for ref in self.fetchRefs(text):
-                    yield RefWrapper.RefWrapper(text, ref)
+                    yield wrapper.RefWrapper(text, ref)
 
         def forRefsIterator(targetFors):
             # Same as above, but only grabs those for certain values
@@ -131,7 +131,7 @@ class RefSource:
             for for_ in targetFors:
                 for text in self.fors[for_]:
                     for ref in self.fetchRefs(text):
-                        yield RefWrapper.RefWrapper(text, ref)
+                        yield wrapper.RefWrapper(text, ref)
 
         # Set up the initial list of refs to query
         if text:

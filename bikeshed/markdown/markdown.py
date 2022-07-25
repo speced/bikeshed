@@ -1,7 +1,7 @@
 import functools
 import re
 
-from .. import Line, messages as m, h
+from .. import line as l, messages as m, h
 
 
 def parse(
@@ -14,8 +14,8 @@ def parse(
     fromStrings = False
     if any(isinstance(x, str) for x in lines):
         fromStrings = True
-        lines = [Line.Line(-1, x) for x in lines]
-    lines = Line.rectify(lines)
+        lines = [l.Line(-1, x) for x in lines]
+    lines = l.rectify(lines)
     tokens = tokenizeLines(
         lines,
         numSpacesForIndentation,
@@ -454,7 +454,7 @@ def parseTokens(tokens, numSpacesForIndentation):
 def lineFromStream(stream, text):
     # Shortcut for when you're producing a new line from the currline in the stream,
     # with some modified text.
-    return Line.Line(stream.currline().i, text)
+    return l.Line(stream.currline().i, text)
 
 
 # Each parser gets passed the stream
@@ -602,12 +602,12 @@ def parseBulleted(stream):
                 stream.advance()
             yield parseItem(stream)
 
-    lines = [Line.Line(-1, f"<ul data-md line-number={ul_i}>")]
+    lines = [l.Line(-1, f"<ul data-md line-number={ul_i}>")]
     for li_lines, i in getItems(stream):
-        lines.append(Line.Line(-1, f"<li data-md line-number={i}>"))
+        lines.append(l.Line(-1, f"<li data-md line-number={i}>"))
         lines.extend(parse(li_lines, numSpacesForIndentation))
-        lines.append(Line.Line(-1, "</li>"))
-    lines.append(Line.Line(-1, "</ul>"))
+        lines.append(l.Line(-1, "</li>"))
+    lines.append(l.Line(-1, "</ul>"))
     return lines
 
 
@@ -655,14 +655,14 @@ def parseNumbered(stream, start=1):
             yield parseItem(stream)
 
     if start == 1:
-        lines = [Line.Line(-1, f"<ol data-md line-number={ol_i}>")]
+        lines = [l.Line(-1, f"<ol data-md line-number={ol_i}>")]
     else:
-        lines = [Line.Line(-1, f"<ol data-md start='{start}' line-number={ol_i}>")]
+        lines = [l.Line(-1, f"<ol data-md start='{start}' line-number={ol_i}>")]
     for li_lines, i in getItems(stream):
-        lines.append(Line.Line(-1, f"<li data-md line-number={i}>"))
+        lines.append(l.Line(-1, f"<li data-md line-number={i}>"))
         lines.extend(parse(li_lines, numSpacesForIndentation))
-        lines.append(Line.Line(-1, "</li>"))
-    lines.append(Line.Line(-1, "</ol>"))
+        lines.append(l.Line(-1, "</li>"))
+    lines.append(l.Line(-1, "</ol>"))
     return lines
 
 
@@ -717,12 +717,12 @@ def parseDl(stream):
                 stream.advance()
             yield parseItem(stream)
 
-    lines = [Line.Line(-1, f"<dl data-md line-number={dl_i}>")]
+    lines = [l.Line(-1, f"<dl data-md line-number={dl_i}>")]
     for type, di_lines, i in getItems(stream):
-        lines.append(Line.Line(-1, f"<{type} data-md line-number={i}>"))
+        lines.append(l.Line(-1, f"<{type} data-md line-number={i}>"))
         lines.extend(parse(di_lines, numSpacesForIndentation))
-        lines.append(Line.Line(-1, f"</{type}>"))
-    lines.append(Line.Line(-1, "</dl>"))
+        lines.append(l.Line(-1, f"</{type}>"))
+    lines.append(l.Line(-1, "</dl>"))
     return lines
 
 
@@ -739,9 +739,9 @@ def parseBlockquote(stream):
         else:
             break
     return (
-        [Line.Line(-1, f"<blockquote line-number={i}>\n")]
+        [l.Line(-1, f"<blockquote line-number={i}>\n")]
         + parse(lines, stream.numSpacesForIndentation)
-        + [Line.Line(-1, "</blockquote>\n")]
+        + [l.Line(-1, "</blockquote>\n")]
     )
 
 
