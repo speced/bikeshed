@@ -176,6 +176,8 @@ class AliasBiblioEntry(BiblioEntry):
     which is just an alternate name for some other entry.
     """
 
+    aliasOf: str
+
     def __init__(self, linkText: str, aliasOf: str, order: int = 0):
         super().__init__(linkText=linkText, order=order)
         self.aliasOf = aliasOf.strip()

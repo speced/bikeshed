@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import os
 import re
@@ -5,7 +7,7 @@ from collections import defaultdict
 
 import requests
 
-from .. import biblio, messages as m
+from .. import biblio, messages as m, t
 from ..DefaultOrderedDict import DefaultOrderedDict
 
 
@@ -124,7 +126,7 @@ def groupBiblios(biblios):
     return groupedBiblios, allNames
 
 
-def writeBiblioFile(fh, biblios):
+def writeBiblioFile(fh, biblios: t.Dict[str, t.List[biblio.BiblioEntry]]) -> None:
     """
     Each line is a value for a specific key, in the order:
 
@@ -142,35 +144,32 @@ def writeBiblioFile(fh, biblios):
 
     Each entry (including last) is ended by a line containing a single - character.
     """
-    typePrefixes = {"dict": "d", "string": "s", "alias": "a"}
     for key, entries in biblios.items():
-        b = sorted(entries, key=lambda x: x["order"])[0]
-        format = b["biblioFormat"]
-        fh.write("{prefix}:{key}\n".format(prefix=typePrefixes[format], key=key.lower()))
-        if format == "dict":
-            for field in [
-                "linkText",
-                "date",
-                "status",
-                "title",
-                "snapshot_url",
-                "current_url",
-                "obsoletedBy",
-                "other",
-            ]:
-                fh.write(b.get(field, "") + "\n")
-            if b.get("etAl", False):
+        b = sorted(entries, key=lambda x: x.order)[0]
+        if isinstance(b, biblio.NormalBiblioEntry):
+            fh.write("d:" + key.lower() + "\n")
+            fh.write(b.linkText + "\n")
+            fh.write((b.date or "") + "\n")
+            fh.write((b.status or "") + "\n")
+            fh.write((b.title or "") + "\n")
+            fh.write((b.snapshotURL or "") + "\n")
+            fh.write((b.currentURL or "") + "\n")
+            fh.write((b.obsoletedBy or "") + "\n")
+            fh.write((b.other or "") + "\n")
+            if b.etAl:
                 fh.write("1\n")
             else:
                 fh.write("\n")
-            for author in b.get("authors", []):
+            for author in b.authors:
                 fh.write(author + "\n")
-        elif format == "string":
-            fh.write(b["linkText"] + "\n")
-            fh.write(b["data"] + "\n")
-        elif format == "alias":
-            fh.write(b["linkText"] + "\n")
-            fh.write(b["aliasOf"] + "\n")
+        elif isinstance(b, biblio.StringBiblioEntry):
+            fh.write("s:" + key.lower() + "\n")
+            fh.write(b.linkText + "\n")
+            fh.write(b.data + "\n")
+        elif isinstance(b, biblio.AliasBiblioEntry):
+            fh.write("a:" + key.lower() + "\n")
+            fh.write(b.linkText + "\n")
+            fh.write(b.aliasOf + "\n")
         else:
             m.die(f"The biblio key '{key}' has an unknown biblio type '{format}'.")
             continue
