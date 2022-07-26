@@ -72,7 +72,7 @@ class Spec:
             )
             return
         self.inputSource: InputSource.InputSource = InputSource.inputFromName(inputFilename, chroot=constants.chroot)
-        self.transitiveDependencies: t.Set[str] = set()
+        self.transitiveDependencies: t.Set[InputSource.InputSource] = set()
         self.debug: bool = debug
         self.token: t.Optional[str] = token
         self.testing: bool = testing
@@ -137,12 +137,13 @@ class Spec:
     def recordDependencies(self, *inputSources):
         self.transitiveDependencies.update(inputSources)
 
-    def preprocess(self):
+    def preprocess(self) -> Spec:
         self.transitiveDependencies.clear()
         self.assembleDocument()
         self.processDocument()
+        return self
 
-    def assembleDocument(self):
+    def assembleDocument(self) -> Spec:
         # Textual hacks
         u.stripBOM(self)
         if self.lineNumbers:
@@ -203,13 +204,14 @@ class Spec:
 
         # Build the document
         self.document = h.parseDocument(self.html)
-        self.head = h.find("head", self)
-        self.body = h.find("body", self)
+        self.head = t.cast("t.ElementT", h.find("head", self))
+        self.body = t.cast("t.ElementT", h.find("body", self))
         u.correctFrontMatter(self)
         includes.processInclusions(self)
         metadata.parseDoc(self)
+        return self
 
-    def processDocument(self):
+    def processDocument(self) -> Spec:
         # Fill in and clean up a bunch of data
         conditional.processConditionals(self)
         self.fillContainers: t.FillContainersT = u.locateFillContainers(self)
@@ -292,8 +294,8 @@ class Spec:
                 h.removeNode(el)
             # Make sure the W3C stylesheet is after all other styles.
             for el in h.findAll("link", self):
-                if el.get("href").startswith("https://www.w3.org/StyleSheets/TR"):
-                    h.appendChild(h.find("head", self), el)
+                if el.get("href", "").startswith("https://www.w3.org/StyleSheets/TR"):
+                    h.appendChild(self.head, el)
             # Ensure that all W3C links are https.
             for el in h.findAll("a", self):
                 href = el.get("href", "")
@@ -303,20 +305,20 @@ class Spec:
                 if text.startswith("http://www.w3.org") or text.startswith("http://lists.w3.org"):
                     el.text = "https" + text[4:]
             # Loaded from .include files
-            extensions.BSPrepTR(self)  # pylint: disable=no-member
+            extensions.BSPrepTR(self)  # type: ignore # pylint: disable=no-member
 
         return self
 
-    def serialize(self):
+    def serialize(self) -> t.Optional[str]:
         try:
             rendered = h.Serializer(self.md.opaqueElements, self.md.blockElements).serialize(self.document)
         except Exception as e:
             m.die(str(e))
-            return
+            return None
         rendered = u.finalHackyCleanup(rendered)
         return rendered
 
-    def fixMissingOutputFilename(self, outputFilename):
+    def fixMissingOutputFilename(self, outputFilename: t.Optional[str]) -> str:
         if outputFilename is None:
             # More sensible defaults!
             if isinstance(self.inputSource, InputSource.TarInputSource):
@@ -331,12 +333,12 @@ class Spec:
                 outputFilename = "-"
         return outputFilename
 
-    def finish(self, outputFilename=None, newline=None):
+    def finish(self, outputFilename: t.Optional[str]=None, newline: t.Optional[str]=None) -> None:
         catchArgparseBug(outputFilename)
         self.printResultMessage()
         outputFilename = self.fixMissingOutputFilename(outputFilename)
         rendered = self.serialize()
-        if not constants.dryRun:
+        if rendered and not constants.dryRun:
             try:
                 if outputFilename == "-":
                     sys.stdout.write(rendered)
@@ -346,7 +348,7 @@ class Spec:
             except Exception as e:
                 m.die(f"Something prevented me from saving the output document to {outputFilename}:\n{e}")
 
-    def printResultMessage(self):
+    def printResultMessage(self) -> None:
         # If I reach this point, I've succeeded, but maybe with reservations.
         fatals = m.messageCounts["fatal"]
         links = m.messageCounts["linkerror"]
@@ -363,7 +365,7 @@ class Spec:
             m.success("Successfully generated, with warnings")
             return
 
-    def watch(self, outputFilename, port=None, localhost=False):
+    def watch(self, outputFilename: t.Optional[str], port: int=None, localhost: bool=False) -> None:
         import time
 
         outputFilename = self.fixMissingOutputFilename(outputFilename)
@@ -424,7 +426,7 @@ class Spec:
         except Exception as e:
             m.die(f"Something went wrong while watching the file:\n{e}")
 
-    def fixText(self, text, moreMacros=None):
+    def fixText(self, text: str, moreMacros: t.Dict[str, str]=None) -> str:
         # Do several textual replacements that need to happen *before* the document is parsed as h.
 
         # If markdown shorthands are on, remove all `foo`s while processing,
@@ -432,6 +434,7 @@ class Spec:
         # Also handle markdown escapes.
         if moreMacros is None:
             moreMacros = {}
+        textFunctor: func.Functor
         if "markdown" in self.md.markupShorthands:
             textFunctor = u.MarkdownCodeSpans(text)
         else:
@@ -445,7 +448,7 @@ class Spec:
 
         return textFunctor.extract()
 
-    def printTargets(self):
+    def printTargets(self) -> None:
         m.p("Exported terms:")
         for el in h.findAll("[data-export]", self):
             for term in config.linkTextsFromElement(el):
@@ -455,7 +458,7 @@ class Spec:
             for term in config.linkTextsFromElement(el):
                 m.p("  " + term)
 
-    def isOpaqueElement(self, el):
+    def isOpaqueElement(self, el: t.ElementT) -> bool:
         if el.tag in self.md.opaqueElements:
             return True
         if el.get("data-opaque") is not None:
@@ -463,7 +466,7 @@ class Spec:
         return False
 
 
-def printDone():
+def printDone() -> None:
     contents = f"Finished at {datetime.now().strftime('%H:%M:%S %b-%d-%Y')}"
     contentLen = len(contents) + 2
     if not constants.asciiOnly:
@@ -478,7 +481,7 @@ def printDone():
         m.p("")
 
 
-def findImplicitInputFile():
+def findImplicitInputFile() -> t.Optional[str]:
     """
     Find what input file the user *probably* wants to use,
     by scanning the current folder.
@@ -505,7 +508,7 @@ def findImplicitInputFile():
     return None
 
 
-def catchArgparseBug(string):
+def catchArgparseBug(string: t.Optional[str]) -> bool:
     # Argparse has had a long-standing bug
     # https://bugs.python.org/issue22433
     # about spaces in the values of unknown optional arguments

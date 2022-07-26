@@ -351,7 +351,7 @@ def addIndexOfLocallyDefinedTerms(doc, container):
     h.appendChild(container, indexHTML, allowEmpty=True)
 
 
-def disambiguator(ref, types, specs):
+def disambiguator(ref: r.RefWrapper, types: t.Optional[t.Set[str]], specs: t.Optional[t.Set[str]]) -> str:
     disambInfo = []
     if types is None or len(types) > 1:
         disambInfo.append(ref.type)
@@ -376,16 +376,16 @@ def addExplicitIndexes(doc):
             continue
 
         if el.get("type"):
-            types = {x.strip() for x in el.get("type").split(",")}
-            for t in types:
-                if t not in config.dfnTypes:
+            elTypes = {x.strip() for x in el.get("type").split(",")}
+            for elType in elTypes:
+                if elType not in config.dfnTypes:
                     m.die(
-                        f"Unknown type value '{t}' on {h.outerHTML(el)}",
+                        f"Unknown type value '{elType}' on {h.outerHTML(el)}",
                         el=el,
                     )
-                    types.remove(t)
+                    elTypes.remove(elType)
         else:
-            types = None
+            elTypes = None
 
         if el.get("data-link-spec"):
             # Yes, this is dumb. Accidental over-firing of a shortcut attribute. >_<
@@ -425,7 +425,7 @@ def addExplicitIndexes(doc):
                 continue
             if specs is not None and ref.spec not in specs:
                 continue
-            if types is not None and ref.type not in types:
+            if elTypes is not None and ref.type not in elTypes:
                 continue
             if fors is not None and not (set(ref.for_) & fors):
                 continue
@@ -435,9 +435,9 @@ def addExplicitIndexes(doc):
         # ensuring no duplicate disambiguators.
         refsFromText = defaultdict(list)
         for ref in possibleRefs:
-            refDisambiguator = disambiguator(ref, types, specs)
+            refDisambiguator = disambiguator(ref, elTypes, specs)
             for i, existingRef in enumerate(refsFromText[ref.text]):
-                if disambiguator(existingRef, types, specs) != refDisambiguator:
+                if disambiguator(existingRef, elTypes, specs) != refDisambiguator:
                     continue
                 # Whoops, found an identical entry.
                 if existingRef.status != ref.status:
@@ -475,7 +475,7 @@ def addExplicitIndexes(doc):
             refs = r.utils.filterOldVersions(refs)
             if refs:
                 filteredRefs[ttf[0]].extend(
-                    {"url": ref.url, "disambiguator": disambiguator(ref, types, specs)} for ref in refs
+                    {"url": ref.url, "disambiguator": disambiguator(ref, elTypes, specs)} for ref in refs
                 )
 
         h.appendChild(el, htmlFromIndexTerms(filteredRefs), allowEmpty=True)

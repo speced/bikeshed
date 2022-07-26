@@ -1324,7 +1324,7 @@ def finalHackyCleanup(text: str) -> str:
     return text
 
 
-def hackyLineNumbers(lines: t.Sequence[Line]) -> t.Sequence[Line]:
+def hackyLineNumbers(lines: t.List[Line]) -> t.List[Line]:
     # Hackily adds line-number information to each thing that looks like an open tag.
     # This is just regex text-munging, so potentially dangerous!
     for line in lines:
