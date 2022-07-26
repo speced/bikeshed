@@ -333,7 +333,7 @@ class Spec:
                 outputFilename = "-"
         return outputFilename
 
-    def finish(self, outputFilename: t.Optional[str]=None, newline: t.Optional[str]=None) -> None:
+    def finish(self, outputFilename: t.Optional[str] = None, newline: t.Optional[str] = None) -> None:
         catchArgparseBug(outputFilename)
         self.printResultMessage()
         outputFilename = self.fixMissingOutputFilename(outputFilename)
@@ -365,7 +365,7 @@ class Spec:
             m.success("Successfully generated, with warnings")
             return
 
-    def watch(self, outputFilename: t.Optional[str], port: int=None, localhost: bool=False) -> None:
+    def watch(self, outputFilename: t.Optional[str], port: int = None, localhost: bool = False) -> None:
         import time
 
         outputFilename = self.fixMissingOutputFilename(outputFilename)
@@ -426,7 +426,7 @@ class Spec:
         except Exception as e:
             m.die(f"Something went wrong while watching the file:\n{e}")
 
-    def fixText(self, text: str, moreMacros: t.Dict[str, str]=None) -> str:
+    def fixText(self, text: str, moreMacros: t.Dict[str, str] = None) -> str:
         # Do several textual replacements that need to happen *before* the document is parsed as h.
 
         # If markdown shorthands are on, remove all `foo`s while processing,
