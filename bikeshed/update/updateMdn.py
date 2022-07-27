@@ -17,7 +17,7 @@ def update(path, dryRun=False):
         return
 
     try:
-        data = response.json(encoding="utf-8", object_pairs_hook=OrderedDict)
+        data = response.json(object_pairs_hook=OrderedDict)
     except Exception as e:
         m.die(f"The MDN Spec Links data wasn't valid JSON for some reason. Try downloading again?\n{e}")
         return
