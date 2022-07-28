@@ -27,7 +27,7 @@ A short overview of some of Bikeshed's features:
 * [automatic id generation](https://tabatkins.github.io/bikeshed/#id-gen) for headings and definitions, based on their text.
 * [textual shortcuts for autolinks](https://tabatkins.github.io/bikeshed/#autolink-shortcuts): [[FOO]] for bibliography entries, &lt;&lt;foo>> for grammar productions, 'foo' for CSS property names, {{foo}} for IDL terms, and more.
 * [boilerplate generation](https://tabatkins.github.io/bikeshed/#boilerplate), both wholesale and piecemeal.
-* [Bikeshed-flavored Markdown](https://tabatkins.github.io/bikeshed/#markdown), a slight variant that is extra-friendly to intermixing with normal HTML. (Besides the few intentional divergences, compliance with [CommonMark](http://commonmark.org) is expected.)
+* [Bikeshed-flavored Markdown](https://tabatkins.github.io/bikeshed/#markdown), a slight variant that is extra-friendly to intermixing with normal HTML. (Besides the few intentional divergences, compliance with [CommonMark](https://commonmark.org) is expected.)
 * a [compact syntax](https://tabatkins.github.io/bikeshed/#table-expansion) for writing property-definition tables.
 * [automatic whitespace-prefix stripping](https://tabatkins.github.io/bikeshed/#pre-whitespace-stripping) from `<pre>` contents, so the contents can be indented properly in your HTML.
 * [automatic IDL processing and syntax-checking](https://tabatkins.github.io/bikeshed/#idl) for `<pre class=idl>` contents, so you don't have to mark up every single significant term yourself.
@@ -70,7 +70,7 @@ which isn't generally what you want.)
 License
 -------
 
-This document and all associated files in the github project are licensed under [CC0](http://creativecommons.org/publicdomain/zero/1.0/) ![](http://licensebuttons.net/p/zero/1.0/80x15.png).
+This document and all associated files in the github project are licensed under [CC0](https://creativecommons.org/publicdomain/zero/1.0/) ![](https://licensebuttons.net/p/zero/1.0/80x15.png).
 This means you can reuse, remix, or otherwise appropriate this project for your own use **without restriction**.
 (The actual legal meaning can be found at the above link.)
 Don't ask me for permission to use any part of this project, **just use it**.
