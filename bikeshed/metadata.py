@@ -1,6 +1,9 @@
+# pylint: disable=unused-argument
+
 from __future__ import annotations
 
 import copy
+import dataclasses
 import json
 import os
 import re
@@ -9,11 +12,13 @@ from collections import OrderedDict, defaultdict
 from datetime import date, datetime, timedelta
 from functools import partial
 
-import attr
 from isodate import Duration, parse_duration
 
 from . import config, constants, datablocks, markdown, h, messages as m, repository, t
 from .DefaultOrderedDict import DefaultOrderedDict
+
+if t.TYPE_CHECKING:
+    from .line import Line
 
 
 class MetadataManager:
@@ -134,7 +139,7 @@ class MetadataManager:
 
         self.manuallySetKeys: t.Set[str] = set()
 
-    def addData(self, key: str, val: str, lineNum: t.Optional[str] = None) -> MetadataManager:
+    def addData(self, key: str, val: str, lineNum: t.Union[None, str, int] = None) -> MetadataManager:
         key = key.strip()
         if isinstance(val, str):
             if key in ["Abstract"]:
@@ -157,7 +162,7 @@ class MetadataManager:
             return self
         md = knownKeys[key]
 
-        val = md.parse(key=key, val=val, lineNum=lineNum)
+        val = md.parse(key, val, lineNum)
 
         self.addParsedData(key, val)
         return self
@@ -376,7 +381,7 @@ class MetadataManager:
             macros[name.lower()] = text
 
 
-def parseDate(key: str, val: str, lineNum: t.Optional[str]) -> t.Optional[date]:
+def parseDate(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Optional[date]:
     if val == "now":
         return datetime.utcnow().date()
     try:
@@ -386,7 +391,7 @@ def parseDate(key: str, val: str, lineNum: t.Optional[str]) -> t.Optional[date]:
         return None
 
 
-def parseDateOrDuration(key: str, val: str, lineNum: t.Optional[str]) -> t.Optional[t.Union[date, timedelta]]:
+def parseDateOrDuration(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Optional[t.Union[date, timedelta]]:
     if val == "now":
         return datetime.utcnow().date()
     if val == "never" or boolish(val) is False:
@@ -403,7 +408,7 @@ def parseDateOrDuration(key: str, val: str, lineNum: t.Optional[str]) -> t.Optio
         return None
 
 
-def canonicalizeExpiryDate(base, expires):
+def canonicalizeExpiryDate(base: date, expires: t.Union[None, timedelta, Duration, datetime, date]) -> t.Optional[date]:
     if expires is None:
         return None
     if isinstance(expires, timedelta):
@@ -418,34 +423,35 @@ def canonicalizeExpiryDate(base, expires):
     return None
 
 
-def parseLevel(key, val, lineNum):  # pylint: disable=unused-argument
+def parseLevel(key: str, val: str, lineNum: t.Union[None, str, int]) -> str:
     val = val.lower().strip()
     if val == "none":
         return ""
     return val.strip()
 
 
-def parseInteger(key, val, lineNum):  # pylint: disable=unused-argument
+def parseInteger(key: str, val: str, lineNum: t.Union[None, str, int]) -> int:
     return int(val)
 
 
-def parseBoolean(key, val, lineNum):
+def parseBoolean(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Optional[bool]:
     b = boolish(val)
     if b is None:
         m.die(f"The {key} field must be true/false, yes/no, y/n, or on/off. Got '{val}' instead.", lineNum=lineNum)
     return b
 
 
-def parseSoftBoolean(key, val, lineNum):
+def parseSoftBoolean(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Union[None, bool, t.Literal["maybe"]]:
     b = boolish(val)
     if b is not None:
         return b
     if val.lower() in ["maybe", "if possible", "if needed"]:
         return "maybe"
     m.die(f"The {key} field must be boolish, or 'maybe'. Got '{val}' instead.", lineNum=lineNum)
+    return None
 
 
-def boolish(val):
+def boolish(val) -> t.Optional[bool]:
     if val.lower() in ("true", "yes", "y", "on"):
         return True
     if val.lower() in ("false", "no", "n", "off"):
@@ -453,7 +459,7 @@ def boolish(val):
     return None
 
 
-def parseWarning(key, val, lineNum):
+def parseWarning(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Optional[t.Tuple[str, ...]]:
     if val.lower() == "obsolete":
         return ("warning-obsolete",)
     if val.lower() == "not ready":
@@ -486,7 +492,7 @@ def parseWarning(key, val, lineNum):
     return None
 
 
-def parseEditor(key, val, lineNum):
+def parseEditor(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.List[t.Dict[str, t.Optional[str]]]:
     pieces = [h.unescape(piece.strip()) for piece in val.split(",")]
 
     def looksLinkish(string):
@@ -565,16 +571,18 @@ def parseEditor(key, val, lineNum):
     return [data]
 
 
-def parseCommaSeparated(key, val, lineNum):  # pylint: disable=unused-argument
+def parseCommaSeparated(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.List[str]:
     return [term.strip().lower() for term in val.split(",")]
 
 
-def parseIdList(key, val, lineNum):  # pylint: disable=unused-argument
+def parseIdList(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.List[str]:
     return [term.strip() for term in val.split(",")]
 
 
-def parseLinkDefaults(key, val, lineNum):
-    defaultSpecs = defaultdict(list)
+def parseLinkDefaults(
+    key: str, val: str, lineNum: t.Union[None, str, int]
+) -> t.DefaultDict[str, t.List[t.Tuple[str, str, str, t.Optional[str]]]]:
+    defaultSpecs: t.DefaultDict[str, t.List[t.Tuple[str, str, str, t.Optional[str]]]] = defaultdict(list)
     for default in val.split(","):
         match = re.match(
             r"^([\w\d-]+)  (?:\s+\( ({}) (?:\s+(snapshot|current))? \) )  \s+(.*)$".format(
@@ -600,7 +608,7 @@ def parseLinkDefaults(key, val, lineNum):
     return defaultSpecs
 
 
-def parseBoilerplate(key, val, lineNum):  # pylint: disable=unused-argument
+def parseBoilerplate(key: str, val: str, lineNum: t.Union[None, str, int]) -> config.BoolSet:
     boilerplate = config.BoolSet(default=True)
     for command in val.split(","):
         pieces = command.lower().strip().split()
@@ -625,7 +633,7 @@ def parseBoilerplate(key, val, lineNum):  # pylint: disable=unused-argument
     return boilerplate
 
 
-def parseBiblioDisplay(key, val, lineNum):
+def parseBiblioDisplay(key: str, val: str, lineNum: t.Union[None, str, int]) -> str:
     val = val.strip().lower()
     if val in constants.biblioDisplay:
         return val
@@ -633,7 +641,7 @@ def parseBiblioDisplay(key, val, lineNum):
     return constants.biblioDisplay.index
 
 
-def parseRefStatus(key, val, lineNum):
+def parseRefStatus(key: str, val: str, lineNum: t.Union[None, str, int]) -> str:
     val = val.strip().lower()
     if val == "dated":
         # Legacy term that used to be allowed
@@ -644,13 +652,13 @@ def parseRefStatus(key, val, lineNum):
     return constants.refStatus.current
 
 
-def parseComplainAbout(key, val, lineNum):
+def parseComplainAbout(key: str, val: str, lineNum: t.Union[None, str, int]) -> config.BoolSet:
     validLabels = frozenset(["missing-example-ids", "broken-links", "accidental-2119", "missing-exposed"])
     ret = parseBoolishList(key, val.lower(), default=False, validLabels=validLabels, lineNum=lineNum)
     return ret
 
 
-def parseExternalInfotrees(key, val, lineNum):
+def parseExternalInfotrees(key: str, val: str, lineNum: t.Union[None, str, int]) -> config.BoolSet:
     return parseBoolishList(
         key,
         val.lower(),
@@ -660,13 +668,18 @@ def parseExternalInfotrees(key, val, lineNum):
     )
 
 
-def parseBoolishList(key, val, default=None, validLabels=None, extraValues=None, lineNum=None):
-    # Parses anything defined as "label <boolish>, label <boolish>" into a passed BoolSet
+def parseBoolishList(
+    key: str,
+    val: str,
+    default: bool,
+    validLabels: t.Optional[t.AbstractSet[str]] = None,
+    extraValues: t.Optional[t.Dict[str, bool]] = None,
+    lineNum: t.Union[None, str, int] = None,
+) -> config.BoolSet:
+    # Parses anything defined as "label <boolish>, label <boolish>" into a BoolSet
     # Supply a list of valid labels if you want to have them checked,
     # and a dict of {value=>bool} pairs you want in addition to the standard boolish values
-    if default is None:
-        boolset = {}
-    elif default in (True, False):
+    if default in (True, False):
         boolset = config.BoolSet(default=default)
     else:
         m.die(f"Programming error - parseBoolishList() got a non-bool default value: '{default}'")
@@ -693,18 +706,20 @@ def parseBoolishList(key, val, default=None, validLabels=None, extraValues=None,
     return boolset
 
 
-def parseLinkedText(key, val, lineNum):  # pylint: disable=unused-argument
+def parseLinkedText(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.List[t.Tuple[str, str]]:
     # Parses anything defined as "text url, text url, text url" into a list of 2-tuples.
     entries = []
     vals = [v.strip() for v in val.split(",")]
     for v in vals:
-        entries.append(v.rsplit(" ", 1))
+        pieces = v.rsplit(" ", 1)
+        entries.append((pieces[0], pieces[1]))
     return entries
 
 
-def parseMarkupShorthands(key, val, lineNum):  # pylint: disable=unused-argument
+def parseMarkupShorthands(key: str, val: str, lineNum: t.Union[None, str, int]) -> config.BoolSet:
     # Format is comma-separated list of shorthand category followed by boolean.
-    # Output is a dict of the shorthand categories with boolean values.
+    # Output is a boolset of the shorthand categories.
+    # TODO: Just call parseBoolistList instead
     vals = [v.strip() for v in val.lower().split(",")]
     ret = config.BoolSet(default=False)
     validCategories = frozenset(["css", "markup", "dfn", "biblio", "http", "idl", "markdown", "algorithm"])
@@ -730,7 +745,7 @@ def parseMarkupShorthands(key, val, lineNum):  # pylint: disable=unused-argument
     return ret
 
 
-def parseInlineGithubIssues(key, val, lineNum):  # pylint: disable=unused-argument
+def parseInlineGithubIssues(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Union[t.Literal[False], str]:
     val = val.lower()
     if val in ["title", "full"]:
         return val
@@ -743,7 +758,7 @@ def parseInlineGithubIssues(key, val, lineNum):  # pylint: disable=unused-argume
     return False
 
 
-def parseTextMacro(key, val, lineNum):  # pylint: disable=unused-argument
+def parseTextMacro(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.List[t.Tuple[str, str]]:
     # Each Text Macro line is just a macro name (must be uppercase)
     # followed by the text it expands to.
     try:
@@ -757,7 +772,7 @@ def parseTextMacro(key, val, lineNum):  # pylint: disable=unused-argument
     return [(name, text)]
 
 
-def parseWorkStatus(key, val, lineNum):  # pylint: disable=unused-argument
+def parseWorkStatus(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Optional[str]:
     # The Work Status is one of (completed, stable, testing, refining, revising, exploring, rewriting, abandoned).
     val = val.strip().lower()
     if val not in (
@@ -778,7 +793,7 @@ def parseWorkStatus(key, val, lineNum):  # pylint: disable=unused-argument
     return val
 
 
-def parseRepository(key, val, lineNum):  # pylint: disable=unused-argument
+def parseRepository(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Optional[repository.Repository]:
     # Shortname followed by url, or just url.
     # If just url, I'll try to recognize the shortname from it; otherwise it's the url again.
     val = val.strip()
@@ -798,10 +813,10 @@ def parseRepository(key, val, lineNum):  # pylint: disable=unused-argument
         # Otherwise just use the url as the shortname
         return repository.Repository(url=val)
     m.die(f"Repository must be a url, optionally followed by a shortname. Got '{val}'", lineNum=lineNum)
-    return config.Nil()
+    return None
 
 
-def parseTranslateIDs(key, val, lineNum):  # pylint: disable=unused-argument
+def parseTranslateIDs(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Dict[str, str]:
     translations = {}
     for v in val.split(","):
         pieces = v.strip().split()
@@ -813,7 +828,7 @@ def parseTranslateIDs(key, val, lineNum):  # pylint: disable=unused-argument
     return translations
 
 
-def parseTranslation(key, val, lineNum):  # pylint: disable=unused-argument
+def parseTranslation(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.List[t.Dict[str, t.Optional[str]]]:
     # Format is <lang-code> <url> [ [ , name <name-in-spec-lang> ] || [ , native-name <name-in-the-lang> ] ]?
     pieces = val.split(",")
     if not (1 <= len(pieces) <= 3):
@@ -821,14 +836,14 @@ def parseTranslation(key, val, lineNum):  # pylint: disable=unused-argument
             f"Format of a Translation line is <lang-code> <url> [ [ , name <name-in-spec-lang> ] || [ , native-name <name-in-the-lang> ] ]?. Got:\n{val}",
             lineNum=lineNum,
         )
-        return
+        return []
     firstParts = pieces[0].split()
     if len(firstParts) != 2:
         m.die(
             f"First part of a Translation line must be a lang-code followed by a url. Got:\n{pieces[0]}",
             lineNum=lineNum,
         )
-        return
+        return []
     langCode, url = firstParts
     name = None
     nativeName = None
@@ -846,15 +861,12 @@ def parseTranslation(key, val, lineNum):  # pylint: disable=unused-argument
     return [{"lang-code": langCode, "url": url, "name": name, "native-name": nativeName}]
 
 
-def parseAudience(key, val, lineNum):  # pylint: disable=unused-argument
+def parseAudience(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.List[str]:
     # WG21 value
     values = [x.strip().upper() for x in val.strip().split(",")]
-    if not values:
-        m.die("Audience metadata must have at least one value if specified.")
-        return []
     if len(values) == 1 and values[0] == "ALL":
         return ["all"]
-    if len(values) >= 1:
+    elif len(values) >= 1:
         ret = []
         namedAudiences = {"CWG", "LWG", "EWG", "LEWG", "DIRECTION"}
         pseudonymAudiences = {
@@ -887,9 +899,12 @@ def parseAudience(key, val, lineNum):  # pylint: disable=unused-argument
                 m.die(f"Unknown 'Audience' value '{v}'.", lineNum=lineNum)
                 continue
         return ret
+    else:
+        m.die("Audience metadata must have at least one value if specified.")
+        return []
 
 
-def parseEditorTerm(key, val, lineNum):  # pylint: disable=unused-argument
+def parseEditorTerm(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Dict[str, str]:
     values = [x.strip() for x in val.strip().split(",")]
     if len(values) == 2:
         return {"singular": values[0], "plural": values[1]}
@@ -900,7 +915,7 @@ def parseEditorTerm(key, val, lineNum):  # pylint: disable=unused-argument
     return {"singular": "Editor", "plural": "Editors"}
 
 
-def parseMaxToCDepth(key, val, lineNum):  # pylint: disable=unused-argument
+def parseMaxToCDepth(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Union[int, float]:
     if val.lower() == "none":
         return float("inf")
     try:
@@ -920,12 +935,12 @@ def parseMaxToCDepth(key, val, lineNum):  # pylint: disable=unused-argument
     return v
 
 
-def parseMetadataOrder(key, val, lineNum):  # pylint: disable=unused-argument
+def parseMetadataOrder(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.List[str]:
     pieces = [x.strip() for x in val.split(",")]
     return pieces
 
 
-def parseWptDisplay(key, val, lineNum):  # pylint: disable=unused-argument
+def parseWptDisplay(key: str, val: str, lineNum: t.Union[None, str, int]) -> str:
     val = val.lower()
     if val in ("none", "inline", "open", "closed"):
         return val
@@ -936,7 +951,7 @@ def parseWptDisplay(key, val, lineNum):  # pylint: disable=unused-argument
     return "none"
 
 
-def parsePreviousVersion(key, val, lineNum):  # pylint: disable=unused-argument
+def parsePreviousVersion(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.List[t.Dict[str, str]]:
     biblioMatch = re.match(r"from biblio(\s+\S+)?", val.lower())
     if biblioMatch:
         if biblioMatch.group(1):
@@ -945,13 +960,13 @@ def parsePreviousVersion(key, val, lineNum):  # pylint: disable=unused-argument
     return [{"type": "url", "value": val}]
 
 
-def parseInlineTagCommand(key, val, lineNum):  # pylint: disable=unused-argument
+def parseInlineTagCommand(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Dict[str, str]:
     tag, _, command = val.strip().partition(" ")
     command = command.strip()
     return {tag: command}
 
 
-def parse(lines):
+def parse(lines: t.Sequence[Line]) -> t.Tuple[t.List[Line], MetadataManager]:
     # Given HTML document text, in the form of an array of text lines,
     # extracts all <pre class=metadata> lines and parses their contents.
     # Returns the text lines, with the metadata-related lines removed,
@@ -971,7 +986,7 @@ def parse(lines):
             else:
                 endTag = r"</xmp>\s*"
             continue
-        if inMetadata and re.match(endTag, line.text):
+        if inMetadata and re.match(t.cast(str, endTag), line.text):
             inMetadata = False
             continue
         if inMetadata:
@@ -983,6 +998,7 @@ def parse(lines):
                 md.addData(lastKey, line.text, lineNum=line.i)
             elif re.match(r"([^:]+):\s*(.*)", line.text):
                 match = re.match(r"([^:]+):\s*(.*)", line.text)
+                assert match is not None
                 md.addData(match.group(1), match.group(2), lineNum=line.i)
                 lastKey = match.group(1)
             else:
@@ -993,7 +1009,9 @@ def parse(lines):
                 continue
         elif re.match(r"\s*<h1[^>]*>.*?</h1>", line.text):
             if md.title is None:
-                title = re.match(r"\s*<h1[^>]*>(.*?)</h1>", line.text).group(1)
+                match = re.match(r"\s*<h1[^>]*>(.*?)</h1>", line.text)
+                assert match is not None
+                title = match.group(1)
                 md.addData("Title", title, lineNum=line.i)
             newlines.append(line)
         else:
@@ -1001,7 +1019,7 @@ def parse(lines):
     return newlines, md
 
 
-def fromCommandLine(overrides):
+def fromCommandLine(overrides: t.List[str]) -> MetadataManager:
     # Given a list of strings representing command-line arguments,
     # finds the args that correspond to metadata keys
     # and fills a MetadataManager accordingly.
@@ -1020,7 +1038,7 @@ def fromCommandLine(overrides):
     return md
 
 
-def fromJson(data, source=""):
+def fromJson(data: str, source: str) -> MetadataManager:
     md = MetadataManager()
     try:
         defaults = json.loads(data, object_pairs_hook=OrderedDict)
@@ -1045,7 +1063,7 @@ def fromJson(data, source=""):
     return md
 
 
-def getSpecRepository(doc):
+def getSpecRepository(doc: t.SpecT) -> t.Optional[repository.Repository]:
     """
     Attempts to find the name of the repository the spec is a part of.
     Currently only searches for GitHub repos.
@@ -1068,14 +1086,14 @@ def getSpecRepository(doc):
                 search = re.search(search_re, remotes)
                 if search:
                     return repository.GithubRepository(*search.groups())
-            return config.Nil()
+            return None
         except subprocess.CalledProcessError:
             # check_output will throw CalledProcessError when not in a git repo
-            return config.Nil()
-    return config.Nil()
+            return None
+    return None
 
 
-def parseDoc(doc):
+def parseDoc(doc: t.SpecT) -> None:
     # Look through the doc for any additional metadata information that might be needed.
 
     for el in h.findAll(".replace-with-note-class", doc):
@@ -1100,13 +1118,15 @@ def parseDoc(doc):
         doc.md.issues.append(("Inline In Spec", "#issues-index"))
 
 
-def join(*sources):
+def join(*sources: t.Optional[MetadataManager]) -> MetadataManager:
     """
     MetadataManager is a monoid
     """
     md = MetadataManager()
-    md.hasMetadata = any(x.hasMetadata for x in sources)
+    md.hasMetadata = any(x.hasMetadata for x in sources if x)
     for mdsource in sources:
+        if mdsource is None:
+            continue
         for k in mdsource.manuallySetKeys:
             mdentry = knownKeys[k]
             md.addParsedData(k, getattr(mdsource, mdentry.attrName))
@@ -1115,15 +1135,15 @@ def join(*sources):
     return md
 
 
-@attr.s(slots=True, frozen=True)
+@dataclasses.dataclass
 class Metadata:
-    humanName = attr.ib()
-    attrName = attr.ib()
-    join = attr.ib()
-    parse = attr.ib()
+    humanName: str
+    attrName: str
+    join: t.Callable[[t.Any, t.Any], t.Any]
+    parse: t.Callable[[str, str, t.Union[None, str, int]], t.Any]
 
 
-def joinValue(a, b):  # pylint: disable=unused-argument
+def joinValue(a, b):
     return b
 
 
@@ -1151,21 +1171,21 @@ def joinDdList(a, b):
     return x
 
 
-def parseLiteral(key, val, lineNum):  # pylint: disable=unused-argument
+def parseLiteral(key: str, val: str, lineNum: t.Union[None, str, int]):
     return val
 
 
-def parseLiteralOrNone(key, val, lineNum):  # pylint: disable=unused-argument
+def parseLiteralOrNone(key: str, val: str, lineNum: t.Union[None, str, int]):
     if val.lower() == "none":
         return None
     return val
 
 
-def parseLiteralCaseless(key, val, lineNum):  # pylint: disable=unused-argument
+def parseLiteralCaseless(key: str, val: str, lineNum: t.Union[None, str, int]):
     return val.lower()
 
 
-def parseLiteralList(key, val, lineNum):  # pylint: disable=unused-argument
+def parseLiteralList(key: str, val: str, lineNum: t.Union[None, str, int]):
     return [val]
 
 

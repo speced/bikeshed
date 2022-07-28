@@ -1,10 +1,10 @@
-import attr
+import dataclasses
 
 
-@attr.s(slots=True)
+@dataclasses.dataclass
 class Line:
-    i = attr.ib(validator=[attr.validators.instance_of(int)])
-    text = attr.ib(validator=[attr.validators.instance_of(str)])
+    i: int
+    text: str
 
     def __unicode__(self):
         return self.text

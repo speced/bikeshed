@@ -39,7 +39,7 @@ def p(msg: t.Union[str, t.Tuple[str, str]], sep: t.Optional[str] = None, end: t.
             print(msg.encode("ascii", "xmlcharrefreplace"), sep=sep, end=end)
 
 
-def die(msg: str, el: t.Optional[t.ElementT] = None, lineNum: t.Optional[str] = None) -> None:
+def die(msg: str, el: t.Optional[t.ElementT] = None, lineNum: t.Union[None, str, int] = None) -> None:
     if lineNum is None and el is not None and el.get("line-number"):
         lineNum = el.get("line-number")
     formattedMsg = formatMessage("fatal", msg, lineNum=lineNum)
@@ -52,7 +52,7 @@ def die(msg: str, el: t.Optional[t.ElementT] = None, lineNum: t.Optional[str] = 
         errorAndExit()
 
 
-def linkerror(msg: str, el: t.Optional[t.ElementT] = None, lineNum: t.Optional[str] = None) -> None:
+def linkerror(msg: str, el: t.Optional[t.ElementT] = None, lineNum: t.Union[None, str, int] = None) -> None:
     if lineNum is None and el is not None and el.get("line-number"):
         lineNum = el.get("line-number")
     suffix = ""
@@ -71,7 +71,7 @@ def linkerror(msg: str, el: t.Optional[t.ElementT] = None, lineNum: t.Optional[s
         errorAndExit()
 
 
-def warn(msg: str, el: t.Optional[t.ElementT] = None, lineNum: t.Optional[str] = None) -> None:
+def warn(msg: str, el: t.Optional[t.ElementT] = None, lineNum: t.Union[None, str, int] = None) -> None:
     if lineNum is None and el is not None and el.get("line-number"):
         lineNum = el.get("line-number")
     formattedMsg = formatMessage("warning", msg, lineNum=lineNum)
@@ -146,7 +146,7 @@ def printColor(text: str, color: str = "white", *styles: str) -> str:
     return text
 
 
-def formatMessage(type: str, text: str, lineNum: t.Optional[str] = None) -> t.Union[str, t.Tuple[str, str]]:
+def formatMessage(type: str, text: str, lineNum: t.Union[None, str, int] = None) -> t.Union[str, t.Tuple[str, str]]:
     if constants.printMode == "markup":
         text = text.replace("<", "&lt;")
         if type == "fatal":
