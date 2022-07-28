@@ -1,11 +1,23 @@
+import dataclasses
+import itertools
 import re
 import sys
-import itertools
 
 if __name__ == "__main__":
-    from bikeshed import config, messages as m
+    from bikeshed import config, messages as m, t
 else:
-    from . import config, messages as m
+    from . import config, messages as m, t
+
+if t.TYPE_CHECKING:
+    Characters: t.TypeAlias = t.Dict[str, t.List[str]]
+    T = t.TypeVar("T")
+    U = t.TypeVar("U")
+
+
+@dataclasses.dataclass
+class FontMetadata:
+    height: int
+    spaceWidth: int
 
 
 class Font:
@@ -60,7 +72,7 @@ class Font:
 
     """
 
-    def __init__(self, fontfilename=config.scriptPath("bigblocks.bsfont")):
+    def __init__(self, fontfilename: str = config.scriptPath("bigblocks.bsfont")):
         try:
             with open(fontfilename, encoding="utf-8") as fh:
                 lines = fh.readlines()
@@ -83,39 +95,43 @@ class Font:
         return output
 
 
-def parseMetadata(lines):
+def parseMetadata(lines: t.List[str]) -> t.Tuple[FontMetadata, t.List[str]]:
     # Each metadata line is of the form "key: value".
     # First line that's not of that form ends the metadata.
     # Returns the parsed metadata, and the non-metadata lines
-    md = {}
-    nameMapping = {"Character Height": "height", "Space Width": "space-width"}
-    valProcessors = {"height": int, "space-width": int}
     i = 0
+    height = None
+    spaceWidth = None
     for i, line in enumerate(lines):
         match = re.match(r"([^:]+):\s+(\S.*)", line)
         if not match:
             break
         key = match.group(1)
         val = match.group(2)
-        if key in nameMapping:
-            key = nameMapping[key]
+        if key == "Character Height":
+            height = int(val)
+        elif key == "Space Width":
+            spaceWidth = int(val)
         else:
             m.die(f"Unrecognized font metadata “{key}”")
-        if key in valProcessors:
-            val = valProcessors[key](val)
-        md[key] = val
+    if height is None:
+        m.die("Missing 'Character Height' metadata.")
+        raise Exception("")
+    if spaceWidth is None:
+        m.die("Missing 'Space Width' metadata.")
+        raise Exception("")
+    md = FontMetadata(height, spaceWidth)
     return md, lines[i:]
 
 
-def parseCharacters(md, lines):
+def parseCharacters(md: FontMetadata, lines: t.List[str]) -> Characters:
     import string
 
-    height = md["height"]
-    characters = {}
-    if "space-width" in md:
-        characters[" "] = [" " * md["space-width"]] * height
-    for bigcharlines in grouper(lines, height + 1):
-        littlechar = bigcharlines[0][0]
+    height = md.height
+    characters: Characters = {}
+    characters[" "] = [" " * md.spaceWidth] * height
+    for bigcharlines in grouper(lines, height + 1, ""):
+        littlechar = t.cast(str, bigcharlines[0][0])
         bigchar = [line.strip("\n") for line in bigcharlines[1:]]
         width = max(len(line) for line in bigchar)
         for i, line in enumerate(bigchar):
@@ -132,7 +148,7 @@ def parseCharacters(md, lines):
     return characters
 
 
-def replaceComments(font, inputFilename=None, outputFilename=None):
+def replaceComments(font: Font, inputFilename: t.Optional[str] = None, outputFilename: t.Optional[str] = None) -> None:
     lines, inputFilename = getInputLines(inputFilename)
     replacements = []
     for i, line in enumerate(lines):
@@ -148,14 +164,14 @@ def replaceComments(font, inputFilename=None, outputFilename=None):
 # Some utility functions
 
 
-def grouper(iterable, n, fillvalue=None):
+def grouper(iterable: t.Sequence[T], n: int, fillvalue: U) -> t.Generator[t.List[t.Union[T, U]], None, None]:
     "Collect data into fixed-length chunks or blocks"
     # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx
     args = [iter(iterable)] * n
-    return (list(x) for x in itertools.zip_longest(fillvalue=fillvalue, *args))
+    return (list(t.cast("t.Iterable[t.Union[T,U]]", x)) for x in itertools.zip_longest(fillvalue=fillvalue, *args))
 
 
-def getInputLines(inputFilename):
+def getInputLines(inputFilename: t.Optional[str]) -> t.Tuple[t.List[str], str]:
     if inputFilename is None:
         # Default to looking for a *.bs file.
         # Otherwise, look for a *.src.html file.
@@ -176,14 +192,14 @@ def getInputLines(inputFilename):
                 lines = fh.readlines()
     except FileNotFoundError:
         m.die(f"Couldn't find the input file at the specified location '{inputFilename}'.")
-        return []
+        return ([], "")
     except OSError:
         m.die(f"Couldn't open the input file '{inputFilename}'.")
-        return []
+        return ([], "")
     return lines, inputFilename
 
 
-def writeOutputLines(outputFilename, inputFilename, lines):
+def writeOutputLines(outputFilename: t.Optional[str], inputFilename: str, lines: t.List[str]) -> None:
     if outputFilename is None:
         outputFilename = inputFilename
     try:
@@ -196,7 +212,7 @@ def writeOutputLines(outputFilename, inputFilename, lines):
         m.die(f"Something prevented me from saving the output document to {outputFilename}:\n{e}")
 
 
-def main():
+def main() -> None:
     import argparse
 
     argparser = argparse.ArgumentParser(description="Outputs text as giant ASCII art.")
