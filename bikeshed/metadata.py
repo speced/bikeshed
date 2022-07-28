@@ -23,13 +23,13 @@ if t.TYPE_CHECKING:
 
 class MetadataManager:
     @property
-    def vshortname(self) -> t.Optional[str]:
+    def vshortname(self) -> str:
         if self.level:
             return f"{self.shortname}-{self.level}"
         return self.shortname
 
     @property
-    def displayVshortname(self) -> t.Optional[str]:
+    def displayVshortname(self) -> str:
         if self.level:
             return f"{self.displayShortname}-{self.level}"
         return self.displayShortname
@@ -42,11 +42,12 @@ class MetadataManager:
 
         # required metadata
         self.abstract: t.List[str] = []
-        self.ED: t.Optional[str] = None
-        self.level: t.Optional[str] = None
-        self.shortname: t.Optional[str] = None
-        self.status: t.Optional[str] = None
-        self.rawStatus: t.Optional[str] = None
+        self.ED: str
+        self.level: str
+        self.displayShortname: str
+        self.shortname: str
+        self.status: str
+        self.rawStatus: str
 
         # optional metadata
         self.advisementClass: str = "advisement"
@@ -67,7 +68,6 @@ class MetadataManager:
         self.defaultHighlight: t.Optional[str] = None
         self.defaultBiblioDisplay: str = "index"
         self.defaultRefStatus: t.Optional[str] = None
-        self.displayShortname: t.Optional[str] = None
         self.editors: t.List[str] = []
         self.editorTerm: t.Dict[str, str] = {"singular": "Editor", "plural": "Editors"}
         self.expires: t.Optional[date] = None

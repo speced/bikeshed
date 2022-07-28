@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import json
 from collections import OrderedDict
 
-from . import h, messages as m
+from . import h, messages as m, t
 
 
-def addMdnPanels(doc):
+def addMdnPanels(doc: t.SpecT) -> None:
     if not doc.md.includeMdnPanels:
         return
 
@@ -98,11 +100,11 @@ def addMdnPanels(doc):
             """  # noqa
 
 
-def createAnno(className, mdnButton, featureDivs):
+def createAnno(className: str, mdnButton: t.ElementT, featureDivs: t.List[t.ElementT]):
     return h.E.div({"class": className}, mdnButton, featureDivs)
 
 
-def panelsFromData(doc, data):
+def panelsFromData(doc: t.SpecT, data: t.Dict[str, t.Any]) -> bool:
     mdnBaseUrl = "https://developer.mozilla.org/en-US/docs/Web/"
 
     browsersProvidingCurrentEngines = ["firefox", "safari", "chrome"]
@@ -256,7 +258,12 @@ def panelsFromData(doc, data):
     return panels
 
 
-def addSupportRow(browserCodeName, nameFromCodeName, support, supportData):
+def addSupportRow(
+    browserCodeName: str,
+    nameFromCodeName: t.Dict[str, str],
+    support: t.Dict[str, t.Any],
+    supportData: t.Dict[str, t.Any],
+) -> None:
     if browserCodeName not in support:
         return
     isEdgeLegacy = browserCodeName == "edge"
@@ -264,7 +271,6 @@ def addSupportRow(browserCodeName, nameFromCodeName, support, supportData):
     needsFlag = False
     versionAdded = None
     versionRemoved = None
-    minVersion = None
     thisBrowserSupport = support[browserCodeName]
     if isinstance(thisBrowserSupport, dict):
         if "version_added" in thisBrowserSupport:
@@ -332,14 +338,14 @@ def addSupportRow(browserCodeName, nameFromCodeName, support, supportData):
 
 
 def mdnPanelFor(
-    feature,
-    mdnBaseUrl,
-    nameFromCodeName,
-    browsersProvidingCurrentEngines,
-    browsersWithBorrowedEngines,
-    browsersWithRetiredEngines,
-    browsersForMobileDevices,
-):
+    feature: t.Dict[str, t.Any],
+    mdnBaseUrl: str,
+    nameFromCodeName: t.Dict[str, str],
+    browsersProvidingCurrentEngines: t.List[str],
+    browsersWithBorrowedEngines: t.List[str],
+    browsersWithRetiredEngines: t.List[str],
+    browsersForMobileDevices: t.List[str],
+) -> t.ElementT:
     featureDiv = h.E.div({"class": "feature"})
     if "slug" in feature:
         slug = feature["slug"]
@@ -378,7 +384,9 @@ def mdnPanelFor(
     return featureDiv
 
 
-def browserCompatSpan(browserCodeName, browserFullName, statusCode, minVersion, needsFlag):
+def browserCompatSpan(
+    browserCodeName: str, browserFullName: str, statusCode: str, minVersion: str, needsFlag: bool
+) -> t.ElementT:
     # browserCodeName: e.g. "chrome"
     # browserFullName: e.g. "Chrome for Android"
     minVersionAttributes = {}
