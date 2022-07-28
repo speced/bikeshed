@@ -1,7 +1,9 @@
-from . import config, h, messages as m
+from __future__ import annotations
+
+from . import config, h, messages as m, t
 
 
-def processHeadings(doc, scope="doc"):
+def processHeadings(doc: t.SpecT, scope: str = "doc") -> None:
     # scope arg can be "doc" or "all"
     # "doc" ignores things that are part of boilerplate
     for el in h.findAll("h2, h3, h4, h5, h6", doc):
@@ -23,20 +25,14 @@ def processHeadings(doc, scope="doc"):
         checkPrivacySecurityHeadings(h.findAll(".heading", doc))
 
 
-def resetHeadings(headings):
+def resetHeadings(headings: t.List[t.ElementT]) -> None:
     for header in headings:
-        # Reset to base, if this is a re-run
-        if h.find(".content", header) is not None:
-            content = h.find(".content", header)
-            h.moveContents(header, content)
-
-        # Insert current header contents into a <span class='content'>
         content = h.E.span({"class": "content"})
         h.moveContents(content, header)
         h.appendChild(header, content)
 
 
-def addHeadingIds(doc, headings):
+def addHeadingIds(doc: t.SpecT, headings: t.List[t.ElementT]) -> None:
     neededIds = set()
     for header in headings:
         if header.get("id") is None:
@@ -58,7 +54,7 @@ def addHeadingIds(doc, headings):
         )
 
 
-def checkPrivacySecurityHeadings(headings):
+def checkPrivacySecurityHeadings(headings: t.List[t.ElementT]) -> None:
     security = False
     privacy = False
     for header in headings:
@@ -88,13 +84,13 @@ def checkPrivacySecurityHeadings(headings):
         )
 
 
-def addHeadingAlgorithms(headings):
+def addHeadingAlgorithms(headings: t.List[t.ElementT]) -> None:
     for header in headings:
         if header.get("data-algorithm") == "":
             header.set("data-algorithm", h.textContent(header).strip())
 
 
-def determineHeadingLevels(headings):
+def determineHeadingLevels(headings: t.List[t.ElementT]) -> None:
     headerLevel = [0, 0, 0, 0, 0]
 
     def incrementLevel(level):
@@ -127,7 +123,7 @@ def determineHeadingLevels(headings):
         header.set("data-level", printLevel())
 
 
-def addHeadingBonuses(headings):
+def addHeadingBonuses(headings: t.List[t.ElementT]) -> None:
     for header in headings:
         if header.get("data-level") is not None:
             secno = h.E.span({"class": "secno"}, header.get("data-level") + ". ")

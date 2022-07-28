@@ -1,10 +1,14 @@
 # pylint: disable=R1732
 
+import dataclasses
 import glob
 import re
 import sys
 
-from . import messages as m
+from . import messages as m, t
+
+if t.TYPE_CHECKING:
+    import io  # pylint: disable=unused-import
 
 statusStyle = {
     "accepted": "a",
@@ -17,7 +21,18 @@ statusStyle = {
 }
 
 
-def printIssueList(infilename=None, outfilename=None):
+@dataclasses.dataclass
+class HeaderInfo:
+    title: str
+    url: str
+    status: str
+    ed: str
+    date: str
+    cdate: str
+    intro: t.Optional[str] = None
+
+
+def printIssueList(infilename: t.Optional[str] = None, outfilename: t.Optional[str] = None) -> None:
     if infilename is None:
         infilename = findIssuesFile()
         if infilename is None:
@@ -39,10 +54,13 @@ def printIssueList(infilename=None, outfilename=None):
 
     lines = infile.readlines()
     headerInfo = extractHeaderInfo(lines, infilename)
+    if headerInfo is None:
+        m.die("Couldn't parse header info.")
+        return
 
     if outfilename is None:
         if infilename == "-":
-            outfilename = "issues-{status}-{cdate}.html".format(**headerInfo).lower()
+            outfilename = f"issues-{headerInfo.status}-{headerInfo.cdate}.html".lower()
         elif infilename.endswith(".txt"):
             outfilename = infilename[:-4] + ".html"
         else:
@@ -62,33 +80,33 @@ def printIssueList(infilename=None, outfilename=None):
     printScript(outfile)
 
 
-def findIssuesFile():
+def findIssuesFile() -> t.Optional[str]:
     # Look for digits in the filename, and use the one with the largest number if it's unique.
-    def extractNumber(filename):
+    def extractNumber(filename: str) -> t.Optional[str]:
         number = re.sub(r"\D", "", filename)
         return number if number else None
 
     possibleFiles = [*glob.glob("issues*.txt"), *glob.glob("*.bsi")]
     if len(possibleFiles) == 0:
         m.die("Can't find an 'issues*.txt' or '*.bsi' file in this folder. Explicitly pass a filename.")
-        return
+        return None
     if len(possibleFiles) == 1:
         return possibleFiles[0]
 
     # If there are more than one, assume they contain either an index or a YYYYMMDD date,
     # and select the largest such value.
-    possibleFiles = [(extractNumber(fn), fn) for fn in possibleFiles if extractNumber(fn) is not None]
-    if len(possibleFiles) == 1:
-        return possibleFiles[0][1]
+    possibleFilesNum = [(extractNumber(fn), fn) for fn in possibleFiles if extractNumber(fn) is not None]
+    if len(possibleFilesNum) == 1:
+        return possibleFilesNum[0][1]
 
-    possibleFiles.sort(reverse=True)
-    if len(possibleFiles) == 0 or possibleFiles[0][0] == possibleFiles[1][0]:
+    possibleFilesNum.sort(reverse=True)
+    if len(possibleFilesNum) == 0 or possibleFilesNum[0][0] == possibleFilesNum[1][0]:
         m.die("Can't tell which issues-list file is the most recent. Explicitly pass a filename.")
-        return
-    return possibleFiles[0][1]
+        return None
+    return possibleFilesNum[0][1]
 
 
-def extractHeaderInfo(lines, infilename):
+def extractHeaderInfo(lines: t.Sequence[str], infilename: str) -> t.Optional[HeaderInfo]:
     title = None
     url = None
     status = None
@@ -114,10 +132,10 @@ def extractHeaderInfo(lines, infilename):
                 ed = match.group(2).rstrip()
     if url is None:
         m.die("Missing 'Draft' metadata.")
-        return
+        return None
     if title is None:
         m.die("Missing 'Title' metadata.")
-        return
+        return None
 
     match = re.search(r"([A-Z]{2,})-([a-z0-9-]+)-(\d{8})", url)
     if match:
@@ -131,7 +149,9 @@ def extractHeaderInfo(lines, infilename):
             ed = f"http://dev.w3.org/csswg/{shortname}/"
         if date is None:
             cdate = match.group(3)
-            date = "{}-{}-{}".format(*re.match(r"(\d{4})(\d\d)(\d\d)", cdate).groups())
+            match = re.match(r"(\d{4})(\d\d)(\d\d)", cdate)
+            assert match is not None
+            date = f"{match.group(1)}-{match.group(2)}-{match.group(3)}"
     else:
         m.warn(
             f"Autodetection of Shortname, Date, and Status failed; draft url does not match the format /status-shortname-date/. Got:\n{url}"
@@ -139,30 +159,30 @@ def extractHeaderInfo(lines, infilename):
 
     if date is None:
         m.die("Missing 'Date' metadata.")
-        return
+        return None
     if status is None:
         m.die("Missing 'Status' metadata.")
-        return
+        return None
     if ed is None:
         m.die("Missing 'ED' metadata.")
-        return
+        return None
 
     match = re.search(r"^Intro:\s*(.*(\n^$|\n[ \t]+.*)*)", "".join(lines), re.M)
     if match:
         intro = match.group(1)
 
-    return {
-        "title": title,
-        "date": date,
-        "cdate": cdate,
-        "ed": ed,
-        "status": status,
-        "url": url,
-        "intro": intro,
-    }
+    return HeaderInfo(
+        title=title,
+        date=date,
+        cdate=t.cast(str, cdate),
+        ed=ed,
+        status=status,
+        url=url,
+        intro=intro,
+    )
 
 
-def printHelpMessage():
+def printHelpMessage() -> None:
     m.say(
         """Draft:    http://www.w3.org/TR/2013/WD-css-foo-3-20130103/ (Mandatory)
 Title:    CSS Foo Level 3 (Mandatory)
@@ -193,11 +213,11 @@ Issue 2.
     )
 
 
-def printHeader(outfile, headerInfo):
+def printHeader(outfile: t.TextIO, hi: HeaderInfo):
     outfile.write(
-        """<!DOCTYPE html>
+        f"""<!DOCTYPE html>
 <meta charset="utf-8">
-<title>{title} Disposition of Comments for {date} {status}</title>
+<title>{hi.title} Disposition of Comments for {hi.date} {hi.status}</title>
 <style>
   .a  {{ background: lightgreen }}
   .d  {{ background: lightblue  }}
@@ -207,13 +227,13 @@ def printHeader(outfile, headerInfo):
   :target {{ box-shadow: 0.25em 0.25em 0.25em;  }}
 </style>
 
-<h1>{title} Disposition of Comments for {date} {status}</h1>
+<h1>{hi.title} Disposition of Comments for {hi.date} {hi.status}</h1>
 
-<p>Review document: <a href="{url}">{url}</a>
+<p>Review document: <a href="{hi.url}">{hi.url}</a>
 
-<p>Editor's draft: <a href="{ed}">{ed}</a></p>
+<p>Editor's draft: <a href="{hi.ed}">{hi.ed}</a></p>
 
-{intro}
+{hi.intro or ""}
 
 <p>The following color coding convention is used for comments:</p>
 
@@ -230,13 +250,11 @@ def printHeader(outfile, headerInfo):
 <p>An issue can be closed as <code>Accepted</code>, <code>OutOfScope</code>,
 <code>Invalid</code>, <code>Rejected</code>, or <code>Retracted</code>.
 <code>Verified</code> indicates commentor's acceptance of the response.</p>
-        """.format(
-            **headerInfo
-        )
+"""
     )
 
 
-def printIssues(outfile, lines):
+def printIssues(outfile: t.TextIO, lines: t.List[str]) -> None:
     text = "".join(lines)
     issues = text.split("----\n")[1:]
     for issue in issues:
@@ -258,6 +276,7 @@ def printIssues(outfile, lines):
             code = "a"
         elif re.search(r"\n(Closed|Open):\s+\S+", issue):
             match = re.search(r"\n(Closed|Open):\s+(\S+)", issue)
+            assert match is not None
             code = match.group(2)
             if code.lower() in statusStyle:
                 code = statusStyle[code.lower()]
@@ -279,7 +298,7 @@ def printIssues(outfile, lines):
         outfile.write("</pre>\n")
 
 
-def printScript(outfile):
+def printScript(outfile: t.TextIO) -> None:
     outfile.write(
         """<script>
 (function () {

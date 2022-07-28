@@ -20,6 +20,7 @@ from typing import (
     overload,
     Sequence,
     Set,
+    TextIO,
     Tuple,
     TYPE_CHECKING,
     TypeVar,
