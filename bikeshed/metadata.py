@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import json
 import os
@@ -10,127 +12,129 @@ from functools import partial
 import attr
 from isodate import Duration, parse_duration
 
-from . import config, constants, datablocks, markdown, h, messages as m, repository
+from . import config, constants, datablocks, markdown, h, messages as m, repository, t
 from .DefaultOrderedDict import DefaultOrderedDict
 
 
 class MetadataManager:
     @property
-    def vshortname(self):
+    def vshortname(self) -> t.Optional[str]:
         if self.level:
             return f"{self.shortname}-{self.level}"
         return self.shortname
 
     @property
-    def displayVshortname(self):
+    def displayVshortname(self) -> t.Optional[str]:
         if self.level:
             return f"{self.displayShortname}-{self.level}"
         return self.displayShortname
 
-    def __init__(self):
-        self.hasMetadata = False
+    def __init__(self) -> None:
+        self.hasMetadata: bool = False
 
         # All metadata ever passed to .addData()
-        self.allData = defaultdict(list)
+        self.allData: t.DefaultDict[str, t.List[str]] = defaultdict(list)
 
         # required metadata
-        self.abstract = []
-        self.ED = None
-        self.level = None
-        self.shortname = None
-        self.status = None
-        self.rawStatus = None
+        self.abstract: t.List[str] = []
+        self.ED: t.Optional[str] = None
+        self.level: t.Optional[str] = None
+        self.shortname: t.Optional[str] = None
+        self.status: t.Optional[str] = None
+        self.rawStatus: t.Optional[str] = None
 
         # optional metadata
-        self.advisementClass = "advisement"
-        self.assertionClass = "assertion"
-        self.assumeExplicitFor = False
-        self.atRisk = []
-        self.audience = []
-        self.blockElements = []
-        self.boilerplate = config.BoolSet(default=True)
-        self.canIUseURLs = []
-        self.canonicalURL = None
-        self.complainAbout = config.BoolSet()
-        self.customTextMacros = []
-        self.customWarningText = []
-        self.customWarningTitle = None
-        self.date = datetime.utcnow().date()
-        self.deadline = None
-        self.defaultHighlight = None
-        self.defaultBiblioDisplay = "index"
-        self.defaultRefStatus = None
-        self.displayShortname = None
-        self.editors = []
-        self.editorTerm = {"singular": "Editor", "plural": "Editors"}
-        self.expires = None
-        self.externalInfotrees = config.BoolSet(default=False)
-        self.favicon = None
-        self.forceCrossorigin = False
-        self.group = None
-        self.h1 = None
-        self.ignoreCanIUseUrlFailure = []
-        self.ignoredTerms = []
-        self.ignoredVars = []
-        self.implementationReport = None
-        self.includeCanIUsePanels = False
-        self.includeMdnPanels = False
-        self.indent = 4
-        self.inferCSSDfns = False
-        self.informativeClasses = []
-        self.inlineGithubIssues = False
-        self.inlineTagCommands = {}
-        self.issueClass = "issue"
-        self.issues = []
-        self.issueTrackerTemplate = None
-        self.lineNumbers = False
-        self.linkDefaults = defaultdict(list)
-        self.localBoilerplate = config.BoolSet(default=False)
-        self.logo = None
-        self.mailingList = None
-        self.mailingListArchives = None
-        self.markupShorthands = config.BoolSet(["css", "dfn", "biblio", "markup", "http", "idl", "algorithm"])
-        self.maxToCDepth = float("inf")
-        self.metadataInclude = config.BoolSet(default=True)
-        self.metadataOrder = ["*", "!*"]
-        self.noAbstract = False
-        self.noEditor = False
-        self.noteClass = "note"
-        self.opaqueElements = ["pre", "xmp", "script", "style"]
-        self.prepTR = False
-        self.previousEditors = []
-        self.previousVersions = []
-        self.removeMultipleLinks = False
-        self.repository = config.Nil()
-        self.requiredIDs = []
-        self.slimBuildArtifact = False
-        self.statusText = []
-        self.testSuite = None
-        self.title = None
-        self.toggleDiffs = False
-        self.TR = None
-        self.trackingVectorAltText = "(This is a tracking vector.)"
-        self.trackingVectorClass = "tracking-vector"
-        self.trackingVectorImage = None
-        self.trackingVectorImageHeight = "64"
-        self.trackingVectorImageWidth = "46"
-        self.trackingVectorTitle = "There is a tracking vector here."
-        self.translateIDs = defaultdict(list)
-        self.translations = []
-        self.useDfnPanels = True
-        self.useIAutolinks = False
-        self.versionHistory = []
-        self.warning = None
-        self.workStatus = None
-        self.wptDisplay = "none"
-        self.wptPathPrefix = None
-        self.imgAutoSize = True
+        self.advisementClass: str = "advisement"
+        self.assertionClass: str = "assertion"
+        self.assumeExplicitFor: bool = False
+        self.atRisk: t.List[str] = []
+        self.audience: t.List[str] = []
+        self.blockElements: t.List[str] = []
+        self.boilerplate: config.BoolSet = config.BoolSet(default=True)
+        self.canIUseURLs: t.List[str] = []
+        self.canonicalURL: t.Optional[str] = None
+        self.complainAbout: config.BoolSet = config.BoolSet()
+        self.customTextMacros: t.List[t.Tuple[str, str]] = []
+        self.customWarningText: t.List[str] = []
+        self.customWarningTitle: t.Optional[str] = None
+        self.date: date = datetime.utcnow().date()
+        self.deadline: t.Optional[date] = None
+        self.defaultHighlight: t.Optional[str] = None
+        self.defaultBiblioDisplay: str = "index"
+        self.defaultRefStatus: t.Optional[str] = None
+        self.displayShortname: t.Optional[str] = None
+        self.editors: t.List[str] = []
+        self.editorTerm: t.Dict[str, str] = {"singular": "Editor", "plural": "Editors"}
+        self.expires: t.Optional[date] = None
+        self.externalInfotrees: config.BoolSet = config.BoolSet(default=False)
+        self.favicon: t.Optional[str] = None
+        self.forceCrossorigin: bool = False
+        self.group: t.Optional[str] = None
+        self.h1: t.Optional[str] = None
+        self.ignoreCanIUseUrlFailure: t.List[str] = []
+        self.ignoredTerms: t.List[str] = []
+        self.ignoredVars: t.List[str] = []
+        self.implementationReport: t.Optional[str] = None
+        self.includeCanIUsePanels: bool = False
+        self.includeMdnPanels: bool = False
+        self.indent: int = 4
+        self.inferCSSDfns: bool = False
+        self.informativeClasses: t.List[str] = []
+        self.inlineGithubIssues: bool = False
+        self.inlineTagCommands: t.Dict[str, str] = {}
+        self.issueClass: str = "issue"
+        self.issues: t.List[t.Tuple[str, str]] = []
+        self.issueTrackerTemplate: t.Optional[str] = None
+        self.lineNumbers: bool = False
+        self.linkDefaults: t.DefaultDict[str, t.List[t.Tuple[str, str, str, str]]] = defaultdict(list)
+        self.localBoilerplate: config.BoolSet = config.BoolSet(default=False)
+        self.logo: t.Optional[str] = None
+        self.mailingList: t.Optional[str] = None
+        self.mailingListArchives: t.Optional[str] = None
+        self.markupShorthands: config.BoolSet = config.BoolSet(
+            ["css", "dfn", "biblio", "markup", "http", "idl", "algorithm"]
+        )
+        self.maxToCDepth: t.Union[int, float, None] = float("inf")
+        self.metadataInclude: config.BoolSet = config.BoolSet(default=True)
+        self.metadataOrder: t.List[str] = ["*", "!*"]
+        self.noAbstract: bool = False
+        self.noEditor: bool = False
+        self.noteClass: str = "note"
+        self.opaqueElements: t.List[str] = ["pre", "xmp", "script", "style"]
+        self.prepTR: bool = False
+        self.previousEditors: t.List[t.Dict[str, t.Optional[str]]] = []
+        self.previousVersions: t.List[str] = []
+        self.removeMultipleLinks: bool = False
+        self.repository: t.Optional[repository.Repository] = None
+        self.requiredIDs: t.List[str] = []
+        self.slimBuildArtifact: bool = False
+        self.statusText: t.List[str] = []
+        self.testSuite: t.Optional[str] = None
+        self.title: t.Optional[str] = None
+        self.toggleDiffs: bool = False
+        self.TR: t.Optional[str] = None
+        self.trackingVectorAltText: str = "(This is a tracking vector.)"
+        self.trackingVectorClass: str = "tracking-vector"
+        self.trackingVectorImage: t.Optional[str] = None
+        self.trackingVectorImageHeight: str = "64"
+        self.trackingVectorImageWidth: str = "46"
+        self.trackingVectorTitle: str = "There is a tracking vector here."
+        self.translateIDs: t.DefaultDict[str, t.List[t.Tuple[str, str]]] = defaultdict(list)
+        self.translations: t.List[t.Dict[str, str]] = []
+        self.useDfnPanels: bool = True
+        self.useIAutolinks: bool = False
+        self.versionHistory: t.List[str] = []
+        self.warning: t.Optional[str] = None
+        self.workStatus: t.Optional[str] = None
+        self.wptDisplay: str = "none"
+        self.wptPathPrefix: t.Optional[str] = None
+        self.imgAutoSize: bool = True
 
         self.otherMetadata = DefaultOrderedDict(list)
 
-        self.manuallySetKeys = set()
+        self.manuallySetKeys: t.Set[str] = set()
 
-    def addData(self, key, val, lineNum=None):
+    def addData(self, key: str, val: str, lineNum: t.Optional[str] = None) -> MetadataManager:
         key = key.strip()
         if isinstance(val, str):
             if key in ["Abstract"]:
@@ -142,7 +146,7 @@ class MetadataManager:
             self.allData[key].append(val)
             key = key[1:]
             self.otherMetadata[key].append(val)
-            return
+            return self
 
         if key not in ("ED", "TR", "URL"):
             key = key.title()
@@ -150,20 +154,22 @@ class MetadataManager:
 
         if key not in knownKeys:
             m.die(f'Unknown metadata key "{key}". Prefix custom keys with "!".', lineNum=lineNum)
-            return
+            return self
         md = knownKeys[key]
 
         val = md.parse(key=key, val=val, lineNum=lineNum)
 
         self.addParsedData(key, val)
+        return self
 
-    def addParsedData(self, key, val):
+    def addParsedData(self, key: str, val: t.Any) -> MetadataManager:
         md = knownKeys[key]
         result = md.join(getattr(self, md.attrName), val)
         setattr(self, md.attrName, result)
         self.manuallySetKeys.add(key)
+        return self
 
-    def computeImplicitMetadata(self, doc):
+    def computeImplicitMetadata(self, doc: t.SpecT) -> None:
         # Do some "computed metadata", based on the value of other metadata.
         # Only call this when you're sure all metadata sources are parsed.
         if self.group == "byos":
@@ -171,7 +177,7 @@ class MetadataManager:
         if not self.repository and doc:
             self.repository = getSpecRepository(doc)
         if (
-            self.repository.type == "github"
+            isinstance(self.repository, repository.GithubRepository)
             and "feedback-header" in self.boilerplate
             and "repository-issue-tracking" in self.boilerplate
         ):
@@ -190,13 +196,13 @@ class MetadataManager:
         if self.displayShortname:
             self.shortname = self.displayShortname.lower()
 
-    def validate(self):
+    def validate(self) -> bool:
         if self.group == "byos":
             return True
 
         if not self.hasMetadata:
             m.die("The document requires at least one <pre class=metadata> block.")
-            return
+            return False
 
         if self.status in ("w3c/IG-NOTE", "w3c/WG-NOTE"):
             m.die(
@@ -251,22 +257,25 @@ class MetadataManager:
             m.warn("Some recommended metadata is missing:\n" + "\n".join(warnings))
         if errors:
             m.die("Not all required metadata was provided:\n" + "\n".join(errors))
-            return
+            return False
+        return True
 
-    def fillTextMacros(self, macros, doc):
+    def fillTextMacros(self, macros: t.DefaultDict[str, str], doc: t.SpecT) -> None:
         # Fills up a set of text macros based on metadata.
         if self.title:
             macros["title"] = self.title
             macros["spectitle"] = self.title
         if self.h1:
             macros["spectitle"] = self.h1
-        macros["shortname"] = self.displayShortname
+        if self.displayShortname:
+            macros["shortname"] = self.displayShortname
         if self.statusText:
             macros["statustext"] = "\n".join(markdown.parse(self.statusText, self.indent))
         else:
             macros["statustext"] = ""
         macros["level"] = str(self.level)
-        macros["vshortname"] = self.displayVshortname
+        if self.displayVshortname:
+            macros["vshortname"] = self.displayVshortname
         if self.status == "FINDING" and self.group:
             macros["longstatus"] = f"Finding of the {self.group}"
         elif self.status in config.shortToLongStatus:
@@ -281,7 +290,7 @@ class MetadataManager:
             macros["status"] = "NOTE"
         elif self.status == "w3c/NOTE-ED":
             macros["status"] = "ED"
-        else:
+        elif self.rawStatus:
             macros["status"] = self.rawStatus
         if self.workStatus:
             macros["workstatus"] = self.workStatus
@@ -294,7 +303,7 @@ class MetadataManager:
         elif self.noAbstract:
             macros["abstract"] = ""
             macros["abstractattr"] = ""
-        macros["year"] = self.date.year
+        macros["year"] = str(self.date.year)
         macros["date"] = self.date.strftime(f"{self.date.day} %B %Y")
         macros["date-dmmy"] = self.date.strftime(f"{self.date.day} %B %Y")  # same as plain 'date'
         macros["cdate"] = self.date.strftime("%Y%m%d")
@@ -328,7 +337,7 @@ class MetadataManager:
         if self.logo:
             macros["logo"] = self.logo
         if self.repository:
-            macros["repository"] = self.repository.name
+            macros["repository"] = self.repository.name or "Unnamed Repo"
             macros["repositoryurl"] = self.repository.url
         if self.mailingList:
             macros["mailinglist"] = self.mailingList
@@ -367,7 +376,7 @@ class MetadataManager:
             macros[name.lower()] = text
 
 
-def parseDate(key, val, lineNum):
+def parseDate(key: str, val: str, lineNum: t.Optional[str]) -> t.Optional[date]:
     if val == "now":
         return datetime.utcnow().date()
     try:
@@ -377,7 +386,7 @@ def parseDate(key, val, lineNum):
         return None
 
 
-def parseDateOrDuration(key, val, lineNum):
+def parseDateOrDuration(key: str, val: str, lineNum: t.Optional[str]) -> t.Optional[t.Union[date, timedelta]]:
     if val == "now":
         return datetime.utcnow().date()
     if val == "never" or boolish(val) is False:

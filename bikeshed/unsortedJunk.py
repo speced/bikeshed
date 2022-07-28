@@ -7,7 +7,7 @@ from collections import Counter, defaultdict, namedtuple
 from urllib import parse
 from PIL import Image
 
-from . import biblio, config, dfnpanels, h, func, t, messages as m, idl
+from . import biblio, config, dfnpanels, h, func, t, messages as m, idl, repository
 
 if t.TYPE_CHECKING:
     import widlparser  # pylint: disable=unused-import
@@ -1031,7 +1031,7 @@ def processIssuesAndExamples(doc: t.SpecT) -> None:
                         "data-inline-github",
                         "{} {} {}".format(*githubMatch.groups()),
                     )
-            elif numberMatch and doc.md.repository.type == "github":
+            elif numberMatch and isinstance(doc.md.repository, repository.GithubRepository):
                 remoteIssueURL = doc.md.repository.formatIssueUrl(numberMatch.group(1))
                 if doc.md.inlineGithubIssues:
                     el.set(
@@ -1427,6 +1427,9 @@ def inlineRemoteIssues(doc: t.SpecT) -> None:
 
     # Right now, only github inline issues are supported.
     # More can be supported when someone cares.
+
+    if not isinstance(doc.md.repository, repository.GithubRepository):
+        return
 
     # Collect all the inline issues in the document
     inlineIssues = []
