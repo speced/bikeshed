@@ -1,3 +1,4 @@
+import copy
 from collections import OrderedDict
 
 
@@ -28,14 +29,12 @@ class DefaultOrderedDict(OrderedDict):
         return type(self), args, None, None, list(self.items())
 
     def copy(self):
-        return self.__copy__()
+        return copy.copy(self)
 
     def __copy__(self):
         return type(self)(self.default_factory, self)
 
     def __deepcopy__(self, memo):
-        import copy
-
         return type(self)(self.default_factory, copy.deepcopy(list(self.items())))
 
     def __repr__(self):

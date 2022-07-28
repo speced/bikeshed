@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# pylint: disable=arguments-renamed
+
 from __future__ import annotations
 
 import math as Math

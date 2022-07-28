@@ -49,7 +49,7 @@ def processWptElements(doc):
         if localPrefix is not None:
             pathPrefix = localPrefix
         if pathPrefix is None:
-            m.die("Can't use <wpt-rest> without either a pathprefix=" " attribute or a 'WPT Path Prefix' metadata.")
+            m.die("Can't use <wpt-rest> without either a pathprefix='' attribute or a 'WPT Path Prefix' metadata.")
             return
         prefixedNames = [p for p in testData if prefixInPath(pathPrefix, p) and p not in seenTestNames]
         if len(prefixedNames) == 0:
