@@ -42,12 +42,12 @@ class MetadataManager:
 
         # required metadata
         self.abstract: t.List[str] = []
-        self.ED: str
-        self.level: str
-        self.displayShortname: str
-        self.shortname: str
-        self.status: str
-        self.rawStatus: str
+        self.ED: str = ""
+        self.level: str = ""
+        self.displayShortname: str = ""
+        self.shortname: str = ""
+        self.status: str = ""
+        self.rawStatus: str = ""
 
         # optional metadata
         self.advisementClass: str = "advisement"
@@ -162,7 +162,7 @@ class MetadataManager:
             return self
         md = knownKeys[key]
 
-        val = md.parse(key, val, lineNum)
+        val = md.parse(key, val, lineNum=lineNum)
 
         self.addParsedData(key, val)
         return self
