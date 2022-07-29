@@ -42,12 +42,12 @@ class MetadataManager:
 
         # required metadata
         self.abstract: t.List[str] = []
-        self.ED: str = ""
-        self.level: str = ""
-        self.displayShortname: str = ""
-        self.shortname: str = ""
-        self.status: str = ""
-        self.rawStatus: str = ""
+        self.ED: t.Optional[str] = None
+        self.level: t.Optional[str] = None
+        self.displayShortname: t.Optional[str] = None
+        self.shortname: t.Optional[str] = None
+        self.status: t.Optional[str] = None
+        self.rawStatus: t.Optional[str] = None
 
         # optional metadata
         self.advisementClass: str = "advisement"

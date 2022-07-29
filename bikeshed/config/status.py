@@ -312,7 +312,7 @@ assert w3cIgs.issubset(megaGroups["w3c"])
 
 
 def canonicalizeStatus(rawStatus, group):
-    if not rawStatus:
+    if rawStatus is None:
         return None
 
     def validateW3Cstatus(group, status, rawStatus):
@@ -363,7 +363,7 @@ def canonicalizeStatus(rawStatus, group):
     else:
         canonStatus = status
 
-    if not group:
+    if group is not None:
         group = group.lower()
 
     if group in megaGroups["w3c"]:
