@@ -23,13 +23,13 @@ if t.TYPE_CHECKING:
 
 class MetadataManager:
     @property
-    def vshortname(self) -> str:
+    def vshortname(self) -> t.Optional[str]:
         if self.level:
             return f"{self.shortname}-{self.level}"
         return self.shortname
 
     @property
-    def displayVshortname(self) -> str:
+    def displayVshortname(self) -> t.Optional[str]:
         if self.level:
             return f"{self.displayShortname}-{self.level}"
         return self.displayShortname
@@ -379,6 +379,11 @@ class MetadataManager:
         # Custom macros
         for name, text in self.customTextMacros:
             macros[name.lower()] = text
+
+
+class ParseFunc(t.Protocol):
+    def __call__(self, key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Any:
+        ...
 
 
 def parseDate(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Optional[date]:
@@ -1140,7 +1145,7 @@ class Metadata:
     humanName: str
     attrName: str
     join: t.Callable[[t.Any, t.Any], t.Any]
-    parse: t.Callable[[str, str, t.Union[None, str, int]], t.Any]
+    parse: ParseFunc
 
 
 def joinValue(a, b):

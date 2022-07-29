@@ -11,11 +11,11 @@ def addMdnPanels(doc: t.SpecT) -> None:
         return
 
     try:
-        filename = doc.md.vshortname + ".json"
+        filename = f"{doc.md.vshortname}.json"
         datafile = doc.dataFile.fetch("mdn", filename, str=True)
     except OSError:
         try:
-            filename = doc.md.shortname + ".json"
+            filename = f"{doc.md.shortname}.json"
             datafile = doc.dataFile.fetch("mdn", filename, str=True)
         except OSError:
             if doc.md.includeMdnPanels == "maybe":

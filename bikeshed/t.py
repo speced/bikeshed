@@ -17,6 +17,7 @@ from typing import (
     List,
     Mapping,
     Optional,
+    Protocol,
     overload,
     Sequence,
     Set,
