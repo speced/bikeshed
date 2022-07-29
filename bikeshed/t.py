@@ -18,7 +18,6 @@ from typing import (
     List,
     Mapping,
     Optional,
-    Protocol,
     overload,
     Sequence,
     Set,
@@ -29,9 +28,18 @@ from typing import (
     Union,
 )
 
-from lxml import etree
-from typing_extensions import Literal, TypeAlias
+if sys.version_info >= (3, 8):
+    from typing import Literal, Protocol
+else:
+    from typing_extensions import Literal, Protocol
 
+if sys.version_info >= (3, 9):
+    from typing import TypeAlias
+else:
+    from typing_extensions import TypeAlias
+
+
+from lxml import etree
 
 ElementT: TypeAlias = etree._Element  # pylint: disable=protected-access
 DocumentT: TypeAlias = etree._ElementTree  # pylint: disable=protected-access
