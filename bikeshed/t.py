@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 from collections import defaultdict
+
 from typing import (
     AbstractSet,
     Any,
@@ -39,7 +40,7 @@ else:
     from typing_extensions import TypeAlias
 
 
-from lxml import etree
+from lxml import etree  # pylint: disable=wrong-import-position
 
 ElementT: TypeAlias = etree._Element  # pylint: disable=protected-access
 DocumentT: TypeAlias = etree._ElementTree  # pylint: disable=protected-access
