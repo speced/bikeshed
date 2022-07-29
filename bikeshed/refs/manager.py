@@ -97,7 +97,7 @@ class ReferenceManager:
         self.specLevel = None
         self.spec = None
 
-    def initializeRefs(self, doc=None):
+    def initializeRefs(self, doc: t.SpecT = None) -> None:
         """
         Load up the xref data
         This is oddly split up into sub-functions to make it easier to track performance.
@@ -118,7 +118,7 @@ class ReferenceManager:
 
         initFors()
         if doc and doc.inputSource and doc.inputSource.hasDirectory:
-            ldLines = self.dataFile.fetch("link-defaults.infotree").read().rawLines
+            ldLines = self.dataFile.fetch("link-defaults.infotree").read().split("\n")
             datablocks.transformInfo(lines=ldLines, doc=doc, firstLine=ldLines[0], tagName="pre", lineNum=None)
 
             # Get local anchor data
@@ -133,7 +133,10 @@ class ReferenceManager:
                 shouldGetLocalAnchorData = True
             if shouldGetLocalAnchorData:
                 try:
-                    anchorLines = doc.inputSource.relative("anchors.bsdata").read().rawLines
+                    anchorFile = doc.inputSource.relative("anchors.bsdata")
+                    if not anchorFile:
+                        raise OSError()
+                    anchorLines = anchorFile.read().rawLines
                     datablocks.transformAnchors(
                         lines=anchorLines, doc=doc, firstLine=anchorLines[0], tagName="pre", lineNum=None
                     )
@@ -152,7 +155,10 @@ class ReferenceManager:
                 shouldGetLocalLinkDefaults = True
             if shouldGetLocalLinkDefaults:
                 try:
-                    ldLines = doc.inputSource.relative("link-defaults.infotree").read().rawLines
+                    ldFile = doc.inputSource.relative("link-defaults.infotree")
+                    if not ldFile:
+                        raise OSError()
+                    ldLines = ldFile.read().rawLines
                     datablocks.transformInfo(
                         lines=ldLines,
                         doc=doc,
