@@ -1,8 +1,14 @@
-from . import h
+from __future__ import annotations
+
+
+from . import h, t
 from .DefaultOrderedDict import DefaultOrderedDict
 
+if t.TYPE_CHECKING:
+    from . import refs as r  # pylint: disable=unused-import
 
-def addDfnPanels(doc, dfns):
+
+def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
     # Constructs "dfn panels" which show all the local references to a term
     atLeastOnePanel = False
     # Gather all the <a href>s together
@@ -74,7 +80,9 @@ def addDfnPanels(doc, dfns):
         doc.extraStyles["style-dfn-panel"] = dfnPanelStyle
 
 
-def addExternalDfnPanel(termEl, ref, elsFromHref, doc):
+def addExternalDfnPanel(
+    termEl: t.ElementT, ref: r.RefWrapper, elsFromHref: dict[str, list[t.ElementT]], doc: t.SpecT
+) -> None:
     # Constructs "dfn panels" which show all the local references to an external term
     # Gather all the <a href>s together
     refs = DefaultOrderedDict(list)
@@ -127,7 +135,7 @@ def addExternalDfnPanel(termEl, ref, elsFromHref, doc):
         h.appendChild(doc.body, panel)
 
 
-def addExternalDfnPanelStyles(doc):
+def addExternalDfnPanelStyles(doc: t.SpecT) -> None:
     doc.extraScripts["script-dfn-panel"] = dfnPanelScript
     doc.extraStyles["style-dfn-panel"] = dfnPanelStyle
     doc.extraStyles["style-darkmode"] += dfnPanelDarkmodeStyle
