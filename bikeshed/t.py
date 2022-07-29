@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from collections import defaultdict
 from typing import (
     AbstractSet,
     Any,
@@ -46,10 +47,10 @@ if TYPE_CHECKING:
         from .Spec import Spec  # pylint: disable=cyclic-import
     SpecT = Spec
 
-if TYPE_CHECKING:
     from . import biblio  # pylint: disable=cyclic-import
 
     BiblioStorageT: TypeAlias = DefaultDict[str, List[biblio.BiblioEntry]]
 
-if TYPE_CHECKING:
     FillContainersT: TypeAlias = DefaultDict[str, List[ElementT]]
+
+    LinkDefaultsT: TypeAlias = defaultdict[str, list[tuple[str, str, str | None, str | None]]]

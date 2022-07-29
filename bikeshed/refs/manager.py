@@ -118,7 +118,8 @@ class ReferenceManager:
 
         initFors()
         if doc and doc.inputSource and doc.inputSource.hasDirectory:
-            datablocks.transformInfo(self.dataFile.fetch("link-defaults.infotree", str=True).split("\n"), doc)
+            ldLines = self.dataFile.fetch("link-defaults.infotree").read().rawLines
+            datablocks.transformInfo(lines=ldLines, doc=doc, firstLine=ldLines[0], tagName="pre", lineNum=None)
 
             # Get local anchor data
             shouldGetLocalAnchorData = doc.md.externalInfotrees["anchors.bsdata"]
@@ -132,7 +133,10 @@ class ReferenceManager:
                 shouldGetLocalAnchorData = True
             if shouldGetLocalAnchorData:
                 try:
-                    datablocks.transformAnchors(doc.inputSource.relative("anchors.bsdata").read().rawLines, doc)
+                    anchorLines = doc.inputSource.relative("anchors.bsdata").read().rawLines
+                    datablocks.transformAnchors(
+                        lines=anchorLines, doc=doc, firstLine=anchorLines[0], tagName="pre", lineNum=None
+                    )
                 except OSError:
                     m.warn("anchors.bsdata not found despite being listed in the External Infotrees metadata.")
 
@@ -148,9 +152,13 @@ class ReferenceManager:
                 shouldGetLocalLinkDefaults = True
             if shouldGetLocalLinkDefaults:
                 try:
+                    ldLines = doc.inputSource.relative("link-defaults.infotree").read().rawLines
                     datablocks.transformInfo(
-                        doc.inputSource.relative("link-defaults.infotree").read().rawLines,
-                        doc,
+                        lines=ldLines,
+                        doc=doc,
+                        firstLine=ldLines[0],
+                        tagName="pre",
+                        lineNum=None,
                     )
                 except OSError:
                     m.warn("link-defaults.infotree not found despite being listed in the External Infotrees metadata.")

@@ -91,7 +91,7 @@ class MetadataManager:
         self.issues: t.List[t.Tuple[str, str]] = []
         self.issueTrackerTemplate: t.Optional[str] = None
         self.lineNumbers: bool = False
-        self.linkDefaults: t.DefaultDict[str, t.List[t.Tuple[str, str, str, str]]] = defaultdict(list)
+        self.linkDefaults: t.LinkDefaultsT = defaultdict(list)
         self.localBoilerplate: config.BoolSet = config.BoolSet(default=False)
         self.logo: t.Optional[str] = None
         self.mailingList: t.Optional[str] = None
@@ -584,10 +584,8 @@ def parseIdList(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.List[
     return [term.strip() for term in val.split(",")]
 
 
-def parseLinkDefaults(
-    key: str, val: str, lineNum: t.Union[None, str, int]
-) -> t.DefaultDict[str, t.List[t.Tuple[str, str, str, t.Optional[str]]]]:
-    defaultSpecs: t.DefaultDict[str, t.List[t.Tuple[str, str, str, t.Optional[str]]]] = defaultdict(list)
+def parseLinkDefaults(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.LinkDefaultsT:
+    defaultSpecs: t.LinkDefaultsT = defaultdict(list)
     for default in val.split(","):
         match = re.match(
             r"^([\w\d-]+)  (?:\s+\( ({}) (?:\s+(snapshot|current))? \) )  \s+(.*)$".format(
