@@ -424,7 +424,7 @@ def canonicalizeExpiryDate(base: date, expires: t.Union[None, timedelta, Duratio
         return expires.date()
     if isinstance(expires, date):
         return expires
-    m.die(f"Unexpected expiry type: canonicalizeExpiryDate({base}, {expires})", base, expires)
+    m.die(f"Unexpected expiry type: canonicalizeExpiryDate({base}, {expires})")
     return None
 
 

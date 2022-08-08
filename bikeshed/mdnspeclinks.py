@@ -223,10 +223,10 @@ def panelsFromData(doc: t.SpecT, data: t.Dict[str, t.Any]) -> bool:
 
         className = "mdn-anno wrapped"
         if isAnnoForListItemOrTableContent:
-            if targetElement.getchildren() and h.hasClass(targetElement.getchildren()[0], "mdn-anno"):
+            if h.hasChildElements(targetElement) and h.hasClass(h.childElements(targetElement)[0], "mdn-anno"):
                 # If there's already an annotation at the point where we want
                 # this, just re-use it (instead of creating another one).
-                h.appendChild(targetElement.getchildren()[0], featureDivs)
+                h.appendChild(h.childElements(targetElement)[0], featureDivs)
             else:
                 # For elements we're annotating inside a dt, dd, li, or td, we
                 # prepend the annotation to the dt, dd, li, or td — because in
@@ -236,20 +236,22 @@ def panelsFromData(doc: t.SpecT, data: t.Dict[str, t.Any]) -> bool:
                 h.prependChild(targetElement, createAnno(className, mdnButton, featureDivs))
         elif isAnnoForHeadingContent:
             className = "mdn-anno wrapped after"
-            if targetElement.getnext() is not None and targetElement.getnext().get("class") == className:
+            nextEl = targetElement.getnext()
+            if nextEl is not None and h.hasClass(nextEl, className):
                 # If there's already an annotation at the point where we want
                 # this, just re-use it (instead of creating another one).
-                h.appendChild(targetElement.getnext(), featureDivs)
+                h.appendChild(nextEl, featureDivs)
             else:
                 # For elements we're annotating inside an h1-h6 heading, we
                 # insert the annotation as the next sibling of the heading.
                 h.insertAfter(targetElement, createAnno(className, mdnButton, featureDivs))
         else:
-            if targetElement.getprevious() is not None and targetElement.getprevious().get("class") == className:
+            prevEl = targetElement.getprevious()
+            if prevEl is not None and h.hasClass(prevEl, className):
                 # If there's already an annotation at the point where we want
                 # this, just re-use it (instead of creating another one) —
                 # unless it's a class=after annotation (following a heading).
-                h.appendChild(targetElement.getprevious(), featureDivs)
+                h.appendChild(prevEl, featureDivs)
             else:
                 # For elements we're annotating that aren't inside a table or
                 # list or heading, we insert the annotation as the previous
@@ -262,7 +264,7 @@ def addSupportRow(
     browserCodeName: str,
     nameFromCodeName: t.Dict[str, str],
     support: t.Dict[str, t.Any],
-    supportData: t.Dict[str, t.Any],
+    supportData: t.ElementT,
 ) -> None:
     if browserCodeName not in support:
         return

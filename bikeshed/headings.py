@@ -39,7 +39,8 @@ def addHeadingIds(doc: t.SpecT, headings: t.List[t.ElementT]) -> None:
             if header.get("data-dfn-type") is None:
                 # dfn headings will get their IDs assigned by the dfn code
                 neededIds.add(header)
-                id = config.simplifyText(h.textContent(h.find(".content", header)))
+                contentEl = t.cast("t.ElementT", h.find(".content", header))
+                id = config.simplifyText(h.textContent(contentEl))
                 header.set("id", h.safeID(doc, id))
     h.addOldIDs(headings)
     if len(neededIds) == 0:
@@ -58,7 +59,8 @@ def checkPrivacySecurityHeadings(headings: t.List[t.ElementT]) -> None:
     security = False
     privacy = False
     for header in headings:
-        text = h.textContent(h.find(".content", header)).lower()
+        contentEl = t.cast("t.ElementT", h.find(".content", header))
+        text = h.textContent(contentEl).lower()
         if "security" in text and "considerations" in text:
             security = True
         if "privacy" in text and "considerations" in text:
@@ -125,6 +127,7 @@ def determineHeadingLevels(headings: t.List[t.ElementT]) -> None:
 
 def addHeadingBonuses(headings: t.List[t.ElementT]) -> None:
     for header in headings:
-        if header.get("data-level") is not None:
-            secno = h.E.span({"class": "secno"}, header.get("data-level") + ". ")
+        level = header.get("data-level")
+        if level is not None:
+            secno = h.E.span({"class": "secno"}, level + ". ")
             header.insert(0, secno)

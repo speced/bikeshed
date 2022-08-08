@@ -484,7 +484,7 @@ def transformArgumentdef(
     attrs = parseDefBlock(lines, "argumentdef", capitalizeKeys=False, lineNum=lineNum)
     el = h.parseHTML(firstLine + "</pre>")[0]
     if "for" in el.attrib:
-        forValue = el.get("for")
+        forValue = t.cast(str, el.get("for"))
         el.set("data-dfn-for", forValue)
         if "/" in forValue:
             interface, method = forValue.split("/")
@@ -496,7 +496,7 @@ def transformArgumentdef(
         m.die("Argumentdef blocks need a for='' attribute specifying their method.", lineNum=lineNum)
         return []
     h.addClass(el, "data")
-    rootAttrs = " ".join("{}='{}'".format(k, h.escapeAttr(v)) for k, v in el.attrib.items())
+    rootAttrs = " ".join(f"{str(k)}='{h.escapeAttr(str(v))}'" for k, v in el.attrib.items())
     text = (
         """
 <table {attrs}{lineNumAttr}>
