@@ -221,33 +221,35 @@ def panelsFromData(doc: t.SpecT, data: t.Dict[str, t.Any]) -> bool:
             )
         h.appendChild(mdnButton, h.E.span("MDN"))
 
-        className = "mdn-anno wrapped"
         if isAnnoForListItemOrTableContent:
-            if h.hasChildElements(targetElement) and h.hasClass(h.childElements(targetElement)[0], "mdn-anno"):
+            firstChild = None
+            if h.hasChildElements(targetElement):
+                firstChild = list(h.childElements(targetElement))[0]
+            if firstChild is not None and h.hasClass(firstChild, "mdn-anno") and not h.hasClass(firstChild, "after"):
                 # If there's already an annotation at the point where we want
                 # this, just re-use it (instead of creating another one).
-                h.appendChild(h.childElements(targetElement)[0], featureDivs)
+                h.appendChild(firstChild, featureDivs)
             else:
                 # For elements we're annotating inside a dt, dd, li, or td, we
                 # prepend the annotation to the dt, dd, li, or td — because in
                 # cases where we have a long table or list, all the annotations
                 # for everything in it otherwise ends up being merged into a
                 # single annotation way up at the top of the table or list.
-                h.prependChild(targetElement, createAnno(className, mdnButton, featureDivs))
+                h.prependChild(targetElement, createAnno("mdn-anno wrapped", mdnButton, featureDivs))
         elif isAnnoForHeadingContent:
-            className = "mdn-anno wrapped after"
             nextEl = targetElement.getnext()
-            if nextEl is not None and h.hasClass(nextEl, className):
-                # If there's already an annotation at the point where we want
-                # this, just re-use it (instead of creating another one).
+            if nextEl is not None and h.hasClass(nextEl, "mdn-anno") and h.hasClass(nextEl, "after"):
+                # If there's already an "after" annotation
+                # at the point where we want this,
+                # just re-use it (instead of creating another one).
                 h.appendChild(nextEl, featureDivs)
             else:
                 # For elements we're annotating inside an h1-h6 heading, we
                 # insert the annotation as the next sibling of the heading.
-                h.insertAfter(targetElement, createAnno(className, mdnButton, featureDivs))
+                h.insertAfter(targetElement, createAnno("mdn-anno wrapped after", mdnButton, featureDivs))
         else:
             prevEl = targetElement.getprevious()
-            if prevEl is not None and h.hasClass(prevEl, className):
+            if prevEl is not None and h.hasClass(prevEl, "mdn-anno") and not h.hasClass(prevEl, "after"):
                 # If there's already an annotation at the point where we want
                 # this, just re-use it (instead of creating another one) —
                 # unless it's a class=after annotation (following a heading).
@@ -256,7 +258,7 @@ def panelsFromData(doc: t.SpecT, data: t.Dict[str, t.Any]) -> bool:
                 # For elements we're annotating that aren't inside a table or
                 # list or heading, we insert the annotation as the previous
                 # sibling of whatever block-level element holds the element.
-                h.insertBefore(targetElement, createAnno(className, mdnButton, featureDivs))
+                h.insertBefore(targetElement, createAnno("mdn-anno wrapped", mdnButton, featureDivs))
     return panels
 
 
