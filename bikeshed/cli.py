@@ -1,3 +1,4 @@
+from __future__ import annotations
 import argparse
 import json
 import os
@@ -6,7 +7,7 @@ import sys
 from . import config, constants, update, messages as m
 
 
-def main():
+def main() -> None:
     # Hack around argparse's lack of optional subparsers
     if len(sys.argv) == 1:
         sys.argv.append("spec")
@@ -444,7 +445,7 @@ def main():
         handleWpt(options)
 
 
-def handleUpdate(options):
+def handleUpdate(options: argparse.Namespace) -> None:
     update.update(
         anchors=options.anchors,
         backrefs=options.backrefs,
@@ -461,7 +462,7 @@ def handleUpdate(options):
     )
 
 
-def handleSpec(options, extras):
+def handleSpec(options: argparse.Namespace, extras: list[str]) -> None:
     from . import metadata
     from .Spec import Spec
 
@@ -478,7 +479,7 @@ def handleSpec(options, extras):
     doc.finish(outputFilename=options.outfile)
 
 
-def handleEchidna(options, extras):
+def handleEchidna(options: argparse.Namespace, extras: list[str]) -> None:
     from . import metadata, publish
     from .Spec import Spec
 
@@ -501,7 +502,7 @@ def handleEchidna(options, extras):
         )
 
 
-def handleWatch(options, extras):
+def handleWatch(options: argparse.Namespace, extras: list[str]) -> None:
     from . import metadata
     from .Spec import Spec
 
@@ -514,7 +515,7 @@ def handleWatch(options, extras):
     doc.watch(outputFilename=options.outfile)
 
 
-def handleServe(options, extras):
+def handleServe(options: argparse.Namespace, extras: list[str]) -> None:
     from . import metadata
     from .Spec import Spec
 
@@ -526,7 +527,7 @@ def handleServe(options, extras):
     doc.watch(outputFilename=options.outfile, port=int(options.port))
 
 
-def handleDebug(options, extras):
+def handleDebug(options: argparse.Namespace, extras: list[str]) -> None:
     from . import metadata
     from .Spec import Spec
 
@@ -556,15 +557,15 @@ def handleDebug(options, extras):
         doc.mdCommandLine = metadata.fromCommandLine(extras)
         doc.preprocess()
         md = {
-            "defaults.include": doc.mdDefaults.allData,
-            "computed-metadata.include": doc.mdOverridingDefaults.allData,
-            "document": doc.mdDocument.allData,
+            "defaults.include": doc.mdDefaults.allData if doc.mdDefaults else [],
+            "computed-metadata.include": doc.mdOverridingDefaults.allData if doc.mdOverridingDefaults else [],
+            "document": doc.mdDocument.allData if doc.mdDocument else [],
             "command-line": doc.mdCommandLine.allData,
         }
         print(json.dumps(md, indent=2, default=config.getjson))
 
 
-def handleRefs(options, extras):
+def handleRefs(options: argparse.Namespace, extras: list[str]) -> None:
     from . import metadata
     from .refs import ReferenceManager
     from .Spec import Spec
@@ -596,7 +597,7 @@ def handleRefs(options, extras):
         m.p(config.printjson(refs))
 
 
-def handleIssuesList(options):
+def handleIssuesList(options: argparse.Namespace) -> None:
     from . import issuelist
 
     if options.printTemplate:
@@ -605,7 +606,7 @@ def handleIssuesList(options):
         issuelist.printIssueList(options.infile, options.outfile)
 
 
-def handleSource(options):
+def handleSource(options: argparse.Namespace) -> None:
     if not options.bigText:  # If no options are given, do all options.
         options.bigText = True
     if options.bigText:
@@ -615,7 +616,7 @@ def handleSource(options):
         fonts.replaceComments(font=font, inputFilename=options.infile, outputFilename=options.outfile)
 
 
-def handleTest(options, extras):
+def handleTest(options: argparse.Namespace, extras: list[str]) -> None:
     from . import metadata, test
 
     md = metadata.fromCommandLine(extras)
@@ -628,7 +629,7 @@ def handleTest(options, extras):
         sys.exit(0 if result else 1)
 
 
-def handleProfile(options):
+def handleProfile(options: argparse.Namespace) -> None:
     root = f'--root="{options.root}"' if options.root else ""
     leaf = f'--leaf="{options.leaf}"' if options.leaf else ""
     if options.svgFile:
@@ -645,7 +646,7 @@ def handleProfile(options):
         )
 
 
-def handleTemplate():
+def handleTemplate() -> None:
     m.p(
         """<pre class='metadata'>
 Title: Your Spec Title
@@ -666,7 +667,7 @@ Introduction here.
     )
 
 
-def handleWpt(options):
+def handleWpt(options: argparse.Namespace) -> None:
     if options.template:
         m.p(
             """

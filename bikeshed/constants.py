@@ -4,7 +4,7 @@ from .stringEnum import StringEnum
 dryRun: bool = False
 errorLevel: list[str] = ["fatal"]
 printMode: str = "console"
-quiet: bool = True
+quiet: float = 0
 asciiOnly: bool = False
 refStatus: StringEnum = StringEnum("current", "snapshot")
 biblioDisplay: StringEnum = StringEnum("index", "inline", "direct")
