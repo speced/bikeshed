@@ -14,7 +14,7 @@ from .DefaultOrderedDict import DefaultOrderedDict
 def boilerplateFromHtml(doc, htmlString):
     htmlString = doc.fixText(htmlString)
     bp = h.E.div({}, h.parseHTML(htmlString))
-    conditional.processConditionals(bp, doc)
+    conditional.processConditionals(doc, bp)
     return h.childNodes(bp, clear=True)
 
 
