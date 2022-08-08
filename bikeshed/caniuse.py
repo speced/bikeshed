@@ -1,11 +1,13 @@
+from __future__ import annotations
+
 import json
 from collections import OrderedDict
 from datetime import datetime
 
-from . import h, messages as m
+from . import h, messages as m, t
 
 
-def addCanIUsePanels(doc):
+def addCanIUsePanels(doc: t.SpecT) -> None:
     # Constructs "Can I Use panels" which show a compatibility data summary
     # for a term's feature.
     if not doc.md.includeCanIUsePanels:
@@ -128,7 +130,7 @@ def addCanIUsePanels(doc):
             }"""
 
 
-def canIUsePanelFor(id, data, update, classFromBrowser):
+def canIUsePanelFor(id: str, data: t.JSONT, update: str, classFromBrowser: dict[str, str]) -> t.ElementT:
     panel = h.E.aside(
         {"class": "caniuse-status wrapped", "data-deco": ""},
         h.E.input({"value": "CanIUse", "type": "button", "class": "caniuse-panel-btn"}),
@@ -156,7 +158,9 @@ def canIUsePanelFor(id, data, update, classFromBrowser):
     return panel
 
 
-def browserCompatSpan(browserCodeName, browserFullName, statusCode, minVersion=None):
+def browserCompatSpan(
+    browserCodeName: str, browserFullName: str, statusCode: str, minVersion: str | None = None
+) -> t.ElementT:
     if statusCode == "n" or minVersion is None:
         minVersion = "None"
     elif minVersion == "all":
@@ -175,10 +179,12 @@ def browserCompatSpan(browserCodeName, browserFullName, statusCode, minVersion=N
     return outer
 
 
-def validateCanIUseURLs(doc, elements):
+def validateCanIUseURLs(doc: t.SpecT, elements: list[t.ElementT]) -> None:
     # First, ensure that each Can I Use URL shows up at least once in the data;
     # otherwise, it's an error to be corrected somewhere.
     urlFeatures = set()
+    if doc.canIUse is None:
+        return
     for url in doc.md.canIUseURLs:
         sawTheURL = False
         for featureID, featureUrl in doc.canIUse.urlFromFeature.items():
@@ -197,7 +203,9 @@ def validateCanIUseURLs(doc, elements):
     # otherwise, you're missing some features.
     docFeatures = set()
     for el in elements:
-        featureID = el.get("caniuse").lower()
+        canIUseAttr = el.get("caniuse")
+        assert canIUseAttr is not None
+        featureID = canIUseAttr.lower()
         docFeatures.add(featureID)
 
     unusedFeatures = urlFeatures - docFeatures
@@ -209,7 +217,7 @@ def validateCanIUseURLs(doc, elements):
 
 
 class CanIUseManager:
-    def __init__(self, dataFile):
+    def __init__(self, dataFile: t.DataFileRequester):
         self.dataFile = dataFile
         data = json.loads(
             self.dataFile.fetch("caniuse", "data.json", str=True),
@@ -218,16 +226,16 @@ class CanIUseManager:
         self.updated = data["updated"]
         self.agents = data["agents"]
         self.urlFromFeature = data["features"]
-        self.features = {}
+        self.features: t.JSONT = {}
 
-    def hasFeature(self, featureName):
+    def hasFeature(self, featureName: str) -> bool:
         return featureName in self.urlFromFeature
 
-    def getFeature(self, featureName):
+    def getFeature(self, featureName: str) -> t.JSONT:
         if featureName in self.features:
             return self.features[featureName]
         if not self.hasFeature(featureName):
-            return
+            return {}
         data = json.loads(
             self.dataFile.fetch("caniuse", f"feature-{featureName}.json", str=True),
             object_pairs_hook=OrderedDict,

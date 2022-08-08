@@ -50,6 +50,9 @@ NodeT: TypeAlias = Union[str, ElementT]
 # Get as close as possible, but let lists be Any
 NodesT: TypeAlias = Union[NodeT, List]
 
+# Similar for JSON
+JSONT: TypeAlias = Dict[str, Any]
+
 
 if TYPE_CHECKING:
     if "Spec" not in sys.modules:
@@ -57,6 +60,7 @@ if TYPE_CHECKING:
     SpecT = Spec
 
     from . import biblio  # pylint: disable=cyclic-import
+    from .retrieve import DataFileRequester  # pylint: disable=cyclic-import
 
     BiblioStorageT: TypeAlias = DefaultDict[str, List[biblio.BiblioEntry]]
 
