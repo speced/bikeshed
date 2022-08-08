@@ -1,6 +1,5 @@
 from __future__ import annotations
 from .stringEnum import StringEnum
-from . import t
 
 dryRun: bool = False
 errorLevel: list[str] = ["fatal"]
@@ -27,7 +26,7 @@ def errorLevelAt(target: str) -> bool:
     return currentLevel >= targetLevel
 
 
-def setErrorLevel(level: str|None=None) -> None:
+def setErrorLevel(level: str | None = None) -> None:
     if level is None:
         level = "fatal"
     errorLevel[0] = level
