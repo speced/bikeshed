@@ -5,7 +5,7 @@ import requests
 from .. import messages as m
 
 
-def update(path, dryRun=False):
+def update(path: str, dryRun: bool = False) -> set[str] | None:
     try:
         m.say("Downloading link defaults...")
         data = requests.get(
@@ -13,13 +13,16 @@ def update(path, dryRun=False):
         ).text
     except Exception as e:
         m.die(f"Couldn't download link defaults data.\n{e}")
-        return
+        return None
+
+    filePath = os.path.join(path, "link-defaults.infotree")
 
     if not dryRun:
         try:
-            with open(os.path.join(path, "link-defaults.infotree"), "w", encoding="utf-8") as f:
+            with open(filePath, "w", encoding="utf-8") as f:
                 f.write(data)
         except Exception as e:
             m.die(f"Couldn't save link-defaults database to disk.\n{e}")
-            return
+            return None
     m.say("Success!")
+    return set([filePath])

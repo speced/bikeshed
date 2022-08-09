@@ -12,7 +12,7 @@ testSuiteDataContentTypes = [
 ]
 
 
-def update(path, dryRun=False):
+def update(path: str, dryRun: bool = False) -> set[str] | None:
     try:
         m.say("Downloading test suite data...")
         shepherd = APIClient(
@@ -23,14 +23,14 @@ def update(path, dryRun=False):
         res = shepherd.get("test_suites")
         if (not res) or (res.status_code == 406):
             m.die("This version of the test suite API is no longer supported. Please update Bikeshed.")
-            return
+            return None
         if res.content_type not in testSuiteDataContentTypes:
             m.die(f"Unrecognized test suite content-type '{res.content_type}'.")
-            return
+            return None
         rawTestSuiteData = res.data
     except Exception as e:
         m.die(f"Couldn't download test suite data.  Error was:\n{e}")
-        return
+        return None
 
     testSuites = dict()
     for rawTestSuite in rawTestSuiteData.values():
@@ -48,10 +48,13 @@ def update(path, dryRun=False):
         }
         testSuites[testSuite["spec"]] = testSuite
 
+    filePath = os.path.join(path, "test-suites.json")
+
     if not dryRun:
         try:
-            with open(os.path.join(path, "test-suites.json"), "w", encoding="utf-8") as f:
+            with open(filePath, "w", encoding="utf-8") as f:
                 f.write(json.dumps(testSuites, ensure_ascii=False, indent=2, sort_keys=True))
         except Exception as e:
             m.die(f"Couldn't save test-suite database to disk.\n{e}")
     m.say("Success!")
+    return set([filePath])

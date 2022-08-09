@@ -8,16 +8,15 @@ from collections import defaultdict
 import requests
 
 from .. import biblio, messages as m, t
-from ..DefaultOrderedDict import DefaultOrderedDict
 
 
-def update(path, dryRun=False):
+def update(path: str, dryRun: bool = False) -> set[str] | None:
     m.say("Downloading biblio data...")
-    biblios = defaultdict(list)
+    biblios: t.BiblioStorageT = defaultdict(list)
     biblio.processSpecrefBiblioFile(getSpecrefData(), biblios, order=3)
     biblio.processSpecrefBiblioFile(getWG21Data(), biblios, order=3)
     biblio.processReferBiblioFile(getCSSWGData(), biblios, order=4)
-    writtenPaths = set()
+    writtenPaths: set[str] = set()
     if not dryRun:
         groupedBiblios, allNames = groupBiblios(biblios)
         # Save each group to a file
@@ -29,7 +28,7 @@ def update(path, dryRun=False):
                     writeBiblioFile(fh, biblios)
             except Exception as e:
                 m.die(f"Couldn't save biblio database to disk.\n{e}")
-                return
+                return None
 
         # biblio-keys is used to help correct typos,
         # so remove all the useless purely-numbered name types,
@@ -76,7 +75,7 @@ def update(path, dryRun=False):
                 fh.write(str(json.dumps(reducedNames, indent=0, ensure_ascii=False, sort_keys=True)))
         except Exception as e:
             m.die(f"Couldn't save biblio database to disk.\n{e}")
-            return
+            return None
 
         # Collect all the number-suffix names which also exist un-numbered
         numberedNames = collectNumberedNames(reducedNames)
@@ -91,7 +90,7 @@ def update(path, dryRun=False):
     return writtenPaths
 
 
-def getSpecrefData():
+def getSpecrefData() -> str:
     try:
         return requests.get("https://api.specref.org/bibrefs").text
     except Exception as e:
@@ -99,7 +98,7 @@ def getSpecrefData():
         return "{}"
 
 
-def getWG21Data():
+def getWG21Data() -> str:
     try:
         return requests.get("https://wg21.link/specref.json").text
     except Exception as e:
@@ -107,7 +106,7 @@ def getWG21Data():
         return "{}"
 
 
-def getCSSWGData():
+def getCSSWGData() -> list[str]:
     try:
         return requests.get("https://raw.githubusercontent.com/w3c/csswg-drafts/master/biblio.ref").text.splitlines()
     except Exception as e:
@@ -115,18 +114,20 @@ def getCSSWGData():
         return []
 
 
-def groupBiblios(biblios):
+def groupBiblios(biblios: t.BiblioStorageT) -> tuple[dict[str, t.BiblioStorageT], list[str]]:
     # Group the biblios by the first two letters of their keys
-    groupedBiblios = DefaultOrderedDict(DefaultOrderedDict)
+    groupedBiblios: dict[str, t.BiblioStorageT] = {}
     allNames = []
     for k, v in sorted(biblios.items(), key=lambda x: x[0].lower()):
         allNames.append(k)
         group = k[0:2]
+        if group not in groupedBiblios:
+            groupedBiblios[group] = defaultdict(list)
         groupedBiblios[group][k] = v
     return groupedBiblios, allNames
 
 
-def writeBiblioFile(fh, biblios: t.Dict[str, t.List[biblio.BiblioEntry]]) -> None:
+def writeBiblioFile(fh: t.TextIO, biblios: t.BiblioStorageT) -> None:
     """
     Each line is a value for a specific key, in the order:
 
@@ -176,16 +177,15 @@ def writeBiblioFile(fh, biblios: t.Dict[str, t.List[biblio.BiblioEntry]]) -> Non
         fh.write("-" + "\n")
 
 
-def collectNumberedNames(names):
+def collectNumberedNames(names: t.Sequence[str]) -> defaultdict[str, list[str]]:
     """
     Collects the set of names that have numeric suffixes
     (excluding ones that look like dates)
     for better error-correction.
     """
 
-    names = set(names)
     prefixes = defaultdict(list)
-    for name in names:
+    for name in set(names):
         # Ignoring 4+ digits, as they're probably years or isodates.
         match = re.match(r"(.+\D)\d{1,3}$", name)
         if match:

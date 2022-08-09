@@ -5,7 +5,7 @@ import requests
 from .. import messages as m
 
 
-def update(path, dryRun=False):
+def update(path: str, dryRun: bool = False) -> set[str] | None:
     try:
         m.say("Downloading web-platform-tests data...")
         response = requests.get("https://wpt.fyi/api/manifest")
@@ -13,19 +13,19 @@ def update(path, dryRun=False):
         jsonData = response.json()
     except Exception as e:
         m.die(f"Couldn't download web-platform-tests data.\n{e}")
-        return
+        return None
 
     if "version" not in jsonData:
         m.die("Can't figure out the WPT data version. Please report this to the maintainer!")
-        return
+        return None
 
     if jsonData["version"] != 8:
         m.die(
             f"Bikeshed currently only knows how to handle WPT v8 manifest data, but got v{jsonData['version']}. Please report this to the maintainer!"
         )
-        return
+        return None
 
-    paths = []
+    paths: list[str] = []
     for testType, typePaths in jsonData["items"].items():
         if testType in (
             "crashtest",
@@ -37,16 +37,20 @@ def update(path, dryRun=False):
             "wdspec",
         ):
             collectPaths(paths, typePaths, testType + " ")
+
+    filePath = os.path.join(path, "wpt-tests.txt")
+
     if not dryRun:
         try:
-            with open(os.path.join(path, "wpt-tests.txt"), "w", encoding="utf-8") as f:
+            with open(filePath, "w", encoding="utf-8") as f:
                 f.write(f"sha: {sha}\n")
                 for ordered_path in sorted(paths):
                     f.write(ordered_path + "\n")
         except Exception as e:
             m.die(f"Couldn't save web-platform-tests data to disk.\n{e}")
-            return
+            return None
     m.say("Success!")
+    return set([filePath])
 
 
 def collectPaths(pathListSoFar, pathTrie, pathPrefix):
