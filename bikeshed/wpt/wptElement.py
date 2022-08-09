@@ -1,7 +1,9 @@
-from .. import config, h, messages as m
+from __future__ import annotations
+
+from .. import config, h, messages as m, t
 
 
-def processWptElements(doc):
+def processWptElements(doc: t.SpecT) -> None:
     pathPrefix = doc.md.wptPathPrefix
 
     atLeastOneElement = False
@@ -16,6 +18,7 @@ def processWptElements(doc):
             atLeastOneElement = True
         if testData is None:
             testData = loadTestData(doc)
+        assert testData is not None
         testNames = testNamesFromEl(el, pathPrefix=pathPrefix)
         for testName in testNames:
             if testName not in testData:
@@ -39,28 +42,30 @@ def processWptElements(doc):
 
     # <wpt-rest> elements
     wptRestElements = h.findAll("wpt-rest", doc)
-    if wptRestElements and testData is None:
-        testData = loadTestData(doc)
-    if len(wptRestElements) > 1:
-        m.die(f"Only one <wpt-rest> element allowed per document, you have {len(wptRestElements)}.")
-        wptRestElements = wptRestElements[0:1]
-    elif len(wptRestElements) == 1:
-        localPrefix = wptRestElements[0].get("pathprefix")
-        if localPrefix is not None:
-            pathPrefix = localPrefix
-        if pathPrefix is None:
-            m.die("Can't use <wpt-rest> without either a pathprefix='' attribute or a 'WPT Path Prefix' metadata.")
-            return
-        prefixedNames = [p for p in testData if prefixInPath(pathPrefix, p) and p not in seenTestNames]
-        if len(prefixedNames) == 0:
-            m.die(f"Couldn't find any tests with the path prefix '{pathPrefix}'.")
-            return
-        atLeastOneElement = True
-        atLeastOneVisibleTest = True
-        createHTML(doc, wptRestElements[0], prefixedNames, testData)
-        m.warn(
-            "<wpt-rest> is intended for debugging only. Move the tests to <wpt> elements next to what they're testing."
-        )
+    if wptRestElements:
+        if testData is None:
+            testData = loadTestData(doc)
+        assert testData is not None
+        if len(wptRestElements) > 1:
+            m.die(f"Only one <wpt-rest> element allowed per document, you have {len(wptRestElements)}.")
+            wptRestElements = wptRestElements[0:1]
+        else:
+            localPrefix = wptRestElements[0].get("pathprefix")
+            if localPrefix is not None:
+                pathPrefix = localPrefix
+            if pathPrefix is None:
+                m.die("Can't use <wpt-rest> without either a pathprefix='' attribute or a 'WPT Path Prefix' metadata.")
+                return
+            prefixedNames = [p for p in testData if prefixInPath(pathPrefix, p) and p not in seenTestNames]
+            if len(prefixedNames) == 0:
+                m.die(f"Couldn't find any tests with the path prefix '{pathPrefix}'.")
+                return
+            atLeastOneElement = True
+            atLeastOneVisibleTest = True
+            createHTML(doc, wptRestElements[0], prefixedNames, testData)
+            m.warn(
+                "<wpt-rest> is intended for debugging only. Move the tests to <wpt> elements next to what they're testing."
+            )
     else:
         if pathPrefix:
             if testData is None:
@@ -70,7 +75,7 @@ def processWptElements(doc):
     if atLeastOneVisibleTest:
         if pathPrefix is None:
             pathPrefix = commonPathPrefix(seenTestNames)
-        if not pathPrefix.startswith("/"):
+        if pathPrefix and not pathPrefix.startswith("/"):
             pathPrefix = "/" + pathPrefix
         if pathPrefix != "/":
             doc.md.otherMetadata["Test Suite"].append(
@@ -91,7 +96,15 @@ def processWptElements(doc):
             doc.extraScripts["script-wpt"] = getWptScript(pathPrefix)
 
 
-def createHTML(doc, blockEl, testNames, testData, title=None, titleLang=None, titleDir=None):
+def createHTML(
+    doc: t.SpecT,
+    blockEl: t.ElementT,
+    testNames: list[str],
+    testData: dict[str, str],
+    title: str | None = None,
+    titleLang: str | None = None,
+    titleDir: str | None = None,
+) -> None:
     if doc.md.wptDisplay == "none":
         h.removeNode(blockEl)
     elif doc.md.wptDisplay in ("inline", "open", "closed"):
@@ -111,7 +124,14 @@ def createHTML(doc, blockEl, testNames, testData, title=None, titleLang=None, ti
         m.die("Programming error, uncaught WPT Display value in createHTML.")
 
 
-def appendTestList(blockEl, testNames, testData, title=None, titleLang=None, titleDir=None):
+def appendTestList(
+    blockEl: t.ElementT,
+    testNames: list[str],
+    testData: dict[str, str],
+    title: str | None = None,
+    titleLang: str | None = None,
+    titleDir: str | None = None,
+) -> None:
     if title:
         titleEl = h.E.p(
             {
@@ -202,7 +222,7 @@ def appendTestList(blockEl, testNames, testData, title=None, titleLang=None, tit
         h.appendChild(blockEl, h.E.hr())
 
 
-def testNamesFromEl(el, pathPrefix=None):
+def testNamesFromEl(el: t.ElementT, pathPrefix: str | None = None) -> list[str]:
     testNames = []
     localPrefix = el.get("pathprefix")
     if localPrefix is not None:
@@ -215,7 +235,7 @@ def testNamesFromEl(el, pathPrefix=None):
     return testNames
 
 
-def prefixPlusPath(prefix, path):
+def prefixPlusPath(prefix: str | None, path: str) -> str:
     # Join prefix to path, normalizing slashes
     if path.startswith("/"):
         return path[1:]
@@ -225,13 +245,23 @@ def prefixPlusPath(prefix, path):
     return prefix + path
 
 
-def prefixInPath(prefix, path):
+def prefixInPath(prefix: str | None, path: str) -> bool:
     if prefix is None:
         return False
     return path.startswith(normalizePathSegment(prefix))
 
 
-def normalizePathSegment(pathSeg):
+@t.overload
+def normalizePathSegment(pathSeg: str) -> str:
+    ...
+
+
+@t.overload
+def normalizePathSegment(pathSeg: None) -> None:
+    ...
+
+
+def normalizePathSegment(pathSeg: str | None) -> str | None:
     # No slash at front, yes slash at end
     if pathSeg is None:
         return None
@@ -242,7 +272,7 @@ def normalizePathSegment(pathSeg):
     return pathSeg
 
 
-def checkForOmittedTests(pathPrefix, testData, seenTestNames):
+def checkForOmittedTests(pathPrefix: str, testData: dict[str, str], seenTestNames: set[str]) -> None:
     unseenTests = []
     for testPath in testData.keys():
         if ".tentative." in testPath:
@@ -258,7 +288,7 @@ def checkForOmittedTests(pathPrefix, testData, seenTestNames):
         )
 
 
-def loadTestData(doc):
+def loadTestData(doc: t.SpecT) -> dict[str, str]:
     paths = {}
     for line in doc.dataFile.fetch("wpt-tests.txt", str=True).split("\n")[1:]:
         testType, _, testPath = line.strip().partition(" ")
@@ -266,20 +296,20 @@ def loadTestData(doc):
     return paths
 
 
-def xor(a, b):
+def xor(a: t.Any, b: t.Any) -> bool:
     return bool(a) != bool(b)
 
 
-def commonPathPrefix(paths):
-    paths = [x.split("/")[:-1] for x in paths]
-    commonPrefix = paths[0]
-    for path in paths[1:]:
+def commonPathPrefix(paths: t.Iterable[str]) -> str | None:
+    splitPaths = [x.split("/")[:-1] for x in paths]
+    commonPrefix = splitPaths[0]
+    for pathSegs in splitPaths[1:]:
         # can't have a common prefix longer than the shortest path
-        if len(path) < len(commonPrefix):
-            commonPrefix = commonPrefix[: len(path)]
+        if len(pathSegs) < len(commonPrefix):
+            commonPrefix = commonPrefix[: len(pathSegs)]
         # now compare the remaining segments
-        for i in range(0, min(len(commonPrefix), len(path))):
-            if path[i] != commonPrefix[i]:
+        for i in range(0, min(len(commonPrefix), len(pathSegs))):
+            if pathSegs[i] != commonPrefix[i]:
                 commonPrefix = commonPrefix[:i]
                 break
     if len(commonPrefix) >= 1:
@@ -426,7 +456,7 @@ dd:not(:last-child) > .wpt-tests-block:not([open]):last-child {
 """
 
 
-def getWptScript(path):
+def getWptScript(path: str | None) -> str:
     if path is None:
         path = "/"
     if not path.startswith("/"):
