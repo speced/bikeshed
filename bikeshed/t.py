@@ -35,9 +35,9 @@ else:
     from typing_extensions import Literal, Protocol
 
 if sys.version_info >= (3, 10):
-    from typing import TypeAlias
+    from typing import TypeAlias, TypeGuard
 else:
-    from typing_extensions import TypeAlias
+    from typing_extensions import TypeAlias, TypeGuard
 
 
 from lxml import etree  # pylint: disable=wrong-import-position

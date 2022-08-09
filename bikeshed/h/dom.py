@@ -622,7 +622,7 @@ def removeClass(el, cls):
         el.set("class", newClass)
 
 
-def isElement(node):
+def isElement(node: t.Any) -> t.TypeGuard[t.ElementT]:
     # LXML HAS THE DUMBEST XML TREE DATA MODEL IN THE WORLD
     return etree.iselement(node) and isinstance(node.tag, str)
 

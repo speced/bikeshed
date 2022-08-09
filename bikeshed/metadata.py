@@ -68,7 +68,7 @@ class MetadataManager:
         self.defaultHighlight: t.Optional[str] = None
         self.defaultBiblioDisplay: str = "index"
         self.defaultRefStatus: t.Optional[str] = None
-        self.editors: t.List[str] = []
+        self.editors: list[dict[str, str | None]] = []
         self.editorTerm: t.Dict[str, str] = {"singular": "Editor", "plural": "Editors"}
         self.expires: t.Optional[date] = None
         self.externalInfotrees: config.BoolSet = config.BoolSet(default=False)
@@ -107,8 +107,8 @@ class MetadataManager:
         self.noteClass: str = "note"
         self.opaqueElements: t.List[str] = ["pre", "xmp", "script", "style"]
         self.prepTR: bool = False
-        self.previousEditors: t.List[t.Dict[str, t.Optional[str]]] = []
-        self.previousVersions: t.List[str] = []
+        self.previousEditors: list[dict[str, str | None]] = []
+        self.previousVersions: list[dict[str, str]] = []
         self.removeMultipleLinks: bool = False
         self.repository: t.Optional[repository.Repository] = None
         self.requiredIDs: t.List[str] = []
@@ -497,7 +497,7 @@ def parseWarning(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Opti
     return None
 
 
-def parseEditor(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.List[t.Dict[str, t.Optional[str]]]:
+def parseEditor(key: str, val: str, lineNum: None | str | int) -> list[dict[str, str | None]]:
     pieces = [h.unescape(piece.strip()) for piece in val.split(",")]
 
     def looksLinkish(string):
