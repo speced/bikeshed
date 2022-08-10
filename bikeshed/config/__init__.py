@@ -38,7 +38,6 @@ from .main import (
     chrootPath,
     doEvery,
 )
-from .Nil import Nil
 from .printjson import printjson, getjson
 from .status import (
     shortToLongStatus,
