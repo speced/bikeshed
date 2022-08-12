@@ -181,7 +181,7 @@ def addImplicitAlgorithms(doc: t.SpecT):
     for el in h.findAll("[data-algorithm='']:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6)", doc):
         dfns = h.findAll("dfn", el)
         if len(dfns) == 1:
-            dfnName = config.firstLinkTextFromElement(dfns[0])
+            dfnName = config.firstLinkTextFromElement(dfns[0]) or ""
             el.set("data-algorithm", dfnName)
             dfnFor = dfns[0].get("data-dfn-for")
             if dfnFor:

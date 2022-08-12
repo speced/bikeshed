@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import collections.abc
 import os
 import re
@@ -8,7 +10,7 @@ from .. import messages
 from .. import t
 
 
-def englishFromList(items, conjunction="or"):
+def englishFromList(items: t.Iterable, conjunction: str = "or") -> str:
     # Format a list of strings into an English list.
     items = list(items)
     if len(items) == 1:
@@ -18,7 +20,14 @@ def englishFromList(items, conjunction="or"):
     return "{0}, {2} {1}".format(", ".join(items[:-1]), items[-1], conjunction)
 
 
-def intersperse(iterable, delimiter):
+if t.TYPE_CHECKING:
+    IntersperseU = t.TypeVar("IntersperseU")
+    IntersperseV = t.TypeVar("IntersperseV")
+
+
+def intersperse(
+    iterable: t.Iterable[IntersperseU], delimiter: IntersperseV
+) -> t.Generator[IntersperseU | IntersperseV, None, None]:
     first = True
     for x in iterable:
         if not first:
@@ -27,7 +36,11 @@ def intersperse(iterable, delimiter):
         yield x
 
 
-def processTextNodes(nodes, regex, replacer):
+if t.TYPE_CHECKING:
+    ProcessTextNodesU = t.TypeVar("ProcessTextNodesU")
+
+
+def processTextNodes(nodes: list[t.NodesT], regex: re.Pattern, replacer: t.Callable) -> t.NodesT:
     """
     Takes an array of alternating text/objects,
     and runs reSubObject on the text parts,
@@ -37,11 +50,29 @@ def processTextNodes(nodes, regex, replacer):
     for i, node in enumerate(nodes):
         # Node list always alternates between text and elements
         if i % 2 == 0:
-            nodes[i : i + 1] = reSubObject(regex, node, replacer)
+            nodes[i : i + 1] = reSubObject(regex, t.cast(str, node), replacer)
     return nodes
 
 
-def reSubObject(pattern, string, repl=None):
+if t.TYPE_CHECKING:
+    ReSubObjectU = t.TypeVar("ReSubObjectU")
+
+
+@t.overload
+def reSubObject(pattern: re.Pattern, string: str, repl: None) -> list[str | re.Match]:
+    ...
+
+
+@t.overload
+def reSubObject(
+    pattern: re.Pattern, string: str, repl: t.Callable[[re.Match], ReSubObjectU]
+) -> list[str | ReSubObjectU]:
+    ...
+
+
+def reSubObject(
+    pattern: re.Pattern, string: str, repl: t.Callable[[re.Match], ReSubObjectU] | None = None
+) -> list[str | re.Match] | list[str | ReSubObjectU] | list[str | re.Match | ReSubObjectU]:
     """
     like re.sub, but replacements don't have to be text;
     returns an array of alternating unmatched text and match objects instead.
@@ -49,7 +80,7 @@ def reSubObject(pattern, string, repl=None):
     and the result then shows up in the array instead.
     """
     lastEnd = 0
-    pieces = []
+    pieces: list[str | re.Match | ReSubObjectU] = []
     for match in pattern.finditer(string):
         pieces.append(string[lastEnd : match.start()])
         if repl:
@@ -61,7 +92,7 @@ def reSubObject(pattern, string, repl=None):
     return pieces
 
 
-def simplifyText(text):
+def simplifyText(text: str) -> str:
     # Remove anything that's not a name character.
     text = text.strip().lower()
     # I convert ( to - so foo(bar) becomes foo-bar,
@@ -74,13 +105,13 @@ def simplifyText(text):
     return text
 
 
-def linkTextsFromElement(el):
+def linkTextsFromElement(el: t.ElementT) -> list[str]:
     from ..h import find, textContent
 
     if el.get("data-lt") == "":
         return []
     elif el.get("data-lt"):
-        rawText = el.get("data-lt")
+        rawText = el.get("data-lt", "")
         if rawText in ["|", "||", "|||"]:
             texts = [rawText]
         else:
@@ -89,9 +120,12 @@ def linkTextsFromElement(el):
         if el.tag in ("dfn", "a"):
             texts = [textContent(el).strip()]
         elif el.tag in ("h2", "h3", "h4", "h5", "h6"):
-            texts = [textContent(find(".content", el)).strip()]
+            textEl = find(".content", el)
+            if textEl is None:
+                textEl = el
+            texts = [textContent(textEl).strip()]
     if el.get("data-local-lt"):
-        localTexts = [x.strip() for x in el.get("data-local-lt").split("|")]
+        localTexts = [x.strip() for x in el.get("data-local-lt", "").split("|")]
         for text in localTexts:
             if text in texts:
                 # lt and local-lt both specify the same thing
@@ -109,11 +143,11 @@ class DuplicatedLinkText(Exception):
         self.allTexts = allTexts
         self.el = el
 
-    def __unicode__(self):
+    def __unicode__(self) -> str:
         return f"<Text '{self.offendingText}' shows up in both lt and local-lt>"
 
 
-def firstLinkTextFromElement(el):
+def firstLinkTextFromElement(el: t.ElementT) -> str | None:
     try:
         texts = linkTextsFromElement(el)
     except DuplicatedLinkText as e:
@@ -121,7 +155,17 @@ def firstLinkTextFromElement(el):
     return texts[0] if len(texts) > 0 else None
 
 
-def splitForValues(forValues):
+@t.overload
+def splitForValues(forValues: str) -> list[str]:
+    ...
+
+
+@t.overload
+def splitForValues(forValues: None) -> None:
+    ...
+
+
+def splitForValues(forValues: str | None) -> list[str] | None:
     """
     Splits a string of 1+ "for" values into an array of individual value.
     Respects function args, etc.
@@ -133,7 +177,7 @@ def splitForValues(forValues):
     return [value.strip() for value in re.split(r",(?![^()]*\))", forValues) if value.strip()]
 
 
-def groupFromKey(key, length=2):
+def groupFromKey(key: str, length: int = 2) -> str:
     """Generates a filename-safe "group" from a key, of a specified length."""
     if key in _groupFromKeyCache:
         return _groupFromKeyCache[key]
@@ -154,7 +198,7 @@ _groupFromKeyCache: t.Dict[str, str]
 _groupFromKeyCache = {}
 
 
-def flatten(arr):
+def flatten(arr: t.Iterable) -> t.Generator:
     for el in arr:
         if isinstance(el, collections.abc.Iterable) and not isinstance(el, str) and not lxml.etree.iselement(el):
             yield from flatten(el)
@@ -162,13 +206,13 @@ def flatten(arr):
             yield el
 
 
-def scriptPath(*pathSegs):
+def scriptPath(*pathSegs: str) -> str:
     startPath = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
     path = os.path.join(startPath, *pathSegs)
     return path
 
 
-def chrootPath(rootPath, path):
+def chrootPath(rootPath: str, path: str) -> str:
     rootPath = os.path.abspath(rootPath)
     path = os.path.abspath(path)
     if not path.startswith(rootPath):
@@ -180,7 +224,7 @@ def chrootPath(rootPath, path):
         return path
 
 
-def doEvery(s, action, lastTime=None):
+def doEvery(s: float, action: t.Callable, lastTime: float | None = None) -> float:
     # Takes an action every N seconds.
     # Pass it the duration and the last time it took the action;
     # it returns the time it last took the action

@@ -364,7 +364,8 @@ def markupIDLBlock(pre: t.ElementT, doc: t.SpecT) -> t.Set[t.ElementT]:
         for idlText in (el.get("data-lt") or "").split("|"):
             if idlType == "interface" and idlText in forcedInterfaces:
                 forceDfn = True
-            for linkFor in config.splitForValues(el.get("data-idl-for", "")) or [None]:
+            linkFors = t.cast("list[str|None]", config.splitForValues(el.get("data-idl-for", ""))) or [None]
+            for linkFor in linkFors:
                 ref = doc.refs.getRef(
                     idlType,
                     idlText,

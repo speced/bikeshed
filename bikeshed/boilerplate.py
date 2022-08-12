@@ -333,7 +333,7 @@ def addIndexOfLocallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> None:
         if el.get("data-dfn-for") is not None:
             disamb = "{} for {}".format(
                 dfnType,
-                ", ".join(config.splitForValues(el.get("data-dfn-for"))),
+                ", ".join(config.splitForValues(el.get("data-dfn-for", ""))),
             )
         elif dfnType == "dfn":
             disamb = "definition of"
