@@ -1,9 +1,12 @@
+from __future__ import annotations
+
+import dataclasses
 import re
 
-from .. import config, h, messages as m
+from .. import config, h, messages as m, t
 
 
-def addAttributeInfoSpans(doc):
+def addAttributeInfoSpans(doc: t.SpecT) -> None:
     # <dt><dfn attribute> automatically gets a <span attribute-info> appended to it
     # (and same for <dfn dict-member> and <span dict-member-info>).
     for dt in h.findAll("dt", doc):
@@ -27,14 +30,14 @@ def addAttributeInfoSpans(doc):
         if spanFor.startswith("[["):
             continue
         if dfn.get("data-dfn-for"):
-            spanFor = dfn.get("data-dfn-for") + "/" + spanFor
+            spanFor = dfn.get("data-dfn-for", "") + "/" + spanFor
         # If there's whitespace after the dfn, clear it out
         if h.emptyText(dfn.tail, wsAllowed=True):
             dfn.tail = None
         h.insertAfter(dfn, ", ", h.E.span({attrName: "", "for": spanFor}))
 
 
-def fillAttributeInfoSpans(doc):
+def fillAttributeInfoSpans(doc: t.SpecT) -> None:
     for el in h.findAll("span[data-attribute-info], span[data-dict-member-info]", doc):
         if not h.isEmpty(el):
             # Manually filled, bail
@@ -47,7 +50,15 @@ def fillAttributeInfoSpans(doc):
         h.appendChild(el, htmlFromInfo(info))
 
 
-def getTargetInfo(doc, el):
+@dataclasses.dataclass
+class TargetInfo:
+    type: str
+    nullable: bool = False
+    readonly: bool = False
+    default: str | None = None
+
+
+def getTargetInfo(doc: t.SpecT, el: t.ElementT) -> TargetInfo | None:
     if el.get("data-attribute-info") is not None:
         refType = "attribute"
     else:
@@ -56,7 +67,7 @@ def getTargetInfo(doc, el):
     referencedAttribute = el.get("for")
     if not referencedAttribute:
         m.die("Missing for='' reference in attribute info span.", el=el)
-        return
+        return None
     if "/" in referencedAttribute:
         interface, referencedAttribute = referencedAttribute.split("/")
         targets = h.findAll(
@@ -71,39 +82,39 @@ def getTargetInfo(doc, el):
 
     if len(targets) == 0:
         m.die(f"Couldn't find target {referencedAttribute} '{refType}':\n{h.outerHTML(el)}", el=el)
-        return
+        return None
     elif len(targets) > 1:
         m.die(f"Multiple potential target {referencedAttribute}s '{refType}':\n{h.outerHTML(el)}", el=el)
-        return
+        return None
 
     target = targets[0]
 
-    info = {}
-    info["type"] = target.get("data-type").strip()
-    if info["type"].endswith("?"):
-        info["nullable"] = True
-        info["type"] = info["type"][:-1]
+    type = target.get("data-type", "").strip()
+    if type.endswith("?"):
+        nullable = True
+        type = type[:-1]
     else:
-        info["nullable"] = False
-    info["default"] = target.get("data-default")
-    info["readonly"] = target.get("data-readonly") is not None
-    return info
+        nullable = False
+    default = target.get("data-default")
+    readonly = target.get("data-readonly") is not None
+    return TargetInfo(type, nullable, readonly, default)
 
 
-def htmlFromInfo(info):
+def htmlFromInfo(info: TargetInfo) -> t.NodesT:
     deco = []
-    if re.match(r"\w+<\w+(\s*,\s*\w+)*>", info["type"]):
+    if re.match(r"\w+<\w+(\s*,\s*\w+)*>", info.type):
         # Simple higher-kinded types
-        match = re.match(r"(\w+)<(\w+(?:\s*,\s*\w+)*)>", info["type"])
+        match = re.match(r"(\w+)<(\w+(?:\s*,\s*\w+)*)>", info.type)
+        assert match is not None
         types = [h.E.a({"data-link-type": "idl-name"}, x.strip()) for x in match.group(2).split(",")]
         deco.extend([" of type ", match.group(1), "<", config.intersperse(types, ", "), ">"])
-    elif "<" in info["type"] or "(" in info["type"]:
+    elif "<" in info.type or "(" in info.type:
         # Unions or more-complex higher-kinded types
         # Currently just bail, but I need to address this at some point.
         deco.extend(
             [
                 " of type ",
-                h.E.code({"class": "idl-code"}, info["type"]),
+                h.E.code({"class": "idl-code"}, info.type),
             ]
         )
     else:
@@ -111,16 +122,16 @@ def htmlFromInfo(info):
         deco.extend(
             [
                 " of type ",
-                h.E.a({"data-link-type": "idl-name"}, info["type"]),
+                h.E.a({"data-link-type": "idl-name"}, info.type),
             ]
         )
 
-    if info["readonly"]:
+    if info.readonly:
         deco.append(", readonly")
-    if info["nullable"]:
+    if info.nullable:
         deco.append(", nullable")
-    if info["default"] is not None:
+    if info.default is not None:
         deco.append(", defaulting to ")
-        deco.append(h.E.code(info["default"]))
+        deco.append(h.E.code(info.default))
 
     return deco
