@@ -1,4 +1,6 @@
-from .. import messages as m
+from __future__ import annotations
+
+from .. import messages as m, t
 from . import main
 
 shortToLongStatus = {
@@ -311,11 +313,21 @@ w3cIgs = frozenset(["ping"])
 assert w3cIgs.issubset(megaGroups["w3c"])
 
 
-def canonicalizeStatus(rawStatus, group):
+@t.overload
+def canonicalizeStatus(rawStatus: None, group: str | None) -> None:
+    ...
+
+
+@t.overload
+def canonicalizeStatus(rawStatus: str, group: str | None) -> str:
+    ...
+
+
+def canonicalizeStatus(rawStatus: str | None, group: str | None) -> str | None:
     if rawStatus is None:
         return None
 
-    def validateW3Cstatus(group, status, rawStatus):
+    def validateW3Cstatus(group: str, status: str, rawStatus: str) -> None:
         if status == "DREAM":
             m.warn("You used Status: DREAM for a W3C document. Consider UD instead.")
             return
@@ -341,7 +353,7 @@ def canonicalizeStatus(rawStatus, group):
                 f"You used Status: {rawStatus}, but W3C Community and Business Groups are limited to these statuses: {formatStatusSet(w3cCommunityStatuses)}."
             )
 
-    def megaGroupsForStatus(status):
+    def megaGroupsForStatus(status: str) -> list[str]:
         # Returns a list of megagroups that recognize the given status
         mgs = []
         for key in shortToLongStatus:
@@ -443,7 +455,17 @@ def canonicalizeStatus(rawStatus, group):
     return canonStatus
 
 
-def splitStatus(st):
+@t.overload
+def splitStatus(st: None) -> tuple[None, None]:
+    ...
+
+
+@t.overload
+def splitStatus(st: str) -> tuple[str | None, str]:
+    ...
+
+
+def splitStatus(st: str | None) -> tuple[str | None, str | None]:
     if st is None:
         return None, None
 
@@ -454,7 +476,7 @@ def splitStatus(st):
     return parts[0], parts[2]
 
 
-def looselyMatch(s1, s2):
+def looselyMatch(s1: str | None, s2: str | None) -> bool:
     # Loosely matches two statuses:
     # they must have the same status name,
     # and either the same or missing group name
