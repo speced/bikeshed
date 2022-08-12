@@ -721,10 +721,10 @@ def determineLinkType(el: t.ElementT) -> str:
 
 
 def determineLinkText(el: t.ElementT) -> str:
-    linkType = el.get("data-link-type")
+    linkType = el.get("data-link-type", "")
     contents = h.textContent(el)
     if el.get("data-lt"):
-        linkText = t.cast(str, el.get("data-lt"))
+        linkText = el.get("data-lt", "")
     elif config.linkTypeIn(linkType, "function") and re.match(r"^[\w-]+\(.*\)$", contents):
         # Remove arguments from CSS function autolinks,
         # as they should always be defined argument-less

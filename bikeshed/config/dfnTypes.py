@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 from collections import defaultdict
 
@@ -151,7 +153,7 @@ specStatuses = frozenset(["current", "snapshot"])
 linkStatuses = frozenset(["current", "snapshot", "local", "anchor-block"])
 
 
-def linkTypeIn(startTypes, targetTypes="all"):
+def linkTypeIn(startTypes: str | t.AbstractSet[str], targetTypes: str | t.AbstractSet[str] = "all") -> bool:
     # Tests if two link/dfn types are "compatible",
     # such that they share at least one base type when expanded.
     # (All dfn types are "base"; link types like "idl" are shorthand,
@@ -177,7 +179,7 @@ dfnElementsSelector = "dfn:not([data-var-ignore]), h2[data-dfn-type], h3[data-df
 
 # Some of the more significant types and their patterns
 trivialPattern = re.compile(r".+")
-typeRe: t.Dict[str, re.Pattern]
+typeRe: dict[str, re.Pattern]
 typeRe = defaultdict(lambda: trivialPattern)
 typeRe["property"] = re.compile(r"^[\w-]+$")
 typeRe["at-rule"] = re.compile(r"^@[\w-]+$")
