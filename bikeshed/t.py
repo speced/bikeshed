@@ -8,6 +8,7 @@ from collections import defaultdict
 from typing import (
     AbstractSet,
     Any,
+    AnyStr,
     Awaitable,
     cast,
     Callable,
@@ -21,6 +22,7 @@ from typing import (
     List,
     Mapping,
     MutableMapping,
+    NewType,
     Optional,
     overload,
     Sequence,
