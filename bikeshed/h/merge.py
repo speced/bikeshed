@@ -12,6 +12,7 @@ if t.TYPE_CHECKING:
 # WARNING: This file isn't in use yet
 # (as evidenced by mergeTrees() logging stuff and returning nothing)
 
+
 def mergeTrees(tree1: t.ElementT, tree2: t.ElementT) -> list:
     """
     Attempts to merge two HTML trees

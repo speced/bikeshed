@@ -10,8 +10,9 @@ if t.TYPE_CHECKING:
     WriterFn: t.TypeAlias = t.Callable[[str], t.Any]
 
     # more specific than t.NodesT, as nested lists can't happen
-    Nodes: t.TypeAlias = t.ElementT|list[str|t.ElementT]
+    Nodes: t.TypeAlias = t.ElementT | list[str | t.ElementT]
     Blocks: t.TypeAlias = list[Nodes]
+
 
 class Serializer:
     inlineEls = frozenset(
@@ -110,7 +111,7 @@ class Serializer:
         return n
 
     def groupIntoBlocks(self, nodes: t.Iterable[t.NodeT]) -> t.Generator[Nodes, None, None]:
-        nonBlockNodes: list[str|t.ElementT] = []
+        nonBlockNodes: list[str | t.ElementT] = []
         for node in nodes:
             if self.isElement(node) and self.isBlockElement(node.tag):
                 if nonBlockNodes:
@@ -176,7 +177,7 @@ class Serializer:
     def isBlockElement(self, tag: str) -> bool:
         return not self.isInlineElement(tag)
 
-    def needsEndTag(self, el: t.ElementT, nextEl: Nodes|None=None) -> bool:
+    def needsEndTag(self, el: t.ElementT, nextEl: Nodes | None = None) -> bool:
         if el.tag not in self.omitEndTagEls:
             return True
         if el.tag in ["dt", "dd"]:
@@ -226,7 +227,7 @@ class Serializer:
     def _blocksFromChildren(self, children: t.Iterable[t.NodeT]) -> Nodes:
         return t.cast("Nodes", [block for block in self.groupIntoBlocks(children) if not self.justWS(block)])
 
-    def _categorizeBlockChildren(self, el: Nodes) -> tuple[str, Nodes|None]:
+    def _categorizeBlockChildren(self, el: Nodes) -> tuple[str, Nodes | None]:
         """
         Figure out what sort of contents the block has,
         so we know what serialization strategy to use.
@@ -281,7 +282,15 @@ class Serializer:
                 write("\n" + (" " * indent))
                 self.endTag(tag, write)
 
-    def _serializeEl(self, el: Nodes, write: WriterFn, indent: int=0, pre: bool=False, inline: bool=False, nextEl: Nodes|None=None) -> None:
+    def _serializeEl(
+        self,
+        el: Nodes,
+        write: WriterFn,
+        indent: int = 0,
+        pre: bool = False,
+        inline: bool = False,
+        nextEl: Nodes | None = None,
+    ) -> None:
         if isinstance(el, list):
             tag = "[]"
         else:
@@ -302,9 +311,12 @@ class Serializer:
             assert isinstance(el, t.ElementT)
             self._writeBlockElement(tag, el, write, indent, nextEl)
 
+
 if t.TYPE_CHECKING:
     PairwiseU = t.TypeVar("PairwiseU")
-def pairwise(iterable: t.Iterable[PairwiseU]) -> itertools.zip_longest[tuple[PairwiseU, PairwiseU|None]]:
+
+
+def pairwise(iterable: t.Iterable[PairwiseU]) -> itertools.zip_longest[tuple[PairwiseU, PairwiseU | None]]:
     # pairwise('ABCDEFG') --> AB BC CD DE EF FG GNone
     a, b = itertools.tee(iterable)
     next(b, None)
