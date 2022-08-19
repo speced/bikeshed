@@ -240,7 +240,7 @@ class Serializer:
                 return "blocks", self._blocksFromChildren(children)
         return "inlines", children
 
-    def _writeBlockElement(self, tag: str, el: t.ElementT, write: WriterFn, indent: int, nextEl: Nodes) -> None:
+    def _writeBlockElement(self, tag: str, el: t.ElementT, write: WriterFn, indent: int, nextEl: Nodes | None) -> None:
         # Dropping pure-WS anonymous blocks.
         # This maintains whitespace between *inline* elements, which is required.
         # It just avoids serializing a line of "inline content" that's just WS.
