@@ -1,7 +1,9 @@
 # pylint: disable=wrong-import-position
 
+from __future__ import annotations
 
-def verify_python_version():
+
+def verify_python_version() -> None:
     import platform
     import sys
 
@@ -29,7 +31,7 @@ def verify_python_version():
 verify_python_version()
 
 
-def verify_requirements():
+def verify_requirements() -> None:
     import os
     import sys
 

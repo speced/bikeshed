@@ -1,16 +1,18 @@
+from __future__ import annotations
+
 import difflib
 import glob
 import os
 import re
 
-from . import config, messages as m, retrieve
+from . import config, messages as m, metadata, retrieve, t
 from .Spec import Spec
 
 TEST_DIR = os.path.abspath(os.path.join(config.scriptPath(), "..", "tests"))
 TEST_FILE_EXTENSIONS = (".bs", ".tar")
 
 
-def findTestFiles(manualOnly=False):
+def findTestFiles(manualOnly: bool = False) -> t.Generator[str, None, None]:
     for root, _, filenames in os.walk(TEST_DIR):
         for filename in filenames:
             filePath = testNameForPath(os.path.join(root, filename))
@@ -24,7 +26,7 @@ def findTestFiles(manualOnly=False):
                 yield os.path.join(root, filename)
 
 
-def splitPath(path, reverseSegs=None):
+def splitPath(path: str, reverseSegs: list[str] | None = None) -> list[str]:
     if reverseSegs is None:
         reverseSegs = []
     [head, tail] = os.path.split(path)
@@ -36,17 +38,21 @@ def splitPath(path, reverseSegs=None):
 
 # The test name will be the path relative to the tests directory, or the path as
 # given if the test is outside of that directory.
-def testNameForPath(path):
+def testNameForPath(path: str) -> str:
     if path.startswith(TEST_DIR):
         return path[len(TEST_DIR) + 1 :]
     return path
 
 
-def sortTests(tests):
+def sortTests(tests: t.Iterable[str]) -> t.Iterable[str]:
     return sorted(tests, key=lambda x: ("/" in testNameForPath(x), x))
 
 
-def runAllTests(patterns=None, manualOnly=False, md=None):  # pylint: disable=unused-argument
+def runAllTests(
+    patterns: list[str] | None = None,
+    manualOnly: bool = False,  # pylint: disable=unused-argument
+    md: t.MetadataManager | None = None,
+) -> bool:
     paths = testPaths(patterns)
     if len(paths) == 0:
         m.p("No tests were found")
@@ -60,6 +66,10 @@ def runAllTests(patterns=None, manualOnly=False, md=None):  # pylint: disable=un
         total += 1
         doc = processTest(path, md)
         outputText = doc.serialize()
+        if outputText is None:
+            m.p(m.printColor("Serialization failed.", color="red"))
+            fails.append(testName)
+            continue
         with open(os.path.splitext(path)[0] + ".html", encoding="utf-8") as golden:
             goldenText = golden.read()
         if compare(outputText, goldenText):
@@ -73,9 +83,14 @@ def runAllTests(patterns=None, manualOnly=False, md=None):  # pylint: disable=un
     m.p(m.printColor("Failed Tests:", color="red"))
     for fail in fails:
         m.p("* " + fail)
+    return False
 
 
-def processTest(path, md=None, fileRequester=retrieve.DataFileRequester(fileType="readonly")):
+def processTest(
+    path: str,
+    md: metadata.MetadataManager | None = None,
+    fileRequester: t.DataFileRequester = retrieve.DataFileRequester(fileType="readonly"),
+) -> t.SpecT:
     doc = Spec(inputFilename=path, fileRequester=fileRequester, testing=True)
     if md is not None:
         doc.mdCommandLine = md
@@ -84,7 +99,7 @@ def processTest(path, md=None, fileRequester=retrieve.DataFileRequester(fileType
     return doc
 
 
-def compare(suspect, golden):
+def compare(suspect: str, golden: str) -> bool:
     if suspect == golden:
         return True
     for line in difflib.unified_diff(golden.split("\n"), suspect.split("\n"), fromfile="golden", tofile="suspect"):
@@ -98,7 +113,7 @@ def compare(suspect, golden):
     return False
 
 
-def rebase(patterns=None, md=None):
+def rebase(patterns: list[str] | None = None, md: t.MetadataManager = None) -> bool:
     paths = testPaths(patterns)
     if len(paths) == 0:
         m.p("No tests were found.")
@@ -109,14 +124,15 @@ def rebase(patterns=None, md=None):
         m.p(f"{ratio(i,len(paths))}: Rebasing {name}")
         doc = processTest(path, md)
         doc.finish(newline="\n")
+    return True
 
 
-def ratio(i, total):
+def ratio(i: int, total: int) -> str:
     justifiedI = str(i).rjust(len(str(total)))
     return f"{justifiedI}/{total}"
 
 
-def testPaths(patterns=None):
+def testPaths(patterns: list[str] | None = None) -> list[str]:
     # if None, get all the test paths
     # otherwise, glob the provided paths, rooted at the test dir
     if not patterns:
@@ -129,9 +145,9 @@ def testPaths(patterns=None):
     ]
 
 
-def addTestMetadata(doc):
-    from . import metadata
-
+def addTestMetadata(doc: t.SpecT) -> None:
+    assert doc.mdBaseline is not None
+    assert doc.mdCommandLine is not None
     doc.mdBaseline.addData("Boilerplate", "omit feedback-header, omit generator, omit document-revision")
     doc.mdBaseline.addData("Repository", "test/test")
     _, md = metadata.parse(lines=doc.lines)

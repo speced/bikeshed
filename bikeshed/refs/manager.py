@@ -6,7 +6,7 @@ import re
 from collections import defaultdict
 
 from .. import biblio, config, constants, datablocks, h, messages as m, retrieve, t
-from . import utils, source
+from . import utils, source, headingdata
 
 
 class ReferenceManager:
@@ -35,67 +35,67 @@ class ReferenceManager:
 
     def __init__(
         self,
-        defaultStatus: t.Optional[str] = None,
-        fileRequester: t.Optional[retrieve.DataFileRequester] = None,
+        defaultStatus: str | None = None,
+        fileRequester: t.DataFileRequester | None = None,
         testing: bool = False,
     ):
+        self.dataFile: t.DataFileRequester
         if fileRequester is None:
             self.dataFile = retrieve.defaultRequester
         else:
             self.dataFile = fileRequester
 
-        self.testing = testing
+        self.testing: bool = testing
 
         # Dict of {spec vshortname => spec data}
-        self.specs: t.Dict[str, t.Dict] = dict()
+        self.specs: dict[str, dict] = dict()
 
         # Dict of {linking text => link-defaults data}
-        self.defaultSpecs: t.DefaultDict[str, t.List[t.Dict]] = defaultdict(list)
+        self.defaultSpecs: t.LinkDefaultsT = defaultdict(list)
 
         # Set of spec vshortnames to remove from consideration when there are other possible anchors
-        self.ignoredSpecs: t.Set[str] = set()
+        self.ignoredSpecs: set[str] = set()
 
         # Set of (obsolete spec vshortname, replacing spec vshortname), when both obsolete and replacing specs are possible anchors
-        self.replacedSpecs: t.Set[t.Tuple[str, str]] = set()
+        self.replacedSpecs: set[tuple[str, str]] = set()
 
         # Dict of {biblio term => biblio data}
         # Sparsely populated, with more loaded on demand
-        self.biblios: t.DefaultDict[str, t.List[biblio.BiblioEntry]] = defaultdict(list)
-        self.loadedBiblioGroups: t.Set[str] = set()
+        self.biblios: defaultdict[str, list[biblio.BiblioEntry]] = defaultdict(list)
+        self.loadedBiblioGroups: set[str] = set()
 
         # Most of the biblio keys, for biblio near-miss correction
         # (Excludes dated versions, and all huge "foo\d+" groups that can't usefully correct typos.)
-        self.biblioKeys: t.Set[str] = set()
+        self.biblioKeys: set[str] = set()
 
         # Dict of {suffixless key => [keys with numeric suffixes]}
         # (So you can tell when it's appropriate to default a numeric-suffix ref to a suffixless one.)
-        self.biblioNumericSuffixes: t.Dict[str, t.List[str]] = dict()
+        self.biblioNumericSuffixes: dict[str, list[str]] = dict()
 
         # Dict of {base key name => preferred display name}
-        self.preferredBiblioNames: t.Dict[str, str] = dict()
+        self.preferredBiblioNames: dict[str, str] = dict()
 
         # Dict of {spec vshortname => headings}
-        # Each heading is either {#foo => heading-dict}, {/foo#bar => heading-dict} or {#foo => [page-heading-keys]}
-        # In the latter, it's a list of the heading keys (of the form /foo#bar) that collide for that id.
-        self.headings: t.Dict[str, t.Union[t.Dict[str, str], t.List[str]]] = dict()
+        self.headings: dict[str, headingdata.SpecHeadings] = dict()
 
+        self.defaultStatus: str
         if defaultStatus is None:
             self.defaultStatus = constants.refStatus.current
         else:
             self.defaultStatus = constants.refStatus[defaultStatus]
 
-        self.localRefs = source.RefSource("local", fileRequester=fileRequester)
-        self.anchorBlockRefs = source.RefSource("anchor-block", fileRequester=fileRequester)
-        self.foreignRefs = source.RefSource(
+        self.localRefs: source.RefSource = source.RefSource("local", fileRequester=fileRequester)
+        self.anchorBlockRefs: source.RefSource = source.RefSource("anchor-block", fileRequester=fileRequester)
+        self.foreignRefs: source.RefSource = source.RefSource(
             "foreign",
             specs=self.specs,
             ignored=self.ignoredSpecs,
             replaced=self.replacedSpecs,
             fileRequester=fileRequester,
         )
-        self.shortname = None
-        self.specLevel = None
-        self.spec = None
+        self.shortname: str | None = None
+        self.specLevel: str | None = None
+        self.spec: str | None = None
 
     def initializeRefs(self, doc: t.SpecT = None) -> None:
         """
@@ -169,7 +169,7 @@ class ReferenceManager:
                 except OSError:
                     m.warn("link-defaults.infotree not found despite being listed in the External Infotrees metadata.")
 
-    def fetchHeadings(self, spec):
+    def fetchHeadings(self, spec: str) -> headingdata.SpecHeadings:
         if spec in self.headings:
             return self.headings[spec]
         with self.dataFile.fetch("headings", f"headings-{spec}.json", okayToFail=True) as fh:
@@ -177,59 +177,26 @@ class ReferenceManager:
                 data = json.load(fh)
             except ValueError:
                 # JSON couldn't be decoded, *should* only be because of empty file
-                return
-            self.headings[spec] = data
-            return data
+                data = {}
+            specHeadings = headingdata.SpecHeadings(spec, data)
+            self.headings[spec] = specHeadings
+            return specHeadings
 
     def fetchHeading(
-        self, spec: str, id: str, status: t.Optional[str] = None, el: t.Optional[t.ElementT] = None
-    ) -> t.Optional[t.Dict[str, str]]:
-        headingData = self.fetchHeadings(spec)
-        # Each heading is either {#id => heading-dict}, {/page#id => heading-dict} or {#id => ["/page#id"]}
-        # In the latter, it's a list of the heading keys (of the form /foo#bar) that collide for that id.
-        currentHeading: t.Optional[t.Dict[str, str]]
-        snapshotHeading: t.Optional[t.Dict[str, str]]
-        if id in headingData:
-            if isinstance(headingData[id], dict):
-                currentHeading = headingData[id].get("current")
-                snapshotHeading = headingData[id].get("snapshot")
-            if isinstance(headingData[id], list):
-                clashingIds = headingData[id]
-                # Multipage spec, list is "/page#id" keys
-                # that (potentially) collide for that heading ID
-                if len(clashingIds) == 1:
-                    # only one heading of this name, no worries
-                    x = headingData[clashingIds[0]]
-                    currentHeading = x.get("current")
-                    snapshotHeading = x.get("snapshot")
-                else:
-                    # multiple headings of this id, user needs to disambiguate
-                    m.die(
-                        f"Multiple headings with id '{id}' for spec '{spec}'. Please specify:\n"
-                        + "\n".join(f"  [[{spec + x}]]" for x in clashingIds),
-                        el=el,
-                    )
-                    return None
-        else:
-            m.die(
-                f"Couldn't find section '{id}' in spec '{spec}':\n{h.outerHTML(el)}",
-                el=el,
-            )
-            return None
+        self, spec: str, id: str, status: str | None = None, el: t.ElementT | None = None
+    ) -> dict[str, str] | None:
+        specHeadings = self.fetchHeadings(spec)
         if status is None:
             status = self.defaultStatus
-        if status == "current":
-            return currentHeading or snapshotHeading
-        else:
-            return snapshotHeading or currentHeading
+        return specHeadings.get(id, status, el)
 
-    def initializeBiblio(self):
+    def initializeBiblio(self) -> None:
         self.biblioKeys.update(json.loads(self.dataFile.fetch("biblio-keys.json", str=True)))
         self.biblioNumericSuffixes.update(json.loads(self.dataFile.fetch("biblio-numeric-suffixes.json", str=True)))
 
         # Get local bibliography data
         try:
-            storage = defaultdict(list)
+            storage: t.BiblioStorageT = defaultdict(list)
             with open("biblio.json", encoding="utf-8") as fh:
                 biblio.processSpecrefBiblioFile(fh.read(), storage, order=2)
         except OSError:
@@ -254,7 +221,7 @@ class ReferenceManager:
             )
         )
 
-    def setSpecData(self, md):
+    def setSpecData(self, md: t.MetadataManager) -> None:
         if md.defaultRefStatus:
             self.defaultStatus = md.defaultRefStatus
         elif md.status in config.snapshotStatuses:
@@ -273,7 +240,7 @@ class ReferenceManager:
         # with the possibility of overriding the "shortname-level" pattern.
         self.removeSameSpecRefs()
 
-    def removeSameSpecRefs(self):
+    def removeSameSpecRefs(self) -> None:
         # Kill all the non-local anchors with the same shortname as the current spec,
         # so you don't end up accidentally linking to something that's been removed from the local copy.
         # TODO: This is dumb.
@@ -282,10 +249,12 @@ class ReferenceManager:
                 if ref["status"] != "local" and ref["shortname"].rstrip() == self.shortname:
                     ref["export"] = False
 
-    def addLocalDfns(self, dfns):
+    def addLocalDfns(self, dfns: t.Iterable[t.ElementT]) -> None:
         for el in dfns:
             if h.hasClass(el, "no-ref"):
                 continue
+            elId = el.get("id")
+            assert elId is not None
             try:
                 linkTexts = config.linkTextsFromElement(el)
             except config.DuplicatedLinkText as e:
@@ -345,7 +314,7 @@ class ReferenceManager:
                     "spec": self.spec,
                     "shortname": self.shortname,
                     "level": self.specLevel,
-                    "url": "#" + el.get("id"),
+                    "url": "#" + elId,
                     "export": True,
                     "for": dfnFor,
                     "el": el,

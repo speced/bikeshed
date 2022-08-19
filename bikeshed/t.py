@@ -1,4 +1,4 @@
-# pylint: disable=unused-import
+# pylint: skip-file
 # Module for holding types, for easy importing into the rest of the codebase
 from __future__ import annotations
 
@@ -26,6 +26,7 @@ from typing import (
     Optional,
     overload,
     Sequence,
+    MutableSequence,
     Set,
     TextIO,
     Tuple,
@@ -45,10 +46,10 @@ else:
     from typing_extensions import TypeAlias, TypeGuard
 
 
-from lxml import etree  # pylint: disable=wrong-import-position
+from lxml import etree
 
-ElementT: TypeAlias = etree._Element  # pylint: disable=protected-access
-DocumentT: TypeAlias = etree._ElementTree  # pylint: disable=protected-access
+ElementT: TypeAlias = etree._Element
+DocumentT: TypeAlias = etree._ElementTree
 NodeT: TypeAlias = Union[str, ElementT]
 
 # Can't actually do recursive types yet :(
@@ -61,11 +62,13 @@ JSONT: TypeAlias = Dict[str, Any]
 
 if TYPE_CHECKING:
     if "Spec" not in sys.modules:
-        from .Spec import Spec  # pylint: disable=cyclic-import
+        from .Spec import Spec
     SpecT = Spec
 
-    from . import biblio  # pylint: disable=cyclic-import
-    from .retrieve import DataFileRequester  # pylint: disable=cyclic-import
+    from . import biblio
+    from .retrieve import DataFileRequester
+    from .metadata import MetadataManager
+    from .refs import RefSource, ReferenceManager, RefWrapper
 
     BiblioStorageT: TypeAlias = DefaultDict[str, List[biblio.BiblioEntry]]
 
