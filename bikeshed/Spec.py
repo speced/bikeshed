@@ -32,7 +32,7 @@ from . import (
     line,
     lint,
     markdown,
-    mdnspeclinks,
+    mdn,
     messages as m,
     metadata,
     refs,
@@ -271,7 +271,7 @@ class Spec:
         boilerplate.addAnnotations(self)
         boilerplate.removeUnwantedBoilerplate(self)
         # Add MDN panels after all IDs/anchors have been added
-        mdnspeclinks.addMdnPanels(self)
+        mdn.addMdnPanels(self)
         highlight.addSyntaxHighlighting(self)
         boilerplate.addBikeshedBoilerplate(self)
         fingerprinting.addTrackingVector(self)

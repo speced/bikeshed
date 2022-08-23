@@ -1,0 +1,1 @@
+from .mdnspeclinks import addMdnPanels
