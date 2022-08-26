@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io  # pylint: disable=unused-import
 import logging
 import os
 import tarfile
@@ -22,7 +23,7 @@ def publishEchidna(
     import requests
 
     logging.captureWarnings(True)  # Silence SNIMissingWarning
-    tar = prepareTar(doc, visibleTar=False, additionalDirectories=additionalDirectories)
+    tarBytes = prepareTar(doc, visibleTar=False, additionalDirectories=additionalDirectories)
     # curl 'https://labs.w3.org/echidna/api/request' --user '<username>:<password>' -F "tar=@/some/path/spec.tar" -F "decision=<decisionUrl>"
     data = {
         "decision": decision,
@@ -35,10 +36,8 @@ def publishEchidna(
         "https://labs.w3.org/echidna/api/request",
         auth=(username, password),
         data=data,
-        files={"tar": tar.read()},
+        files={"tar": tarBytes},
     )
-    tar.close()
-    os.remove(tar.name)
 
     if r.status_code == 202:
         print("Successfully pushed to Echidna!")
@@ -51,7 +50,7 @@ def publishEchidna(
         print(r.headers)
 
 
-def prepareTar(doc: t.SpecT, visibleTar: bool = False, additionalDirectories: t.Optional[t.List[str]] = None):
+def prepareTar(doc: t.SpecT, visibleTar: bool = False, additionalDirectories: t.Optional[t.List[str]] = None) -> bytes:
     if additionalDirectories is None:
         additionalDirectories = ["images", "diagrams", "examples"]
     # Finish the spec
@@ -78,6 +77,12 @@ def prepareTar(doc: t.SpecT, visibleTar: bool = False, additionalDirectories: t.
     specOutput.close()
     os.remove(specOutput.name)
     if visibleTar:
-        return open("test.tar", "rb")
-    f.seek(0)
-    return f
+        file = open("test.tar", "rb")
+        tarData = file.read()
+        file.close()
+        os.remove("test.tar")
+    else:
+        f.seek(0)
+        tarData = f.read()
+        f.close()
+    return tarData

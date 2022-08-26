@@ -1,9 +1,10 @@
+from __future__ import annotations
 import re
 
-from .. import h, messages as m
+from .. import h, messages as m, t
 
 
-def accidental2119(doc):
+def accidental2119(doc: t.SpecT) -> None:
     """
     Looks for usage of 2119 keywords in non-normative sections.
     You can override this, allowing the keyword,

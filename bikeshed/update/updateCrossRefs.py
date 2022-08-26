@@ -9,14 +9,20 @@ import certifi
 import tenacity
 from json_home_client import Client as APIClient
 
-from .. import config, messages as m
+from .. import config, messages as m, t
+
+if t.TYPE_CHECKING:
+    AnchorT: t.TypeAlias = dict[str, str | None]
+    HeadingT: t.TypeAlias = dict[str, str]
+    RawSpecT: t.TypeAlias = dict[str, str | None]
+    SpecT: t.TypeAlias = dict[str, str | None]
 
 
-def progressMessager(index, total):
+def progressMessager(index: int, total: int) -> t.Callable[[], None]:
     return lambda: m.say(f"Downloading data for spec {index}/{total}...")
 
 
-def update(path, dryRun=False):
+def update(path: str, dryRun: bool = False) -> set[str] | None:
     m.say("Downloading anchor data...")
     shepherd = APIClient(
         "https://api.csswg.org/shepherd/",
@@ -25,12 +31,12 @@ def update(path, dryRun=False):
     )
     rawSpecData = dataFromApi(shepherd, "specifications", draft=True)
     if not rawSpecData:
-        return
+        return None
 
-    specs = dict()
-    anchors = defaultdict(list)
-    headings = defaultdict(dict)
-    lastMsgTime = 0
+    specs: dict[str | None, SpecT] = dict()
+    anchors: defaultdict[str, list[AnchorT]] = defaultdict(list)
+    headings: defaultdict[str | None, HeadingT] = defaultdict(dict)
+    lastMsgTime: float = 0
     for i, rawSpec in enumerate(rawSpecData.values(), 1):
         lastMsgTime = config.doEvery(
             s=5,
@@ -77,21 +83,21 @@ def update(path, dryRun=False):
                 f.write(json.dumps(specs, ensure_ascii=False, indent=2, sort_keys=True))
         except Exception as e:
             m.die(f"Couldn't save spec database to disk.\n{e}")
-            return
+            return None
         try:
-            for spec, specHeadings in headings.items():
-                p = os.path.join(path, "headings", f"headings-{spec}.json")
+            for specName, specHeadings in headings.items():
+                p = os.path.join(path, "headings", f"headings-{specName}.json")
                 writtenPaths.add(p)
                 with open(p, "w", encoding="utf-8") as f:
                     f.write(json.dumps(specHeadings, ensure_ascii=False, indent=2, sort_keys=True))
         except Exception as e:
             m.die(f"Couldn't save headings database to disk.\n{e}")
-            return
+            return None
         try:
             writtenPaths.update(writeAnchorsFile(anchors, path))
         except Exception as e:
             m.die(f"Couldn't save anchor database to disk.\n{e}")
-            return
+            return None
         try:
             p = os.path.join(path, "methods.json")
             writtenPaths.add(p)
@@ -99,7 +105,7 @@ def update(path, dryRun=False):
                 f.write(json.dumps(methods, ensure_ascii=False, indent=2, sort_keys=True))
         except Exception as e:
             m.die(f"Couldn't save methods database to disk.\n{e}")
-            return
+            return None
         try:
             p = os.path.join(path, "fors.json")
             writtenPaths.add(p)
@@ -107,14 +113,14 @@ def update(path, dryRun=False):
                 f.write(json.dumps(fors, ensure_ascii=False, indent=2, sort_keys=True))
         except Exception as e:
             m.die(f"Couldn't save fors database to disk.\n{e}")
-            return
+            return None
 
     m.say("Success!")
     return writtenPaths
 
 
 @tenacity.retry(reraise=True, stop=tenacity.stop_after_attempt(3), wait=tenacity.wait_random(1, 2))
-def dataFromApi(api, *args, **kwargs):
+def dataFromApi(api: APIClient, *args: t.Any, **kwargs: t.Any) -> t.JSONT:
     anchorDataContentTypes = [
         "application/json",
         "application/vnd.csswg.shepherd.v1+json",
@@ -130,7 +136,7 @@ def dataFromApi(api, *args, **kwargs):
             "This version of the anchor-data API is no longer supported. Try updating Bikeshed. If the error persists, please report it on GitHub."
         )
     if res.content_type not in anchorDataContentTypes:
-        raise Exception(f"Unrecognized anchor-data content-type '{res.contentType}'.")
+        raise Exception(f"Unrecognized anchor-data content-type '{res.content_type}'.")
     if res.status_code >= 300:
         raise Exception(
             f"Unknown error fetching anchor data; got status {res.status_code} and bytes:\n{data.decode('utf-8')}"
@@ -140,7 +146,7 @@ def dataFromApi(api, *args, **kwargs):
     return data
 
 
-def linearizeAnchorTree(multiTree, list=None):
+def linearizeAnchorTree(multiTree: list, list: list[dict[str, t.Any]] = None):
     if list is None:
         list = []
     # Call with multiTree being a list of trees
@@ -153,7 +159,7 @@ def linearizeAnchorTree(multiTree, list=None):
     return list
 
 
-def genSpec(rawSpec):
+def genSpec(rawSpec: RawSpecT) -> SpecT:
     spec = {
         "vshortname": rawSpec["name"],
         "shortname": rawSpec.get("short_name"),
@@ -167,28 +173,30 @@ def genSpec(rawSpec):
         "status": rawSpec.get("status"),
         "abstract": rawSpec.get("abstract"),
     }
-    if spec["shortname"] is not None and spec["vshortname"].startswith(spec["shortname"]):
+    vShortname = spec["vshortname"]
+    assert vShortname is not None
+    if spec["shortname"] is not None and vShortname.startswith(spec["shortname"]):
         # S = "foo", V = "foo-3"
         # Strip the prefix
-        level = spec["vshortname"][len(spec["shortname"]) :]
+        level = vShortname[len(spec["shortname"]) :]
         if level.startswith("-"):
             level = level[1:]
         if level.isdigit():
-            spec["level"] = int(level)
+            spec["level"] = str(int(level))
         else:
-            spec["level"] = 1
-    elif spec["shortname"] is None and re.match(r"(.*)-(\d+)", spec["vshortname"]):
+            spec["level"] = "1"
+    elif spec["shortname"] is None and re.match(r"(.*)-(\d+)", vShortname):
         # S = None, V = "foo-3"
-        match = re.match(r"(.*)-(\d+)", spec["vshortname"])
+        match = t.cast(re.Match, re.match(r"(.*)-(\d+)", vShortname))
         spec["shortname"] = match.group(1)
-        spec["level"] = int(match.group(2))
+        spec["level"] = str(int(match.group(2)))
     else:
-        spec["shortname"] = spec["vshortname"]
-        spec["level"] = 1
+        spec["shortname"] = vShortname
+        spec["level"] = "1"
     return spec
 
 
-def fixupAnchor(anchor):
+def fixupAnchor(anchor: AnchorT) -> AnchorT:
     """Miscellaneous fixes to the anchors before I start processing"""
 
     # This one issue was annoying
@@ -196,21 +204,22 @@ def fixupAnchor(anchor):
         anchor["title"] = "@import"
 
     # css3-tables has this a bunch, for some strange reason
-    if anchor.get("uri", "").startswith("??"):
-        anchor["uri"] = anchor["uri"][2:]
+    if (anchor.get("uri") or "").startswith("??"):
+        anchor["uri"] = t.cast(str, anchor.get("uri"))[2:]
 
     # If any smart quotes crept in, replace them with ASCII.
-    linkingTexts = anchor.get("linking_text", [anchor.get("title")])
-    for i, t in enumerate(linkingTexts):
-        if t is None:
+    linkingTexts: list[str | None] = t.cast("list[str|None]", anchor.get("linking_text")) or [anchor.get("title")]
+    for i, text in enumerate(linkingTexts):
+        if text is None:
             continue
-        if "’" in t or "‘" in t:
-            t = re.sub(r"‘|’", "'", t)
-            linkingTexts[i] = t
-        if "“" in t or "”" in t:
-            t = re.sub(r"“|”", '"', t)
-            linkingTexts[i] = t
-    anchor["linking_text"] = linkingTexts
+        if "’" in text or "‘" in text:
+            text = re.sub(r"‘|’", "'", text)
+            linkingTexts[i] = text
+        if "“" in text or "”" in text:
+            text = re.sub(r"“|”", '"', text)
+            linkingTexts[i] = text
+    # FIXME: AnchorT is wrong, it can have some list values
+    anchor["linking_text"] = t.cast(str, linkingTexts)
 
     # Normalize whitespace to a single space
     for k, v in list(anchor.items()):

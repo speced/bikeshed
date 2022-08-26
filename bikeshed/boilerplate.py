@@ -27,7 +27,7 @@ def loadBoilerplate(doc: t.SpecT, filename: str, bpname: str | None = None) -> N
     fillWith(bpname, el, doc=doc)
 
 
-def addBikeshedVersion(doc: t.SpecT):
+def addBikeshedVersion(doc: t.SpecT) -> None:
     # Adds a <meta> containing the current Bikeshed semver.
     if "generator" not in doc.md.boilerplate:
         return
@@ -537,7 +537,7 @@ def addIndexOfExternallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> Non
     if not doc.externalRefsUsed:
         return
 
-    def makeLink(*contents):
+    def makeLink(*contents: t.NodesT) -> t.ElementT:
         return h.E.span({}, *contents)
 
     ul = h.E.ul({"class": "index"})
@@ -623,7 +623,7 @@ def addPropertyIndex(doc: t.SpecT) -> None:
         ),
     )
 
-    def extractKeyValFromRow(row, table):
+    def extractKeyValFromRow(row: t.ElementT, table: t.ElementT) -> tuple[str, str]:
         # Extract the key, minus the trailing :
         result = re.match(r"(.*):", h.textContent(row[0]).strip())
         if result is None:
@@ -693,7 +693,7 @@ def addPropertyIndex(doc: t.SpecT) -> None:
         columns.extend(sorted(allKeys - set(columns)))
         # Create the table
 
-        def formatColumnName(name):
+        def formatColumnName(name: str) -> str:
             if name == "Inherited":
                 return "Inh."
             if name == "Percentages":

@@ -1,9 +1,10 @@
+from __future__ import annotations
 import logging
 
-from .. import h, messages as m
+from .. import h, messages as m, t
 
 
-def brokenLinks(doc):
+def brokenLinks(doc: t.SpecT) -> None:
     """
     Check every external link in the document to make sure it returns a 2XX or 3XX response.
     Auto-skips mailto: links.

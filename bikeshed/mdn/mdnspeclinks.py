@@ -37,7 +37,7 @@ def addMdnPanels(doc: t.SpecT) -> None:
         doc.extraStyles["style-darkmode"] += getModuleFile("mdn-dark.css")
 
 
-def createAnno(className: str, mdnButton: t.ElementT, featureDivs: t.List[t.ElementT]):
+def createAnno(className: str, mdnButton: t.ElementT, featureDivs: list[t.ElementT]) -> t.ElementT:
     return h.E.div({"class": className}, mdnButton, featureDivs)
 
 

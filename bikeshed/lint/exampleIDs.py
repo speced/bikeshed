@@ -1,7 +1,9 @@
-from .. import h, messages as m
+from __future__ import annotations
+
+from .. import h, messages as m, t
 
 
-def exampleIDs(doc):
+def exampleIDs(doc: t.SpecT) -> None:
     """
     Checks that every example in the document has an ID.
     """

@@ -94,7 +94,7 @@ def mergeStreams(s1: TagStream, s2: TagStream) -> TagStream:
     # Stack of open elements, to track that things merged validly.
     openStack: list[TagStreamNode] = []
 
-    def popStack(endNode):
+    def popStack(endNode: TagStreamNode) -> bool:
         if openStack[-1]["item"] != endNode["item"]:
             raise ValueError("mergeStreams() can't merge these trees, due to overlapping elements.")
         openStack.pop()

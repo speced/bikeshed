@@ -134,7 +134,7 @@ class Spec:
 
         return True
 
-    def recordDependencies(self, *inputSources):
+    def recordDependencies(self, *inputSources: InputSource.InputSource) -> None:
         self.transitiveDependencies.update(inputSources)
 
     def preprocess(self) -> Spec:
@@ -382,7 +382,7 @@ class Spec:
             import threading
 
             class SilentServer(http.server.SimpleHTTPRequestHandler):
-                def log_message(self, format, *args):
+                def log_message(self, format: t.Any, *args: t.Any) -> None:
                     pass
 
             socketserver.TCPServer.allow_reuse_address = True

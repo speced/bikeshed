@@ -9,35 +9,33 @@ from . import config, InputSource, messages as m, t
 
 
 class DataFileRequester:
-    def __init__(self, fileType: str = None, fallback: t.Optional[DataFileRequester] = None):
+    def __init__(self, fileType: str = None, fallback: DataFileRequester | None = None):
         if fileType not in ("readonly", "latest"):
             raise Exception(f"Bad value for DataFileRequester.type, got '{fileType}'.")
         self.fileType: str = fileType
         # fallback is another requester, used if the main one fails.
         self.fallback = fallback
 
-    def path(self, *segs: str, fileType: t.Optional[str] = None) -> str:
+    def path(self, *segs: str, fileType: str | None = None) -> str:
         return self._buildPath(segs=segs, fileType=fileType or self.fileType)
 
     @t.overload
-    def fetch(
-        self, *segs: str, str: t.Literal[True], okayToFail: bool = False, fileType: t.Optional[str] = None
-    ) -> str:
+    def fetch(self, *segs: str, str: t.Literal[True], okayToFail: bool = False, fileType: str | None = None) -> str:
         ...
 
     @t.overload
     def fetch(
-        self, *segs: str, str: t.Literal[False], okayToFail: bool = False, fileType: t.Optional[str] = None
+        self, *segs: str, str: t.Literal[False], okayToFail: bool = False, fileType: str | None = None
     ) -> io.TextIOWrapper:
         ...
 
     @t.overload
-    def fetch(self, *segs: str, okayToFail: bool = False, fileType: t.Optional[str] = None) -> io.TextIOWrapper:
+    def fetch(self, *segs: str, okayToFail: bool = False, fileType: str | None = None) -> io.TextIOWrapper:
         ...
 
     def fetch(
-        self, *segs: str, str: bool = False, okayToFail: bool = False, fileType: t.Optional[str] = None
-    ) -> t.Union[str, io.TextIOWrapper]:
+        self, *segs: str, str: bool = False, okayToFail: bool = False, fileType: str | None = None
+    ) -> str | io.TextIOWrapper:
         location = self._buildPath(segs=segs, fileType=fileType or self.fileType)
         try:
             if str:
@@ -59,11 +57,11 @@ class DataFileRequester:
                         return self._fail(location, str=False, okayToFail=okayToFail)
             return self._fail(location, str, okayToFail)
 
-    def walkFiles(self, *segs, fileType: t.Optional[str] = None) -> t.Generator[str, None, None]:
+    def walkFiles(self, *segs: str, fileType: str | None = None) -> t.Generator[str, None, None]:
         for _, _, files in os.walk(self._buildPath(segs, fileType=fileType or self.fileType)):
             yield from files
 
-    def _buildPath(self, segs: t.Sequence[str], fileType: t.Optional[str] = None) -> str:
+    def _buildPath(self, segs: t.Sequence[str], fileType: str | None = None) -> str:
         if fileType is None:
             fileType = self.fileType
         if fileType == "readonly":
@@ -80,10 +78,10 @@ class DataFileRequester:
         ...
 
     @t.overload
-    def _fail(self, location: str, str: bool, okayToFail: bool) -> t.Union[str, io.TextIOWrapper]:
+    def _fail(self, location: str, str: bool, okayToFail: bool) -> str | io.TextIOWrapper:
         ...
 
-    def _fail(self, location: str, str: bool, okayToFail: bool) -> t.Union[str, io.TextIOWrapper]:
+    def _fail(self, location: str, str: bool, okayToFail: bool) -> str | io.TextIOWrapper:
         if okayToFail:
             if str:
                 return ""
@@ -98,11 +96,11 @@ defaultRequester = DataFileRequester(fileType="latest", fallback=DataFileRequest
 def retrieveBoilerplateFile(
     doc: t.SpecT,
     name: str,
-    group: t.Optional[str] = None,
-    status: t.Optional[str] = None,
+    group: str | None = None,
+    status: str | None = None,
     error: bool = True,
     allowLocal: bool = True,
-    fileRequester: t.Optional[DataFileRequester] = None,
+    fileRequester: DataFileRequester | None = None,
 ) -> str:
     # Looks in three or four locations, in order:
     # the folder the spec source is in, the group's boilerplate folder, the megagroup's boilerplate folder, and the generic boilerplate folder.
@@ -124,12 +122,12 @@ def retrieveBoilerplateFile(
 
     searchLocally = allowLocal and doc.md.localBoilerplate[name]
 
-    def boilerplatePath(*segs):
+    def boilerplatePath(*segs: str) -> str:
         return dataFile.path("boilerplate", *segs)
 
     statusFile = f"{name}-{status}.include"
     genericFile = f"{name}.include"
-    sources = []
+    sources: list[InputSource.InputSource | None] = []
     if searchLocally:
         sources.append(doc.inputSource.relative(statusFile))  # Can be None.
         sources.append(doc.inputSource.relative(genericFile))
@@ -154,7 +152,7 @@ def retrieveBoilerplateFile(
 
     # Watch all the possible sources, not just the one that got used, because if
     # an earlier one appears, we want to rebuild.
-    doc.recordDependencies(*sources)
+    doc.recordDependencies(*(x for x in sources if x is not None))
 
     for source in sources:
         if source is not None:

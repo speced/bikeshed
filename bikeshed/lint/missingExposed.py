@@ -1,7 +1,11 @@
-from .. import h, messages as m
+from __future__ import annotations
+
+import widlparser  # pylint: disable=unused-import
+
+from .. import h, messages as m, t
 
 
-def missingExposed(doc):
+def missingExposed(doc: t.SpecT) -> None:
     """
     Checks that every IDL interface or namespace has an [Exposed] attribute.
     Specifically:
@@ -15,14 +19,15 @@ def missingExposed(doc):
         return
 
     for construct in doc.widl.constructs:
+        extendedAttrs: list[str]
         if construct.extended_attributes is None:
             extendedAttrs = []
         else:
-            extendedAttrs = construct.extended_attributes
+            extendedAttrs = [x.name for x in construct.extended_attributes if x.name is not None]
         if construct.idl_type == "namespace":
             good = False
             for attr in extendedAttrs:
-                if attr.name == "Exposed":
+                if attr == "Exposed":
                     good = True
                     break
             if not good:
@@ -32,10 +37,10 @@ def missingExposed(doc):
         elif construct.idl_type == "interface":
             good = False
             for attr in extendedAttrs:
-                if attr.name == "Exposed":
+                if attr == "Exposed":
                     good = True
                     break
-                if attr.name == "NoInterfaceObject":
+                if attr == "NoInterfaceObject":
                     good = True
                     break
             if not good:
@@ -46,5 +51,3 @@ def missingExposed(doc):
             if not h.hasAttr(construct, "interface"):
                 # Just a callback function, it's fine
                 continue
-            for _ in construct.interface.members:
-                pass
