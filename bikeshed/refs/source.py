@@ -1,9 +1,16 @@
+from __future__ import annotations
+
 import copy
 import re
 from collections import defaultdict
 
-from .. import config, constants, messages as m, retrieve
+from .. import config, constants, messages as m, retrieve, t
 from . import utils, wrapper
+
+if t.TYPE_CHECKING:
+    from .wrapper import RefWrapper
+
+    MethodDataT = dict[str, dict[str, list[str]]]
 
 
 class RefSource:
@@ -23,7 +30,14 @@ class RefSource:
     # Which sources use lazy-loading; other sources always have all their refs loaded immediately.
     lazyLoadedSources = ["foreign"]
 
-    def __init__(self, source, specs=None, ignored=None, replaced=None, fileRequester=None):
+    def __init__(
+        self,
+        source: str,
+        specs: dict[str, dict[str, str]] | None = None,
+        ignored: set[str] | None = None,
+        replaced: set[tuple[str, str]] | None = None,
+        fileRequester: t.DataFileRequester | None = None,
+    ):
         if fileRequester is None:
             self.dataFile = retrieve.defaultRequester
         else:
@@ -33,18 +47,18 @@ class RefSource:
         self.source = source
 
         # Dict of {linking text => [anchor data]}
-        self.refs = defaultdict(list)
+        self.refs: defaultdict[str, list[RefWrapper]] = defaultdict(list)
 
         # Dict of {argless method signatures => {"argfull signature": {"args":[args], "for":[fors]}}}
-        self.methods = defaultdict(dict)
+        self.methods: defaultdict[str, MethodDataT] = defaultdict(dict)
 
         # Dict of {for value => [terms]}
-        self.fors = defaultdict(list)
+        self.fors: defaultdict[str, list[str]] = defaultdict(list)
 
-        self.specs = {} if specs is None else specs
+        self.specs: dict[str, dict[str, str]] = {} if specs is None else specs
         self.ignoredSpecs = set() if ignored is None else ignored
         self.replacedSpecs = set() if replaced is None else replaced
-        self._loadedAnchorGroups = set()
+        self._loadedAnchorGroups: set[str] = set()
 
     def fetchRefs(self, key):
         """Safe, lazy-loading version of self.refs[key]"""

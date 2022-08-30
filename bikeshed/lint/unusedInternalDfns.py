@@ -12,10 +12,10 @@ def unusedInternalDfns(doc: t.SpecT) -> None:
     """
     noexportDfns = [el for el in h.findAll(dfnElementsSelector, doc) if el.get("data-noexport") == "by-default"]
 
-    def local(el):
+    def local(el: t.ElementT) -> bool:
         return (
             el.get("href") is not None
-            and el.get("href").startswith("#")
+            and el.get("href", "").startswith("#")
             and not h.hasClass(el, "self-link")
             and h.closestAncestor(el, lambda x: h.hasClass(x, "index")) is None
         )

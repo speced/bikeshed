@@ -32,7 +32,7 @@ def filterObsoletes(
     return ret
 
 
-def filterOldVersions(refs: list[t.RefWrapper], status: str | None = None):
+def filterOldVersions(refs: list[t.RefWrapper], status: str | None = None) -> list[t.RefWrapper]:
     # If multiple levels of the same shortname exist,
     # only use the latest level.
     # If generating for a snapshot, prefer the latest snapshot level,

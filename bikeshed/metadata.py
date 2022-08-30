@@ -139,7 +139,7 @@ class MetadataManager:
 
         self.manuallySetKeys: t.Set[str] = set()
 
-    def addData(self, key: str, val: str, lineNum: t.Union[None, str, int] = None) -> MetadataManager:
+    def addData(self, key: str, val: str, lineNum: str | int | None = None) -> MetadataManager:
         key = key.strip()
         if isinstance(val, str):
             if key in ["Abstract"]:
@@ -382,11 +382,11 @@ class MetadataManager:
 
 
 class ParseFunc(t.Protocol):
-    def __call__(self, key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Any:
+    def __call__(self, key: str, val: str, lineNum: str | int | None) -> t.Any:
         ...
 
 
-def parseDate(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Optional[date]:
+def parseDate(key: str, val: str, lineNum: str | int | None) -> t.Optional[date]:
     if val == "now":
         return datetime.utcnow().date()
     try:
@@ -396,7 +396,7 @@ def parseDate(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Optiona
         return None
 
 
-def parseDateOrDuration(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Optional[t.Union[date, timedelta]]:
+def parseDateOrDuration(key: str, val: str, lineNum: str | int | None) -> t.Optional[t.Union[date, timedelta]]:
     if val == "now":
         return datetime.utcnow().date()
     if val == "never" or boolish(val) is False:
@@ -428,25 +428,25 @@ def canonicalizeExpiryDate(base: date, expires: t.Union[None, timedelta, Duratio
     return None
 
 
-def parseLevel(key: str, val: str, lineNum: t.Union[None, str, int]) -> str:
+def parseLevel(key: str, val: str, lineNum: str | int | None) -> str:
     val = val.lower().strip()
     if val == "none":
         return ""
     return val.strip()
 
 
-def parseInteger(key: str, val: str, lineNum: t.Union[None, str, int]) -> int:
+def parseInteger(key: str, val: str, lineNum: str | int | None) -> int:
     return int(val)
 
 
-def parseBoolean(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Optional[bool]:
+def parseBoolean(key: str, val: str, lineNum: str | int | None) -> t.Optional[bool]:
     b = boolish(val)
     if b is None:
         m.die(f"The {key} field must be true/false, yes/no, y/n, or on/off. Got '{val}' instead.", lineNum=lineNum)
     return b
 
 
-def parseSoftBoolean(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Union[None, bool, t.Literal["maybe"]]:
+def parseSoftBoolean(key: str, val: str, lineNum: str | int | None) -> t.Union[None, bool, t.Literal["maybe"]]:
     b = boolish(val)
     if b is not None:
         return b
@@ -456,7 +456,7 @@ def parseSoftBoolean(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.
     return None
 
 
-def boolish(val) -> t.Optional[bool]:
+def boolish(val: str) -> t.Optional[bool]:
     if val.lower() in ("true", "yes", "y", "on"):
         return True
     if val.lower() in ("false", "no", "n", "off"):
@@ -464,7 +464,7 @@ def boolish(val) -> t.Optional[bool]:
     return None
 
 
-def parseWarning(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Optional[t.Tuple[str, ...]]:
+def parseWarning(key: str, val: str, lineNum: str | int | None) -> t.Optional[t.Tuple[str, ...]]:
     if val.lower() == "obsolete":
         return ("warning-obsolete",)
     if val.lower() == "not ready":
@@ -500,11 +500,11 @@ def parseWarning(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Opti
 def parseEditor(key: str, val: str, lineNum: None | str | int) -> list[dict[str, str | None]]:
     pieces = [h.unescape(piece.strip()) for piece in val.split(",")]
 
-    def looksLinkish(string):
-        return re.match(r"\w+:", string) or looksEmailish(string)
+    def looksLinkish(string: str) -> bool:
+        return bool(re.match(r"\w+:", string)) or looksEmailish(string)
 
-    def looksEmailish(string):
-        return re.match(r".+@.+\..+", string)
+    def looksEmailish(string: str) -> bool:
+        return bool(re.match(r".+@.+\..+", string))
 
     data = {
         "name": pieces[0],
@@ -576,15 +576,15 @@ def parseEditor(key: str, val: str, lineNum: None | str | int) -> list[dict[str,
     return [data]
 
 
-def parseCommaSeparated(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.List[str]:
+def parseCommaSeparated(key: str, val: str, lineNum: str | int | None) -> t.List[str]:
     return [term.strip().lower() for term in val.split(",")]
 
 
-def parseIdList(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.List[str]:
+def parseIdList(key: str, val: str, lineNum: str | int | None) -> t.List[str]:
     return [term.strip() for term in val.split(",")]
 
 
-def parseLinkDefaults(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.LinkDefaultsT:
+def parseLinkDefaults(key: str, val: str, lineNum: str | int | None) -> t.LinkDefaultsT:
     defaultSpecs: t.LinkDefaultsT = defaultdict(list)
     for default in val.split(","):
         match = re.match(
@@ -611,7 +611,7 @@ def parseLinkDefaults(key: str, val: str, lineNum: t.Union[None, str, int]) -> t
     return defaultSpecs
 
 
-def parseBoilerplate(key: str, val: str, lineNum: t.Union[None, str, int]) -> config.BoolSet:
+def parseBoilerplate(key: str, val: str, lineNum: str | int | None) -> config.BoolSet:
     boilerplate = config.BoolSet(default=True)
     for command in val.split(","):
         pieces = command.lower().strip().split()
@@ -636,7 +636,7 @@ def parseBoilerplate(key: str, val: str, lineNum: t.Union[None, str, int]) -> co
     return boilerplate
 
 
-def parseBiblioDisplay(key: str, val: str, lineNum: t.Union[None, str, int]) -> str:
+def parseBiblioDisplay(key: str, val: str, lineNum: str | int | None) -> str:
     val = val.strip().lower()
     if val in constants.biblioDisplay:
         return val
@@ -644,7 +644,7 @@ def parseBiblioDisplay(key: str, val: str, lineNum: t.Union[None, str, int]) -> 
     return constants.biblioDisplay.index
 
 
-def parseRefStatus(key: str, val: str, lineNum: t.Union[None, str, int]) -> str:
+def parseRefStatus(key: str, val: str, lineNum: str | int | None) -> str:
     val = val.strip().lower()
     if val == "dated":
         # Legacy term that used to be allowed
@@ -655,13 +655,13 @@ def parseRefStatus(key: str, val: str, lineNum: t.Union[None, str, int]) -> str:
     return constants.refStatus.current
 
 
-def parseComplainAbout(key: str, val: str, lineNum: t.Union[None, str, int]) -> config.BoolSet:
+def parseComplainAbout(key: str, val: str, lineNum: str | int | None) -> config.BoolSet:
     validLabels = frozenset(["missing-example-ids", "broken-links", "accidental-2119", "missing-exposed"])
     ret = parseBoolishList(key, val.lower(), default=False, validLabels=validLabels, lineNum=lineNum)
     return ret
 
 
-def parseExternalInfotrees(key: str, val: str, lineNum: t.Union[None, str, int]) -> config.BoolSet:
+def parseExternalInfotrees(key: str, val: str, lineNum: str | int | None) -> config.BoolSet:
     return parseBoolishList(
         key,
         val.lower(),
@@ -677,7 +677,7 @@ def parseBoolishList(
     default: bool,
     validLabels: t.Optional[t.AbstractSet[str]] = None,
     extraValues: t.Optional[t.Dict[str, bool]] = None,
-    lineNum: t.Union[None, str, int] = None,
+    lineNum: str | int | None = None,
 ) -> config.BoolSet:
     # Parses anything defined as "label <boolish>, label <boolish>" into a BoolSet
     # Supply a list of valid labels if you want to have them checked,
@@ -709,7 +709,7 @@ def parseBoolishList(
     return boolset
 
 
-def parseLinkedText(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.List[t.Tuple[str, str]]:
+def parseLinkedText(key: str, val: str, lineNum: str | int | None) -> t.List[t.Tuple[str, str]]:
     # Parses anything defined as "text url, text url, text url" into a list of 2-tuples.
     entries = []
     vals = [v.strip() for v in val.split(",")]
@@ -719,7 +719,7 @@ def parseLinkedText(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.L
     return entries
 
 
-def parseMarkupShorthands(key: str, val: str, lineNum: t.Union[None, str, int]) -> config.BoolSet:
+def parseMarkupShorthands(key: str, val: str, lineNum: str | int | None) -> config.BoolSet:
     # Format is comma-separated list of shorthand category followed by boolean.
     # Output is a boolset of the shorthand categories.
     # TODO: Just call parseBoolistList instead
@@ -748,7 +748,7 @@ def parseMarkupShorthands(key: str, val: str, lineNum: t.Union[None, str, int]) 
     return ret
 
 
-def parseInlineGithubIssues(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Union[t.Literal[False], str]:
+def parseInlineGithubIssues(key: str, val: str, lineNum: str | int | None) -> t.Union[t.Literal[False], str]:
     val = val.lower()
     if val in ["title", "full"]:
         return val
@@ -761,7 +761,7 @@ def parseInlineGithubIssues(key: str, val: str, lineNum: t.Union[None, str, int]
     return False
 
 
-def parseTextMacro(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.List[t.Tuple[str, str]]:
+def parseTextMacro(key: str, val: str, lineNum: str | int | None) -> t.List[t.Tuple[str, str]]:
     # Each Text Macro line is just a macro name (must be uppercase)
     # followed by the text it expands to.
     try:
@@ -775,7 +775,7 @@ def parseTextMacro(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Li
     return [(name, text)]
 
 
-def parseWorkStatus(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Optional[str]:
+def parseWorkStatus(key: str, val: str, lineNum: str | int | None) -> t.Optional[str]:
     # The Work Status is one of (completed, stable, testing, refining, revising, exploring, rewriting, abandoned).
     val = val.strip().lower()
     if val not in (
@@ -796,7 +796,7 @@ def parseWorkStatus(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.O
     return val
 
 
-def parseRepository(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Optional[repository.Repository]:
+def parseRepository(key: str, val: str, lineNum: str | int | None) -> t.Optional[repository.Repository]:
     # Shortname followed by url, or just url.
     # If just url, I'll try to recognize the shortname from it; otherwise it's the url again.
     val = val.strip()
@@ -819,7 +819,7 @@ def parseRepository(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.O
     return None
 
 
-def parseTranslateIDs(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Dict[str, str]:
+def parseTranslateIDs(key: str, val: str, lineNum: str | int | None) -> t.Dict[str, str]:
     translations = {}
     for v in val.split(","):
         pieces = v.strip().split()
@@ -831,7 +831,7 @@ def parseTranslateIDs(key: str, val: str, lineNum: t.Union[None, str, int]) -> t
     return translations
 
 
-def parseTranslation(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.List[t.Dict[str, t.Optional[str]]]:
+def parseTranslation(key: str, val: str, lineNum: str | int | None) -> t.List[t.Dict[str, t.Optional[str]]]:
     # Format is <lang-code> <url> [ [ , name <name-in-spec-lang> ] || [ , native-name <name-in-the-lang> ] ]?
     pieces = val.split(",")
     if not (1 <= len(pieces) <= 3):
@@ -864,7 +864,7 @@ def parseTranslation(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.
     return [{"lang-code": langCode, "url": url, "name": name, "native-name": nativeName}]
 
 
-def parseAudience(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.List[str]:
+def parseAudience(key: str, val: str, lineNum: str | int | None) -> t.List[str]:
     # WG21 value
     values = [x.strip().upper() for x in val.strip().split(",")]
     if len(values) == 1 and values[0] == "ALL":
@@ -907,7 +907,7 @@ def parseAudience(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Lis
         return []
 
 
-def parseEditorTerm(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Dict[str, str]:
+def parseEditorTerm(key: str, val: str, lineNum: str | int | None) -> t.Dict[str, str]:
     values = [x.strip() for x in val.strip().split(",")]
     if len(values) == 2:
         return {"singular": values[0], "plural": values[1]}
@@ -918,7 +918,7 @@ def parseEditorTerm(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.D
     return {"singular": "Editor", "plural": "Editors"}
 
 
-def parseMaxToCDepth(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Union[int, float]:
+def parseMaxToCDepth(key: str, val: str, lineNum: str | int | None) -> t.Union[int, float]:
     if val.lower() == "none":
         return float("inf")
     try:
@@ -938,12 +938,12 @@ def parseMaxToCDepth(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.
     return v
 
 
-def parseMetadataOrder(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.List[str]:
+def parseMetadataOrder(key: str, val: str, lineNum: str | int | None) -> t.List[str]:
     pieces = [x.strip() for x in val.split(",")]
     return pieces
 
 
-def parseWptDisplay(key: str, val: str, lineNum: t.Union[None, str, int]) -> str:
+def parseWptDisplay(key: str, val: str, lineNum: str | int | None) -> str:
     val = val.lower()
     if val in ("none", "inline", "open", "closed"):
         return val
@@ -954,7 +954,7 @@ def parseWptDisplay(key: str, val: str, lineNum: t.Union[None, str, int]) -> str
     return "none"
 
 
-def parsePreviousVersion(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.List[t.Dict[str, str]]:
+def parsePreviousVersion(key: str, val: str, lineNum: str | int | None) -> t.List[t.Dict[str, str]]:
     biblioMatch = re.match(r"from biblio(\s+\S+)?", val.lower())
     if biblioMatch:
         if biblioMatch.group(1):
@@ -963,7 +963,7 @@ def parsePreviousVersion(key: str, val: str, lineNum: t.Union[None, str, int]) -
     return [{"type": "url", "value": val}]
 
 
-def parseInlineTagCommand(key: str, val: str, lineNum: t.Union[None, str, int]) -> t.Dict[str, str]:
+def parseInlineTagCommand(key: str, val: str, lineNum: str | int | None) -> t.Dict[str, str]:
     tag, _, command = val.strip().partition(" ")
     command = command.strip()
     return {tag: command}
@@ -1146,49 +1146,56 @@ class Metadata:
     parse: ParseFunc
 
 
-def joinValue(a, b):
+if t.TYPE_CHECKING:
+    JoinA = t.TypeVar("JoinA")
+    JoinB = t.TypeVar("JoinB")
+
+
+def joinValue(a: JoinA, b: JoinB) -> JoinB:
     return b
 
 
-def joinList(a, b):
-    return a + b
+def joinList(a: t.Sequence[JoinA], b: t.Sequence[JoinB]) -> t.Sequence[JoinA | JoinB]:
+    return a + b  # type: ignore[operator]
 
 
-def joinDict(a, b):
-    x = {}
+def joinDict(a: t.Mapping[str, JoinA], b: t.Mapping[str, JoinB]) -> dict[str, JoinA | JoinB]:
+    x: dict[str, JoinA | JoinB] = {}
     x.update(a)
     x.update(b)
     return x
 
 
-def joinBoolSet(a, b):
+def joinBoolSet(a: config.BoolSet, b: config.BoolSet) -> config.BoolSet:
     x = copy.deepcopy(a)
     x.update(b)
     return x
 
 
-def joinDdList(a, b):
-    x = defaultdict(list)
-    x.update(a)
-    x.update(b)
+def joinDdList(
+    a: defaultdict[str, list[JoinA]], b: defaultdict[str, list[JoinB]]
+) -> defaultdict[str, list[JoinA | JoinB]]:
+    x: defaultdict[str, list[JoinA | JoinB]] = defaultdict(list)
+    x.update(a)  # type: ignore[arg-type]
+    x.update(b)  # type: ignore[arg-type]
     return x
 
 
-def parseLiteral(key: str, val: str, lineNum: t.Union[None, str, int]):
+def parseLiteral(key: str, val: str, lineNum: str | int | None) -> str:
     return val
 
 
-def parseLiteralOrNone(key: str, val: str, lineNum: t.Union[None, str, int]):
+def parseLiteralOrNone(key: str, val: str, lineNum: str | int | None) -> str | None:
     if val.lower() == "none":
         return None
     return val
 
 
-def parseLiteralCaseless(key: str, val: str, lineNum: t.Union[None, str, int]):
+def parseLiteralCaseless(key: str, val: str, lineNum: str | int | None) -> str:
     return val.lower()
 
 
-def parseLiteralList(key: str, val: str, lineNum: t.Union[None, str, int]):
+def parseLiteralList(key: str, val: str, lineNum: str | int | None) -> list[str]:
     return [val]
 
 

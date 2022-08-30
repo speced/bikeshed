@@ -20,7 +20,7 @@ class MarkdownCodeSpans(func.Functor):
     # and contains no markdown code spans.
     # Thus, functions mapping over the text can freely make substitutions,
     # knowing they won't accidentally replace stuff in a code span.
-    def __init__(self, text):
+    def __init__(self, text: str):
         self.__codeSpanReplacements__ = []
         newText = ""
         mode = "text"
@@ -59,18 +59,18 @@ class MarkdownCodeSpans(func.Functor):
 
         super().__init__(newText)
 
-    def map(self, fn):
+    def map(self, fn: t.Callable) -> MarkdownCodeSpans:
         x = MarkdownCodeSpans("")
         x.__val__ = fn(self.__val__)
         x.__codeSpanReplacements__ = self.__codeSpanReplacements__
         return x
 
-    def extract(self):
+    def extract(self) -> str:
         if self.__codeSpanReplacements__:
             # Reverse the list, so I can use pop() to get them starting from the first.
             repls = self.__codeSpanReplacements__[::-1]
 
-            def codeSpanReviver(_):
+            def codeSpanReviver(_: t.Any) -> str:
                 # Match object is the PUA character, which I can ignore.
                 repl = repls.pop()
                 if repl[0] == "" or repl[0].endswith("-"):
@@ -86,7 +86,7 @@ class MarkdownCodeSpans(func.Functor):
         return self.__val__
 
 
-def stripBOM(doc: t.SpecT):
+def stripBOM(doc: t.SpecT) -> None:
     if len(doc.lines) >= 1 and doc.lines[0].text[0:1] == "\ufeff":
         doc.lines[0].text = doc.lines[0].text[1:]
         m.warn("Your document has a BOM. There's no need for that, please re-save it without a BOM.")
@@ -174,7 +174,7 @@ def canonicalizeShortcuts(doc: t.SpecT) -> None:
             el.set("data-dfn-for", _for)
 
 
-def addImplicitAlgorithms(doc: t.SpecT):
+def addImplicitAlgorithms(doc: t.SpecT) -> None:
     # If a container has an empty `algorithm` attribute,
     # but it contains only a single `<dfn>`,
     # assume that the dfn is a description of the algorithm.
@@ -199,10 +199,10 @@ def addImplicitAlgorithms(doc: t.SpecT):
 
 
 def checkVarHygiene(doc: t.SpecT) -> None:
-    def isAlgo(el):
+    def isAlgo(el: t.ElementT) -> bool:
         return el.get("data-algorithm") is not None
 
-    def nearestAlgo(el):
+    def nearestAlgo(el: t.ElementT) -> t.ElementT | None:
         # Find the nearest "algorithm" container,
         # either an ancestor with [algorithm] or the nearest heading with same.
         if isAlgo(el):
@@ -213,8 +213,9 @@ def checkVarHygiene(doc: t.SpecT) -> None:
         for heading in h.relevantHeadings(el):
             if isAlgo(heading):
                 return heading
+        return None
 
-    def algoName(el):
+    def algoName(el: t.ElementT) -> str | None:
         # Finds a uniquified algorithm name from an algo container
         algo = nearestAlgo(el)
         if algo is None:
@@ -224,11 +225,11 @@ def checkVarHygiene(doc: t.SpecT) -> None:
         return f"'{algoName}'" + (f" for {algoFor}" if algoFor else "")
 
     # Look for vars that only show up once. These are probably typos.
-    varCounts: t.DefaultDict[t.Tuple[str, str], int] = defaultdict(lambda: 0)
+    varCounts: defaultdict[tuple[str, str | None], int] = defaultdict(lambda: 0)
     for el in h.findAll("var:not([data-var-ignore])", doc):
         key = (h.foldWhitespace(h.textContent(el)).strip(), algoName(el))
         varCounts[key] += 1
-    foldedVarCounts: t.DefaultDict[t.Tuple[str, str], int] = defaultdict(lambda: 0)
+    foldedVarCounts: defaultdict[tuple[str, str | None], int] = defaultdict(lambda: 0)
     atLeastOneAlgo = False
     for (var, algo), count in varCounts.items():
         if algo:
@@ -500,7 +501,7 @@ def processDfns(doc: t.SpecT) -> None:
     doc.refs.addLocalDfns(dfn for dfn in dfns if dfn.get("id") is not None)
 
 
-def determineDfnType(dfn: t.ElementT, inferCSS=False) -> str:
+def determineDfnType(dfn: t.ElementT, inferCSS: bool = False) -> str:
     # 1. Look at data-dfn-type
     if dfn.get("data-dfn-type"):
         return t.cast(str, dfn.get("data-dfn-type"))
@@ -541,7 +542,7 @@ def determineDfnType(dfn: t.ElementT, inferCSS=False) -> str:
     return "dfn"
 
 
-def classifyDfns(doc: t.SpecT, dfns: t.List[t.ElementT]) -> None:
+def classifyDfns(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
     dfnTypeToPrefix = {v: k for k, v in config.dfnClassToType.items()}
     for el in dfns:
         dfnType = determineDfnType(el, inferCSS=doc.md.inferCSSDfns)
@@ -996,7 +997,7 @@ def removeMultipleLinks(doc: t.SpecT) -> None:
     # only keep the first.
     if not doc.md.removeMultipleLinks:
         return
-    paras: t.DefaultDict[t.Any, t.DefaultDict[str, t.List[t.Any]]]
+    paras: defaultdict[t.Any, defaultdict[str, t.List[t.Any]]]
     paras = defaultdict(lambda: defaultdict(list))
     for el in h.findAll("a[data-link-type]", doc):
         if h.hasAncestor(el, lambda x: x.tag in ["pre", "xmp"]):
@@ -1055,7 +1056,7 @@ def addSelfLinks(doc: t.SpecT) -> None:
     if doc.md.slimBuildArtifact:
         return
 
-    def makeSelfLink(el):
+    def makeSelfLink(el: t.ElementT) -> t.ElementT:
         return h.E.a({"href": "#" + h.escapeUrlFrag(el.get("id", "")), "class": "self-link"})
 
     dfnElements = h.findAll(config.dfnElementsSelector, doc)
@@ -1654,7 +1655,7 @@ def addImageSize(doc: t.SpecT) -> None:
             )
 
 
-def processIDL(doc) -> None:
+def processIDL(doc: t.SpecT) -> None:
     localDfns = set()
     for pre in h.findAll("pre.idl, xmp.idl", doc):
         if pre.get("data-no-idl") is not None:

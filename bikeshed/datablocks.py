@@ -7,7 +7,7 @@ from functools import reduce
 
 import attr
 
-from . import biblio, config, h, messages as m, t
+from . import biblio, config, h, messages as m, refs, t
 from .line import Line
 
 
@@ -700,17 +700,20 @@ def processAnchors(anchors: InfoTreeT, doc: t.SpecT, lineNum: int | None = None)
         if anchor["type"][0] in config.lowercaseTypes:
             anchor["text"][0] = anchor["text"][0].lower()
         doc.refs.anchorBlockRefs.refs[anchor["text"][0]].append(
-            {
-                "linkingText": anchor["text"][0],
-                "type": anchor["type"][0].lower(),
-                "url": url,
-                "shortname": shortname.lower() if shortname is not None else doc.md.shortname,
-                "level": level if level is not None else doc.md.level,
-                "for": anchor.get("for", []),
-                "export": True,
-                "status": status,
-                "spec": spec.lower() if spec is not None else "",
-            }
+            refs.RefWrapper(
+                anchor["text"][0],
+                {
+                    "linkingText": anchor["text"][0],
+                    "type": anchor["type"][0].lower(),
+                    "url": url,
+                    "shortname": shortname.lower() if shortname is not None else doc.md.shortname,
+                    "level": level if level is not None else doc.md.level,
+                    "for": anchor.get("for", []),
+                    "export": True,
+                    "status": status,
+                    "spec": spec.lower() if spec is not None else "",
+                },
+            )
         )
         methodishStart = re.match(r"([^(]+\()[^)]", anchor["text"][0])
         if methodishStart:
@@ -844,8 +847,8 @@ def transformInclude(lines: list[str], tagName: str, firstLine: str, lineNum: in
                     )
     if path:
         el = "<pre class=include path='{}'".format(h.escapeAttr(path))
-        for i, (k, v) in enumerate(macros.items()):
-            el += " macro-{}='{} {}'".format(i, k, h.escapeAttr(v))
+        for i, (macroName, macroVal) in enumerate(macros.items()):
+            el += " macro-{}='{} {}'".format(i, macroName, h.escapeAttr(macroVal))
         el += f"{lineNumAttr}></pre>"
 
         indent = getWsPrefix(firstLine)
@@ -944,7 +947,7 @@ def transformIncludeRaw(lines: list[str], tagName: str, firstLine: str, lineNum:
     return []
 
 
-def parseInfoTree(lines: list[str], indent: int = 4, lineNum: int | None = 0):
+def parseInfoTree(lines: list[str], indent: int = 4, lineNum: int | None = 0) -> InfoTreeT:
     # Parses sets of info, which can be arranged into trees.
     # Each info is a set of key/value pairs, semicolon-separated:
     # key1: val1; key2: val2; key3: val3
@@ -1047,13 +1050,13 @@ def parseTag(text: str, lineNumber: int | None) -> StartTag | None:
     The text must start with the opening < character.
     """
 
-    def parseerror(index, state):
+    def parseerror(index: int, state: str) -> None:
         m.die(
             f"Tried to parse a start tag from '{text}', but failed at character {index} '{text[index]}' and parse-state '{state}'.",
             lineNum=lineNumber,
         )
 
-    def eof(i, text):
+    def eof(i: int, text: str) -> bool:
         return i >= len(text)
 
     i = 0

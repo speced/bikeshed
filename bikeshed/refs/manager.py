@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+import dataclasses
 import json
 import random
 import re
 from collections import defaultdict
 
 from .. import biblio, config, constants, datablocks, h, messages as m, retrieve, t
-from . import utils, source, headingdata
+from . import utils, source, headingdata, wrapper
+
+if t.TYPE_CHECKING:
+    from .wrapper import RefWrapper
+
+    SpecDataT: t.TypeAlias = dict[str, str]
 
 
 class ReferenceManager:
@@ -48,7 +54,7 @@ class ReferenceManager:
         self.testing: bool = testing
 
         # Dict of {spec vshortname => spec data}
-        self.specs: dict[str, dict] = dict()
+        self.specs: dict[str, SpecDataT] = dict()
 
         # Dict of {linking text => link-defaults data}
         self.defaultSpecs: t.LinkDefaultsT = defaultdict(list)
@@ -103,17 +109,17 @@ class ReferenceManager:
         This is oddly split up into sub-functions to make it easier to track performance.
         """
 
-        def initSpecs():
+        def initSpecs() -> None:
             self.specs.update(json.loads(self.dataFile.fetch("specs.json", str=True)))
 
         initSpecs()
 
-        def initMethods():
+        def initMethods() -> None:
             self.foreignRefs.methods.update(json.loads(self.dataFile.fetch("methods.json", str=True)))
 
         initMethods()
 
-        def initFors():
+        def initFors() -> None:
             self.foreignRefs.fors.update(json.loads(self.dataFile.fetch("fors.json", str=True)))
 
         initFors()
@@ -246,8 +252,8 @@ class ReferenceManager:
         # TODO: This is dumb.
         for _, refs in self.foreignRefs.refs.items():
             for ref in refs:
-                if ref["status"] != "local" and ref["shortname"].rstrip() == self.shortname:
-                    ref["export"] = False
+                if ref.status != "local" and ref.shortname.rstrip() == self.shortname:
+                    ref._ref["export"] = False
 
     def addLocalDfns(self, dfns: t.Iterable[t.ElementT]) -> None:
         for el in dfns:
@@ -308,25 +314,28 @@ class ReferenceManager:
                         dfnFor.add(match.group(1).strip())
                 # convert back into a list now, for easier JSONing
                 dfnFor = sorted(dfnFor)
-                ref = {
-                    "type": linkType,
-                    "status": "local",
-                    "spec": self.spec,
-                    "shortname": self.shortname,
-                    "level": self.specLevel,
-                    "url": "#" + elId,
-                    "export": True,
-                    "for": dfnFor,
-                    "el": el,
-                }
+                ref = wrapper.RefWrapper(
+                    linkText,
+                    {
+                        "type": linkType,
+                        "status": "local",
+                        "spec": self.spec,
+                        "shortname": self.shortname,
+                        "level": self.specLevel,
+                        "url": "#" + elId,
+                        "export": True,
+                        "for": dfnFor,
+                        "el": el,
+                    },
+                )
                 self.localRefs.refs[linkText].append(ref)
                 for for_ in dfnFor:
                     self.localRefs.fors[for_].append(linkText)
                 methodishStart = re.match(r"([^(]+\()[^)]", linkText)
                 if methodishStart:
-                    self.localRefs.addMethodVariants(linkText, dfnFor, ref["shortname"])
+                    self.localRefs.addMethodVariants(linkText, dfnFor, ref.shortname)
 
-    def filterObsoletes(self, refs):
+    def filterObsoletes(self, refs: list[RefWrapper]) -> list[RefWrapper]:
         return utils.filterObsoletes(
             refs,
             replacedSpecs=self.replacedSpecs,
@@ -335,7 +344,7 @@ class ReferenceManager:
             localSpec=self.spec,
         )
 
-    def queryAllRefs(self, **kwargs):
+    def queryAllRefs(self, **kwargs: t.Any) -> list[RefWrapper]:
         r1, _ = self.localRefs.queryRefs(**kwargs)
         r2, _ = self.anchorBlockRefs.queryRefs(**kwargs)
         r3, _ = self.foreignRefs.queryRefs(**kwargs)
@@ -346,17 +355,17 @@ class ReferenceManager:
 
     def getRef(
         self,
-        linkType,
-        text,
-        spec=None,
-        status=None,
-        statusHint=None,
-        linkFor=None,
-        explicitFor=False,
-        linkForHint=None,
-        error=True,
-        el=None,
-    ):
+        linkType: str,
+        text: str,
+        spec: str | None = None,
+        status: str | None = None,
+        statusHint: str | None = None,
+        linkFor: str | list[str] | None = None,
+        explicitFor: bool = False,
+        linkForHint: str | None = None,
+        error: bool = True,
+        el: t.ElementT | None = None,
+    ) -> RefWrapper | None:
         # If error is False, this function just shuts up and returns a reference or None
         # Otherwise, it pops out debug messages for the user.
 
@@ -423,7 +432,7 @@ class ReferenceManager:
 
         if status == "local":
             # Already checked local refs, can early-exit now.
-            return
+            return None
 
         # Take defaults into account
         if not spec or not status or not linkFor:
@@ -514,15 +523,15 @@ class ReferenceManager:
                 # Find all method signatures that contain the arg in question
                 # and, if interface is specified, are for that interface.
                 # Dedup/collect by url, so I'll get all the signatures for a given dfn.
-                possibleMethods = defaultdict(list)
+                possibleMethodsDict = defaultdict(list)
                 for argfullName, metadata in methodSignatures.items():
                     if (
                         text in metadata["args"]
                         and (interfaceName in metadata["for"] or interfaceName is None)
                         and metadata["shortname"] != self.shortname
                     ):
-                        possibleMethods[metadata["shortname"]].append(argfullName)
-                possibleMethods = list(possibleMethods.values())
+                        possibleMethodsDict[metadata["shortname"]].append(argfullName)
+                possibleMethods = list(possibleMethodsDict.values())
                 if not possibleMethods:
                     # No method signatures with this argument/interface.
                     # Jump out and fail in a normal way.
@@ -588,7 +597,7 @@ class ReferenceManager:
                     f"Too many possible method targets to disambiguate '{linkFor}/{text}'. Please specify the names of the required args, like 'foo(bar, baz)', in the 'for' attribute.",
                     el=el,
                 )
-                return
+                return None
             # Otherwise
 
         if failure in ("text", "type"):
@@ -796,7 +805,7 @@ class ReferenceManager:
             return None
         return self._bestCandidateBiblio(latestRefs)
 
-    def vNamesFromSpecNames(self, specName):
+    def vNamesFromSpecNames(self, specName: str) -> list[str]:
         # Takes an unversioned specName,
         # returns the versioned names that Shepherd knows about.
 
@@ -811,7 +820,7 @@ class ReferenceManager:
         return chosenVNames
 
 
-def simplifyPossibleRefs(refs, alwaysShowFor=False):
+def simplifyPossibleRefs(refs: list[RefWrapper], alwaysShowFor: bool = False) -> list[SimplifiedRef]:
     # "Simplifies" the set of possible refs according to their 'for' value;
     # returns a list of text/type/spec/for objects,
     # with the for value filled in *only if necessary for disambiguation*.
@@ -827,28 +836,44 @@ def simplifyPossibleRefs(refs, alwaysShowFor=False):
         if len(fors) >= 2 or alwaysShowFor:
             # Needs for-based disambiguation
             for for_, url in fors:
-                retRefs.append({"text": text, "type": type, "spec": spec, "for_": for_, "url": url})
+                retRefs.append(SimplifiedRef(text=text, type=type, spec=spec, for_=for_, url=url))
         else:
             retRefs.append(
-                {
-                    "text": text,
-                    "type": type,
-                    "spec": spec,
-                    "for_": None,
-                    "url": fors[0][1],
-                }
+                SimplifiedRef(
+                    text=text,
+                    type=type,
+                    spec=spec,
+                    for_=None,
+                    url=fors[0][1],
+                )
             )
     return retRefs
 
 
-def refToText(ref):
-    if ref["for_"]:
-        return "spec:{spec}; type:{type}; for:{for_}; text:{text}".format(**ref)
+@dataclasses.dataclass
+class SimplifiedRef:
+    text: str
+    type: str
+    spec: str
+    for_: str | None
+    url: str
+
+
+def refToText(ref: SimplifiedRef) -> str:
+    if ref.for_ is not None:
+        return f"spec:{ref.spec}; type:{ref.type}; for:{ref.for_}; text:{ref.text}"
     else:
-        return "spec:{spec}; type:{type}; text:{text}".format(**ref)
+        return f"spec:{ref.spec}; type:{ref.type}; text:{ref.text}"
 
 
-def reportMultiplePossibleRefs(possibleRefs, linkText, linkType, linkFor, defaultRef, el):
+def reportMultiplePossibleRefs(
+    possibleRefs: t.Sequence[SimplifiedRef],
+    linkText: str,
+    linkType: str,
+    linkFor: str | list[str] | None,
+    defaultRef: RefWrapper,
+    el: t.ElementT | None,
+) -> None:
     # Sometimes a badly-written spec has indistinguishable dfns.
     # Detect this by seeing if more than one stringify to the same thing.
     allRefs = defaultdict(list)
@@ -875,11 +900,13 @@ def reportMultiplePossibleRefs(possibleRefs, linkText, linkType, linkFor, defaul
         for refs in mergedRefs:
             error += "\n" + refToText(refs[0])
             for ref in refs:
-                error += "\n  " + ref["url"]
+                error += "\n  " + ref.url
     m.linkerror(error, el=el)
 
 
-def reportAmbiguousForlessLink(el, text, forlessRefs, localRefs):
+def reportAmbiguousForlessLink(
+    el: t.ElementT | None, text: str, forlessRefs: list[RefWrapper], localRefs: list[RefWrapper]
+) -> None:
     localRefText = "\n".join([refToText(ref) for ref in simplifyPossibleRefs(localRefs, alwaysShowFor=True)])
     forlessRefText = "\n".join([refToText(ref) for ref in simplifyPossibleRefs(forlessRefs, alwaysShowFor=True)])
     m.linkerror(
