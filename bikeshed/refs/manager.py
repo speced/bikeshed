@@ -6,7 +6,7 @@ import random
 import re
 from collections import defaultdict
 
-from .. import biblio, config, constants, datablocks, h, messages as m, retrieve, t
+from .. import biblio, config, constants, h, messages as m, retrieve, t
 from . import utils, source, headingdata, wrapper
 
 if t.TYPE_CHECKING:
@@ -103,7 +103,7 @@ class ReferenceManager:
         self.specLevel: str | None = None
         self.spec: str | None = None
 
-    def initializeRefs(self, doc: t.SpecT = None) -> None:
+    def initializeRefs(self, datablocks: t.ModuleType, doc: t.SpecT = None) -> None:
         """
         Load up the xref data
         This is oddly split up into sub-functions to make it easier to track performance.
@@ -115,7 +115,13 @@ class ReferenceManager:
         initSpecs()
 
         def initMethods() -> None:
-            self.foreignRefs.methods.update(json.loads(self.dataFile.fetch("methods.json", str=True)))
+            for arglessSig, argfulls in json.loads(self.dataFile.fetch("methods.json", str=True)).items():
+                variants = source.MethodVariants(arglessSig, {})
+                self.foreignRefs.methods[arglessSig] = variants
+                for argfullSig, data in argfulls.items():
+                    variants.variants[argfullSig] = source.MethodVariant(
+                        argfullSig, data["args"], data["for"], data["shortname"]
+                    )
 
         initMethods()
 
@@ -253,7 +259,7 @@ class ReferenceManager:
         for _, refs in self.foreignRefs.refs.items():
             for ref in refs:
                 if ref.status != "local" and ref.shortname.rstrip() == self.shortname:
-                    ref._ref["export"] = False
+                    ref._ref["export"] = False  # pylint: disable=protected-access
 
     def addLocalDfns(self, dfns: t.Iterable[t.ElementT]) -> None:
         for el in dfns:
@@ -523,14 +529,14 @@ class ReferenceManager:
                 # Find all method signatures that contain the arg in question
                 # and, if interface is specified, are for that interface.
                 # Dedup/collect by url, so I'll get all the signatures for a given dfn.
-                possibleMethodsDict = defaultdict(list)
-                for argfullName, metadata in methodSignatures.items():
+                possibleMethodsDict: defaultdict[str, list[str]] = defaultdict(list)
+                for variant in methodSignatures.variants.values():
                     if (
-                        text in metadata["args"]
-                        and (interfaceName in metadata["for"] or interfaceName is None)
-                        and metadata["shortname"] != self.shortname
+                        text in variant.args
+                        and (interfaceName in variant.for_ or interfaceName is None)
+                        and variant.shortname != self.shortname
                     ):
-                        possibleMethodsDict[metadata["shortname"]].append(argfullName)
+                        possibleMethodsDict[variant.shortname or ""].append(variant.signature)
                 possibleMethods = list(possibleMethodsDict.values())
                 if not possibleMethods:
                     # No method signatures with this argument/interface.

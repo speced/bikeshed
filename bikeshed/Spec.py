@@ -183,7 +183,7 @@ class Spec:
         extensions.load(self)
 
         # Initialize things
-        self.refs.initializeRefs(self)
+        self.refs.initializeRefs(doc=self, datablocks=datablocks)
         self.refs.initializeBiblio()
 
         # Deal with further <pre> blocks, and markdown

@@ -566,7 +566,7 @@ def handleDebug(options: argparse.Namespace, extras: list[str]) -> None:
 
 
 def handleRefs(options: argparse.Namespace, extras: list[str]) -> None:
-    from . import metadata
+    from . import metadata, datablocks
     from .refs import ReferenceManager
     from .Spec import Spec
 
@@ -579,7 +579,7 @@ def handleRefs(options: argparse.Namespace, extras: list[str]) -> None:
         rm = doc.refs
     else:
         rm = ReferenceManager()
-        rm.initializeRefs()
+        rm.initializeRefs(datablocks=datablocks)
     if options.text:
         options.text = options.text
     refs = rm.queryAllRefs(

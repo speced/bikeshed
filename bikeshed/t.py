@@ -61,6 +61,9 @@ JSONT: TypeAlias = Dict[str, Any]
 
 
 if TYPE_CHECKING:
+
+    from types import ModuleType
+
     if "Spec" not in sys.modules:
         from .Spec import Spec
     SpecT = Spec
@@ -68,7 +71,7 @@ if TYPE_CHECKING:
     from . import biblio
     from .retrieve import DataFileRequester
     from .metadata import MetadataManager
-    from .refs import RefSource, ReferenceManager, RefWrapper
+    from .refs import RefSource, ReferenceManager, RefWrapper, MethodVariants, MethodVariant
 
     BiblioStorageT: TypeAlias = DefaultDict[str, List[biblio.BiblioEntry]]
 
