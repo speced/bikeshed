@@ -40,18 +40,18 @@ if t.TYPE_CHECKING:
     ProcessTextNodesU = t.TypeVar("ProcessTextNodesU")
 
 
-def processTextNodes(nodes: list[t.NodesT], regex: re.Pattern, replacer: t.Callable) -> t.NodesT:
+def processTextNodes(nodes: list[t.NodeT], regex: re.Pattern, replacer: t.Callable) -> list[t.NodeT]:
     """
-    Takes an array of alternating text/objects,
-    and runs reSubObject on the text parts,
-    splicing them into the passed-in array.
-    Mutates!
+    Takes an array of text/objects,
+    and flatmaps reSubObject over the text parts.
     """
-    for i, node in enumerate(nodes):
-        # Node list always alternates between text and elements
-        if i % 2 == 0:
-            nodes[i : i + 1] = reSubObject(regex, t.cast(str, node), replacer)
-    return nodes
+    ret: list[t.NodeT] = []
+    for node in nodes:
+        if isinstance(node, str):
+            ret.extend(reSubObject(regex, t.cast(str, node), replacer))
+        else:
+            ret.append(node)
+    return ret
 
 
 if t.TYPE_CHECKING:

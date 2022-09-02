@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import re
 
-from .. import config, h, messages as m
+from .. import config, h, messages as m, t
 
 
-def transformProductionPlaceholders(doc):
+def transformProductionPlaceholders(doc: t.SpecT) -> None:
     propdescRe = re.compile(r"^'(?:(\S*)/)?([\w*-]+)(?:!!([\w-]+))?'$")  # pylint: disable=redefined-outer-name
     funcRe = re.compile(r"^(?:(\S*)/)?([\w*-]+\(\))$")
     atruleRe = re.compile(r"^(?:(\S*)/)?(@[\w*-]+)$")
@@ -13,9 +15,9 @@ def transformProductionPlaceholders(doc):
         (\S+)
         (?:\s+
             \[\s*
-            (-?(?:\d+[\w-]*|∞|Infinity))\s*
+            (-?(?:\d+[\w-]*|∞|[Ii]nfinity))\s*
             ,\s*
-            (-?(?:\d+[\w-]*|∞|Infinity))\s*
+            (-?(?:\d+[\w-]*|∞|[Ii]nfinity))\s*
             \]\s*
         )?$
         """,
@@ -74,27 +76,26 @@ def transformProductionPlaceholders(doc):
         if match:
             for_, term, rangeStart, rangeEnd = match.groups()
             el.tag = "a"
+            el.set("data-lt", f"<{term}>")
             el.set("data-link-type", "type")
             if for_ is not None:
                 el.set("for", for_)
-            interior = term
             if rangeStart is not None:
-                rangeStart = formatValue(rangeStart)
-                rangeEnd = formatValue(rangeEnd)
-                if rangeStart is None or rangeEnd is None:
+                formattedStart, numStart = parseRangeComponent(rangeStart)
+                formattedEnd, numEnd = parseRangeComponent(rangeEnd)
+                if formattedStart is None or formattedEnd is None:
                     m.die(f"Shorthand <<{text}>> has an invalid range.", el=el)
-                try:
-                    if not correctlyOrderedRange(rangeStart, rangeEnd):
-                        m.die(
-                            f"Shorthand <<{text}>> has a range whose start is not less than its end.",
-                            el=el,
-                        )
-                except:
-                    print(text)
-                    raise
-                interior += f" [{rangeStart},{rangeEnd}]"
-                el.set("data-lt", f"<{term}>")
-            el.text = f"<{interior}>"
+                    el.text = f"<{match.group(0)}>"
+                elif numStart >= numEnd:
+                    m.die(
+                        f"Shorthand <<{text}>> has a range whose start is not less than its end.",
+                        el=el,
+                    )
+                    el.text = f"<{term} [{formattedStart},{formattedEnd}]>"
+                else:
+                    el.text = f"<{term} [{formattedStart},{formattedEnd}]>"
+            else:
+                el.text = f"<{term}>"
             continue
         m.die(f"Shorthand <<{text}>> does not match any recognized shorthand grammar.", el=el)
         el.tag = "span"
@@ -102,44 +103,32 @@ def transformProductionPlaceholders(doc):
         continue
 
 
-def formatValue(val):
-    negative = False
+def parseRangeComponent(val: str) -> tuple[str | None, float | int]:
+    sign = ""
+    signVal = 1
+    num: float | int
+    val = val.strip()
     if val[0] in ["-", "−"]:
-        negative = True
+        sign = "−"
+        signVal = -1
         val = val[1:]
 
-    if val == "Infinity":
+    if val.lower() == "infinity":
         val = "∞"
     if val == "∞":
-        return ("−" if negative else "") + val
+        return sign + val, signVal * float("inf")
 
-    try:
-        (num, unit) = re.match(r"(\d+)([\w-]*)", val).groups()
-        val = int(num)
-    except ValueError:
-        return None
+    match = re.match(r"(\d+)([\w-]*)", val)
+    if match is None:
+        return None, 0
+    (digits, unit) = match.groups()
+    num = int(digits)
+    val = str(num)
 
-    return ("−" if negative else "") + str(val) + unit
-
-
-def correctlyOrderedRange(start, end):
-    start = numFromRangeVal(start)
-    end = numFromRangeVal(end)
-    return start < end
+    return sign + val + unit, num
 
 
-def numFromRangeVal(val):
-    sign = 1
-    if val[0] == "−":
-        sign = -1
-        val = val[1:]
-    if val == "∞":
-        return sign * float("inf")
-    val = re.match(r"(\d+)", val).group(1)
-    return sign * int(val)
-
-
-def transformMaybePlaceholders(doc):
+def transformMaybePlaceholders(doc: t.SpecT) -> None:
     propRe = re.compile(r"^([\w-]+): .+")
     valRe = re.compile(r"^(?:(\S*)/)?(\S[^!]*)(?:!!([\w-]+))?$")
     for el in h.findAll("fake-maybe-placeholder", doc):
@@ -179,12 +168,12 @@ def transformMaybePlaceholders(doc):
         el.text = text
 
 
-def transformAutolinkShortcuts(doc):
+def transformAutolinkShortcuts(doc: t.SpecT) -> None:
     # Do the remaining textual replacements
 
     addedNodes = []
 
-    def transformElement(parentEl):
+    def transformElement(parentEl: t.ElementT) -> None:
         processContents = h.isElement(parentEl) and not doc.isOpaqueElement(parentEl)
         if not processContents:
             return
@@ -198,29 +187,29 @@ def transformAutolinkShortcuts(doc):
                 newChildren.append(el)
         h.appendChild(parentEl, *newChildren, allowEmpty=True)
 
-    def transformText(text):
-        nodes = [text]
+    def transformText(text: str) -> list[t.NodeT]:
+        nodes: list[t.NodeT] = [text]
         if "css" in doc.md.markupShorthands:
-            config.processTextNodes(nodes, propdescRe, propdescReplacer)
+            nodes = config.processTextNodes(nodes, propdescRe, propdescReplacer)
         if "dfn" in doc.md.markupShorthands:
-            config.processTextNodes(nodes, dfnRe, dfnReplacer)
-            config.processTextNodes(nodes, abstractRe, abstractReplacer)
+            nodes = config.processTextNodes(nodes, dfnRe, dfnReplacer)
+            nodes = config.processTextNodes(nodes, abstractRe, abstractReplacer)
         if "http" in doc.md.markupShorthands:
-            config.processTextNodes(nodes, headerRe, headerReplacer)
+            nodes = config.processTextNodes(nodes, headerRe, headerReplacer)
         if "idl" in doc.md.markupShorthands:
-            config.processTextNodes(nodes, idlRe, idlReplacer)
+            nodes = config.processTextNodes(nodes, idlRe, idlReplacer)
         if "markup" in doc.md.markupShorthands:
-            config.processTextNodes(nodes, elementRe, elementReplacer)
+            nodes = config.processTextNodes(nodes, elementRe, elementReplacer)
         if "biblio" in doc.md.markupShorthands:
-            config.processTextNodes(nodes, biblioRe, biblioReplacer)
-            config.processTextNodes(nodes, sectionRe, sectionReplacer)
+            nodes = config.processTextNodes(nodes, biblioRe, biblioReplacer)
+            nodes = config.processTextNodes(nodes, sectionRe, sectionReplacer)
         if "algorithm" in doc.md.markupShorthands:
-            config.processTextNodes(nodes, varRe, varReplacer)
+            nodes = config.processTextNodes(nodes, varRe, varReplacer)
         if "markdown" in doc.md.markupShorthands:
-            config.processTextNodes(nodes, inlineLinkRe, inlineLinkReplacer)
-            config.processTextNodes(nodes, strongRe, strongReplacer)
-            config.processTextNodes(nodes, emRe, emReplacer)
-            config.processTextNodes(nodes, escapedRe, escapedReplacer)
+            nodes = config.processTextNodes(nodes, inlineLinkRe, inlineLinkReplacer)
+            nodes = config.processTextNodes(nodes, strongRe, strongReplacer)
+            nodes = config.processTextNodes(nodes, emRe, emReplacer)
+            nodes = config.processTextNodes(nodes, escapedRe, escapedReplacer)
         for node in nodes:
             if h.isElement(node):
                 addedNodes.append(node)
@@ -235,24 +224,29 @@ def transformAutolinkShortcuts(doc):
         h.fixSurroundingTypography(el)
 
 
-def transformShorthandElements(doc):
+def transformShorthandElements(doc: t.SpecT) -> None:
     """
     The <l> element can contain any shorthand,
     and works inside of "opaque" elements too,
     unlike ordinary autolinking shorthands.
     """
 
-    def replacer(reg, rep, el, text):
+    def replacer(reg: re.Pattern, rep: t.Callable[[re.Match], t.NodeT], el: t.ElementT, text: str) -> bool:
         match = reg.match(text)
         if match:
             result = rep(match)
             h.replaceNode(el, result)
+            if isinstance(result, str):
+                return True
+            # Move the linking attributes from <l> to the <a>
+            attrTarget: t.ElementT | None
             if result.tag == "a":
                 attrTarget = result
             else:
                 attrTarget = h.find("a", result)
-            for k, v in el.attrib.items():
-                attrTarget.set(k, v)
+            if attrTarget is not None:
+                for k, v in el.attrib.items():
+                    attrTarget.set(k, v)
             return True
         return False
 
@@ -282,30 +276,30 @@ def transformShorthandElements(doc):
         el.tag = "span"
 
 
-def transformProductionGrammars(doc):
+def transformProductionGrammars(doc: t.SpecT) -> None:
     # Link up the various grammar symbols in CSS grammars to their definitions.
     if "css" not in doc.md.markupShorthands:
         return
 
     hashMultRe = re.compile(r"#{\s*\d+(\s*,(\s*\d+)?)?\s*}")
 
-    def hashMultReplacer(match):
+    def hashMultReplacer(match: re.Match) -> t.ElementT:
         return h.E.a({"data-link-type": "grammar", "data-lt": "#", "for": ""}, match.group(0))
 
     multRe = re.compile(r"{\s*\d+\s*}")
 
-    def multReplacer(match):
+    def multReplacer(match: re.Match) -> t.ElementT:
         return h.E.a({"data-link-type": "grammar", "data-lt": "{A}", "for": ""}, match.group(0))
 
     multRangeRe = re.compile(r"{\s*\d+\s*,(\s*\d+)?\s*}")
 
-    def multRangeReplacer(match):
+    def multRangeReplacer(match: re.Match) -> t.ElementT:
         return h.E.a({"data-link-type": "grammar", "data-lt": "{A,B}", "for": ""}, match.group(0))
 
     simpleRe = re.compile(r"(\?|!|#|\*|\+|\|\||\||&amp;&amp;|&&|,)(?!')")
     # Note the negative-lookahead, to avoid matching delim tokens.
 
-    def simpleReplacer(match):
+    def simpleReplacer(match: re.Match) -> t.ElementT:
         return h.E.a(
             {"data-link-type": "grammar", "data-lt": match.group(0), "for": ""},
             match.group(0),
@@ -313,9 +307,9 @@ def transformProductionGrammars(doc):
 
     addedNodes = []
 
-    def transformElement(parentEl):
+    def transformElement(parentEl: t.ElementT) -> None:
         children = h.childNodes(parentEl, clear=True)
-        newChildren = []
+        newChildren: list[t.NodesT] = []
         for el in children:
             if isinstance(el, str):
                 newChildren.extend(transformText(el))
@@ -326,12 +320,12 @@ def transformProductionGrammars(doc):
                 newChildren.append(el)
         h.appendChild(parentEl, *newChildren, allowEmpty=True)
 
-    def transformText(text):
-        nodes = [text]
-        config.processTextNodes(nodes, hashMultRe, hashMultReplacer)
-        config.processTextNodes(nodes, multRe, multReplacer)
-        config.processTextNodes(nodes, multRangeRe, multRangeReplacer)
-        config.processTextNodes(nodes, simpleRe, simpleReplacer)
+    def transformText(text: str) -> t.NodesT:
+        nodes: list[t.NodeT] = [text]
+        nodes = config.processTextNodes(nodes, hashMultRe, hashMultReplacer)
+        nodes = config.processTextNodes(nodes, multRe, multReplacer)
+        nodes = config.processTextNodes(nodes, multRangeRe, multRangeReplacer)
+        nodes = config.processTextNodes(nodes, simpleRe, simpleReplacer)
         for node in nodes:
             if h.isElement(node):
                 addedNodes.append(node)
@@ -358,7 +352,7 @@ biblioRe = re.compile(
 )
 
 
-def biblioReplacer(match):
+def biblioReplacer(match: re.Match) -> t.NodeT:
     # Allow escaping things that aren't actually biblio links, by preceding with a \
     escape, bang, term, modifiers, linkText = match.groups()
     if escape:
@@ -419,7 +413,7 @@ sectionRe = re.compile(
 )
 
 
-def sectionReplacer(match):
+def sectionReplacer(match: re.Match) -> t.NodeT:
     escape, spec, section, justPage, linkText = match.groups()
     if escape:
         return match.group(0)[1:]
@@ -467,7 +461,7 @@ propdescRe = re.compile(
 )
 
 
-def propdescReplacer(match):
+def propdescReplacer(match: re.Match) -> t.NodeT:
     escape, linkFor, lt, linkType, linkText = match.groups()
     if escape:
         return match.group(0)[1:]
@@ -515,7 +509,7 @@ idlRe = re.compile(
 )
 
 
-def idlReplacer(match):
+def idlReplacer(match: re.Match) -> t.NodeT:
     escape, linkFor, lt, linkType, linkText = match.groups()
     if escape:
         return match.group(0)[1:]
@@ -562,7 +556,7 @@ dfnRe = re.compile(
 )
 
 
-def dfnReplacer(match):
+def dfnReplacer(match: re.Match) -> t.NodeT:
     escape, linkFor, lt, linkText = match.groups()
     if escape:
         return match.group(0)[1:]
@@ -593,7 +587,7 @@ abstractRe = re.compile(
 )
 
 
-def abstractReplacer(match):
+def abstractReplacer(match: re.Match) -> t.NodeT:
     escape, linkFor, lt, linkText = match.groups()
     if escape:
         return match.group(0)[1:]
@@ -627,7 +621,7 @@ elementRe = re.compile(
 )
 
 
-def elementReplacer(match):
+def elementReplacer(match: re.Match) -> t.NodeT:
     groupdict = match.groupdict()
     if groupdict["escape"]:
         return match.group(0)[1:]
@@ -673,7 +667,7 @@ varRe = re.compile(
 )
 
 
-def varReplacer(match):
+def varReplacer(match: re.Match) -> t.NodeT:
     escape, varText = match.groups()
     if escape:
         return match.group(0)[1:]
@@ -692,7 +686,7 @@ inlineLinkRe = re.compile(
 )
 
 
-def inlineLinkReplacer(match):
+def inlineLinkReplacer(match: re.Match) -> t.NodeT:
     _, text, href, title = match.groups()
     if title:
         attrs = {"href": href, "title": title}
@@ -712,7 +706,7 @@ strongRe = re.compile(
 )
 
 
-def strongReplacer(match):
+def strongReplacer(match: re.Match) -> t.NodeT:
     return h.E.strong({"bs-autolink-syntax": match.group(0)}, match.group(1))
 
 
@@ -726,14 +720,14 @@ emRe = re.compile(
 )
 
 
-def emReplacer(match):
+def emReplacer(match: re.Match) -> t.NodeT:
     return h.E.em({"bs-autolink-syntax": match.group(0)}, match.group(1))
 
 
 escapedRe = re.compile(r"\\\*")
 
 
-def escapedReplacer(match):  # pylint: disable=unused-argument
+def escapedReplacer(match: re.Match) -> t.NodeT:  # pylint: disable=unused-argument
     return "*"
 
 
@@ -748,7 +742,7 @@ headerRe = re.compile(
 )
 
 
-def headerReplacer(match):
+def headerReplacer(match: re.Match) -> t.NodeT:
     escape, lt, linkText = match.groups()
     if escape:
         return match.group(0)[1:]
@@ -765,7 +759,7 @@ def headerReplacer(match):
     )
 
 
-def addLineNumber(el):
+def addLineNumber(el: t.ElementT) -> None:
     if el.get("line-number"):
         return
     line = h.approximateLineNumber(el)

@@ -55,7 +55,7 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:  # pylint: disab
     # print(config.printjson(backrefs))
 
 
-def processRefs(refs):
+def processRefs(refs: t.Any) -> t.Any:
     seenRefs = set()
     # shape is {spec: {reftext: {forKey: ref}}}, just collect all the refs
     for keysByText in refs.values():

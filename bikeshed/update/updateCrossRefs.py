@@ -13,9 +13,14 @@ from .. import config, messages as m, t
 
 if t.TYPE_CHECKING:
     AnchorT: t.TypeAlias = dict[str, str | None]
-    HeadingT: t.TypeAlias = dict[str, str]
+    AnchorsT: t.TypeAlias = defaultdict[str, list[AnchorT]]
+    HeadingT: t.TypeAlias = dict[str, dict[str, str]]
+    HeadingsT: t.TypeAlias = defaultdict[str, HeadingT]
     RawSpecT: t.TypeAlias = dict[str, str | None]
     SpecT: t.TypeAlias = dict[str, str | None]
+    SpecsT: t.TypeAlias = dict[str|None, SpecT]
+    MethodsT: t.TypeAlias = defaultdict[str, dict[str, t.Any]]
+    ForsT: t.TypeAlias = defaultdict[str, set[str]]
 
 
 def progressMessager(index: int, total: int) -> t.Callable[[], None]:
@@ -33,9 +38,9 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
     if not rawSpecData:
         return None
 
-    specs: dict[str | None, SpecT] = dict()
-    anchors: defaultdict[str, list[AnchorT]] = defaultdict(list)
-    headings: defaultdict[str | None, HeadingT] = defaultdict(dict)
+    specs: SpecsT = dict()
+    anchors: AnchorsT = defaultdict(list)
+    headings: HeadingsT = defaultdict(dict)
     lastMsgTime: float = 0
     for i, rawSpec in enumerate(rawSpecData.values(), 1):
         lastMsgTime = config.doEvery(
@@ -48,7 +53,7 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
         specs[spec["vshortname"]] = spec
         specHeadings = headings[spec["vshortname"]]
 
-        def setStatus(obj, status):
+        def setStatus(obj: AnchorT, status: str) -> AnchorT:
             obj["status"] = status
             return obj
 
@@ -58,6 +63,7 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
         for rawAnchor in rawAnchorData:
             rawAnchor = fixupAnchor(rawAnchor)
             linkingTexts = rawAnchor["linking_text"]
+            assert linkingTexts is not None
             if linkingTexts[0] is None:
                 # Happens if it had no linking text at all originally
                 continue
@@ -146,7 +152,7 @@ def dataFromApi(api: APIClient, *args: t.Any, **kwargs: t.Any) -> t.JSONT:
     return data
 
 
-def linearizeAnchorTree(multiTree: list, list: list[dict[str, t.Any]] = None):
+def linearizeAnchorTree(multiTree: list, list: list[dict[str, t.Any]] = None) -> list[AnchorT]:
     if list is None:
         list = []
     # Call with multiTree being a list of trees
@@ -232,16 +238,19 @@ def fixupAnchor(anchor: AnchorT) -> AnchorT:
     return anchor
 
 
-def addToHeadings(rawAnchor, specHeadings, spec):
+def addToHeadings(rawAnchor: AnchorT, specHeadings: HeadingT, spec: SpecT) -> None:
     uri = rawAnchor["uri"]
+    assert uri is not None
+    baseUrl = spec["{}_url".format(rawAnchor["status"])]
+    assert baseUrl is not None
+    heading = {
+        "url": baseUrl + uri,
+        "number": rawAnchor["name"] if re.match(r"[\d.]+$", rawAnchor["name"] or "") else "",
+        "text": rawAnchor["title"],
+        "spec": spec["title"],
+    }
     if uri[0] == "#":
         # Either single-page spec, or link on the top page of a multi-page spec
-        heading = {
-            "url": spec["{}_url".format(rawAnchor["status"])] + uri,
-            "number": rawAnchor["name"] if re.match(r"[\d.]+$", rawAnchor["name"]) else "",
-            "text": rawAnchor["title"],
-            "spec": spec["title"],
-        }
         fragment = uri
         shorthand = "/" + fragment
     else:
@@ -262,12 +271,6 @@ def addToHeadings(rawAnchor, specHeadings, spec):
             page = "/" + page
             fragment = "#"
         shorthand = page + fragment
-        heading = {
-            "url": spec["{}_url".format(rawAnchor["status"])] + uri,
-            "number": rawAnchor["name"] if re.match(r"[\d.]+$", rawAnchor["name"]) else "",
-            "text": rawAnchor["title"],
-            "spec": spec["title"],
-        }
     if shorthand not in specHeadings:
         specHeadings[shorthand] = {}
     specHeadings[shorthand][rawAnchor["status"]] = heading
@@ -277,7 +280,7 @@ def addToHeadings(rawAnchor, specHeadings, spec):
         specHeadings[fragment].append(shorthand)
 
 
-def cleanSpecHeadings(headings):
+def cleanSpecHeadings(headings: HeadingsT) -> None:
     """Headings data was purposely verbose, assuming collisions even when there wasn't one.
     Want to keep the collision data for multi-page, so I can tell when you request a non-existent page,
     but need to collapse away the collision stuff for single-page."""
@@ -290,7 +293,7 @@ def cleanSpecHeadings(headings):
                 del specHeadings[v[0]]
 
 
-def addToAnchors(rawAnchor, anchors, spec):
+def addToAnchors(rawAnchor: AnchorT, anchors: AnchorsT, spec: SpecT) -> None:
     anchor = {
         "status": rawAnchor["status"],
         "type": rawAnchor["type"],
@@ -309,10 +312,10 @@ def addToAnchors(rawAnchor, anchors, spec):
         anchors[text].append(anchor)
 
 
-def extractMethodData(anchors):
+def extractMethodData(anchors: AnchorsT) -> MethodsT:
     """Compile a db of {argless methods => {argfull method => {args, fors, url, shortname}}"""
 
-    methods = defaultdict(dict)
+    methods: defaultdict[str, dict] = defaultdict(dict)
     for key, anchors_ in anchors.items():
         # Extract the name and arguments
         match = re.match(r"([^(]+)\((.*)\)", key)
@@ -338,7 +341,7 @@ def extractMethodData(anchors):
     return methods
 
 
-def extractForsData(anchors):
+def extractForsData(anchors: AnchorsT) -> ForsT:
     """Compile a db of {for value => dict terms that use that for value}"""
 
     fors = defaultdict(set)
@@ -355,7 +358,7 @@ def extractForsData(anchors):
     return fors
 
 
-def writeAnchorsFile(anchors, path):
+def writeAnchorsFile(anchors: AnchorsT, path: str) -> set[str]:
     """
     Keys may be duplicated.
 

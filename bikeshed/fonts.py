@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import dataclasses
 import itertools
 import re
@@ -81,8 +83,8 @@ class Font:
         self.metadata, lines = parseMetadata(lines)
         self.characters = parseCharacters(self.metadata, lines)
 
-    def write(self, text):
-        output = [""] * self.metadata["height"]
+    def write(self, text: str) -> list[str]:
+        output = [""] * self.metadata.height
         for letterIndex, letter in enumerate(text):
             if letter in self.characters:
                 for i, line in enumerate(self.characters[letter]):
@@ -150,14 +152,14 @@ def parseCharacters(md: FontMetadata, lines: t.List[str]) -> Characters:
 
 def replaceComments(font: Font, inputFilename: t.Optional[str] = None, outputFilename: t.Optional[str] = None) -> None:
     lines, inputFilename = getInputLines(inputFilename)
-    replacements = []
+    replacements: list[tuple[int, list[str]]] = []
     for i, line in enumerate(lines):
         match = re.match(r"\s*<!--\s*Big Text:\s*(\S.*)-->", line)
         if match:
             newtext = ["<!--\n"] + font.write(match.group(1).strip()) + ["-->\n"]
-            replacements.append({"line": i, "content": newtext})
+            replacements.append((i, newtext))
     for r in reversed(replacements):
-        lines[r["line"] : r["line"] + 1] = r["content"]
+        lines[r[0] : r[0] + 1] = r[1]
     writeOutputLines(outputFilename, inputFilename, lines)
 
 

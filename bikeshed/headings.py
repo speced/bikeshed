@@ -95,12 +95,12 @@ def addHeadingAlgorithms(headings: t.List[t.ElementT]) -> None:
 def determineHeadingLevels(headings: t.List[t.ElementT]) -> None:
     headerLevel = [0, 0, 0, 0, 0]
 
-    def incrementLevel(level):
+    def incrementLevel(level: int) -> None:
         headerLevel[level - 2] += 1
         for i in range(level - 1, 5):
             headerLevel[i] = 0
 
-    def printLevel():
+    def printLevel() -> str:
         return ".".join(str(x) for x in headerLevel if x > 0)
 
     skipLevel = float("inf")
