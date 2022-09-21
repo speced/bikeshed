@@ -698,30 +698,38 @@ def inlineLinkReplacer(match: re.Match) -> t.NodeT:
 
 strongRe = re.compile(
     r"""
-                        (?<!\\)
-                        \*\*
-                        (?!\s)([^*]+)(?!\s)
-                        (?<!\\)\*\*""",
+                    # **, not escaped, followed by non-space
+                    (?<!\\)\*\*(?!\s)
+                    # Escaped **, or not a ** at all
+                    ((?:[^*]|\\\*\*|\s\*\*|\*[^*])+)
+                    # **, not escaped, preceded by non-space
+                    (?<!\s|\\)\*\*
+                    """,
     re.X,
 )
 
 
 def strongReplacer(match: re.Match) -> t.NodeT:
-    return h.E.strong({"bs-autolink-syntax": match.group(0)}, match.group(1))
+    text = match.group(1).replace("\\**", "**")
+    return h.E.strong({"bs-autolink-syntax": match.group(0)}, text)
 
 
 emRe = re.compile(
     r"""
-                    (?<!\\)
-                    \*
-                    (?!\s)([^*]+)(?!\s)
-                    (?<!\\)\*""",
+                    # *, not escaped, followed by non-space
+                    (?<!\\)\*(?!\s)
+                    # Escaped *, or not a * at all
+                    ((?:[^*]|\\\*|\s\*)+)
+                    # *, not escaped, preceded by non-space
+                    (?<!\s|\\)\*
+                    """,
     re.X,
 )
 
 
 def emReplacer(match: re.Match) -> t.NodeT:
-    return h.E.em({"bs-autolink-syntax": match.group(0)}, match.group(1))
+    text = match.group(1).replace("\\*", "*")
+    return h.E.em({"bs-autolink-syntax": match.group(0)}, text)
 
 
 escapedRe = re.compile(r"\\\*")

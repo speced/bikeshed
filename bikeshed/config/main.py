@@ -48,7 +48,7 @@ def processTextNodes(nodes: list[t.NodeT], regex: re.Pattern, replacer: t.Callab
     ret: list[t.NodeT] = []
     for node in nodes:
         if isinstance(node, str):
-            ret.extend(reSubObject(regex, t.cast(str, node), replacer))
+            ret.extend(reSubObject(regex, node, replacer))
         else:
             ret.append(node)
     return ret
