@@ -32,7 +32,13 @@ from typing import (
     Tuple,
     TYPE_CHECKING,
     TypeVar,
+    TypedDict,
     Union,
+)
+
+from typing_extensions import (
+    Required,
+    NotRequired,
 )
 
 if sys.version_info >= (3, 8):
