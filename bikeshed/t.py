@@ -32,7 +32,6 @@ from typing import (
     Tuple,
     TYPE_CHECKING,
     TypeVar,
-    TypedDict,
     Union,
 )
 
@@ -42,9 +41,9 @@ from typing_extensions import (
 )
 
 if sys.version_info >= (3, 8):
-    from typing import Literal, Protocol
+    from typing import Literal, Protocol, TypedDict
 else:
-    from typing_extensions import Literal, Protocol
+    from typing_extensions import Literal, Protocol, TypedDict
 
 if sys.version_info >= (3, 10):
     from typing import TypeAlias, TypeGuard
