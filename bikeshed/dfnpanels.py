@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from collections import OrderedDict
 
 from . import h, t
-from .DefaultOrderedDict import DefaultOrderedDict
 
 if t.TYPE_CHECKING:
     from . import refs as r  # pylint: disable=unused-import
@@ -12,24 +12,24 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
     # Constructs "dfn panels" which show all the local references to a term
     atLeastOnePanel = False
     # Gather all the <a href>s together
-    allRefs = DefaultOrderedDict(list)
+    allRefs: OrderedDict[str, list[t.ElementT]] = OrderedDict()
     for a in h.findAll("a", doc):
         href = a.get("href")
         if href is None:
             continue
         if not href.startswith("#"):
             continue
-        allRefs[href[1:]].append(a)
+        allRefs.setdefault(href[1:], []).append(a)
     for dfn in dfns:
         id = dfn.get("id")
         if not id:
             # Something went wrong, bail.
             continue
-        refs = DefaultOrderedDict(list)
-        for link in allRefs[id]:
+        refs: OrderedDict[str, list[t.ElementT]] = OrderedDict()
+        for link in allRefs.get(id, []):
             section = h.sectionName(link)
             if section is not None:
-                refs[section].append(link)
+                refs.setdefault(section, []).append(link)
         if not refs:
             # Just insert a self-link instead
             # unless it already has a self-link, of course
@@ -85,11 +85,11 @@ def addExternalDfnPanel(
 ) -> None:
     # Constructs "dfn panels" which show all the local references to an external term
     # Gather all the <a href>s together
-    refs = DefaultOrderedDict(list)
+    refs: OrderedDict[str, list[t.ElementT]] = OrderedDict()
     for el in elsFromHref[ref.url]:
         section = h.sectionName(el) or "Unnumbered Section"
-        refs[section].append(el)
-    if len(refs) > 0:
+        refs.setdefault(section, []).append(el)
+    if refs:
         h.addClass(termEl, "dfn-paneled")
         _, _, refID = ref.url.partition("#")
         termID = f"term-for-{refID}"

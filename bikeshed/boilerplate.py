@@ -9,7 +9,10 @@ from collections import OrderedDict, defaultdict
 from datetime import datetime
 
 from . import biblio, conditional, config, dfnpanels, h, messages as m, refs as r, retrieve, t
-from .DefaultOrderedDict import DefaultOrderedDict
+
+if t.TYPE_CHECKING:
+    MetadataT: t.TypeAlias = t.Mapping[str, t.Sequence[MetadataValueT]]
+    MetadataValueT: t.TypeAlias = str | t.NodesT | None
 
 
 def boilerplateFromHtml(doc: t.SpecT, htmlString: str) -> t.NodesT:
@@ -542,14 +545,14 @@ def addIndexOfExternallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> Non
 
     ul = h.E.ul({"class": "index"})
     # Gather all the <a href> in the document, for use in the dfn-panels
-    elsFromHref = DefaultOrderedDict(list)
+    elsFromHref: OrderedDict[str, list[t.ElementT]] = OrderedDict()
     for a in h.findAll("a", doc):
         href = a.get("href")
         if href is None:
             continue
         if href.startswith("#"):
             continue
-        elsFromHref[href].append(a)
+        elsFromHref.setdefault(href, []).append(a)
     atLeastOnePanel = False
     for spec, refGroups in sorted(doc.externalRefsUsed.items(), key=lambda x: x[0].upper()):
         # ref.spec is always lowercase; if the same string shows up in biblio data,
@@ -976,14 +979,14 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
             return None
         return h.E.a({"href": dated.url, "rel": "prev"}, dated.url)
 
-    md = DefaultOrderedDict(list)
+    md: OrderedDict[str, list[MetadataValueT]] = OrderedDict()
     mac = doc.macros
     if "version" in mac:
-        md["This version"].append(h.E.a({"href": mac["version"], "class": "u-url"}, mac["version"]))
+        md.setdefault("This version", []).append(h.E.a({"href": mac["version"], "class": "u-url"}, mac["version"]))
     if doc.md.TR:
-        md["Latest published version"].append(h.E.a({"href": doc.md.TR}, doc.md.TR))
+        md.setdefault("Latest published version", []).append(h.E.a({"href": doc.md.TR}, doc.md.TR))
     if doc.md.ED and doc.md.status in config.snapshotStatuses:
-        md["Editor's Draft"].append(h.E.a({"href": doc.md.ED}, doc.md.ED))
+        md.setdefault("Editor's Draft", []).append(h.E.a({"href": doc.md.ED}, doc.md.ED))
     if doc.md.previousVersions:
         md["Previous Versions"] = [printPreviousVersion(ver) for ver in doc.md.previousVersions]
     if "history" in mac:
@@ -1017,17 +1020,19 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
                 ),
                 ")",
             )
-        md["Feedback"].append(span)
+        md.setdefault("Feedback", []).append(span)
     if doc.md.implementationReport is not None:
-        md["Implementation Report"].append(h.E.a({"href": doc.md.implementationReport}, doc.md.implementationReport))
+        md.setdefault("Implementation Report", []).append(
+            h.E.a({"href": doc.md.implementationReport}, doc.md.implementationReport)
+        )
     if doc.md.testSuite is not None:
-        md["Test Suite"].append(h.E.a({"href": doc.md.testSuite}, doc.md.testSuite))
+        md.setdefault("Test Suite", []).append(h.E.a({"href": doc.md.testSuite}, doc.md.testSuite))
     elif (doc.md.vshortname in doc.testSuites) and (doc.testSuites[doc.md.vshortname].url is not None):
         url = doc.testSuites[doc.md.vshortname].url
-        md["Test Suite"].append(h.E.a({"href": url}, url))
+        md.setdefault("Test Suite", []).append(h.E.a({"href": url}, url))
     if doc.md.issues:
         if doc.md.TR:
-            md["Feedback"].extend([h.E.a({"href": href}, text) for text, href in doc.md.issues])
+            md.setdefault("Feedback", []).extend([h.E.a({"href": href}, text) for text, href in doc.md.issues])
         else:
             md["Issue Tracking"] = [h.E.a({"href": href}, text) for text, href in doc.md.issues]
     if doc.md.editors:
@@ -1063,52 +1068,63 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
             #hidedel:checked ~ #hidedel-label::before, #hidedel:checked ~ * #hidedel-label::before { content: "☑ "; }
         """
 
-    def createMdEntry(key: str, dirtyVals: list[str | t.ElementT | None]) -> t.NodesT:
-        vals: list[t.NodesT] = [x for x in dirtyVals if x is not None]
-        if not vals:
-            return []
-        # Convert the canonical key to a display version
-        if key == "Editor":
-            displayKey = doc.md.editorTerm["singular"]
-        elif key == "Former Editor":
-            displayKey = "Former " + doc.md.editorTerm["singular"]
-        else:
-            displayKey = key
-        # Pluralize appropriate words
-        pluralization = {
-            "Previous Version": "Previous Versions",
-            "Test Suite": "Test Suites",
-            doc.md.editorTerm["singular"]: doc.md.editorTerm["plural"],
-            "Former " + doc.md.editorTerm["singular"]: "Former " + doc.md.editorTerm["plural"],
-        }
-        if len(vals) > 1 and displayKey in pluralization:
-            displayKey = pluralization[displayKey]
-        # Handle some custom <dt> structures
-        if key in ("Editor", "Former Editor"):
-            ret = [h.E.dt({"class": "editor"}, displayKey, ":")]
-        elif key == "Translations":
-            ret = [h.E.dt(displayKey, " ", h.E.small("(non-normative)"), ":")]
-        else:
-            ret = [h.E.dt(displayKey, ":")]
-        # Add all the values, wrapping in a <dd> if necessary.
-        for val in vals:
-            if h.isElement(val) and val.tag == "dd":
-                ret.append(val)
-            else:
-                ret.append(h.E.dd({}, val))
-        return ret
-
     # Merge "custom" metadata into non-custom, when they match up
     # and upgrade html-text values into real elements
-    otherMd = OrderedDict()
+    otherMd: OrderedDict[str, list[MetadataValueT]] = OrderedDict()
     for k, vs in doc.md.otherMetadata.items():
-        for i, v in enumerate(vs):
-            if isinstance(v, str):
-                vs[i] = h.parseHTML(doc.fixText(v))
+        parsed: list[t.NodesT] = [h.parseHTML(doc.fixText(v)) if isinstance(v, str) else v for v in vs]
         if k in md:
-            md[k].extend(vs)
+            md[k].extend(parsed)
         else:
-            otherMd[k] = vs
+            otherMd[k] = t.cast("list[t.NodesT|None]", parsed)
+
+    el = h.E.div(htmlFromMd(md, otherMd, doc))
+
+    fillWith("spec-metadata", el, doc=doc)
+
+
+def createMdEntry(key: str, dirtyVals: t.Sequence[MetadataValueT], doc) -> t.NodesT:
+    # Turns a metadata key/vals pair
+    # into a list of dt/dd elements.
+
+    vals: list[t.NodesT] = [x for x in dirtyVals if x is not None]
+    if not vals:
+        return []
+    # Convert the canonical key to a display version
+    if key == "Editor":
+        displayKey = doc.md.editorTerm["singular"]
+    elif key == "Former Editor":
+        displayKey = "Former " + doc.md.editorTerm["singular"]
+    else:
+        displayKey = key
+    # Pluralize appropriate words
+    pluralization = {
+        "Previous Version": "Previous Versions",
+        "Test Suite": "Test Suites",
+        doc.md.editorTerm["singular"]: doc.md.editorTerm["plural"],
+        "Former " + doc.md.editorTerm["singular"]: "Former " + doc.md.editorTerm["plural"],
+    }
+    if len(vals) > 1 and displayKey in pluralization:
+        displayKey = pluralization[displayKey]
+    # Handle some custom <dt> structures
+    if key in ("Editor", "Former Editor"):
+        ret = [h.E.dt({"class": "editor"}, displayKey, ":")]
+    elif key == "Translations":
+        ret = [h.E.dt(displayKey, " ", h.E.small("(non-normative)"), ":")]
+    else:
+        ret = [h.E.dt(displayKey, ":")]
+    # Add all the values, wrapping in a <dd> if necessary.
+    for val in vals:
+        if h.isElement(val) and val.tag == "dd":
+            ret.append(val)
+        else:
+            ret.append(h.E.dd({}, val))
+    return ret
+
+
+def htmlFromMd(md: MetadataT, otherMd: MetadataT, doc: t.SpecT) -> t.ElementT:
+    # Turns canonical and "other" metadata
+    # into a <dl>, per Metadata Order.
 
     dl = h.E.dl()
     for key in doc.md.metadataOrder:
@@ -1121,7 +1137,7 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
                 if k not in doc.md.metadataInclude:
                     # Explicitly excluded
                     continue
-                h.appendChild(dl, *createMdEntry(k, vs), allowEmpty=True)
+                h.appendChild(dl, *createMdEntry(k, vs, doc), allowEmpty=True)
         elif key == "!*":
             # Do all the non-explicit custom keys
             for k, vs in otherMd.items():
@@ -1129,15 +1145,15 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
                     continue
                 if k not in doc.md.metadataInclude:
                     continue
-                h.appendChild(dl, *createMdEntry(k, vs), allowEmpty=True)
+                h.appendChild(dl, *createMdEntry(k, vs, doc), allowEmpty=True)
         elif key not in doc.md.metadataInclude:
             # Key explicitly excluded
             continue
         elif key in md:
-            h.appendChild(dl, *createMdEntry(key, md[key]), allowEmpty=True)
+            h.appendChild(dl, *createMdEntry(key, md[key], doc), allowEmpty=True)
         elif key in otherMd:
-            h.appendChild(dl, *createMdEntry(key, otherMd[key]), allowEmpty=True)
-    fillWith("spec-metadata", h.E.div(dl), doc=doc)
+            h.appendChild(dl, *createMdEntry(key, otherMd[key], doc), allowEmpty=True)
+    return dl
 
 
 def addReferencesSection(doc: t.SpecT) -> None:

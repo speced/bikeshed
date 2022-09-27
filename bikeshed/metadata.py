@@ -15,7 +15,6 @@ from functools import partial
 from isodate import Duration, parse_duration
 
 from . import config, constants, datablocks, markdown, h, messages as m, repository, t
-from .DefaultOrderedDict import DefaultOrderedDict
 
 if t.TYPE_CHECKING:
     from .line import Line
@@ -135,22 +134,21 @@ class MetadataManager:
         self.wptPathPrefix: t.Optional[str] = None
         self.imgAutoSize: bool = True
 
-        self.otherMetadata = DefaultOrderedDict(list)
+        self.otherMetadata: OrderedDict[str, list[t.NodesT]] = OrderedDict()
 
         self.manuallySetKeys: t.Set[str] = set()
 
     def addData(self, key: str, val: str, lineNum: str | int | None = None) -> MetadataManager:
         key = key.strip()
-        if isinstance(val, str):
-            if key in ["Abstract"]:
-                val = val.strip("\n")
-            else:
-                val = val.strip()
+        if key in ["Abstract"]:
+            val = val.strip("\n")
+        else:
+            val = val.strip()
 
         if key.startswith("!"):
             self.allData[key].append(val)
             key = key[1:]
-            self.otherMetadata[key].append(val)
+            self.otherMetadata.setdefault(key, []).append(val)
             return self
 
         if key not in ("ED", "TR", "URL"):
@@ -1134,7 +1132,7 @@ def join(*sources: t.Optional[MetadataManager]) -> MetadataManager:
             mdentry = knownKeys[k]
             md.addParsedData(k, getattr(mdsource, mdentry.attrName))
         for k, v in mdsource.otherMetadata.items():
-            md.otherMetadata[k].extend(v)
+            md.otherMetadata.setdefault(k, []).extend(v)
     return md
 
 

@@ -25,6 +25,7 @@ from typing import (
     NewType,
     Optional,
     overload,
+    Protocol,
     Sequence,
     MutableSequence,
     Set,

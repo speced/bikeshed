@@ -4,13 +4,14 @@ import collections.abc
 import hashlib
 import re
 
+from collections import OrderedDict
+
 import html5lib
 from lxml import etree
 from lxml.cssselect import CSSSelector
 from lxml.html import tostring
 
 from .. import t
-from ..DefaultOrderedDict import DefaultOrderedDict
 from ..messages import die, warn
 
 
@@ -29,9 +30,9 @@ def unescape(string: str) -> str:
 
 
 def findAll(sel: str, context: t.Union[t.SpecT, t.ElementT]) -> t.List[t.ElementT]:
-    context = t.cast(t.ElementT, getattr(context, "document", context))
+    context = t.cast("t.ElementT", getattr(context, "document", context))
     try:
-        return t.cast(t.List[t.ElementT], CSSSelector(sel, namespaces={"svg": "http://www.w3.org/2000/svg"})(context))
+        return t.cast("list[t.ElementT]", CSSSelector(sel, namespaces={"svg": "http://www.w3.org/2000/svg"})(context))
     except Exception as e:
         die(f"The selector '{sel}' returned an error:\n{e}")
         return []
@@ -627,6 +628,21 @@ def isElement(node: t.Any) -> t.TypeGuard[t.ElementT]:
     return etree.iselement(node) and isinstance(node.tag, str)
 
 
+def isNode(node: t.Any) -> t.TypeGuard[t.NodeT]:
+    return isElement(node) or isinstance(node, str)
+
+
+def isNodes(nodes: t.Any) -> t.TypeGuard[t.NodesT]:
+    if isNode(nodes):
+        return True
+    if not isinstance(nodes, list):
+        return False
+    for child in nodes:
+        if not isNodes(child):
+            return False
+    return True
+
+
 def isOddNode(node):
     # Something other than an element node or string.
     if isinstance(node, str):
@@ -832,9 +848,9 @@ def addOldIDs(els):
 def dedupIDs(doc):
     import itertools as iter
 
-    ids = DefaultOrderedDict(list)
+    ids: OrderedDict[str, list[t.ElementT]] = OrderedDict()
     for el in findAll("[id]", doc):
-        ids[el.get("id")].append(el)
+        ids.setdefault(el.get("id"), []).append(el)
     for dupeId, els in list(ids.items()):
         if len(els) < 2:
             # Only one instance, so nothing to do.
@@ -850,7 +866,7 @@ def dedupIDs(doc):
                 altId = el.get("data-alternate-id")
                 if altId not in ids:
                     el.set("id", safeID(doc, el.get("data-alternate-id")))
-                    ids[altId].append(el)
+                    ids.setdefault(altId, []).append(el)
                     continue
             if el.get("data-silently-dedup") is not None:
                 warnAboutDupes = False
@@ -866,7 +882,7 @@ def dedupIDs(doc):
                 altId = "{}{}".format(dupeId, circledDigits(x))
                 if altId not in ids:
                     el.set("id", safeID(doc, altId))
-                    ids[altId].append(el)
+                    ids.setdefault(altId, []).append(el)
                     break
 
 
@@ -912,24 +928,34 @@ def nextIter(it, default=None):
         return default
 
 
-def createElement(tag, attrs=None, *children):
+def createElement(tag: str, attrs: t.Mapping[str, str | None] | None = None, *children: t.NodesT | None) -> t.ElementT:
     if attrs is None:
         attrs = {}
-    el = etree.Element(tag, {n: v for n, v in attrs.items() if v is not None})
+    el: t.ElementT = etree.Element(tag, {n: v for n, v in attrs.items() if v is not None})
     if children:
-        appendChild(el, children, allowEmpty=True)
+        appendChild(el, *(x for x in children if x is not None), allowEmpty=True)
     return el
 
 
+if t.TYPE_CHECKING:
+
+    class ElementCreatorFnT(t.Protocol):
+        def __call__(
+            self, attrsOrChild: t.Mapping[str, str | None] | t.NodesT | None = None, *children: t.NodesT | None
+        ) -> t.ElementT:
+            ...
+
+
 class ElementCreationHelper:
-    def __getattr__(self, name):
-        def _creater(*children):
-            if children and not (isinstance(children[0], str) or isElement(children[0])):
-                attrs = children[0]
-                children = children[1:]
+    def __getattr__(self, name: str) -> ElementCreatorFnT:
+        def _creater(
+            attrsOrChild: t.Mapping[str, str | None] | t.NodesT | None = None, *children: t.NodesT | None
+        ) -> t.ElementT:
+            if isNodes(attrsOrChild):
+                return createElement(name, None, attrsOrChild, *children)
             else:
-                attrs = {}
-            return createElement(name, attrs, *children)
+                assert isinstance(attrsOrChild, dict) or attrsOrChild is None
+                return createElement(name, attrsOrChild, *children)
 
         return _creater
 

@@ -60,7 +60,7 @@ class NormalBiblioEntry(BiblioEntry):
     other: t.Optional[str] = None
 
     def toHTML(self) -> t.NodesT:
-        ret = []
+        ret: list[t.NodesT] = []
 
         s = ""
         etAl = self.etAl

@@ -17,7 +17,7 @@ def brokenLinks(doc: t.SpecT) -> None:
     m.say("Checking links, this may take a while...")
     logging.captureWarnings(True)  # Silence the requests library :/
     startTime = time.time()
-    globalTimeout = 10 # seconds
+    globalTimeout = 10  # seconds
     for el in h.findAll("a", doc):
         if time.time() - startTime > globalTimeout:
             m.warn(f"Link checking took longer than {globalTimeout} seconds, skipping the rest.")

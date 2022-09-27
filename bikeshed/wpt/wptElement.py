@@ -78,7 +78,7 @@ def processWptElements(doc: t.SpecT) -> None:
         if pathPrefix and not pathPrefix.startswith("/"):
             pathPrefix = "/" + pathPrefix
         if pathPrefix != "/":
-            doc.md.otherMetadata["Test Suite"].append(
+            doc.md.otherMetadata.setdefault("Test Suite", []).append(
                 h.E.dd(
                     {"class": "wpt-overview"},
                     h.E.a(
