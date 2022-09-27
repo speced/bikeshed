@@ -19,7 +19,7 @@ from . import config, line, t
 @attr.s(auto_attribs=True)
 class InputContent:
     rawLines: t.List[str]
-    date: t.Optional[datetime.date]
+    date: datetime.date | None
 
     @property
     def lines(self) -> t.List[line.Line]:
@@ -30,7 +30,7 @@ class InputContent:
         return "".join(self.rawLines)
 
 
-def inputFromName(sourceName: str, **kwargs) -> InputSource:
+def inputFromName(sourceName: str, **kwargs: t.Any) -> InputSource:
     if sourceName == "-":
         return StdinInputSource(sourceName)
     if sourceName.startswith("https:"):
@@ -55,10 +55,10 @@ class InputSource:
     def __repr__(self) -> str:
         return "{}({!r})".format(self.__class__.__name__, str(self))
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(str(self))
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         return str(self) == str(other)
 
     @abstractmethod
@@ -73,7 +73,7 @@ class InputSource:
         """Suitable for passing to subprocess(cwd=)."""
         raise TypeError("{} instances don't have directories.".format(type(self)))
 
-    def relative(self, _) -> t.Optional[InputSource]:
+    def relative(self, _: t.Any) -> InputSource | None:
         """Resolves relativePath relative to this InputSource.
 
         For example, InputSource("/foo/bar/baz.txt").relative("quux/fuzzy.txt")
@@ -83,18 +83,18 @@ class InputSource:
         """
         return None
 
-    def mtime(self) -> t.Optional[float]:
+    def mtime(self) -> float | None:
         """Returns the last modification time of this source, if that's known."""
         return None
 
-    def cheaplyExists(self, _) -> t.Optional[bool]:
+    def cheaplyExists(self, _: t.Any) -> bool | None:
         """If it's cheap to determine, returns whether relativePath exists.
 
         Otherwise, returns None.
         """
         return None
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> str:
         """Hack to make pylint happy, since all the attrs are defined
         on the subclasses that __new__ dynamically dispatches to.
         See https://stackoverflow.com/a/60731663/455535
@@ -104,7 +104,7 @@ class InputSource:
 
 
 class StdinInputSource(InputSource):
-    def __init__(self, sourceName: str, **kwargs):  # pylint: disable=unused-argument
+    def __init__(self, sourceName: str, **kwargs: t.Any):  # pylint: disable=unused-argument
         assert sourceName == "-"
         self.type = "stdin"
         self.sourceName = sourceName
@@ -118,7 +118,7 @@ class StdinInputSource(InputSource):
 
 
 class UrlInputSource(InputSource):
-    def __init__(self, sourceName: str, **kwargs):  # pylint: disable=unused-argument
+    def __init__(self, sourceName: str, **kwargs: t.Any):  # pylint: disable=unused-argument
         assert sourceName.startswith("https:")
         self.sourceName = sourceName
         self.type = "url"
@@ -131,7 +131,7 @@ class UrlInputSource(InputSource):
         stop=tenacity.stop_after_attempt(3),
         wait=tenacity.wait_random(1, 2),
     )
-    def _fetch(self):
+    def _fetch(self) -> requests.Response:
         response = requests.get(self.sourceName, timeout=10)
         if response.status_code == 404:
             # This matches the OSErrors expected by older uses of
@@ -150,12 +150,12 @@ class UrlInputSource(InputSource):
             date = email.utils.parsedate_to_datetime(response.headers["Date"]).date()
         return InputContent(response.text.splitlines(True), date)
 
-    def relative(self, relativePath) -> UrlInputSource:
+    def relative(self, relativePath: str) -> UrlInputSource:
         return UrlInputSource(urllib.parse.urljoin(self.sourceName, relativePath))
 
 
 class FileInputSource(InputSource):
-    def __init__(self, sourceName: str, *, chroot: bool, chrootPath: t.Optional[str] = None):
+    def __init__(self, sourceName: str, *, chroot: bool, chrootPath: str | None = None):
         self.sourceName = sourceName
         self.chrootPath = chrootPath
         self.type = "file"
@@ -182,17 +182,17 @@ class FileInputSource(InputSource):
     def directory(self) -> str:
         return os.path.dirname(os.path.abspath(self.sourceName))
 
-    def relative(self, relativePath) -> FileInputSource:
+    def relative(self, relativePath: str) -> FileInputSource:
         return FileInputSource(
             os.path.join(self.directory(), relativePath),
             chroot=False,
             chrootPath=self.chrootPath,
         )
 
-    def cheaplyExists(self, relativePath) -> bool:
+    def cheaplyExists(self, relativePath: str) -> bool:
         return os.access(self.relative(relativePath).sourceName, os.R_OK)
 
-    def mtime(self) -> t.Optional[float]:
+    def mtime(self) -> float | None:
         """Returns the last modification time of this file, or None if it doesn't exist."""
         try:
             return os.stat(self.sourceName).st_mtime
@@ -201,7 +201,7 @@ class FileInputSource(InputSource):
 
 
 class TarInputSource(InputSource):
-    def __init__(self, sourceName: str, *, tarMemberName: str = "index.bs", **_):
+    def __init__(self, sourceName: str, *, tarMemberName: str = "index.bs", **_: t.Any):
         self.sourceName = sourceName
         self.tarMemberName = tarMemberName
         self.type = "tar"
@@ -237,19 +237,19 @@ class TarInputSource(InputSource):
         # It would be possible to produce a file listing. But not a meaningful directory path.
         raise TypeError("{} instances don't have directories.".format(type(self)))
 
-    def relative(self, relativePath) -> TarInputSource:
+    def relative(self, relativePath: str) -> TarInputSource:
         """Returns an InputSource relative to this file. Since a TarInputSource is always inside the
         tar file, any relative InputSource is also inside the tar file."""
         memberPath = os.path.join(os.path.dirname(self.tarMemberName), relativePath)
         return TarInputSource(self.sourceName, tarMemberName=memberPath)
 
-    def cheaplyExists(self, relativePath) -> t.Optional[bool]:
+    def cheaplyExists(self, relativePath: str) -> bool | None:
         memberPath = os.path.join(os.path.dirname(self.tarMemberName), relativePath)
         with self._openTarFile() as tarFile:
             members = tarFile.getnames()
             return memberPath in members
 
-    def mtime(self) -> t.Optional[float]:
+    def mtime(self) -> float | None:
         """Returns the last modification time of this file, or None if it doesn't exist."""
         try:
             return os.stat(self.sourceName).st_mtime
