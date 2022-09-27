@@ -1083,7 +1083,7 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
     fillWith("spec-metadata", el, doc=doc)
 
 
-def createMdEntry(key: str, dirtyVals: t.Sequence[MetadataValueT], doc) -> t.NodesT:
+def createMdEntry(key: str, dirtyVals: t.Sequence[MetadataValueT], doc: t.SpecT) -> t.NodesT:
     # Turns a metadata key/vals pair
     # into a list of dt/dd elements.
 

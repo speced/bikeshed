@@ -17,6 +17,7 @@ from typing import (
     Dict,
     Generator,
     Generic,
+    FrozenSet,
     Iterable,
     Iterator,
     List,

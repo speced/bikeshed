@@ -55,7 +55,7 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
     return set([filePath])
 
 
-def collectPaths(pathListSoFar, pathTrie, pathPrefix):
+def collectPaths(pathListSoFar: list[str], pathTrie: dict[str, dict | str], pathPrefix: str) -> list[str]:
     for k, v in pathTrie.items():
         if isinstance(v, dict):
             collectPaths(pathListSoFar, v, f"{pathPrefix}{k}/")

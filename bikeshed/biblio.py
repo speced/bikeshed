@@ -246,7 +246,7 @@ def groupsFromReferFile(lines: t.Sequence[str]) -> t.Generator[t.List[str], None
         yield group
 
 
-def processSpecrefBiblioFile(text: str, storage: t.BiblioStorageT, order: int):
+def processSpecrefBiblioFile(text: str, storage: t.BiblioStorageT, order: int) -> t.BiblioStorageT:
     r"""
     A SpecRef file is a JSON object, where keys are ids
     and values are either <alias>, <legacyRef>, or <ref>.
@@ -337,7 +337,7 @@ def processSpecrefBiblioFile(text: str, storage: t.BiblioStorageT, order: int):
     return storage
 
 
-def loadBiblioDataFile(lines: t.Iterator[str], storage: t.BiblioStorageT):
+def loadBiblioDataFile(lines: t.Iterator[str], storage: t.BiblioStorageT) -> None:
     b: t.Dict[str, t.Any]
     biblio: BiblioEntry
     try:

@@ -137,7 +137,7 @@ def linkTextsFromElement(el: t.ElementT) -> list[str]:
 
 
 class DuplicatedLinkText(Exception):
-    def __init__(self, offendingText, allTexts, el):
+    def __init__(self, offendingText: str, allTexts: list[str], el: t.ElementT):
         super().__init__()
         self.offendingText = offendingText
         self.allTexts = allTexts

@@ -264,7 +264,7 @@ async def errorFromAsyncErr(res: Result[str, t.Awaitable[str]]) -> str | Excepti
     return x
 
 
-def wrapError(retry_state) -> Err[t.Awaitable[str]]:
+def wrapError(retry_state: t.Any) -> Err[t.Awaitable[str]]:
     return Err(asyncio.wrap_future(retry_state.outcome))
 
 

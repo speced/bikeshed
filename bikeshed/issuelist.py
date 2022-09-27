@@ -213,7 +213,7 @@ Issue 2.
     )
 
 
-def printHeader(outfile: t.TextIO, hi: HeaderInfo):
+def printHeader(outfile: t.TextIO, hi: HeaderInfo) -> None:
     outfile.write(
         f"""<!DOCTYPE html>
 <meta charset="utf-8">
