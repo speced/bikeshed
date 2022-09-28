@@ -59,6 +59,9 @@ ElementT: TypeAlias = etree._Element
 DocumentT: TypeAlias = etree._ElementTree
 NodeT: TypeAlias = Union[str, ElementT]
 
+# In many places I treat lists as an "anonymous" element
+ElementishT: TypeAlias = ElementT | list[NodeT]
+
 # Can't actually do recursive types yet :(
 # Get as close as possible, but let lists be Any
 NodesT: TypeAlias = Union[NodeT, List]

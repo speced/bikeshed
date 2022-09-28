@@ -204,8 +204,12 @@ class Spec:
 
         # Build the document
         self.document = h.parseDocument(self.html)
-        self.head = t.cast("t.ElementT", h.find("head", self))
-        self.body = t.cast("t.ElementT", h.find("body", self))
+        headEl = h.find("head", self)
+        bodyEl = h.find("body", self)
+        assert headEl is not None
+        assert bodyEl is not None
+        self.head = headEl
+        self.body = bodyEl
         u.correctFrontMatter(self)
         includes.processInclusions(self)
         metadata.parseDoc(self)

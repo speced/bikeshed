@@ -123,7 +123,7 @@ class MetadataManager:
         self.trackingVectorImageHeight: str = "64"
         self.trackingVectorImageWidth: str = "46"
         self.trackingVectorTitle: str = "There is a tracking vector here."
-        self.translateIDs: t.DefaultDict[str, t.List[t.Tuple[str, str]]] = defaultdict(list)
+        self.translateIDs: dict[str, str] = {}
         self.translations: t.List[t.Dict[str, str]] = []
         self.useDfnPanels: bool = True
         self.useIAutolinks: bool = False

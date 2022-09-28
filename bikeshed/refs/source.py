@@ -357,7 +357,7 @@ class RefSource:
 
         return refs, None
 
-    def addMethodVariants(self, methodSig: str, forVals: list[str], shortname: str | None) -> None:
+    def addMethodVariants(self, methodSig: str, forVals: t.Iterable[str], shortname: str | None) -> None:
         # Takes a full method signature, like "foo(bar)",
         # and adds appropriate lines to self.methods for it
         match = re.match(r"([^(]+)\((.*)\)", methodSig)

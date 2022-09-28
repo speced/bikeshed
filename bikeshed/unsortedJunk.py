@@ -1247,8 +1247,8 @@ def cleanupHTML(doc: t.SpecT) -> None:
         # If a markdown-generated <dt> contains only a single paragraph,
         # remove that paragraph so it just contains naked text.
         if el.tag == "dt" and el.get("data-md") is not None:
-            child = h.hasOnlyChild(el)
-            if child is not None and child.tag == "p" and h.emptyText(el.text) and h.emptyText(child.tail):
+            dtChild = h.hasOnlyChild(el)
+            if dtChild is not None and h.tagName(dtChild) == "p" and h.emptyText(el.text) and h.emptyText(dtChild.tail):
                 flattenEls.append(el)
 
         # Remove a bunch of attributes
@@ -1309,7 +1309,7 @@ def cleanupHTML(doc: t.SpecT) -> None:
             # Remove *all* data- attributes.
             for attrName in el.attrib:
                 if str(attrName).startswith("data-"):
-                    h.removeAttr(el, attrName)
+                    h.removeAttr(el, str(attrName))
     if head is not None:
         for el in strayHeadEls:
             head.append(el)

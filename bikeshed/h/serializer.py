@@ -203,6 +203,7 @@ class Serializer:
             if self.isElement(node):
                 raise Exception(f"Somehow a CDATA element got an element child:\n{dom.outerHTML(el)}")
             else:
+                assert isinstance(node, str)
                 write(node)
         self.endTag(tag, write)
 
@@ -212,6 +213,7 @@ class Serializer:
             if self.isElement(node):
                 self._serializeEl(node, write, indent=indent, pre=True)
             else:
+                assert isinstance(node, str)
                 write(dom.escapeHTML(node))
         self.endTag(tag, write)
 
@@ -221,6 +223,7 @@ class Serializer:
             if self.isElement(node):
                 self._serializeEl(node, write, inline=inline)
             else:
+                assert isinstance(node, str)
                 write(dom.escapeHTML(self.fixWS(node)))
         self.endTag(tag, write)
 
@@ -232,7 +235,7 @@ class Serializer:
         Figure out what sort of contents the block has,
         so we know what serialization strategy to use.
         """
-        if dom.isElement(el) and len(el) == 0 and dom.emptyText(el.text):
+        if self.isElement(el) and len(el) == 0 and dom.emptyText(el.text):
             return "empty", None
         children = dom.childNodes(el, clear=True)
         for child in children:

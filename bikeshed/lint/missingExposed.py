@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import widlparser  # pylint: disable=unused-import
 
-from .. import h, messages as m, t
+from .. import messages as m, t
 
 
 def missingExposed(doc: t.SpecT) -> None:
@@ -48,6 +48,6 @@ def missingExposed(doc: t.SpecT) -> None:
                     f"The '{construct.name}' interface is missing an [Exposed] extended attribute. Does it need [Exposed=Window], or something more?"
                 )
         elif construct.idl_type == "callback":
-            if not h.hasAttr(construct, "interface"):
+            if not hasattr(construct, "interface"):
                 # Just a callback function, it's fine
                 continue

@@ -284,9 +284,9 @@ class ReferenceManager:
                     continue
                 if linkType in config.lowercaseTypes:
                     linkText = linkText.lower()
-                dfnFor = h.treeAttr(el, "data-dfn-for")
-                if dfnFor is None:
-                    dfnFor = set()
+                dfnForAttr = h.treeAttr(el, "data-dfn-for")
+                if dfnForAttr is None:
+                    dfnFor: set[str] = set()
                     existingRefs = self.localRefs.queryRefs(linkType=linkType, text=linkText, linkFor="/", exact=True)[
                         0
                     ]
@@ -294,7 +294,7 @@ class ReferenceManager:
                         m.die(f"Multiple local '{linkType}' <dfn>s have the same linking text '{linkText}'.", el=el)
                         continue
                 else:
-                    dfnFor = set(config.splitForValues(dfnFor))
+                    dfnFor = set(config.splitForValues(dfnForAttr))
                     encounteredError = False
                     for singleFor in dfnFor:
                         existingRefs = self.localRefs.queryRefs(
@@ -319,7 +319,7 @@ class ReferenceManager:
                     if match:
                         dfnFor.add(match.group(1).strip())
                 # convert back into a list now, for easier JSONing
-                dfnFor = sorted(dfnFor)
+                dfnForList = list(sorted(dfnFor))
                 ref = wrapper.RefWrapper(
                     linkText,
                     {
@@ -330,7 +330,7 @@ class ReferenceManager:
                         "level": self.specLevel,
                         "url": "#" + elId,
                         "export": True,
-                        "for": dfnFor,
+                        "for": dfnForList,
                         "el": el,
                     },
                 )
@@ -339,7 +339,7 @@ class ReferenceManager:
                     self.localRefs.fors[for_].append(linkText)
                 methodishStart = re.match(r"([^(]+\()[^)]", linkText)
                 if methodishStart:
-                    self.localRefs.addMethodVariants(linkText, dfnFor, ref.shortname)
+                    self.localRefs.addMethodVariants(linkText, dfnForList, ref.shortname)
 
     def filterObsoletes(self, refs: list[RefWrapper]) -> list[RefWrapper]:
         return utils.filterObsoletes(

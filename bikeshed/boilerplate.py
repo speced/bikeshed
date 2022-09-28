@@ -246,7 +246,7 @@ def addAnnotations(doc: t.SpecT) -> None:
     if doc.md.vshortname in doc.testSuites:
         html = retrieve.retrieveBoilerplateFile(doc, "annotations")
         el = boilerplateFromHtml(doc, html)
-        h.appendContents(h.find("head", doc), el)
+        h.appendContents(doc.head, el)
 
 
 def w3cStylesheetInUse(doc: t.SpecT) -> bool:

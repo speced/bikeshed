@@ -297,6 +297,7 @@ def mergeHighlighting(el: t.ElementT, coloredText: t.Sequence[ColoredText]) -> N
             if h.isElement(node):
                 h.appendChild(el, colorizeEl(node, coloredText))
             else:
+                assert isinstance(node, str)
                 h.appendChild(el, *colorizeText(node, coloredText), allowEmpty=True)
         return el
 
@@ -418,7 +419,7 @@ def coloredTextFromRawTokens(text: str) -> t.Deque[ColoredText]:
     return textList
 
 
-def normalizeLanguageName(lang: str) -> str:
+def normalizeLanguageName(lang: str | None) -> str | None:
     # Translates some names to ones Pygment understands
     if lang == "aspnet":
         return "aspx-cs"
@@ -457,6 +458,7 @@ def addLineWrappers(el: t.ElementT, options: LineNumberOptions) -> t.ElementT:
         if h.isElement(node):
             h.appendChild(lineWrapper, node)
         else:
+            assert isinstance(node, str)
             while True:
                 if "\n" in node:
                     pre, _, post = node.partition("\n")
@@ -465,6 +467,7 @@ def addLineWrappers(el: t.ElementT, options: LineNumberOptions) -> t.ElementT:
                     h.appendChild(el, lineWrapper)
                     lineWrapper = h.E.span({"class": "line"})
                     node = post
+                    assert isinstance(node, str)
                 else:
                     h.appendChild(lineWrapper, node)
                     break
@@ -473,9 +476,7 @@ def addLineWrappers(el: t.ElementT, options: LineNumberOptions) -> t.ElementT:
         h.appendChild(el, lineWrapper)
     # Number the lines
     lineNumber = options.startingLine
-    for lineNo, node in grouper(h.childNodes(el), 2):
-        assert lineNo is not None
-        assert node is not None
+    for lineNo, node in t.cast("tuple[t.ElementT, t.ElementT]", grouper(h.childNodes(el), 2)):
         if options.addNumbers or lineNumber in options.highlights:
             lineNo.set("data-line", str(lineNumber))
         if lineNumber in options.highlights:
@@ -502,6 +503,7 @@ def countInternalNewlines(el: t.ElementT) -> int:
         if h.isElement(node):
             count += countInternalNewlines(node)
         else:
+            assert isinstance(node, str)
             count += node.count("\n")
     return count
 
