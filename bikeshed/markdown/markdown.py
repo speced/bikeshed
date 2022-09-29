@@ -28,26 +28,27 @@ if t.TYPE_CHECKING:
         start: int
 
 
-@t.overload
-def parse(
-    lines: list[str],
-    numSpacesForIndentation: int,
-    features: set[str] | None = None,
-    opaqueElements: list[str] = None,
-    blockElements: list[str] = None,
-) -> list[str]:
-    ...
+if t.TYPE_CHECKING:
 
+    @t.overload
+    def parse(
+        lines: list[str],
+        numSpacesForIndentation: int,
+        features: set[str] | None = None,
+        opaqueElements: list[str] = None,
+        blockElements: list[str] = None,
+    ) -> list[str]:
+        ...
 
-@t.overload
-def parse(
-    lines: list[l.Line],
-    numSpacesForIndentation: int,
-    features: set[str] | None = None,
-    opaqueElements: list[str] = None,
-    blockElements: list[str] = None,
-) -> list[l.Line]:
-    ...
+    @t.overload
+    def parse(
+        lines: list[l.Line],
+        numSpacesForIndentation: int,
+        features: set[str] | None = None,
+        opaqueElements: list[str] = None,
+        blockElements: list[str] = None,
+    ) -> list[l.Line]:
+        ...
 
 
 def parse(

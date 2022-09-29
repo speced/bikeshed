@@ -379,9 +379,11 @@ class MetadataManager:
             macros[name.lower()] = text
 
 
-class ParseFunc(t.Protocol):
-    def __call__(self, key: str, val: str, lineNum: str | int | None) -> t.Any:
-        ...
+if t.TYPE_CHECKING:
+
+    class ParseFunc(t.Protocol):
+        def __call__(self, key: str, val: str, lineNum: str | int | None) -> t.Any:
+            ...
 
 
 def parseDate(key: str, val: str, lineNum: str | int | None) -> t.Optional[date]:

@@ -251,7 +251,7 @@ class Serializer:
 
         if contentsType == "empty":
             # Empty of text and children
-            assert isinstance(el, t.ElementT)
+            assert self.isElement(el)
             write(" " * indent)
             self.startTag(tag, el, write)
             if self.needsEndTag(el, nextEl):
@@ -269,7 +269,7 @@ class Serializer:
         else:
             # Otherwise I'm a block that contains at least one block
             assert contents is not None
-            assert isinstance(el, t.ElementT)
+            assert self.isElement(el)
             write(" " * indent)
             self.startTag(tag, el, write)
             for block, nextBlock in t.cast("itertools.zip_longest[tuple[Nodes, Nodes|None]]", pairwise(contents)):
@@ -300,18 +300,18 @@ class Serializer:
             tag = self.unfuckName(el.tag)
 
         if self.isVoidElement(tag):
-            assert isinstance(el, t.ElementT)
+            assert self.isElement(el)
             self._writeVoidElement(tag, el, write, indent)
         elif self.isRawElement(tag):
-            assert isinstance(el, t.ElementT)
+            assert self.isElement(el)
             self._writeRawElement(tag, el, write)
         elif pre or self.isOpaqueElement(tag):
-            assert isinstance(el, t.ElementT)
+            assert self.isElement(el)
             self._writeOpaqueElement(tag, el, write, indent)
         elif inline:
             self._writeInlineElement(tag, el, write, inline)
         else:
-            assert isinstance(el, t.ElementT)
+            assert self.isElement(el)
             self._writeBlockElement(tag, el, write, indent, nextEl)
 
 

@@ -18,22 +18,25 @@ from .line import Line
 # if you're outputting a raw element (<pre>/etc),
 # just spam it onto the first line.
 
-InfoTreeT: t.TypeAlias = "list[defaultdict[str, list[str]]]"
+if t.TYPE_CHECKING:
+    InfoTreeT: t.TypeAlias = list[defaultdict[str, list[str]]]
+
+    class TransformFuncT(t.Protocol):
+        def __call__(
+            self, lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT
+        ) -> list[str]:
+            ...
 
 
-class TransformFuncT(t.Protocol):
-    def __call__(self, lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT) -> list[str]:
+if t.TYPE_CHECKING:
+
+    @t.overload
+    def transformDataBlocks(doc: t.SpecT, lines: list[Line]) -> list[Line]:
         ...
 
-
-@t.overload
-def transformDataBlocks(doc: t.SpecT, lines: list[Line]) -> list[Line]:
-    ...
-
-
-@t.overload
-def transformDataBlocks(doc: t.Spec, lines: list[str]) -> list[str]:
-    ...
+    @t.overload
+    def transformDataBlocks(doc: t.Spec, lines: list[str]) -> list[str]:
+        ...
 
 
 def transformDataBlocks(doc: t.SpecT, lines: list[Line] | list[str]) -> list[Line] | list[str]:
