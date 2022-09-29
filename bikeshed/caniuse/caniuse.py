@@ -13,19 +13,18 @@ def addCanIUsePanels(doc: t.SpecT) -> None:
     if not doc.md.includeCanIUsePanels:
         return
 
-    if not doc.canIUse:
-        doc.canIUse = CanIUseManager(dataFile=doc.dataFile)
+    canIUseData = CanIUseManager(dataFile=doc.dataFile)
 
-    lastUpdated = datetime.utcfromtimestamp(doc.canIUse.updated).date().isoformat()
+    lastUpdated = datetime.utcfromtimestamp(canIUseData.updated).date().isoformat()
 
     # e.g. 'iOS Safari' -> 'ios_saf'
-    classFromBrowser = doc.canIUse.agents
+    classFromBrowser = canIUseData.agents
 
     atLeastOnePanel = False
     elements = h.findAll("[caniuse]", doc)
     if not elements:
         return
-    validateCanIUseURLs(doc, elements)
+    validateCanIUseURLs(doc, canIUseData, elements)
     for dfn in elements:
         featId = dfn.get("caniuse")
         if not featId:
@@ -33,9 +32,9 @@ def addCanIUsePanels(doc: t.SpecT) -> None:
         del dfn.attrib["caniuse"]
 
         featId = featId.lower()
-        if not doc.canIUse.hasFeature(featId):
+        if not canIUseData.hasFeature(featId):
             m.die(f"Unrecognized Can I Use feature ID: {featId}", el=dfn)
-        feature = doc.canIUse.getFeature(featId)
+        feature = canIUseData.getFeature(featId)
 
         h.addClass(dfn, "caniuse-paneled")
         panel = canIUsePanelFor(
@@ -107,15 +106,13 @@ def browserCompatSpan(
     return outer
 
 
-def validateCanIUseURLs(doc: t.SpecT, elements: list[t.ElementT]) -> None:
+def validateCanIUseURLs(doc: t.SpecT, canIUseData: CanIUseManager, elements: list[t.ElementT]) -> None:
     # First, ensure that each Can I Use URL shows up at least once in the data;
     # otherwise, it's an error to be corrected somewhere.
     urlFeatures = set()
-    if doc.canIUse is None:
-        return
     for url in doc.md.canIUseURLs:
         sawTheURL = False
-        for featureID, featureUrl in doc.canIUse.urlFromFeature.items():
+        for featureID, featureUrl in canIUseData.urlFromFeature.items():
             if featureUrl.startswith(url):
                 sawTheURL = True
                 urlFeatures.add(featureID)

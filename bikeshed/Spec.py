@@ -103,8 +103,6 @@ class Spec:
         defaultMacro: t.Callable[[], str] = lambda: "???"
         self.macros: t.DefaultDict[str, str] = defaultdict(defaultMacro)
 
-        self.canIUse: caniuse.CanIUseManager | None = None
-        self.mdnSpecLinks: t.Any = {}
         self.widl: widlparser.Parser = idl.getParser()
 
         self.testSuites: dict[str, testsuite.TestSuite] = fetchTestSuites(self.dataFile)
