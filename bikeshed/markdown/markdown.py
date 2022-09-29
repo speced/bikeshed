@@ -1,20 +1,65 @@
+from __future__ import annotations
+
 import functools
 import re
 
-from .. import line as l, messages as m, h
+from .. import h, line as l, messages as m, t
+
+if t.TYPE_CHECKING:
+
+    class TokenT(t.TypedDict, total=False):
+        type: t.Required[str]
+        prefixlen: int | float
+        line: l.Line
+        text: str
+
+    class HeadingTokenT(TokenT, total=False):
+        level: t.Required[int]
+        id: str
+
+    class NumberedTokenT(TokenT):
+        num: int
+
+    class RawTokenT(t.TypedDict, total=False):
+        type: t.Required[str]
+        tag: t.Required[str]
+        nest: t.Required[bool]
+        prefixLen: int | float
+        start: int
+
+
+@t.overload
+def parse(
+    lines: list[str],
+    numSpacesForIndentation: int,
+    features: set[str] | None = None,
+    opaqueElements: list[str] = None,
+    blockElements: list[str] = None,
+) -> list[str]:
+    ...
+
+
+@t.overload
+def parse(
+    lines: list[l.Line],
+    numSpacesForIndentation: int,
+    features: set[str] | None = None,
+    opaqueElements: list[str] = None,
+    blockElements: list[str] = None,
+) -> list[l.Line]:
+    ...
 
 
 def parse(
-    lines,
-    numSpacesForIndentation,
-    features=None,
-    opaqueElements=None,
-    blockElements=None,
-):
+    lines: list[str] | list[l.Line],
+    numSpacesForIndentation: int,
+    features: set[str] | None = None,
+    opaqueElements: list[str] = None,
+    blockElements: list[str] = None,
+) -> list[str] | list[l.Line]:
     fromStrings = False
     if any(isinstance(x, str) for x in lines):
         fromStrings = True
-        lines = [l.Line(-1, x) for x in lines]
     lines = l.rectify(lines)
     tokens = tokenizeLines(
         lines,
@@ -31,18 +76,26 @@ def parse(
 
 
 def tokenizeLines(
-    lines,
-    numSpacesForIndentation,
-    features=None,
-    opaqueElements=None,
-    blockElements=None,
-):
+    lines: list[l.Line],
+    numSpacesForIndentation: int,
+    features: set[str] | None = None,
+    opaqueElements: list[str] | None = None,
+    blockElements: list[str] | None = None,
+) -> list[TokenT]:
     # Turns lines of text into block tokens,
     # which'll be turned into MD blocks later.
     # Every token *must* have 'type', 'raw', and 'prefix' keys.
 
     if features is None:
         features = {"headings"}
+
+    if opaqueElements is None:
+        opaqueElements = []
+    opaqueElements += ["pre", "xmp", "script", "style"]
+
+    if blockElements is None:
+        blockElements = []
+    blockElements.append("if-wrapper")
 
     # Inline elements that are allowed to start a "normal" line of text.
     # Any other element will instead be an HTML line and will close paragraphs, etc.
@@ -81,14 +134,7 @@ def tokenizeLines(
         "l",
     }
 
-    if blockElements is None:
-        blockElements = []
-    # Custom elements are assumed to be inline in general,
-    # (you have to pass the block-level custom elements as metadata),
-    # but Bikeshed has some custom elements that it uses as block-level
-    blockElements.append("if-wrapper")
-
-    def inlineElementStart(line):
+    def inlineElementStart(line: str) -> bool:
         # Whether or not the line starts with an inline element
         match = re.match(r"\s*</?([\w-]+)", line)
         if not match:
@@ -96,16 +142,14 @@ def tokenizeLines(
         tagname = match.group(1)
         if tagname in inlineElements:
             return True
+        assert blockElements is not None
         if "-" in tagname and tagname not in blockElements:
             # Assume custom elements are inline by default
             return True
         return False
 
-    tokens = []
-    rawStack = []
-    if opaqueElements is None:
-        opaqueElements = []
-    opaqueElements += ["pre", "xmp", "script", "style"]
+    tokens: list[TokenT] = []
+    rawStack: list[RawTokenT] = []
     rawElements = "|".join(re.escape(x) for x in opaqueElements)
 
     for i, line in enumerate(lines):
@@ -186,6 +230,8 @@ def tokenizeLines(
 
         lineText = line.text.strip()
 
+        token: TokenT
+
         if lineText == "":
             token = {
                 "type": "blank",
@@ -202,8 +248,9 @@ def tokenizeLines(
         elif "headings" in features and re.match(r"(#{1,5})\s+(.+?)(\1\s*\{#[^ }]+\})?\s*$", lineText):
             # single-line heading
             match = re.match(r"(#{1,5})\s+(.+?)(\1\s*\{#[^ }]+\})?\s*$", lineText)
+            assert match is not None
             level = len(match.group(1)) + 1
-            token = {"type": "heading", "text": match.group(2).strip(), "level": level}
+            token = t.cast("HeadingTokenT", {"type": "heading", "text": match.group(2).strip(), "level": level})
             match = re.search(r"\{#([^ }]+)\}\s*$", lineText)
             if match:
                 token["id"] = match.group(1)
@@ -211,28 +258,36 @@ def tokenizeLines(
             token = {"type": "rule"}
         elif re.match(r"-?\d+\.\s", lineText):
             match = re.match(r"(-?\d+)\.\s+(.*)", lineText)
-            token = {
-                "type": "numbered",
-                "text": match.group(2),
-                "num": int(match.group(1)),
-            }
+            assert match is not None
+            token = t.cast(
+                "NumberedTokenT",
+                {
+                    "type": "numbered",
+                    "text": match.group(2),
+                    "num": int(match.group(1)),
+                },
+            )
         elif re.match(r"-?\d+\.$", lineText):
-            token = {"type": "numbered", "text": "", "num": int(lineText[:-1])}
+            token = t.cast("NumberedTokenT", {"type": "numbered", "text": "", "num": int(lineText[:-1])})
         elif re.match(r"[*+-]\s", lineText):
             match = re.match(r"[*+-]\s+(.*)", lineText)
+            assert match is not None
             token = {"type": "bulleted", "text": match.group(1)}
         elif re.match(r"[*+-]$", lineText):
             token = {"type": "bulleted", "text": ""}
         elif re.match(r":{1,2}\s+", lineText):
             match = re.match(r"(:{1,2})\s+(.*)", lineText)
+            assert match is not None
             type = "dt" if len(match.group(1)) == 1 else "dd"
             token = {"type": type, "text": match.group(2)}
         elif re.match(r":{1,2}$", lineText):
             match = re.match(r"(:{1,2})", lineText)
+            assert match is not None
             type = "dt" if len(match.group(1)) == 1 else "dd"
             token = {"type": type, "text": ""}
         elif re.match(r">", lineText):
             match = re.match(r">\s?(.*)", lineText)
+            assert match is not None
             token = {"type": "blockquote", "text": match.group(1)}
         elif re.match(r"<", lineText):
             if re.match(r"<<|<\{", lineText) or inlineElementStart(lineText):
@@ -258,7 +313,7 @@ def tokenizeLines(
     return tokens
 
 
-def stripComments(lines):
+def stripComments(lines: list[l.Line]) -> list[l.Line]:
     """
     Eagerly strip comments, because the serializer can't output them right now anyway,
     and they trigger some funky errors.
@@ -284,7 +339,7 @@ def stripComments(lines):
     return output
 
 
-def stripCommentsFromLine(line, inComment=False):
+def stripCommentsFromLine(line: str, inComment: bool = False) -> tuple[str, bool]:
     # Removes HTML comments from the line.
     # Returns true if the comment wasn't closed by the end of the line
     if inComment:
@@ -308,7 +363,7 @@ def stripCommentsFromLine(line, inComment=False):
             return pre + res, inComment
 
 
-def prefixCount(text, numSpacesForIndentation):
+def prefixCount(text: str, numSpacesForIndentation: int) -> int:
     i = 0
     prefixLen = 0
     while i < len(text):
@@ -323,7 +378,7 @@ def prefixCount(text, numSpacesForIndentation):
     return prefixLen
 
 
-def stripPrefix(token, numSpacesForIndentation, len):
+def stripPrefix(token: TokenT, numSpacesForIndentation: int, len: int) -> str:
     """Removes len number of prefix groups"""
 
     text = token["line"].text
@@ -349,20 +404,22 @@ def stripPrefix(token, numSpacesForIndentation, len):
     return text[offset:]
 
 
-def lineEndsRawBlock(line, rawToken):
-    return (rawToken["type"] == "element" and re.search(rawToken["tag"], line.text)) or (
+def lineEndsRawBlock(line: l.Line, rawToken: RawTokenT) -> bool:
+    elementEnds = bool(rawToken["type"] == "element" and re.search(rawToken["tag"], line.text))
+    fencedEnds = bool(
         rawToken["type"] == "fenced"
         and re.match(r"\s*{}{}*\s*$".format(rawToken["tag"], rawToken["tag"][0]), line.text)
     )
+    return elementEnds or fencedEnds
 
 
-def stripCommonWsPrefix(tokens):
+def stripCommonWsPrefix(tokens: list[TokenT]) -> list[TokenT]:
     # Remove the longest common whitespace prefix from the lines.
     if not tokens:
         return tokens
     ws = [getWsPrefix(t["line"].text) for t in tokens]
     prefix = functools.reduce(commonPrefix, ws)
-    prefixLen = len(prefix)
+    prefixLen = len(prefix) if prefix else 0
     for token in tokens:
         stripped = token["line"].text
         if len(token["line"].text) > prefixLen:
@@ -373,7 +430,7 @@ def stripCommonWsPrefix(tokens):
     return tokens
 
 
-def commonPrefix(line1, line2):
+def commonPrefix(line1: str | None, line2: str | None) -> str | None:
     if line1 is None:
         return line2
     if line2 is None:
@@ -389,13 +446,13 @@ def commonPrefix(line1, line2):
     return prefixSoFar
 
 
-def getWsPrefix(line):
+def getWsPrefix(line: str) -> str | None:
     if line.strip() == "":
         return None
-    return re.match(r"(\s*)", line).group(1)
+    return t.cast("re.Match", re.match(r"(\s*)", line)).group(1)
 
 
-def parseTokens(tokens, numSpacesForIndentation):
+def parseTokens(tokens: list[TokenT], numSpacesForIndentation: int) -> list[l.Line]:
     """
     Token types:
     eof
@@ -414,7 +471,7 @@ def parseTokens(tokens, numSpacesForIndentation):
     raw
     """
     stream = TokenStream(tokens, numSpacesForIndentation)
-    lines = []
+    lines: list[l.Line] = []
 
     while True:
         if stream.ended():
@@ -451,7 +508,7 @@ def parseTokens(tokens, numSpacesForIndentation):
     return lines
 
 
-def lineFromStream(stream, text):
+def lineFromStream(stream: TokenStream, text: str) -> l.Line:
     # Shortcut for when you're producing a new line from the currline in the stream,
     # with some modified text.
     return l.Line(stream.currline().i, text)
@@ -463,7 +520,7 @@ def lineFromStream(stream, text):
 # after the lines you've used up dealing with the construct.
 
 
-def parseSingleLineHeading(stream):
+def parseSingleLineHeading(stream: TokenStream) -> list[l.Line]:
     if "id" in stream.curr():
         idattr = f" id='{stream.currid()}'"
     else:
@@ -480,7 +537,7 @@ def parseSingleLineHeading(stream):
     return lines
 
 
-def parseMultiLineHeading(stream):
+def parseMultiLineHeading(stream: TokenStream) -> list[l.Line]:
     if stream.nexttype() == "equals-line":
         level = 2
     elif stream.nexttype() == "dash-line":
@@ -515,13 +572,13 @@ def parseMultiLineHeading(stream):
     return lines
 
 
-def parseHorizontalRule(stream):
+def parseHorizontalRule(stream: TokenStream) -> list[l.Line]:
     lines = [lineFromStream(stream, "<hr>\n")]
     stream.advance()
     return lines
 
 
-def parseParagraph(stream):
+def parseParagraph(stream: TokenStream) -> list[l.Line]:
     line = stream.currtext()
     i = stream.currline().i
     initialPrefixLen = stream.currprefixlen()
@@ -559,12 +616,12 @@ def parseParagraph(stream):
         lines.append(stream.currline())
 
 
-def parseBulleted(stream):
+def parseBulleted(stream: TokenStream) -> list[l.Line]:
     prefixLen = stream.currprefixlen()
     numSpacesForIndentation = stream.numSpacesForIndentation
     ul_i = stream.currline().i
 
-    def parseItem(stream):
+    def parseItem(stream: TokenStream) -> tuple[list[l.Line], int]:
         # Assumes it's being called with curr being a bulleted line.
         # Remove the bulleted part from the line
         firstLine = stream.currtext() + "\n"
@@ -589,7 +646,7 @@ def parseBulleted(stream):
                 )
             )
 
-    def getItems(stream):
+    def getItems(stream: TokenStream) -> t.Generator[tuple[list[l.Line], int], None, None]:
         while True:
             # The conditions that indicate we're past the end of the list itself
             if stream.currtype() == "eof":
@@ -611,12 +668,12 @@ def parseBulleted(stream):
     return lines
 
 
-def parseNumbered(stream, start=1):
+def parseNumbered(stream: TokenStream, start: int = 1) -> list[l.Line]:
     prefixLen = stream.currprefixlen()
     ol_i = stream.currline().i
     numSpacesForIndentation = stream.numSpacesForIndentation
 
-    def parseItem(stream):
+    def parseItem(stream: TokenStream) -> tuple[list[l.Line], int]:
         # Assumes it's being called with curr being a numbered line.
         # Remove the numbered part from the line
         firstLine = stream.currtext() + "\n"
@@ -641,7 +698,7 @@ def parseNumbered(stream, start=1):
                 )
             )
 
-    def getItems(stream):
+    def getItems(stream: TokenStream) -> t.Generator[tuple[list[l.Line], int], None, None]:
         while True:
             # The conditions that indicate we're past the end of the list itself
             if stream.currtype() == "eof":
@@ -666,12 +723,12 @@ def parseNumbered(stream, start=1):
     return lines
 
 
-def parseDl(stream):
+def parseDl(stream: TokenStream) -> list[l.Line]:
     prefixLen = stream.currprefixlen()
     dl_i = stream.currline().i
     numSpacesForIndentation = stream.numSpacesForIndentation
 
-    def parseItem(stream):
+    def parseItem(stream: TokenStream) -> tuple[str, list[l.Line], int]:
         # Assumes it's being called with curr being a :/:: prefixed line.
         firstLine = stream.currtext() + "\n"
         i = stream.currline().i
@@ -700,7 +757,7 @@ def parseDl(stream):
                 )
             )
 
-    def getItems(stream):
+    def getItems(stream: TokenStream) -> t.Generator[tuple[str, list[l.Line], int], None, None]:
         while True:
             # The conditions that indicate we're past the end of the list itself
             if stream.currtype() == "eof":
@@ -726,7 +783,7 @@ def parseDl(stream):
     return lines
 
 
-def parseBlockquote(stream):
+def parseBlockquote(stream: TokenStream) -> list[l.Line]:
     prefixLen = stream.currprefixlen()
     i = stream.currline().i
     lines = [lineFromStream(stream, stream.currtext() + "\n")]
@@ -748,14 +805,16 @@ def parseBlockquote(stream):
 class TokenStream:
     def __init__(
         self,
-        tokens,
-        numSpacesForIndentation,
-        before=None,
-        after=None,
+        tokens: list[TokenT],
+        numSpacesForIndentation: int,
+        before: TokenT | None = None,
+        after: TokenT | None = None,
     ):
         self.tokens = tokens
         self.i = 0
         self.numSpacesForIndentation = numSpacesForIndentation
+        self.before: TokenT
+        self.after: TokenT
         if before is None:
             self.before = {"type": "blank", "prefixlen": 0}
         else:
@@ -765,13 +824,13 @@ class TokenStream:
         else:
             self.after = after
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.tokens)
 
-    def ended(self):
+    def ended(self) -> bool:
         return self.i >= len(self)
 
-    def nth(self, i):
+    def nth(self, i: int) -> TokenT:
         if i < 0:
             return self.before
         elif i >= len(self):
@@ -779,25 +838,27 @@ class TokenStream:
         else:
             return self.tokens[i]
 
-    def prev(self, i=1):
+    def prev(self, i: int = 1) -> TokenT:
         return self.nth(self.i - i)
 
-    def curr(self):
+    def curr(self) -> TokenT:
         return self.nth(self.i)
 
-    def next(self, i=1):
+    def next(self, i: int = 1) -> TokenT:
         return self.nth(self.i + i)
 
-    def advance(self, i=1):
+    def advance(self, i: int = 1) -> TokenT:
         self.i += i
         return self.curr()
 
-    def __getattr__(self, name):
+    # FIXME: Undo this metaprogramming and just
+    # write the dang methods out.
+    def __getattr__(self, name: str) -> t.Any:
         if len(name) >= 5 and name[0:4] in ("prev", "curr", "next"):
             tokenDir = name[0:4]
             attrName = name[4:]
 
-            def _missing(i=1):
+            def _missing(i: int = 1) -> t.Any:
                 if tokenDir == "prev":
                     tok = self.prev(i)
                 elif tokenDir == "next":
@@ -805,7 +866,7 @@ class TokenStream:
                 else:
                     tok = self.curr()
                 if attrName in tok:
-                    return tok[attrName]
+                    return tok[attrName]  # type: ignore
 
                 raise AttributeError(attrName)
 
