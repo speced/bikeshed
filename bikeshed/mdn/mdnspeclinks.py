@@ -41,7 +41,7 @@ def createAnno(className: str, mdnButton: t.ElementT, featureDivs: list[t.Elemen
     return h.E.div({"class": className}, mdnButton, featureDivs)
 
 
-def panelsFromData(doc: t.SpecT, data: t.Dict[str, t.Any]) -> bool:
+def panelsFromData(doc: t.SpecT, data: dict[str, t.Any]) -> bool:
     mdnBaseUrl = "https://developer.mozilla.org/en-US/docs/Web/"
 
     browsersProvidingCurrentEngines = ["firefox", "safari", "chrome"]
@@ -201,8 +201,8 @@ def panelsFromData(doc: t.SpecT, data: t.Dict[str, t.Any]) -> bool:
 
 def addSupportRow(
     browserCodeName: str,
-    nameFromCodeName: t.Dict[str, str],
-    support: t.Dict[str, t.Any],
+    nameFromCodeName: dict[str, str],
+    support: dict[str, t.Any],
     supportData: t.ElementT,
 ) -> None:
     if browserCodeName not in support:
@@ -279,13 +279,13 @@ def addSupportRow(
 
 
 def mdnPanelFor(
-    feature: t.Dict[str, t.Any],
+    feature: dict[str, t.Any],
     mdnBaseUrl: str,
-    nameFromCodeName: t.Dict[str, str],
-    browsersProvidingCurrentEngines: t.List[str],
-    browsersWithBorrowedEngines: t.List[str],
-    browsersWithRetiredEngines: t.List[str],
-    browsersForMobileDevices: t.List[str],
+    nameFromCodeName: dict[str, str],
+    browsersProvidingCurrentEngines: list[str],
+    browsersWithBorrowedEngines: list[str],
+    browsersWithRetiredEngines: list[str],
+    browsersForMobileDevices: list[str],
 ) -> t.ElementT:
     featureDiv = h.E.div({"class": "feature"})
     if "slug" in feature:

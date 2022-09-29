@@ -98,7 +98,7 @@ class LineNumberOptions:
     startingLine: int
     # Which lines, if any, to specially highlight
     # (relative to the starting line)
-    highlights: t.Set[int]
+    highlights: set[int]
 
 
 def determineLineNumbers(doc: t.SpecT, el: t.ElementT) -> LineNumberOptions:
@@ -217,7 +217,7 @@ def highlightWithWebIDL(text: str, el: t.ElementT) -> t.Deque[ColoredText] | Non
 
 def coloredTextFromWidlStack(widlText: str) -> t.Deque[ColoredText]:
     coloredTexts: t.Deque[ColoredText] = collections.deque()
-    colors: t.List[str] = []
+    colors: list[str] = []
     currentText = ""
     mode = "text"
     for char in widlText:
@@ -299,8 +299,8 @@ def mergeHighlighting(el: t.ElementT, coloredText: t.Sequence[ColoredText]) -> N
                 h.appendChild(el, *colorizeText(node, coloredText), allowEmpty=True)
         return el
 
-    def colorizeText(text: str, coloredText: t.Deque[ColoredText]) -> t.List[t.NodeT]:
-        nodes: t.List[t.NodeT] = []
+    def colorizeText(text: str, coloredText: t.Deque[ColoredText]) -> list[t.NodeT]:
+        nodes: list[t.NodeT] = []
         while text and coloredText:
             nextColor = coloredText.popleft()
             if len(nextColor.text) <= len(text):
@@ -751,9 +751,7 @@ def getLineHighlightingDarkmodeStyles() -> str:
 """
 
 
-def grouper(
-    iterable: t.Sequence[T], n: int, fillvalue: T | None = None
-) -> itertools.zip_longest[t.Tuple[T | None, ...]]:
+def grouper(iterable: t.Sequence[T], n: int, fillvalue: T | None = None) -> itertools.zip_longest[tuple[T | None, ...]]:
     "Collect data into fixed-length chunks or blocks"
     # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx
     args = [iter(iterable)] * n

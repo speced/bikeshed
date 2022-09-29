@@ -53,7 +53,7 @@ class BiblioEntry(metaclass=abc.ABCMeta):
 
 @dataclasses.dataclass
 class NormalBiblioEntry(BiblioEntry):
-    authors: t.List[str] = dataclasses.field(default_factory=list)
+    authors: list[str] = dataclasses.field(default_factory=list)
     etAl: bool = False
     status: str | None = None
     date: str | None = None
@@ -123,7 +123,7 @@ class SpecBiblioEntry(BiblioEntry):
     for when we don't have "real" bibliography data for a reference.
     """
 
-    def __init__(self, spec: t.Dict[str, str], preferredStatus: str | None = None, order: int = 0):
+    def __init__(self, spec: dict[str, str], preferredStatus: str | None = None, order: int = 0):
         super().__init__(
             linkText=spec["vshortname"],
             title=spec["description"],
@@ -205,7 +205,7 @@ def processReferBiblioFile(lines: t.Sequence[str], storage: t.BiblioStorageT, or
     unusedReferCodes = set("BCIJNPRVX")
 
     for group in groupsFromReferFile(lines):
-        biblio: t.Dict[str, t.Any] = {"order": order}
+        biblio: dict[str, t.Any] = {"order": order}
         for line in group:
 
             match = re.match(r"%(\w)\s+(.*)", line)
@@ -227,8 +227,8 @@ def processReferBiblioFile(lines: t.Sequence[str], storage: t.BiblioStorageT, or
     return storage
 
 
-def groupsFromReferFile(lines: t.Sequence[str]) -> t.Generator[t.List[str], None, None]:
-    group: t.List[str] = []
+def groupsFromReferFile(lines: t.Sequence[str]) -> t.Generator[list[str], None, None]:
+    group: list[str] = []
     for line in lines:
         line = line.strip()
 
@@ -298,7 +298,7 @@ def processSpecrefBiblioFile(text: str, storage: t.BiblioStorageT, order: int) -
         "status": "status",
     }
 
-    obsoletedBy: t.Dict[str, str] = {}
+    obsoletedBy: dict[str, str] = {}
     biblio: BiblioEntry
     for biblioKey, data in datas.items():
         biblioKey = biblioKey.strip()
@@ -338,7 +338,7 @@ def processSpecrefBiblioFile(text: str, storage: t.BiblioStorageT, order: int) -
 
 
 def loadBiblioDataFile(lines: t.Iterator[str], storage: t.BiblioStorageT) -> None:
-    b: t.Dict[str, t.Any]
+    b: dict[str, t.Any]
     biblio: BiblioEntry
     try:
         while True:
@@ -396,7 +396,7 @@ def levenshtein(a: str, b: str) -> int:
         a, b = b, a
         n, m = m, n
 
-    current: t.List[int] = list(range(n + 1))
+    current: list[int] = list(range(n + 1))
     for i in range(1, m + 1):
         previous, current = current, [i] + [0] * n
         for j in range(1, n + 1):
@@ -409,15 +409,15 @@ def levenshtein(a: str, b: str) -> int:
     return current[n]
 
 
-def findCloseBiblios(biblioKeys: t.Sequence[str], target: str, n: int = 5) -> t.List[str]:
+def findCloseBiblios(biblioKeys: t.Sequence[str], target: str, n: int = 5) -> list[str]:
     """
     Finds biblio entries close to the target.
     Returns all biblios with target as the substring,
     plus the 5 closest ones per levenshtein distance.
     """
     target = target.lower()
-    names: t.List[t.Tuple[str, int]] = []
-    superStrings: t.List[str] = []
+    names: list[tuple[str, int]] = []
+    superStrings: list[str] = []
 
     for name in biblioKeys:
         if target in name:
@@ -507,7 +507,7 @@ def dedupBiblioReferences(doc: t.SpecT) -> None:
     dupedUrls = shepherdUrls & specRefUrls
 
     # Remove all the Shepherd refs that are left in duped
-    poppedKeys: t.DefaultDict[str, t.Dict[str, str]] = defaultdict(dict)
+    poppedKeys: t.DefaultDict[str, dict[str, str]] = defaultdict(dict)
     for key, ref in list(doc.informativeRefs.items()):
         if ref.url in dupedUrls:
             if isShepherdRef(ref):

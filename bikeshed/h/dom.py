@@ -179,7 +179,7 @@ def foldWhitespace(text: str) -> str:
     return re.sub(r"(\s|\xa0)+", " ", text)
 
 
-def parseHTML(text: str) -> t.List[t.ElementT]:
+def parseHTML(text: str) -> list[t.ElementT]:
     doc = html5lib.parse(text, treebuilder="lxml", namespaceHTMLElements=False)
     head = doc.getroot()[0]
     body = doc.getroot()[1]
@@ -553,7 +553,7 @@ def treeAttr(el: t.ElementT, attrName: str) -> str | None:
     return None
 
 
-def closestAttr(el: t.ElementT, *attrs: str) -> t.Tuple[str, str] | t.Tuple[None, None]:
+def closestAttr(el: t.ElementT, *attrs: str) -> tuple[str, str] | tuple[None, None]:
     # Like treeAttr, but can provide multiple attr names, and returns the first one found.
     # Useful with combos like highlight/nohighlight
     # If multiple target attrs show up on same element, priority is calling order.
@@ -704,7 +704,7 @@ def isNormative(el: t.ElementT, doc: t.SpecT) -> bool:
     return norm
 
 
-_normativeElCache: t.Dict[t.Any, bool]
+_normativeElCache: dict[t.Any, bool]
 _normativeElCache = {}
 
 

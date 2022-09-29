@@ -1001,7 +1001,7 @@ def removeMultipleLinks(doc: t.SpecT) -> None:
     # only keep the first.
     if not doc.md.removeMultipleLinks:
         return
-    paras: defaultdict[t.Any, defaultdict[str, t.List[t.Any]]]
+    paras: defaultdict[t.Any, defaultdict[str, list[t.Any]]]
     paras = defaultdict(lambda: defaultdict(list))
     for el in h.findAll("a[data-link-type]", doc):
         if h.hasAncestor(el, lambda x: x.tag in ["pre", "xmp"]):
@@ -1329,7 +1329,7 @@ def finalHackyCleanup(text: str) -> str:
     return text
 
 
-def hackyLineNumbers(lines: t.List[Line]) -> t.List[Line]:
+def hackyLineNumbers(lines: list[Line]) -> list[Line]:
     # Hackily adds line-number information to each thing that looks like an open tag.
     # This is just regex text-munging, so potentially dangerous!
     for line in lines:

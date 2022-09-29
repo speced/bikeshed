@@ -294,7 +294,7 @@ class IDLMarker(widlparser.protocols.Marker):
     def encode(self, text: str) -> str:
         return h.escapeHTML(text)
 
-    def methodLinkingTexts(self, method: widlparser.OperationRest) -> t.List[str]:
+    def methodLinkingTexts(self, method: widlparser.OperationRest) -> list[str]:
         """
         Given a method-ish widlparser Construct,
         finds all possible linking texts.
@@ -373,7 +373,7 @@ def markupIDL(doc: t.SpecT) -> None:
             """
 
 
-def markupIDLBlock(pre: t.ElementT, doc: t.SpecT) -> t.Set[t.ElementT]:
+def markupIDLBlock(pre: t.ElementT, doc: t.SpecT) -> set[t.ElementT]:
     localDfns = set()
     forcedInterfaces = []
     for x in (h.treeAttr(pre, "data-dfn-force") or "").split():

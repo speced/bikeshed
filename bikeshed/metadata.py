@@ -37,10 +37,10 @@ class MetadataManager:
         self.hasMetadata: bool = False
 
         # All metadata ever passed to .addData()
-        self.allData: t.DefaultDict[str, t.List[str]] = defaultdict(list)
+        self.allData: t.DefaultDict[str, list[str]] = defaultdict(list)
 
         # required metadata
-        self.abstract: t.List[str] = []
+        self.abstract: list[str] = []
         self.ED: str | None = None
         self.level: str | None = None
         self.displayShortname: str | None = None
@@ -52,15 +52,15 @@ class MetadataManager:
         self.advisementClass: str = "advisement"
         self.assertionClass: str = "assertion"
         self.assumeExplicitFor: bool = False
-        self.atRisk: t.List[str] = []
-        self.audience: t.List[str] = []
-        self.blockElements: t.List[str] = []
+        self.atRisk: list[str] = []
+        self.audience: list[str] = []
+        self.blockElements: list[str] = []
         self.boilerplate: config.BoolSet = config.BoolSet(default=True)
-        self.canIUseURLs: t.List[str] = []
+        self.canIUseURLs: list[str] = []
         self.canonicalURL: str | None = None
         self.complainAbout: config.BoolSet = config.BoolSet()
-        self.customTextMacros: t.List[t.Tuple[str, str]] = []
-        self.customWarningText: t.List[str] = []
+        self.customTextMacros: list[tuple[str, str]] = []
+        self.customWarningText: list[str] = []
         self.customWarningTitle: str | None = None
         self.date: date = datetime.utcnow().date()
         self.deadline: date | None = None
@@ -68,26 +68,26 @@ class MetadataManager:
         self.defaultBiblioDisplay: str = "index"
         self.defaultRefStatus: str | None = None
         self.editors: list[dict[str, str | None]] = []
-        self.editorTerm: t.Dict[str, str] = {"singular": "Editor", "plural": "Editors"}
+        self.editorTerm: dict[str, str] = {"singular": "Editor", "plural": "Editors"}
         self.expires: date | None = None
         self.externalInfotrees: config.BoolSet = config.BoolSet(default=False)
         self.favicon: str | None = None
         self.forceCrossorigin: bool = False
         self.group: str | None = None
         self.h1: str | None = None
-        self.ignoreCanIUseUrlFailure: t.List[str] = []
-        self.ignoredTerms: t.List[str] = []
-        self.ignoredVars: t.List[str] = []
+        self.ignoreCanIUseUrlFailure: list[str] = []
+        self.ignoredTerms: list[str] = []
+        self.ignoredVars: list[str] = []
         self.implementationReport: str | None = None
         self.includeCanIUsePanels: bool = False
         self.includeMdnPanels: bool = False
         self.indent: int = 4
         self.inferCSSDfns: bool = False
-        self.informativeClasses: t.List[str] = []
+        self.informativeClasses: list[str] = []
         self.inlineGithubIssues: bool = False
-        self.inlineTagCommands: t.Dict[str, str] = {}
+        self.inlineTagCommands: dict[str, str] = {}
         self.issueClass: str = "issue"
-        self.issues: t.List[t.Tuple[str, str]] = []
+        self.issues: list[tuple[str, str]] = []
         self.issueTrackerTemplate: str | None = None
         self.lineNumbers: bool = False
         self.linkDefaults: t.LinkDefaultsT = defaultdict(list)
@@ -100,19 +100,19 @@ class MetadataManager:
         )
         self.maxToCDepth: int | float | None = float("inf")
         self.metadataInclude: config.BoolSet = config.BoolSet(default=True)
-        self.metadataOrder: t.List[str] = ["*", "!*"]
+        self.metadataOrder: list[str] = ["*", "!*"]
         self.noAbstract: bool = False
         self.noEditor: bool = False
         self.noteClass: str = "note"
-        self.opaqueElements: t.List[str] = ["pre", "xmp", "script", "style"]
+        self.opaqueElements: list[str] = ["pre", "xmp", "script", "style"]
         self.prepTR: bool = False
         self.previousEditors: list[dict[str, str | None]] = []
         self.previousVersions: list[dict[str, str]] = []
         self.removeMultipleLinks: bool = False
         self.repository: repository.Repository | None = None
-        self.requiredIDs: t.List[str] = []
+        self.requiredIDs: list[str] = []
         self.slimBuildArtifact: bool = False
-        self.statusText: t.List[str] = []
+        self.statusText: list[str] = []
         self.testSuite: str | None = None
         self.title: str | None = None
         self.toggleDiffs: bool = False
@@ -124,10 +124,10 @@ class MetadataManager:
         self.trackingVectorImageWidth: str = "46"
         self.trackingVectorTitle: str = "There is a tracking vector here."
         self.translateIDs: dict[str, str] = {}
-        self.translations: t.List[t.Dict[str, str]] = []
+        self.translations: list[dict[str, str]] = []
         self.useDfnPanels: bool = True
         self.useIAutolinks: bool = False
-        self.versionHistory: t.List[str] = []
+        self.versionHistory: list[str] = []
         self.warning: str | None = None
         self.workStatus: str | None = None
         self.wptDisplay: str = "none"
@@ -136,7 +136,7 @@ class MetadataManager:
 
         self.otherMetadata: OrderedDict[str, list[t.NodesT]] = OrderedDict()
 
-        self.manuallySetKeys: t.Set[str] = set()
+        self.manuallySetKeys: set[str] = set()
 
     def addData(self, key: str, val: str, lineNum: str | int | None = None) -> MetadataManager:
         key = key.strip()
@@ -576,11 +576,11 @@ def parseEditor(key: str, val: str, lineNum: None | str | int) -> list[dict[str,
     return [data]
 
 
-def parseCommaSeparated(key: str, val: str, lineNum: str | int | None) -> t.List[str]:
+def parseCommaSeparated(key: str, val: str, lineNum: str | int | None) -> list[str]:
     return [term.strip().lower() for term in val.split(",")]
 
 
-def parseIdList(key: str, val: str, lineNum: str | int | None) -> t.List[str]:
+def parseIdList(key: str, val: str, lineNum: str | int | None) -> list[str]:
     return [term.strip() for term in val.split(",")]
 
 
@@ -709,7 +709,7 @@ def parseBoolishList(
     return boolset
 
 
-def parseLinkedText(key: str, val: str, lineNum: str | int | None) -> t.List[t.Tuple[str, str]]:
+def parseLinkedText(key: str, val: str, lineNum: str | int | None) -> list[tuple[str, str]]:
     # Parses anything defined as "text url, text url, text url" into a list of 2-tuples.
     entries = []
     vals = [v.strip() for v in val.split(",")]
@@ -761,7 +761,7 @@ def parseInlineGithubIssues(key: str, val: str, lineNum: str | int | None) -> t.
     return False
 
 
-def parseTextMacro(key: str, val: str, lineNum: str | int | None) -> t.List[t.Tuple[str, str]]:
+def parseTextMacro(key: str, val: str, lineNum: str | int | None) -> list[tuple[str, str]]:
     # Each Text Macro line is just a macro name (must be uppercase)
     # followed by the text it expands to.
     try:
@@ -819,7 +819,7 @@ def parseRepository(key: str, val: str, lineNum: str | int | None) -> repository
     return None
 
 
-def parseTranslateIDs(key: str, val: str, lineNum: str | int | None) -> t.Dict[str, str]:
+def parseTranslateIDs(key: str, val: str, lineNum: str | int | None) -> dict[str, str]:
     translations = {}
     for v in val.split(","):
         pieces = v.strip().split()
@@ -864,7 +864,7 @@ def parseTranslation(key: str, val: str, lineNum: str | int | None) -> list[dict
     return [{"lang-code": langCode, "url": url, "name": name, "native-name": nativeName}]
 
 
-def parseAudience(key: str, val: str, lineNum: str | int | None) -> t.List[str]:
+def parseAudience(key: str, val: str, lineNum: str | int | None) -> list[str]:
     # WG21 value
     values = [x.strip().upper() for x in val.strip().split(",")]
     if len(values) == 1 and values[0] == "ALL":
@@ -907,7 +907,7 @@ def parseAudience(key: str, val: str, lineNum: str | int | None) -> t.List[str]:
         return []
 
 
-def parseEditorTerm(key: str, val: str, lineNum: str | int | None) -> t.Dict[str, str]:
+def parseEditorTerm(key: str, val: str, lineNum: str | int | None) -> dict[str, str]:
     values = [x.strip() for x in val.strip().split(",")]
     if len(values) == 2:
         return {"singular": values[0], "plural": values[1]}
@@ -938,7 +938,7 @@ def parseMaxToCDepth(key: str, val: str, lineNum: str | int | None) -> int | flo
     return v
 
 
-def parseMetadataOrder(key: str, val: str, lineNum: str | int | None) -> t.List[str]:
+def parseMetadataOrder(key: str, val: str, lineNum: str | int | None) -> list[str]:
     pieces = [x.strip() for x in val.split(",")]
     return pieces
 
@@ -954,7 +954,7 @@ def parseWptDisplay(key: str, val: str, lineNum: str | int | None) -> str:
     return "none"
 
 
-def parsePreviousVersion(key: str, val: str, lineNum: str | int | None) -> t.List[t.Dict[str, str]]:
+def parsePreviousVersion(key: str, val: str, lineNum: str | int | None) -> list[dict[str, str]]:
     biblioMatch = re.match(r"from biblio(\s+\S+)?", val.lower())
     if biblioMatch:
         if biblioMatch.group(1):
@@ -963,13 +963,13 @@ def parsePreviousVersion(key: str, val: str, lineNum: str | int | None) -> t.Lis
     return [{"type": "url", "value": val}]
 
 
-def parseInlineTagCommand(key: str, val: str, lineNum: str | int | None) -> t.Dict[str, str]:
+def parseInlineTagCommand(key: str, val: str, lineNum: str | int | None) -> dict[str, str]:
     tag, _, command = val.strip().partition(" ")
     command = command.strip()
     return {tag: command}
 
 
-def parse(lines: t.Sequence[Line]) -> t.Tuple[t.List[Line], MetadataManager]:
+def parse(lines: t.Sequence[Line]) -> tuple[list[Line], MetadataManager]:
     # Given HTML document text, in the form of an array of text lines,
     # extracts all <pre class=metadata> lines and parses their contents.
     # Returns the text lines, with the metadata-related lines removed,
@@ -1022,7 +1022,7 @@ def parse(lines: t.Sequence[Line]) -> t.Tuple[t.List[Line], MetadataManager]:
     return newlines, md
 
 
-def fromCommandLine(overrides: t.List[str]) -> MetadataManager:
+def fromCommandLine(overrides: list[str]) -> MetadataManager:
     # Given a list of strings representing command-line arguments,
     # finds the args that correspond to metadata keys
     # and fills a MetadataManager accordingly.

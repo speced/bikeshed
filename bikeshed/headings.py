@@ -25,14 +25,14 @@ def processHeadings(doc: t.SpecT, scope: str = "doc") -> None:
         checkPrivacySecurityHeadings(h.findAll(".heading", doc))
 
 
-def resetHeadings(headings: t.List[t.ElementT]) -> None:
+def resetHeadings(headings: list[t.ElementT]) -> None:
     for header in headings:
         content = h.E.span({"class": "content"})
         h.moveContents(content, header)
         h.appendChild(header, content)
 
 
-def addHeadingIds(doc: t.SpecT, headings: t.List[t.ElementT]) -> None:
+def addHeadingIds(doc: t.SpecT, headings: list[t.ElementT]) -> None:
     neededIds = set()
     for header in headings:
         if header.get("id") is None:
@@ -55,7 +55,7 @@ def addHeadingIds(doc: t.SpecT, headings: t.List[t.ElementT]) -> None:
         )
 
 
-def checkPrivacySecurityHeadings(headings: t.List[t.ElementT]) -> None:
+def checkPrivacySecurityHeadings(headings: list[t.ElementT]) -> None:
     security = False
     privacy = False
     for header in headings:
@@ -86,13 +86,13 @@ def checkPrivacySecurityHeadings(headings: t.List[t.ElementT]) -> None:
         )
 
 
-def addHeadingAlgorithms(headings: t.List[t.ElementT]) -> None:
+def addHeadingAlgorithms(headings: list[t.ElementT]) -> None:
     for header in headings:
         if header.get("data-algorithm") == "":
             header.set("data-algorithm", h.textContent(header).strip())
 
 
-def determineHeadingLevels(headings: t.List[t.ElementT]) -> None:
+def determineHeadingLevels(headings: list[t.ElementT]) -> None:
     headerLevel = [0, 0, 0, 0, 0]
 
     def incrementLevel(level: int) -> None:
@@ -125,7 +125,7 @@ def determineHeadingLevels(headings: t.List[t.ElementT]) -> None:
         header.set("data-level", printLevel())
 
 
-def addHeadingBonuses(headings: t.List[t.ElementT]) -> None:
+def addHeadingBonuses(headings: list[t.ElementT]) -> None:
     for header in headings:
         level = header.get("data-level")
         if level is not None:

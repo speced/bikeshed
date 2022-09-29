@@ -194,7 +194,7 @@ def groupFromKey(key: str, length: int = 2) -> str:
     return group
 
 
-_groupFromKeyCache: t.Dict[str, str]
+_groupFromKeyCache: dict[str, str]
 _groupFromKeyCache = {}
 
 

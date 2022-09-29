@@ -72,7 +72,7 @@ class Spec:
             )
             return
         self.inputSource: InputSource.InputSource = InputSource.inputFromName(inputFilename, chroot=constants.chroot)
-        self.transitiveDependencies: t.Set[InputSource.InputSource] = set()
+        self.transitiveDependencies: set[InputSource.InputSource] = set()
         self.debug: bool = debug
         self.token: str | None = token
         self.testing: bool = testing
@@ -82,12 +82,12 @@ class Spec:
         else:
             self.dataFile = fileRequester
 
-        self.lines: t.List[line.Line] = []
+        self.lines: list[line.Line] = []
         self.valid = self.initializeState()
 
     def initializeState(self) -> bool:
-        self.normativeRefs: t.Dict[str, biblio.BiblioEntry] = {}
-        self.informativeRefs: t.Dict[str, biblio.BiblioEntry] = {}
+        self.normativeRefs: dict[str, biblio.BiblioEntry] = {}
+        self.informativeRefs: dict[str, biblio.BiblioEntry] = {}
         self.refs: refs.ReferenceManager = refs.ReferenceManager(fileRequester=self.dataFile, testing=self.testing)
         self.externalRefsUsed: t.Any = defaultdict(lambda: defaultdict(dict))
 
@@ -98,7 +98,7 @@ class Spec:
         self.mdDefaults: metadata.MetadataManager | None = None
         self.mdOverridingDefaults: metadata.MetadataManager | None = None
 
-        self.typeExpansions: t.Dict[str, str] = {}
+        self.typeExpansions: dict[str, str] = {}
 
         defaultMacro: t.Callable[[], str] = lambda: "???"
         self.macros: t.DefaultDict[str, str] = defaultdict(defaultMacro)
@@ -107,8 +107,8 @@ class Spec:
         self.mdnSpecLinks: t.Any = {}
         self.widl: widlparser.Parser = idl.getParser()
 
-        self.testSuites: t.Dict[str, testsuite.TestSuite] = fetchTestSuites(self.dataFile)
-        self.languages: t.Dict[str, language.Language] = fetchLanguages(self.dataFile)
+        self.testSuites: dict[str, testsuite.TestSuite] = fetchTestSuites(self.dataFile)
+        self.languages: dict[str, language.Language] = fetchLanguages(self.dataFile)
 
         self.extraStyles: t.DefaultDict[str, str] = defaultdict(str)
         self.extraStyles["style-colors"] = styleColors
@@ -430,7 +430,7 @@ class Spec:
         except Exception as e:
             m.die(f"Something went wrong while watching the file:\n{e}")
 
-    def fixText(self, text: str, moreMacros: t.Dict[str, str] = None) -> str:
+    def fixText(self, text: str, moreMacros: dict[str, str] = None) -> str:
         # Do several textual replacements that need to happen *before* the document is parsed as h.
 
         # If markdown shorthands are on, remove all `foo`s while processing,
@@ -530,11 +530,11 @@ def catchArgparseBug(string: str | None) -> bool:
     return True
 
 
-def fetchTestSuites(dataFile: retrieve.DataFileRequester) -> t.Dict[str, testsuite.TestSuite]:
+def fetchTestSuites(dataFile: retrieve.DataFileRequester) -> dict[str, testsuite.TestSuite]:
     return {k: testsuite.TestSuite(**v) for k, v in json.loads(dataFile.fetch("test-suites.json", str=True)).items()}
 
 
-def fetchLanguages(dataFile: retrieve.DataFileRequester) -> t.Dict[str, language.Language]:
+def fetchLanguages(dataFile: retrieve.DataFileRequester) -> dict[str, language.Language]:
     return {
         k: language.Language(v["name"], v["native-name"])
         for k, v in json.loads(dataFile.fetch("languages.json", str=True)).items()

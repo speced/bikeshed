@@ -335,7 +335,7 @@ def canonicalizeStatus(rawStatus: str | None, group: str | None) -> str | None:
         if "w3c/" + status in shortToLongStatus:
             status = "w3c/" + status
 
-        def formatStatusSet(statuses: t.FrozenSet[str]) -> str:
+        def formatStatusSet(statuses: frozenset[str]) -> str:
             return ", ".join(sorted({status.split("/")[-1] for status in statuses}))
 
         if group in w3cIgs and status not in w3cIGStatuses:

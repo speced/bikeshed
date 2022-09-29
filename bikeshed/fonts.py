@@ -11,7 +11,7 @@ else:
     from . import config, messages as m, t
 
 if t.TYPE_CHECKING:
-    Characters: t.TypeAlias = t.Dict[str, t.List[str]]
+    Characters: t.TypeAlias = dict[str, list[str]]
     T = t.TypeVar("T")
     U = t.TypeVar("U")
 
@@ -97,7 +97,7 @@ class Font:
         return output
 
 
-def parseMetadata(lines: t.List[str]) -> t.Tuple[FontMetadata, t.List[str]]:
+def parseMetadata(lines: list[str]) -> tuple[FontMetadata, list[str]]:
     # Each metadata line is of the form "key: value".
     # First line that's not of that form ends the metadata.
     # Returns the parsed metadata, and the non-metadata lines
@@ -126,7 +126,7 @@ def parseMetadata(lines: t.List[str]) -> t.Tuple[FontMetadata, t.List[str]]:
     return md, lines[i:]
 
 
-def parseCharacters(md: FontMetadata, lines: t.List[str]) -> Characters:
+def parseCharacters(md: FontMetadata, lines: list[str]) -> Characters:
     import string
 
     height = md.height

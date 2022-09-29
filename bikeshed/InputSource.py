@@ -18,11 +18,11 @@ from . import config, line, t
 
 @attr.s(auto_attribs=True)
 class InputContent:
-    rawLines: t.List[str]
+    rawLines: list[str]
     date: datetime.date | None
 
     @property
-    def lines(self) -> t.List[line.Line]:
+    def lines(self) -> list[line.Line]:
         return [line.Line(lineNo, text) for lineNo, text in enumerate(self.rawLines, 1)]
 
     @property

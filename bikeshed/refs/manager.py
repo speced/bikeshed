@@ -771,7 +771,7 @@ class ReferenceManager:
         bib.preferredStatus = status
         return bib
 
-    def bibliosFromKey(self, key: str) -> t.List[biblio.BiblioEntry]:
+    def bibliosFromKey(self, key: str) -> list[biblio.BiblioEntry]:
         # Load up the biblio data necessary to fetch the given key
         # and then actually fetch it.
         # If you don't call this,
@@ -785,7 +785,7 @@ class ReferenceManager:
             self.loadedBiblioGroups.add(group)
         return self.biblios.get(key, [])
 
-    def _bestCandidateBiblio(self, candidates: t.List[biblio.BiblioEntry]) -> biblio.BiblioEntry:
+    def _bestCandidateBiblio(self, candidates: list[biblio.BiblioEntry]) -> biblio.BiblioEntry:
         return sorted(candidates, key=lambda x: x.order or 0)[0].strip()
 
     def getLatestBiblioRef(self, key: str) -> biblio.BiblioEntry | None:

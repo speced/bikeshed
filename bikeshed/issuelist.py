@@ -254,7 +254,7 @@ def printHeader(outfile: t.TextIO, hi: HeaderInfo) -> None:
     )
 
 
-def printIssues(outfile: t.TextIO, lines: t.List[str]) -> None:
+def printIssues(outfile: t.TextIO, lines: list[str]) -> None:
     text = "".join(lines)
     issues = text.split("----\n")[1:]
     for issue in issues:
