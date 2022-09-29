@@ -26,7 +26,6 @@ from typing import (
     NewType,
     Optional,
     overload,
-    Protocol,
     Sequence,
     MutableSequence,
     Set,
@@ -48,9 +47,9 @@ else:
     from typing_extensions import Literal, Protocol, TypedDict
 
 if sys.version_info >= (3, 10):
-    from typing import TypeAlias, TypeGuard
+    from typing import Protocol, TypeAlias, TypeGuard
 else:
-    from typing_extensions import TypeAlias, TypeGuard
+    from typing_extensions import Protocol, TypeAlias, TypeGuard
 
 
 from lxml import etree
