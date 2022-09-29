@@ -59,7 +59,7 @@ def addTrackingVector(doc: t.SpecT) -> None:
 
 
 def trackingVectorImage(
-    imageURL: t.Optional[str], imageWidth: str, imageHeight: str, altText: str, title: str
+    imageURL: str | None, imageWidth: str, imageHeight: str, altText: str, title: str
 ) -> t.ElementT:
     if imageURL is None:
 

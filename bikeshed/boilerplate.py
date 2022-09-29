@@ -356,7 +356,7 @@ def addIndexOfLocallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> None:
     h.appendChild(container, indexHTML, allowEmpty=True)
 
 
-def disambiguator(ref: r.RefWrapper, types: t.Optional[t.Set[str]], specs: t.Optional[t.Set[str]]) -> str:
+def disambiguator(ref: r.RefWrapper, types: set[str] | None, specs: set[str] | None) -> str:
     disambInfo = []
     if types is None or len(types) > 1:
         disambInfo.append(ref.type)
@@ -884,7 +884,7 @@ def addTOCSection(doc: t.SpecT) -> None:
 
 
 def addSpecMetadataSection(doc: t.SpecT) -> None:
-    def printEditor(editor: dict[str, str | None]) -> t.Optional[t.ElementT]:
+    def printEditor(editor: dict[str, str | None]) -> t.ElementT | None:
         dd = h.E.dd({"class": "editor p-author h-card vcard"})
         if editor["w3cid"]:
             dd.attrib["data-editor-id"] = editor["w3cid"]
@@ -926,7 +926,7 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
             )
         return dd
 
-    def printTranslation(tr: dict[str, str]) -> t.Optional[t.ElementT]:
+    def printTranslation(tr: dict[str, str]) -> t.ElementT | None:
         lang = tr["lang-code"]
         # canonicalize the lang-code structure
         lang = lang.lower().replace("_", "-")

@@ -3,8 +3,6 @@ from __future__ import annotations
 import abc
 import dataclasses
 
-from . import t
-
 
 @dataclasses.dataclass
 class Repository(metaclass=abc.ABCMeta):
@@ -14,7 +12,7 @@ class Repository(metaclass=abc.ABCMeta):
 
     url: str
     type: str = "unknown"
-    name: t.Optional[str] = None
+    name: str | None = None
 
 
 class UnknownRepository(Repository):
@@ -39,7 +37,7 @@ class GithubRepository(Repository):
         else:
             self.api = f"https://github.{ns}/api/v3"
 
-    def formatIssueUrl(self, id: t.Optional[str] = None) -> str:
+    def formatIssueUrl(self, id: str | None = None) -> str:
         if id is None:
             return f"https://github.{self.ns}/{self.user}/{self.repo}/issues/"
         return f"https://github.{self.ns}/{self.user}/{self.repo}/issues/{id}"

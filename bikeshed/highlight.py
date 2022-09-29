@@ -22,14 +22,14 @@ def loadCSSLexer() -> lexers.CSSLexer:
     return CSSLexer()
 
 
-customLexers: t.Dict[str, pygments.lexer.Lexer] = {"css": loadCSSLexer}
+customLexers: dict[str, pygments.lexer.Lexer] = {"css": loadCSSLexer}
 
 
 @dataclasses.dataclass
 class ColoredText:
     text: str
     # None indicates uncolored text
-    color: t.Optional[str]
+    color: str | None
 
 
 def addSyntaxHighlighting(doc: t.SpecT) -> None:
@@ -70,7 +70,7 @@ def addSyntaxHighlighting(doc: t.SpecT) -> None:
         doc.extraStyles["style-darkmode"] += getLineHighlightingDarkmodeStyles()
 
 
-def determineHighlightLang(doc: t.SpecT, el: t.ElementT) -> t.Optional[t.Union[str, t.Literal[False]]]:
+def determineHighlightLang(doc: t.SpecT, el: t.ElementT) -> str | t.Literal[False] | None:
     # Either returns a normalized highlight lang,
     # False indicating the element was already highlighted,
     # or None indicating the element shouldn't be highlighted.
@@ -153,7 +153,7 @@ def determineLineNumbers(doc: t.SpecT, el: t.ElementT) -> LineNumberOptions:
 
 def highlightEl(el: t.ElementT, lang: str) -> None:
     text = h.textContent(el)
-    coloredText: t.Optional[t.Deque[ColoredText]]
+    coloredText: t.Deque[ColoredText] | None
     if lang == "webidl":
         coloredText = highlightWithWebIDL(text, el=el)
     else:
@@ -163,7 +163,7 @@ def highlightEl(el: t.ElementT, lang: str) -> None:
         h.addClass(el, "highlight")
 
 
-def highlightWithWebIDL(text: str, el: t.ElementT) -> t.Optional[t.Deque[ColoredText]]:
+def highlightWithWebIDL(text: str, el: t.ElementT) -> t.Deque[ColoredText] | None:
     """
     Trick the widlparser emitter,
     which wants to output HTML via wrapping with start/end tags,
@@ -188,22 +188,20 @@ def highlightWithWebIDL(text: str, el: t.ElementT) -> t.Optional[t.Deque[Colored
 
         def markup_type_name(
             self, text: str, construct: widlparser.constructs.Construct
-        ) -> t.Tuple[t.Optional[str], t.Optional[str]]:
+        ) -> tuple[str | None, str | None]:
             return ("\1n\2", "\3")
 
-        def markup_name(
-            self, text: str, construct: widlparser.constructs.Construct
-        ) -> t.Tuple[t.Optional[str], t.Optional[str]]:
+        def markup_name(self, text: str, construct: widlparser.constructs.Construct) -> tuple[str | None, str | None]:
             return ("\1g\2", "\3")
 
         def markup_keyword(
             self, text: str, construct: widlparser.constructs.Construct
-        ) -> t.Tuple[t.Optional[str], t.Optional[str]]:
+        ) -> tuple[str | None, str | None]:
             return ("\1b\2", "\3")
 
         def markup_enum_value(
             self, text: str, construct: widlparser.constructs.Construct
-        ) -> t.Tuple[t.Optional[str], t.Optional[str]]:
+        ) -> tuple[str | None, str | None]:
             return ("\1s\2", "\3")
 
     if "\1" in text or "\2" in text or "\3" in text:
@@ -262,7 +260,7 @@ def coloredTextFromWidlStack(widlText: str) -> t.Deque[ColoredText]:
     return coloredTexts
 
 
-def highlightWithPygments(text: str, lang: str, el: t.ElementT) -> t.Optional[t.Deque[ColoredText]]:
+def highlightWithPygments(text: str, lang: str, el: t.ElementT) -> t.Deque[ColoredText] | None:
     import pygments  # pylint: disable=redefined-outer-name
     from pygments.formatters.other import RawTokenFormatter
 
@@ -397,7 +395,7 @@ def coloredTextFromRawTokens(text: str) -> t.Deque[ColoredText]:
             list.append(ct)
 
     textList: t.Deque[ColoredText] = collections.deque()
-    currentCT: t.Optional[ColoredText] = None
+    currentCT: ColoredText | None = None
     for line in text.split("\n"):
         if not line:
             continue
@@ -438,7 +436,7 @@ def normalizeHighlightMarkers(doc: t.SpecT) -> None:
             el.set("highlight", match.group(1))
 
 
-def lexerFromLang(lang: str) -> t.Optional[pygments.lexer.Lexer]:
+def lexerFromLang(lang: str) -> pygments.lexer.Lexer | None:
     if lang in customLexers:
         return customLexers[lang]()
     try:
@@ -754,8 +752,8 @@ def getLineHighlightingDarkmodeStyles() -> str:
 
 
 def grouper(
-    iterable: t.Sequence[T], n: int, fillvalue: t.Optional[T] = None
-) -> itertools.zip_longest[t.Tuple[t.Optional[T], ...]]:
+    iterable: t.Sequence[T], n: int, fillvalue: T | None = None
+) -> itertools.zip_longest[t.Tuple[T | None, ...]]:
     "Collect data into fixed-length chunks or blocks"
     # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx
     args = [iter(iterable)] * n

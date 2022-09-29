@@ -5,7 +5,7 @@ import dataclasses
 from . import railroaddiagrams as rr, messages as m, t
 
 
-def parse(string: str) -> t.Optional[rr.Diagram]:
+def parse(string: str) -> rr.Diagram | None:
     """
     Parses a DSL for railroad diagrams,
     based on significant whitespace.
@@ -100,13 +100,13 @@ def parse(string: str) -> t.Optional[rr.Diagram]:
 @dataclasses.dataclass
 class RRCommand:
     name: str
-    prelude: t.Optional[str]
-    children: t.List[RRCommand]
-    text: t.Optional[str]
+    prelude: str | None
+    children: list[RRCommand]
+    text: str | None
     line: int
 
 
-def _createDiagram(command: RRCommand) -> t.Optional[rr.DiagramItem]:
+def _createDiagram(command: RRCommand) -> rr.DiagramItem | None:
     """
     From a tree of commands,
     create an actual Diagram class.

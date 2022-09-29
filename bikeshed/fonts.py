@@ -150,7 +150,7 @@ def parseCharacters(md: FontMetadata, lines: t.List[str]) -> Characters:
     return characters
 
 
-def replaceComments(font: Font, inputFilename: t.Optional[str] = None, outputFilename: t.Optional[str] = None) -> None:
+def replaceComments(font: Font, inputFilename: str | None = None, outputFilename: str | None = None) -> None:
     lines, inputFilename = getInputLines(inputFilename)
     replacements: list[tuple[int, list[str]]] = []
     for i, line in enumerate(lines):
@@ -166,14 +166,14 @@ def replaceComments(font: Font, inputFilename: t.Optional[str] = None, outputFil
 # Some utility functions
 
 
-def grouper(iterable: t.Sequence[T], n: int, fillvalue: U) -> t.Generator[t.List[t.Union[T, U]], None, None]:
+def grouper(iterable: t.Sequence[T], n: int, fillvalue: U) -> t.Generator[list[T | U], None, None]:
     "Collect data into fixed-length chunks or blocks"
     # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx
     args = [iter(iterable)] * n
-    return (list(t.cast("t.Iterable[t.Union[T,U]]", x)) for x in itertools.zip_longest(fillvalue=fillvalue, *args))
+    return (list(t.cast("t.Iterable[T|U]", x)) for x in itertools.zip_longest(fillvalue=fillvalue, *args))
 
 
-def getInputLines(inputFilename: t.Optional[str]) -> t.Tuple[t.List[str], str]:
+def getInputLines(inputFilename: str | None) -> tuple[list[str], str]:
     if inputFilename is None:
         # Default to looking for a *.bs file.
         # Otherwise, look for a *.src.html file.
@@ -201,7 +201,7 @@ def getInputLines(inputFilename: t.Optional[str]) -> t.Tuple[t.List[str], str]:
     return lines, inputFilename
 
 
-def writeOutputLines(outputFilename: t.Optional[str], inputFilename: str, lines: t.List[str]) -> None:
+def writeOutputLines(outputFilename: str | None, inputFilename: str, lines: list[str]) -> None:
     if outputFilename is None:
         outputFilename = inputFilename
     try:

@@ -22,13 +22,13 @@ if t.TYPE_CHECKING:
 
 class MetadataManager:
     @property
-    def vshortname(self) -> t.Optional[str]:
+    def vshortname(self) -> str | None:
         if self.level:
             return f"{self.shortname}-{self.level}"
         return self.shortname
 
     @property
-    def displayVshortname(self) -> t.Optional[str]:
+    def displayVshortname(self) -> str | None:
         if self.level:
             return f"{self.displayShortname}-{self.level}"
         return self.displayShortname
@@ -41,12 +41,12 @@ class MetadataManager:
 
         # required metadata
         self.abstract: t.List[str] = []
-        self.ED: t.Optional[str] = None
-        self.level: t.Optional[str] = None
-        self.displayShortname: t.Optional[str] = None
-        self.shortname: t.Optional[str] = None
-        self.status: t.Optional[str] = None
-        self.rawStatus: t.Optional[str] = None
+        self.ED: str | None = None
+        self.level: str | None = None
+        self.displayShortname: str | None = None
+        self.shortname: str | None = None
+        self.status: str | None = None
+        self.rawStatus: str | None = None
 
         # optional metadata
         self.advisementClass: str = "advisement"
@@ -57,28 +57,28 @@ class MetadataManager:
         self.blockElements: t.List[str] = []
         self.boilerplate: config.BoolSet = config.BoolSet(default=True)
         self.canIUseURLs: t.List[str] = []
-        self.canonicalURL: t.Optional[str] = None
+        self.canonicalURL: str | None = None
         self.complainAbout: config.BoolSet = config.BoolSet()
         self.customTextMacros: t.List[t.Tuple[str, str]] = []
         self.customWarningText: t.List[str] = []
-        self.customWarningTitle: t.Optional[str] = None
+        self.customWarningTitle: str | None = None
         self.date: date = datetime.utcnow().date()
-        self.deadline: t.Optional[date] = None
-        self.defaultHighlight: t.Optional[str] = None
+        self.deadline: date | None = None
+        self.defaultHighlight: str | None = None
         self.defaultBiblioDisplay: str = "index"
-        self.defaultRefStatus: t.Optional[str] = None
+        self.defaultRefStatus: str | None = None
         self.editors: list[dict[str, str | None]] = []
         self.editorTerm: t.Dict[str, str] = {"singular": "Editor", "plural": "Editors"}
-        self.expires: t.Optional[date] = None
+        self.expires: date | None = None
         self.externalInfotrees: config.BoolSet = config.BoolSet(default=False)
-        self.favicon: t.Optional[str] = None
+        self.favicon: str | None = None
         self.forceCrossorigin: bool = False
-        self.group: t.Optional[str] = None
-        self.h1: t.Optional[str] = None
+        self.group: str | None = None
+        self.h1: str | None = None
         self.ignoreCanIUseUrlFailure: t.List[str] = []
         self.ignoredTerms: t.List[str] = []
         self.ignoredVars: t.List[str] = []
-        self.implementationReport: t.Optional[str] = None
+        self.implementationReport: str | None = None
         self.includeCanIUsePanels: bool = False
         self.includeMdnPanels: bool = False
         self.indent: int = 4
@@ -88,17 +88,17 @@ class MetadataManager:
         self.inlineTagCommands: t.Dict[str, str] = {}
         self.issueClass: str = "issue"
         self.issues: t.List[t.Tuple[str, str]] = []
-        self.issueTrackerTemplate: t.Optional[str] = None
+        self.issueTrackerTemplate: str | None = None
         self.lineNumbers: bool = False
         self.linkDefaults: t.LinkDefaultsT = defaultdict(list)
         self.localBoilerplate: config.BoolSet = config.BoolSet(default=False)
-        self.logo: t.Optional[str] = None
-        self.mailingList: t.Optional[str] = None
-        self.mailingListArchives: t.Optional[str] = None
+        self.logo: str | None = None
+        self.mailingList: str | None = None
+        self.mailingListArchives: str | None = None
         self.markupShorthands: config.BoolSet = config.BoolSet(
             ["css", "dfn", "biblio", "markup", "http", "idl", "algorithm"]
         )
-        self.maxToCDepth: t.Union[int, float, None] = float("inf")
+        self.maxToCDepth: int | float | None = float("inf")
         self.metadataInclude: config.BoolSet = config.BoolSet(default=True)
         self.metadataOrder: t.List[str] = ["*", "!*"]
         self.noAbstract: bool = False
@@ -109,17 +109,17 @@ class MetadataManager:
         self.previousEditors: list[dict[str, str | None]] = []
         self.previousVersions: list[dict[str, str]] = []
         self.removeMultipleLinks: bool = False
-        self.repository: t.Optional[repository.Repository] = None
+        self.repository: repository.Repository | None = None
         self.requiredIDs: t.List[str] = []
         self.slimBuildArtifact: bool = False
         self.statusText: t.List[str] = []
-        self.testSuite: t.Optional[str] = None
-        self.title: t.Optional[str] = None
+        self.testSuite: str | None = None
+        self.title: str | None = None
         self.toggleDiffs: bool = False
-        self.TR: t.Optional[str] = None
+        self.TR: str | None = None
         self.trackingVectorAltText: str = "(This is a tracking vector.)"
         self.trackingVectorClass: str = "tracking-vector"
-        self.trackingVectorImage: t.Optional[str] = None
+        self.trackingVectorImage: str | None = None
         self.trackingVectorImageHeight: str = "64"
         self.trackingVectorImageWidth: str = "46"
         self.trackingVectorTitle: str = "There is a tracking vector here."
@@ -128,10 +128,10 @@ class MetadataManager:
         self.useDfnPanels: bool = True
         self.useIAutolinks: bool = False
         self.versionHistory: t.List[str] = []
-        self.warning: t.Optional[str] = None
-        self.workStatus: t.Optional[str] = None
+        self.warning: str | None = None
+        self.workStatus: str | None = None
         self.wptDisplay: str = "none"
-        self.wptPathPrefix: t.Optional[str] = None
+        self.wptPathPrefix: str | None = None
         self.imgAutoSize: bool = True
 
         self.otherMetadata: OrderedDict[str, list[t.NodesT]] = OrderedDict()
@@ -386,7 +386,7 @@ if t.TYPE_CHECKING:
             ...
 
 
-def parseDate(key: str, val: str, lineNum: str | int | None) -> t.Optional[date]:
+def parseDate(key: str, val: str, lineNum: str | int | None) -> date | None:
     if val == "now":
         return datetime.utcnow().date()
     try:
@@ -396,7 +396,7 @@ def parseDate(key: str, val: str, lineNum: str | int | None) -> t.Optional[date]
         return None
 
 
-def parseDateOrDuration(key: str, val: str, lineNum: str | int | None) -> t.Optional[t.Union[date, timedelta]]:
+def parseDateOrDuration(key: str, val: str, lineNum: str | int | None) -> date | timedelta | None:
     if val == "now":
         return datetime.utcnow().date()
     if val == "never" or boolish(val) is False:
@@ -413,7 +413,7 @@ def parseDateOrDuration(key: str, val: str, lineNum: str | int | None) -> t.Opti
         return None
 
 
-def canonicalizeExpiryDate(base: date, expires: t.Union[None, timedelta, Duration, datetime, date]) -> t.Optional[date]:
+def canonicalizeExpiryDate(base: date, expires: timedelta | Duration | datetime | date | None) -> date | None:
     if expires is None:
         return None
     if isinstance(expires, timedelta):
@@ -439,14 +439,14 @@ def parseInteger(key: str, val: str, lineNum: str | int | None) -> int:
     return int(val)
 
 
-def parseBoolean(key: str, val: str, lineNum: str | int | None) -> t.Optional[bool]:
+def parseBoolean(key: str, val: str, lineNum: str | int | None) -> bool | None:
     b = boolish(val)
     if b is None:
         m.die(f"The {key} field must be true/false, yes/no, y/n, or on/off. Got '{val}' instead.", lineNum=lineNum)
     return b
 
 
-def parseSoftBoolean(key: str, val: str, lineNum: str | int | None) -> t.Union[None, bool, t.Literal["maybe"]]:
+def parseSoftBoolean(key: str, val: str, lineNum: str | int | None) -> bool | t.Literal["maybe"] | None:
     b = boolish(val)
     if b is not None:
         return b
@@ -456,7 +456,7 @@ def parseSoftBoolean(key: str, val: str, lineNum: str | int | None) -> t.Union[N
     return None
 
 
-def boolish(val: str) -> t.Optional[bool]:
+def boolish(val: str) -> bool | None:
     if val.lower() in ("true", "yes", "y", "on"):
         return True
     if val.lower() in ("false", "no", "n", "off"):
@@ -464,7 +464,7 @@ def boolish(val: str) -> t.Optional[bool]:
     return None
 
 
-def parseWarning(key: str, val: str, lineNum: str | int | None) -> t.Optional[t.Tuple[str, ...]]:
+def parseWarning(key: str, val: str, lineNum: str | int | None) -> tuple[str, ...] | None:
     if val.lower() == "obsolete":
         return ("warning-obsolete",)
     if val.lower() == "not ready":
@@ -675,8 +675,8 @@ def parseBoolishList(
     key: str,
     val: str,
     default: bool,
-    validLabels: t.Optional[t.AbstractSet[str]] = None,
-    extraValues: t.Optional[t.Dict[str, bool]] = None,
+    validLabels: t.AbstractSet[str] | None = None,
+    extraValues: dict[str, bool] | None = None,
     lineNum: str | int | None = None,
 ) -> config.BoolSet:
     # Parses anything defined as "label <boolish>, label <boolish>" into a BoolSet
@@ -748,7 +748,7 @@ def parseMarkupShorthands(key: str, val: str, lineNum: str | int | None) -> conf
     return ret
 
 
-def parseInlineGithubIssues(key: str, val: str, lineNum: str | int | None) -> t.Union[t.Literal[False], str]:
+def parseInlineGithubIssues(key: str, val: str, lineNum: str | int | None) -> t.Literal[False] | str:
     val = val.lower()
     if val in ["title", "full"]:
         return val
@@ -775,7 +775,7 @@ def parseTextMacro(key: str, val: str, lineNum: str | int | None) -> t.List[t.Tu
     return [(name, text)]
 
 
-def parseWorkStatus(key: str, val: str, lineNum: str | int | None) -> t.Optional[str]:
+def parseWorkStatus(key: str, val: str, lineNum: str | int | None) -> str | None:
     # The Work Status is one of (completed, stable, testing, refining, revising, exploring, rewriting, abandoned).
     val = val.strip().lower()
     if val not in (
@@ -796,7 +796,7 @@ def parseWorkStatus(key: str, val: str, lineNum: str | int | None) -> t.Optional
     return val
 
 
-def parseRepository(key: str, val: str, lineNum: str | int | None) -> t.Optional[repository.Repository]:
+def parseRepository(key: str, val: str, lineNum: str | int | None) -> repository.Repository | None:
     # Shortname followed by url, or just url.
     # If just url, I'll try to recognize the shortname from it; otherwise it's the url again.
     val = val.strip()
@@ -831,7 +831,7 @@ def parseTranslateIDs(key: str, val: str, lineNum: str | int | None) -> t.Dict[s
     return translations
 
 
-def parseTranslation(key: str, val: str, lineNum: str | int | None) -> t.List[t.Dict[str, t.Optional[str]]]:
+def parseTranslation(key: str, val: str, lineNum: str | int | None) -> list[dict[str, str | None]]:
     # Format is <lang-code> <url> [ [ , name <name-in-spec-lang> ] || [ , native-name <name-in-the-lang> ] ]?
     pieces = val.split(",")
     if not (1 <= len(pieces) <= 3):
@@ -918,7 +918,7 @@ def parseEditorTerm(key: str, val: str, lineNum: str | int | None) -> t.Dict[str
     return {"singular": "Editor", "plural": "Editors"}
 
 
-def parseMaxToCDepth(key: str, val: str, lineNum: str | int | None) -> t.Union[int, float]:
+def parseMaxToCDepth(key: str, val: str, lineNum: str | int | None) -> int | float:
     if val.lower() == "none":
         return float("inf")
     try:
@@ -1066,7 +1066,7 @@ def fromJson(data: str, source: str) -> MetadataManager:
     return md
 
 
-def getSpecRepository(doc: t.SpecT) -> t.Optional[repository.Repository]:
+def getSpecRepository(doc: t.SpecT) -> repository.Repository | None:
     """
     Attempts to find the name of the repository the spec is a part of.
     Currently only searches for GitHub repos.
@@ -1121,7 +1121,7 @@ def parseDoc(doc: t.SpecT) -> None:
         doc.md.issues.append(("Inline In Spec", "#issues-index"))
 
 
-def join(*sources: t.Optional[MetadataManager]) -> MetadataManager:
+def join(*sources: MetadataManager | None) -> MetadataManager:
     """
     MetadataManager is a monoid
     """

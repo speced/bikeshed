@@ -53,9 +53,9 @@ class Spec:
         self,
         inputFilename: str,
         debug: bool = False,
-        token: t.Optional[str] = None,
+        token: str | None = None,
         lineNumbers: bool = False,
-        fileRequester: t.Optional[retrieve.DataFileRequester] = None,
+        fileRequester: retrieve.DataFileRequester | None = None,
         testing: bool = False,
     ):
         catchArgparseBug(inputFilename)
@@ -74,7 +74,7 @@ class Spec:
         self.inputSource: InputSource.InputSource = InputSource.inputFromName(inputFilename, chroot=constants.chroot)
         self.transitiveDependencies: t.Set[InputSource.InputSource] = set()
         self.debug: bool = debug
-        self.token: t.Optional[str] = token
+        self.token: str | None = token
         self.testing: bool = testing
         self.dataFile: retrieve.DataFileRequester
         if fileRequester is None:
@@ -92,18 +92,18 @@ class Spec:
         self.externalRefsUsed: t.Any = defaultdict(lambda: defaultdict(dict))
 
         self.md: metadata.MetadataManager
-        self.mdBaseline: t.Optional[metadata.MetadataManager] = metadata.MetadataManager()
-        self.mdDocument: t.Optional[metadata.MetadataManager] = None
-        self.mdCommandLine: t.Optional[metadata.MetadataManager] = metadata.MetadataManager()
-        self.mdDefaults: t.Optional[metadata.MetadataManager] = None
-        self.mdOverridingDefaults: t.Optional[metadata.MetadataManager] = None
+        self.mdBaseline: metadata.MetadataManager | None = metadata.MetadataManager()
+        self.mdDocument: metadata.MetadataManager | None = None
+        self.mdCommandLine: metadata.MetadataManager | None = metadata.MetadataManager()
+        self.mdDefaults: metadata.MetadataManager | None = None
+        self.mdOverridingDefaults: metadata.MetadataManager | None = None
 
         self.typeExpansions: t.Dict[str, str] = {}
 
         defaultMacro: t.Callable[[], str] = lambda: "???"
         self.macros: t.DefaultDict[str, str] = defaultdict(defaultMacro)
 
-        self.canIUse: t.Optional[caniuse.CanIUseManager] = None
+        self.canIUse: caniuse.CanIUseManager | None = None
         self.mdnSpecLinks: t.Any = {}
         self.widl: widlparser.Parser = idl.getParser()
 
@@ -313,7 +313,7 @@ class Spec:
 
         return self
 
-    def serialize(self) -> t.Optional[str]:
+    def serialize(self) -> str | None:
         try:
             rendered = h.Serializer(self.md.opaqueElements, self.md.blockElements).serialize(self.document)
         except Exception as e:
@@ -322,7 +322,7 @@ class Spec:
         rendered = u.finalHackyCleanup(rendered)
         return rendered
 
-    def fixMissingOutputFilename(self, outputFilename: t.Optional[str]) -> str:
+    def fixMissingOutputFilename(self, outputFilename: str | None) -> str:
         if outputFilename is None:
             # More sensible defaults!
             if isinstance(self.inputSource, InputSource.TarInputSource):
@@ -337,7 +337,7 @@ class Spec:
                 outputFilename = "-"
         return outputFilename
 
-    def finish(self, outputFilename: t.Optional[str] = None, newline: t.Optional[str] = None) -> None:
+    def finish(self, outputFilename: str | None = None, newline: str | None = None) -> None:
         catchArgparseBug(outputFilename)
         self.printResultMessage()
         outputFilename = self.fixMissingOutputFilename(outputFilename)
@@ -369,7 +369,7 @@ class Spec:
             m.success("Successfully generated, with warnings")
             return
 
-    def watch(self, outputFilename: t.Optional[str], port: int = None, localhost: bool = False) -> None:
+    def watch(self, outputFilename: str | None, port: int = None, localhost: bool = False) -> None:
         import time
 
         outputFilename = self.fixMissingOutputFilename(outputFilename)
@@ -485,7 +485,7 @@ def printDone() -> None:
         m.p("")
 
 
-def findImplicitInputFile() -> t.Optional[str]:
+def findImplicitInputFile() -> str | None:
     """
     Find what input file the user *probably* wants to use,
     by scanning the current folder.
@@ -512,7 +512,7 @@ def findImplicitInputFile() -> t.Optional[str]:
     return None
 
 
-def catchArgparseBug(string: t.Optional[str]) -> bool:
+def catchArgparseBug(string: str | None) -> bool:
     # Argparse has had a long-standing bug
     # https://bugs.python.org/issue22433
     # about spaces in the values of unknown optional arguments

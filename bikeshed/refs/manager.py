@@ -675,13 +675,13 @@ class ReferenceManager:
     def getBiblioRef(
         self,
         text: str,
-        status: t.Optional[str] = None,
+        status: str | None = None,
         generateFakeRef: bool = False,
         allowObsolete: bool = False,
-        el: t.Optional[t.ElementT] = None,
+        el: t.ElementT | None = None,
         quiet: bool = False,
         depth: int = 0,
-    ) -> t.Optional[biblio.BiblioEntry]:
+    ) -> biblio.BiblioEntry | None:
         if depth > 100:
             m.die(f"Data error in biblio files; infinitely recursing trying to find [{text}].")
             return None
@@ -788,7 +788,7 @@ class ReferenceManager:
     def _bestCandidateBiblio(self, candidates: t.List[biblio.BiblioEntry]) -> biblio.BiblioEntry:
         return sorted(candidates, key=lambda x: x.order or 0)[0].strip()
 
-    def getLatestBiblioRef(self, key: str) -> t.Optional[biblio.BiblioEntry]:
+    def getLatestBiblioRef(self, key: str) -> biblio.BiblioEntry | None:
         # Takes a biblio reference name,
         # returns the latest dated variant of that name
         # (names in the form FOO-19700101)

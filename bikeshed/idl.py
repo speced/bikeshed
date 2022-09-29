@@ -436,7 +436,7 @@ def markupIDLBlock(pre: t.ElementT, doc: t.SpecT) -> t.Set[t.ElementT]:
     return localDfns
 
 
-def combineIdlLinkingTexts(t1: t.Optional[str], t2: t.Optional[str]) -> str:
+def combineIdlLinkingTexts(t1: str | None, t2: str | None) -> str:
     t1s = [normalizeIdlWhitespace(x) for x in (t1 or "").split("|")]
     t2s = [normalizeIdlWhitespace(x) for x in (t2 or "").split("|")]
     for lt in t2s:
@@ -461,7 +461,7 @@ def nodesFromType(prod: widlparser.productions.Production) -> t.ElementT:
     return h.E.code({"class": "idl"}, _nodesFromProduction(prod))
 
 
-def _nodesFromProduction(prod: t.Union[widlparser.productions.Production, widlparser.protocols.Construct]) -> t.NodesT:
+def _nodesFromProduction(prod: widlparser.productions.Production | widlparser.protocols.Construct) -> t.NodesT:
     # pylint: disable=protected-access
     # Things that should be directly linkifiable from their text
     if isinstance(

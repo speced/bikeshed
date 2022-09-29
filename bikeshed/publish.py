@@ -16,8 +16,8 @@ def publishEchidna(
     username: str,
     password: str,
     decision: str,
-    additionalDirectories: t.Optional[t.List[str]] = None,
-    cc: t.Optional[str] = None,
+    additionalDirectories: list[str] | None = None,
+    cc: str | None = None,
     editorial: bool = False,
 ) -> None:
     import requests
@@ -50,7 +50,7 @@ def publishEchidna(
         print(r.headers)
 
 
-def prepareTar(doc: t.SpecT, visibleTar: bool = False, additionalDirectories: t.Optional[t.List[str]] = None) -> bytes:
+def prepareTar(doc: t.SpecT, visibleTar: bool = False, additionalDirectories: list[str] | None = None) -> bytes:
     if additionalDirectories is None:
         additionalDirectories = ["images", "diagrams", "examples"]
     # Finish the spec

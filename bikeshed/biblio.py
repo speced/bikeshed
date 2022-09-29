@@ -11,12 +11,12 @@ from . import constants, h, messages as m, t
 @dataclasses.dataclass
 class BiblioEntry(metaclass=abc.ABCMeta):
     linkText: str
-    title: t.Optional[str] = None
-    snapshotURL: t.Optional[str] = None
-    currentURL: t.Optional[str] = None
+    title: str | None = None
+    snapshotURL: str | None = None
+    currentURL: str | None = None
     preferredStatus: str = constants.refStatus.snapshot
-    originalLinkText: t.Optional[str] = None
-    obsoletedBy: t.Optional[str] = None
+    originalLinkText: str | None = None
+    obsoletedBy: str | None = None
     order: int = 0
 
     @property
@@ -55,9 +55,9 @@ class BiblioEntry(metaclass=abc.ABCMeta):
 class NormalBiblioEntry(BiblioEntry):
     authors: t.List[str] = dataclasses.field(default_factory=list)
     etAl: bool = False
-    status: t.Optional[str] = None
-    date: t.Optional[str] = None
-    other: t.Optional[str] = None
+    status: str | None = None
+    date: str | None = None
+    other: str | None = None
 
     def toHTML(self) -> t.NodesT:
         ret: list[t.NodesT] = []
@@ -123,7 +123,7 @@ class SpecBiblioEntry(BiblioEntry):
     for when we don't have "real" bibliography data for a reference.
     """
 
-    def __init__(self, spec: t.Dict[str, str], preferredStatus: t.Optional[str] = None, order: int = 0):
+    def __init__(self, spec: t.Dict[str, str], preferredStatus: str | None = None, order: int = 0):
         super().__init__(
             linkText=spec["vshortname"],
             title=spec["description"],

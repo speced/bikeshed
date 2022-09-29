@@ -29,10 +29,10 @@ class HeaderInfo:
     ed: str
     date: str
     cdate: str
-    intro: t.Optional[str] = None
+    intro: str | None = None
 
 
-def printIssueList(infilename: t.Optional[str] = None, outfilename: t.Optional[str] = None) -> None:
+def printIssueList(infilename: str | None = None, outfilename: str | None = None) -> None:
     if infilename is None:
         infilename = findIssuesFile()
         if infilename is None:
@@ -80,9 +80,9 @@ def printIssueList(infilename: t.Optional[str] = None, outfilename: t.Optional[s
     printScript(outfile)
 
 
-def findIssuesFile() -> t.Optional[str]:
+def findIssuesFile() -> str | None:
     # Look for digits in the filename, and use the one with the largest number if it's unique.
-    def extractNumber(filename: str) -> t.Optional[str]:
+    def extractNumber(filename: str) -> str | None:
         number = re.sub(r"\D", "", filename)
         return number if number else None
 
@@ -106,7 +106,7 @@ def findIssuesFile() -> t.Optional[str]:
     return possibleFilesNum[0][1]
 
 
-def extractHeaderInfo(lines: t.Sequence[str], infilename: str) -> t.Optional[HeaderInfo]:
+def extractHeaderInfo(lines: t.Sequence[str], infilename: str) -> HeaderInfo | None:
     title = None
     url = None
     status = None

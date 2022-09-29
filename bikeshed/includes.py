@@ -157,21 +157,22 @@ def handleRawInclude(el: t.ElementT, doc: t.SpecT) -> None:
     h.replaceNode(el, *subtree)
 
 
-RangeItem: t.TypeAlias = "t.List[t.Optional[int]]"
-# UGH I DON'T UNDERSTAND THE ERROR HERE
-# fuck it, replace this with a tiny dataclass anyway
+if t.TYPE_CHECKING:
+    RangeItem: t.TypeAlias = list[int | None]
+    # UGH I DON'T UNDERSTAND THE ERROR HERE
+    # fuck it, replace this with a tiny dataclass anyway
 
 
-def parseRangeString(rangeStr: str) -> t.List[RangeItem]:
+def parseRangeString(rangeStr: str) -> list[RangeItem]:
     rangeStr = re.sub(r"\s*", "", rangeStr)
     return [_f for _f in (parseSingleRange(x) for x in rangeStr.split(",")) if _f is not None]
 
 
-def parseSingleRange(item: str) -> t.Optional[RangeItem]:
+def parseSingleRange(item: str) -> RangeItem | None:
     if "-" in item:
         # Range, format of DDD-DDD
-        low: t.Optional[int]
-        high: t.Optional[int]
+        low: int | None
+        high: int | None
         lowStr, _, highStr = item.partition("-")
         if lowStr == "*":
             low = None
