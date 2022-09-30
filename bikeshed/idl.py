@@ -345,7 +345,7 @@ def markupIDL(doc: t.SpecT) -> None:
     # Then a real pass to actually mark up the IDL,
     # and collect it for the index.
     for el in idlEls:
-        if h.isNormative(el, doc):
+        if h.isNormative(doc, el):
             text = h.textContent(el)
             # Parse once with a fresh parser, so I can spit out just this <pre>'s markup.
             widl = widlparser.parser.Parser(text, ui=IDLUI(), symbol_table=symbolTable)

@@ -16,7 +16,7 @@ def accidental2119(doc: t.SpecT) -> None:
     keywords = r"\b(may|must|should|shall|optional|recommended|required)\b"
 
     def searchFor2119(el: t.ElementT) -> None:
-        if h.isNormative(el, doc):
+        if h.isNormative(doc, el):
             # 2119 is fine, just look at children
             pass
         elif h.hasClass(doc, el, "allow-2119"):

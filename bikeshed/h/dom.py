@@ -672,11 +672,11 @@ def isOddNode(node: t.Any) -> bool:
     return True
 
 
-def isNormative(el: t.ElementT, doc: t.SpecT) -> bool:
+def isNormative(doc: t.SpecT, el: t.ElementT) -> bool:
     # Returns whether the element is "informative" or "normative" with a crude algo.
     # Currently just tests whether the element is in a class=example or class=note block, or not.
-    if el in _normativeElCache:
-        return _normativeElCache[el]
+    if el in doc.cachedNormativeEls:
+        return doc.cachedNormativeEls[el]
     informativeClasses = [
         "note",
         "example",
@@ -685,25 +685,21 @@ def isNormative(el: t.ElementT, doc: t.SpecT) -> bool:
     ] + doc.md.informativeClasses
     for cls in informativeClasses:
         if hasClass(doc, el, cls):
-            _normativeElCache[el] = False
+            doc.cachedNormativeEls[el] = False
             return False
     if hasClass(doc, el, "normative"):
-        _normativeElCache[el] = True
+        doc.cachedNormativeEls[el] = True
         return True
     parent = parentElement(el)
     if not isElement(parent):
         # Went past the root without finding any indicator,
         # so normative by default.
-        _normativeElCache[el] = True
+        doc.cachedNormativeEls[el] = True
         return True
     # Otherwise, walk the tree
-    norm = isNormative(parent, doc)
-    _normativeElCache[el] = norm
+    norm = isNormative(doc, parent)
+    doc.cachedNormativeEls[el] = norm
     return norm
-
-
-_normativeElCache: dict[t.Any, bool]
-_normativeElCache = {}
 
 
 def isEmpty(el: t.ElementT) -> bool:

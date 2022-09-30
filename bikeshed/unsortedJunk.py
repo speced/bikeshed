@@ -946,7 +946,7 @@ def processAutolinks(doc: t.SpecT) -> None:
 
 def registerBiblioUsage(doc: t.SpecT, ref: biblio.BiblioEntry, el: t.ElementT, type: str | None = None) -> None:
     if type is None:
-        if h.isNormative(el, doc):
+        if h.isNormative(doc, el):
             type = "normative"
         else:
             type = "informative"
@@ -1342,7 +1342,7 @@ def correctFrontMatter(doc: t.SpecT) -> None:
     # Detect and move around some bits of information,
     # if you provided them in your
     # If you provided an <h1> manually, use that element rather than whatever the boilerplate contains.
-    h1s = [h1 for h1 in h.findAll("h1", doc) if h.isNormative(h1, doc)]
+    h1s = [h1 for h1 in h.findAll("h1", doc) if h.isNormative(doc, h1)]
     if len(h1s) == 2:
         h.replaceNode(h1s[0], h1s[1])
 
@@ -1661,7 +1661,7 @@ def processIDL(doc: t.SpecT) -> None:
     for pre in h.findAll("pre.idl, xmp.idl", doc):
         if pre.get("data-no-idl") is not None:
             continue
-        if not h.isNormative(pre, doc):
+        if not h.isNormative(doc, pre):
             continue
         localDfns.update(idl.markupIDLBlock(pre, doc))
 

@@ -102,6 +102,7 @@ class Spec:
 
         self.cachedLinksFromHref: OrderedDict[str, list[t.ElementT]] = OrderedDict()
         self.cachedClassTests: dict[tuple[str, str], bool] = {}
+        self.cachedNormativeEls: dict[t.ElementT, bool] = {}
 
         defaultMacro: t.Callable[[], str] = lambda: "???"
         self.macros: t.DefaultDict[str, str] = defaultdict(defaultMacro)

@@ -746,7 +746,7 @@ def addPropertyIndex(doc: t.SpecT) -> None:
 
 
 def addIDLSection(doc: t.SpecT) -> None:
-    idlBlocks = [x for x in h.findAll("pre.idl, xmp.idl", doc) if h.isNormative(x, doc)]
+    idlBlocks = [x for x in h.findAll("pre.idl, xmp.idl", doc) if h.isNormative(doc, x)]
     if len(idlBlocks) == 0:
         return
     html = getFillContainer("idl-index", doc=doc, default=True)
