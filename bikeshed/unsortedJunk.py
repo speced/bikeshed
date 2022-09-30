@@ -998,7 +998,7 @@ def removeMultipleLinks(doc: t.SpecT) -> None:
     # only keep the first.
     if not doc.md.removeMultipleLinks:
         return
-    paras: defaultdict[t.Any, defaultdict[str, list[t.Any]]]
+    paras: defaultdict[t.ElementT | None, defaultdict[str, list[t.ElementT]]]
     paras = defaultdict(lambda: defaultdict(list))
     for el in h.findAll("a[data-link-type]", doc):
         if h.hasAncestor(el, lambda x: x.tag in ["pre", "xmp"]):
