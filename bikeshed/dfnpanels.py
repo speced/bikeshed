@@ -80,16 +80,26 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
         doc.extraStyles["style-dfn-panel"] = dfnPanelStyle
 
 
-def addExternalDfnPanel(
-    termEl: t.ElementT, ref: r.RefWrapper, elsFromHref: dict[str, list[t.ElementT]], doc: t.SpecT
-) -> None:
+def addExternalDfnPanel(termEl: t.ElementT, ref: r.RefWrapper, doc: t.SpecT) -> None:
     # Constructs "dfn panels" which show all the local references to an external term
-    # Gather all the <a href>s together
-    refs: OrderedDict[str, list[t.ElementT]] = OrderedDict()
-    for el in elsFromHref[ref.url]:
-        section = h.sectionName(el) or "Unnumbered Section"
-        refs.setdefault(section, []).append(el)
-    if refs:
+
+    # Calculate and cache the doc's links,
+    # so I'm not iterating the doc for links constantly.
+    if not doc.cachedLinksFromHref:
+        for a in h.findAll("a", doc):
+            href = a.get("href")
+            if href is None:
+                continue
+            if href.startswith("#"):
+                continue
+            doc.cachedLinksFromHref.setdefault(href, []).append(a)
+
+    # Group the relevant links according to the section they're in.
+    linksBySection: OrderedDict[str, list[t.ElementT]] = OrderedDict()
+    for link in doc.cachedLinksFromHref[ref.url]:
+        section = h.sectionName(link) or "Unnumbered Section"
+        linksBySection.setdefault(section, []).append(link)
+    if linksBySection:
         h.addClass(termEl, "dfn-paneled")
         _, _, refID = ref.url.partition("#")
         termID = f"term-for-{refID}"
@@ -101,7 +111,7 @@ def addExternalDfnPanel(
             h.E.b("Referenced in:"),
         )
         ul = h.appendChild(panel, h.E.ul())
-        for text, els in refs.items():
+        for text, els in linksBySection.items():
             li = h.appendChild(ul, h.E.li())
             for i, el in enumerate(els):
                 linkID = el.get("id")

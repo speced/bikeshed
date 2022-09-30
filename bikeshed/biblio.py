@@ -528,7 +528,20 @@ def dedupBiblioReferences(doc: t.SpecT) -> None:
     for keys in poppedKeys.values():
         if "shepherd" not in keys or "specref" not in keys:
             continue
-        if keys["shepherd"] in doc.externalRefsUsed:
-            for k, v in list(doc.externalRefsUsed[keys["shepherd"]].items()):
-                doc.externalRefsUsed[keys["specref"]][k] = v
-            del doc.externalRefsUsed[keys["shepherd"]]
+        oldName = keys["shepherd"]
+        newName = keys["specref"]
+        if oldName in doc.externalRefsUsed.specs:
+            oldSpecData = doc.externalRefsUsed.specs[oldName]
+            del doc.externalRefsUsed.specs[oldName]
+            if newName not in doc.externalRefsUsed.specs:
+                # just move it over
+                doc.externalRefsUsed.specs[newName] = oldSpecData
+                continue
+            else:
+                # Merge it in
+                newSpecData = doc.externalRefsUsed.specs[newName]
+                if newSpecData.biblio is None:
+                    newSpecData.biblio = oldSpecData.biblio
+                for refGroup in oldSpecData.refs.values():
+                    for forVal, refWrapper in refGroup.valuesByFor.items():
+                        newSpecData.addRef(refWrapper, forVal)

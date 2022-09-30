@@ -909,13 +909,10 @@ def processAutolinks(doc: t.SpecT) -> None:
             error=not okayToFail and not ignorable,
         )
         # Capture the reference (and ensure we add a biblio entry) if it
-        # points to an external specification. We check the spec name here
-        # rather than checking `status == "local"`, as "local" refs include
-        # those defined in `<pre class="anchor">` datablocks, which we do
-        # want to capture here.
-        if ref and ref.spec and doc.refs.spec and ref.spec.upper() != doc.refs.spec.upper():
+        # points to an external specification.
+        if ref and ref.status != "local":
             spec = ref.spec.upper()
-            key = ref.for_[0] if ref.for_ else ""
+            forVal = ref.for_[0] if ref.for_ else None
 
             # If the ref is from an anchor block, it knows what it's doing.
             # Don't follow obsoletion chains.
@@ -931,7 +928,7 @@ def processAutolinks(doc: t.SpecT) -> None:
             if biblioRef:
                 spec = biblioRef.linkText.upper()
                 registerBiblioUsage(doc, biblioRef, el=el)
-            doc.externalRefsUsed[spec][ref.text][key] = ref
+            doc.externalRefsUsed.addRef(spec, ref, forVal)
 
         if ref:
             el.set("href", ref.url)
@@ -962,7 +959,7 @@ def registerBiblioUsage(doc: t.SpecT, ref: biblio.BiblioEntry, el: t.ElementT, t
         return
     spec = ref.linkText.upper()
     biblioStorage[spec] = ref
-    doc.externalRefsUsed[spec]["_biblio"] = ref
+    doc.externalRefsUsed.addBiblio(spec, ref)
 
 
 def decorateAutolink(doc: t.SpecT, el: t.ElementT, linkType: str, linkText: str, ref: refs.RefWrapper) -> None:

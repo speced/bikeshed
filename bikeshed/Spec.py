@@ -5,7 +5,7 @@ import glob
 import json
 import os
 import sys
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from datetime import datetime
 from functools import partial as curry
 
@@ -89,7 +89,7 @@ class Spec:
         self.normativeRefs: dict[str, biblio.BiblioEntry] = {}
         self.informativeRefs: dict[str, biblio.BiblioEntry] = {}
         self.refs: refs.ReferenceManager = refs.ReferenceManager(fileRequester=self.dataFile, testing=self.testing)
-        self.externalRefsUsed: t.Any = defaultdict(lambda: defaultdict(dict))
+        self.externalRefsUsed: refs.ExternalRefsManager = refs.ExternalRefsManager()
 
         self.md: metadata.MetadataManager
         self.mdBaseline: metadata.MetadataManager | None = metadata.MetadataManager()
@@ -99,6 +99,8 @@ class Spec:
         self.mdOverridingDefaults: metadata.MetadataManager | None = None
 
         self.typeExpansions: dict[str, str] = {}
+
+        self.cachedLinksFromHref: OrderedDict[str, list[t.ElementT]] = OrderedDict()
 
         defaultMacro: t.Callable[[], str] = lambda: "???"
         self.macros: t.DefaultDict[str, str] = defaultdict(defaultMacro)

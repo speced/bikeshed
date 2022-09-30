@@ -8,7 +8,7 @@ import subprocess
 from collections import OrderedDict, defaultdict
 from datetime import datetime
 
-from . import biblio, conditional, config, dfnpanels, h, messages as m, refs as r, retrieve, t
+from . import conditional, config, dfnpanels, h, messages as m, refs as r, retrieve, t
 
 if t.TYPE_CHECKING:
     MetadataT: t.TypeAlias = t.Mapping[str, t.Sequence[MetadataValueT]]
@@ -288,16 +288,7 @@ def addBikeshedBoilerplate(doc: t.SpecT) -> None:
 
 def addIndexSection(doc: t.SpecT) -> None:
     hasLocalDfns = len(h.findAll(config.dfnElementsSelector, doc)) > 0
-    hasExternalDfns = False
-    for refs in doc.externalRefsUsed.values():
-        # refs is a {ref text => ref} table
-        # but it can also have a _biblio key
-        # to track biblio references.
-        # Need to make sure it doesn't contain *only* _biblio
-        if "_biblio" in refs and len(refs) == 1:
-            continue
-        hasExternalDfns = True
-        break
+    hasExternalDfns = doc.externalRefsUsed.hasRefs()
     if not hasLocalDfns and not hasExternalDfns:
         return
 
@@ -537,41 +528,31 @@ def htmlFromIndexTerms(entries: t.Mapping[str, list[IndexTerm]]) -> t.ElementT:
 
 
 def addIndexOfExternallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> None:
-    if not doc.externalRefsUsed:
+    if not doc.externalRefsUsed.hasRefs():
         return
 
     def makeLink(*contents: t.NodesT) -> t.ElementT:
         return h.E.span({}, *contents)
 
     ul = h.E.ul({"class": "index"})
-    # Gather all the <a href> in the document, for use in the dfn-panels
-    elsFromHref: OrderedDict[str, list[t.ElementT]] = OrderedDict()
-    for a in h.findAll("a", doc):
-        href = a.get("href")
-        if href is None:
-            continue
-        if href.startswith("#"):
-            continue
-        elsFromHref.setdefault(href, []).append(a)
+
     atLeastOnePanel = False
-    for spec, refGroups in sorted(doc.externalRefsUsed.items(), key=lambda x: x[0].upper()):
+    for specName, specData in doc.externalRefsUsed.sorted():
+
+        # Skip entries that are *solely* a biblio entry.
+        if not specData.refs:
+            continue
+
         # ref.spec is always lowercase; if the same string shows up in biblio data,
         # use its casing instead.
-        if "_biblio" in refGroups:
-            biblioRef = refGroups["_biblio"]
-        else:
-            biblioRef = doc.refs.getBiblioRef(spec, quiet=True)
+        biblioRef = specData.biblio or doc.refs.getBiblioRef(specName, quiet=True)
         if biblioRef:
             printableSpec = biblioRef.linkText
         else:
-            printableSpec = spec
-
-        # Skip entries that are *solely* a biblio entry.
-        if "_biblio" in refGroups and len(refGroups) == 1:
-            continue
+            printableSpec = specName
 
         attrs = {
-            "data-lt": spec,
+            "data-lt": specName,
             "data-link-type": "biblio",
             "data-biblio-type": "informative",
             "data-okay-to-fail": "true",
@@ -581,22 +562,21 @@ def addIndexOfExternallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> Non
             h.E.li(h.E.a(attrs, "[", formatBiblioTerm(printableSpec), "]"), " defines the following terms:"),
         )
         termsUl = h.appendChild(specLi, h.E.ul())
-        for _, refs in sorted(refGroups.items(), key=lambda x: x[0]):
-            if isinstance(refs, biblio.BiblioEntry):
-                # Not a refGroup, just some metadata
-                continue
-            if len(refs) == 1:
-                ref = list(refs.values())[0]
-                link = makeLink(ref.text)
+        for refText, refGroup in specData.sorted():
+            if len(refGroup) == 1:
+                ref = refGroup.single()
+                link = makeLink(refText)
+                h.appendChild(termsUl, h.E.li(link))
+                dfnpanels.addExternalDfnPanel(link, ref, doc)
             else:
-                for key, ref in sorted(refs.items(), key=lambda x: x[0]):
-                    if key:
-                        link = makeLink(ref.text, " ", h.E.small({}, f"(for {key})"))
+                for forVal, ref in refGroup.sorted():
+                    if forVal:
+                        link = makeLink(refText, " ", h.E.small({}, f"(for {forVal})"))
                     else:
-                        link = makeLink(ref.text)
-            h.appendChild(termsUl, h.E.li(link))
+                        link = makeLink(refText)
+                    h.appendChild(termsUl, h.E.li(link))
+                    dfnpanels.addExternalDfnPanel(link, ref, doc)
             atLeastOnePanel = True
-            dfnpanels.addExternalDfnPanel(link, ref, elsFromHref, doc)
     if atLeastOnePanel:
         dfnpanels.addExternalDfnPanelStyles(doc)
     h.appendChild(

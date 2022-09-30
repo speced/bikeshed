@@ -667,8 +667,11 @@ def processAnchors(anchors: InfoTreeT, doc: t.SpecT, lineNum: int | None = None)
             urlSuffix = anchor["url"][0]
         else:
             urlSuffix = config.simplifyText(anchor["text"][0])
-        url = urlPrefix + ("" if "#" in urlPrefix or "#" in urlSuffix else "#") + urlSuffix
-        status = "local"
+        if "#" in urlPrefix or "#" in urlSuffix or urlPrefix == "":
+            urlJoiner = ""
+        else:
+            urlJoiner = "#"
+        url = urlPrefix + urlJoiner + urlSuffix
         shortname = None
         level = None
         if "shortname" in anchor and "level" in anchor:

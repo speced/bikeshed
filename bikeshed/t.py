@@ -61,12 +61,12 @@ if TYPE_CHECKING:
         from .Spec import Spec
     SpecT = Spec
 
-    from . import biblio
+    from .biblio import BiblioEntry
     from .retrieve import DataFileRequester
     from .metadata import MetadataManager
     from .refs import RefSource, ReferenceManager, RefWrapper, MethodVariants, MethodVariant
 
-    BiblioStorageT: TypeAlias = DefaultDict[str, list[biblio.BiblioEntry]]
+    BiblioStorageT: TypeAlias = DefaultDict[str, list[BiblioEntry]]
 
     FillContainersT: TypeAlias = DefaultDict[str, list[ElementT]]
 
