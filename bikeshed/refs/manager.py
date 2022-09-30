@@ -261,7 +261,7 @@ class ReferenceManager:
                 if ref.status != "local" and ref.shortname.rstrip() == self.shortname:
                     ref._ref["export"] = False  # pylint: disable=protected-access
 
-    def addLocalDfns(self, doc, dfns: t.Iterable[t.ElementT]) -> None:
+    def addLocalDfns(self, doc: t.SpecT, dfns: t.Iterable[t.ElementT]) -> None:
         for el in dfns:
             if h.hasClass(doc, el, "no-ref"):
                 continue

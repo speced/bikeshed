@@ -24,7 +24,7 @@ class StringEnum:
     def __len__(self) -> int:
         return len(self._vals)
 
-    def __contains__(self, val: t.Any) -> bool:
+    def __contains__(self, val: str) -> bool:
         return val in self._vals
 
     def __getitem__(self, val: str) -> str:

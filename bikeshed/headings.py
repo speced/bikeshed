@@ -92,7 +92,7 @@ def addHeadingAlgorithms(headings: list[t.ElementT]) -> None:
             header.set("data-algorithm", h.textContent(header).strip())
 
 
-def determineHeadingLevels(doc, headings: list[t.ElementT]) -> None:
+def determineHeadingLevels(doc: t.SpecT, headings: list[t.ElementT]) -> None:
     headerLevel = [0, 0, 0, 0, 0]
 
     def incrementLevel(level: int) -> None:
