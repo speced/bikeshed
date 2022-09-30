@@ -5,6 +5,20 @@ from collections import OrderedDict
 
 from .. import config, h, messages as m, t
 
+if t.TYPE_CHECKING:
+
+    class MdnFeatureT(t.TypedDict, total=False):
+        engines: list[str]
+        filename: str
+        name: str
+        slug: str
+        summary: str
+        mdn_url: str
+        support: dict[str, t.Any]
+        # the support values are wild
+
+    MdnDataT: t.TypeAlias = dict[str, list[MdnFeatureT]]
+
 
 def addMdnPanels(doc: t.SpecT) -> None:
     if not doc.md.includeMdnPanels:
@@ -25,7 +39,7 @@ def addMdnPanels(doc: t.SpecT) -> None:
                 m.die(f"Couldn't find the MDN data for '{doc.md.vshortname}' nor '{doc.md.shortname}'.")
             return
     try:
-        data = json.loads(datafile, object_pairs_hook=OrderedDict)
+        data = t.cast("MdnDataT", json.loads(datafile, object_pairs_hook=OrderedDict))
     except Exception as e:
         m.die(f"Couldn't load MDN Spec Links data for this spec.\n{e}")
         return
@@ -41,7 +55,7 @@ def createAnno(className: str, mdnButton: t.ElementT, featureDivs: list[t.Elemen
     return h.E.div({"class": className}, mdnButton, featureDivs)
 
 
-def panelsFromData(doc: t.SpecT, data: dict[str, t.Any]) -> bool:
+def panelsFromData(doc: t.SpecT, data: MdnDataT) -> bool:
     mdnBaseUrl = "https://developer.mozilla.org/en-US/docs/Web/"
 
     browsersProvidingCurrentEngines = ["firefox", "safari", "chrome"]
@@ -283,7 +297,7 @@ def addSupportRow(
 
 
 def mdnPanelFor(
-    feature: dict[str, t.Any],
+    feature: MdnFeatureT,
     mdnBaseUrl: str,
     nameFromCodeName: dict[str, str],
     browsersProvidingCurrentEngines: list[str],
