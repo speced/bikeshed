@@ -7,31 +7,35 @@ import itertools
 from . import dom
 from .. import t
 
-if t.TYPE_CHECKING:
-    U = t.TypeVar("U", bound=Tag)
-    TagStream: t.TypeAlias = t.Generator[U, None, None]
 
 # WARNING: This file isn't in use yet
 # (as evidenced by mergeTrees() logging stuff and returning nothing)
 
+
 @dataclasses.dataclass
 class Tag(metaclass=abc.ABCMeta):
     item: t.Any
+
 
 @dataclasses.dataclass
 class TagStart(Tag):
     item: t.ElementT
     length: int
 
+
 @dataclasses.dataclass
 class TagEnd(Tag):
     item: t.ElementT
     length: int
 
+
 @dataclasses.dataclass
 class TagStr(Tag):
     item: str
 
+
+if t.TYPE_CHECKING:
+    TagStream: t.TypeAlias = t.Generator[Tag, None, None]
 
 
 def mergeTrees(tree1: t.ElementT, tree2: t.ElementT) -> list:
@@ -51,11 +55,9 @@ def mergeTrees(tree1: t.ElementT, tree2: t.ElementT) -> list:
         digestTree(tree2),
     ):
         print("*")
-        if node["type"] == "end":
-            assert dom.isElement(node['item'])
-            print(f"</{node['item'].tag}>")
-        elif node["type"] == "start":
-            assert dom.isElement(node['item'])
+        if isinstance(node, TagEnd):
+            print(f"</{node.item.tag}>")
+        elif isinstance(node, TagStart):
             print(dom.serializeTag(node.item))
         else:
             print(node.item)
