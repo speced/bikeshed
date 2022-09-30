@@ -336,7 +336,7 @@ def markupIDL(doc: t.SpecT) -> None:
         idlEls.append(el)
         el.tag = "pre"
         h.removeAttr(el, "type")
-        h.addClass(el, "idl")
+        h.addClass(doc, el, "idl")
     # One pass with a silent parser to collect the symbol table.
     symbolTable = None
     for el in idlEls:
@@ -354,7 +354,7 @@ def markupIDL(doc: t.SpecT) -> None:
             h.replaceContents(el, h.parseHTML(str(widl.markup(marker))))
             # Parse a second time with the global one, which collects all data in the doc.
             doc.widl.parse(text)
-        h.addClass(el, "highlight")
+        h.addClass(doc, el, "highlight")
         highlightingOccurred = True
     if doc.md.slimBuildArtifact:
         # Remove the highlight-only spans

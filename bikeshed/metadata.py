@@ -1101,16 +1101,16 @@ def parseDoc(doc: t.SpecT) -> None:
 
     for el in h.findAll(".replace-with-note-class", doc):
         h.removeClass(el, "replace-with-note-class")
-        h.addClass(el, doc.md.noteClass)
+        h.addClass(doc, el, doc.md.noteClass)
     for el in h.findAll(".replace-with-issue-class", doc):
         h.removeClass(el, "replace-with-issue-class")
-        h.addClass(el, doc.md.issueClass)
+        h.addClass(doc, el, doc.md.issueClass)
     for el in h.findAll(".replace-with-assertion-class", doc):
         h.removeClass(el, "replace-with-assertion-class")
-        h.addClass(el, doc.md.assertionClass)
+        h.addClass(doc, el, doc.md.assertionClass)
     for el in h.findAll(".replace-with-advisement-class", doc):
         h.removeClass(el, "replace-with-advisement-class")
-        h.addClass(el, doc.md.advisementClass)
+        h.addClass(doc, el, doc.md.advisementClass)
 
     if (
         "feedback-header" in doc.md.boilerplate

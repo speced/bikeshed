@@ -162,7 +162,11 @@ def panelsFromData(doc: t.SpecT, data: dict[str, t.Any]) -> bool:
             firstChild = None
             if h.hasChildElements(targetElement):
                 firstChild = list(h.childElements(targetElement))[0]
-            if firstChild is not None and h.hasClass(firstChild, "mdn-anno") and not h.hasClass(firstChild, "after"):
+            if (
+                firstChild is not None
+                and h.hasClass(doc, firstChild, "mdn-anno")
+                and not h.hasClass(doc, firstChild, "after")
+            ):
                 # If there's already an annotation at the point where we want
                 # this, just re-use it (instead of creating another one).
                 h.appendChild(firstChild, featureDivs)
@@ -175,7 +179,7 @@ def panelsFromData(doc: t.SpecT, data: dict[str, t.Any]) -> bool:
                 h.prependChild(targetElement, createAnno("mdn-anno wrapped", mdnButton, featureDivs))
         elif isAnnoForHeadingContent:
             nextEl = targetElement.getnext()
-            if nextEl is not None and h.hasClass(nextEl, "mdn-anno") and h.hasClass(nextEl, "after"):
+            if nextEl is not None and h.hasClass(doc, nextEl, "mdn-anno") and h.hasClass(doc, nextEl, "after"):
                 # If there's already an "after" annotation
                 # at the point where we want this,
                 # just re-use it (instead of creating another one).
@@ -186,7 +190,7 @@ def panelsFromData(doc: t.SpecT, data: dict[str, t.Any]) -> bool:
                 h.insertAfter(targetElement, createAnno("mdn-anno wrapped after", mdnButton, featureDivs))
         else:
             prevEl = targetElement.getprevious()
-            if prevEl is not None and h.hasClass(prevEl, "mdn-anno") and not h.hasClass(prevEl, "after"):
+            if prevEl is not None and h.hasClass(doc, prevEl, "mdn-anno") and not h.hasClass(doc, prevEl, "after"):
                 # If there's already an annotation at the point where we want
                 # this, just re-use it (instead of creating another one) —
                 # unless it's a class=after annotation (following a heading).

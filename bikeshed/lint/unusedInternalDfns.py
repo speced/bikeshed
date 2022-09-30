@@ -16,8 +16,8 @@ def unusedInternalDfns(doc: t.SpecT) -> None:
         return (
             el.get("href") is not None
             and el.get("href", "").startswith("#")
-            and not h.hasClass(el, "self-link")
-            and h.closestAncestor(el, lambda x: h.hasClass(x, "index")) is None
+            and not h.hasClass(doc, el, "self-link")
+            and h.closestAncestor(el, lambda x: h.hasClass(doc, x, "index")) is None
         )
 
     localHrefs = [el.get("href", "")[1:] for el in h.findAll("a", doc) if local(el)]

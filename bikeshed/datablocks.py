@@ -498,7 +498,7 @@ def transformArgumentdef(
     else:
         m.die("Argumentdef blocks need a for='' attribute specifying their method.", lineNum=lineNum)
         return []
-    h.addClass(el, "data")
+    h.addClass(doc, el, "data")
     rootAttrs = " ".join(f"{str(k)}='{h.escapeAttr(str(v))}'" for k, v in el.attrib.items())
     text = (
         """

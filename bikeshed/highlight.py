@@ -48,12 +48,12 @@ def addSyntaxHighlighting(doc: t.SpecT) -> None:
             # Element was already highlighted, but needs styles
             highlightingOccurred = True
         elif lang:
-            highlightEl(el, lang)
+            highlightEl(doc, el, lang)
             highlightingOccurred = True
         # Find whether to add line numbers
         ln = determineLineNumbers(doc, el)
         if ln.addNumbers or ln.highlights:
-            addLineWrappers(el, ln)
+            addLineWrappers(doc, el, ln)
             if ln.addNumbers:
                 lineWrappingOccurred = True
             if ln.highlights:
@@ -85,7 +85,7 @@ def determineHighlightLang(doc: t.SpecT, el: t.ElementT) -> str | t.Literal[Fals
     if attr == "highlight":
         return lang
     # Highlight-by-default, if applicable.
-    if el.tag in ["pre", "xmp"] and h.hasClass(el, "idl"):
+    if el.tag in ["pre", "xmp"] and h.hasClass(doc, el, "idl"):
         return "webidl"
     return doc.md.defaultHighlight
 
@@ -151,7 +151,7 @@ def determineLineNumbers(doc: t.SpecT, el: t.ElementT) -> LineNumberOptions:
     return LineNumberOptions(addLineNumbers, lineStart, lineHighlights)
 
 
-def highlightEl(el: t.ElementT, lang: str) -> None:
+def highlightEl(doc: t.SpecT, el: t.ElementT, lang: str) -> None:
     text = h.textContent(el)
     coloredText: t.Deque[ColoredText] | None
     if lang == "webidl":
@@ -160,7 +160,7 @@ def highlightEl(el: t.ElementT, lang: str) -> None:
         coloredText = highlightWithPygments(text, lang, el=el)
     if coloredText is not None:
         mergeHighlighting(el, coloredText)
-        h.addClass(el, "highlight")
+        h.addClass(doc, el, "highlight")
 
 
 def highlightWithWebIDL(text: str, el: t.ElementT) -> t.Deque[ColoredText] | None:
@@ -448,7 +448,7 @@ def lexerFromLang(lang: str) -> pygments.lexer.Lexer | None:
         return None
 
 
-def addLineWrappers(el: t.ElementT, options: LineNumberOptions) -> t.ElementT:
+def addLineWrappers(doc: t.SpecT, el: t.ElementT, options: LineNumberOptions) -> t.ElementT:
     # Wrap everything between each top-level newline with a line tag.
     # Add an attr for the line number, and if needed, the end line.
     lineWrapper = h.E.span({"class": "line"})
@@ -478,20 +478,20 @@ def addLineWrappers(el: t.ElementT, options: LineNumberOptions) -> t.ElementT:
         if options.addNumbers or lineNumber in options.highlights:
             lineNo.set("data-line", str(lineNumber))
         if lineNumber in options.highlights:
-            h.addClass(node, "highlight-line")
-            h.addClass(lineNo, "highlight-line")
+            h.addClass(doc, node, "highlight-line")
+            h.addClass(doc, lineNo, "highlight-line")
         internalNewlines = countInternalNewlines(node)
         if internalNewlines:
             for i in range(1, internalNewlines + 1):
                 if (lineNumber + i) in options.highlights:
-                    h.addClass(lineNo, "highlight-line")
-                    h.addClass(node, "highlight-line")
+                    h.addClass(doc, lineNo, "highlight-line")
+                    h.addClass(doc, node, "highlight-line")
                     lineNo.set("data-line", str(lineNumber))
             lineNumber += internalNewlines
             if options.addNumbers:
                 lineNo.set("data-line-end", str(lineNumber))
         lineNumber += 1
-    h.addClass(el, "line-numbered")
+    h.addClass(doc, el, "line-numbered")
     return el
 
 

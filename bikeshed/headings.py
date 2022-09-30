@@ -7,20 +7,20 @@ def processHeadings(doc: t.SpecT, scope: str = "doc") -> None:
     # scope arg can be "doc" or "all"
     # "doc" ignores things that are part of boilerplate
     for el in h.findAll("h2, h3, h4, h5, h6", doc):
-        h.addClass(el, "heading")
+        h.addClass(doc, el, "heading")
     headings = []
     for el in h.findAll(".heading:not(.settled)", doc):
         if scope == "doc" and h.treeAttr(el, "boilerplate"):
             continue
         headings.append(el)
     resetHeadings(headings)
-    determineHeadingLevels(headings)
+    determineHeadingLevels(doc, headings)
     addHeadingIds(doc, headings)
     addHeadingAlgorithms(headings)
     h.fixupIDs(doc, headings)
     addHeadingBonuses(headings)
     for el in headings:
-        h.addClass(el, "settled")
+        h.addClass(doc, el, "settled")
     if scope == "all" and doc.md.group in config.megaGroups["priv-sec"]:
         checkPrivacySecurityHeadings(h.findAll(".heading", doc))
 
@@ -92,7 +92,7 @@ def addHeadingAlgorithms(headings: list[t.ElementT]) -> None:
             header.set("data-algorithm", h.textContent(header).strip())
 
 
-def determineHeadingLevels(headings: list[t.ElementT]) -> None:
+def determineHeadingLevels(doc, headings: list[t.ElementT]) -> None:
     headerLevel = [0, 0, 0, 0, 0]
 
     def incrementLevel(level: int) -> None:
@@ -113,7 +113,7 @@ def determineHeadingLevels(headings: list[t.ElementT]) -> None:
             del header.attrib["data-level"]
 
         # If we encounter a no-num or an appendix, don't number it or any in the same section.
-        if h.hasClass(header, "no-num") or h.textContent(header).lstrip()[0:9].lower() == "appendix ":
+        if h.hasClass(doc, header, "no-num") or h.textContent(header).lstrip()[0:9].lower() == "appendix ":
             skipLevel = min(level, skipLevel)
             continue
         if skipLevel < level:

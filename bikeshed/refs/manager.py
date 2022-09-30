@@ -261,9 +261,9 @@ class ReferenceManager:
                 if ref.status != "local" and ref.shortname.rstrip() == self.shortname:
                     ref._ref["export"] = False  # pylint: disable=protected-access
 
-    def addLocalDfns(self, dfns: t.Iterable[t.ElementT]) -> None:
+    def addLocalDfns(self, doc, dfns: t.Iterable[t.ElementT]) -> None:
         for el in dfns:
-            if h.hasClass(el, "no-ref"):
+            if h.hasClass(doc, el, "no-ref"):
                 continue
             elId = el.get("id")
             assert elId is not None

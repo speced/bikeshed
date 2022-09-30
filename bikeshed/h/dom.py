@@ -393,7 +393,7 @@ def relevantHeadings(startEl: t.ElementT, levels: list[int] | None = None) -> t.
             return
 
 
-def sectionName(el: t.ElementT) -> str | None:
+def sectionName(doc: t.SpecT, el: t.ElementT) -> str | None:
     """
     Return the name of the nearest section to el,
     or None if that section isn't meant to be referenced.
@@ -402,7 +402,7 @@ def sectionName(el: t.ElementT) -> str | None:
         h = next(relevantHeadings(el))
     except StopIteration:
         return "Unnamed section"
-    if hasClass(h, "no-ref"):
+    if hasClass(doc, h, "no-ref"):
         return None
     return textContent(h)
 
@@ -605,31 +605,29 @@ def hasAttrs(el: t.ElementT) -> bool:
     return bool(el.attrib)
 
 
-def addClass(el: t.ElementT, cls: str) -> t.ElementT:
+def addClass(doc: t.SpecT, el: t.ElementT, cls: str) -> t.ElementT:
     if el.get("class") is None:
         el.set("class", cls)
-    elif hasClass(el, cls):
+    elif hasClass(doc, el, cls):
         pass
     else:
         el.set("class", "{} {}".format(el.get("class"), cls))
     return el
 
 
-_classMap: dict[tuple[str, str], bool]
-_classMap = {}
-
-
-def hasClass(el: t.ElementT, cls: str) -> bool:
+def hasClass(doc: t.SpecT, el: t.ElementT, cls: str) -> bool:
     elClass = el.get("class")
     if elClass is None:
         return False
+    if cls == elClass:
+        return True
     if cls not in elClass:
         return False
     key = cls, elClass
-    if key in _classMap:
-        return _classMap[key]
+    if key in doc.cachedClassTests:
+        return doc.cachedClassTests[key]
     ret = bool(re.search(r"(^|\s)" + cls + r"($|\s)", elClass))
-    _classMap[key] = ret
+    doc.cachedClassTests[key] = ret
     return ret
 
 
@@ -686,10 +684,10 @@ def isNormative(el: t.ElementT, doc: t.SpecT) -> bool:
         "informative",
     ] + doc.md.informativeClasses
     for cls in informativeClasses:
-        if hasClass(el, cls):
+        if hasClass(doc, el, cls):
             _normativeElCache[el] = False
             return False
-    if hasClass(el, "normative"):
+    if hasClass(doc, el, "normative"):
         _normativeElCache[el] = True
         return True
     parent = parentElement(el)

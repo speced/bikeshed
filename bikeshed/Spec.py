@@ -101,6 +101,7 @@ class Spec:
         self.typeExpansions: dict[str, str] = {}
 
         self.cachedLinksFromHref: OrderedDict[str, list[t.ElementT]] = OrderedDict()
+        self.cachedClassTests: dict[tuple[str, str], bool] = {}
 
         defaultMacro: t.Callable[[], str] = lambda: "???"
         self.macros: t.DefaultDict[str, str] = defaultdict(defaultMacro)

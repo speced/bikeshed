@@ -27,7 +27,7 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
             continue
         refs: OrderedDict[str, list[t.ElementT]] = OrderedDict()
         for link in allRefs.get(id, []):
-            section = h.sectionName(link)
+            section = h.sectionName(doc, link)
             if section is not None:
                 refs.setdefault(section, []).append(link)
         if not refs:
@@ -36,7 +36,7 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
             if h.find(".self-link", dfn) is None:
                 h.appendChild(dfn, h.E.a({"href": "#" + h.escapeUrlFrag(id), "class": "self-link"}))
             continue
-        h.addClass(dfn, "dfn-paneled")
+        h.addClass(doc, dfn, "dfn-paneled")
         atLeastOnePanel = True
         panel = h.E.aside(
             {"class": "dfn-panel", "data-for": id},
@@ -97,10 +97,10 @@ def addExternalDfnPanel(termEl: t.ElementT, ref: r.RefWrapper, doc: t.SpecT) -> 
     # Group the relevant links according to the section they're in.
     linksBySection: OrderedDict[str, list[t.ElementT]] = OrderedDict()
     for link in doc.cachedLinksFromHref[ref.url]:
-        section = h.sectionName(link) or "Unnumbered Section"
+        section = h.sectionName(doc, link) or "Unnumbered Section"
         linksBySection.setdefault(section, []).append(link)
     if linksBySection:
-        h.addClass(termEl, "dfn-paneled")
+        h.addClass(doc, termEl, "dfn-paneled")
         _, _, refID = ref.url.partition("#")
         termID = f"term-for-{refID}"
         termEl.set("id", termID)

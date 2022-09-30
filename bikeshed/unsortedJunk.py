@@ -99,18 +99,18 @@ def fixManualDefTables(doc: t.SpecT) -> None:
     # Def tables generated via datablocks are guaranteed correct,
     # but manually-written ones often don't link up the names in the first row.
     for table in h.findAll("table.propdef, table.descdef, table.elementdef", doc):
-        if h.hasClass(table, "partial"):
+        if h.hasClass(doc, table, "partial"):
             tag = "a"
             attr = "data-link-type"
         else:
             tag = "dfn"
             attr = "data-dfn-type"
-        tag = "a" if h.hasClass(table, "partial") else "dfn"
-        if h.hasClass(table, "propdef"):
+        tag = "a" if h.hasClass(doc, table, "partial") else "dfn"
+        if h.hasClass(doc, table, "propdef"):
             type = "property"
-        elif h.hasClass(table, "descdef"):
+        elif h.hasClass(doc, table, "descdef"):
             type = "descriptor"
-        elif h.hasClass(table, "elementdef"):
+        elif h.hasClass(doc, table, "elementdef"):
             type = "element"
         cell = h.findAll("tr:first-child > :nth-child(2)", table)[0]
         names = [x.strip() for x in h.textContent(cell).split(",")]
@@ -498,10 +498,10 @@ def processDfns(doc: t.SpecT) -> None:
     dfns = h.findAll(config.dfnElementsSelector, doc)
     classifyDfns(doc, dfns)
     h.fixupIDs(doc, dfns)
-    doc.refs.addLocalDfns(dfn for dfn in dfns if dfn.get("id") is not None)
+    doc.refs.addLocalDfns(doc, (dfn for dfn in dfns if dfn.get("id") is not None))
 
 
-def determineDfnType(dfn: t.ElementT, inferCSS: bool = False) -> str:
+def determineDfnType(doc: t.SpecT, dfn: t.ElementT, inferCSS: bool = False) -> str:
     # 1. Look at data-dfn-type
     if dfn.get("data-dfn-type"):
         return t.cast(str, dfn.get("data-dfn-type"))
@@ -516,9 +516,9 @@ def determineDfnType(dfn: t.ElementT, inferCSS: bool = False) -> str:
         if ancestor.get("data-dfn-type"):
             return t.cast(str, ancestor.get("data-dfn-type"))
         for cls, type in config.dfnClassToType.items():
-            if h.hasClass(ancestor, cls):
+            if h.hasClass(doc, ancestor, cls):
                 return type
-            if h.hasClass(ancestor, "idl") and not h.hasClass(ancestor, "extract"):
+            if h.hasClass(doc, ancestor, "idl") and not h.hasClass(doc, ancestor, "extract"):
                 return "interface"
     # 4. Introspect on the text
     if inferCSS:
@@ -545,7 +545,7 @@ def determineDfnType(dfn: t.ElementT, inferCSS: bool = False) -> str:
 def classifyDfns(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
     dfnTypeToPrefix = {v: k for k, v in config.dfnClassToType.items()}
     for el in dfns:
-        dfnType = determineDfnType(el, inferCSS=doc.md.inferCSSDfns)
+        dfnType = determineDfnType(doc, el, inferCSS=doc.md.inferCSSDfns)
         if dfnType not in config.dfnTypes:
             m.die(f"Unknown dfn type '{dfnType}':\n{h.outerHTML(el)}", el=el)
             continue
@@ -1134,8 +1134,8 @@ def cleanupHTML(doc: t.SpecT) -> None:
             el.tag = "{http://www.w3.org/2000/svg}tspan"
 
         # Add .algorithm to [algorithm] elements, for styling
-        if el.get("data-algorithm") is not None and not h.hasClass(el, "algorithm"):
-            h.addClass(el, "algorithm")
+        if el.get("data-algorithm") is not None and not h.hasClass(doc, el, "algorithm"):
+            h.addClass(doc, el, "algorithm")
 
         # Allow MD-generated lists to be surrounded by HTML list containers,
         # so you can add classes/etc without an extraneous wrapper.
@@ -1179,22 +1179,22 @@ def cleanupHTML(doc: t.SpecT) -> None:
             h.removeAttr(el, "data-md")
 
         # Mark pre.idl blocks as .def, for styling
-        if el.tag == "pre" and h.hasClass(el, "idl") and not h.hasClass(el, "def"):
-            h.addClass(el, "def")
+        if el.tag == "pre" and h.hasClass(doc, el, "idl") and not h.hasClass(doc, el, "def"):
+            h.addClass(doc, el, "def")
 
         # Tag classes on wide types of dfns/links
         if el.tag in config.dfnElements:
             if el.get("data-dfn-type") in config.idlTypes:
-                h.addClass(el, "idl-code")
+                h.addClass(doc, el, "idl-code")
             if el.get("data-dfn-type") in config.maybeTypes.union(config.linkTypeToDfnType["propdesc"]):
                 if not h.hasAncestor(el, lambda x: x.tag == "pre"):
-                    h.addClass(el, "css")
+                    h.addClass(doc, el, "css")
         if el.tag == "a":
             if el.get("data-link-type") in config.idlTypes:
-                h.addClass(el, "idl-code")
+                h.addClass(doc, el, "idl-code")
             if el.get("data-link-type") in config.maybeTypes.union(config.linkTypeToDfnType["propdesc"]):
                 if not h.hasAncestor(el, lambda x: x.tag == "pre"):
-                    h.addClass(el, "css")
+                    h.addClass(doc, el, "css")
 
         # Remove duplicate linking texts.
         if (
@@ -1208,7 +1208,7 @@ def cleanupHTML(doc: t.SpecT) -> None:
         # (Used when the ''foo'' shorthand doesn't work.)
         if el.tag == "css":
             el.tag = "span"
-            h.addClass(el, "css")
+            h.addClass(doc, el, "css")
 
         # Assert IDs are used to tag arbitrary sections with an ID so you can point tests at it.
         # (The ID will be guaranteed stable across publications, but guaranteed to change when the text changes.)
@@ -1223,7 +1223,7 @@ def cleanupHTML(doc: t.SpecT) -> None:
             el.set("id", h.safeID(doc, "assert-" + h.hashContents(el)))
 
         # Add ARIA role of "note" to class="note" elements
-        if el.tag in ["div", "p"] and h.hasClass(el, doc.md.noteClass):
+        if el.tag in ["div", "p"] and h.hasClass(doc, el, doc.md.noteClass):
             el.set("role", "note")
 
         # Look for nested <a> elements, and warn about them.
@@ -1239,7 +1239,7 @@ def cleanupHTML(doc: t.SpecT) -> None:
                 if letter.isalpha() and letter.islower():
                     break
             else:
-                h.addClass(el, "allcaps")
+                h.addClass(doc, el, "allcaps")
 
         # If a markdown-generated <dt> contains only a single paragraph,
         # remove that paragraph so it just contains naked text.
@@ -1524,7 +1524,7 @@ def inlineRemoteIssues(doc: t.SpecT) -> None:
                 ),
                 h.E.a({"href": href}, data["title"]),
             )
-            h.addClass(el, "no-marker")
+            h.addClass(doc, el, "no-marker")
         else:
             h.appendChild(
                 el,
@@ -1534,7 +1534,7 @@ def inlineRemoteIssues(doc: t.SpecT) -> None:
                 ),
                 *h.parseHTML(data["body_html"]),
             )
-            h.addClass(el, "no-marker")
+            h.addClass(doc, el, "no-marker")
         if el.tag == "p":
             el.tag = "div"
     # Save the cache for later
@@ -1549,12 +1549,12 @@ def inlineRemoteIssues(doc: t.SpecT) -> None:
 def addNoteHeaders(doc: t.SpecT) -> None:
     # Finds <foo heading="bar"> and turns it into a marker-heading
     for el in h.findAll("[heading]", doc):
-        h.addClass(el, "no-marker")
-        if h.hasClass(el, "note"):
+        h.addClass(doc, el, "no-marker")
+        if h.hasClass(doc, el, "note"):
             preText = "NOTE: "
-        elif h.hasClass(el, "issue"):
+        elif h.hasClass(doc, el, "issue"):
             preText = "ISSUE: "
-        elif h.hasClass(el, "example"):
+        elif h.hasClass(doc, el, "example"):
             preText = "EXAMPLE: "
         else:
             preText = ""
@@ -1668,4 +1668,4 @@ def processIDL(doc: t.SpecT) -> None:
     dfns = h.findAll("pre.idl:not([data-no-idl]) dfn, xmp.idl:not([data-no-idl]) dfn", doc) + list(localDfns)
     classifyDfns(doc, dfns)
     h.fixupIDs(doc, dfns)
-    doc.refs.addLocalDfns(dfn for dfn in dfns if dfn.get("id") is not None)
+    doc.refs.addLocalDfns(doc, (dfn for dfn in dfns if dfn.get("id") is not None))

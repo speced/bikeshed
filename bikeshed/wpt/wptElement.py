@@ -109,7 +109,7 @@ def createHTML(
         h.removeNode(blockEl)
     elif doc.md.wptDisplay in ("inline", "open", "closed"):
         blockEl.tag = "details"
-        h.addClass(blockEl, "wpt-tests-block")
+        h.addClass(doc, blockEl, "wpt-tests-block")
         h.removeAttr(blockEl, "pathprefix")
         h.removeAttr(blockEl, "title")
         blockEl.set("lang", "en")

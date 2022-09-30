@@ -19,7 +19,7 @@ def accidental2119(doc: t.SpecT) -> None:
         if h.isNormative(el, doc):
             # 2119 is fine, just look at children
             pass
-        elif h.hasClass(el, "allow-2119"):
+        elif h.hasClass(doc, el, "allow-2119"):
             # Override 2119 detection on this element's text specifically,
             # so you can use the keywords in examples *describing* the keywords.
             pass

@@ -185,7 +185,7 @@ def addExpiryNotice(doc: t.SpecT) -> None:
         boilerplate = "warning-expires"
         doc.extraScripts["script-expires"] = expiryScript
     loadBoilerplate(doc, boilerplate, "warning")
-    h.addClass(doc.body, boilerplate)
+    h.addClass(doc, doc.body, boilerplate)
 
 
 expiryScript = """
@@ -760,7 +760,7 @@ def addIDLSection(doc: t.SpecT) -> None:
 
     container = h.appendChild(html, h.E.pre({"class": "idl"}))
     for block in idlBlocks:
-        if h.hasClass(block, "extract"):
+        if h.hasClass(doc, block, "extract"):
             continue
         blockCopy = copy.deepcopy(block)
         h.appendContents(container, blockCopy)
@@ -770,7 +770,7 @@ def addIDLSection(doc: t.SpecT) -> None:
             el.tag = "a"
             el.set("href", "#" + el.get("id", ""))
         del el.attrib["id"]
-    h.addClass(container, "highlight")
+    h.addClass(doc, container, "highlight")
 
 
 def addTOCSection(doc: t.SpecT) -> None:
@@ -826,7 +826,7 @@ def addTOCSection(doc: t.SpecT) -> None:
             return
 
         addToTOC = True
-        if h.hasClass(header, "no-toc"):
+        if h.hasClass(doc, header, "no-toc"):
             # Hit a no-toc, suppress the entire section.
             addToTOC = False
         elif container is None:
