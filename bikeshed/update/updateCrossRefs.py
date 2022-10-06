@@ -126,7 +126,7 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
             rawAnchor = fixupAnchor(rawAnchor)
             linkingTexts = rawAnchor["linking_text"]
             assert linkingTexts is not None
-            if linkingTexts[0] is None:
+            if len(linkingTexts) == 0:
                 # Happens if it had no linking text at all originally
                 continue
             if len(linkingTexts) == 1 and linkingTexts[0].strip() == "":
@@ -296,7 +296,7 @@ def fixupAnchor(anchor: RawAnchorT) -> RawAnchorT:
     anchor["type"] = strip(anchor["type"])
     anchor["for"] = [strip(x) for x in anchor.get("for", [])]
     anchor["status"] = strip(anchor["status"])
-    anchor["linking_text"] = [strip(x) for x in anchor.get("linking_text", [])]
+    anchor["linking_text"] = [strip(x) for x in anchor.get("linking_text", []) if x is not None]
     anchor["uri"] = strip(anchor["uri"])
 
     return anchor
