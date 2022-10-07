@@ -452,7 +452,7 @@ class Spec:
         if "css" in self.md.markupShorthands:
             textFunctor = textFunctor.map(h.replaceAwkwardCSSShorthands)
 
-        return textFunctor.extract()
+        return t.cast(str, textFunctor.extract())
 
     def printTargets(self) -> None:
         m.p("Exported terms:")
