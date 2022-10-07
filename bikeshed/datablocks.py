@@ -709,13 +709,13 @@ def processAnchors(anchors: InfoTreeT, doc: t.SpecT, lineNum: int | None = None)
             refs.RefWrapper(
                 anchor["text"][0],
                 {
-                    "linkingText": anchor["text"][0],
                     "type": anchor["type"][0].lower(),
                     "url": url,
                     "shortname": shortname.lower() if shortname is not None else doc.md.shortname,
                     "level": level if level is not None else doc.md.level,
-                    "for": anchor.get("for", []),
+                    "for_": anchor.get("for", []),
                     "export": True,
+                    "normative": True,
                     "status": status,
                     "spec": spec.lower() if spec is not None else "",
                 },

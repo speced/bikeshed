@@ -381,7 +381,7 @@ def decodeAnchors(linesIter: t.Iterator[str]) -> defaultdict[str, list[t.RefWrap
     try:
         while True:
             key = next(linesIter)[:-1]
-            a = {
+            a: wrapper.RefDataT = {
                 "type": next(linesIter),
                 "spec": next(linesIter),
                 "shortname": next(linesIter),
@@ -390,13 +390,13 @@ def decodeAnchors(linesIter: t.Iterator[str]) -> defaultdict[str, list[t.RefWrap
                 "url": next(linesIter),
                 "export": next(linesIter) != "\n",
                 "normative": next(linesIter) != "\n",
-                "for": [],
+                "for_": [],
             }
             while True:
                 line = next(linesIter)
                 if line == "-\n":
                     break
-                t.cast("list", a["for"]).append(line)
+                t.cast("list", a["for_"]).append(line)
             anchors[key].append(wrapper.RefWrapper(key, a))
     except StopIteration:
         return anchors

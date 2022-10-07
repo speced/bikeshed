@@ -6,6 +6,22 @@ import dataclasses
 from . import utils
 from .. import t
 
+if t.TYPE_CHECKING:
+    # Need to use function form due to "for" key
+    # being invalid as a property name
+    class RefDataT(t.TypedDict, total=False):
+        type: t.Required[str]
+        spec: t.Required[str | None]
+        shortname: t.Required[str | None]
+        level: t.Required[str | None]
+        status: t.Required[str]
+        url: t.Required[str]
+        export: t.Required[bool]
+        normative: t.Required[bool]
+        for_: t.Required[list[str]]
+        el: t.ElementT|None
+
+
 
 @dataclasses.dataclass
 class RefWrapper:
@@ -14,7 +30,7 @@ class RefWrapper:
     # It also makes all the ref dict keys look like object attributes.
 
     text: str
-    _ref: t.JSONT
+    _ref: RefDataT
 
     @property
     def type(self) -> str:
@@ -60,26 +76,22 @@ class RefWrapper:
 
     @property
     def for_(self) -> list[str]:
-        return [x.strip() for x in self._ref["for"]]
+        return [x.strip() for x in self._ref["for_"]]
 
     @property
     def el(self) -> t.ElementT | None:
         return self._ref.get("el", None)
 
-    """
-        "type": linesIter.next(),
-        "spec": linesIter.next(),
-        "shortname": linesIter.next(),
-        "level": linesIter.next(),
-        "status": linesIter.next(),
-        "url": linesIter.next(),
-        "export": linesIter.next() != "\n",
-        "normative": linesIter.next() != "\n",
-        "for": [],
-        (optionall) "el": manuallyProvided,
-    """
-
     def __json__(self) -> t.JSONT:
-        refCopy = copy.copy(self._ref)
-        refCopy["text"] = self.text
-        return utils.stripLineBreaks(refCopy)
+        return {
+            "text": self.text,
+            "type": self.type,
+            "spec": self.spec,
+            "shortname": self.shortname,
+            "level": self.level,
+            "status": self.status,
+            "url": self.url,
+            "export": self.export,
+            "normative": self.normative,
+            "for_": self.for_,
+        }

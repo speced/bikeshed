@@ -330,7 +330,8 @@ class ReferenceManager:
                         "level": self.specLevel,
                         "url": "#" + elId,
                         "export": True,
-                        "for": dfnForList,
+                        "normative": True,
+                        "for_": dfnForList,
                         "el": el,
                     },
                 )
