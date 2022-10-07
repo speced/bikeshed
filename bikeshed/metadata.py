@@ -12,12 +12,15 @@ from collections import OrderedDict, defaultdict
 from datetime import date, datetime, timedelta
 from functools import partial
 
-from isodate import parse_duration
+from isodate import Duration, parse_duration
 
 from . import config, constants, datablocks, markdown, h, messages as m, repository, t
 
 if t.TYPE_CHECKING:
     from .line import Line
+
+    class DurationT:
+        pass
 
 
 class MetadataManager:
@@ -418,6 +421,8 @@ def canonicalizeExpiryDate(base: date, expires: timedelta | datetime | date | No
         return None
     if isinstance(expires, timedelta):
         return base + expires
+    if isinstance(expires, Duration):
+        return t.cast(date, base + expires)
     if isinstance(expires, datetime):
         return expires.date()
     if isinstance(expires, date):

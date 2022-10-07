@@ -250,7 +250,7 @@ def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: bool) -> t.Eleme
 
 def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: bool = False) -> t.ElementT | None:
     # Appends either text or an element.
-    child: t.NodeT|None = None
+    child: t.NodeT | None = None
     for child in flatten(els):
         assert child is not None
         if isinstance(child, str):
