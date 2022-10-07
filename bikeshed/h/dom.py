@@ -199,7 +199,7 @@ def parseHTML(text: str) -> list[t.ElementT]:
 
 def parseDocument(text: str) -> t.DocumentT:
     doc = html5lib.parse(text, treebuilder="lxml", namespaceHTMLElements=False)
-    return t.cast(t.DocumentT, doc)
+    return t.cast("t.DocumentT", doc)
 
 
 def escapeHTML(text: str) -> str:
@@ -250,10 +250,9 @@ def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: bool) -> t.Eleme
 
 def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: bool = False) -> t.ElementT | None:
     # Appends either text or an element.
-    child: t.NodeT
-    sawNode = False
+    child: t.NodeT|None = None
     for child in flatten(els):
-        sawNode = True
+        assert child is not None
         if isinstance(child, str):
             if len(parent) > 0:
                 parent[-1].tail = (parent[-1].tail or "") + child
@@ -271,7 +270,7 @@ def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: bool = False) ->
                 # when the parent already has children; the last child's tail
                 # doesn't get moved into the appended child or anything.
                 parent.append(child)
-    if not sawNode and not allowEmpty:
+    if child is None and not allowEmpty:
         raise Exception("Empty child list appended without allowEmpty=True")
     if isElement(child):
         return child
