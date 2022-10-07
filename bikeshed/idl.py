@@ -140,9 +140,9 @@ class IDLMarker(widlparser.protocols.Marker):
             # the "value" is a DOMString attr
             member = construct.parent.member  # type: ignore
             if hasattr(member, "rest"):
-                type = member.rest.type  # type: ignore
+                type = member.rest.type
             elif hasattr(member, "attribute"):
-                type = member.attribute.type  # type: ignore
+                type = member.attribute.type
             typeName = str(type).strip()
             if typeName.endswith("?"):
                 typeName = typeName[:-1]

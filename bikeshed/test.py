@@ -113,7 +113,7 @@ def compare(suspect: str, golden: str) -> bool:
     return False
 
 
-def rebase(patterns: list[str] | None = None, md: t.MetadataManager = None) -> bool:
+def rebase(patterns: list[str] | None = None, md: t.MetadataManager | None = None) -> bool:
     paths = testPaths(patterns)
     if len(paths) == 0:
         m.p("No tests were found.")

@@ -103,7 +103,7 @@ class ReferenceManager:
         self.specLevel: str | None = None
         self.spec: str | None = None
 
-    def initializeRefs(self, datablocks: t.ModuleType, doc: t.SpecT = None) -> None:
+    def initializeRefs(self, datablocks: t.ModuleType, doc: t.SpecT | None = None) -> None:
         """
         Load up the xref data
         This is oddly split up into sub-functions to make it easier to track performance.

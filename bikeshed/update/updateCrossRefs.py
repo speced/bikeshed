@@ -214,7 +214,7 @@ def dataFromApi(api: APIClient, *args: t.Any, **kwargs: t.Any) -> t.JSONT:
     return data
 
 
-def linearizeAnchorTree(multiTree: list, rawAnchors: list[dict[str, t.Any]] = None) -> list[RawAnchorT]:
+def linearizeAnchorTree(multiTree: list, rawAnchors: list[dict[str, t.Any]] | None = None) -> list[RawAnchorT]:
     if rawAnchors is None:
         rawAnchors = []
     # Call with multiTree being a list of trees

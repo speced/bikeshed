@@ -371,7 +371,7 @@ class Spec:
             m.success("Successfully generated, with warnings")
             return
 
-    def watch(self, outputFilename: str | None, port: int = None, localhost: bool = False) -> None:
+    def watch(self, outputFilename: str | None, port: int | None = None, localhost: bool = False) -> None:
         import time
 
         outputFilename = self.fixMissingOutputFilename(outputFilename)
@@ -432,7 +432,7 @@ class Spec:
         except Exception as e:
             m.die(f"Something went wrong while watching the file:\n{e}")
 
-    def fixText(self, text: str, moreMacros: dict[str, str] = None) -> str:
+    def fixText(self, text: str, moreMacros: dict[str, str] | None = None) -> str:
         # Do several textual replacements that need to happen *before* the document is parsed as h.
 
         # If markdown shorthands are on, remove all `foo`s while processing,

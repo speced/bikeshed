@@ -9,7 +9,7 @@ from . import config, InputSource, messages as m, t
 
 
 class DataFileRequester:
-    def __init__(self, fileType: str = None, fallback: DataFileRequester | None = None):
+    def __init__(self, fileType: str | None = None, fallback: DataFileRequester | None = None):
         if fileType not in ("readonly", "latest"):
             raise Exception(f"Bad value for DataFileRequester.type, got '{fileType}'.")
         self.fileType: str = fileType

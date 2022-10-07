@@ -133,7 +133,7 @@ def parseCharacters(md: FontMetadata, lines: list[str]) -> Characters:
     characters: Characters = {}
     characters[" "] = [" " * md.spaceWidth] * height
     for bigcharlines in grouper(lines, height + 1, ""):
-        littlechar = t.cast(str, bigcharlines[0][0])
+        littlechar = bigcharlines[0][0]
         bigchar = [line.strip("\n") for line in bigcharlines[1:]]
         width = max(len(line) for line in bigchar)
         for i, line in enumerate(bigchar):
