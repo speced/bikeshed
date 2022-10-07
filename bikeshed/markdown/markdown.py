@@ -450,7 +450,8 @@ def commonPrefix(line1: str | None, line2: str | None) -> str | None:
 def getWsPrefix(line: str) -> str | None:
     if line.strip() == "":
         return None
-    return t.cast("re.Match", re.match(r"(\s*)", line)).group(1)
+    match = t.cast("re.Match", re.match(r"(\s*)", line))
+    return t.cast(str, match.group(1))
 
 
 def parseTokens(tokens: list[TokenT], numSpacesForIndentation: int) -> list[l.Line]:

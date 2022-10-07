@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import copy
 import dataclasses
 
-from . import utils
 from .. import t
 
 if t.TYPE_CHECKING:
@@ -19,8 +17,7 @@ if t.TYPE_CHECKING:
         export: t.Required[bool]
         normative: t.Required[bool]
         for_: t.Required[list[str]]
-        el: t.ElementT|None
-
+        el: t.ElementT | None
 
 
 @dataclasses.dataclass

@@ -256,7 +256,7 @@ async def updateFile(localPrefix: str, filePath: str, session: t.Any) -> Result[
 
 async def errorFromAsyncErr(res: Result[str, t.Awaitable[str]]) -> str | Exception:
     if isOk(res):
-        return res.ok()
+        return t.cast(str, res.ok())
     try:
         x = await t.cast("t.Awaitable[str]", res.err())
     except Exception as e:

@@ -356,7 +356,7 @@ def biblioReplacer(match: re.Match) -> t.NodeT:
     # Allow escaping things that aren't actually biblio links, by preceding with a \
     escape, bang, term, modifiers, linkText = match.groups()
     if escape:
-        return match.group(0)[1:]
+        return t.cast(str, match.group(0))[1:]
     if bang == "!":
         type = "normative"
     else:
@@ -416,7 +416,7 @@ sectionRe = re.compile(
 def sectionReplacer(match: re.Match) -> t.NodeT:
     escape, spec, section, justPage, linkText = match.groups()
     if escape:
-        return match.group(0)[1:]
+        return t.cast(str, match.group(0))[1:]
     if linkText is None:
         linkText = ""
 
@@ -464,7 +464,7 @@ propdescRe = re.compile(
 def propdescReplacer(match: re.Match) -> t.NodeT:
     escape, linkFor, lt, linkType, linkText = match.groups()
     if escape:
-        return match.group(0)[1:]
+        return t.cast(str, match.group(0))[1:]
     if linkFor == "":
         linkFor = "/"
     if lt == "-":
@@ -512,7 +512,7 @@ idlRe = re.compile(
 def idlReplacer(match: re.Match) -> t.NodeT:
     escape, linkFor, lt, linkType, linkText = match.groups()
     if escape:
-        return match.group(0)[1:]
+        return t.cast(str, match.group(0))[1:]
     if linkFor == "":
         linkFor = "/"
     if linkType is None:
@@ -559,7 +559,7 @@ dfnRe = re.compile(
 def dfnReplacer(match: re.Match) -> t.NodeT:
     escape, linkFor, lt, linkText = match.groups()
     if escape:
-        return match.group(0)[1:]
+        return t.cast(str, match.group(0))[1:]
     if linkFor == "":
         linkFor = "/"
     if linkText is None:
@@ -590,7 +590,7 @@ abstractRe = re.compile(
 def abstractReplacer(match: re.Match) -> t.NodeT:
     escape, linkFor, lt, linkText = match.groups()
     if escape:
-        return match.group(0)[1:]
+        return t.cast(str, match.group(0))[1:]
     if linkFor == "":
         linkFor = "/"
     if linkText is None:
@@ -624,7 +624,7 @@ elementRe = re.compile(
 def elementReplacer(match: re.Match) -> t.NodeT:
     groupdict = match.groupdict()
     if groupdict["escape"]:
-        return match.group(0)[1:]
+        return t.cast(str, match.group(0))[1:]
     if groupdict["attr"] is None and groupdict["value"] is None:
         linkType = "element"
         linkFor = None
@@ -670,7 +670,7 @@ varRe = re.compile(
 def varReplacer(match: re.Match) -> t.NodeT:
     escape, varText = match.groups()
     if escape:
-        return match.group(0)[1:]
+        return t.cast(str, match.group(0))[1:]
     return h.E.var({"bs-autolink-syntax": match.group(0)}, varText)
 
 
@@ -710,7 +710,7 @@ strongRe = re.compile(
 
 
 def strongReplacer(match: re.Match) -> t.NodeT:
-    text = match.group(1).replace("\\**", "**")
+    text = t.cast(str, match.group(1)).replace("\\**", "**")
     return h.E.strong({"bs-autolink-syntax": match.group(0)}, text)
 
 
@@ -728,7 +728,7 @@ emRe = re.compile(
 
 
 def emReplacer(match: re.Match) -> t.NodeT:
-    text = match.group(1).replace("\\*", "*")
+    text = t.cast(str, match.group(1)).replace("\\*", "*")
     return h.E.em({"bs-autolink-syntax": match.group(0)}, text)
 
 
@@ -753,7 +753,7 @@ headerRe = re.compile(
 def headerReplacer(match: re.Match) -> t.NodeT:
     escape, lt, linkText = match.groups()
     if escape:
-        return match.group(0)[1:]
+        return t.cast(str, match.group(0))[1:]
     if linkText is None:
         linkText = lt
     return h.E.a(

@@ -124,7 +124,7 @@ def textContent(el: t.ElementT, exact: bool = False) -> str:
     if len(el) == 0:
         return el.text or ""
     if exact:
-        return tostring(el, method="text", with_tail=False, encoding="unicode")
+        return t.cast(str, tostring(el, method="text", with_tail=False, encoding="unicode"))
     else:
         return textContentIgnoringDecorative(el)
 
@@ -153,7 +153,7 @@ def outerHTML(el: t.NodesT | None, literal: bool = False, with_tail: bool = Fals
         return "".join(outerHTML(x) for x in el)
     if el.get("bs-autolink-syntax") is not None and not literal:
         return el.get("bs-autolink-syntax") or ""
-    return tostring(el, with_tail=with_tail, encoding="unicode")
+    return t.cast(str, tostring(el, with_tail=with_tail, encoding="unicode"))
 
 
 def serializeTag(el: t.ElementT) -> str:
@@ -199,7 +199,7 @@ def parseHTML(text: str) -> list[t.ElementT]:
 
 def parseDocument(text: str) -> t.DocumentT:
     doc = html5lib.parse(text, treebuilder="lxml", namespaceHTMLElements=False)
-    return doc
+    return t.cast(t.DocumentT, doc)
 
 
 def escapeHTML(text: str) -> str:
@@ -250,8 +250,10 @@ def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: bool) -> t.Eleme
 
 def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: bool = False) -> t.ElementT | None:
     # Appends either text or an element.
-    child = None
+    child: t.NodeT
+    sawNode = False
     for child in flatten(els):
+        sawNode = True
         if isinstance(child, str):
             if len(parent) > 0:
                 parent[-1].tail = (parent[-1].tail or "") + child
@@ -269,9 +271,12 @@ def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: bool = False) ->
                 # when the parent already has children; the last child's tail
                 # doesn't get moved into the appended child or anything.
                 parent.append(child)
-    if child is None and not allowEmpty:
+    if not sawNode and not allowEmpty:
         raise Exception("Empty child list appended without allowEmpty=True")
-    return child
+    if isElement(child):
+        return child
+    else:
+        return None
 
 
 def prependChild(parent: t.ElementT, *children: t.NodesT) -> None:
@@ -785,7 +790,7 @@ def replaceMacros(text: str, macros: t.Mapping[str, str]) -> str:
     # If written as [FOO?], failure to find a matching macro just replaced it with nothing;
     # otherwise, it throws a fatal error.
     def macroReplacer(match: re.Match) -> str:
-        fullText = match.group(0)
+        fullText = t.cast(str, match.group(0))
         innerText = match.group(2).lower() or ""
         optional = match.group(3) == "?"
         if fullText.startswith("\\"):

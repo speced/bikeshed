@@ -10,7 +10,7 @@ from .. import messages
 from .. import t
 
 
-def englishFromList(items: t.Iterable, conjunction: str = "or") -> str:
+def englishFromList(items: t.Iterable[str], conjunction: str = "or") -> str:
     # Format a list of strings into an English list.
     items = list(items)
     if len(items) == 1:

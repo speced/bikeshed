@@ -158,7 +158,7 @@ class CanIUseManager:
 
     def getFeature(self, featureName: str) -> t.JSONT:
         if featureName in self.features:
-            return self.features[featureName]
+            return t.cast("t.JSONT", self.features[featureName])
         if not self.hasFeature(featureName):
             return {}
         data = json.loads(
@@ -166,7 +166,7 @@ class CanIUseManager:
             object_pairs_hook=OrderedDict,
         )
         self.features[featureName] = data
-        return data
+        return t.cast("t.JSONT", data)
 
 
 def getModuleFile(filename: str) -> str:

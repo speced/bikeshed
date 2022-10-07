@@ -83,7 +83,7 @@ class MarkdownCodeSpans(func.Functor):
                 return f"<code data-opaque data-span-tag={repl[0]} bs-autolink-syntax='{h.escapeAttr(repl[2])}'>{h.escapeHTML(repl[1])}</code>"
 
             return re.sub(r"\ue0ff", codeSpanReviver, self.__val__)
-        return self.__val__
+        return t.cast(str, self.__val__)
 
 
 def stripBOM(doc: t.SpecT) -> None:

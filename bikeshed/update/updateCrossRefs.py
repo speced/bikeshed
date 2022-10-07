@@ -211,7 +211,7 @@ def dataFromApi(api: APIClient, *args: t.Any, **kwargs: t.Any) -> t.JSONT:
         )
     if isinstance(data, bytes):
         raise Exception(f"Didn't get expected JSON data. Got:\n{data.decode('utf-8')}")
-    return data
+    return t.cast("t.JSONT", data)
 
 
 def linearizeAnchorTree(multiTree: list, rawAnchors: list[dict[str, t.Any]] | None = None) -> list[RawAnchorT]:

@@ -12,7 +12,7 @@ from collections import OrderedDict, defaultdict
 from datetime import date, datetime, timedelta
 from functools import partial
 
-from isodate import Duration, parse_duration
+from isodate import parse_duration
 
 from . import config, constants, datablocks, markdown, h, messages as m, repository, t
 
@@ -403,7 +403,7 @@ def parseDateOrDuration(key: str, val: str, lineNum: str | int | None) -> date |
         return None
     try:
         if val.startswith("P"):
-            return parse_duration(val)
+            return t.cast(timedelta, parse_duration(val))
         return datetime.strptime(val, "%Y-%m-%d").date()
     except ValueError:
         m.die(
@@ -413,12 +413,10 @@ def parseDateOrDuration(key: str, val: str, lineNum: str | int | None) -> date |
         return None
 
 
-def canonicalizeExpiryDate(base: date, expires: timedelta | Duration | datetime | date | None) -> date | None:
+def canonicalizeExpiryDate(base: date, expires: timedelta | datetime | date | None) -> date | None:
     if expires is None:
         return None
     if isinstance(expires, timedelta):
-        return base + expires
-    if isinstance(expires, Duration):
         return base + expires
     if isinstance(expires, datetime):
         return expires.date()
@@ -1156,7 +1154,7 @@ def joinValue(a: JoinA, b: JoinB) -> JoinB:
 
 
 def joinList(a: t.Sequence[JoinA], b: t.Sequence[JoinB]) -> t.Sequence[JoinA | JoinB]:
-    return a + b  # type: ignore[operator]
+    return a + b  # type: ignore[operator, no-any-return]
 
 
 def joinDict(a: t.Mapping[str, JoinA], b: t.Mapping[str, JoinB]) -> dict[str, JoinA | JoinB]:

@@ -196,7 +196,8 @@ def commonPrefix(line1: str, line2: str) -> str:
 
 
 def getWsPrefix(line: str) -> str:
-    return t.cast("re.Match", re.match(r"(\s*)", line)).group(1)
+    match = t.cast("re.Match", re.match(r"(\s*)", line))
+    return t.cast(str, match.group(1))
 
 
 def transformPre(lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT) -> list[str]:
