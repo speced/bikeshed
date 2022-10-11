@@ -238,6 +238,7 @@ class IDLMarker(widlparser.protocols.Marker):
                 rest = member.attribute
             else:
                 m.die(f"Can't figure out how to construct attribute-info from:\n  {construct}")
+                return (None, None)
             if rest.readonly is not None:
                 readonly = "data-readonly"
             else:

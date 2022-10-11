@@ -223,6 +223,7 @@ def processReferBiblioFile(lines: t.Sequence[str], storage: t.BiblioStorageT, or
                 pass
             else:
                 m.die(f"Unknown line type {letter}:\n{line}")
+                continue
         storage[biblio["linkText"].lower()].append(NormalBiblioEntry(**biblio))
     return storage
 

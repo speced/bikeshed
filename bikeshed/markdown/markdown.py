@@ -402,6 +402,7 @@ def stripPrefix(token: TokenT, numSpacesForIndentation: int, len: int) -> str:
             m.die(
                 f'Line {token["line"].i} isn\'t indented enough (needs {len} indent{"" if len == 1 else "s"}) to be valid Markdown:\n"{text[:-1]}"'
             )
+            return text
     return text[offset:]
 
 

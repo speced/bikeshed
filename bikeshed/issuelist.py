@@ -128,6 +128,7 @@ def extractHeaderInfo(lines: t.Sequence[str], infilename: str) -> HeaderInfo | N
                 cdate = date
                 if not re.match(r"(\d{4})-(\d\d)-(\d\d)$", date):
                     m.die(f"Incorrect Date format. Expected YYYY-MM-DD, but got:\n{date}")
+                    return None
             elif match.group(1) == "ED":
                 ed = match.group(2).rstrip()
     if url is None:
@@ -270,6 +271,7 @@ def printIssues(outfile: t.TextIO, lines: list[str]) -> None:
             index = match.group(1)
         else:
             m.die(f"Issues must contain a line like 'Issue 1.'. Got:\n{originalText}")
+            continue
 
         # Color coding
         if re.search(r"\nVerified:\s*\S+", issue):

@@ -377,6 +377,7 @@ class Spec:
         outputFilename = self.fixMissingOutputFilename(outputFilename)
         if self.inputSource.mtime() is None:
             m.die(f"Watch mode doesn't support {self.inputSource}")
+            return
         if outputFilename == "-":
             m.die("Watch mode doesn't support streaming to STDOUT.")
             return

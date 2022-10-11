@@ -685,10 +685,8 @@ def parseBoolishList(
     # Parses anything defined as "label <boolish>, label <boolish>" into a BoolSet
     # Supply a list of valid labels if you want to have them checked,
     # and a dict of {value=>bool} pairs you want in addition to the standard boolish values
-    if default in (True, False):
-        boolset = config.BoolSet(default=default)
-    else:
-        m.die(f"Programming error - parseBoolishList() got a non-bool default value: '{default}'")
+    boolset = config.BoolSet(default=default)
+
     if extraValues is None:
         extraValues = {}
     vals = [v.strip() for v in val.split(",")]

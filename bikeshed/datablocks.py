@@ -841,6 +841,7 @@ def transformInclude(lines: list[str], tagName: str, firstLine: str, lineNum: in
                 path = info["path"][0]
             else:
                 m.die("Include blocks must only contain a single 'path'.", lineNum=lineNum)
+                return []
         if "macros" in info:
             for k, v in info.items():
                 if k == "macros":
@@ -852,6 +853,7 @@ def transformInclude(lines: list[str], tagName: str, firstLine: str, lineNum: in
                         f"Include block defines the '{k}' local macro more than once.",
                         lineNum=lineNum,
                     )
+                    return []
     if path:
         el = "<pre class=include path='{}'".format(h.escapeAttr(path))
         for i, (macroName, macroVal) in enumerate(macros.items()):

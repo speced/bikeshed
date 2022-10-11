@@ -34,6 +34,7 @@ def addCanIUsePanels(doc: t.SpecT) -> None:
         featId = featId.lower()
         if not canIUseData.hasFeature(featId):
             m.die(f"Unrecognized Can I Use feature ID: {featId}", el=dfn)
+            continue
         feature = canIUseData.getFeature(featId)
 
         h.addClass(doc, dfn, "caniuse-paneled")

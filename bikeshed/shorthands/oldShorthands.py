@@ -375,6 +375,7 @@ def biblioReplacer(match: re.Match) -> t.NodeT:
     statusSnapshot = "snapshot" in modifiers
     if statusCurrent and statusSnapshot:
         m.die(f"Biblio shorthand {match.group(0)} contains *both* 'current' and 'snapshot', please pick one.")
+        return t.cast(str, match.group(0))
     elif statusCurrent or statusSnapshot:
         attrs["data-biblio-status"] = "current" if statusCurrent else "snapshot"
 
@@ -385,6 +386,7 @@ def biblioReplacer(match: re.Match) -> t.NodeT:
         m.die(
             f"Biblio shorthand {match.group(0)} contains more than one of 'inline', 'index' and 'direct', please pick one."
         )
+        return t.cast(str, match.group(0))
     elif displayInline:
         attrs["data-biblio-display"] = "inline"
     elif displayIndex:

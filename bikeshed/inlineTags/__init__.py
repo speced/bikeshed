@@ -21,10 +21,12 @@ def processTags(doc: t.SpecT) -> None:
                 out = t.cast(bytes, out).decode("utf-8")
             except UnicodeDecodeError as e:
                 m.die(f"When trying to process {h.outerHTML(el)}, got invalid unicode in stdout:\n{e}", el=el)
+                return
             try:
                 err = t.cast(bytes, err).decode("utf-8")
             except UnicodeDecodeError as e:
                 m.die(f"When trying to process {h.outerHTML(el)}, got invalid unicode in stderr:\n{e}", el=el)
+                return
             if p.returncode:
                 m.die(
                     f"When trying to process {h.outerHTML(el)}, got return code {p.returncode} and the following stderr:\n{str(err)}",

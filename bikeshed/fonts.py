@@ -80,6 +80,7 @@ class Font:
                 lines = fh.readlines()
         except Exception as e:
             m.die(f"Couldn't find font file “{fontfilename}”:\n{e}")
+            raise e
         self.metadata, lines = parseMetadata(lines)
         self.characters = parseCharacters(self.metadata, lines)
 
@@ -93,6 +94,7 @@ class Font:
                     output[i] += line
             else:
                 m.die(f"The character “{letter}” doesn't appear in the specified font.")
+                continue
         output = [line + "\n" for line in output]
         return output
 
@@ -116,6 +118,7 @@ def parseMetadata(lines: list[str]) -> tuple[FontMetadata, list[str]]:
             spaceWidth = int(val)
         else:
             m.die(f"Unrecognized font metadata “{key}”")
+            continue
     if height is None:
         m.die("Missing 'Character Height' metadata.")
         raise Exception("")
