@@ -286,6 +286,7 @@ class Spec:
         u.verifyUsageOfAllLocalBiblios(self)
         u.removeMultipleLinks(self)
         u.forceCrossorigin(self)
+        addDomintroStyles(self)
         lint.brokenLinks(self)
         lint.accidental2119(self)
         lint.missingExposed(self)
@@ -542,6 +543,15 @@ def fetchLanguages(dataFile: retrieve.DataFileRequester) -> dict[str, language.L
         k: language.Language(v["name"], v["native-name"])
         for k, v in json.loads(dataFile.fetch("languages.json", str=True)).items()
     }
+
+
+def addDomintroStyles(doc: t.SpectT) -> None:
+    # Adds common WHATWG styles for domintro blocks.
+
+    if h.find(".domintro", doc) is None:
+        return
+
+    doc.extraStyles["styles-domintro"] = styleDomintro
 
 
 styleColors = """
@@ -936,5 +946,36 @@ a[href].issue-return {
     color: var(--issueheading-text);
     font-weight: bold;
     text-decoration: none;
+}
+"""
+
+styleDomintro = """
+.domintro {
+  position: relative;
+  color: green;
+  background: #DDFFDD;
+  margin: 2.5em 0 2em 0;
+  padding: 1.5em 1em 0.5em 2em;
+}
+
+.domintro dt, .domintro dt * {
+  color: black;
+  font-size: inherit;
+}
+.domintro dd {
+  margin: 0.5em 0 1em 2em; padding: 0;
+}
+.domintro dd p {
+  margin: 0.5em 0;
+}
+.domintro::before {
+  content: 'For web developers (non-normative)';
+  background: green;
+  color: white;
+  padding: 0.15em 0.25em;
+  font-style: normal;
+  position: absolute;
+  top: -0.8em;
+  left: -0.8em;
 }
 """

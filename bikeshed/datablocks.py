@@ -65,7 +65,7 @@ def transformDataBlocks(doc: t.SpecT, lines: list[Line] | list[str]) -> list[Lin
         _lines = t.cast("list[Line]", lines)
     inBlock = False
     blockTypes: dict[str, TransformFuncT] = {
-        "def": transformSimpleDef,
+        "simpledef": transformSimpleDef,
         "propdef": transformPropdef,
         "descdef": transformDescdef,
         "elementdef": transformElementdef,
@@ -246,7 +246,7 @@ def transformPre(lines: list[str], tagName: str, firstLine: str, lineNum: int | 
 
 
 def transformSimpleDef(lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT) -> list[str]:
-    rows = parseDefBlock(lines, "propdef")
+    rows = parseDefBlock(lines, "simpledef")
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = f" line-number={lineNum}"
