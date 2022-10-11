@@ -30,41 +30,41 @@ def update(
     wpt: bool = False,
     path: str | None = None,
     dryRun: bool = False,
-    force: bool = False,
+    manifestMode: str | None = None,
 ) -> str | None:
     if path is None:
         path = config.scriptPath("spec-data")
     assert path is not None
 
     # Update via manifest by default, falling back to a full update only if failed or forced.
-    if not force:
-        success = manifest.updateByManifest(path=path, dryRun=dryRun)
-        if not success:
+    if manifestMode is None or manifestMode == "force":
+        success = manifest.updateByManifest(path=path, dryRun=dryRun, force=manifestMode == "force")
+        if success:
+            return None
+        else:
             m.say("Falling back to a manual update...")
-            force = True
-    if force:
-        # fmt: off
-        # If all are False, update everything
-        if anchors == backrefs == biblio == boilerplate == caniuse == linkDefaults == mdn == testSuites == languages == wpt == False:  # noqa: E712
-            anchors = backrefs =  biblio =  boilerplate =  caniuse =  linkDefaults =  mdn =  testSuites =  languages =  wpt =  True  # noqa: E222
 
-        touchedPaths: dict[str, set[str]|None] = {
-            "anchors": updateCrossRefs.update(path=path, dryRun=dryRun) if anchors else None,
-            "backrefs": updateBackRefs.update(path=path, dryRun=dryRun) if backrefs else None,
-            "biblio": updateBiblio.update(path=path, dryRun=dryRun) if biblio else None,
-            "boilerplate": updateBoilerplates.update(path=path, dryRun=dryRun) if boilerplate else None,
-            "caniuse": updateCanIUse.update(path=path, dryRun=dryRun) if caniuse else None,
-            "mdn": updateMdn.update(path=path, dryRun=dryRun) if mdn else None,
-            "linkDefaults": updateLinkDefaults.update(path=path, dryRun=dryRun) if linkDefaults else None,
-            "testSuites": updateTestSuites.update(path=path, dryRun=dryRun) if testSuites else None,
-            "languages": updateLanguages.update(path=path, dryRun=dryRun) if languages else None,
-            "wpt": updateWpt.update(path=path, dryRun=dryRun) if wpt else None,
-        }
-        # fmt: on
+    # fmt: off
+    # If all are False, update everything
+    if anchors == backrefs == biblio == boilerplate == caniuse == linkDefaults == mdn == testSuites == languages == wpt == False:  # noqa: E712
+        anchors = backrefs =  biblio =  boilerplate =  caniuse =  linkDefaults =  mdn =  testSuites =  languages =  wpt =  True  # noqa: E222
 
-        cleanupFiles(path, touchedPaths=touchedPaths, dryRun=dryRun)
-        return manifest.createManifest(path=path, dryRun=dryRun)
-    return None
+    touchedPaths: dict[str, set[str]|None] = {
+        "anchors": updateCrossRefs.update(path=path, dryRun=dryRun) if anchors else None,
+        "backrefs": updateBackRefs.update(path=path, dryRun=dryRun) if backrefs else None,
+        "biblio": updateBiblio.update(path=path, dryRun=dryRun) if biblio else None,
+        "boilerplate": updateBoilerplates.update(path=path, dryRun=dryRun) if boilerplate else None,
+        "caniuse": updateCanIUse.update(path=path, dryRun=dryRun) if caniuse else None,
+        "mdn": updateMdn.update(path=path, dryRun=dryRun) if mdn else None,
+        "linkDefaults": updateLinkDefaults.update(path=path, dryRun=dryRun) if linkDefaults else None,
+        "testSuites": updateTestSuites.update(path=path, dryRun=dryRun) if testSuites else None,
+        "languages": updateLanguages.update(path=path, dryRun=dryRun) if languages else None,
+        "wpt": updateWpt.update(path=path, dryRun=dryRun) if wpt else None,
+    }
+    # fmt: on
+
+    cleanupFiles(path, touchedPaths=touchedPaths, dryRun=dryRun)
+    return manifest.createManifest(path=path, dryRun=dryRun)
 
 
 def fixupDataFiles() -> None:

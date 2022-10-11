@@ -110,7 +110,7 @@ def getDatafilePaths(basePath: str) -> t.Generator[tuple[str, str], None, None]:
             yield filePath, os.path.relpath(filePath, basePath)
 
 
-def updateByManifest(path: str, dryRun: bool = False) -> str | None:
+def updateByManifest(path: str, dryRun: bool = False, force: bool = False) -> str | None:
     """
     Attempts to update only the recently updated datafiles by using a manifest file.
     Returns None if updating failed and a full update should be performed;
@@ -157,15 +157,16 @@ def updateByManifest(path: str, dryRun: bool = False) -> str | None:
             m.warn(
                 "Remote data is more than two days old; the update process has probably fallen over. Please report this!"
             )
-        if localDt == remoteDt and localDt != 0:
-            m.say(f"Local data is already up-to-date with remote ({localDt.strftime('%Y-%m-%d %H:%M:%S')})")
-            return "\n".join(localManifest)
-        elif localDt > remoteDt:
-            # No need to update, local data is more recent.
-            m.say(
-                f"Local data is fresher ({localDt.strftime('%Y-%m-%d %H:%M:%S')}) than remote ({remoteDt.strftime('%Y-%m-%d %H:%M:%S')}), so nothing to update.",
-            )
-            return "\n".join(localManifest)
+        if not force:
+            if localDt == remoteDt and localDt != 0:
+                m.say(f"Local data is already up-to-date with remote ({localDt.strftime('%Y-%m-%d %H:%M:%S')})")
+                return "\n".join(localManifest)
+            elif localDt > remoteDt:
+                # No need to update, local data is more recent.
+                m.say(
+                    f"Local data is fresher ({localDt.strftime('%Y-%m-%d %H:%M:%S')}) than remote ({remoteDt.strftime('%Y-%m-%d %H:%M:%S')}), so nothing to update.",
+                )
+                return "\n".join(localManifest)
 
     if len(localFiles) == 0:
         m.say("The local manifest is borked or missing; re-downloading everything...")

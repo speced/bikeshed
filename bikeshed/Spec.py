@@ -545,7 +545,7 @@ def fetchLanguages(dataFile: retrieve.DataFileRequester) -> dict[str, language.L
     }
 
 
-def addDomintroStyles(doc: t.SpectT) -> None:
+def addDomintroStyles(doc: Spec) -> None:
     # Adds common WHATWG styles for domintro blocks.
 
     if h.find(".domintro", doc) is None:

@@ -230,9 +230,17 @@ def main() -> None:
     )
     updateParser.add_argument(
         "--skip-manifest",
-        dest="force",
-        action="store_true",
+        dest="manifest",
+        action="store_const",
+        const="skip",
         help="Forces Bikeshed to do a full update manually, rather than using the manifest to get the preprocessed update (which can be several minutes old).",
+    )
+    updateParser.add_argument(
+        "--force-manifest",
+        dest="manifest",
+        action="store_const",
+        const="force",
+        help="Force a manifest-based update even if local manifest data is more recent than the remote manifest.",
     )
     updateParser.add_argument("--anchors", action="store_true", help="Download crossref anchor data.")
     updateParser.add_argument("--backrefs", action="store_true", help="Download link backref data.")
@@ -458,7 +466,7 @@ def handleUpdate(options: argparse.Namespace) -> None:
         languages=options.languages,
         wpt=options.wpt,
         dryRun=constants.dryRun,
-        force=options.force,
+        manifestMode=options.manifest,
     )
 
 
