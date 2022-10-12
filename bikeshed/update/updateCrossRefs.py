@@ -134,7 +134,7 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
                 continue
             if "section" in rawAnchor and rawAnchor["section"] is True:
                 addToHeadings(rawAnchor, specHeadings, spec=spec)
-            else:
+            if rawAnchor["type"] in config.dfnTypes.union(["dfn"]):
                 addToAnchors(rawAnchor, anchors, spec=spec)
 
     cleanSpecHeadings(headings)
