@@ -22,11 +22,12 @@ def processWptElements(doc: t.SpecT) -> None:
         testNames = testNamesFromEl(el, pathPrefix=pathPrefix)
         for testName in testNames:
             if testName not in testData:
-                m.die(f"Couldn't find WPT test '{testName}' - did you misspell something?", el=el)
+                m.warn(f"Couldn't find WPT test '{testName}' - did you misspell something?", el=el)
                 continue
             seenTestNames.add(testName)
             if atLeastOneVisibleTest is False and el.get("hidden") is None:
                 atLeastOneVisibleTest = True
+        testNames = [x for x in testNames if x in seenTestNames]
         if el.get("hidden") is not None:
             h.removeNode(el)
         else:
