@@ -134,7 +134,7 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
                 continue
             if "section" in rawAnchor and rawAnchor["section"] is True:
                 addToHeadings(rawAnchor, specHeadings, spec=spec)
-            else:
+            if rawAnchor["type"] in config.dfnTypes.union(["dfn"]):
                 addToAnchors(rawAnchor, anchors, spec=spec)
 
     cleanSpecHeadings(headings)
@@ -219,7 +219,7 @@ def linearizeAnchorTree(multiTree: list, rawAnchors: list[dict[str, t.Any]] | No
         rawAnchors = []
     # Call with multiTree being a list of trees
     for item in multiTree:
-        if (item["type"] == "dfn") or ("section" in item and item["section"] is True):
+        if (item["type"] in config.dfnTypes.union(["dfn"])) or ("section" in item and item["section"] is True):
             rawAnchors.append(item)
         if item.get("children"):
             linearizeAnchorTree(item["children"], rawAnchors)
