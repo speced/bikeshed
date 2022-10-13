@@ -1,5 +1,7 @@
 # pylint: disable=R1732
 
+from __future__ import annotations
+
 import dataclasses
 import glob
 import re
