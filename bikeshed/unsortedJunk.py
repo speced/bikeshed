@@ -188,12 +188,12 @@ def addImplicitAlgorithms(doc: t.SpecT) -> None:
                 el.set("data-algorithm-for", dfnFor)
         elif len(dfns) == 0:
             m.die(
-                "Algorithm container has no name, and there is no <dfn> to infer one from.",
+                "Algorithm container has no name, and there is no <dfn> to infer one from. Please set the algorithm='name here' attribute.",
                 el=el,
             )
         else:
             m.die(
-                "Algorithm container has no name, and there are too many <dfn>s to choose which to infer a name from.",
+                "Algorithm container has no name, and there are too many <dfn>s to choose which to infer a name from. Please set the algorithm='name here' attribute.",
                 el=el,
             )
 
