@@ -690,6 +690,9 @@ def processAnchors(anchors: InfoTreeT, doc: t.SpecT, lineNum: int | None = None)
         else:
             urlJoiner = "#"
         url = urlPrefix + urlJoiner + urlSuffix
+
+        if url.startswith("#"):
+            m.die(f"<pre class=anchors> anchor was defined with a local link '{url}'. Please use urlPrefix and/or url to define an external URL.")
         shortname = None
         level = None
         if "shortname" in anchor and "level" in anchor:

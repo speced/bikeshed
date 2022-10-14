@@ -94,6 +94,9 @@ def addExternalDfnPanel(termEl: t.ElementT, ref: r.RefWrapper, doc: t.SpecT) -> 
                 continue
             doc.cachedLinksFromHref.setdefault(href, []).append(a)
 
+    if ref.url not in doc.cachedLinksFromHref:
+        return
+
     # Group the relevant links according to the section they're in.
     linksBySection: OrderedDict[str, list[t.ElementT]] = OrderedDict()
     for link in doc.cachedLinksFromHref[ref.url]:
