@@ -975,7 +975,7 @@ def decorateAutolink(doc: t.SpecT, el: t.ElementT, linkType: str, linkText: str,
 
     # Put an ID on every reference, so I can link to references to a term.
     if el.get("id") is None:
-        x, x, id = ref.url.partition("#")
+        unused1, unused2, id = ref.url.partition("#")  # pylint: disable=unused-variable
         if id:
             el.set("id", f"ref-for-{id}")
             el.set("data-silently-dedup", "")

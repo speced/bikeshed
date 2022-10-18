@@ -105,7 +105,7 @@ def addExternalDfnPanel(termEl: t.ElementT, ref: r.RefWrapper, doc: t.SpecT) -> 
         linksBySection.setdefault(section, []).append(link)
     if linksBySection:
         h.addClass(doc, termEl, "dfn-paneled")
-        x, x, refID = ref.url.partition("#")
+        unused1, unused2, refID = ref.url.partition("#")  # pylint: disable=unused-variable
         termID = f"term-for-{refID}"
         termEl.set("id", termID)
         termEl.set("data-silently-dedup", "")

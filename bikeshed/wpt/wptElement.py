@@ -153,7 +153,7 @@ def appendTestList(
             liveTestScheme = "https"
         else:
             liveTestScheme = "http"
-        x, x, lastNameFragment = testName.rpartition("/")
+        unused1, unused2, lastNameFragment = testName.rpartition("/")  # pylint: disable=unused-variable
         testType = testData[testName]
         if testType in ["crashtest", "print-reftest", "reftest", "testharness"]:
             singleTestEl = h.E.li(
