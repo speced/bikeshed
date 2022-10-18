@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import OrderedDict
 
 from . import h, t
+from .translate import _
 
 if t.TYPE_CHECKING:
     from . import refs as r  # pylint: disable=unused-import
@@ -41,7 +42,7 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
         panel = h.E.aside(
             {"class": "dfn-panel", "data-for": id},
             h.E.b(h.E.a({"href": "#" + h.escapeUrlFrag(id)}, "#" + id)),
-            h.E.b("Referenced in:"),
+            h.E.b(_("Referenced in:")),
         )
         ul = h.appendChild(panel, h.E.ul())
         for text, els in refs.items():
@@ -100,18 +101,18 @@ def addExternalDfnPanel(termEl: t.ElementT, ref: r.RefWrapper, doc: t.SpecT) -> 
     # Group the relevant links according to the section they're in.
     linksBySection: OrderedDict[str, list[t.ElementT]] = OrderedDict()
     for link in doc.cachedLinksFromHref[ref.url]:
-        section = h.sectionName(doc, link) or "Unnumbered Section"
+        section = h.sectionName(doc, link) or _("Unnumbered Section")
         linksBySection.setdefault(section, []).append(link)
     if linksBySection:
         h.addClass(doc, termEl, "dfn-paneled")
-        _, _, refID = ref.url.partition("#")
+        x, x, refID = ref.url.partition("#")
         termID = f"term-for-{refID}"
         termEl.set("id", termID)
         termEl.set("data-silently-dedup", "")
         panel = h.E.aside(
             {"class": "dfn-panel", "data-for": termID},
             h.E.a({"href": ref.url}, ref.url),
-            h.E.b("Referenced in:"),
+            h.E.b(_("Referenced in:")),
         )
         ul = h.appendChild(panel, h.E.ul())
         for text, els in linksBySection.items():

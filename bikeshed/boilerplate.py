@@ -9,6 +9,7 @@ from collections import OrderedDict, defaultdict
 from datetime import datetime
 
 from . import conditional, config, dfnpanels, h, messages as m, refs as r, retrieve, t
+from .translate import _
 
 if t.TYPE_CHECKING:
     MetadataT: t.TypeAlias = t.Mapping[str, t.Sequence[MetadataValueT]]
@@ -295,7 +296,7 @@ def addIndexSection(doc: t.SpecT) -> None:
     container = getFillContainer("index", doc=doc, default=True)
     if container is None:
         return
-    h.appendChild(container, h.E.h2({"class": "no-num no-ref", "id": h.safeID(doc, "index")}, "Index"))
+    h.appendChild(container, h.E.h2({"class": "no-num no-ref", "id": h.safeID(doc, "index")}, _("Index")))
 
     if hasLocalDfns:
         addIndexOfLocallyDefinedTerms(doc, container)
@@ -309,7 +310,7 @@ def addIndexOfLocallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> None:
         container,
         h.E.h3(
             {"class": "no-num no-ref", "id": h.safeID(doc, "index-defined-here")},
-            "Terms defined by this specification",
+            _("Terms defined by this specification"),
         ),
     )
 
@@ -320,17 +321,17 @@ def addIndexOfLocallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> None:
         if dfnID is None or dfnType is None:
             continue
         linkTexts = config.linkTextsFromElement(el)
-        headingLevel = h.headingLevelOfElement(el) or "Unnumbered section"
+        headingLevel = h.headingLevelOfElement(el) or _("Unnumbered section")
         if dfnType == "argument":
             # Don't generate index entries for arguments.
             continue
         if el.get("data-dfn-for") is not None:
-            disamb = "{} for {}".format(
-                dfnType,
-                ", ".join(config.splitForValues(el.get("data-dfn-for", ""))),
+            disamb = _("{type} for {forVals}").format(
+                type=dfnType,
+                forVals=", ".join(config.splitForValues(el.get("data-dfn-for", ""))),
             )
         elif dfnType == "dfn":
-            disamb = "definition of"
+            disamb = _("definition of")
         else:
             disamb = "({})".format(dfnType)
 
@@ -352,9 +353,9 @@ def disambiguator(ref: r.RefWrapper, types: set[str] | None, specs: set[str] | N
     if types is None or len(types) > 1:
         disambInfo.append(ref.type)
     if specs is None or len(specs) > 1:
-        disambInfo.append("in " + ref.spec)
+        disambInfo.append(_("in {spec}").format(spec=ref.spec))
     if ref.for_:
-        disambInfo.append("for {}".format(", ".join(x.strip() for x in ref.for_)))
+        disambInfo.append(_("for {forVals}").format(forVals=", ".join(x.strip() for x in ref.for_)))
     return ", ".join(disambInfo)
 
 
@@ -510,7 +511,7 @@ def htmlFromIndexTerms(entries: t.Mapping[str, list[IndexTerm]]) -> t.ElementT:
                 topList,
                 h.E.li(
                     h.E.a({"href": item.url}, text),
-                    h.E.span(", in ", item.label) if item.label else "",
+                    h.E.span(_(", in "), item.label) if item.label else "",
                 ),
             )
         else:
@@ -521,7 +522,7 @@ def htmlFromIndexTerms(entries: t.Mapping[str, list[IndexTerm]]) -> t.ElementT:
                     ul,
                     h.E.li(
                         h.E.a({"href": item.url}, item.disambiguator),
-                        h.E.span(", in ", item.label) if item.label else "",
+                        h.E.span(_(", in "), item.label) if item.label else "",
                     ),
                 )
     return topList
@@ -571,7 +572,7 @@ def addIndexOfExternallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> Non
             else:
                 for forVal, ref in refGroup.sorted():
                     if forVal:
-                        link = makeLink(refText, " ", h.E.small({}, f"(for {forVal})"))
+                        link = makeLink(refText, " ", h.E.small({}, f"({_('for')} {forVal})"))
                     else:
                         link = makeLink(refText)
                     h.appendChild(termsUl, h.E.li(link))
@@ -583,7 +584,9 @@ def addIndexOfExternallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> Non
         container,
         h.E.h3(
             {"class": "no-num no-ref", "id": h.safeID(doc, "index-defined-elsewhere")},
-            "Terms defined by reference",
+            _(
+                "Terms defined by reference",
+            ),
         ),
         ul,
     )
@@ -602,7 +605,7 @@ def addPropertyIndex(doc: t.SpecT) -> None:
         html,
         h.E.h2(
             {"class": "no-num no-ref", "id": h.safeID(doc, "property-index")},
-            "Property Index",
+            _("Property Index"),
         ),
     )
 
@@ -755,7 +758,7 @@ def addIDLSection(doc: t.SpecT) -> None:
 
     h.appendChild(
         html,
-        h.E.h2({"class": "no-num no-ref", "id": h.safeID(doc, "idl-index")}, "IDL Index"),
+        h.E.h2({"class": "no-num no-ref", "id": h.safeID(doc, "idl-index")}, _("IDL Index")),
     )
 
     container = h.appendChild(html, h.E.pre({"class": "idl"}))
@@ -781,7 +784,7 @@ def addTOCSection(doc: t.SpecT) -> None:
         toc,
         h.E.h2(
             {"class": "no-num no-toc no-ref", "id": h.safeID(doc, "contents")},
-            "Table of Contents",
+            _("Table of Contents"),
         ),
     )
 
@@ -1086,11 +1089,12 @@ def createMdEntry(key: str, dirtyVals: t.Sequence[MetadataValueT], doc: t.SpecT)
     }
     if len(vals) > 1 and displayKey in pluralization:
         displayKey = pluralization[displayKey]
+    displayKey = _(displayKey)
     # Handle some custom <dt> structures
     if key in ("Editor", "Former Editor"):
         ret = [h.E.dt({"class": "editor"}, displayKey, ":")]
     elif key == "Translations":
-        ret = [h.E.dt(displayKey, " ", h.E.small("(non-normative)"), ":")]
+        ret = [h.E.dt(displayKey, " ", h.E.small(_("(non-normative)")), ":")]
     else:
         ret = [h.E.dt(displayKey, ":")]
     # Add all the values, wrapping in a <dd> if necessary.
@@ -1145,7 +1149,7 @@ def addReferencesSection(doc: t.SpecT) -> None:
 
     h.appendChild(
         container,
-        h.E.h2({"class": "no-num no-ref", "id": h.safeID(doc, "references")}, "References"),
+        h.E.h2({"class": "no-num no-ref", "id": h.safeID(doc, "references")}, _("References")),
     )
 
     normRefs = sorted(doc.normativeRefs.values(), key=lambda r: r.linkText.lower())
@@ -1155,7 +1159,7 @@ def addReferencesSection(doc: t.SpecT) -> None:
             container,
             h.E.h3(
                 {"class": "no-num no-ref", "id": h.safeID(doc, "normative")},
-                "Normative References",
+                _("Normative References"),
             ),
             h.E.dl(),
         )
@@ -1180,7 +1184,7 @@ def addReferencesSection(doc: t.SpecT) -> None:
             container,
             h.E.h3(
                 {"class": "no-num no-ref", "id": h.safeID(doc, "informative")},
-                "Informative References",
+                _("Informative References"),
             ),
             h.E.dl(),
         )
@@ -1208,7 +1212,7 @@ def addIssuesSection(doc: t.SpecT) -> None:
         container,
         h.E.h2(
             {"class": "no-num no-ref", "id": h.safeID(doc, "issues-index")},
-            "Issues Index",
+            _("Issues Index"),
         ),
     )
     container = h.appendChild(container, h.E.div({"style": "counter-reset:issue"}))
@@ -1221,7 +1225,7 @@ def addIssuesSection(doc: t.SpecT) -> None:
         h.appendChild(
             el,
             " ",
-            h.E.a({"href": "#" + issue.get("id", ""), "class": "issue-return", "title": "Jump to section"}, "↵"),
+            h.E.a({"href": "#" + issue.get("id", ""), "class": "issue-return", "title": _("Jump to section")}, "↵"),
         )
     for idel in h.findAll("[id]", container):
         del idel.attrib["id"]

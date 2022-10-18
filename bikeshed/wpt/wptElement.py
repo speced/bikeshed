@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .. import config, h, messages as m, t
+from ..translate import _
 
 
 def processWptElements(doc: t.SpecT) -> None:
@@ -79,7 +80,7 @@ def processWptElements(doc: t.SpecT) -> None:
         if pathPrefix and not pathPrefix.startswith("/"):
             pathPrefix = "/" + pathPrefix
         if pathPrefix != "/":
-            doc.md.otherMetadata.setdefault("Test Suite", []).append(
+            doc.md.otherMetadata.setdefault(_("Test Suite"), []).append(
                 h.E.dd(
                     {"class": "wpt-overview"},
                     h.E.a(
@@ -118,7 +119,7 @@ def createHTML(
         if doc.md.wptDisplay in ("open", "inline"):
             blockEl.set("open", "")
         h.clearContents(blockEl)
-        testSummaryEl = h.E.summary("Tests")
+        testSummaryEl = h.E.summary(_("Tests"))
         h.appendChild(blockEl, testSummaryEl)
         appendTestList(blockEl, testNames, testData, title, titleLang, titleDir)
     else:
@@ -152,7 +153,7 @@ def appendTestList(
             liveTestScheme = "https"
         else:
             liveTestScheme = "http"
-        _, _, lastNameFragment = testName.rpartition("/")
+        x, x, lastNameFragment = testName.rpartition("/")
         testType = testData[testName]
         if testType in ["crashtest", "print-reftest", "reftest", "testharness"]:
             singleTestEl = h.E.li(
@@ -171,7 +172,7 @@ def appendTestList(
                         "href": f"{liveTestScheme}://wpt.live/{testName}",
                         "class": "wpt-live",
                     },
-                    h.E.small("(live test)"),
+                    h.E.small(_("(live test)")),
                 ),
                 " ",
                 h.E.a(
@@ -179,7 +180,7 @@ def appendTestList(
                         "href": "https://github.com/web-platform-tests/wpt/blob/master/" + testName,
                         "class": "wpt-source",
                     },
-                    h.E.small("(source)"),
+                    h.E.small(_("(source)")),
                 ),
             )
         elif testType in ["manual", "visual"]:
@@ -191,7 +192,7 @@ def appendTestList(
                         "href": "https://github.com/web-platform-tests/wpt/blob/master/" + testName,
                         "class": "wpt-source",
                     },
-                    h.E.small("(source)"),
+                    h.E.small(_("(source)")),
                 ),
             )
         elif testType in ["wdspec"]:
@@ -210,7 +211,7 @@ def appendTestList(
                         "href": "https://github.com/web-platform-tests/wpt/blob/master/" + testName,
                         "class": "wpt-source",
                     },
-                    h.E.small("(source)"),
+                    h.E.small(_("(source)")),
                 ),
             )
         else:

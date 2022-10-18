@@ -5,6 +5,7 @@ from collections import OrderedDict
 from datetime import datetime
 
 from .. import config, h, messages as m, t
+from ..translate import _
 
 
 def addCanIUsePanels(doc: t.SpecT) -> None:
@@ -63,7 +64,7 @@ def canIUsePanelFor(id: str, data: t.JSONT, update: str, classFromBrowser: dict[
         {"class": "caniuse-status wrapped", "data-deco": ""},
         h.E.input({"value": "CanIUse", "type": "button", "class": "caniuse-panel-btn"}),
     )
-    mainPara = h.E.p({"class": "support"}, h.E.b({}, "Support:"))
+    mainPara = h.E.p({"class": "support"}, h.E.b({}, _("Support:")))
     h.appendChild(panel, mainPara)
     for browser, support in data["support"].items():
         statusCode = support[0]
@@ -78,9 +79,9 @@ def canIUsePanelFor(id: str, data: t.JSONT, update: str, classFromBrowser: dict[
         panel,
         h.E.p(
             {"class": "caniuse"},
-            "Source: ",
+            _("Source: "),
             h.E.a({"href": "https://caniuse.com/#feat=" + id}, "caniuse.com"),
-            " as of " + update,
+            _(" as of {date}").format(date=update),
         ),
     )
     return panel
@@ -100,7 +101,7 @@ def browserCompatSpan(
     statusClass = {"y": "yes", "n": "no", "a": "partial"}[statusCode]
     outer = h.E.span({"class": browserCodeName + " " + statusClass})
     if statusCode == "a":
-        h.appendChild(outer, h.E.span({}, h.E.span({}, browserFullName, " (limited)")))
+        h.appendChild(outer, h.E.span({}, h.E.span({}, browserFullName, _(" (limited)"))))
     else:
         h.appendChild(outer, h.E.span({}, browserFullName))
     h.appendChild(outer, h.E.span({}, minVersion))

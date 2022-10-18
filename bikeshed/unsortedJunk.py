@@ -8,6 +8,7 @@ from urllib import parse
 from PIL import Image
 
 from . import biblio, config, dfnpanels, h, func, t, messages as m, idl, repository
+from .translate import _
 
 if t.TYPE_CHECKING:
     import widlparser  # pylint: disable=unused-import
@@ -974,7 +975,7 @@ def decorateAutolink(doc: t.SpecT, el: t.ElementT, linkType: str, linkText: str,
 
     # Put an ID on every reference, so I can link to references to a term.
     if el.get("id") is None:
-        _, _, id = ref.url.partition("#")
+        x, x, id = ref.url.partition("#")
         if id:
             el.set("id", f"ref-for-{id}")
             el.set("data-silently-dedup", "")
@@ -992,7 +993,8 @@ def decorateAutolink(doc: t.SpecT, el: t.ElementT, linkType: str, linkText: str,
             typeRefs = doc.refs.queryAllRefs(linkFor=linkText, ignoreObsoletes=True)
             texts = sorted({ref.text for ref in typeRefs})
             if typeRefs:
-                titleText = "Expands to: " + " | ".join(texts)
+                titleText = _("Expands to: ") + " | ".join(texts)
+                assert titleText is not None
                 doc.typeExpansions[linkText] = titleText
         if titleText:
             el.set("title", titleText)
@@ -1052,7 +1054,9 @@ def processIssuesAndExamples(doc: t.SpecT) -> None:
             elif doc.md.issueTrackerTemplate:
                 remoteIssueURL = doc.md.issueTrackerTemplate.format(remoteIssueID)
             if remoteIssueURL:
-                h.appendChild(el, " ", h.E.a({"href": remoteIssueURL}, "[Issue #" + remoteIssueID + "]"))
+                h.appendChild(
+                    el, " ", h.E.a({"href": remoteIssueURL}, _("[Issue #{number}]").format(number=remoteIssueID))
+                )
     for el in h.findAll(".example:not([id])", doc):
         el.set("id", h.safeID(doc, "example-" + h.hashContents(el)))
     h.fixupIDs(doc, h.findAll(".issue, .example", doc))
@@ -1535,7 +1539,7 @@ def inlineRemoteIssues(doc: t.SpecT) -> None:
                 el,
                 h.E.a(
                     {"href": href, "class": "marker"},
-                    f"Issue #{data['number']} on GitHub: “{data['title']}”",
+                    _("Issue #{number} on GitHub: “{title}”").format(number=data["number"], title=data["title"]),
                 ),
                 *h.parseHTML(data["body_html"]),
             )
@@ -1556,11 +1560,11 @@ def addNoteHeaders(doc: t.SpecT) -> None:
     for el in h.findAll("[heading]", doc):
         h.addClass(doc, el, "no-marker")
         if h.hasClass(doc, el, "note"):
-            preText = "NOTE: "
+            preText = _("NOTE: ")
         elif h.hasClass(doc, el, "issue"):
-            preText = "ISSUE: "
+            preText = _("ISSUE: ")
         elif h.hasClass(doc, el, "example"):
-            preText = "EXAMPLE: "
+            preText = _("EXAMPLE: ")
         else:
             preText = ""
         h.prependChild(el, h.E.div({"class": "marker"}, preText, *h.parseHTML(el.get("heading", ""))))

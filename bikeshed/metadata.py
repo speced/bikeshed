@@ -15,6 +15,7 @@ from functools import partial
 from isodate import Duration, parse_duration
 
 from . import config, constants, datablocks, markdown, h, messages as m, repository, t
+from .translate import _
 
 if t.TYPE_CHECKING:
     from .line import Line
@@ -71,7 +72,7 @@ class MetadataManager:
         self.defaultBiblioDisplay: str = "index"
         self.defaultRefStatus: str | None = None
         self.editors: list[dict[str, str | None]] = []
-        self.editorTerm: dict[str, str] = {"singular": "Editor", "plural": "Editors"}
+        self.editorTerm: dict[str, str] = {"singular": _("Editor"), "plural": _("Editors")}
         self.expires: date | None = None
         self.externalInfotrees: config.BoolSet = config.BoolSet(default=False)
         self.favicon: str | None = None
@@ -120,12 +121,12 @@ class MetadataManager:
         self.title: str | None = None
         self.toggleDiffs: bool = False
         self.TR: str | None = None
-        self.trackingVectorAltText: str = "(This is a tracking vector.)"
+        self.trackingVectorAltText: str = _("(This is a tracking vector.)")
         self.trackingVectorClass: str = "tracking-vector"
         self.trackingVectorImage: str | None = None
         self.trackingVectorImageHeight: str = "64"
         self.trackingVectorImageWidth: str = "46"
-        self.trackingVectorTitle: str = "There is a tracking vector here."
+        self.trackingVectorTitle: str = _("There is a tracking vector here.")
         self.translateIDs: dict[str, str] = {}
         self.translations: list[dict[str, str]] = []
         self.useDfnPanels: bool = True
@@ -343,7 +344,7 @@ class MetadataManager:
         if self.logo:
             macros["logo"] = self.logo
         if self.repository:
-            macros["repository"] = self.repository.name or "Unnamed Repo"
+            macros["repository"] = self.repository.name or _("Unnamed Repo")
             macros["repositoryurl"] = self.repository.url
         if self.mailingList:
             macros["mailinglist"] = self.mailingList
