@@ -466,9 +466,14 @@ def fillInterDocumentReferenceFromShepherd(doc: t.SpecT, el: t.ElementT, specNam
     h.removeAttr(el, "data-link-spec", "spec-section")
 
     # Mark this as a used biblio ref
-    specData = doc.refs.specs[specName]
-    bib = biblio.SpecBiblioEntry(specData)
-    registerBiblioUsage(doc, bib, el=el)
+    biblioRef = doc.refs.getBiblioRef(
+        specName,
+        status=doc.md.defaultRefStatus,
+        generateFakeRef=True,
+        quiet=False,
+    )
+    if biblioRef:
+        registerBiblioUsage(doc, biblioRef, el=el)
 
 
 def fillInterDocumentReferenceFromSpecref(doc: t.SpecT, el: t.ElementT, spec: str, section: str) -> None:
