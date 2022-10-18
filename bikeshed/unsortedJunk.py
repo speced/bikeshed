@@ -1013,7 +1013,7 @@ def removeMultipleLinks(doc: t.SpecT) -> None:
             continue
         paras[h.parentElement(el)][el.get("href", "")].append(el)
     for linkGroups in paras.values():
-        for _, links in linkGroups.items():
+        for links in linkGroups.values():
             if len(links) > 1:
                 for el in links[1:]:
                     el.tag = "span"
