@@ -757,7 +757,7 @@ class ReferenceManager:
                         )
                     return None
                 if not quiet:
-                    m.die(
+                    m.linkerror(
                         f"Obsolete biblio ref: [{bib.linkText}] is replaced by [{newBib.linkText}]. Either update the reference, or use [{bib.linkText} obsolete] if this is an intentionally-obsolete reference."
                     )
                 bib = newBib
