@@ -770,7 +770,6 @@ def headerReplacer(match: re.Match) -> t.NodeT:
         h.E.code({}, h.E.a(attrs, linkText)),
         "`",
     )
-    return
 
 
 def addLineNumber(el: t.ElementT) -> None:
