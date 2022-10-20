@@ -758,15 +758,20 @@ def headerReplacer(match: re.Match) -> t.NodeT:
         return t.cast(str, match.group(0))[1:]
     if linkText is None:
         linkText = lt
-    return h.E.a(
-        {
-            "data-link-type": "http-header",
-            "for": "/",
-            "lt": lt,
-            "bs-autolink-syntax": match.group(0),
-        },
-        linkText,
+    attrs = {
+        "data-link-type": "http-header",
+        "for": "/",
+        "lt": lt,
+        "bs-autolink-syntax": match.group(0),
+    }
+    return h.E.span({},
+        "`",
+        h.E.code({},
+            h.E.a(attrs, linkText)
+        ),
+        "`",
     )
+    return
 
 
 def addLineNumber(el: t.ElementT) -> None:
