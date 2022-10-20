@@ -764,11 +764,10 @@ def headerReplacer(match: re.Match) -> t.NodeT:
         "lt": lt,
         "bs-autolink-syntax": match.group(0),
     }
-    return h.E.span({},
+    return h.E.span(
+        {},
         "`",
-        h.E.code({},
-            h.E.a(attrs, linkText)
-        ),
+        h.E.code({}, h.E.a(attrs, linkText)),
         "`",
     )
     return
