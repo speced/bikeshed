@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import copy
 import dataclasses
 import json
 import os
@@ -1169,7 +1168,8 @@ def joinDict(a: t.Mapping[str, JoinA], b: t.Mapping[str, JoinB]) -> dict[str, Jo
 
 
 def joinBoolSet(a: config.BoolSet, b: config.BoolSet) -> config.BoolSet:
-    x = copy.deepcopy(a)
+    x = config.BoolSet()
+    x.update(a)
     x.update(b)
     return x
 

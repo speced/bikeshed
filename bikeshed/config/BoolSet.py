@@ -56,3 +56,31 @@ class BoolSet(collections.abc.MutableMapping):
             falseVals = [k for k, v in self._internal.items() if v is False]
             vrepr = "{" + ", ".join(repr(x) + ":False" for x in falseVals) + "}"
         return f"BoolSet({vrepr}, default={self.default})"
+
+    def hasExplicit(self, key: t.Any) -> bool:
+        return key in self._internal
+
+    @t.overload
+    def update(self, __other: t.SupportsKeysAndGetItem[t.Any, t.Any], **kwargs: bool) -> None:
+        ...
+
+    @t.overload
+    def update(self, __other: t.Iterable[tuple[t.Any, t.Any]], **kwargs: bool) -> None:
+        ...
+
+    @t.overload
+    def update(self, **kwargs: bool) -> None:
+        ...
+
+    def update(self, __other: t.Any = None, **kwargs: bool) -> None:
+        # If either defaults to True, the result
+        # should too, since it "contains" everything
+        # by default.
+        if isinstance(__other, BoolSet):
+            self.default = self.default or __other.default
+            self._internal.update(__other._internal)  # pylint: disable=protected-access
+        elif __other is not None:
+            self._internal.update(__other)
+        for k, v in kwargs.items():
+            self[k] = bool(v)
+        return

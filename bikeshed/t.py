@@ -36,6 +36,7 @@ if TYPE_CHECKING:
         Required,
         NotRequired,
     )
+    from _typeshed import SupportsKeysAndGetItem
 
     from lxml import etree
 
