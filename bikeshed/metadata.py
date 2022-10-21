@@ -61,7 +61,7 @@ class MetadataManager:
         self.boilerplate: config.BoolSet = config.BoolSet(default=True)
         self.canIUseURLs: list[str] = []
         self.canonicalURL: str | None = None
-        self.complainAbout: config.BoolSet = config.BoolSet()
+        self.complainAbout: config.BoolSet = config.BoolSet(["mixed-indents"])
         self.customTextMacros: list[tuple[str, str]] = []
         self.customWarningText: list[str] = []
         self.customWarningTitle: str | None = None
@@ -659,7 +659,9 @@ def parseRefStatus(key: str, val: str, lineNum: str | int | None) -> str:
 
 
 def parseComplainAbout(key: str, val: str, lineNum: str | int | None) -> config.BoolSet:
-    validLabels = frozenset(["missing-example-ids", "broken-links", "accidental-2119", "missing-exposed"])
+    validLabels = frozenset(
+        ["missing-example-ids", "broken-links", "accidental-2119", "missing-exposed", "mixed-indents"]
+    )
     ret = parseBoolishList(key, val.lower(), default=False, validLabels=validLabels, lineNum=lineNum)
     return ret
 

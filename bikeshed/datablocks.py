@@ -521,26 +521,26 @@ def transformArgumentdef(
     text = (
         """
 <table {attrs}{lineNumAttr}>
-    <caption>Arguments for the <a idl lt='{method}' for='{interface}'{lineNumAttr}>{interface}.{method}</a> method.</caption>
-    <thead>
-        <tr>
-            <th>Parameter
-            <th>Type
-            <th style="text-align:center">Nullable
-            <th style="text-align:center">Optional
-            <th>Description
-    <tbody>""".format(
+<caption>Arguments for the <a idl lt='{method}' for='{interface}'{lineNumAttr}>{interface}.{method}</a> method.</caption>
+<thead>
+<tr>
+<th>Parameter
+<th>Type
+<th style="text-align:center">Nullable
+<th style="text-align:center">Optional
+<th>Description
+<tbody>""".format(
             attrs=rootAttrs, interface=interface, method=method, lineNumAttr=lineNumAttr
         )
         + "\n".join(
             [
                 """
-        <tr>
-            <td><dfn argument{lineNumAttr}>{0}</dfn>
-            <td>
-            <td style="text-align:center">
-            <td style="text-align:center">
-            <td>{1}""".format(
+<tr>
+<td><dfn argument{lineNumAttr}>{0}</dfn>
+<td>
+<td style="text-align:center">
+<td style="text-align:center">
+<td>{1}""".format(
                     param, desc, lineNumAttr=lineNumAttr
                 )
                 for param, desc in attrs.items()
