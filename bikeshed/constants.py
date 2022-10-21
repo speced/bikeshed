@@ -19,6 +19,7 @@ def errorLevelAt(target: str) -> bool:
         "fatal": 1,
         "link-error": 2,
         "warning": 3,
+        "lint": 4,
         "everything": 1000,
     }
     currentLevel = levels[errorLevel[0]]

@@ -71,6 +71,25 @@ def linkerror(msg: str, el: t.ElementT | None = None, lineNum: str | int | None 
         errorAndExit()
 
 
+def lint(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None) -> None:
+    if lineNum is None and el is not None and el.get("line-number"):
+        lineNum = el.get("line-number")
+    suffix = ""
+    if el is not None:
+        if el.get("bs-autolink-syntax"):
+            suffix = "\n" + t.cast(str, el.get("bs-autolink-syntax"))
+        else:
+            suffix = "\n" + lxml.html.tostring(el, with_tail=False, encoding="unicode")
+    formattedMsg = formatMessage("lint", msg + suffix, lineNum=lineNum)
+    if formattedMsg not in messages:
+        messageCounts["lint"] += 1
+        messages.add(formattedMsg)
+        if constants.quiet < 1:
+            p(formattedMsg)
+    if constants.errorLevelAt("lint"):
+        errorAndExit()
+
+
 def warn(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None) -> None:
     if lineNum is None and el is not None and el.get("line-number"):
         lineNum = el.get("line-number")
@@ -153,6 +172,8 @@ def formatMessage(type: str, text: str, lineNum: str | int | None = None) -> str
             return f"<fatal>{text}</fatal>"
         if type == "link":
             return f"<linkerror>{text}</linkerror>"
+        if type == "lint":
+            return f"<lint>{text}</lint>"
         if type == "warning":
             return f"<warning>{text}</warning>"
         if type == "message":
@@ -178,6 +199,9 @@ def formatMessage(type: str, text: str, lineNum: str | int | None = None) -> str
         color = "red"
     elif type == "link":
         headingText = "LINK ERROR"
+        color = "yellow"
+    elif type == "lint":
+        headingText = "LINT"
         color = "yellow"
     elif type == "warning":
         headingText = "WARNING"

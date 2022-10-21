@@ -20,7 +20,7 @@ def brokenLinks(doc: t.SpecT) -> None:
     globalTimeout = 10  # seconds
     for el in h.findAll("a", doc):
         if time.time() - startTime > globalTimeout:
-            m.warn(f"Link checking took longer than {globalTimeout} seconds, skipping the rest.")
+            m.lint(f"Link checking took longer than {globalTimeout} seconds, skipping the rest.")
             break
         href = el.get("href")
         if not href or href[0] == "#":
@@ -32,10 +32,10 @@ def brokenLinks(doc: t.SpecT) -> None:
         try:
             res = requests.get(href, verify=False, timeout=5)
         except requests.exceptions.Timeout:
-            m.warn(f"Checking the following link timed out:\n{h.outerHTML(el)}", el=el)
+            m.lint(f"Checking the following link timed out:\n{h.outerHTML(el)}", el=el)
         except Exception as e:
-            m.warn(f"The following link caused an error when I tried to request it:\n{h.outerHTML(el)}\n{e}", el=el)
+            m.lint(f"The following link caused an error when I tried to request it:\n{h.outerHTML(el)}\n{e}", el=el)
             continue
         if res.status_code >= 400:
-            m.warn(f"Got a {res.status_code} status when fetching the link for:\n{h.outerHTML(el)}", el=el)
+            m.lint(f"Got a {res.status_code} status when fetching the link for:\n{h.outerHTML(el)}", el=el)
     m.say("Done checking links!")

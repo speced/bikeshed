@@ -27,7 +27,7 @@ def accidental2119(doc: t.SpecT) -> None:
             if el.text is not None:
                 match = re.search(keywords, el.text)
                 if match:
-                    m.warn(
+                    m.lint(
                         f"RFC2119 keyword in non-normative section (use: might, can, has to, or override with <span class=allow-2119>): {el.text}",
                         el=el,
                     )
@@ -35,7 +35,7 @@ def accidental2119(doc: t.SpecT) -> None:
                 if child.tail is not None:
                     match = re.search(keywords, child.tail)
                     if match:
-                        m.warn(
+                        m.lint(
                             f"RFC2119 keyword in non-normative section (use: might, can, has to, or override with <span class=allow-2119>): {child.tail}",
                             el=el,
                         )

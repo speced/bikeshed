@@ -10,4 +10,4 @@ def exampleIDs(doc: t.SpecT) -> None:
     if not doc.md.complainAbout["missing-example-ids"]:
         return
     for el in h.findAll(".example:not([id])", doc):
-        m.warn(f"Example needs ID:\n{h.outerHTML(el)[0:100]}", el=el)
+        m.lint(f"Example needs ID:\n{h.outerHTML(el)[0:100]}", el=el)
