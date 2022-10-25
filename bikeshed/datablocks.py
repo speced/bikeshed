@@ -354,6 +354,9 @@ def transformPropdef(lines: list[str], tagName: str, firstLine: str, lineNum: in
             th = f"<th><a href='https://www.w3.org/TR/css-cascade/#applies-to'>{key}:</a>"
             if val and val.lower() == "all elements":
                 td = "<td><a href='https://www.w3.org/TR/css-pseudo/#generated-content' title='Includes ::before and ::after pseudo-elements.'>all elements</a>"
+        elif key == "Logical property group":
+            th = f"<th><a href='https://drafts.csswg.org/css-logical-1/#logical-property-group'>{key}:</a>"
+            td = f"<td><a data-link-type=property data-okay-to-fail>{val}</a>"
         ret.append(tr + th + td)
     ret.append("</table>")
 
