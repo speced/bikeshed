@@ -678,18 +678,28 @@ def varReplacer(match: re.Match) -> t.NodeT:
 
 inlineLinkRe = re.compile(
     r"""
-                            (\\)?
-                            \[([^\]]*)\]
-                            \(\s*
-                            ([^\s)]+)
-                            \s*(?:"([^"]*)")?\s*
-                            \)""",
+                    (\\)?
+                    \[([^\]]+)\]
+                    \(\s*
+                    (
+                        (?:\\[()]|[^\s"()])*
+                        (?:
+                            # Optional top-level paren group
+                            (?:\((?:\\[()]|[^\s"()])*\))
+                            (?:\\[()]|[^\s"()])*
+                        )*
+                    )
+                    \s*(?:"([^"]*)")?\s*
+                    \)""",
     re.X,
 )
 
 
 def inlineLinkReplacer(match: re.Match) -> t.NodeT:
     _, text, href, title = match.groups()
+    # Remove escapes from parens.
+    href = re.sub(r"\\\(", "(", href)
+    href = re.sub(r"\\\)", ")", href)
     if title:
         attrs = {"href": href, "title": title}
     else:
