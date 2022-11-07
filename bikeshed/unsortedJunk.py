@@ -826,6 +826,8 @@ def processBiblioLinks(doc: t.SpecT) -> None:
             ):  # False if it's already been replaced by an author supplied text using the [[FOOBAR inline|custom text]] syntax.
                 h.clearContents(el)
                 h.appendChild(el, h.E.cite(ref.title))
+        else:
+            el.set("title", ref.title)
         if biblioDisplay in ("inline", "direct"):
             if ref.url:
                 el.set("href", ref.url)
