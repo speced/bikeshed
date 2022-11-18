@@ -213,7 +213,6 @@ class RefSource:
             if exact:
                 refs = list(textRefsIterator([text]))
             else:
-                assert linkType is not None
                 textsToSearch = list(utils.linkTextVariations(text, linkType))
                 if text.endswith("()") and text in self.methods:
                     textsToSearch += list(self.methods[text].variants.keys())
