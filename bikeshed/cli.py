@@ -497,7 +497,8 @@ def handleEchidna(options: argparse.Namespace, extras: list[str]) -> None:
     doc.preprocess()
     addDirs = [] if options.selfContained else options.additionalDirectories
     if options.justTar:
-        publish.prepareTar(doc, visibleTar=True, additionalDirectories=addDirs)
+        tarBytes = publish.prepareTar(doc, additionalDirectories=addDirs)
+        sys.stdout.buffer.write(tarBytes)
     else:
         publish.publishEchidna(
             doc,

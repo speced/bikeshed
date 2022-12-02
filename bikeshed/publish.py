@@ -50,18 +50,15 @@ def publishEchidna(
         print(r.headers)
 
 
-def prepareTar(doc: t.SpecT, visibleTar: bool = False, additionalDirectories: list[str] | None = None) -> bytes:
+def prepareTar(doc: t.SpecT, additionalDirectories: list[str] | None = None) -> bytes:
     if additionalDirectories is None:
         additionalDirectories = ["images", "diagrams", "examples"]
     # Finish the spec
     specOutput = tempfile.NamedTemporaryFile(delete=False)
     doc.finish(outputFilename=specOutput.name)
     # Build the TAR file
-    if visibleTar:
-        tar = tarfile.open(name="test.tar", mode="w")
-    else:
-        f = tempfile.NamedTemporaryFile(delete=False)
-        tar = tarfile.open(fileobj=f, mode="w")
+    f = tempfile.NamedTemporaryFile(delete=False)
+    tar = tarfile.open(fileobj=f, mode="w")
     tar.add(specOutput.name, arcname="Overview.html")
     # Loaded from .include files
     additionalFiles = extensions.BSPublishAdditionalFiles(additionalDirectories)  # type: ignore # pylint: disable=no-member
@@ -76,13 +73,7 @@ def prepareTar(doc: t.SpecT, visibleTar: bool = False, additionalDirectories: li
     tar.close()
     specOutput.close()
     os.remove(specOutput.name)
-    if visibleTar:
-        file = open("test.tar", "rb")
-        tarData = file.read()
-        file.close()
-        os.remove("test.tar")
-    else:
-        f.seek(0)
-        tarData = f.read()
-        f.close()
+    f.seek(0)
+    tarData = f.read()
+    f.close()
     return tarData
