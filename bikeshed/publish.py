@@ -75,7 +75,7 @@ def prepareTar(doc: t.SpecT, additionalDirectories: list[str] | None = None) -> 
             else:
                 tar.add(inputPath, outputPath)
         except OSError as e:
-            m.die(f"Failed to add the file '{inputPath}' to the TAR file.\n{e}")
+            pass
     tar.close()
     specOutput.close()
     os.remove(specOutput.name)
