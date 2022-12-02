@@ -8,7 +8,7 @@ import os
 import tarfile
 import tempfile
 
-from . import extensions, t
+from . import extensions, t, messages as m
 
 
 def publishEchidna(
@@ -63,13 +63,19 @@ def prepareTar(doc: t.SpecT, additionalDirectories: list[str] | None = None) -> 
     # Loaded from .include files
     additionalFiles = extensions.BSPublishAdditionalFiles(additionalDirectories)  # type: ignore # pylint: disable=no-member
     for fname in additionalFiles:
+        if isinstance(fname, str):
+            inputPath = str(doc.inputSource.relative(fname))
+            outputPath = None
+        else:
+            inputPath = str(doc.inputSource.relative(fname[0]))
+            outputPath = fname[1]
         try:
-            if isinstance(fname, str):
-                tar.add(fname)
-            elif isinstance(fname, list):
-                tar.add(fname[0], arcname=fname[1])
-        except OSError:
-            pass
+            if outputPath is None:
+                tar.add(inputPath)
+            else:
+                tar.add(inputPath, outputPath)
+        except OSError as e:
+            m.die(f"Failed to add the file '{inputPath}' to the TAR file.\n{e}")
     tar.close()
     specOutput.close()
     os.remove(specOutput.name)
