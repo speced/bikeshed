@@ -173,7 +173,12 @@ def main() -> None:
         action="store_true",
         help="The spec is self-contained, do not bundle any extra directories in the tar file.",
     )
-    echidnaParser.add_argument("--just-tar", dest="justTar", action="store_true")
+    echidnaParser.add_argument(
+        "--just-tar",
+        dest="justTar",
+        action="store_true",
+        help="Don't actually submit to the echidna service, instead just echo the prepared TAR file to stdout.",
+    )
 
     watchParser = subparsers.add_parser(
         "watch",
