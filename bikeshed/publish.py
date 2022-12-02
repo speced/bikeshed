@@ -74,7 +74,7 @@ def prepareTar(doc: t.SpecT, additionalDirectories: list[str] | None = None) -> 
                 tar.add(inputPath)
             else:
                 tar.add(inputPath, outputPath)
-        except OSError as e:
+        except OSError:
             pass
     tar.close()
     specOutput.close()
