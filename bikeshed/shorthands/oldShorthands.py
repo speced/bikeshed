@@ -125,7 +125,7 @@ def parseRangeComponent(val: str) -> tuple[str | None, float | int]:
     num = int(digits) * signVal
     val = str(num)
 
-    return sign + val + unit, num
+    return val + unit, num
 
 
 def transformMaybePlaceholders(doc: t.SpecT) -> None:
