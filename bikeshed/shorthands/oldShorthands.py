@@ -122,7 +122,7 @@ def parseRangeComponent(val: str) -> tuple[str | None, float | int]:
     if match is None:
         return None, 0
     (digits, unit) = match.groups()
-    num = int(digits)
+    num = int(digits) * signVal
     val = str(num)
 
     return sign + val + unit, num
