@@ -109,7 +109,7 @@ def parseRangeComponent(val: str) -> tuple[str | None, float | int]:
     num: float | int
     val = val.strip()
     if val[0] in ["-", "−"]:
-        sign = "−"
+        sign = "-"
         signVal = -1
         val = val[1:]
 
