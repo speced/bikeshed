@@ -67,9 +67,10 @@ if t.TYPE_CHECKING:
             "href": t.Required[str],
             "title": t.Required[str],
             "level": t.Required[int],
-            "number": t.Required[str]
+            "number": t.Required[str],
         },
-        total=False)
+        total=False,
+    )
 
     # Need to use function form due to "for" key
     # being invalid as a property name
@@ -122,6 +123,7 @@ if t.TYPE_CHECKING:
 def progressMessager(index: int, total: int) -> t.Callable[[], None]:
     return lambda: m.say(f"Downloading data for spec {index}/{total}...")
 
+
 def update(path: str, dryRun: bool = False) -> set[str] | None:
     def setStatus(obj: RawAnchorT, status: str) -> RawAnchorT:
         obj["status"] = status
@@ -132,7 +134,9 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
             return True
         for s in specs.values():
             # Shortnames don't always match. Let's compare URLs
-            if (s["snapshot_url"] is not None and s["snapshot_url"] == spec["snapshot_url"]) or (s["current_url"] is not None and s["current_url"] == spec["current_url"]):
+            if (s["snapshot_url"] is not None and s["snapshot_url"] == spec["snapshot_url"]) or (
+                s["current_url"] is not None and s["current_url"] == spec["current_url"]
+            ):
                 return True
         return False
 
@@ -187,11 +191,15 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
     m.say("Downloading anchor data from Webref...")
     webrefAPIUrl = "https://raw.githubusercontent.com/w3c/webref/main/"
     currentWebrefData = dataFromWebref(webrefAPIUrl + "ed/index.json")
-    if not currentWebrefData or not "results" in currentWebrefData or currentWebrefData["results"] is None:
+    if not currentWebrefData or "results" not in currentWebrefData or currentWebrefData["results"] is None:
         return None
     currentWebrefData = currentWebrefData["results"]
     snapshotWebrefData = dataFromWebref(webrefAPIUrl + "tr/index.json")
-    snapshotWebrefData = snapshotWebrefData["results"] if snapshotWebrefData and "results" in snapshotWebrefData and snapshotWebrefData["results"] is not None else None
+    snapshotWebrefData = (
+        snapshotWebrefData["results"]
+        if snapshotWebrefData and "results" in snapshotWebrefData and snapshotWebrefData["results"] is not None
+        else None
+    )
 
     for i, currentSpec in enumerate(currentWebrefData, 1):
         lastMsgTime = config.doEvery(
@@ -214,11 +222,16 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
         if "dfns" in currentSpec:
             currentAnchors = dataFromWebref(webrefAPIUrl + "ed/" + currentSpec["dfns"])
             if currentAnchors:
-                rawAnchorData = [setStatus(convertWebrefAnchor(x, spec["current_url"]), "current") for x in currentAnchors["dfns"]]
+                rawAnchorData = [
+                    setStatus(convertWebrefAnchor(x, spec["current_url"]), "current") for x in currentAnchors["dfns"]
+                ]
         if "headings" in currentSpec:
             currentHeadings = dataFromWebref(webrefAPIUrl + "ed/" + currentSpec["headings"])
             if currentHeadings:
-                rawAnchorData += [setStatus(convertWebrefHeading(x, spec["current_url"]), "current") for x in currentHeadings["headings"]]
+                rawAnchorData += [
+                    setStatus(convertWebrefHeading(x, spec["current_url"]), "current")
+                    for x in currentHeadings["headings"]
+                ]
 
         # Complete list of anchors/headings with those from the snapshot version of the spec
         if spec["snapshot_url"] is not None and snapshotWebrefData is not None:
@@ -228,11 +241,17 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
                 if "dfns" in snapshotSpec:
                     snapshotAnchors = dataFromWebref(webrefAPIUrl + "tr/" + snapshotSpec["dfns"])
                     if snapshotAnchors:
-                        rawAnchorData += [setStatus(convertWebrefAnchor(x, spec["snapshot_url"]), "snapshot") for x in snapshotAnchors["dfns"]]
+                        rawAnchorData += [
+                            setStatus(convertWebrefAnchor(x, spec["snapshot_url"]), "snapshot")
+                            for x in snapshotAnchors["dfns"]
+                        ]
                 if "headings" in snapshotSpec:
                     snapshotHeadings = dataFromWebref(webrefAPIUrl + "tr/" + snapshotSpec["headings"])
                     if snapshotHeadings:
-                        rawAnchorData += [setStatus(convertWebrefHeading(x, spec["snapshot_url"]), "snapshot") for x in snapshotHeadings["headings"]]
+                        rawAnchorData += [
+                            setStatus(convertWebrefHeading(x, spec["snapshot_url"]), "snapshot")
+                            for x in snapshotHeadings["headings"]
+                        ]
 
         if len(rawAnchorData) > 0:
             processRawAnchors(rawAnchorData, anchors, specHeadings)
@@ -313,20 +332,21 @@ def dataFromApi(api: APIClient, *args: t.Any, **kwargs: t.Any) -> t.JSONT:
         raise Exception(f"Didn't get expected JSON data. Got:\n{data.decode('utf-8')}")
     return t.cast("t.JSONT", data)
 
+
 @tenacity.retry(reraise=True, stop=tenacity.stop_after_attempt(3), wait=tenacity.wait_random(1, 2))
 def dataFromWebref(url: str) -> t.JSONT:
     try:
         response = requests.get(url)
     except Exception as e:
-        raise Exception(
-            f"Couldn't download data from Webref.\n{e}"
-        )
+        raise Exception(f"Couldn't download data from Webref.\n{e}") from e
     try:
         data = response.json()
     except Exception as e:
         raise Exception(
-            f"Data retrieved from Webref wasn't valid JSON for some reason. Try downloading again?\n{e}")
+            f"Data retrieved from Webref wasn't valid JSON for some reason. Try downloading again?\n{e}"
+        ) from e
     return data
+
 
 def linearizeAnchorTree(multiTree: list, rawAnchors: list[dict[str, t.Any]] | None = None) -> list[RawAnchorT]:
     if rawAnchors is None:
@@ -377,6 +397,7 @@ def genSpec(rawSpec: RawSpecT) -> SpecT:
         spec["level"] = 1
     return spec
 
+
 def genWebrefSpec(rawSpec: RawWebrefSpecT) -> SpecT:
     """Generate a spec object from data gleaned from Webref"""
     assert rawSpec["shortname"] is not None
@@ -392,9 +413,12 @@ def genWebrefSpec(rawSpec: RawWebrefSpecT) -> SpecT:
         "title": rawSpec["shortTitle"],
         "description": rawSpec["title"],
         "abstract": None,
-        "level": int(rawSpec["seriesVersion"]) if "seriesVersion" in rawSpec and re.match(r"^\d+$", rawSpec["seriesVersion"]) else None,
+        "level": int(rawSpec["seriesVersion"])
+        if "seriesVersion" in rawSpec and re.match(r"^\d+$", rawSpec["seriesVersion"])
+        else None,
     }
     return spec
+
 
 def convertWebrefHeading(heading: RawWebrefHeadingT, specUrl: str) -> RawAnchorT:
     """Convert a heading returned by Webref to the anchor format used in Shepherd"""
@@ -414,6 +438,7 @@ def convertWebrefHeading(heading: RawWebrefHeadingT, specUrl: str) -> RawAnchorT
         "uri": heading["href"].replace(specUrl, ""),
     }
     return anchor
+
 
 def convertWebrefAnchor(rawAnchor: RawWebrefAnchorT, specUrl: str) -> RawAnchorT:
     """Convert an anchor returned by Webref to the anchor format used in Shepherd"""
@@ -435,6 +460,7 @@ def convertWebrefAnchor(rawAnchor: RawWebrefAnchorT, specUrl: str) -> RawAnchorT
         "uri": rawAnchor["href"].replace(specUrl, ""),
     }
     return anchor
+
 
 def fixupAnchor(anchor: RawAnchorT) -> RawAnchorT:
     """Miscellaneous fixes to the anchors before I start processing"""
