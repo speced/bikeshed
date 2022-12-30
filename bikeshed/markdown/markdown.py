@@ -623,7 +623,7 @@ def parseParagraph(stream: TokenStream) -> list[l.Line]:
         matchNote = re.match(r"(note[:,])(\s*)(.*)", line, re.I)
         if matchNote:
             line = matchNote.group(3)
-            p += "<span>{note}</span>{ws}".format(note=matchNote.group(1), ws=matchNote.group(2))
+            p += "<span class=marker>{note}</span>{ws}".format(note=matchNote.group(1), ws=matchNote.group(2))
     elif line.lower().startswith("issue:"):
         line = line[6:]
         p = f"<p line-number={i} class='replace-with-issue-class'>"
