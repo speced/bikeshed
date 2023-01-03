@@ -775,11 +775,87 @@ def addIDLSection(doc: t.SpecT) -> None:
         del el.attrib["id"]
     h.addClass(doc, container, "highlight")
 
+bookmarkCss = """
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24
+}
+.heading {
+    position: relative;
+}
+.tooltip {
+    opacity: 0;
+    display: block;
+	position: absolute;
+	top: -90%;
+	left: 0;
+    pointer-events: auto;
+    border: shadow 2px gray;
+    padding: 0;
+    margin: 0;
+    background: rgb(200 200 200 / 50%);
+    color: black;
+    border-radius: 5px;
+}
+.tooltip button {
+    padding: 0;
+    background: rgb(100 100 100 / 50%);
+}
+.heading:hover .tooltip {
+	opacity: 0.8;
+}
+.bookmarksSection {
+    margin-left: 2em;
+}
+"""
+
+bookmarkScript = """
+  "use strict";
+    // Add tooltip behavior to all headers.
+    const headers = document.querySelectorAll('.heading');
+    // We need to get the createElement method now, or else it is not available!?
+    const createElement = document.createElement;
+    const makeTag = (tag) => {
+        return createElement.call(document, tag);
+    }
+
+    for (let h of headers) {
+        const tooltipDiv = makeTag('div');
+        tooltipDiv.className = 'tooltip';
+        const button = makeTag('button');
+        button.setHTML('<span class="material-symbols-outlined" title="Add bookmark">bookmark_add</span>');
+        button.addEventListener('click', () => { addBookmark(h); });
+        tooltipDiv.insertAdjacentElement('beforeend', button);
+        h.insertAdjacentElement('beforeend', tooltipDiv);
+    }
+    function addBookmark(header) {
+        console.info('add bookmark for', header);
+        let bookmarksSection = document.querySelector('.bookmarksSection');
+        if (bookmarksSection == null) {
+            const tocContents = document.querySelector('#toc #contents');
+            bookmarksSection = makeTag('div');
+            bookmarksSection.className = 'bookmarksSection';
+            bookmarksSection.setHTML('Bookmarks <ul class="bookmarks"></ul>');
+            tocContents.insertAdjacentElement('afterend', bookmarksSection);
+        }
+        const bookmarksList = document.querySelector('.bookmarks');
+        const bookmark = makeTag('li');
+        bookmark.setHTML(`<li><a href="#${header.id}">${header.id}</a></li>`);
+        bookmarksList.insertAdjacentElement('beforeend', bookmark);
+    }
+"""
 
 def addTOCSection(doc: t.SpecT) -> None:
     toc = getFillContainer("table-of-contents", doc=doc, default=False)
     if toc is None:
         return
+    # Load icon for "add bookmark"
+    h.appendChild(
+        toc,
+        h.E.link(
+            { "rel": "stylesheet",
+             "href": "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@48,400,0,0"}
+        )
+    )
     h.appendChild(
         toc,
         h.E.h2(
@@ -787,6 +863,8 @@ def addTOCSection(doc: t.SpecT) -> None:
             _("Table of Contents"),
         ),
     )
+    doc.extraScripts["script-bookmark"] = bookmarkScript
+    doc.extraStyles["css-bookmark"] = bookmarkCss
 
     # containers[n] holds the current <ol> for inserting each heading's <li> into.
     # containers[1] is initialized with something arbitrary
