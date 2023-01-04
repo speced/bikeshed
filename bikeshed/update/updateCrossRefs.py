@@ -156,37 +156,10 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
             if rawAnchor["type"] in config.dfnTypes.union(["dfn"]):
                 addToAnchors(rawAnchor, anchors, spec=spec)
 
-    m.say("Downloading anchor data from Shepherd...")
-    shepherd = APIClient(
-        "https://api.csswg.org/shepherd/",
-        version="vnd.csswg.shepherd.v1",
-        ca_cert_path=certifi.where(),
-    )
-    rawSpecData = dataFromApi(shepherd, "specifications", draft=True)
-    if not rawSpecData:
-        return None
-
     specs: SpecsT = dict()
     anchors: AnchorsT = defaultdict(list)
     headings: AllHeadingsT = {}
     lastMsgTime: float = 0
-    for i, rawSpec in enumerate(rawSpecData.values(), 1):
-        lastMsgTime = config.doEvery(
-            s=5,
-            lastTime=lastMsgTime,
-            action=progressMessager(i, len(rawSpecData)),
-        )
-        rawSpec = dataFromApi(shepherd, "specifications", draft=True, anchors=True, spec=rawSpec["name"])
-        spec = genSpec(rawSpec)
-        assert spec["vshortname"] is not None
-        specs[spec["vshortname"]] = spec
-        specHeadings: HeadingsT = {}
-        headings[spec["vshortname"]] = specHeadings
-
-        rawAnchorData = [setStatus(x, "snapshot") for x in linearizeAnchorTree(rawSpec.get("anchors", []))] + [
-            setStatus(x, "current") for x in linearizeAnchorTree(rawSpec.get("draft_anchors", []))
-        ]
-        processRawAnchors(rawAnchorData, anchors, specHeadings)
 
     m.say("Downloading anchor data from Webref...")
     webrefAPIUrl = "https://raw.githubusercontent.com/w3c/webref/main/"
@@ -210,12 +183,9 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
         if "dfns" not in currentSpec and "headings" not in currentSpec:
             continue
         spec = genWebrefSpec(currentSpec)
-        if isSpecInList(spec, specs):
-            # Skip specs that are already in Shepherd's database
-            continue
 
         assert spec["vshortname"] is not None
-        specs[spec["vshortname"]] = spec
+        specs[spec["vshortname"].lower()] = spec
         specHeadings: HeadingsT = {}
         headings[spec["vshortname"]] = specHeadings
         rawAnchorData: list[RawAnchorT] = []
@@ -255,6 +225,37 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
 
         if len(rawAnchorData) > 0:
             processRawAnchors(rawAnchorData, anchors, specHeadings)
+
+    m.say("Downloading anchor data from Shepherd...")
+    shepherd = APIClient(
+        "https://api.csswg.org/shepherd/",
+        version="vnd.csswg.shepherd.v1",
+        ca_cert_path=certifi.where(),
+    )
+    rawSpecData = dataFromApi(shepherd, "specifications", draft=True)
+    if not rawSpecData:
+        return None
+
+    for i, rawSpec in enumerate(rawSpecData.values(), 1):
+        lastMsgTime = config.doEvery(
+            s=5,
+            lastTime=lastMsgTime,
+            action=progressMessager(i, len(rawSpecData)),
+        )
+        if isSpecInList(genSpec(rawSpec), specs):
+            # Skip specs that are already in Shepherd's database
+            continue
+        rawSpec = dataFromApi(shepherd, "specifications", draft=False, anchors=False, spec=rawSpec["name"])
+        spec = genSpec(rawSpec)
+        assert spec["vshortname"] is not None
+        specs[spec["vshortname"]] = spec
+        specHeadings: HeadingsT = {}
+        headings[spec["vshortname"]] = specHeadings
+
+        rawAnchorData = [setStatus(x, "snapshot") for x in linearizeAnchorTree(rawSpec.get("anchors", []))] + [
+            setStatus(x, "current") for x in linearizeAnchorTree(rawSpec.get("draft_anchors", []))
+        ]
+        processRawAnchors(rawAnchorData, anchors, specHeadings)
 
     cleanSpecHeadings(headings)
 
@@ -406,8 +407,8 @@ def genWebrefSpec(rawSpec: RawWebrefSpecT) -> SpecT:
     assert rawSpec["title"] is not None
     assert rawSpec["shortTitle"] is not None
     spec: SpecT = {
-        "vshortname": rawSpec["shortname"],
-        "shortname": rawSpec["series"]["shortname"],
+        "vshortname": rawSpec["shortname"].lower(),
+        "shortname": rawSpec["series"]["shortname"].lower(),
         "snapshot_url": rawSpec["release"]["url"] if "release" in rawSpec else None,
         "current_url": rawSpec["nightly"]["url"],
         "title": rawSpec["shortTitle"],
@@ -661,7 +662,7 @@ def writeAnchorsFile(anchors: AnchorsT, path: str) -> set[str]:
         writtenPaths.add(p)
         with open(p, "w", encoding="utf-8") as fh:
             for key, entries in sorted(group_anchors.items(), key=lambda x: x[0]):
-                for e in entries:
+                for e in sorted(entries, key=lambda x: x["url"]):
                     fh.write(key + "\n")
                     for field in [
                         "type",
