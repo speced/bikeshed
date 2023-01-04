@@ -12,8 +12,8 @@ from . import conditional, config, dfnpanels, h, messages as m, refs as r, retri
 from .translate import _
 
 if t.TYPE_CHECKING:
-    MetadataT: t.TypeAlias = t.Mapping[str, t.Sequence[MetadataValueT]]
     MetadataValueT: t.TypeAlias = str | t.NodesT | None
+    MetadataT: t.TypeAlias = t.Mapping[str, t.Sequence[MetadataValueT]]
 
 
 def boilerplateFromHtml(doc: t.SpecT, htmlString: str) -> t.NodesT:
@@ -776,40 +776,43 @@ def addIDLSection(doc: t.SpecT) -> None:
     h.addClass(doc, container, "highlight")
 
 bookmarkCss = """
-.material-symbols-outlined {
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24
-}
-.heading {
-    position: relative;
-}
-.tooltip {
-    opacity: 0;
-    display: block;
-	position: absolute;
-	top: -90%;
-	left: 0;
-    pointer-events: auto;
-    border: shadow 2px gray;
-    padding: 0;
-    margin: 0;
-    background: rgb(200 200 200 / 50%);
-    color: black;
-    border-radius: 5px;
-}
-.tooltip button {
-    padding: 0;
-    background: rgb(100 100 100 / 50%);
-}
-.heading:hover .tooltip {
-	opacity: 0.8;
-}
-.bookmarksSection {
-    margin-left: 2em;
-}
-"""
+    .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24
+    }
+    .heading {
+        position: relative;
+    }
+    .tooltip {
+        opacity: 0;
+        display: block;
+        position: absolute;
+        top: -90%;
+        left: 0;
+        pointer-events: auto;
+        border: shadow 2px gray;
+        padding: 0;
+        margin: 0;
+        background: rgb(200 200 200 / 50%);
+        color: black;
+        border-radius: 5px;
+    }
+    a.has-tooltip {
+        display: block;
+    }
+    .tooltip button {
+        padding: 0;
+        background: rgb(100 100 100 / 50%);
+    }
+    .has-tooltip:hover .tooltip {
+        opacity: 0.8;
+    }
+    .bookmarksSection {
+        margin-left: 2em;
+    }
+    """
 
 bookmarkScript = """
-  "use strict";
+    "use strict";
     // Add tooltip behavior to all headers.
     const headers = document.querySelectorAll('.heading');
     // We need to get the createElement method now, or else it is not available!?
@@ -819,16 +822,26 @@ bookmarkScript = """
     }
 
     for (let h of headers) {
+        const textElement = h.querySelector('span.content');
+        insertTooltipAction(h, 'bookmark_add', 'Add bookmark', (event) => {
+            addBookmark(h, textElement.textContent); })
+    }
+
+    function insertTooltipAction(element, className, title, action) {
         const tooltipDiv = makeTag('div');
         tooltipDiv.className = 'tooltip';
         const button = makeTag('button');
-        button.setHTML('<span class="material-symbols-outlined" title="Add bookmark">bookmark_add</span>');
-        button.addEventListener('click', () => { addBookmark(h); });
+        button.setHTML(
+            `<span class="material-symbols-outlined"
+                title="${title}">${className}</span>`);
+        button.addEventListener('click', action);
         tooltipDiv.insertAdjacentElement('beforeend', button);
-        h.insertAdjacentElement('beforeend', tooltipDiv);
+        element.insertAdjacentElement('beforeend', tooltipDiv);
+        element.classList.add('has-tooltip');
     }
-    function addBookmark(header) {
-        console.info('add bookmark for', header);
+
+    function addBookmark(header, text) {
+        // console.info('add bookmark for', header);
         let bookmarksSection = document.querySelector('.bookmarksSection');
         if (bookmarksSection == null) {
             const tocContents = document.querySelector('#toc #contents');
@@ -838,24 +851,32 @@ bookmarkScript = """
             tocContents.insertAdjacentElement('afterend', bookmarksSection);
         }
         const bookmarksList = document.querySelector('.bookmarks');
-        const bookmark = makeTag('li');
-        bookmark.setHTML(`<li><a href="#${header.id}">${header.id}</a></li>`);
-        bookmarksList.insertAdjacentElement('beforeend', bookmark);
+        const bookmarkItem = makeTag('li');
+        bookmarksList.insertAdjacentElement('beforeend', bookmarkItem);
+
+        const bookmarkLink = makeTag('a');
+        bookmarkLink.href = header.id;
+        bookmarkLink.textContent = text;
+        bookmarkItem.insertAdjacentElement('beforeend', bookmarkLink);
+
+        insertTooltipAction(bookmarkLink, 'bookmark_remove', 'Remove bookmark',
+            (event) => {
+                removeBookmark(bookmarkItem);
+                event.stopPropagation();
+                event.preventDefault();
+            });
     }
-"""
+
+    function removeBookmark(bookmarkItem) {
+        const parentElement = bookmarkItem.parentElement;
+        parentElement.removeChild(bookmarkItem);
+    }
+    """
 
 def addTOCSection(doc: t.SpecT) -> None:
     toc = getFillContainer("table-of-contents", doc=doc, default=False)
     if toc is None:
         return
-    # Load icon for "add bookmark"
-    h.appendChild(
-        toc,
-        h.E.link(
-            { "rel": "stylesheet",
-             "href": "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@48,400,0,0"}
-        )
-    )
     h.appendChild(
         toc,
         h.E.h2(
@@ -863,8 +884,18 @@ def addTOCSection(doc: t.SpecT) -> None:
             _("Table of Contents"),
         ),
     )
-    doc.extraScripts["script-bookmark"] = bookmarkScript
-    doc.extraStyles["css-bookmark"] = bookmarkCss
+    if True or "bookmark" not in doc.md.boilerplate:
+        # Load icon for "add bookmark"
+        h.appendChild(
+            toc,
+            h.E.link(
+                { "rel": "stylesheet",
+                "href": "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@48,400,0,0"}
+            )
+        )
+
+        doc.extraScripts["script-bookmark"] = bookmarkScript
+        doc.extraStyles["css-bookmark"] = bookmarkCss
 
     # containers[n] holds the current <ol> for inserting each heading's <li> into.
     # containers[1] is initialized with something arbitrary
