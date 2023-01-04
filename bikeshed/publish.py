@@ -65,15 +65,12 @@ def prepareTar(doc: t.SpecT, additionalDirectories: list[str] | None = None) -> 
     for fname in additionalFiles:
         if isinstance(fname, str):
             inputPath = str(doc.inputSource.relative(fname))
-            outputPath = None
+            outputPath = fname
         else:
             inputPath = str(doc.inputSource.relative(fname[0]))
             outputPath = fname[1]
         try:
-            if outputPath is None:
-                tar.add(inputPath)
-            else:
-                tar.add(inputPath, outputPath)
+            tar.add(inputPath, outputPath)
         except OSError:
             pass
     tar.close()
