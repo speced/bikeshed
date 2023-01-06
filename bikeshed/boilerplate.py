@@ -886,7 +886,7 @@ def addTOCSection(doc: t.SpecT) -> None:
             _("Table of Contents"),
         ),
     )
-    if True or "bookmark" not in doc.md.boilerplate:
+    if "bookmark" not in doc.md.boilerplate:
         # Load icon for "add bookmark"
         h.appendChild(
             toc,
