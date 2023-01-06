@@ -12,8 +12,8 @@ from . import conditional, config, dfnpanels, h, messages as m, refs as r, retri
 from .translate import _
 
 if t.TYPE_CHECKING:
-    MetadataValueT: t.TypeAlias = str | t.NodesT | None
     MetadataT: t.TypeAlias = t.Mapping[str, t.Sequence[MetadataValueT]]
+    MetadataValueT: t.TypeAlias = str | t.NodesT | None
 
 
 def boilerplateFromHtml(doc: t.SpecT, htmlString: str) -> t.NodesT:
@@ -859,12 +859,14 @@ bookmarkScript = """
         bookmarkLink.textContent = text;
         bookmarkItem.insertAdjacentElement('beforeend', bookmarkLink);
 
+        /* Disabled for now, since clicking 'Remove bookmark' also does click action on link.
         insertTooltipAction(bookmarkLink, 'bookmark_remove', 'Remove bookmark',
             (event) => {
                 removeBookmark(bookmarkItem);
                 event.stopPropagation();
                 event.preventDefault();
             });
+        */
     }
 
     function removeBookmark(bookmarkItem) {
