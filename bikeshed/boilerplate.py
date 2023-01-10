@@ -855,7 +855,7 @@ bookmarkScript = """
         bookmarksList.insertAdjacentElement('beforeend', bookmarkItem);
 
         const bookmarkLink = makeTag('a');
-        bookmarkLink.href = header.id;
+        bookmarkLink.href = `#${header.id}`;
         bookmarkLink.textContent = text;
         bookmarkItem.insertAdjacentElement('beforeend', bookmarkLink);
 
@@ -886,7 +886,7 @@ def addTOCSection(doc: t.SpecT) -> None:
             _("Table of Contents"),
         ),
     )
-    if "bookmark" not in doc.md.boilerplate:
+    if "bookmark" in doc.md.boilerplate:
         # Load icon for "add bookmark"
         h.appendChild(
             toc,
