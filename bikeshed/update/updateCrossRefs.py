@@ -129,107 +129,10 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
     specs: SpecsT = dict()
     anchors: AnchorsT = defaultdict(list)
     headings: AllHeadingsT = {}
-    lastMsgTime: float = 0
 
-    m.say("Downloading anchor data from Webref...")
-    currentWebrefData = specsFromWebref("current")
-    snapshotWebrefData = specsFromWebref("snapshot")
-
-    for i, rawWSpec in enumerate(currentWebrefData, 1):
-        lastMsgTime = config.doEvery(
-            s=5,
-            lastTime=lastMsgTime,
-            action=progressMessager(i, len(currentWebrefData)),
-        )
-        if "dfns" not in rawWSpec and "headings" not in rawWSpec:
-            continue
-        spec = genWebrefSpec(rawWSpec)
-        currentUrl = spec["current_url"]
-        assert currentUrl is not None
-
-        specs[spec["vshortname"].lower()] = spec
-        specHeadings: HeadingsT = {}
-        headings[spec["vshortname"]] = specHeadings
-        rawAnchorData: list[ShepherdAnchorT] = []
-
-        if "dfns" in rawWSpec:
-            currentAnchors = anchorsFromWebref("current", rawWSpec["dfns"])
-            if currentAnchors:
-                rawAnchorData = [
-                    convertWebrefAnchor(x, currentUrl, "current") for x in currentAnchors
-                ]
-        if "headings" in rawWSpec:
-            currentHeadings = headingsFromWebref("current", rawWSpec["headings"])
-            if currentHeadings:
-                rawAnchorData += [
-                    convertWebrefHeading(x, currentUrl, "current")
-                    for x in currentHeadings
-                ]
-
-        # Complete list of anchors/headings with those from the snapshot version of the spec
-        if spec["snapshot_url"] is not None and snapshotWebrefData is not None:
-            rawSnapshotSpec: WebrefSpecT | None = None
-            for s in snapshotWebrefData:
-                if s["shortname"] == spec["vshortname"]:
-                    rawSnapshotSpec = s
-                    break
-            else:
-                print(f"Despite claiming to have a snapshot url, no snapshot data found for '{spec['vshortname']}'.")
-            if rawSnapshotSpec:
-                if "dfns" in rawSnapshotSpec:
-                    snapshotAnchors = anchorsFromWebref("snapshot", rawSnapshotSpec["dfns"])
-                    if snapshotAnchors:
-                        rawAnchorData += [
-                            convertWebrefAnchor(x, spec["snapshot_url"], "snapshot")
-                            for x in snapshotAnchors
-                        ]
-                if "headings" in rawSnapshotSpec:
-                    snapshotHeadings = headingsFromWebref("snapshot", rawSnapshotSpec["headings"])
-                    if snapshotHeadings:
-                        rawAnchorData += [
-                            convertWebrefHeading(x, spec["snapshot_url"], "snapshot")
-                            for x in snapshotHeadings
-                        ]
-
-        if len(rawAnchorData) > 0:
-            print(f"processing raw anchors for {spec['vshortname']}")
-            processRawAnchors(rawAnchorData, anchors, specHeadings, spec)
-
-    m.say("Downloading anchor data from Shepherd...")
-    shepherd = APIClient(
-        "https://api.csswg.org/shepherd/",
-        version="vnd.csswg.shepherd.v1",
-        ca_cert_path=certifi.where(),
-    )
-    rawSpecData = dataFromApi(shepherd, "specifications", draft=True)
-    if not rawSpecData:
-        return None
-
-    neededShepherdSpecs = ["css-2022", "css-color-3", "css-color-6", "css-color-hdr-1", "css-conditional-values-1", "css-contain-1", "css-display-4", "css-forms-1", "css-grid-1", "css-ui-3", "css-writing-modes-3", "dom-level-2-style", "mediaqueries-3"]
-    for i, rawSSpec in enumerate(rawSpecData.values(), 1):
-        lastMsgTime = config.doEvery(
-            s=5,
-            lastTime=lastMsgTime,
-            action=progressMessager(i, len(rawSpecData)),
-        )
-        if rawSSpec["name"] not in neededShepherdSpecs and not isSpecInList(genSpec(rawSSpec), specs):
-            # Only download the handful of specs that aren't in WebRef
-            # and are still needed.
-            continue
-        rawSSpec = dataFromApi(shepherd, "specifications", draft=False, anchors=False, spec=rawSSpec["name"])
-        spec = genSpec(rawSSpec)
-        assert spec["vshortname"] is not None
-        specs[spec["vshortname"]] = spec
-        specHeadings = {}
-        headings[spec["vshortname"]] = specHeadings
-
-        rawAnchorData = [setStatus(x, "snapshot") for x in linearizeAnchorTree(rawSSpec.get("anchors", []))] + [
-            setStatus(x, "current") for x in linearizeAnchorTree(rawSSpec.get("draft_anchors", []))
-        ]
-        processRawAnchors(rawAnchorData, anchors, specHeadings, spec)
-
+    gatherWebrefData(specs, anchors, headings)
+    gatherShepherdData(specs, anchors, headings)
     cleanSpecHeadings(headings)
-
     methods = extractMethodData(anchors)
     fors = extractForsData(anchors)
 
@@ -278,6 +181,117 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
     return writtenPaths
 
 
+def gatherWebrefData(specs: SpecsT, anchors: AnchorsT, headings: AllHeadingsT) -> None:
+    m.say("Downloading anchor data from Webref...")
+    currentWebrefData = specsFromWebref("current")
+    snapshotWebrefData = specsFromWebref("snapshot")
+
+    lastMsgTime: float = 0
+    for i, rawWSpec in enumerate(currentWebrefData, 1):
+        lastMsgTime = config.doEvery(
+            s=5,
+            lastTime=lastMsgTime,
+            action=progressMessager(i, len(currentWebrefData)),
+        )
+        if "dfns" not in rawWSpec and "headings" not in rawWSpec:
+            continue
+        spec = genWebrefSpec(rawWSpec)
+        currentUrl = spec["current_url"]
+        assert currentUrl is not None
+
+        specs[spec["vshortname"].lower()] = spec
+        specHeadings: HeadingsT = {}
+        headings[spec["vshortname"]] = specHeadings
+        rawAnchorData: list[ShepherdAnchorT] = []
+
+        if "dfns" in rawWSpec:
+            currentAnchors = anchorsFromWebref("current", rawWSpec["dfns"])
+            if currentAnchors:
+                rawAnchorData = [convertWebrefAnchor(x, currentUrl, "current") for x in currentAnchors]
+        if "headings" in rawWSpec:
+            currentHeadings = headingsFromWebref("current", rawWSpec["headings"])
+            if currentHeadings:
+                rawAnchorData += [convertWebrefHeading(x, currentUrl, "current") for x in currentHeadings]
+
+        # Complete list of anchors/headings with those from the snapshot version of the spec
+        if spec["snapshot_url"] is not None and snapshotWebrefData is not None:
+            rawSnapshotSpec: WebrefSpecT | None = None
+            for s in snapshotWebrefData:
+                if s["shortname"].lower() == spec["vshortname"].lower():
+                    rawSnapshotSpec = s
+                    break
+            else:
+                print(f"Despite claiming to have a snapshot url, no snapshot data found for '{spec['vshortname']}'.")
+            if rawSnapshotSpec:
+                if "dfns" in rawSnapshotSpec:
+                    snapshotAnchors = anchorsFromWebref("snapshot", rawSnapshotSpec["dfns"])
+                    if snapshotAnchors:
+                        rawAnchorData += [
+                            convertWebrefAnchor(x, spec["snapshot_url"], "snapshot") for x in snapshotAnchors
+                        ]
+                if "headings" in rawSnapshotSpec:
+                    snapshotHeadings = headingsFromWebref("snapshot", rawSnapshotSpec["headings"])
+                    if snapshotHeadings:
+                        rawAnchorData += [
+                            convertWebrefHeading(x, spec["snapshot_url"], "snapshot") for x in snapshotHeadings
+                        ]
+
+        if len(rawAnchorData) > 0:
+            processRawAnchors(rawAnchorData, anchors, specHeadings, spec)
+
+
+def gatherShepherdData(specs: SpecsT, anchors: AnchorsT, headings: AllHeadingsT) -> None:
+    m.say("Downloading anchor data from Shepherd...")
+    shepherd = APIClient(
+        "https://api.csswg.org/shepherd/",
+        version="vnd.csswg.shepherd.v1",
+        ca_cert_path=certifi.where(),
+    )
+    rawSpecData = dataFromApi(shepherd, "specifications", draft=True)
+    if not rawSpecData:
+        return None
+
+    neededShepherdSpecs = [
+        "css-2022",
+        "css-color-3",
+        "css-color-6",
+        "css-color-hdr-1",
+        "css-conditional-values-1",
+        "css-contain-1",
+        "css-display-4",
+        "css-forms-1",
+        "css-grid-1",
+        "css-ui-3",
+        "css-writing-modes-3",
+        "dom-level-2-style",
+        "mediaqueries-3",
+    ]
+    lastMsgTime: float = 0
+    for i, rawSSpec in enumerate(rawSpecData.values(), 1):
+        lastMsgTime = config.doEvery(
+            s=5,
+            lastTime=lastMsgTime,
+            action=progressMessager(i, len(rawSpecData)),
+        )
+        if rawSSpec["name"] not in neededShepherdSpecs:
+            continue
+        if isSpecInList(genSpec(rawSSpec), specs):
+            # Gradually stop as they get filled in
+            continue
+        print(rawSSpec["name"])
+        rawSSpec = dataFromApi(shepherd, "specifications", draft=False, anchors=False, spec=rawSSpec["name"])
+        spec = genSpec(rawSSpec)
+        assert spec["vshortname"] is not None
+        specs[spec["vshortname"]] = spec
+        specHeadings: HeadingsT = {}
+        headings[spec["vshortname"]] = specHeadings
+
+        rawAnchorData = [setStatus(x, "snapshot") for x in linearizeAnchorTree(rawSSpec.get("anchors", []))] + [
+            setStatus(x, "current") for x in linearizeAnchorTree(rawSSpec.get("draft_anchors", []))
+        ]
+        processRawAnchors(rawAnchorData, anchors, specHeadings, spec)
+
+
 @tenacity.retry(reraise=True, stop=tenacity.stop_after_attempt(3), wait=tenacity.wait_random(1, 2))
 def dataFromApi(api: APIClient, *args: t.Any, **kwargs: t.Any) -> t.JSONT:
     anchorDataContentTypes = [
@@ -305,24 +319,24 @@ def dataFromApi(api: APIClient, *args: t.Any, **kwargs: t.Any) -> t.JSONT:
     return t.cast("t.JSONT", data)
 
 
-def specsFromWebref(status: t.Literal["current"|"snapshot"]) -> list[WebrefSpecT]:
-    url = ("ed" if status=="current" else "tr") + "/index.json"
+def specsFromWebref(status: t.Literal["current" | "snapshot"]) -> list[WebrefSpecT]:
+    url = ("ed" if status == "current" else "tr") + "/index.json"
     j = dataFromWebref(url)
     if j is None or j.get("results") is None:
         raise Exception(f"No {status} specs data from WebRef. Got:\n{json.dumps(j, indent=1)}")
     return t.cast("list[WebrefSpecT]", j["results"])
 
 
-def anchorsFromWebref(status: t.Literal["current"|"snapshot"], urlSuffix: str) -> list[WebrefAnchorT]:
-    url = ("ed" if status=="current" else "tr") + "/" + urlSuffix
+def anchorsFromWebref(status: t.Literal["current" | "snapshot"], urlSuffix: str) -> list[WebrefAnchorT]:
+    url = ("ed" if status == "current" else "tr") + "/" + urlSuffix
     j = dataFromWebref(url)
     if j is None or j.get("dfns") is None:
         raise Exception(f"No WebRef dfns data at {url}. Got:\n{json.dumps(j, indent=1)}")
     return t.cast("list[WebrefAnchorT]", j["dfns"])
 
 
-def headingsFromWebref(status: t.Literal["current"|"snapshot"], urlSuffix: str) -> list[WebrefHeadingT]:
-    url = ("ed" if status=="current" else "tr") + "/" + urlSuffix
+def headingsFromWebref(status: t.Literal["current" | "snapshot"], urlSuffix: str) -> list[WebrefHeadingT]:
+    url = ("ed" if status == "current" else "tr") + "/" + urlSuffix
     j = dataFromWebref(url)
     if j is None or j.get("headings") is None:
         raise Exception(f"No WebRef headings data at {url}. Got:\n{json.dumps(j, indent=1)}")
@@ -586,6 +600,25 @@ def addToAnchors(rawAnchor: ShepherdAnchorT, anchors: AnchorsT, spec: SpecT) -> 
         anchors[text].append(anchor)
 
 
+def processRawAnchors(
+    rawAnchorData: list[ShepherdAnchorT], anchors: AnchorsT, specHeadings: HeadingsT, spec: SpecT
+) -> None:
+    for rawAnchor in rawAnchorData:
+        rawAnchor = fixupAnchor(rawAnchor)
+        linkingTexts = rawAnchor["linking_text"]
+        assert linkingTexts is not None
+        if len(linkingTexts) == 0:
+            # Happens if it had no linking text at all originally
+            continue
+        if len(linkingTexts) == 1 and linkingTexts[0].strip() == "":
+            # Happens if it was marked with an empty lt and Shepherd still picked it up
+            continue
+        if "section" in rawAnchor and rawAnchor["section"] is True:
+            addToHeadings(rawAnchor, specHeadings, spec=spec)
+        if rawAnchor["type"] in config.dfnTypes.union(["dfn"]):
+            addToAnchors(rawAnchor, anchors, spec=spec)
+
+
 def extractMethodData(anchors: AnchorsT) -> MethodsT:
     """Compile a db of {argless methods => {argfull method => {args, fors, url, shortname}}"""
 
@@ -636,6 +669,7 @@ def setStatus(obj: ShepherdAnchorT, status: str) -> ShepherdAnchorT:
     obj["status"] = status
     return obj
 
+
 def isSpecInList(spec: SpecT, specs: SpecsT) -> bool:
     if spec["vshortname"].lower() in specs:
         return True
@@ -646,22 +680,6 @@ def isSpecInList(spec: SpecT, specs: SpecsT) -> bool:
         ):
             return True
     return False
-
-def processRawAnchors(rawAnchorData: list[ShepherdAnchorT], anchors: AnchorsT, specHeadings: HeadingsT, spec: SpecT) -> None:
-    for rawAnchor in rawAnchorData:
-        rawAnchor = fixupAnchor(rawAnchor)
-        linkingTexts = rawAnchor["linking_text"]
-        assert linkingTexts is not None
-        if len(linkingTexts) == 0:
-            # Happens if it had no linking text at all originally
-            continue
-        if len(linkingTexts) == 1 and linkingTexts[0].strip() == "":
-            # Happens if it was marked with an empty lt and Shepherd still picked it up
-            continue
-        if "section" in rawAnchor and rawAnchor["section"] is True:
-            addToHeadings(rawAnchor, specHeadings, spec=spec)
-        if rawAnchor["type"] in config.dfnTypes.union(["dfn"]):
-            addToAnchors(rawAnchor, anchors, spec=spec)
 
 
 def writeAnchorsFile(anchors: AnchorsT, path: str) -> set[str]:
