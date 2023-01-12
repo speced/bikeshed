@@ -290,6 +290,7 @@ class Spec:
         u.fixInterDocumentReferences(self)
         u.verifyUsageOfAllLocalBiblios(self)
         u.removeMultipleLinks(self)
+        u.processDfnLinks(self)
         u.forceCrossorigin(self)
         addDomintroStyles(self)
         lint.brokenLinks(self)
