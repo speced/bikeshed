@@ -775,6 +775,7 @@ def addIDLSection(doc: t.SpecT) -> None:
         del el.attrib["id"]
     h.addClass(doc, container, "highlight")
 
+
 bookmarkCss = """
     .material-symbols-outlined {
         font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24
@@ -873,6 +874,7 @@ bookmarkScript = """
     }
     """
 
+
 def addTOCSection(doc: t.SpecT) -> None:
     toc = getFillContainer("table-of-contents", doc=doc, default=False)
     if toc is None:
@@ -889,9 +891,11 @@ def addTOCSection(doc: t.SpecT) -> None:
         h.appendChild(
             toc,
             h.E.link(
-                { "rel": "stylesheet",
-                "href": "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@48,400,0,0"}
-            )
+                {
+                    "rel": "stylesheet",
+                    "href": "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@48,400,0,0",
+                }
+            ),
         )
 
         doc.extraScripts["script-bookmark"] = bookmarkScript
