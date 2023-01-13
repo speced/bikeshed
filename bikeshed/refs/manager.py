@@ -464,7 +464,7 @@ class ReferenceManager:
             # so manually fix it up for a little while
             spec = "css22"
             if error:
-                m.linkerror(f"The spec 'css2' was renamed to 'css22'; please update your links.")
+                m.linkerror("The spec 'css2' was renamed to 'css22'; please update your links.")
 
         # Then anchor-block refs get preference
         blockRefs, _ = self.anchorBlockRefs.queryRefs(
