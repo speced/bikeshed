@@ -1242,3 +1242,156 @@ def formatBiblioTerm(linkText: str) -> str:
     if linkText.islower():
         return linkText.upper()
     return linkText
+
+    doc.extraStyles[
+        "style-link-hints"
+    ] = """
+    a[data-link-type='dfn']:hover {
+
+    }
+    """
+
+linkHintsCss = """
+    pre.highlight, pre > code.highlight {
+        overflow: visible !important; /* cheating here */
+    }
+
+    a.has-link-hints-tooltip {
+        position: relative;
+        cursor: pointer;
+        xfont: normal normal 85% sans-serif;
+        xcolor: white;
+        xtext-shadow: #090A0B 0 -1px;
+        display: inline-block;
+    }
+
+    a.has-link-hints-tooltip > .link-hints-tooltip {
+        text-align: center;
+        font: italic normal 90% Georgia, serif;
+        color: black;
+        text-shadow: white 0 1px;
+        background: #DDD;
+        background-clip: padding-box;
+        box-shadow: 0 0px 2px rgba(0, 0, 0, 0.5);
+        border: 5px solid #111;
+        border: 5px solid rgba(0, 0, 0, 0.5);
+        border-radius: 3px;
+        position: absolute;
+        padding: 0.5em 1em;
+        bottom: 100%;
+        left: -0.5em;
+        visibility:hidden;
+        opacity:0;
+        transition: opacity 0.25s linear;
+    }
+
+    a.has-link-hints-tooltip > .link-hints-tooltip:before, a > .link-hints-tooltip:after {
+        content: "";
+        position: absolute;
+        border-left: 10px solid transparent;
+        border-right: 10px solid transparent;
+        top: 100%;
+        left: 1em;
+        margin-left: -10px;
+    }
+
+    a.has-link-hints-tooltip > .link-hints-tooltip:before {
+        border-top: 10px solid #111;
+        border-top: 10px solid rgba(0, 0, 0, 0.5);
+        margin-top: 5px;
+    }
+
+    a.has-link-hints-tooltip > .link-hints-tooltip:after{
+        border-top: 10px solid #DDD;
+        margin-top: -2px;
+        z-index: 1;
+    }
+
+    a.has-link-hints-tooltip:hover > .link-hints-tooltip {
+        visibility: visible;
+        opacity: 1;
+    }
+    """
+
+linkHintsScript = """
+    "use strict";
+    // Add tooltip behavior to all links.
+    const links = document.querySelectorAll('a[href]');
+    // We need to get the createElement method now, or else it is not available!?
+    const createElement = document.createElement;
+    const makeTag = (tag) => {
+        return createElement.call(document, tag);
+    }
+
+    for (let link of links) {
+        insertLinkHintsTooltipAction(link, 'show-link-hint', '', (event) => {
+            console.info(link); })
+    }
+
+    function insertLinkHintsTooltipAction(element, className, title, action) {
+        const linkType = element.getAttribute('data-link-type');
+        let linkTypeText = '';
+        if (linkType) linkTypeText = linkType;
+        const dataType = element.getAttribute('data-type');
+        let dataTypeText = '';
+        if (dataType) { dataTypeText = `: ${dataType}`}
+        let hrefType = '';
+        const href = element.href;
+        if (href.match('infra')) hrefType = 'infra ';
+        if (href.match('webidl')) hrefType = 'webidl ';
+
+        const tooltipSpan = makeTag('span');
+        tooltipSpan.className = 'link-hints-tooltip';
+        tooltipSpan.setHTML(`${hrefType}${linkTypeText}${dataTypeText}`);
+        element.insertAdjacentElement('beforeend', tooltipSpan);
+        element.classList.add('has-link-hints-tooltip');
+    }
+
+    function addBookmark(header, text) {
+        // console.info('add bookmark for', header);
+        let bookmarksSection = document.querySelector('.bookmarksSection');
+        if (bookmarksSection == null) {
+            const tocContents = document.querySelector('#toc #contents');
+            bookmarksSection = makeTag('div');
+            bookmarksSection.className = 'bookmarksSection';
+            bookmarksSection.setHTML('Bookmarks <ul class="bookmarks"></ul>');
+            tocContents.insertAdjacentElement('afterend', bookmarksSection);
+        }
+        const bookmarksList = document.querySelector('.bookmarks');
+        const bookmarkItem = makeTag('li');
+        bookmarksList.insertAdjacentElement('beforeend', bookmarkItem);
+        const bookmarkLink = makeTag('a');
+        bookmarkLink.href = `#${header.id}`;
+        bookmarkLink.textContent = text;
+        bookmarkItem.insertAdjacentElement('beforeend', bookmarkLink);
+        insertTooltipAction(bookmarkLink, 'bookmark_remove', 'Remove bookmark',
+            (event) => {
+                removeBookmark(bookmarkItem);
+                event.stopPropagation();
+                event.preventDefault();
+            });
+    }
+
+    function removeBookmark(bookmarkItem) {
+        const parentElement = bookmarkItem.parentElement;
+        parentElement.removeChild(bookmarkItem);
+    }
+    """
+
+def addLinkHints(doc: t.SpecT) -> None:
+    if "link-hints" in doc.md.boilerplate:
+
+        doc.extraScripts["script-link-hints"] = linkHintsScript
+        doc.extraStyles["css-link-hints"] = linkHintsCss
+
+    # dfnLinks = h.findAll("a[data-link-type='dfn']", doc)
+    # for el in dfnLinks:
+    #     print('link', el)
+    #     href = el.get("href")
+    #     print ('href', href)
+    #     if href is not None:
+    #         if re.match(r"^https?://infra.spec.whatwg.org", href):
+    #             el.set("title", "infra")
+    #         else:
+    #             if re.match(r"^https?://webidl.spec.whatwg.org", href):
+    #                 el.set("title", "webidl")

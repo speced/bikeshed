@@ -767,19 +767,6 @@ def classifyLink(el: t.ElementT) -> t.ElementT:
 
 # Additional Processing
 
-def processDfnLinks(doc: t.SpecT) -> None:
-    dfnLinks = h.findAll("a[data-link-type='dfn']", doc)
-    for el in dfnLinks:
-        print('link', el)
-        href = el.get("href")
-        print ('href', href)
-        if href is not None:
-            if re.match(r"^https?://infra.spec.whatwg.org", href):
-                el.set("title", "infra")
-            else:
-                if re.match(r"^https?://webidl.spec.whatwg.org", href):
-                    el.set("title", "webidl")
-
 def processBiblioLinks(doc: t.SpecT) -> None:
     biblioLinks = h.findAll("a[data-link-type='biblio']", doc)
     for el in biblioLinks:

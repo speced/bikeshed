@@ -277,6 +277,7 @@ class Spec:
         headings.processHeadings(self, "all")  # again
         boilerplate.removeUnwantedBoilerplate(self)
         boilerplate.addTOCSection(self)
+        boilerplate.addLinkHints(self)
         u.addSelfLinks(self)
         u.processAutolinks(self)
         boilerplate.addAnnotations(self)
@@ -290,7 +291,6 @@ class Spec:
         u.fixInterDocumentReferences(self)
         u.verifyUsageOfAllLocalBiblios(self)
         u.removeMultipleLinks(self)
-        u.processDfnLinks(self)
         u.forceCrossorigin(self)
         addDomintroStyles(self)
         lint.brokenLinks(self)
