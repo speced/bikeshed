@@ -226,33 +226,26 @@ def checkVarHygiene(doc: t.SpecT) -> None:
         return f"'{algoName}'" + (f" for {algoFor}" if algoFor else "")
 
     # Look for vars that only show up once. These are probably typos.
-    varCounts: defaultdict[tuple[str, str | None], int] = defaultdict(lambda: 0)
-    for el in h.findAll("var:not([data-var-ignore])", doc):
-        key = (h.foldWhitespace(h.textContent(el)).strip(), algoName(el))
-        varCounts[key] += 1
-    foldedVarCounts: defaultdict[tuple[str, str | None], int] = defaultdict(lambda: 0)
+    varCounts: defaultdict[tuple[str, str | None], list[t.ElementT]] = defaultdict(list)
     atLeastOneAlgo = False
-    for (var, algo), count in varCounts.items():
+    for el in h.findAll("var:not([data-var-ignore])", doc):
+        var = h.foldWhitespace(h.textContent(el)).strip()
+        algo = algoName(el)
+        varCounts[(var, algo)].append(el)
         if algo:
             atLeastOneAlgo = True
-        if count > 1:
+    for (var, algo), els in varCounts.items():
+        if len(els) > 1:
             continue
         if var.lower() in doc.md.ignoredVars:
             continue
-        key = var, algo
-        foldedVarCounts[key] += 1
-    varLines = []
-    for (var, algo), count in foldedVarCounts.items():
-        if count == 1:
-            if algo:
-                varLines.append(f"  '{var}', in algorithm {algo}")
-            else:
-                varLines.append(f"  '{var}'")
-    if varLines:
+        if algo:
+            varName = f"'{var}' (in algorithm {algo})"
+        else:
+            varName = f"'{var}' (in global scope)"
         m.warn(
-            "The following <var>s were only used once in the document:\n"
-            + "\n".join(varLines)
-            + "\nIf these are not typos, please add an ignore='' attribute to the <var>."
+            f"The var {varName} is only used once.\nIf this is not a typo, please add an ignore='' attribute to the <var>.",
+            el=els[0],
         )
 
     if atLeastOneAlgo:
