@@ -1252,16 +1252,13 @@ def formatBiblioTerm(linkText: str) -> str:
     """
 
 linkHintsCss = """
-    pre.highlight, pre > code.highlight {
+    pre, .issue {
         overflow: visible !important; /* cheating here */
     }
 
     a.has-link-hints-tooltip {
         position: relative;
         cursor: pointer;
-        xfont: normal normal 85% sans-serif;
-        xcolor: white;
-        xtext-shadow: #090A0B 0 -1px;
         display: inline-block;
     }
 
@@ -1269,7 +1266,6 @@ linkHintsCss = """
         text-align: center;
         font: italic normal 90% Georgia, serif;
         color: black;
-        text-shadow: white 0 1px;
         background: #DDD;
         background-clip: padding-box;
         box-shadow: 0 0px 2px rgba(0, 0, 0, 0.5);
@@ -1311,6 +1307,41 @@ linkHintsCss = """
         visibility: visible;
         opacity: 1;
     }
+
+    .chip {
+        font-size: smaller;
+        border: 2px solid black;
+        border-radius: 6px;
+        padding: 0.2em;
+        margin-top: 2px;
+        text-shadow: none;
+        display:inline-block;
+    }
+
+    .infra-chip {
+        color: #3B790A;
+        background-color: #DCFEDE;
+        border-color: #3B790A;
+    }
+
+    .webidl-chip {
+        color: #3B790A;
+        border-color: #3B790A;
+    }
+
+    .w3c-chip {
+        color: #245B9C;
+        border-color: #245B9C;
+    }
+
+    .whatgw-chip {
+        color: #3B790A;
+    }
+
+    .github-chip {
+        color: black;
+        border-color: black;
+    }
     """
 
 linkHintsScript = """
@@ -1331,18 +1362,41 @@ linkHintsScript = """
     function insertLinkHintsTooltipAction(element, className, title, action) {
         const linkType = element.getAttribute('data-link-type');
         let linkTypeText = '';
-        if (linkType) linkTypeText = linkType;
+        if (linkType) linkTypeText = `${linkType} `;
         const dataType = element.getAttribute('data-type');
-        let dataTypeText = '';
-        if (dataType) { dataTypeText = `: ${dataType}`}
+        const dataTypeText = (dataType) ? `${dataType}` : '';
         let hrefType = '';
+
         const href = element.href;
-        if (href.match('infra')) hrefType = 'infra ';
-        if (href.match('webidl')) hrefType = 'webidl ';
+        if (href.match('infra.spec')) hrefType = '<span class="infra-chip chip">Infra</span> ';
+        if (href.match('webidl.spec')) hrefType = '<span class="webidl-chip chip">Web IDL</span> ';
+        if (href.match('url.spec')) {
+            hrefType = `<span class="chip">URL </span> `;
+        }
+        if (href.match('html.spec')) {
+            hrefType = `<span class="chip">HTML </span> `;
+        }
+        if (href.match('dom.spec')) {
+            hrefType = `<span class="chip">DOM </span> `;
+        }
+        if (href.match('w3.org')) {
+            const tr = href.match(/TR\/([^\/]+)/);
+            hrefType = `<span class="w3c-chip chip">W3C ${tr ? tr[1] : ''}</span> `;
+        }
+
+        if (href.match('github.com')) {
+            hrefType = `<span class="github-chip chip">GitHub </span> `;
+        }
+
+        const id = element.getAttribute('id');
+        const refFor = id && id.match(/(?:^ref-for-)(.*)$/);
+        const refForText = refFor ? ` for ${refFor[1]}` : '';
+        const tooltipText = `${hrefType}${linkTypeText}${dataTypeText}${refForText}`;
+        if (!tooltipText) return;
 
         const tooltipSpan = makeTag('span');
         tooltipSpan.className = 'link-hints-tooltip';
-        tooltipSpan.setHTML(`${hrefType}${linkTypeText}${dataTypeText}`);
+        tooltipSpan.setHTML(`<nobr>${tooltipText}</nobr>`);
         element.insertAdjacentElement('beforeend', tooltipSpan);
         element.classList.add('has-link-hints-tooltip');
     }

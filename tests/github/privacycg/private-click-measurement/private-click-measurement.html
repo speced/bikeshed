@@ -5,6 +5,99 @@
   <meta content="width=device-width" name="viewport">
   <link href="https://www.w3.org/StyleSheets/TR/2021/cg-draft" rel="stylesheet">
   <link href="https://privacycg.github.io/private-click-measurement/" rel="canonical">
+<style>/* css-link-hints */
+
+    pre, .issue {
+        overflow: visible !important; /* cheating here */
+    }
+
+    a.has-link-hints-tooltip {
+        position: relative;
+        cursor: pointer;
+        display: inline-block;
+    }
+
+    a.has-link-hints-tooltip > .link-hints-tooltip {
+        text-align: center;
+        font: italic normal 90% Georgia, serif;
+        color: black;
+        background: #DDD;
+        background-clip: padding-box;
+        box-shadow: 0 0px 2px rgba(0, 0, 0, 0.5);
+        border: 5px solid #111;
+        border: 5px solid rgba(0, 0, 0, 0.5);
+        border-radius: 3px;
+        position: absolute;
+        padding: 0.5em 1em;
+        bottom: 100%;
+        left: -0.5em;
+        visibility:hidden;
+        opacity:0;
+        transition: opacity 0.25s linear;
+    }
+
+    a.has-link-hints-tooltip > .link-hints-tooltip:before, a > .link-hints-tooltip:after {
+        content: "";
+        position: absolute;
+        border-left: 10px solid transparent;
+        border-right: 10px solid transparent;
+        top: 100%;
+        left: 1em;
+        margin-left: -10px;
+    }
+
+    a.has-link-hints-tooltip > .link-hints-tooltip:before {
+        border-top: 10px solid #111;
+        border-top: 10px solid rgba(0, 0, 0, 0.5);
+        margin-top: 5px;
+    }
+
+    a.has-link-hints-tooltip > .link-hints-tooltip:after{
+        border-top: 10px solid #DDD;
+        margin-top: -2px;
+        z-index: 1;
+    }
+
+    a.has-link-hints-tooltip:hover > .link-hints-tooltip {
+        visibility: visible;
+        opacity: 1;
+    }
+
+    .hint {
+        font-size: smaller;
+        border: 2px solid black;
+        border-radius: 6px;
+        padding: 0.2em;
+        margin-top: 2px;
+        text-shadow: none;
+        display:inline-block;
+    }
+
+    .infra-hint {
+        color: #3B790A;
+        background-color: #DCFEDE;
+        border-color: #3B790A;
+    }
+
+    .webidl-hint {
+        color: #3B790A;
+        border-color: #3B790A;
+    }
+
+    .w3c-hint {
+        color: #245B9C;
+        border-color: #245B9C;
+    }
+
+    .whatgw-hint {
+        color: #3B790A;
+    }
+
+    .github-hint {
+        color: black;
+        border-color: black;
+    }
+    </style>
 <style>/* style-autolinks */
 
 .css.css, .property.property, .descriptor.descriptor {
@@ -1341,6 +1434,94 @@ document.body.addEventListener("click", function(e) {
 
 });
 </script>
+<script>/* script-link-hints */
+
+    "use strict";
+    // Add tooltip behavior to all links.
+    const links = document.querySelectorAll('a[href]');
+    // We need to get the createElement method now, or else it is not available!?
+    const createElement = document.createElement;
+    const makeTag = (tag) => {
+        return createElement.call(document, tag);
+    }
+
+    for (let link of links) {
+        insertLinkHintsTooltipAction(link, 'show-link-hint', '', (event) => {
+            console.info(link); })
+    }
+
+    function insertLinkHintsTooltipAction(element, className, title, action) {
+        const linkType = element.getAttribute('data-link-type');
+        let linkTypeText = '';
+        if (linkType) linkTypeText = `${linkType} `;
+        const dataType = element.getAttribute('data-type');
+        const dataTypeText = (dataType) ? `${dataType}` : '';
+        let hrefType = '';
+
+        const href = element.href;
+        if (href.match('infra')) hrefType = '<span class="infra-hint hint">Infra</span> ';
+        if (href.match('webidl.spec')) hrefType = '<span class="webidl-hint hint">Web IDL</span> ';
+        if (href.match('url.spec')) {
+            hrefType = `<span class="hint">URL </span> `;
+        }
+        if (href.match('html.spec')) {
+            hrefType = `<span class="hint">HTML </span> `;
+        }
+        if (href.match('dom.spec')) {
+            hrefType = `<span class="hint">DOM </span> `;
+        }
+        if (href.match('w3.org')) {
+            const tr = href.match(/TR\/([^\/]+)/);
+            hrefType = `<span class="w3c-hint hint">W3C ${tr ? tr[1] : ''}</span> `;
+        }
+
+        if (href.match('github.com')) {
+            hrefType = `<span class="github-hint hint">GitHub </span> `;
+        }
+
+        const id = element.getAttribute('id');
+        const refFor = id && id.match(/(?:^ref-for-)(.*)$/);
+        const refForText = refFor ? ` for ${refFor[1]}` : '';
+        const tooltipText = `${hrefType}${linkTypeText}${dataTypeText}${refForText}`;
+        if (!tooltipText) return;
+
+        const tooltipSpan = makeTag('span');
+        tooltipSpan.className = 'link-hints-tooltip';
+        tooltipSpan.setHTML(`<nobr>${tooltipText}</nobr>`);
+        element.insertAdjacentElement('beforeend', tooltipSpan);
+        element.classList.add('has-link-hints-tooltip');
+    }
+
+    function addBookmark(header, text) {
+        // console.info('add bookmark for', header);
+        let bookmarksSection = document.querySelector('.bookmarksSection');
+        if (bookmarksSection == null) {
+            const tocContents = document.querySelector('#toc #contents');
+            bookmarksSection = makeTag('div');
+            bookmarksSection.className = 'bookmarksSection';
+            bookmarksSection.setHTML('Bookmarks <ul class="bookmarks"></ul>');
+            tocContents.insertAdjacentElement('afterend', bookmarksSection);
+        }
+        const bookmarksList = document.querySelector('.bookmarks');
+        const bookmarkItem = makeTag('li');
+        bookmarksList.insertAdjacentElement('beforeend', bookmarkItem);
+        const bookmarkLink = makeTag('a');
+        bookmarkLink.href = `#${header.id}`;
+        bookmarkLink.textContent = text;
+        bookmarkItem.insertAdjacentElement('beforeend', bookmarkLink);
+        insertTooltipAction(bookmarkLink, 'bookmark_remove', 'Remove bookmark',
+            (event) => {
+                removeBookmark(bookmarkItem);
+                event.stopPropagation();
+                event.preventDefault();
+            });
+    }
+
+    function removeBookmark(bookmarkItem) {
+        const parentElement = bookmarkItem.parentElement;
+        parentElement.removeChild(bookmarkItem);
+    }
+    </script>
 <script>/* script-var-click-highlighting */
 
     "use strict";
