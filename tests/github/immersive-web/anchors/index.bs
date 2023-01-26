@@ -1,18 +1,18 @@
 <pre class="metadata">
 Shortname: webxr-anchors
 Title: WebXR Anchors Module
-Group: immersivewebcg
-Status: CG-DRAFT
+Group: immersivewebwg
+Status: ED
 Level: 1
 ED: https://immersive-web.github.io/anchors/
 Repository: immersive-web/anchors
-Mailing List Archives: https://lists.w3.org/Archives/Public/public-immersive-web/
+Mailing List Archives: https://lists.w3.org/Archives/Public/public-immersive-web-wg/
 
 !Participate: <a href="https://github.com/immersive-web/anchors/issues/new">File an issue</a> (<a href="https://github.com/immersive-web/anchors/issues">open issues</a>)
-!Participate: <a href="https://lists.w3.org/Archives/Public/public-immersive-web/">Mailing list archive</a>
+!Participate: <a href="https://lists.w3.org/Archives/Public/public-immersive-web-wg/">Mailing list archive</a>
 !Participate: <a href="irc://irc.w3.org:6665/">W3C's #immersive-web IRC</a>
 
-Editor: Piotr Bialecki 114482, Google http://google.com/, bialpio@google.com
+Editor: Piotr Bialecki 114482, Google https://google.com/, bialpio@google.com
 
 Abstract: Describes a method to create anchors tracked by underlying system.
 </pre>
@@ -90,9 +90,15 @@ spec: WebXR Hit Test Module; urlPrefix: https://immersive-web.github.io/hit-test
     border-radius: .5em;
     padding: .5em;
     margin: .5em calc(-0.5em - 1px);
-    background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='290'><text transform='rotate(-45)' text-anchor='middle' font-family='sans-serif' font-weight='bold' font-size='70' y='210' opacity='.1'>Unstable</text></svg>");
+    background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='290'><text transform='rotate(-45)' text-anchor='middle' font-family='sans-serif' font-weight='bold' font-size='70' y='210' opacity='.1' fill='white'>Unstable</text></svg>");
     background-repeat: repeat;
-    background-color: #FFF4F4;
+    background-color: #282828;
+  }
+  @media (prefers-color-scheme: light) {
+    .unstable {
+      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='290'><text transform='rotate(-45)' text-anchor='middle' font-family='sans-serif' font-weight='bold' font-size='70' y='210' opacity='.1'>Unstable</text></svg>");
+      background-color: #FFF4F4;
+    }
   }
   .unstable h3:first-of-type {
     margin-top: 0.5rem;
@@ -142,6 +148,8 @@ XRAnchor {#xr-anchor}
 interface XRAnchor {
   readonly attribute XRSpace anchorSpace;
 
+  Promise<DOMString> requestPersistentHandle();
+
   undefined delete();
 };
 </script>
@@ -164,16 +172,46 @@ In order to <dfn>create new anchor object</dfn> from |native origin| and |sessio
     1. Return |anchor|.
 </div>
 
+<div class="algorithm unstable" data-algorithm="restore-anchor-from-frame">
+The {{XRAnchor/requestPersistentHandle()}} method, when invoked on an {{XRAnchor}} |anchor|, MUST run the following steps:
+    1. Let |promise| be [=a new Promise=] in the [=relevant realm=] of this {{XRSystem}}.
+    1. If |anchor|'s [=XRAnchor/deleted=] is <code>true</code>, [=/reject=] |promise| with {{InvalidStateError}}, return |promise|, and abort these steps.
+    1. Let |session| be |anchor|'s [=XRAnchor/session=].
+    1. If |session|'s [=XRSession/map of persistent anchors=] contains the value |anchor|, run the following steps:
+        1. Let |uuid| be the key of the mapping of the |anchor| value on |session|'s [=XRSession/map of persistent anchors=].
+        1. [=/Resolve=] |promise| with |uuid|.
+        1. Return |promise|.
+        1. Abort these steps.
+    1. Let |uuid| be the empty string.
+    1. Generate a UUID [[!RFC4122]] as a string and append it to |uuid|.
+    1. Add |uuid| and |anchor| to |session|'s [=XRSession/map of persistent anchors=].
+    1. [=/Resolve=] |promise| with |uuid|.
+    1. Return |promise|.
+</div>
+
+Note: when the {{XRSystem}} creates the unique ID, it MUST be unique and only known to the current origin.
+
 Anchor creation {#anchor-creation}
 ===============
 
 The {{XRSession}} is extended to contain an associated <dfn for=XRSession>set of tracked anchors</dfn>.
+
+<div class="unstable">
+
+The {{XRSession}} is extended to contain an associated <dfn for=XRSession>map of persistent anchors</dfn> that is keyed with a UUID string and maps to an {{XRAnchor}}.
+
+</div>
 
 The {{XRSession}} is extended to contain an associated <dfn for=XRSession>map of new anchors</dfn> that is keyed with {{XRAnchor}} object and maps to <code>{{Promise}}&lt;{{XRAnchor}}&gt;</code> object.
 
 <script type="idl">
 partial interface XRFrame {
   Promise<XRAnchor> createAnchor(XRRigidTransform pose, XRSpace space);
+};
+
+partial interface XRSession {
+  Promise<XRAnchor> restorePersistentAnchor(DOMString uuid);
+  Promise<undefined> deletePersistentAnchor(DOMString uuid);
 };
 
 partial interface XRHitTestResult {
@@ -204,7 +242,29 @@ The {{XRFrame/createAnchor(pose, space)}} method, when invoked on an {{XRFrame}}
     1. Return |promise|.
 </div>
 
-Note: It is the responsibility of user agents to ensure that the physical origin tracked by the anchor returned by each {{XRFrame/createAnchor(pose, space)}} call aligns as closely as possible with the physical location of |pose| within |space| at the time represented by the frame on which the method is called. Specifically, this means that for spaces that are dynamically changing, user agents should attempt to capture the native origin of such spaces at the app's specified time. This text is non-normative, but expresses the intent of the specification author(s) and contributors and thus it is highly recommended that it is followed by the implementations to ensure consistent behavior across different vendors.
+Note: It is the responsibility of user agents to ensure that the physical origin tracked by the anchor returned by each {{XRFrame/createAnchor(pose, space)}} call aligns as closely as possible with the physical location of <var ignore=''>pose</var> within <var ignore=''>space</var> at the time represented by the frame on which the method is called. Specifically, this means that for spaces that are dynamically changing, user agents should attempt to capture the native origin of such spaces at the app's specified time. This text is non-normative, but expresses the intent of the specification author(s) and contributors and thus it is highly recommended that it is followed by the implementations to ensure consistent behavior across different vendors.
+
+<div class="algorithm unstable" data-algorithm="restore-persistent-anchor-from-frame">
+The {{XRSession/restorePersistentAnchor(uuid)}} method, when invoked on an {{XRSession}} |session| with |uuid|, MUST run the following steps:
+    1. Let |promise| be [=a new Promise=] in the [=relevant realm=] of this {{XRSystem}}.
+    1. If |session|'s [=XRSession/map of persistent anchors=] does not contain a mapping from |uuid| to an {{XRAnchor}}, [=/reject=] |promise| with {{InvalidStateError}}, return |promise|, and abort these steps.
+    1. If |session|’s [=ended=] value is `true`, [=/reject=] |promise| with {{InvalidStateError}}, return |promise|, and abort these steps.
+    1. Let |anchor| be the value of mapping from |uuid| on |session|'s [=XRSession/map of persistent anchors=].
+    1. If |session|'s [=XRSession/map of new anchors=] contains a mapping from |anchor| to |promise|, [=/reject=] the |promise| with {{InvalidStateError}}, return |promise|, and abort these steps.
+    1. Add |anchor| to |session|'s [=XRSession/set of tracked anchors=].
+    1. Add a mapping from |anchor| to |promise| to |session|'s [=XRSession/map of new anchors=].
+    1. Return |promise|.
+</div>
+
+<div class="algorithm unstable" data-algorithm="delete-peristence-from-anchor">
+The {{XRSession/deletePersistentAnchor()}} method, when invoked on an {{XRSession}} |session| with |uuid|, MUST run the following steps:
+    1. Let |promise| be [=a new Promise=] in the [=relevant realm=] of this {{XRSystem}}.
+    1. If |session|'s [=XRSession/map of persistent anchors=] does not contain a mapping to |anchor|, [=/reject=] |promise| with {{InvalidStateError}}, return |promise|, and abort these steps.
+    1. Let |anchor| be the value of mapping from |uuid| on |session|'s [=XRSession/map of persistent anchors=].
+    1. Remove the mapping from |session|'s [=XRSession/map of persistent anchors=].
+    1. Invoke {{XRAnchor/delete()} on |anchor|.
+    1. Return |promise|.
+</div>
 
 In order to <dfn>create an anchor from hit test result</dfn>, the application can call {{XRHitTestResult}}'s {{XRHitTestResult/createAnchor()}} method.
 
@@ -298,7 +358,7 @@ The underlying [=XR device=] is [=capable of supporting=] the [=anchors=] featur
 - Native anchors are continuously <dfn>tracked</dfn> by the underlying XR system and can be queried for their most up-to-date state. When the underlying system deems that the native anchor's location is never going to be known, it SHOULD report that the native anchor is no longer tracked.
 - Optionally, native anchors can be <dfn>attached</dfn> to native entities. A native anchor that is attached to a native entity attempts to maintain its position fixed relative to the entity to which it is attached (as opposed to the real world in case of free-floating anchors). When the device detects that the pose of the object to which the anchor is attached changes, the anchor will be updated accordingly. This does not imply that the object itself moved - it may be that the system's understanding of its location changed. If the underlying system is capable of tracking moving objects, the native anchors attached to moving objects should be updated as well.
 
-In case the underlying device does not support native anchors, the user agents MAY decide to implement the anchors API through <dfn>emulated native anchors</dfn>. This approach assumes that anchors, once created, never change their pose, and their pose is the pose passed in by the application to the anchor creation methods such as {{XRFrame}}'s {{XRFrame/createAnchor(pose, space)}} or {{XRHitTestResult}}'s {{XRHitTestResult/createAnchor(pose)}}.
+In case the underlying device does not support native anchors, the user agents MAY decide to implement the anchors API through <dfn>emulated native anchors</dfn>. This approach assumes that anchors, once created, never change their pose, and their pose is the pose passed in by the application to the anchor creation methods such as {{XRFrame}}'s {{XRFrame/createAnchor(pose, space)}} or {{XRHitTestResult}}'s {{XRHitTestResult/createAnchor()}}.
 
 Note: The [=emulated native anchors=] approach is equivalent to the applications emulating the anchors feature themselves and can help reduce the number of different cases that the applications need to handle. It might also allow the applications to re-use the same code for {{XRSessionMode/"immersive-ar"}} and {{XRSessionMode/"immersive-vr"}} sessions.
 

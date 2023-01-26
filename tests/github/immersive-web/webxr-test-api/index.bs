@@ -45,6 +45,8 @@ spec:webxr-1;
 </pre>
 
 <pre class="anchors">
+spec: Gamepad; urlPrefix: https://www.w3.org/TR/gamepad/#
+    type: enum-value; text: "xr-standard"; for: GamepadMappingType; url: dfn-xr-standard
 spec:webxr-dom-overlays; urlPrefix: https://immersive-web.github.io/dom-overlays#
     type:dfn; text:beforexrselect
 spec:WebXR Anchors Module; urlPrefix: https://immersive-web.github.io/anchors/#
@@ -58,6 +60,8 @@ spec: WebXR Depth Sensing Module; urlPrefix: https://immersive-web.github.io/dep
     type: dfn; text: create a GPU depth information instance; url: create-a-gpu-depth-information-instance
     type: dfn; text: depth coordinates transformation matrix; url: depth-coordinates-transformation-matrix
     type: dfn; text: native depth sensing; url: native-depth-sensing
+spec: WebXR Raw Camera Access Module; urlPrefix: https://immersive-web.github.io/raw-camera-access/#
+    type: dfn; text: obtain camera
 </pre>
 
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
@@ -156,6 +160,10 @@ Every [=simulated XR device=] has an <dfn for="simulated XR device">emulated pos
 
 Every [=simulated XR device=] has an <dfn for="simulated XR device">visibility state</dfn> which is an {{XRVisibilityState}} used to set the {{XRSession/visibilityState}} of any {{XRSession}}s associated with the [=simulated XR device=] . This is initially {{XRVisibilityState/"visible"}}. When it is changed, the associated changes must be reflected on the {{XRSession}}, including triggering {{XRSession/onvisibilitychange}} events if necessary.
 
+Every [=simulated XR device=] has a <dfn for="simulated XR device">list of primary views</dfn> which is a list of [=view|views=] that must be rendered to for an immersive experience. There must be at least one primary view.
+
+Every [=simulated XR device=] may have a <dfn for="simulated XR device">list of secondary views</dfn> which is a list of [=view|views=] that may or may not be rendered to. There may be any number of secondary views.
+
 Every [=view=] for a [=simulated XR device=] has an associated <dfn for=view>device resolution</dfn>, which is an instance of {{FakeXRDeviceResolution}}. This resolution must be used when constructing {{XRViewport}} values for the [=view=], based on the canvas size.
 
 Every [=view=] for a [=simulated XR device=] may have an associated <dfn for=view>field of view</dfn>, which is an instance of {{FakeXRFieldOfViewInit}} used to calculate projection matrices using depth values. If the [=field of view=] is set, projection matrix values are calculated using the [=field of view=] and {{XRRenderState/depthNear}} and {{XRRenderState/depthFar}} values.
@@ -205,8 +213,8 @@ The {{XRTest}} object is the entry point for all testing.
 <script type="idl">
 interface XRTest {
   Promise<FakeXRDevice> simulateDeviceConnection(FakeXRDeviceInit init);
-  void simulateUserActivation(Function f);
-  Promise<void> disconnectAllDevices();
+  undefined simulateUserActivation(Function f);
+  Promise<undefined> disconnectAllDevices();
 };
 </script>
 
@@ -219,9 +227,13 @@ When this method is invoked, the user agent MUST run the following steps:
   1. Run the following steps [=in parallel=]:
     1. Let |device| be a new [=simulated XR device=].
     1. For each |view| in |init|'s {{FakeXRDeviceInit/views}}:
-        1. Let |v| be the result of running [=parse a view=] on |view|.
+        1. Let |p| be the result of running [=parse a view=] on |view|.
         1. If running [=parse a view=] threw an error, reject |promise| with this error and abort these steps.
-        1. [=list/Append=] |v| to |device|'s list of views.
+        1. [=list/Append=] |p| to |device|'s [=simulated XR device/list of primary views=].
+    1. If |init|'s {{FakeXRDeviceInit/secondaryViews}} is set, for each |secondaryView| in |init|'s {{FakeXRDeviceInit/secondaryViews}}:
+        1. Let |s| be the result of running [=parse a view=] on |secondaryView|.
+        1. If running [=parse a view=] threw an error, reject |promise| with this error and abort these steps.
+        1. [=list/Append=] |s| to |device|'s [=simulated XR device/list of secondary views=].
     1. If |init|'s {{FakeXRDeviceInit/boundsCoordinates}} is set, perform the following steps:
         1. If |init|'s {{FakeXRDeviceInit/boundsCoordinates}} has less than 3 elements, reject |promise| with {{TypeError}} and abort these steps.
         1. Set |device|'s [=simulated XR device/native bounds geometry=] to |init|'s {{FakeXRDeviceInit/boundsCoordinates}}.
@@ -259,7 +271,7 @@ NOTE: each |device| stores a [=capable of supporting|list of features it is capa
 When <dfn method for=XRTest>simulateUserActivation(f)</dfn> is called, invoke <code>f</code> as if it had [=transient activation=].
 
 
-When <dfn method for=XRTest>disconnectAllDevices()</dfn> is called, remove all [=simulated XR devices=] from the [=context object=]'s {{XR}} object's [=list of immersive XR devices=] as if they were disconnected. If the [=inline XR device=] is a [=simulated XR device=], reset it to the default [=inline XR device=].
+When <dfn method for=XRTest>disconnectAllDevices()</dfn> is called, remove all [=simulated XR devices=] from the {{Navigator/xr}}'s [=list of immersive XR devices=] as if they were disconnected. If the [=inline XR device=] is a [=simulated XR device=], reset it to the default [=inline XR device=].
 
 
 FakeXRDeviceInit {#fakexrdeviceinit-dict}
@@ -271,6 +283,7 @@ dictionary FakeXRDeviceInit {
     required boolean supportsImmersive;
     sequence<XRSessionMode> supportedModes;
     required sequence<FakeXRViewInit> views;
+    sequence<FakeXRViewInit> secondaryViews;
 
     sequence<any> supportedFeatures;
     sequence<FakeXRBoundsPoint> boundsCoordinates;
@@ -290,6 +303,9 @@ dictionary FakeXRViewInit {
   required FakeXRDeviceResolution resolution;
   required FakeXRRigidTransformInit viewOffset;
   FakeXRFieldOfViewInit fieldOfView;
+
+  // Raw camera access extensions:
+  FakeXRCameraImage cameraImageInit;
 };
 
 dictionary FakeXRFieldOfViewInit {
@@ -312,7 +328,6 @@ dictionary FakeXRRigidTransformInit {
   required sequence<float> position;
   required sequence<float> orientation;
 };
-
 </script>
 
 <p class="advisement">
@@ -361,30 +376,29 @@ FakeXRDevice {#fakexrdevice-interface}
 
 <script type="idl">
 interface FakeXRDevice : EventTarget {
-  void setViews(sequence<FakeXRViewInit> views);
+  undefined setViews(sequence<FakeXRViewInit> views, sequence<FakeXRViewInit> secondaryViews);
 
-  Promise<void> disconnect();
+  Promise<undefined> disconnect();
 
-  void setViewerOrigin(FakeXRRigidTransformInit origin, optional boolean emulatedPosition = false);
-  void clearViewerOrigin();
-  void setFloorOrigin(FakeXRRigidTransformInit origin);
-  void clearFloorOrigin();
-  void setBoundsGeometry(sequence<FakeXRBoundsPoint> boundsCoordinates);
-  void simulateResetPose();
+  undefined setViewerOrigin(FakeXRRigidTransformInit origin, optional boolean emulatedPosition = false);
+  undefined clearViewerOrigin();
+  undefined setFloorOrigin(FakeXRRigidTransformInit origin);
+  undefined clearFloorOrigin();
+  undefined setBoundsGeometry(sequence<FakeXRBoundsPoint> boundsCoordinates);
+  undefined simulateResetPose();
 
-  void simulateVisibilityChange(XRVisibilityState state);
+  undefined simulateVisibilityChange(XRVisibilityState state);
 
   FakeXRInputController simulateInputSourceConnection(FakeXRInputSourceInit init);
 
   // Hit test extensions:
-  void setWorld(FakeXRWorldInit world);
-  void clearWorld();
+  undefined setWorld(FakeXRWorldInit world);
+  undefined clearWorld();
 
   // Depth sensing extensions:
-  void setDepthSensingData(FakeXRDepthSensingDataInit depthSensingData);
-  void clearDepthSensingData();
+  undefined setDepthSensingData(FakeXRDepthSensingDataInit depthSensingData);
+  undefined clearDepthSensingData();
 };
-
 </script>
 
 
@@ -407,15 +421,23 @@ To determine when this frame is, for a given operation, choose a frame based on 
 NOTE: The reason we defer an extra frame when there are pending animation frame callbacks is to avoid having to deal with potential race conditions when the device is ready to trigger an animation frame callback, but has not yet. In practice, this means that tests should be written so that they wait until they have performed all such operations <i>before</i> calling the next {{XRSession/requestAnimationFrame()}}, and in case they are running outside of an [=XR animation frame=], should always wait two frames before expecting any updates to take effect.
 </div>
 
+<div class="algorithm" data-algorithm="parse-views-list">
+To <dfn>parse a list of views</dfn> on a [=list=] |views| run the following steps:
+    1. Let |l| be an empty [=list=]
+    1. For each |view| in |views|:
+        1. Let |v| be the result of running [=parse a view=] on |view|.
+        1. [=list/Append=] |v| to |l|.
+    1. Return |l|.
+</div>
+
 <div class="algorithm" data-algorithm="set-views">
-The <dfn method for=FakeXRDevice>setViews(|views|)</dfn> method performs the following steps:
+The <dfn method for=FakeXRDevice>setViews(|views|, |secondaryViews|)</dfn> method performs the following steps:
 
     1. On the [=next animation frame=], run the following steps:
-        1. Let |l| be an empty [=list=].
-        1. For each |view| in |views|:
-            1. Let |v| be the result of running [=parse a view=] on |view|.
-            1. [=list/Append=] |v| to |l|.
-        1. Set [=FakeXRDevice/device=]'s list of views to |l|.
+        1. Let |p| be the result of running [=parse a list of views=] on |views|.
+        1. Set [=FakeXRDevice/device=]'s [=simulated XR device/list of primary views=] to |p|.
+        1. If |secondaryViews| is set, let |s| be the result of running [=parse a list of views=] on |secondaryViews|.
+            1. Set [=FakeXRDevice/device=]'s [=simulated XR device/list of secondary views=] to |s|.
 
 </div>
 
@@ -424,8 +446,7 @@ The <dfn method for=FakeXRDevice>setViews(|views|)</dfn> method performs the fol
 
 When <dfn method for=FakeXRDevice>disconnect()</dfn> method is called, perform the following steps:
 
-
-    1. Remove [=FakeXRDevice/device=] from the [=context object=]'s {{XR}} object's [=list of immersive XR devices=] as if it were disconnected.
+    1. Remove [=FakeXRDevice/device=] from the {{Navigator/xr}}'s [=list of immersive XR devices=] as if it were disconnected.
     1. If the [=inline XR device=] is equal to the {{FakeXRDevice}}, reset it to the default [=inline XR device=].
 
 </div>
@@ -503,22 +524,22 @@ dictionary FakeXRInputSourceInit {
 };
 
 interface FakeXRInputController {
-  void setHandedness(XRHandedness handedness);
-  void setTargetRayMode(XRTargetRayMode targetRayMode);
-  void setProfiles(sequence<DOMString> profiles);
-  void setGripOrigin(FakeXRRigidTransformInit gripOrigin, optional boolean emulatedPosition = false);
-  void clearGripOrigin();
-  void setPointerOrigin(FakeXRRigidTransformInit pointerOrigin, optional boolean emulatedPosition = false);
+  undefined setHandedness(XRHandedness handedness);
+  undefined setTargetRayMode(XRTargetRayMode targetRayMode);
+  undefined setProfiles(sequence<DOMString> profiles);
+  undefined setGripOrigin(FakeXRRigidTransformInit gripOrigin, optional boolean emulatedPosition = false);
+  undefined clearGripOrigin();
+  undefined setPointerOrigin(FakeXRRigidTransformInit pointerOrigin, optional boolean emulatedPosition = false);
 
-  void disconnect();
-  void reconnect();
+  undefined disconnect();
+  undefined reconnect();
 
-  void startSelection();
-  void endSelection();
-  void simulateSelect();
+  undefined startSelection();
+  undefined endSelection();
+  undefined simulateSelect();
 
-  void setSupportedButtons(sequence<FakeXRButtonStateInit> supportedButtons);
-  void updateButtonState(FakeXRButtonStateInit buttonState);
+  undefined setSupportedButtons(sequence<FakeXRButtonStateInit> supportedButtons);
+  undefined updateButtonState(FakeXRButtonStateInit buttonState);
 };
 
 enum FakeXRButtonType {
@@ -643,11 +664,9 @@ Hit test extensions {#hit-test-extensions}
 The hit test extensions for test API SHOULD be implemented by all user agents that implement <a href="https://immersive-web.github.io/hit-test/">WebXR Hit Test Module</a>.
 
 <script type="idl">
-
 dictionary FakeXRWorldInit {
   required sequence<FakeXRRegionInit> hitTestRegions;
 };
-
 </script>
 
 {{FakeXRWorldInit}} dictionary describes the state of the world that will be used when computing hit test results on a {{FakeXRDevice}}.
@@ -655,12 +674,10 @@ dictionary FakeXRWorldInit {
 {{FakeXRWorldInit/hitTestRegions}} contains a collection of {{FakeXRRegionInit}}s that are used to describe specific regions of the fake world. The order of the regions does not matter.
 
 <script type="idl">
-
 dictionary FakeXRRegionInit {
   required sequence<FakeXRTriangleInit> faces;
   required FakeXRRegionType type;
 };
-
 </script>
 
 {{FakeXRRegionInit}} dictionary describes the contents of a specific region of the world.
@@ -670,11 +687,9 @@ dictionary FakeXRRegionInit {
 {{FakeXRRegionInit/type}} contains a type of the region that will be used during computation of hit test results.
 
 <script type="idl">
-
 dictionary FakeXRTriangleInit {
   required sequence<DOMPointInit> vertices;  // size = 3
 };
-
 </script>
 
 {{FakeXRTriangleInit}} dictionary describes a single face of a region.
@@ -682,13 +697,11 @@ dictionary FakeXRTriangleInit {
 {{FakeXRTriangleInit/vertices}} contains a collection of {{DOMPointInit}}s that comprise the face. The face will be considered as solid when computing hit test results and as such, the winding order of the vertices does not matter.
 
 <script type="idl">
-
 enum FakeXRRegionType {
   "point",
   "plane",
   "mesh"
 };
-
 </script>
 
 {{FakeXRRegionType}} enum is used to describe a type of the world region.
@@ -701,7 +714,7 @@ The DOM Overlay extensions for test API SHOULD be implemented by all user agents
 
 <script type="idl">
 partial interface FakeXRInputController {
-  void setOverlayPointerPosition(float x, float y);
+  undefined setOverlayPointerPosition(float x, float y);
 };
 </script>
 
@@ -713,7 +726,6 @@ Anchors extensions {#anchors-extensions}
 The anchors extensions for test API SHOULD be implemented by all user agents that implement <a href="https://immersive-web.github.io/anchors/">WebXR Anchors</a>.
 
 <script type="idl">
-
 dictionary FakeXRAnchorCreationParameters {
   FakeXRRigidTransformInit requestedAnchorOrigin;
   boolean isAttachedToEntity;
@@ -722,9 +734,8 @@ dictionary FakeXRAnchorCreationParameters {
 callback FakeXRAnchorCreationCallback = Promise<boolean> (FakeXRAnchorCreationParameters parameters, FakeXRAnchorController anchorController);
 
 partial interface FakeXRDevice {
-  void setAnchorCreationCallback(FakeXRAnchorCreationCallback? callback);
+  undefined setAnchorCreationCallback(FakeXRAnchorCreationCallback? callback);
 };
-
 </script>
 
 The {{FakeXRAnchorCreationCallback}} callback can be used by the Web Platform Tests to control the result of a call to create an anchor, and to be able to subsequently control the newly created anchor.
@@ -751,19 +762,17 @@ The {{FakeXRAnchorCreationParameters/isAttachedToEntity}} attribute will be set 
 The <dfn for=FakeXRAnchorCreationCallback>anchorController</dfn> parameter passed in to {{FakeXRAnchorCreationCallback}} can be used to update the state of the anchor, assuming that the creation request was deemed successful. Tests SHOULD store it and issue commands to it for the entire duration of controlled anchor's lifetime.
 
 <script type="idl">
-
 interface FakeXRAnchorController {
   readonly attribute boolean deleted;
 
   // Controlling anchor state:
-  void pauseTracking();
-  void resumeTracking();
-  void stopTracking();
+  undefined pauseTracking();
+  undefined resumeTracking();
+  undefined stopTracking();
 
   // Controlling anchor location:
-  void setAnchorOrigin(FakeXRRigidTransformInit anchorOrigin);
+  undefined setAnchorOrigin(FakeXRRigidTransformInit anchorOrigin);
 };
-
 </script>
 
 Successfully created anchors can be controlled by the test through the use of {{FakeXRAnchorController}} interface.
@@ -786,7 +795,6 @@ Lighting estimation extensions {#lighting-estimation-extensions}
 The lighting estimation extensions for test API SHOULD be implemented by all user agents that implement <a href="https://immersive-web.github.io/lighting-estimation/">WebXR Lighting Estimation</a>.
 
 <script type="idl">
-
 dictionary FakeXRLightEstimateInit {
   required sequence<float> sphericalHarmonicsCoefficients;
   DOMPointInit primaryLightDirection;
@@ -794,9 +802,8 @@ dictionary FakeXRLightEstimateInit {
 };
 
 partial interface FakeXRDevice {
-  void setLightEstimate(FakeXRLightEstimateInit init);
+  undefined setLightEstimate(FakeXRLightEstimateInit init);
 };
-
 </script>
 
 The {{FakeXRDevice}} is extended with internal <dfn for=FakeXRDevice>light estimate</dfn> which is a {{FakeXRLightEstimateInit}}, used to supply data for any requested {{XRLightEstimate}}.
@@ -822,7 +829,6 @@ The depth sensing extensions for test API SHOULD be implemented by all user agen
 The {{FakeXRDevice}} is extended with internal <dfn for=FakeXRDevice>depth sensing data</dfn> which is a {{FakeXRDepthSensingDataInit}}, used to supply data for requests to [=native depth sensing=].
 
 <script type="idl">
-
 dictionary FakeXRDepthSensingDataInit {
   required ArrayBuffer depthData;
   required FakeXRRigidTransformInit normDepthBufferFromNormView;
@@ -830,7 +836,6 @@ dictionary FakeXRDepthSensingDataInit {
   required unsigned long width;
   required unsigned long height;
 };
-
 </script>
 
 {{FakeXRDepthSensingDataInit}} dictionary describes the state of the depth sensing data that should be used when returning latest depth information in [=creating a CPU depth information instance=] and [=creating a GPU depth information instance=] algorithms. All keys present in {{FakeXRDepthSensingDataInit}} correspond to the data required to be returned by [=native depth sensing=] capabilities of the device.
@@ -859,3 +864,29 @@ When the {{FakeXRDevice/clearDepthSensingData()}} method is invoked on {{FakeXRD
 1. Set |device|'s [=FakeXRDevice/depth sensing data=] to <code>null</code>.
 
 </div>
+
+Raw camera access extensions {#raw-camera-access-extensions}
+============================
+
+The raw camera access extensions for test API SHOULD be implemented by all user agents that implement <a href="https://immersive-web.github.io/raw-camera-access/">WebXR Raw Camera Access Module</a>.
+
+The {{FakeXRViewInit}} dictionary is extended with {{FakeXRViewInit/cameraImageInit}} dictionary of type {{FakeXRDeviceResolution}}. This dictionary carries information about the camera image, and is intended to affect the <code>camera image</code> variable in [=obtain camera=] algorithm. If the {{FakeXRViewInit/cameraImageInit}} key is not present in the {{FakeXRViewInit}} dictionary, the [=obtain camera=] algorithm should treat this as <code>null</code> camera image (and thus the algorithm will return <code>null</code>).
+
+<script type="idl">
+dictionary FakeXRCameraImage {
+  required long width;
+  required long height;
+
+  Uint32Array pixels;
+};
+</script>
+
+The {{FakeXRCameraImage/width}} controls the width of the camera image buffer in [=obtain camera=] algorithm.
+
+The {{FakeXRCameraImage/height}} controls the height of the camera image buffer in [=obtain camera=] algorithm.
+
+The {{FakeXRCameraImage/pixels}} control the camera image contents in [=obtain camera=] algorithm. The pixels will be used to initialize the camera image texture.
+
+The camera image will be initialized as if by a call to <code>gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels)</code>, where <code>width</code>, <code>height</code>, and <code>pixels</code> are, respectively, {{FakeXRCameraImage/width}}, {{FakeXRCameraImage/height}}, and {{FakeXRCameraImage/pixels}}. In case {{FakeXRCameraImage/pixels}} key is not present in the dictionary, the behavior would be as if a call to <code>gl.texImage2D()</code> variant that omits the <code>pixels</code> parameter was made.
+
+Any time a [=simulated XR device=]'s [=simulated XR device/list of primary views=] and [=simulated XR device/list of secondary views=] is set, the user agent MUST verify that the camera images associated with the views present across both of those lists are all equal to each other. Camera images are considered equal when their {{FakeXRCameraImage/width}}s and {{FakeXRCameraImage/height}}s are equal, and their {{FakeXRCameraImage/pixels}} are the same instance (if present). If they are not equal, the user agent MUST throw an error from within the algorithm that attempted to set them.

@@ -6,7 +6,8 @@ TR: http://www.w3.org/TR/credential-management-1/
 Previous Version: http://www.w3.org/TR/2016/WD-credential-management-1-20160425/
 Shortname: credential-management
 Level: 1
-Editor: Jeff Hodges, w3cid 43843, Google Inc., jdhodges@google.com
+Former Editor: Jeff Hodges, w3cid 43843, Google Inc., jdhodges@google.com
+Editor: Nina Satragno, w3cid 116344, Google Inc., nsatragno@google.com
 Former Editor: Mike West 56384, Google Inc., mkwst@google.com
 Group: webappsec
 Abstract:
@@ -39,6 +40,15 @@ spec: HTML; urlPrefix: https://html.spec.whatwg.org/multipage/
         text: name; url: attr-fe-autocomplete-name
         text: photo; url: attr-fe-autocomplete-photo
         text: username; url: attr-fe-autocomplete-username
+  urlPrefix: origin.html
+    type: dfn
+      text: origin; for: html-origin-def; url: concept-origin
+  urlPrefix: browsers.html
+    type: dfn
+      text: browsing context; for: document; url: concept-document-bc
+  urlPrefix: webappapis.html
+    type: dfn
+      text: DOM manipulation task source; url: dom-manipulation-task-source
 spec: XHR; urlPrefix: https://xhr.spec.whatwg.org/
   type: dfn
     text: entry; url: concept-formdata-entry
@@ -55,18 +65,25 @@ spec: PSL; urlPrefix: https://publicsuffix.org/list/
 spec: FETCH; urlPrefix: https://fetch.spec.whatwg.org/
   type: dfn
     text: http-network-or-cache fetch; url: http-network-or-cache-fetch
+spec: promises-guide-1; urlPrefix: https://www.w3.org/2001/tag/doc/promises-guide
+  type: dfn
+    text: promise-calling; url: should-promise-call
+spec: web-otp; urlPrefix: https://wicg.github.io/web-otp
+  type: interface
+    text: OTPCredential; url: otpcredential
 </pre>
 
 <pre class="link-defaults">
-spec:html; type:dfn; for:/; text:origin
+spec:html; type:dfn; for:html-origin-def; text:origin
 spec:html; type:dfn; for:environment settings object; text:global object
 spec:fetch; type:dfn; for:/; text:request
 spec:fetch; type:dictionary; for:/; text:RequestInit
 spec:infra; type:dfn; for:/; text:set
 spec:infra; type:dfn; for:struct; text:item
 spec:webidl; type:idl; for:/; text:Function
+spec:webidl; type:dfn; text:identifier
 spec:webidl; type:interface; text:Promise
-spec:promises-guide-1; type:dfn; text:resolve
+spec:webidl; type:dfn; text:resolve
 
 <!-- These need to be exported -->
 spec:html; type:dfn; text:submittable element
@@ -79,10 +96,20 @@ spec:css-syntax-3;
 </pre>
 <pre class="biblio">
 {
+  "FEDCM": {
+    "authors": [ "Sam Goto" ],
+    "href": "https://fedidcg.github.io/FedCM/",
+    "title": "FedCM API"
+  },
   "WEB-LOGIN": {
     "authors": [ "Jason Denizac", "Robin Berjon", "Anne van Kesteren" ],
     "href": "https://github.com/jden/web-login",
     "title": "web-login"
+  },
+  "WEB-OTP": {
+    "authors": [ "Sam Goto" ],
+    "href": "https://wicg.github.io/web-otp/",
+    "title": "WebOTP API"
   }
 }
 </pre>
@@ -103,8 +130,8 @@ spec:css-syntax-3;
 
   Signing into websites is more difficult than it should be. The user agent is in a unique position
   to improve the experience in a number of ways, and most modern user agents have recognized this by
-  providing some measure of  credential management natively in the browser. Users can save usernames
-  and passwords for websites, and those [=credentials=] are autofilled into sign-in forms with
+  providing some measure of <i>credential management</i> natively in the browser. For example, users can save usernames
+  and passwords for websites; those [=credentials=] are later autofilled into sign-in forms, albeit with
   varying degrees of success.
 
   The <{input/autocomplete}> attribute offers a declarative mechanism by which websites can work
@@ -187,9 +214,10 @@ spec:css-syntax-3;
   hanging off of {{CredentialsContainer|navigator.credentials.*}} which enable developers to
   obtain them.
 
-  Various types of [=credentials=] are represented to JavaScript as an interface which
+  Various [=credential type registry/credential types=] are each represented to JavaScript as an interface which
   [=interface/inherits=], either directly or indirectly, from the {{Credential}} interface. This
-  document defines two such interfaces, {{PasswordCredential}} and {{FederatedCredential}}.
+  document defines two such interfaces, {{PasswordCredential}} and {{FederatedCredential}}. Other
+  specifications, for example [[WEBAUTHN]], define other credential types.
 
   A [=credential=] is <dfn export for="credential">effective</dfn> for a particular [=origin=] if it
   is accepted as authentication on that origin. Even if a credential is effective at a particular
@@ -244,24 +272,129 @@ spec:css-syntax-3;
   This document depends on the Infra Standard for a number of foundational concepts used in its
   algorithms and prose [[!INFRA]].
 
+  Each [=/environment settings object=] has an associated <dfn noexport>active credential
+  types</dfn>, a [=set=] which is initially empty.
+
+
+  ### Infrastructure Algorithms ### {#sctn-infra-algorithms}
+
+  <!-- NOTE: '<h4>' maps to the same heading level as three hashs '###', thus using '<h5>' for the next section -->
+  <h5 id="algorithm-same-origin-with-ancestors" algorithm>Same-Origin with its Ancestors</h5>
+
   An [=environment settings object=] (|settings|) is <dfn noexport>same-origin with its
   ancestors</dfn> if the following algorithm returns `true`:
 
-  1.  If |settings| has no [=environment settings object/responsible browsing context=],
-      return `false`.
+  <ol class="algorithm">
+    1.  If |settings|'s [=relevant global object=] has no [=associated Document=],
+        return `false`.
 
-  2.  Let |origin| be |settings|' [=environment settings object/origin=].
+    2.  Let |document| be |settings|' [=relevant global object=]'s [=associated Document=].
 
-  3.  Let |current| be |settings|' [=environment settings object/responsible browsing context=].
+    3.  If |document| has no [=document/browsing context=], return `false`.
 
-  4.  While |current| has a [=parent browsing context=]:
+    4.  Let |origin| be |settings|' [=environment settings object/origin=].
 
-      1.  Set |current| to |current|'s [=parent browsing context=].
+    5.  Let |current| be |document|'s [=document/browsing context=].
 
-      2.  If |current|'s [=active document=]'s [=origin=] is not [=same origin=] with |origin|,
-          return `false`.
+    6.  While |current| has a [=parent browsing context=]:
 
-  5.  Return `true`.
+        1.  Set |current| to |current|'s [=parent browsing context=].
+
+        2.  If |current|'s [=active document=]'s [=origin=] is not [=same origin=] with |origin|,
+            return `false`.
+
+    7.  Return `true`.
+  </ol>
+
+  ### Credential Type Registry ### {#sctn-cred-type-registry}
+
+  This registry maps [=credential type registry/credential types=] (i.e., {{Credential/[[type]]}} values) to various values associated with a given credential type. For example: the [=credential type registry/Options Member Identifier=]
+  (formally, a [=dictionary member=] [=identifier=]) used in
+  {{CredentialCreationOptions}} and {{CredentialRequestOptions}} (i.e., "options dictionaries")
+  by their specifications.
+
+  Note: This registry is used by the [=relevant credential interface objects=] algorithm.
+
+
+  <table class="data">
+    <thead>
+      <tr>
+        <th><dfn for="credential type registry">Credential Type</dfn><br>
+        <small>(in alphabetical order)</small></th>
+        <th><dfn for="credential type registry">Options Member Identifier</dfn></th>
+        <th><dfn for="credential type registry">Appropriate Interface Object</dfn></th>
+        <th>Specification</th>
+        <th>Requestor Contact</th>
+      </tr>
+    </thead>
+    <tr>
+        <td>federated</td>
+        <td>federated</td>
+        <td>{{FederatedCredential}}</td>
+        <td>This specification: [[#federated]]</td>
+        <td><a href="https://www.w3.org/2011/webappsec/">W3C</a></td>
+    </tr>
+    <tr>
+        <td>identity</td>
+        <td>identity</td>
+        <td>{{IdentityCredential}}</td>
+        <td>[[FEDCM]]</td>
+        <td><a href="https://www.w3.org/community/fed-id/">W3C</a></td>
+    </tr>
+    <tr>
+        <td>otp</td>
+        <td>otp</td>
+        <td>{{OTPCredential}}</td>
+        <td>[[WEB-OTP]]</td>
+        <td><a href="https://wicg.io/">WICG</a></td>
+    </tr>
+    <tr>
+        <td>password</td>
+        <td>password</td>
+        <td>{{PasswordCredential}}</td>
+        <td>This specification: [[#passwords]]</td>
+        <td><a href="https://www.w3.org/2011/webappsec/">W3C</a></td>
+    </tr>
+    <tr>
+        <td>public-key</td>
+        <td>publicKey</td>
+        <td>{{PublicKeyCredential}}</td>
+        <td>[[WEBAUTHN]]</td>
+        <td><a href="https://www.w3.org/blog/webauthn/">W3C</a></td>
+    </tr>
+  </table>
+
+  <!-- NOTE: The below Registration Entry Requirements and Update Process is based on
+  https://www.w3.org/TR/timing-entrytypes-registry/, and is similar to other W3C
+  "registry" specs. I.e., this Requirements and Update Process is typical for
+  W3C registries. -->
+
+  #### Registration Entry Requirements and Update Process #### {#sctn-registry-requirements}
+
+  * Each [=credential type registry/credential type=] must be unique amongst the set of [=credential type registry/credential types=].
+
+  * Each registry entry must state the [=dictionary member=] [=identifier=] (known as the [=credential type registry/Options Member Identifier=] in the registry) used in the
+    credential specification's extentions of {{CredentialCreationOptions}} and
+    {{CredentialRequestOptions}}.
+
+  * Each registry entry must state the [=credential type registry/Appropriate Interface Object=] [=identifier=] for the
+    [=credential type registry/credential type=].
+
+  * Each registry entry must include a link that references a publicly available specification
+    defining the [=credential type registry/credential type=] and the [=dictionary member=] [=identifier=].
+
+  * Each registry entry's specification must include the requestor's contact information.
+
+  An update to this registry is an addition, change or deletion of a [=credential type registry/credential type=]'s registry entry.
+  Any person can request an update to this registry by pull requests to the
+  <a href="https://github.com/w3c/webappsec-credential-management">webappsec-credential-management</a>
+  repository.
+  The Web Applications Security Working Group will place it on an upcoming meeting agenda
+  and notify the requestor.
+  Consideration and disposition of the request is by consensus of the W3C Web Applications
+  Security Working Group.
+  The Chair will then notify the requestor of the outcome and update the registry accordingly.
+
 
   ## The `Credential` Interface ## {#the-credential-interface}
 
@@ -270,6 +403,7 @@ spec:css-syntax-3;
     interface Credential {
       readonly attribute USVString id;
       readonly attribute DOMString type;
+      static Promise&lt;boolean&gt; isConditionalMediationAvailable();
     };
   </pre>
   <div dfn-for="Credential">
@@ -279,12 +413,31 @@ spec:css-syntax-3;
 
     :   <dfn attribute>type</dfn>
     ::  This attribute's getter returns the value of the object's [=interface object=]'s
-        {{[[type]]}} slot, which specifies the [=credential type=] represented by this object.
+        {{[[type]]}} slot, which specifies the [=credential/credential type=] represented by this object.
+
+    :   <dfn method>isConditionalMediationAvailable()</dfn>
+    ::  Returns a new {{Promise}} that [=resolves=] with `true` if and only if the user agent supports the
+        {{CredentialMediationRequirement/conditional}} approach to
+        [[#mediation-requirements|mediation of credential requests]] for the [=credential/credential type=],
+        `false` otherwise.
+
+        {{Credential}}'s default implementation of {{Credential/isConditionalMediationAvailable()}}:
+
+        <ol class="algorithm">
+            1.  Return a new {{Promise}} that immediately [=resolves=] with `false`.
+        </ol>
+
+        The specification for any [=credential/credential type=] supporting
+        {{CredentialMediationRequirement/conditional}} mediation must explicitly override this
+        function to [=resolve=] to `true`.
+
+        Note: If this function is not present, {{CredentialMediationRequirement/conditional}}
+        mediation is not supported for the [=credential/credential type=].
 
     :   <dfn attribute>\[[type]]</dfn>
     ::  The {{Credential}} [=interface object=] has an internal slot named `[[type]]`, which
-        unsurprisingly contains a string representing the <dfn>credential type</dfn>. The slot's value
-        is the empty string unless otherwise specified.
+        unsurprisingly contains a <dfn for="credential" lt="credential type">string representing the credential type</dfn>. The slot's value
+        is the empty string unless otherwise specified. See [[#sctn-cred-type-registry]] for a list of [=credential type registry/credential types=].
 
         Note: The {{[[type]]}} slot's value will be the same for all credentials implementing a
         particular interface, which means that developers can rely on `obj.type` returning a string
@@ -343,10 +496,10 @@ spec:css-syntax-3;
     and a boolean which is true iff the caller's [=environment settings object=] is
     [=same-origin with its ancestors=].
     It returns a {{Credential}} if one can be
-    returned given the options provided, `null` if no credential is available, or an error if
-    discovery fails (for example, incorrect options could produce a {{TypeError}}). If this
-    kind of {{Credential}} is only [=effective=] for a single use or a limited time, this
-    method is responsible for generating new [=credentials=] using a [=credential source=].
+    returned given the options provided, `null` if no credential is available, or throws an
+    error if discovery fails (for example, incorrect options could produce a {{TypeError}}).
+    If this kind of {{Credential}} is only [=effective=] for a single use or a limited time,
+    this method is responsible for generating new [=credentials=] using a [=credential source=].
 
     {{Credential}}'s default implementation of
     {{Credential/[[DiscoverFromExternalSource]](origin, options, sameOriginWithAncestors)}}:
@@ -376,14 +529,14 @@ spec:css-syntax-3;
 
     * creates a {{Credential}}, or
     * does not create a credential and returns `null`, or
-    * returns an error if creation fails due to exceptional situations
+    * throws an error if creation fails due to exceptional situations
         (for example, incorrect options could produce a {{TypeError}}).
 
     When creating a {{Credential}}, it will return an algorithm that takes a [=global object=]
         and returns an [=interface object=]
         inheriting from {{Credential}}. This algorithm MUST be invoked from a [=task=].
 
-    Note: This algorithm's steps are defined on a per-[=credential type=] basis.
+    Note: This algorithm's steps are defined on a per-[=credential/credential type=] basis.
 
     {{Credential}}'s default implementation of {{Credential/[[Create]](origin, options, sameOriginWithAncestors)}}:
 
@@ -428,7 +581,7 @@ spec:css-syntax-3;
   </pre>
 
   The <dfn for="Navigator" attribute>`credentials`</dfn> attribute MUST return the
-  {{CredentialsContainer}} associated with the [=context object=].
+  {{CredentialsContainer}} associated with the [=active document=]'s [=document/browsing context=].
 
   Note: As discussed in [[#insecure-sites]], the credential management API is exposed only in
   [=Secure Contexts=].
@@ -519,7 +672,7 @@ spec:css-syntax-3;
     :   <dfn>signal</dfn>
     ::  This property lets the developer abort an ongoing {{CredentialsContainer/get()}} operation.
         An aborted operation may complete normally (generally if the abort was received after the
-        operation finished) or reject with an "{{AbortError}}" {{DOMException}}."
+        operation finished) or reject with an [=AbortSignal/abort reason=].
   </div>
 
   <div class="note">
@@ -533,35 +686,34 @@ spec:css-syntax-3;
   </div>
 
   <div algorithm="relevant credential interfaces">
-    The <dfn for="CredentialRequestOptions">relevant credential interface objects</dfn> for a given
-    {{CredentialRequestOptions}} (|options|) is a set of [=interface objects=], collected as follows:
+    The <dfn for="CredentialRequestOptions,CredentialCreationOptions">relevant credential interface objects</dfn> for a given
+    {{CredentialCreationOptions}} or {{CredentialRequestOptions}} (|options|) is a set of [=interface objects=], collected as follows:
+
+    Note: This algorithm uses the [[#sctn-cred-type-registry|Credential Type Registry]].
 
     <ol class="algorithm">
-      1.  Let |settings| be the <a>current settings object</a>
+        1.  Let |settings| be the <a>current settings object</a>
 
-      2.  Let |interface objects| be the set of [=interface objects=] on |settings|'
-          [=environment settings object/global object=].
-         
-      3.  Let |relevant interface objects| be an empty set.
-      
-      4.  For each |object| in |interface objects|:
+        1.  Let |relevant interface objects| be an [=set/empty=] [=set=].
 
-          1.  If |object|'s [=inherited interfaces=] do not <a for="set">contain</a> {{Credential}},
-              <a for="iteration">continue</a>.
+        1.  [=map/For each=] |optionKey| → <var ignore>optionValue</var> of |options|:
 
-          2.  Let |key| be |object|'s {{Credential/[[type]]}} slot's value.
+            1.  Let |credentialInterfaceObject| be the [=credential type registry/Appropriate Interface Object=]
+                (on |settings|' [=environment settings object/global object=]) whose [=credential
+                type registry/Options Member Identifier=] is |optionKey|.
 
-          3.  If |options|[|key|] <a for="map">exists</a>, <a for="set">append</a> |object| to
-              |relevant interface objects|.
+            1.  Assert: |credentialInterfaceObject|'s {{[[type]]}} slot equals the [=credential type
+                registry/Credential Type=] whose [=credential type registry/Options Member
+                Identifier=] is |optionKey|.
+
+            1.  Append |credentialInterfaceObject| to |relevant interface objects|.
+
+        1.  Return |relevant interface objects|.
     </ol>
-
-    ISSUE: jyasskin@ suggests replacing the iteration through the interface objects with a registry.
-    I'm not sure which is less clear, honestly. I'll leave it like this for the moment, and we can
-    argue about whether this is too much of a `COMEFROM` interface.
   </div>
 
   <div algorithm="can collect locally">
-    A given {{CredentialRequestOptions}} |options| is
+    A given {{CredentialRequestOptions}} (|options|) is
     <dfn for="CredentialRequestOptions">matchable <i lang="la">a priori</i></dfn> if the following
     steps return `true`:
 
@@ -571,7 +723,7 @@ spec:css-syntax-3;
           1.  If |interface|'s {{Credential/[[discovery]]}} slot's value is not
               "{{Credential/[[discovery]]/credential store}}", return `false`.
 
-      2.  Return `true`.
+      1.  Return `true`.
     </ol>
 
     Note: When executing {{get(options)}}, we only return credentials without [=user mediation=] if
@@ -593,6 +745,7 @@ spec:css-syntax-3;
     enum CredentialMediationRequirement {
       "silent",
       "optional",
+      "conditional",
       "required"
     };
   </pre>
@@ -616,6 +769,26 @@ spec:css-syntax-3;
         developer has reasonable confidence that a user expects to start a sign-in operation. If
         a user has just clicked "sign-in" for example, then they won't be surprised or confused to
         see a [=credential chooser=] if necessary.
+
+    :   <dfn>conditional</dfn>
+    ::  Discovered credentials are presented to the user in a non-modal dialog along with an
+        indication of the [=origin=] which is requesting credentials. If the user makes a gesture
+        outside of the dialog, the dialog closes without resolving or rejecting the {{Promise}}
+        returned by the {{CredentialsContainer/get()}} method and without causing a user-visible
+        error condition. If the user makes a gesture that selects a credential, that credential is
+        returned to the caller. The [=prevent silent access flag=] is treated as being `true`
+        regardless of its actual value: the {{CredentialMediationRequirement/conditional}} behavior
+        always involves [=user mediation=] of some sort if applicable credentials are discovered.
+
+        If no credentials are discovered, the user agent MAY prompt the user to take action in a way
+        that depends on the type of credential (e.g. to insert a device containing credentials).
+        Either way, the `get()` method MUST NOT resolve immediately with `null` to avoid revealing
+        the lack of applicable credentials to the website.
+
+        Websites can only pass {{CredentialMediationRequirement/conditional}} into the
+        {{CredentialsContainer/get()}} method if all of the [=relevant credential interface objects|credential
+        interfaces it refers to=] have overridden {{Credential/isConditionalMediationAvailable()}} to return
+        a new {{Promise}} that [=resolves=] with `true`.
 
     :   <dfn>required</dfn>
     ::  The user agent will not hand over credentials without [=user mediation=], even if the
@@ -739,7 +912,7 @@ spec:css-syntax-3;
     :   <dfn>signal</dfn>
     ::  This property lets the developer abort an ongoing {{CredentialsContainer/create()}}
         operation. An aborted operation may complete normally (generally if the abort was received
-        after the operation finished) or reject with an "{{AbortError}}" {{DOMException}}."
+        after the operation finished) or reject with an [=AbortSignal/abort reason=].
   </div>
 
   ## Algorithms ## {#algorithms}
@@ -753,63 +926,124 @@ spec:css-syntax-3;
   <ol class="algorithm">
     1.  Let |settings| be the <a>current settings object</a>
 
-    2.  Assert: |settings| is a [=secure context=].
+    1.  Assert: |settings| is a [=secure context=].
 
-    3.  If <code>|options|.{{CredentialRequestOptions/signal}}</code>'s [=AbortSignal/aborted flag=]
-        is set, then return [=a promise rejected with=] an "{{AbortError}}" {{DOMException}}.
+    1.  If <code>|options|.{{CredentialRequestOptions/signal}}</code> is [=AbortSignal/aborted=],
+        then return [=a promise rejected with=]
+        <code>|options|.{{CredentialRequestOptions/signal}}</code>'s [=AbortSignal/abort reason=].
 
-    4.  Let |p| be [=a new promise=].
+    1.  If <code>|options|.{{CredentialRequestOptions/mediation}}</code> is
+        "{{CredentialMediationRequirement/conditional}}":
 
-    5.  Let |origin| be the [=current settings object=]'s [=environment settings object/origin=].
+        1.  For each |interface| in |options|' [=relevant credential interface objects=]:
 
-    6.  Let |sameOriginWithAncestors| be `true` if |settings| is [=same-origin with its
+            1.  If |interface| does not support {{CredentialMediationRequirement/conditional}}
+                [=user mediation=], return [=a promise rejected with=] a "{{TypeError}}" {{DOMException}}.
+
+    1.  Let |p| be [=a new promise=].
+
+    1. For each |interface| in |options|' <a>relevant credential interface objects</a>:
+
+        1. If |settings|' [=active credential types=] [=set/contains=] |interface|'s
+            {{Credential/[[type]]}}, return [=a promise rejected with=] a "{{NotAllowedError}}"
+            {{DOMException}}.
+
+    1. For each |interface| in |options|' <a>relevant credential interface objects</a>:
+
+        1. [=set/Append=] |interface|'s {{Credential/[[type]]}} to |settings|'
+            [=active credential types=].
+
+    1.  Let |origin| be |settings|' [=environment settings object/origin=].
+
+    1.  Let |sameOriginWithAncestors| be `true` if |settings| is [=same-origin with its
         ancestors=], and `false` otherwise.
 
-    7.  Run the following steps [=in parallel=]:
+    1.  If |options|[{{CredentialRequestOptions/identity}}] [=map/exists=] and
+        if |settings|' [=relevant global object=]'s [=associated Document=] is **not**
+        [=allowed to use=] the [=identity-credentials-get=]
+        [=policy-controlled feature=] return [=a promise rejected with=] a "{{NotAllowedError}}"
+        {{DOMException}}.
+
+    1.  If |options|[{{CredentialRequestOptions/publicKey}}] [=map/exists=] and
+        if |settings|' [=relevant global object=]'s [=associated Document=] is **not**
+        [=allowed to use=] the [=publickey-credentials-get-feature|publickey-credentials-get=]
+        [=policy-controlled feature=] return [=a promise rejected with=] a "{{NotAllowedError}}"
+        {{DOMException}}.
+
+        Note: <a const>`password`</a> and <a const>`federated`</a>
+        [=credential type registry/credential types=] are not presently treated as
+        [=policy-controlled features=], although this may change in the future.
+
+    1.  Run the following steps [=in parallel=]:
 
         1.  Let |credentials| be the result of <a abstract-op lt="collect local">collecting
             `Credential`s from the credential store</a>, given |origin|, |options|, and
             |sameOriginWithAncestors|.
 
-        2.  If |credentials| is an [=exception=], [=reject=] |p| with |credentials|.
+        1.  If |credentials| is an [=exception=], [=reject=] |p| with |credentials|.
 
-        3.  If all of the following statements are true, resolve |p| with |credentials|[0] and
+        1.  If all of the following statements are true, resolve |p| with |credentials|[0] and
             skip the remaining steps:
 
             1.  |credentials|' [=set/size=] is 1
 
-            2.  |origin| does not [=origin/requires user mediation|require user mediation=]
+            1.  |origin| does not [=origin/requires user mediation|require user mediation=]
 
-            3.  |options| is <a>matchable <i lang="la">a priori</i></a>.
+            1.  |options| is <a>matchable <i lang="la">a priori</i></a>.
 
-            4.  |options|.{{CredentialRequestOptions/mediation}} is not
+            1.  |options|.{{CredentialRequestOptions/mediation}} is not
                 "{{CredentialMediationRequirement/required}}".
+
+            1.  |options|.{{CredentialRequestOptions/mediation}} is not
+                "{{CredentialMediationRequirement/conditional}}".
 
             ISSUE: This might be the wrong model. It would be nice to support a site that wished
             to accept either username/passwords or webauthn-style credentials without forcing
             a chooser for those users who use the former, and who wish to remain signed in.
 
-        4.  If |options|' {{CredentialRequestOptions/mediation}} is
+        1.  If |options|' {{CredentialRequestOptions/mediation}} is
             "{{CredentialMediationRequirement/silent}}", [=resolve=] |p| with `null`, and skip
             the remaining steps.
 
-        5.  Let |choice| be the result of <a abstract-op lt="ask to choose">asking the user to
+        1.  Let |result| be the result of <a abstract-op lt="ask to choose">asking the user to
             choose a `Credential`</a>, given |options| and |credentials|.
 
-        6.  If |choice| is `null` or a {{Credential}}, [=resolve=] |p| with |choice| and skip the
-            remaining steps.
+        1.  If |result| is an [=interface object=]:
 
-        7.  Assert: |choice| is an [=interface object=].
+            1.  Set |result| to the result of executing |result|'s
+                {{[[DiscoverFromExternalSource]](origin, options, sameOriginWithAncestors)}},
+                given |origin|, |options|, and |sameOriginWithAncestors|.
 
-        8.  Let |result| be the result of executing |choice|'s
-            {{[[DiscoverFromExternalSource]](origin, options, sameOriginWithAncestors)}},
-            given |origin|, |options|, and |sameOriginWithAncestors|.
+                If that threw an [=exception=]:
 
-        9.  If |result| is a {{Credential}} or `null`, resolve |p| with |result|.
+                1. Let |e| be the thrown [=exception=].
 
-            Otherwise, [=reject=] |p| with |result|.
+                1. [=Queue a task=] on <var ignore>global</var>'s [=DOM manipulation task source=]
+                   to run the following substeps:
 
-    7.  Return |p|.
+                    1. [=Reject=] |p| with |e|.
+
+                1. Terminate these substeps.
+
+        1.  Assert: |result| is `null`, or a {{Credential}}.
+
+        1.  If |result| is a {{Credential}}, [=resolve=] |p| with |result|.
+
+        1.  If |result| is `null` and |options|.{{CredentialRequestOptions/mediation}} is not
+            {{CredentialMediationRequirement/conditional}}, [=resolve=] |p| with |result|.
+
+            Note: if |options|.{{CredentialRequestOptions/mediation}} is
+            {{CredentialMediationRequirement/conditional}} and a `null` credential is discovered,
+            promise |p| is not resolved.
+
+    1. [=React=] to |p|:
+
+        1. For each |interface| in |options|' <a>relevant credential interface objects</a>:
+
+            1. [=set/Remove=] |interface|'s {{Credential/[[type]]}} from |settings|'
+                [=active credential types=].
+
+    1.  Return |p|.
   </ol>
 
   <h4 id="algorithm-collect-known" algorithm>Collect `Credential`s from the credential store</h4>
@@ -828,13 +1062,11 @@ spec:css-syntax-3;
 
         1.  Let |r| be the result of executing |interface|'s
             {{Credential/[[CollectFromCredentialStore]](origin, options, sameOriginWithAncestors)}} internal method on
-            |origin|, |options|, and |sameOriginWithAncestors|.
+            |origin|, |options|, and |sameOriginWithAncestors|. If that threw an [=exception=], rethrow that exception.
 
-        2.  If |r| is an [=exception=], return |r|.
+        2.  Assert: |r| is a list of [=interface objects=].
 
-        3.  Assert: |r| is a list of [=interface objects=].
-
-        4.  For each |c| in |r|:
+        3.  For each |c| in |r|:
 
             1.  <a for="set">Append</a> |c| to |possible matches|.
 
@@ -851,24 +1083,43 @@ spec:css-syntax-3;
   <ol class="algorithm">
     1.  Let |settings| be the <a>current settings object</a>
 
-    2.  Assert: |settings| is a [=secure context=].
+    1.  Assert: |settings| is a [=secure context=].
 
-    3.  Let |sameOriginWithAncestors| be `true` if the [=current settings object=] is [=same-origin
+    1.  Let |sameOriginWithAncestors| be `true` if the [=current settings object=] is [=same-origin
         with its ancestors=], and `false` otherwise.
 
-    4.  Let |p| be [=a new promise=].
+    1.  Let |p| be [=a new promise=].
 
-    5.  Run the following steps [=in parallel=]:
+    1. If |settings|' [=active credential types=] [=set/contains=] |credential|'s
+        {{Credential/[[type]]}}, return [=a promise rejected with=] a "{{NotAllowedError}}"
+        {{DOMException}}.
+
+    1. [=set/Append=] |credential|'s {{Credential/[[type]]}} to |settings|'
+        [=active credential types=].
+
+    1.  Run the following steps [=in parallel=]:
 
         1.  Let |r| be the result of executing |credential|'s [=interface object=]'s
             {{Credential/[[Store]](credential, sameOriginWithAncestors)}} internal method on
             |credential| and |sameOriginWithAncestors|.
 
-        2.  If |r| is an [=exception=], [=reject=] |p| with |r|.
+            If that threw an [=exception=]:
+
+            1.  Let |e| be the thrown [=exception=].
+
+            2.  [=Queue a task=] on <var ignore>global</var>'s [=DOM manipulation task source=] to
+                run the following substeps:
+
+                1. [=Reject=] |p| with |e|.
 
             Otherwise, [=resolve=] |p| with |r|.
 
-    6.  Return |p|.
+    1. [=React=] to |p|:
+
+        1. [=set/Remove=] |credential|'s {{Credential/[[type]]}} from |settings|'
+            [=active credential types=].
+
+    1.  Return |p|.
   </ol>
 
   <h4 id="algorithm-create" algorithm>Create a `Credential`</h4>
@@ -881,19 +1132,19 @@ spec:css-syntax-3;
   <ol class="algorithm">
     1.  Let |settings| be the <a>current settings object</a>.
 
-    2.  Assert: |settings| is a [=secure context=].
+    1.  Assert: |settings| is a [=secure context=].
 
-    3.  Let |global| be |settings|' [=environment settings object/global object=].
+    1.  Let |global| be |settings|' [=environment settings object/global object=].
 
-    4.  Let |sameOriginWithAncestors| be `true` if the [=current settings object=] is [=same-origin
+    1.  Let |sameOriginWithAncestors| be `true` if the [=current settings object=] is [=same-origin
         with its ancestors=], and `false` otherwise.
 
-    5.  Let |interfaces| be the [=set=] of |options|' <a>relevant credential interface objects</a>.
+    1.  Let |interfaces| be the [=set=] of |options|' <a>relevant credential interface objects</a>.
 
-    6.  Return [=a promise rejected with=] `NotSupportedError` if any of the following statements
+    1.  Return [=a promise rejected with=] `NotSupportedError` if any of the following statements
         are true:
 
-        1.  |settings| does not have a [=environment settings object/responsible document=].
+        1.  |global| does not have an [=associated Document=].
 
         2.  |interfaces|' [=list/size=] is greater than 1.
 
@@ -902,30 +1153,51 @@ spec:css-syntax-3;
             types in order to support a "sign-up" use case. For the moment, though, we're punting
             on that by restricting the dictionary to a single entry.
 
-    7.  If <code>|options|.{{CredentialCreationOptions/signal}}</code>'s [=AbortSignal/aborted
-        flag=] is set, then return [=a promise rejected with=] an "{{AbortError}}" {{DOMException}}.
+    1.  If <code>|options|.{{CredentialRequestOptions/signal}}</code> is [=AbortSignal/aborted=],
+        then return [=a promise rejected with=]
+        <code>|options|.{{CredentialRequestOptions/signal}}</code>'s [=AbortSignal/abort reason=].
 
-    8.  Let |p| be [=a new promise=].
+    1.  Let |p| be [=a new promise=].
 
-    9.  Let |origin| be |settings|'s [=environment settings object/origin=].
+    1. Let |type| be |interfaces|[0]'s {{Credential/[[type]]}}.
 
-    10.  Run the following steps [=in parallel=]:
+    1. If |settings|' [=active credential types=] [=set/contains=] |type|, return
+        [=a promise rejected with=] a "{{NotAllowedError}}" {{DOMException}}.
+
+    1. [=set/Append=] |type| to |settings|' [=active credential types=].
+
+    1.  Let |origin| be |settings|'s [=environment settings object/origin=].
+
+    1.  Run the following steps [=in parallel=]:
 
         1.  Let |r| be the result of executing |interfaces|[0]'s
             {{Credential/[[Create]](origin, options, sameOriginWithAncestors)}} internal method on
             |origin|, |options|, and |sameOriginWithAncestors|.
 
-        2.  If |r| is an [=exception=], [=reject=] |p| with |r|, and terminate these substeps.
+            If that threw an [=exception=]:
 
-        3.  If |r| is a {{Credential}} or `null`, [=resolve=] |p| with |r|, and terminate these substeps.
+            1. Let |e| be the thrown [=exception=].
 
-        4.  Assert: |r| is a algorithm (as defined in [[#algorithm-create-cred]]).
+            2. [=Queue a task=] on |global|'s [=DOM manipulation task source=] to run the
+               following substeps:
 
-        5.  [=Queue a task=] on |global|'s [=DOM manipulation task source=] to run the following substeps:
+               1. [=Reject=] |p| with |e|.
+
+            3. Terminate these substeps.
+
+        2.  If |r| is a {{Credential}} or `null`, [=resolve=] |p| with |r|, and terminate these substeps.
+
+        3.  Assert: |r| is an algorithm (as defined in [[#algorithm-create-cred]]).
+
+        4.  [=Queue a task=] on |global|'s [=DOM manipulation task source=] to run the following substeps:
 
             1. [=Resolve=] |p| with the result of [=promise-calling=] |r| given |global|.
 
-    11.  Return |p|.
+    1. [=React=] to |p|:
+
+        1. [=set/Remove=] |type| from |settings|' [=active credential types=].
+
+    1.  Return |p|.
   </ol>
 
   <h4 id="algorithm-prevent-silent-access" algorithm>Prevent Silent Access</h4>
@@ -1245,12 +1517,12 @@ spec:css-syntax-3;
   the [=credential store=]. If no matching {{Credential}} objects are available, the returned set
   will be empty.
 
-  The algorithm will return a `NotAllowedError` if |sameOriginWithAncestors| is not `true`.
+  The algorithm will throw a `NotAllowedError` if |sameOriginWithAncestors| is not `true`.
 
   <ol class="algorithm">
     1.  Assert: |options|["{{CredentialRequestOptions/password}}"] [=map/exists=].
 
-    2.  If |sameOriginWithAncestors is `false`, return a "{{NotAllowedError}}" {{DOMException}}.
+    2.  If |sameOriginWithAncestors| is `false`, throw a "{{NotAllowedError}}" {{DOMException}}.
 
         Note: This restriction aims to address the concern raised in [[#security-origin-confusion]].
 
@@ -1274,7 +1546,7 @@ spec:css-syntax-3;
   The algorithm returns a {{PasswordCredential}} if one can be created,
   `null` otherwise. The {{CredentialCreationOptions}} dictionary must have a `password` member which
   holds either an {{HTMLFormElement}} or a {{PasswordCredentialData}}. If that member's value cannot be
-  used to create a {{PasswordCredential}}, this algorithm will return a {{TypeError}} [=exception=].
+  used to create a {{PasswordCredential}}, this algorithm will throw a {{TypeError}} [=exception=].
 
   <ol class="algorithm">
     1.  Assert: |options|["{{CredentialCreationOptions/password}}"] [=map/exists=], and
@@ -1283,12 +1555,14 @@ spec:css-syntax-3;
     2.  If |options|["{{CredentialCreationOptions/password}}"] is an {{HTMLFormElement}}, return the
         result of executing <a abstract-op>Create a `PasswordCredential` from an
         `HTMLFormElement`</a> given |options|["{{CredentialCreationOptions/password}}"] and |origin|.
+        Rethrow any exceptions.
 
     3.  If |options|["{{CredentialCreationOptions/password}}"] is a {{PasswordCredentialData}}, return
         the result of executing <a abstract-op>Create a `PasswordCredential` from
         `PasswordCredentialData`</a> given |options|["{{CredentialCreationOptions/password}}"].
+        Rethrow any exceptions.
 
-    4.  Return a {{TypeError}} [=exception=].
+    4.  Throw a {{TypeError}} [=exception=].
   </ol>
 
   <h4 algorithm id="store-passwordcredential">
@@ -1303,7 +1577,7 @@ spec:css-syntax-3;
   The algorithm will return a `NotAllowedError` if |sameOriginWithAncestors| is not `true`.
 
   <ol class="algorithm">
-    1.  Return a "{{NotAllowedError}}" {{DOMException}} without altering the user agent's
+    1.  Throw a "{{NotAllowedError}}" {{DOMException}} without altering the user agent's
         [=credential store=] if |sameOriginWithAncestors| is `false`.
 
         Note: This restriction aims to address the concern raised in [[#security-origin-confusion]].
@@ -1418,13 +1692,12 @@ spec:css-syntax-3;
                         on |name|.
 
     7.  Let |c| be the result of executing <a abstract-op>Create a `PasswordCredential` from
-        `PasswordCredentialData`</a> on |data|.
+        `PasswordCredentialData`</a> on |data|. If that threw an [=exception=], rethrow that
+        exception.
      
-    8.  If |c| is an [=exception=], return |c|.
+    8.  Assert: |c| is a {{PasswordCredential}}.
 
-    9.  Assert: |c| is a {{PasswordCredential}}.
-
-    10.  Return |c|.
+    9.  Return |c|.
   </ol>
 
   <h4 algorithm id="construct-passwordcredential-data">
@@ -1437,7 +1710,7 @@ spec:css-syntax-3;
   <ol class="algorithm">
     1.  Let |c| be a new {{PasswordCredential}} object.
     
-    2.  If any of the following are the empty string, return a {{TypeError}} [=exception=]:
+    2.  If any of the following are the empty string, throw a {{TypeError}} [=exception=]:
 
         *   |data|'s {{CredentialData/id}} member's value
         *   |data|'s {{PasswordCredentialData/origin}} member's value
@@ -1529,11 +1802,10 @@ spec:css-syntax-3;
     ::  This constructor accepts a {{FederatedCredentialInit}} (|data|), and runs the following steps:
 
         1.  Let |r| be the result of executing <a abstract-op>Create a `FederatedCredential` from
-            `FederatedCredentialInit`</a> on |data|.
+            `FederatedCredentialInit`</a> on |data|. If that threw an [=exception=], rethrow that
+            exception.
 
-        2.  If |r| is an [=exception=], [=throw=] |r|.
-
-            Otherwise, return |r|.
+        2.  Return |r|.
   </div>
 
   {{FederatedCredential}} objects can be created by passing a {{FederatedCredentialInit}} dictionary
@@ -1602,7 +1874,7 @@ spec:css-syntax-3;
   <ol class="algorithm">
     1.  Assert: |options|["{{CredentialRequestOptions/federated}}"] [=map/exists=].
 
-    2.  If <var ignore>sameOriginWithAncestors</var> is `false`, return a "{{NotAllowedError}}" {{DOMException}}.
+    2.  If |sameOriginWithAncestors| is `false`, throw a "{{NotAllowedError}}" {{DOMException}}.
 
         Note: This restriction aims to address the concern raised in [[#security-origin-confusion]].
 
@@ -1628,17 +1900,18 @@ spec:css-syntax-3;
   {{CredentialCreationOptions}} (|options|), and a boolean which is `true` iff the
   calling context is [=same-origin with its ancestors=] (|sameOriginWithAncestors|).
   The algorithm returns a {{FederatedCredential}} if one can be created,
-  `null` otherwise, or an [=exception=] in exceptional circumstances:
+  `null` otherwise, or throws an [=exception=] in exceptional circumstances:
 
   <ol class="algorithm">
     1.  Assert: |options|["{{CredentialCreationOptions/federated}}"] [=map/exists=], and
-        <var ignore>sameOriginWithAncestors</var> is unused.
+        |sameOriginWithAncestors| is unused.
 
     2.  Set |options|["{{CredentialCreationOptions/federated}}"]'s {{FederatedCredentialInit/origin}}
         member's value to |origin|'s value.
 
     3.  Return the result of executing <a abstract-op>Create a `FederatedCredential` from
         `FederatedCredentialInit`</a> given |options|["{{CredentialCreationOptions/federated}}"].
+        If that threw an [=exception=], then rethrow that exception.
   </ol>
 
   <h4 algorithm id="store-federatedcredential">
@@ -1653,7 +1926,7 @@ spec:css-syntax-3;
   The algorithm will return a `NotAllowedError` if |sameOriginWithAncestors| is not `true`.
 
   <ol class="algorithm">
-    1.  Return a "{{NotAllowedError}}" {{DOMException}} without altering the user agent's
+    1.  Throw a "{{NotAllowedError}}" {{DOMException}} without altering the user agent's
         [=credential store=] if <var ignore>sameOriginWithAncestors</var> is `false`.
 
         Note: This restriction aims to address the concern raised in [[#security-origin-confusion]].
@@ -1695,7 +1968,7 @@ spec:css-syntax-3;
   <ol class="algorithm">
     1.  Let |c| be a new {{FederatedCredential}} object.
     
-    2.  If any of the following are the empty string, return a {{TypeError}} [=exception=]:
+    2.  If any of the following are the empty string, throw a {{TypeError}} [=exception=]:
 
         *   |init|.{{CredentialData/id}}'s value
         *   |init|.{{FederatedCredentialInit/provider}}'s value
@@ -1744,7 +2017,7 @@ spec:css-syntax-3;
   if a user configures their browser to grant persistent credential access to a particular origin,
   credentials may be provided without presenting the user with a UI requesting a decision.
 
-  Here we'll spell out a few requirements that hold for all credential types, but note that there's
+  Here we'll spell out a few requirements that hold for all [=credential type registry/credential types=], but note that there's
   a good deal of latitude left up to the user agent (which is in a priviliged position to assist
   the user). Moreover, specific credential types may have distinct requirements that exceed the
   requirements laid out more generally here.
@@ -1865,7 +2138,7 @@ spec:css-syntax-3;
  ██████  ████████  ██████   ███████  ██     ██ ████    ██       ██
 -->
 <section>
-  # Security and Privacy Considerations # {#security-and-privacy}
+  # Security Considerations # {#security-considerations}
 
   The following sections represent guidelines for various security and privacy considerations.
   Individual credential types may enforce stricter or more relaxed versions of these guidelines.
@@ -1952,15 +2225,6 @@ spec:css-syntax-3;
   will immedietely return an empty set if called from inside a {{Worker}}, or a non-[=top-level
   browsing context=].
 
-  ## Timing Attacks ## {#security-timing}
-
-  If the user has no credentials for an origin, a call to {{CredentialsContainer/get()}} will
-  resolve very quickly indeed. A malicious website could distinguish between a user with no
-  credentials and a user with credentials who chooses not to share them.
-
-  User agents SHOULD also rate-limit credential requests. It's almost certainly abusive for a page
-  to request credentials more than a few times in a short period.
-
   ## Signing-Out ## {#security-signout}
 
   If a user has chosen to automatically sign-in to websites, as discussed in
@@ -1980,6 +2244,20 @@ spec:css-syntax-3;
   the [=credential store=] to `true`. Additionally, the user agent SHOULD provide some UI affordance
   for disabling automatic sign-in for a particular origin. This could be tied to the notification
   that credentials have been provided to an origin, for example.
+</section>
+
+
+<section>
+  # Privacy Considerations # {#privacy-considerations}
+
+  ## Timing Attacks ## {#security-timing}
+
+  If the user has no credentials for an origin, a call to {{CredentialsContainer/get()}} will
+  resolve very quickly indeed. A malicious website could distinguish between a user with no
+  credentials and a user with credentials who chooses not to share them.
+
+  User agents SHOULD also rate-limit credential requests. It's almost certainly abusive for a page
+  to request credentials more than a few times in a short period.
 
   ## Chooser Leakage ## {#security-chooser-leakage}
 
@@ -2056,7 +2334,7 @@ spec:css-syntax-3;
         </pre>
       </div>
 
-  2.  Define appropriate {{Credential/[[Create]](origin, options, sameOriginWithAncestors)}},
+  1.  Define appropriate {{Credential/[[Create]](origin, options, sameOriginWithAncestors)}},
       {{Credential/[[CollectFromCredentialStore]](origin, options, sameOriginWithAncestors)}},
       {{Credential/[[DiscoverFromExternalSource]](origin, options, sameOriginWithAncestors)}}, and
       {{Credential/[[Store]](credential, sameOriginWithAncestors)}} methods on `ExampleCredential`'s
@@ -2090,21 +2368,21 @@ spec:css-syntax-3;
             1.  ...
       </div>
 
-  3.  Define the value of the `ExampleCredential` [=interface object=]'s {{[[type]]}} slot:
+  1.  Define the value of the `ExampleCredential` [=interface object=]'s {{[[type]]}} slot:
 
       <div class="example">
         The `ExampleCredential` [=interface object=] has an internal slot named `[[type]]` whose
         value is the string "`example`".
       </div>
 
-  4.  Define the value of the `ExampleCredential` [=interface object=]'s {{[[discovery]]}} slot:
+  1.  Define the value of the `ExampleCredential` [=interface object=]'s {{[[discovery]]}} slot:
 
       <div class="example">
-        The `ExampleCredential` [=interface object=] has an internal slot named `[[type]]` whose
+        The `ExampleCredential` [=interface object=] has an internal slot named `[[discovery]]` whose
         value is "{{Credential/[[discovery]]/credential store}}".
       </div>
 
-  4.  Extend {{CredentialRequestOptions}} with the options the new credential type needs to respond
+  1.  Extend {{CredentialRequestOptions}} with the options the new credential type needs to respond
       reasonably to {{get()}}:
 
       <div class="example">
@@ -2119,7 +2397,7 @@ spec:css-syntax-3;
         </pre>
       </div>
 
-  5.  Extend {{CredentialCreationOptions}} with the data the new credential type needs to create
+  1.  Extend {{CredentialCreationOptions}} with the data the new credential type needs to create
       `Credential` objects in response to {{create()}}:
 
       <div class="example">
@@ -2133,6 +2411,22 @@ spec:css-syntax-3;
           };
         </pre>
       </div>
+
+  1.  If the new credential type supports {{CredentialMediationRequirement/conditional}} [=user
+      mediation=], define `ExampleCredential/isConditionalMediationAvailable()`
+      to return a new {{Promise}} that [=resolves=] with `true`.
+
+  1.  Following the procedure in [[#sctn-registry-requirements]], add an entry to the
+      [[#sctn-cred-type-registry|Credential Type Registry]] for the new
+      "example" [=credential type registry/credential type=] and its corresponding:
+      *   {{CredentialCreationOptions}}' and {{CredentialRequestOptions}}'
+          [=credential type registry/Options Member Identifier=] (in this case it is "example"), and
+      *   [=credential type registry/Appropriate Interface Object=] [=identifier=] (in this case it is
+          <code>ExampleCredential</code>).
+
+      Note: The [=credential type registry/credential type=]'s options dictionaries' [=credential type registry/Options Member Identifier=] must be the
+      same in both {{CredentialCreationOptions}} and {{CredentialRequestOptions}}, and should be
+      the same as the [=credential/credential type=] value in the {{Credential}} [=interface object=]'s {{[[type]]}} slot.
 
   You might also find that new primitives are necessary. For instance, you might want to return
   many {{Credential}} objects rather than just one in some sort of complicated, multi-factor

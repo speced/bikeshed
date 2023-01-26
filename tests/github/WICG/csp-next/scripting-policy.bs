@@ -1,0 +1,1019 @@
+<pre class='metadata'>
+Title: Scripting Policy
+Shortname: scripting-policy
+Level: None
+Group: webappsec
+Status: ED
+ED: https://wicg.github.io/csp-next/scripting-policy.html
+Editor: Mike West 56384, Google Inc., mkwst@google.com
+!Explainer: https://github.com/WICG/csp-next/
+Abstract:
+    This document defines a mechanism for controling script execution in a given context, with an
+    eye towards mitigating injection attacks in a deployable manner.
+Markup Shorthands: markdown yes
+!Participate: <a href="https://github.com/WICG/csp-next/issues/new">File an issue</a> (<a href="https://github.com/WICG/csp-next/issues">open issues</a>)
+Version History: https://github.com/WICG/csp-next/commits/master/scripting-policy.bs
+</pre>
+<pre class="biblio">
+{
+  "I-D.ietf-httpbis-header-structure": {
+    "authors": [ "Mark Nottingham", "Poul-Henning Kamp" ],
+    "href": "https://tools.ietf.org/html/draft-ietf-httpbis-header-structure",
+    "title": "Structured Headers for HTTP",
+    "status": "ID",
+    "publisher": "IETF"
+  },
+  "ARTUR": {
+    "authors": [ "Mike West" ],
+    "href": "https://mikewest.github.io/artur-yes/",
+    "title": "Anti-XSS Response-Time Uniqueness Requirement"
+  },
+  "CSP-IS-DEAD": {
+    "authors": [ "Lukas Weichselbaum", "Michele Spagnuolo", "Sebastian Lekies", "Artur Janc" ],
+    "href": "https://ai.google/research/pubs/pub45542",
+    "title": "CSP Is Dead, Long Live CSP! On the Insecurity of Whitelists and the Future of Content Security Policy",
+    "date": "2016-10-24",
+    "publisher": "ACM"
+  },
+  "STRICT-CSP": {
+    "publisher": "Google",
+    "href": "https://csp.withgoogle.com/docs/strict-csp.html",
+    "title": "Strict CSP"
+  }
+}
+</pre>
+<pre class="anchors">
+urlPrefix: https://tools.ietf.org/html/draft-ietf-httpbis-header-structure; spec: I-D.ietf-httpbis-header-structure
+    type: dfn
+        text: structured header; url: #
+    for: structured header
+        type: dfn
+            text: list; url: #section-3.1
+            text: token; url: #section-3.7
+            text: boolean; url: #section-3.9
+            text: dictionary; url: #section-3.2
+    type: abstract-op
+        text: serialize Structured Header; url: #section-4.1
+        text: parse structured header; url: #section-4.2
+    type: grammar
+        text: sh-dictionary; url: #section-3.2
+urlPrefix: https://w3c.github.io/webappsec-trusted-types/dist/spec/; spec: TrustedTypes
+    type: interface
+        text: TrustedScript; url: #trustedscript
+spec: ECMA262; urlPrefix: https://tc39.github.io/ecma262
+    type: dfn
+        text: realm
+    type: method
+        text: HostEnsureCanCompileStrings(); url: sec-hostensurecancompilestrings
+        text: eval(); url: sec-eval-x
+spec: RFC4648; urlPrefix: https://tools.ietf.org/html/rfc4648
+    type: dfn
+        text: base64 encoding; url: section-4
+        text: base64url encoding; url: section-5
+spec: SHA2; urlPrefix: https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf
+    type: dfn
+        text: SHA-256; url: #
+        text: SHA-384; url: #
+        text: SHA-512; url: #
+spec: HTML; urlPrefix: https://html.spec.whatwg.org/
+    type: dfn
+        text: secured; for: plugin; url: #concept-plugin-secure
+</pre>
+<pre class="link-defaults">
+spec:fetch; type:dfn; for:/; text:request
+spec:fetch; type:dfn; text:main fetch
+spec:url; type:dfn; for:/; text:url
+spec:html; type:dfn; text:environment
+spec:html; type:element; text:script
+spec:html; type:dfn; for:script; text:parser-inserted
+spec:fetch; type:dfn; for:/; text:response
+spec:html; type:dfn; text:hostensurecancompilestrings(callerrealm, calleerealm)
+spec:infra; type:dfn; text:string
+spec:infra; type:dfn; for:/; text:list
+spec:html; type:dfn; for:/; text:global object
+spec:html; type:dfn; for:/; text:create and initialize a document object
+spec:dom; type:dfn; for:/; text:element
+spec:reporting; type:dfn; for:/; text:report type
+spec:reporting; type:dfn; for:/; text:visible to reportingobservers
+</pre>
+
+Introduction {#intro}
+============
+
+Though cross-site scripting (XSS) is technically trivial to mitigate through proper escaping
+techniques, it remains a somewhat pervasive risk to web applications. [=Content Security Policy=]
+attempts to contain this risk by giving developers more control over the way script is executed on
+a given page, and developers have had moderate success at rolling it out. They've also expressed
+more than a little frustration with the complexity that's crept into CSP over time. 
+
+Originally, CSP aimed to address script injection attacks by limiting the sources from which
+scripts could be loaded. Over time, we learned that limiting scripts' sources was not a terribly
+effective way of addressing the problem. [[CSP-IS-DEAD]] shifted experts' recommendations away from
+a list of allowed sources for script, and towards more robust verification of individual <{script}>
+elements via {{HTMLOrSVGElement/nonce}} attributes on the one hand, or integrity verification on
+the other (see [[CSP#external-hash]]).
+
+The [[ARTUR]] proposal is a tounge-in-cheek proposal that's a fairly bad idea as specified, but
+seems like an interesting foundation conceptually. If we step back from CSP's current syntax, and
+the contortions it takes to remain backwards compatible, it seems like we could extract a concise
+and comprehensible mechanism that would encompass the kinds of requirements that hard experience
+has taught us can be effective (e.g. those expressed in [[STRICT-CSP]]):
+
+1.  Turn off dangerous parts of the platform that influence scripting (e.g. <{base}>, <{embed}>,
+    and <{object}>.
+
+2.  Create an out-of-band signal that a given script is intended to execute (e.g. the aforementioned
+    nonces and hashes).
+
+3.  Allow developers to roll the above out in a report-only manner.
+
+This document aims to build upon that conceptual foundation, defining a [=/Scripting Policy=] that
+governs the way script executes within a given context, focused entirely on mitigating injection
+attacks in a way that developers can easily deploy.
+
+Examples {#examples}
+--------
+
+Most users would be well-served with the following policy:
+
+``` http
+Scripting-Policy: nonce=number-used-once
+```
+
+This would have the effect of:
+
+1.  Executing <a for="script">"parser-inserted"</a> script iff it has a {{HTMLOrSVGElement/nonce}}
+    attribute matching the header-specified nonce (e.g.
+    `<script nonce="number-used-once">...</script>`), and executing all
+    non-<a for="script">"parser-inserted"</a> script in a manner similar to CSP's
+    `'strict-dynamic'` keyword (see [[CSP#strict-dynamic-usage]]).
+
+2.  Preventing <{base}> from changing the meaning of relative URLs.
+
+3.  Blocking <code>eval({{DOMString}})</code>, while allowing <code>eval({{TrustedScript}})</code>.
+
+4.  Blocking inline event handlers, XSLT, navigation to  `javascript:...`, <{embed}>, and
+    <{object}>.
+
+This is a pretty reasonable set of hurdles to put in front of an attacker.
+
+Users with complicated sites might need more complicated policies that take advantage of optional
+features, perhaps along the lines of:
+
+``` http
+Scripting-Policy: integrity=(hash1 hash2 hash3 hash4),
+                  report-to=name,
+                  trusted-types-policy=policyName
+Scripting-Policy-Report-Only: integrity=(hash1 hash2 ...hash18 ... hash37),
+                              eval=block,
+                              dynamic-loading=checked,
+                              report-to=name,
+                              trusted-types-policy=policyName
+```
+
+
+Threat Model {#threat-model}
+------------
+
+Scripting Policy aims to deal soley with injection attacks that cause script execution. It does not
+try to affect resource loading, mitigate data exfiltration, nor does it gate access to any feature
+unrelated to script execution.
+
+This mechanism assumes an attacker can:
+
+1.  Cause a server to output unexpected content directly into the body of any given response,
+    leading to "reflected" cross-site scripting.
+
+2.  Manipulate the inputs to client-side code, causing "stored" or "DOM-based" cross-site scripting.
+
+It does not address other, related attacks. In particular, it assumes that attackers cannot reliably
+inject headers into a server's response.
+
+ISSUE: Extend this description.
+
+Overview {#overview}
+--------
+
+<em>This section is non-normative (but hopefully helpful anyway).</em>
+
+At its core, this story this document wants to tell is the following:
+
+1.  [=/Scripting Policy=] objects define the ways in which script can be executed within a given
+    Document, Worker, etc. They have a number of properties that influence different aspects of
+    script execution, defined in some detail in [[#framework]].
+
+2.  These policies are delivered as HTTP response headers: <a http-header>`Scripting-Policy`</a>
+    defines a policy to be enforced in a given context, and
+    <a http-header>`Scripting-Policy-Report-Only`</a> a policy to be reported upon, but not
+    enforced.
+
+    The headers' syntax is defined in [[#scripting-policy-header]], and parsing rules are in
+    [[#scripting-policy-header-parsing]].
+
+3.  Policies are bound to {{Document}}, {{WorkerGlobalScope}}, and {{WorkletGlobalScope}} objects
+    when each is initialized. Each object obtain a policy from the HTTP response used when
+    initializing the document or worker, or from the context responsible for the document's
+    navigation or worker's instantiation if that response has a [=local scheme=] (e.g. `data:`,
+    `about:`, `blob:`, etc.). These details are spelled out in [[#initialize-doc]] and
+    [[#initialize-global]].
+
+4.  A policy's effects are enforced in a given context through hooks in HTML:
+
+    *   Nonces and hashes are enforced by policy in HTML's [=prepare a script=] algorithm, and rely
+        upon the existing {{HTMLOrSVGElement/nonce}} and <{script/integrity}> attributes,
+        respectively, for enforcement. Hashes further rely upon Subresource Integrity [[SRI]]
+        enforcement in Fetch's [=main fetch=] algorithm.
+
+    *   Inline event handlers rely upon [=scripting policy/integrity=] assertions for enforcement.
+        Details in [[#check-event-handlers]].
+
+    *   <{base}>'s effects are gated via hooks in the [=set the frozen base URL=] algorithm, detailed
+        in [[#check-base]].
+
+    *   <{embed}> and <{object}> are gated via hooks in their respective intialization mechanisms,
+        detailed in [[#check-embed-object]].
+
+    *   `eval()` is gated via HTML's implementation of JavaScript's
+        <a lt="hostensurecancompilestrings(callerrealm, calleerealm)" dfn>HTML's implementation</a> of
+        JavaScript's {{HostEnsureCanCompileStrings()}} abstract operation, detailed in
+        [[#hostensurecancompilestrings]].
+
+    *   ISSUE: Trusted types integration.
+
+    *   Reporting relies upon the Reporting API [[REPORTING]], defining a "`scripting-policy`"
+        report type via the {{ScriptingPolicyReportBody}} interface. Details in [[#reporting]].
+
+The rest of the document's structure follows this general outline: [[#framework]] defines the
+concepts we'll need, and the header delivery mechanism. [[#policy-application]] shows how policies
+are associated with the contexts that love them. [[#policy-enforcement]] explains how HTML and
+Fetch make decisions about how code is executed.
+
+Enjoy!
+
+
+Dependencies {#deps}
+------------
+
+The rest of the document relies upon [=Structured Headers=] to define policies' header syntax
+[[!I-D.ietf-httpbis-header-structure]]. It also depends upon the Infra Standard for a number of
+foundational concepts used in its algorithms and prose [[!INFRA]].
+
+
+Framework {#framework}
+=========
+
+A <dfn export local-lt="Scripting Policies">Scripting Policy</dfn> defines the characteristics of
+script execution in a given context, and may have effect on a {{Document}}, {{WorkerGlobalScope}},
+or {{WorkletGlobalScope}}, as described in [[#initialize-doc]] and [[#initialize-global]].
+
+Each policy has a <dfn for="scripting policy" export>nonce</dfn> member, which is either `null` or a
+[=string=] representing a cryptographic "number-used-once". Unless otherwise specified, its value
+is `null`.
+
+Note: The `nonce` member defines a "number-used-once" which must be reflected in <{script}>
+elements' {{HTMLOrSVGElement/nonce}} attribute in order to enable script execution. This check is
+performed during HTML's [=prepare a script=] algorithm, as described in [[#policy-enforcement]].
+
+Each policy has an <dfn for="scripting policy" export>integrity</dfn> member, which is either `null`, or a
+[=list=] either `null` or a list of [=integrity metadata=] objects. Unless otherwise specified, its
+value is `null`.
+
+Note: The `integrity` member is a list of [=integrity metadata=] that define the set of scripts
+which can be executed on a given page, layering on top of [[SRI]] for enforcement. This check is
+performed during Fetch's [=main fetch=] algorithm, as described in [[#policy-enforcement]].
+
+Each policy has an <dfn for="scripting policy" export>eval</dfn> member, which is either "`allow`",
+"`blocked`", or "`allow-trustedscript`". Unless otherwise specified, its value is
+"`allow-trustedscript`".
+
+Note: The `eval` member influences the way `eval()` is processed (shocking, right?). "`allow`"
+places no restriction upon `eval()`. "`blocked`" causes both `eval(TrustedScript)` and
+`eval(DOMString)` to throw. "`allow-trustedscript`" causes `eval(DOMString)` to throw, but allows
+`eval(TrustedScript)` to execute. This is detailed in [[#hostensurecancompilestrings]].
+
+Each policy has a <dfn for="scripting policy" export>report-to</dfn> member, which is either `null`,
+or a [=string=] representing a [=report/group|reporting group=], as defined in [[!REPORTING]].
+Unless otherwise specified, its value is `null`.
+
+Note: The `report-to` member wires Scripting Policy enforcement up to the Reporting API in order to
+inform developers about violations on their pages. This is detailed in [[#reporting]].
+
+Each policy has a <dfn for="scripting policy" export>trusted-types-required-for</dfn> member, which
+is either `null`, or a [=list=] of [=strings=] representing categories for which Trusted Types are
+enforced. Unless otherwise specified, its value is `null`.
+
+Note: The `trusted-types-require-for` member configures Trusted Type enforcement. The only currently
+valid category is "`script`".
+
+Each policy has a <dfn for="scripting policy" export>dynamic-loading</dfn> member, which is either
+"`allow-non-parser-inserted`", or "`check-non-parser-inserted`". Unless otherwise specified, its
+value is "`allow-non-parser-inserted`".
+
+Note: The `dynamic-loading` member controls how script that executes in a given context can cause
+more script to execute. "`allow-non-parser-inserted`" means that non-[=script/"parser-inserted"=]
+scripts will execute, regardless of [=scripting policy/nonce=] or [=scripting policy/integrity=]
+enforcement. "`check-non-parser-inserted`" will not privilege non-[script/"parser-inserted"=]
+script in any way, applying all checks that were applied to the original script.
+
+ISSUE: Names are hard, but `{allow,check}-non-parser-inserted` are terrible.
+
+[=Scripting Policies=] are often found in a <dfn export>Scripting Policy pair</dfn>, combining
+one enforced policy with one policy which is unenforced, and merely reported upon. This is a
+[=pair=] whose first [=struct/item=] is named <dfn export for="scripting policy pair">enforced</dfn>
+and whose second [=struct/item=] is named <dfn export for="scripting policy pair">report-only</dfn>.
+Both [=struct/items=] are either `null` or a [=/Scripting Policy=] object. Unless otherwise
+specified, their values are both `null`.
+
+Scripting Policy HTTP Response Headers {#scripting-policy-header}
+--------------------------------------
+
+Servers can serialize [=/Scripting Policy=] objects, and deliver them to user agents via HTTP
+response headers that declare the scripting requirements for a given response. The
+<dfn http-header export>`Scripting-Policy`</dfn> HTTP response header informs a user agent about
+the scripting requirements which are to be enforced for a given response. The
+<dfn http-header export>`Scripting-Policy-Report-Only`</dfn> HTTP response header has the same
+grammar and semantics as <a http-header>`Scripting-Policy`</a>, but declares a policy that is not
+enforced in a given context, but merely reported upon.
+
+Both are [=Structured Headers=] whose value MUST be a [=structured header/dictionary=]
+[[!I-D.ietf-httpbis-header-structure]]. Their ABNF is:
+
+```
+Scripting-Policy = scripting-policy-dict
+Scripting-Policy-Report-Only = scripting-policy-dict
+scripting-policy-dict = sh-dictionary
+```
+
+Note: The <a grammar>sh-dictionary</a> type is defined along with Structured Header's
+[=structured header/dictionary=] concept in Section 3.2 of [[!I-D.ietf-httpbis-header-structure]].
+
+The <dfn dictionary>scripting-policy-dict</dfn> [=structured header/dictionary=] MAY contain one or
+more of the following members:
+
+:   <dfn for="scripting-policy-dict" export>nonce</dfn>
+::  The member's value is a [=structured header/token=], which maps to the [=/Scripting Policy=]'s
+    [=scripting policy/nonce=] member.
+
+:   <dfn for="scripting-policy-dict" export>integrity</dfn>
+::  The member's value is a [=structured header/list=] of [=structured header/token=] values, which
+    are processed as [=request/integrity metadata=] values, and map to the [=/Scripting Policy=]'s
+    [=scripting policy/integrity=] member.
+
+:   <dfn for="scripting-policy-dict" export>eval</dfn>
+::  The member's value is an enum represented as one of the following [=structured header/tokens=]:
+    "`allow`", "`blocked`", and "`allow-trustedscript`". It maps to the [=/Scripting Policy=]'s
+    [=scripting policy/eval=] member.
+
+:   <dfn for="scripting-policy-dict" export>report-to</dfn>
+::  The member's value is a [=structured header/token=], which maps to the [=/Scripting Policy=]'s
+    [=scripting policy/report-to=] member.
+
+:   <dfn for="scripting-policy-dict" export>trusted-types-required-for</dfn>
+::  The member's value is a [=structured header/list=] of [=structured header/token=] values, which
+    maps to the [=/Scripting Policy=]'s [=scripting policy/trusted-types-required-for=] member.
+
+:   <dfn for="scripting-policy-dict" export>dynamic-loading</dfn>
+::  The member's value is an enum represented as one of the following [=structured header/tokens=]:
+    "`allow-non-parser-inserted`", and "`check-non-parser-inserted`". It maps to the
+    [=/Scripting Policy=]'s [=scripting policy/dynamic-loading=] member.
+
+Both headers are currently meaningful only for responses that result in a navigation to a new
+document, as well as for responses that are executed as {{Worker}}, {{SharedWorker}}, and
+{{ServiceWorker}}. Detailed processing rules are found in [[#policy-enforcement]].
+
+<h3 id="scripting-policy-header-parsing" algorithm="parse policy header">
+  Parsing Scripting Policy Headers
+</h3>
+
+<div algorithm="parse policy pair from response">
+    To <dfn abstract-op>obtain a Scripting Policy pair from a response</dfn>, given a [=response=]
+    (|r|), execute the following steps. This algorithm will return a [=Scripting Policy pair=].
+
+    1.  Let |headers| be |r|'s [=response/header list=].
+
+    2.  Let |result| be a new [=Scripting Policy pair=].
+
+    3.  Let |header| be the result of [=header list/getting=] `Scripting-Policy` from |headers|.
+
+    4.  If |header| is not `null`, set |result|' [=scripting policy pair/enforced=] to the result
+        of <a lt="obtain a Scripting Policy from a Structured Header" abstract-op>obtaining a
+        Scripting Policy</a> from |header|.
+
+    5.  Let |header| be the result of [=header list/getting=] `Scripting-Policy-Report-Only` from
+        |headers|.
+
+    6.  If |header| is not `null`, set |result|' [=scripting policy pair/report-only=] to the result
+        of <a lt="obtain a Scripting Policy from a Structured Header" abstract-op>obtaining a
+        Scripting Policy</a> from |header|.
+
+    7.  Return |result|.
+</div>
+
+<div algorithm="parse policy from structured header">
+    To <dfn abstract-op>obtain a Scripting Policy from a Structured Header</dfn>, given a serialized
+    [=Structured Header=] (|header|), execute the following steps. The algorithm will return a
+    [=/Scripting Policy=], or `null` if no policy can be parsed successfully.
+
+    1.  Let |policy| be a new [=/Scripting Policy=] object.
+
+    2.  Let |struct| be the result of [$parse structured header|parsing a Structured Header$] with
+        an `input_bytes` of |header| and a `header_type` of [=structured header/dictionary=].
+
+        If parsing fails, return `null`.
+
+    3.  [=list/iterate|For each=] |key| → |value| of |struct|, [=byte-lowercase=] |key| and switch
+        on the result:
+
+        :   "`dynamic-loading`"
+        ::  1.  If |value| is not a [=structured header/token=], [=iteration/continue=].
+            2.  If |value| is not [=list/contains|contained in=] the list
+                « "`allow-non-parser-inserted`", "`check-non-parser-inserted`" »,
+                [=iteration/continue=].
+            3.  Set |policy|'s [=scripting policy/dynamic-loading=] member to |value|.
+
+        :   "`eval`"
+        ::  1.  If |value| is not a [=structured header/token=], [=iteration/continue=].
+            2.  If |value| is not [=list/contains|contained in=] the list
+                « "`allow`", "`allow-trustedscript`", "`block`" », [=iteration/continue=].
+            3.  Set |policy|'s [=scripting policy/eval=] member to |value|.
+
+        :   "`integrity`"
+        ::  ISSUE: Parse the integrity metadata, similar to the definition [[SRI#parse-metadata]].
+            This might be as simple as joining the list on space, and running it through exactly
+            that algorithm.
+
+            ISSUE: Ensure that we normalize the values to base64 from base64url.
+
+        :   "`nonce`"
+        ::  1.  If |value| is not a [=structured header/token=], [=iteration/continue=].
+            2.  Set |policy|'s [=scripting policy/nonce=] member to |value|.
+
+        :   "`report-to`"
+        ::  1.  If |value| is not a [=structured header/token=], [=iteration/continue=].
+            2.  Set |policy|'s [=scripting policy/report-to=] member to |value|.
+
+        :   "`trusted-types-required-for`"
+        ::  1.  If |value| is not a [=structured header/token=], [=iteration/continue=].
+            2.  If |value| is not [=list/contains|contained in=] the list « "`script`" »,
+                [=iteration/continue=].
+            3.  Set |policy|'s [=scripting policy/trusted-types-required-for=] member to |value|.
+
+    4.  Return |policy|.
+
+    Note: Parsing errors fail open for compatibility with future changes to the dictionary names and
+    values, as well as the underlying syntax. In particular, if parsing fails because the header
+    cannot be interpreted as a [=Structured Header=] per the
+    [$parse structured header|parsing rules$] defined in [[!I-D.ietf-httpbis-header-structure]], no
+    policy will be applied. This explicitly prioritizes forward compatibility with future iterations
+    of [=Structured Headers=], which may be surprising. User agents are encouraged to warn
+    developers in this case.
+</div>
+
+Policy Application {#policy-application}
+------------------
+
+Each context that can execute script has at most one [=/Scripting Policy=] that governs script
+execution in that context.
+
+> <strong>Monkeypatching [[HTML]]:</strong>
+>
+> {{Document}} objects have a <dfn for="document" export>scripting policy</dfn>, which is a
+> [=/Scripting Policy pair=].
+>
+> {{WorkerGlobalScope}} objects have a <dfn for="WorkerGlobalScope" export>scripting policy</dfn>,
+> which is a [=/Scripting Policy pair=].
+>
+> {{WorkletGlobalScope}} objects have a <dfn for="WorkletGlobalScope" export>scripting policy</dfn>,
+> which is a [=/Scripting Policy pair=].
+>
+> [=Environment settings objects=] have an algorithm to obtain a
+> <dfn for="environment settings object">scripting policy</dfn>, defined as follows:
+>
+> A {{Window}} objects's [=environment settings object=]'s
+> [=environment settings object/scripting policy=] algorithm returns the [=document/scripting policy=]
+> of the {{Window}}'s [=associated Document=].
+>
+> A {{WorkerGlobalScope}} objects's [=environment settings object=]'s
+> [=environment settings object/scripting policy=] algorithm returns the
+> [=WorkerGlobalScope/scripting policy=] of the {{WorkerGlobalScope}}.
+>
+> A {{WorkletGlobalScope}} objects's [=environment settings object=]'s
+> [=environment settings object/scripting policy=] algorithm returns the
+> [=WorkletGlobalScope/scripting policy=] of the {{WorkletGlobalScope}}.
+>
+> ISSUE: Monkey patching!
+
+<h3 id="initialize-doc">Initialize a Document's Scripting Policy</h3>
+
+A {{Document}}'s [=document/scripting policy=] comes from one of two places: the [=response=] to
+which the user agent navigated, or the [=environment settings object=] responsible for a navigation
+to a [=local scheme=] (e.g. `data:`, `blob:`, `about:`). In particular, note that this latter case
+covers `<iframe srcdoc>`.
+
+<div algorithm="initialize document">
+    Given a {{Document}} (|document|), a [=response=] (|response|), and a [=request=] or `null`
+    (|request|), the user agent can <dfn abstract-op>initialize a `Document`'s Scripting Policy</dfn>
+    by executing the following steps:
+
+    1.  If |request| is not `null`, and |response|'s [=response/url=]'s [=url/scheme=] is a
+        [=local scheme=]:
+
+        1.  Set |document|'s [=document/scripting policy=] to a copy of |request|'s
+            [=request/client=]'s [=environment settings object/scripting policy=].
+
+        2.  Return.
+
+        ISSUE(whatwg/html#4926): Does this cover `about:srcdoc`? Presumably this will be simplified
+        in the future.
+
+    2.  Set |document|'s [=document/scripting policy=] to the result of
+        <a lt="obtain a Scripting Policy pair from a response" abstract-op>obtaining a Scripting Policy pair</a>
+        from |response|.
+</div>
+
+This algorithm should be called from HTML's [=create and initialize a Document object=] algorithm,
+directly after the existing hook for CSP:
+
+>   <strong>Monkeypatching [[HTML]]'s [=create and initialize a Document object=] algorithm:</strong>
+>
+>   12. <a lt="initialize a Document's Scripting Policy" abstract-op>Initialize a `Document`'s
+>       Scripting Policy</a> given <var ignore>document</var>, <var ignore>response</var>, and
+>       <var ignore>request</var>.
+>
+>   ISSUE: Monkey patching!
+
+
+<h3 id="initialize-global">Initialize a global object's Scripting Policy</h3>
+
+A [=global object=]'s [=WorkerGlobalScope/scripting policy=] comes from one of two places: the
+[=response=] used to initialize a given worker, or the [=environment settings object=] responsible
+for intializing a worker from a [=local scheme=] (e.g. `new Worker('data:...');`)
+
+<div algorithm="initialize global">
+    Given a [=global object=] (|global|) and a [=response=] (|response|), the user agent can
+    <dfn abstract-op>initialize a global object's Scripting Policy</dfn> by executing the following
+    steps:
+
+    1.  If |response|'s [=response/url=]'s [=url/scheme=] is a [=local scheme=]:
+
+        1.  Assert: |global| is a {{DedicatedWorkerGlobalScope}}, a {{WorkletGlobalScope}}, or a
+            {{SharedWorkerGlobalScope}} with one [=set/item=] in its
+            [=WorkerGlobalScope/owner set=].
+
+        2.  With the single |owner| in |global|'s [=WorkerGlobalScope/owner set=], set |global|'s
+            [=WorkerGlobalScope/scripting policy=] to a copy of |owner|'s
+            [=relevant settings object=]'s [=environment settings object/scripting policy=].
+
+        3.  Return.
+
+        ISSUE(whatwg/html#4926): Is the assertion above correct? Presumably this will be simplified
+        in the future.
+
+    2.  Set |global|'s [=WorkerGlobalScope/scripting policy=] to the result of
+        <a lt="obtain a Scripting Policy pair from a response" abstract-op>obtaining a Scripting Policy pair</a>
+        from |response|.
+</div>
+
+This algorithm should be called from HTML's [=run a worker=] algorithm, directly after the existing
+hook for CSP:
+
+>   <strong>Monkeypatching [[HTML]]'s [=run a worker=] algorithm:</strong>
+>
+>   12. Obtain <var ignore>script</var> ...
+>
+>       In both cases, ...
+>
+>       1.  ...
+>
+>       7.  <a lt="initialize a global object's Scripting Policy" abstract-op>Initialize a global
+>           object's Scripting Policy</a> given <var ignore>worker global scope</var> and
+>           <var ignore>response</var>.
+>
+>   ISSUE: Monkey patching!
+
+Policy Enforcement {#policy-enforcement}
+------------------
+
+### Checking Nonces and Hashes ### {#check-nonce-hash}
+
+Scripting Policy's restrictions on <{script}> execution are generally performed during HTML's
+[=prepare a script=] algorithm, before requests are fired for externalized scripts, and prior to
+evaluating inline scripts.
+
+Note: If a policy sets requirements for both a [=scripting policy/nonce=] and some set of
+[=scripting policy/integrity=], either will be sufficient to allow script execution. That is,
+the policy `nonce=abcdefg, integrity=(sha256-123456)` would allow execution for each of
+`<script nonce="abcdefg"></script>`, `<script integrity="sha256-123456"></script>`, and
+`<script nonce="abcdefg" integrity="sha256-123456"></script>`.
+
+<div algorithm="block script element">
+    To <dfn local-lt="block script element" abstract-op>determine whether a script element should
+    be blocked by Scripting Policy</dfn>, given an {{Element}} (|el|), execute the following
+    algorithm. It will return "`Blocked`" or "`Allowed`".
+
+    1.  Assert: |el| is an {{HTMLScriptElement}} or an {{SVGScriptElement}}.
+
+    2.  Let |enforced| be |el|'s [=node document=]'s [=document/scripting policy=]'s
+        [=scripting policy pair/enforced=].
+
+    3.  Let |report-only| be |el|'s [=node document=]'s [=document/scripting policy=]'s
+        [=scripting policy pair/report-only=].
+    
+    4.  If |report-only| is not `null`:
+
+        1.  If |report-only|'s [=scripting policy/nonce=] is not `null`, and |el|'s
+            <a for="HTMLOrSVGElement" attribute>\[[CryptographicNonce]]</a> slot is
+            |report-only|'s [=scripting policy/nonce=], then [=iteration/continue=].
+
+        2.  Let |list| be |report-only|'s [=scripting policy/integrity=], or an empty [=list=] if
+            |report-only|'s [=scripting policy/integrity=] is `null`.
+
+        3.  If |handler| [$matches an integrity metadata list|matches$] |list|,
+            [=iteration/continue=].
+
+        4.  [$send report|Report$] a Scripting Policy violation, using |report-only| and |el|.
+
+    5.  If |enforced| is not `null`:
+
+        1.  If |enforced|'s [=scripting policy/nonce=] is not `null`, and |el|'s
+            <a for="HTMLOrSVGElement" attribute>\[[CryptographicNonce]]</a> slot is
+            |enforced|'s [=scripting policy/nonce=], then [=iteration/continue=].
+
+        2.  Let |list| be |enforced|'s [=scripting policy/integrity=], or an empty [=list=] if
+            |enforced|'s [=scripting policy/integrity=] is `null`.
+
+        3.  If |handler| [$matches an integrity metadata list|matches$] |list|,
+            [=iteration/continue=].
+
+        4.  [$send report|Report$] a Scripting Policy violation, using |enforced| and |el|.
+
+        5.  Return "`Blocked`".
+
+    6.  Return "`Allowed`".
+
+    ISSUE(w3c/webappsec-subresource-integrity#44): This relies on SRI doing something useful for
+    inline script blocks. We should probably make that happen.
+
+</div>
+
+### Checking Inline Event Handlers ### {#check-event-handlers}
+
+Inline event handlers (e.g. `<a onclick="amazing_javascript();">...</a>`) are allowed iff they
+match [=integrity metadata=] explicitly allowed via a policy's [=scripting policy/integrity=] list.
+
+<div algorithm="match metadata">
+    A string (|value|) <dfn abstract-op>matches an integrity metadata list</dfn> (|list|) if the
+    following algorithm returns "`Match`":
+
+    1.  Set |source| to the result of executing [=UTF-8 encode=] on the result of executing
+        [=JavaScript string/convert|JavaScript string converstion=] on |value|.
+
+    2.  [=list/iterate|For each=] |integrity metadata| in |list|:
+
+        1.  Let |expected| be |integrity metadata|'s digest.
+
+        2.  Switch on |integrity metadata|'s algorithm:
+
+            :   "`sha256`"
+            ::  1.  If |expected| is a [=case-sensitive=] match with the result of
+                    [=base64 encoding=] the result of applying [=SHA-256=] to |source|, return
+                    "`Matches`".
+
+            :   "`sha384`"
+            ::  1.  If |expected| is a [=case-sensitive=] match with the result of
+                    [=base64 encoding=] the result of applying [=SHA-384=] to |source|, return
+                    "`Matches`".
+
+            :   "`sha512`"
+            ::  1.  If |expected| is a [=case-sensitive=] match with the result of
+                    [=base64 encoding=] the result of applying [=SHA-512=] to |source|, return
+                    "`Matches`".
+
+    3.  Return "`Does Not Match`".
+</div>
+
+<div algorithm="event handler">
+    To <dfn local-lt="check event handler" abstract-op export>determine whether an event handler be
+    blocked by Scripting Policy</dfn>, given an [=element=] (|el|) and [=string=] (|handler|):
+
+    1.  Let |enforced| be |el|'s [=node document=]'s [=document/scripting policy=]'s
+        [=scripting policy pair/enforced=].
+
+    2.  Let |report-only| be |el|'s [=node document=]'s [=document/scripting policy=]'s
+        [=scripting policy pair/report-only=].
+    
+    3.  If |report-only| is not `null`:
+
+        1.  Let |list| be |report-only|'s [=scripting policy/integrity=], or an empty [=list=] if
+            |report-only|'s [=scripting policy/integrity=] is `null`.
+
+        2.  If |handler| [$matches an integrity metadata list|matches$] |list|,
+            [=iteration/continue=].
+
+        3.  [$send report|Report$] a Scripting Policy violation, using |report-only|, |handler|,
+            and |el|.
+
+    4.  If |enforced| is not `null`:
+
+        1.  Let |list| be |enforced|'s [=scripting policy/integrity=], or an empty [=list=] if
+            |enforced|'s [=scripting policy/integrity=] is `null`.
+
+        2.  If |handler| [$matches an integrity metadata list|matches$] |list|,
+            [=iteration/continue=].
+
+        3.  [$send report|Report$] a Scripting Policy violation, using |report-only|, |handler|,
+            and |el|.
+
+        4.  Return "`Blocked`".
+
+    5.  Return "`Allowed`".
+</div>
+
+>   <strong>Monkeypatching [[HTML]]'s [=event handler content attribute=]'s [=attribute change steps=]</strong>:
+>
+>   5.  Otherwise:
+>
+>       1.  ...
+>
+>       2.  If [$check event handler|Should an event handler be blocked by Scripting Policy?$]
+>           returns "`Blocked`" when executed upon <var ignore>element</var> and
+>           <var ignore>value</var>, then return.
+
+### Checking String Compilation (`eval()` and friends) ### {#hostensurecancompilestrings}
+
+To address `eval()`, [=/Scripting Policy=] modifies
+<a lt="hostensurecancompilestrings(callerrealm, calleerealm)" dfn>HTML's implementation</a> of
+JavaScript's `HostEnsureCanCompileStrings` abstract operation to include verification against
+the context's policy.
+
+<div algorithm="evaluate eval">
+    Given two [=realms=] (|callerRealm| and |calleeRealm|), and a string (|source|),
+    <dfn local-lt="ensure eval" abstract-op export>EnsureScriptingPolicyDoesNotBlockScriptExecution(callerRealm, calleeRealm, source)</dfn> returns normally if
+    string compilation is allowed, and throws an `EvalError` if not:
+
+    1.  Let |globals| be a list containing |callerRealm|'s [=Realm/global object=] and |calleeRealm|'s
+        [=Realm/global object=].
+
+    2.  For each |global| in |globals|:
+
+        1.  Let |enforced| be |global|'s [=relevant settings object=]'s
+            [=environment settings object/scripting policy=]'s [=scripting policy pair/enforced=].
+
+        2.  Let |report-only| be |global|'s [=relevant settings object=]'s
+            [=environment settings object/scripting policy=]'s [=scripting policy pair/report-only=].
+
+        3.  If |report-only| is not `null`, switch on its [=scripting policy/eval=] value:
+
+            :   "`allow`"
+            ::  [=iteration/Continue=].
+            
+            :   "`allow-trustedscript`"
+            ::  ISSUE: How does this work?
+
+            :   "`blocked`"
+            ::  1.  [$send report|Report$] a Scripting Policy violation, using |report-only|,
+                    |source|, and |global|.
+
+        4.  If |enforced| is not `null`, switch on its [=scripting policy/eval=] value:
+
+            :   "`allow`"
+            ::  [=iteration/Continue=].
+            
+            :   "`allow-trustedscript`"
+            ::  ISSUE: How does this work?
+
+            :   "`blocked`"
+            ::  1.  [$send report|Report$] a Scripting Policy violation, using |enforced|, |source|,
+                    and |global|.
+                2.  [=Throw=] an {{EvalError}} exception.
+
+    3.  Return.
+
+  ISSUE(tc39/ecma262#938): {{HostEnsureCanCompileStrings()}} does not include the string which is
+  going to be compiled as a parameter. We'll also need to update HTML to pipe that value through.
+</div>
+
+>   <strong>Monkeypatching [[HTML]]'s <a lt="hostensurecancompilestrings(callerrealm, calleerealm)" dfn>HostEnsureCanCompileStrings()</a></strong>:
+>
+>   1.  Perform ? <a lt="ensurecspdoesnotblockstringcompilation(callerrealm, calleerealm, source)">EnsureCSPDoesNotBlockStringCompilation</a>(<var ignore>callerRealm</var>, <var ignore>calleeRealm</var>). [[CSP]]
+>   2.  Perform ? <a lt="ensure eval" abstract-op>EnsureScriptingPolicyDoesNotBlockStringCompilation</a>(<var ignore>callerRealm</var>, <var ignore>calleeRealm</var>).
+>
+>   ISSUE: Monkey patching!
+
+
+### Checking `<base>` ### {#check-base}
+
+[=/Scripting Policy=] blocks `<base>` from pointing to any cross-origin URL, as this can change the
+meaning of a script tag in unexpected and dangerous ways.
+
+<div algorithm="block base element">
+    To <dfn abstract-op local-lt="block base element">determine whether a base element should be
+    blocked by Scripting Policy</dfn>, given an {{Element}} (|el|) and a [=URL=] (|url|), execute
+    the following algorithm. It will return "`Blocked`" or "`Allowed`".
+
+    1.  If |url|'s [=url/origin=] is [=same origin=] with |el|'s [=node document=]'s
+        [=relevant settings object=]'s [=environment settings object/origin=], return "`Allowed`".
+
+    2.  Let |enforced| be |el|'s [=node document=]'s [=document/scripting policy=]'s
+        [=scripting policy pair/enforced=].
+
+    3.  Let |report-only| be |el|'s [=node document=]'s [=document/scripting policy=]'s
+        [=scripting policy pair/report-only=].
+
+    4.  If |report-only| is not `null`:
+
+        1.  [$send report|Report$] a Scripting Policy violation, using |report-only|, |handler|,
+            and |el|.
+
+    5.  If |enforced| is not `null`:
+
+        1.  [$send report|Report$] a Scripting Policy violation, using |enforced|, |handler|,
+            and |el|.
+
+        2.  Return "`Blocked`".
+
+    6.  Return "`Allowed`".
+</div>
+
+>   <strong>Monkeypatching [[HTML]]'s [=set the frozen base URL=] algorithm:</strong>
+>
+>   Insert the algorithm above into the current step 3, as follows:
+>
+>   3.  Set element's frozen base URL to <var ignore>document</var>'s `fallback base URL`, if
+>       <var ignore>urlRecord</var> is failure or <del>running Is base allowed for Document? on
+>       the resulting URL record and document returns "Blocked"</del><ins>either `Is base allowed
+>       by Content Security Policy?` or [$block base element|Is base allowed by Scripting Policy?$]
+>       return "`Blocked`" when executed upon the `resulting URL record` and
+>       <var ignore>document</var>,</ins> and to urlRecord otherwise.
+>
+>   ISSUE: Monkeypatching!
+
+### Checking `<embed>` and `<object>`. ### {#check-embed-object}
+
+[=/Scripting Policy=] blocks `<embed>` and `<object>`, as they have capabilities in line with (and
+beyond the capabilities of) script execution.
+
+<div algorithm="block plugin element">
+    To <dfn abstract-op local-lt="block plugin element">determine whether a plugin element should be
+    blocked by Scripting Policy</dfn>, given an {{Element}} (|el|), execute the following algorithm.
+    It will return "`Blocked`" or "`Allowed`".
+
+    1.  Let |enforced| be |el|'s [=node document=]'s [=document/scripting policy=]'s
+        [=scripting policy pair/enforced=].
+
+    2.  Let |report-only| be |el|'s [=node document=]'s [=document/scripting policy=]'s
+        [=scripting policy pair/report-only=].
+    
+    3.  If |report-only| is not `null`:
+
+        1.  [$send report|Report$] a Scripting Policy violation, using |report-only|, |handler|,
+            and |el|.
+
+    4.  If |enforced| is not `null`:
+
+        1.  [$send report|Report$] a Scripting Policy violation, using |enforced|, |handler|,
+            and |el|.
+
+        2.  Return "`Blocked`".
+
+    5.  Return "`Allowed`".
+</div>
+
+>   <strong>Monkeypatching [[HTML]]'s <{object}> type determination steps</strong>
+>
+>   Insert the algorithm above into the current step 2, as follows:
+>
+>   2.  If the element has an ancestor media element, or has an ancestor object element that is not
+>       showing its fallback content, or if the element is not in a document whose browsing context
+>       is non-null, or if the element's node document is not fully active, or if the element is
+>       still in the stack of open elements of an HTML parser or XML parser, or if the element is
+>       not being rendered, or if the Should element be blocked a priori by Content Security Policy?
+>       algorithm returns "Blocked" when executed on the element, <ins>or if the
+>       [$block plugin element|Should a plugin element be blocked by Scripting Policy?$] algorithm
+>       returns "`Blocked`" when executed on the element,</ins> then jump to the step below labeled
+>       fallback.
+>
+>   ISSUE: Monkeypatching!
+
+ISSUE: This might be too strict, and we might want to have something akin to CSP's `plugin-types`
+so folks can allow PDF in user agents that use PDFium? Or have a carveout similar to the
+[=sandboxed plugins browsing context flag=] concept of a "[=plugin/secured=] plugin"?
+
+
+Reporting Violations {#reporting}
+--------------------
+
+<dfn export>Scripting Policy reports</dfn> provide developers with context when a given page or
+worker violates its policy. These violations are reported to developers via the Reporting API,
+which exposes violations via the {{ReportingObserver}} interface, as well as via [=reports=]
+delivered to endpoints configured via the `Report-To` header as defined in [[!REPORTING]].
+
+[=Scripting Policy reports=] have a [=report type=] of "`scripting-policy`", and are
+[=visible to ReportingObservers=].
+
+A [=Scripting Policy report=]'s [=report/body=] is represented in JavaScript by the
+{{ScriptingPolicyReportBody}} interface:
+
+<pre class="idl">
+enum ScriptingPolicyViolationType {
+  "externalScript",
+  "inlineScript",
+  "inlineEventHandler",
+  "eval"
+};
+
+[Exposed=(Window,Worker), SecureContext]
+interface ScriptingPolicyReportBody : ReportBody {
+  [Default] object toJSON();
+  readonly attribute DOMString     violationType;
+  readonly attribute USVString?    violationURL;
+  readonly attribute USVString?    violationSample;
+  readonly attribute unsigned long lineno;
+  readonly attribute unsigned long colno;
+};
+</pre>
+
+<dl dfn-type="attribute" dfn-for="ScriptingPolicyReportBody">
+    :   <dfn>violationType</dfn>
+    ::  This attribute, to your certain astonishment, reflects the violation's type:
+
+        *   "`externalScript`" reflects a violation when fetching a script (e.g.
+            `<script src="...">`).
+        *   "`inlineScript`" reflects a violation from an inline script block (e.g.
+            `<script>...</script>`).
+        *   "`inlineEventHandler`" reflects a violation from an inline event handler (e.g.
+            `<a onclick="...">`).
+        *   "`eval`" reflects a violation from `eval()`, `new Function()`, etc.
+        *   ISSUE: More for TT? `<base>`? `<object>`?
+
+    :   <dfn>violationURL</dfn>
+    ::  When the `violationType` is "`externalScript`", this attribute will contain that
+        script's URL. It will be `null` for any other type.
+
+    :   <dfn>violationSample</dfn>
+    ::  When the `violationType` is not "`externalScript`", this attribute will contain additional
+        detail about the violation's cause. When inline event handlers cause a violation, for
+        example, this attribute will contain the first 40 characters of the handler's source.
+
+        When the `violationType` is "`externalScript`", this attribute will be `null`.
+
+    :   <dfn>lineno</dfn>
+    :   <dfn>colno</dfn>
+    ::  These attributes contain the line and column numbers, respectively, associated with a
+        violation, if the user agent can obtain them. If no positional information can be obtained,
+        these attributes will both be 0.
+</dl>
+
+<div algorithm="report">
+    To <dfn local-lt="send report" abstract-op>report a Scripting Policy violation</dfn>, given
+    a [=/Scripting Policy=] (|policy|), string (|source|), and [=global object=] (|global|):
+
+    1.  ISSUE: TODO (|policy|, |source|, |global|).
+</div>
+
+
+Security and Privacy Considerations {#sec-priv-considerations}
+===================================
+
+ISSUE: TODO.
+
+IANA Considerations {#iana}
+===================
+
+The permanent message header field registry should be updated with the following registrations [[!RFC3864]]:
+
+`Scripting-Policy` Registration {#scripting-policy-reg}
+-----------------------------
+
+:   Header field name
+::  Scripting-Policy
+:   Applicable protocol
+::  http
+:   Status
+::  standard
+:   Author/Change controller
+::  Me
+:   Specification document
+::  This specification (See [[#scripting-policy-header]])
+
+`Scripting-Policy-Report-Only` Registration {#scripting-policy-ro-reg}
+-------------------------------------------
+
+:   Header field name
+::  Scripting-Policy-Report-Only
+:   Applicable protocol
+::  http
+:   Status
+::  standard
+:   Author/Change controller
+::  Me
+:   Specification document
+::  This specification (See [[#scripting-policy-header]])
+
+Acknowledgements {#acks}
+========================
+
+This document owes much to those developers who have struggled with Content Security Policy
+deployments over the years. In particular, Google (<https://csp.withgoogle.com/docs/index.html>)
+and Dropbox (<https://blogs.dropbox.com/tech/tag/content-security-policy/>) have done a nice job
+sharing their experiences and challenges.

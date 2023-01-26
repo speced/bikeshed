@@ -1,0 +1,360 @@
+<pre class="metadata">
+Shortname: webxr-marker-tracking
+Title: WebXR Marker Tracking Module
+Group: immersivewebcg
+Status: CG-DRAFT
+ED: https://immersive-web.github.io/marker-tracking/
+Repository: immersive-web/marker-tracking
+Level: 1
+Mailing List Archives: https://lists.w3.org/Archives/Public/public-immersive-web/
+
+!Participate: <a href="https://github.com/immersive-web/marker-tracking/issues/new">File an issue</a> (<a href="https://github.com/immersive-web/marker-tracking/issues">open issues</a>)
+!Participate: <a href="https://lists.w3.org/Archives/Public/public-immersive-web/">Mailing list archive</a>
+!Participate: <a href="irc://irc.w3.org:6665/">W3C's #immersive-web IRC</a>
+
+Editor: Piotr Bialecki 114482, Google http://google.com/, bialpio@google.com
+Former Editor: Klaus Weidner 113597, Google http://google.com/, klausw@google.com
+
+Abstract: The Marker Tracking module expands the <a href="https://www.w3.org/TR/webxr/">WebXR Device API</a> with functionality to detect 2D images from a specified set and track their poses in the real world.
+
+Markup Shorthands: markdown yes
+Warning: custom
+Custom Warning Title: Unstable API
+Custom Warning Text:
+  <b>The API represented in this document is under development and may change at any time.</b>
+  <p>For additional context on the use of this API please reference the <a href="https://github.com/immersive-web/marker-tracking/blob/master/explainer.md">WebXR Marker Tracking Module Explainer</a>.</p>
+</pre>
+
+<pre class="link-defaults">
+spec:infra;
+    type:dfn; text:string
+spec: webxr-1;
+    type: dfn; text: 3dof
+    type: dfn; text: 6dof
+    type: dfn; text: capable of supporting
+    type: dfn; text: feature descriptor
+    type: dfn; text: immersive session
+    type: dfn; text: initialize the session
+    type: dfn; text: list of frame updates
+    type: dfn; text: populate the pose
+    type: dfn; text: set of granted features
+</pre>
+
+<pre class="anchors">
+</pre>
+
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png">
+
+<style>
+  .unstable::before {
+    content: "This section is not stable";
+    display: block;
+    font-weight: bold;
+    text-align: right;
+    color: red;
+  }
+  .unstable {
+    border: thin solid pink;
+    border-radius: .5em;
+    padding: .5em;
+    margin: .5em calc(-0.5em - 1px);
+    background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='290'><text transform='rotate(-45)' text-anchor='middle' font-family='sans-serif' font-weight='bold' font-size='70' y='210' opacity='.1'>Unstable</text></svg>");
+    background-repeat: repeat;
+    background-color: #FFF4F4;
+  }
+  .unstable h3:first-of-type {
+    margin-top: 0.5rem;
+  }
+
+  .unstable.example:not(.no-marker)::before {
+    content: "Example " counter(example) " (Unstable)";
+    float: none;
+  }
+
+  .non-normative::before {
+    content: "This section is non-normative.";
+    font-style: italic;
+  }
+  .tg {
+    border-collapse: collapse;
+    border-spacing: 0;
+  }
+  .tg th {
+    border-style: solid;
+    border-width: 1px;
+    background: #90b8de;
+    color: #fff;
+    font-family: sans-serif;
+    font-weight: bold;
+    border-color: grey;
+  }
+  .tg td {
+    padding: 4px 5px;
+    background-color: rgb(221, 238, 255);
+    font-family: monospace;
+    border-style: solid;
+    border-width: 1px;
+    border-color: grey;
+    overflow: hidden;
+    word-break: normal;
+  }
+</style>
+
+Introduction {#intro}
+============
+
+<section class="non-normative">
+
+This module describes a mechanism for detecting 2D images in the real world and tracking their poses (position and orientation). The application supplies a set of images to be tracked when requesting an XR session. The XR device determines if the images are suitable for tracking, and returns information about their real-world position and orientation as they are detected in the user's environment.
+
+Since detecting and tracking these images happens locally on the device, this functionality can be implemented without providing camera images to the application.
+
+</section>
+
+
+Model {#model}
+=====
+
+Tracked Image {#spec-tracked-image}
+-------------
+
+A <dfn>tracked image</dfn> corresponds to the information used by the XR device to track an image.
+
+A [=tracked image=] has an associated integer <dfn>image index</dfn> which is the zero-based index of this image in the {{XRSessionInit/trackedImages}} sequence provided in the session request.
+
+A [=tracked image=] has an associated <dfn>image trackable</dfn> status which corresponds to the XR device's ability to track this image based on characteristics of the supplied image itself. This is a boolean value, it is `false` if the image is unsuitable for tracking and guaranteed to never appear in image tracking results for this {{XRSession}}, and otherwise `true`.
+
+A [=tracked image=] has an <dfn>image was detected</dfn> flag. This is initially `false`. It is set to `true` once the [=suitable for tracking=] algorithm returns `true` for a frame, and then remains `true` for the rest of the {{XRSession}}.
+
+NOTE: A `true` value returned by the [=suitable for tracking=] algorithm indicates that the XR device has found this image during this session, its current view meets suitability requirements, and that the UA is going to provide tracking information for it from this point onward without further suitability checks.
+
+A [=tracked image=] has an associated {{XRImageTrackingState}} <dfn>image tracking state</dfn>. This is {{XRImageTrackingState/"untracked"}} if the image is not being tracked at all, {{XRImageTrackingState/"tracked"}} if it is actively being tracked and visible, or {{XRImageTrackingState/"emulated"}} if its pose is extrapolated from a past tracked state.
+
+NOTE: {{XRImageTrackingState/"tracked"}} typically means the image was recognized and is currently being actively tracked in 3D space, and is at least partially visible to a tracking camera. (This does not necessarily mean that it's visible in the user's viewport in case that differs from the tracking camera field of view.) {{XRImageTrackingState/"emulated"}} means that the image was recognized and tracked recently, but may currently be out of camera view or obscured, and the reported pose is based on assuming that the object remains at the same position and orientation as when it was last seen. This pose is likely to be adequate for a poster attached to a wall, but may be unhelpful for an image attached to a moving object.
+
+NOTE: The {{XRImageTrackingState/"untracked"}} value for [=image tracking state=] is an internal detail of the algorithms described below. The {{XRFrame/getImageTrackingResults()}} API only returns information about images where the state is either {{XRImageTrackingState/"tracked"}} or {{XRImageTrackingState/"emulated"}}.
+
+
+A [=tracked image=] has an associated {{XRSpace}} <dfn>image space</dfn> that represents the tracking system's [=6DoF=] pose of the image in the user's environment. The [=image space=] origin is the center point of the tracked image. The +x axis points toward the right edge of the image and +y toward the top of the image. The +z axis is orthogonal to the picture plane, pointing toward the viewer when the image's front is in view.
+
+The [=image space=] is used for {{XRFrame/getPose()}} calls according to the [=populate the pose=] algorithm with `force emulation` set to `false`. The tracking system MAY provide either actively tracked or statically known (emulated) poses.
+
+NOTE: A {{XRFrame/getPose()}} call using the [=image space=] of an image with an [=image tracking state=] of {{XRImageTrackingState/"untracked"}} will report a `null` pose.
+
+NOTE: For tracked images, the returned pose's {{XRPose/emulatedPosition}} value is always `false`. This attribute is intended to indicate a pose with a known orientation combined with an unknown position, for example a [=3DoF=] headset, and that doesn't fit this use case where both orientation and pose are emulated. Instead, the tracking system treats previously seen but not actively tracked images as statically known, and uses the [=image tracking state=] {{XRImageTrackingState/"emulated"}} to distinguish them from actively tracked images with [=image tracking state=] {{XRImageTrackingState/"tracked"}}.
+
+A [=tracked image=] has an associated float <dfn>measured width in meters</dfn> corresponding to the physical width of the image as measured by the tracking system. It is zero if the device is unable to measure the image's size.
+
+
+WebXR Device API Integration {#webxr-device-api-integration}
+==============
+
+This module expands the definitions of {{XRSessionInit}}, {{XRSession}}, and {{XRFrame}}.
+
+XRSessionInit {#xrsessioninit}
+-------------
+
+This module introduces the string <dfn export for="feature descriptor">marker-tracking</dfn> as a new valid [=feature descriptor=] for use in the {{XRSessionInit/requiredFeatures}} or {{XRSessionInit/optionalFeatures}} sequences for [=immersive sessions=].
+
+A device is [=capable of supporting=] the marker tracking feature if the XR device is capable of detecting and tracking images in the real world.
+
+NOTE: There is no guarantee that the specific images supplied for a session are trackable. For example, an image where all pixels have the same color would likely be untrackable due to lack of features, and some types of images such as synthetic markers may only be trackable on some implementations. However, a device should not claim to support the feature if it completely lacks tracking capability.
+
+The XRSessionInit dictionary is expanded by adding a new {{XRSessionInit/trackedImages}} member that is used to [=set up tracked images=]. It is a sequence of {{XRTrackedImageInit}} values.
+
+NOTE: {{XRSessionInit/trackedImages}} is an optional member of {{XRSessionInit}}, but the feature will effectively be inactive if it is not supplied. There is no default set of tracked images.
+
+<pre class="idl">
+dictionary XRTrackedImageInit {
+  required ImageBitmap image;
+  required float widthInMeters;
+};
+
+partial dictionary XRSessionInit {
+  sequence&lt;XRTrackedImageInit&gt; trackedImages;
+};
+</pre>
+
+Each {{XRSessionInit/trackedImages}} entry specifies an {{ImageBitmap}} and a corresponding {{XRTrackedImageInit/widthInMeters}} value that provides expected physical width measurement for the real-world image being tracked. This width may be approximate but is required. If the actual width differs substantially from the provided width, the tracked image result MAY have an inaccurate reported position.
+
+NOTE: When viewed from a fixed camera position, a half-sized image at half the distance looks identical to a full-sized image, and the tracking system can't differentiate these cases without additional context about the environment. The UA may be able to detect the actual size when tracking the image from multiple angles and update the measured width based on this, but is not required to do so.
+
+NOTE: The UA MAY emit local warnings such as developer console messages if it is unable to support the feature or if the supplied images are unsuitable for tracking.
+
+<div class="algorithm" data-algorithm="set-up-tracked-images">
+
+In order to <dfn>set up tracked images</dfn> for a {{XRSystem/requestSession()}} session request, add the following steps to [=initialize the session=] for the new {{XRSession}} |session|, with |requested image list| set to the value of {{XRSessionInit}}'s {{XRSessionInit/trackedImages}} attribute:
+
+  1. Set |session|'s [=tracked images=] to an empty list.
+  1. If `marker-tracking` is not [=list/contain|contained=] in |session|'s [=XRSession/set of granted features=], abort these steps.
+  1. If |requested image list| is undefined or an empty list, abort these steps.
+  1. For each |requested image| in |requested image list|:
+    1. Set up any platform resources required to track |requested image|.
+    1. Create a new [=tracked image=] |image|:
+        1. Set |image|'s [=image index=] to the position index of this image in |requested image list|.
+        1. Set |image|'s [=image trackable=] to either `true` or `false` depending on the platform's expected ability to track this image.
+        1. Set |image|'s [=image was detected=] flag to `false`.
+        1. Set |image|'s [=image tracking state=] to {{XRImageTrackingState/"untracked"}}.
+        1. Set |image|'s [=measured width in meters=] to zero.
+        1. If [=image trackable=] is true, set |image|'s [=image space=] to a device {{XRSpace}} associated with this image.
+    1. Append |image| to [=tracked images=].
+
+</div>
+
+XRSession {#xrsession}
+-------------
+
+Each {{XRSession}} has a <dfn for="XRSession">list of tracked images</dfn> which is the {{XRSessionInit/trackedImages}} sequence supplied in the session request.
+
+When a valid {{XRSession}} has been established with the [=marker-tracking=] feature active, the {{XRSession/getImageTrackability()}} method can be used to [=obtain image trackability=], it returns a promise that provides information about the expected ability to use the provided images for tracking.
+
+<pre class="idl">
+enum XRImageTrackability {
+  "untrackable",
+  "trackable",
+};
+
+partial interface XRSession {
+  Promise&lt;FrozenArray&lt;XRImageTrackability&gt;&gt; getImageTrackability();
+};
+</pre>
+
+<div class="algorithm" data-algorithm="obtain-image-trackability">
+
+In order to <dfn>obtain image trackability</dfn> for an {{XRSession}} |session|, the user agent MUST run the following steps:
+
+  1. Let |promise| be [=a new Promise=] in the [=relevant realm=] of this {{XRSession}}.
+  1. Run the following steps [=in parallel=]:
+     1. Set |image trackabilities| to an empty list.
+     1. For each [=tracked image=] |image| in |session|'s [=XRSession/list of tracked images=]:
+        1. Obtain an {{XRImageTrackability}} |trackability| from the XR device that represents the trackability of |image|.
+        1. Append |trackability| to |image trackabilities|.
+     1. [=queue a task=] to [=/resolve=] |promise| with the value |image trackabilities|.
+  1. Return |promise|.     
+
+</div>
+
+The {{XRImageTrackability}} enum value {{XRImageTrackability/"untrackable"}} means that the image is not usable for tracking, for example due to having insufficient distinctive feature points, and this image MUST NOT appear in tracking results for this session. The value {{XRImageTrackability/"trackable"}} means that the image is potentially detectable.
+
+NOTE: Future versions of this API may define additional more granular values with quality estimates for trackable images. Applications should treat a value other than {{XRImageTrackability/"untrackable"}} as representing a potentially trackable image.
+
+XRFrame {#xrframe}
+-------------
+
+When marker tracking is active, add the [=update tracked images=] algorithm to the {{XRSession}}'s [=list of frame updates=].
+
+<div class="algorithm" data-algorithm="update-tracked-images">
+
+In order to <dfn>update tracked images</dfn> for an {{XRFrame}} |frame| in an {{XRSession}} |session|, the user agent MUST run the following steps:
+
+  1. For each [=tracked image=] |image| in |session|'s [=XRSession/list of tracked images=], using the current device tracking state of |image| for |frame|:
+    : If the XR device has no tracking information for |image|:
+    :: Set |image|'s [=image tracking state=] to {{XRImageTrackingState/"untracked"}}.
+
+    : Otherwise:
+    ::
+        1. If |image|'s [=image was detected=] flag is `false`, and if the [=suitable for tracking=] algorithm for |image| returns `false`, continue to the next entry.
+        1. Set |image|'s [=image was detected=] attribute to `true`.
+        1. Set |image|'s [=image tracking state=] to {{XRImageTrackingState/"tracked"}} if the image is actively being tracked, or to {{XRImageTrackingState/"emulated"}} if the position is inferred based on previous observations.
+        1. Set |image|'s [=image space=] based on the XR device's estimate of the image's pose.
+        1. Set |image|'s [=measured width in meters=] based on the XR device's estimated physical width if available, or set to zero if there is no available estimate.
+
+</div>
+
+Applications can use the {{XRFrame}}'s {{XRFrame/getImageTrackingResults()}} method to [=obtain image tracking results=] about the current state of tracked images in that frame.
+
+<pre class="idl">
+enum XRImageTrackingState {
+  "untracked",
+  "tracked",
+  "emulated",
+};
+
+[SecureContext, Exposed=Window]
+interface XRImageTrackingResult {
+  [SameObject] readonly attribute XRSpace imageSpace;
+  readonly attribute unsigned long index;
+  readonly attribute XRImageTrackingState trackingState;
+  readonly attribute float measuredWidthInMeters;
+};
+
+partial interface XRFrame {
+  FrozenArray&lt;XRImageTrackingResult&gt; getImageTrackingResults();
+};
+</pre>
+
+
+<div class="algorithm" data-algorithm="obtain-image-tracking-results">
+
+In order to <dfn>obtain image tracking results</dfn> for an {{XRFrame}} |frame|, the user agent MUST run the following steps:
+
+  1. Let |session| be |frame|'s {{XRFrame/session}} object.
+  1. Let |results| be an empty list.
+  1. For each [=tracked image=] |image| in |session|'s [=XRSession/list of tracked images=]:
+     1. If |image|'s [=image tracking state=] is {{XRImageTrackingState/"untracked"}}, continue to the next entry.
+     1. Let |result| be an {{XRImageTrackingResult}}
+     1. Set |result|'s {{XRImageTrackingResult/imageSpace}} to |image|'s [=image space=].
+     1. Set |result|'s {{XRImageTrackingResult/index}} to |image|'s [=image index=]
+     1. Set |result|'s {{XRImageTrackingResult/trackingState}} to |image|'s [=image tracking state=]
+     1. Set |result|'s {{XRImageTrackingResult/measuredWidthInMeters}} to |image|'s [=measured width in meters=]
+     1. Append |result| to |results|.
+  1. Return a new {{FrozenArray}} containing the elements of |results|.
+
+</div>
+
+NOTE: The image tracking results only contains information about images with an [=image tracking state=] of {{XRImageTrackingState/"tracked"}} or {{XRImageTrackingState/"emulated"}}. {{XRImageTrackingState/"untracked"}} images are omitted from the returned array. Applications can use the {{XRImageTrackingResult/index}} value to associate each result with the underlying image.
+
+NOTE: Each tracked image can appear at most once in the tracking results. If multiple copies of the same image exist in the user's environment, the device can choose an arbitrary instance to report a pose, and this choice can change for future {{XRFrame}}s.
+
+Security, Privacy, and Comfort Considerations {#security}
+=============================================
+
+Sensitive Information {#sensitive-information}
+---------------------
+
+In the context of image tracking, <dfn>sensitive image information</dfn> includes, but is not limited to, information about the existence and position of specific real-world images in the user's environment.
+
+NOTE: For example, a hostile application might try to detect large-denomination bank notes or other valuable items, specific book covers of titles that may be banned or restricted in certain jurisdictions, or other information that the user may be unwilling to share.
+
+NOTE: The goal of this API is to provide a reasonable amount of protection against disclosing such information, providing a tradeoff where it provides useful functionality with reduced risk compared to full camera access by the application. If an application were to ask for and receive full camera access, it could scan for all of this sensitive information, and there would be no way for the UA to mitigate the risks.
+
+Protected functionality {#protected-functionality}
+-----------------------
+
+The [=sensitive image information=] exposed by the API has the following threat profiles and necessary protections:
+
+### Presence of images ### {#protect-image-presence}
+
+<div class="algorithm" data-algorithm="suitable-for-tracking">
+
+In order to check if a [=tracked image=] |image| is <dfn>suitable for tracking</dfn> for an {{XRFrame}} |frame|, the user agent MUST run the following steps:
+
+   1. If |image| is considered unsuitable for tracking due to device or UA limitations, return `false`.
+   1. If |image| is not currently being actively tracked by the XR device in |frame|, return `false`.
+   1. If |image|'s current pose indicates it's outside the user's central field of view, return `false`.
+   1. If |image|'s current pose indicates that the image's angular size is too small for it to be prominently visible, return `false`.
+   1. Return `true`.
+
+</div>
+
+The goal of this algorithm is that the image MUST fill a substantial fraction of the user's central field of view (for a head-mounted device) or camera view (for a handheld screen-based device) to be initially detected, and MUST have an angular area large enough to indicate an intent that the user is actively focusing on the image and is aware of it.
+
+The UA MUST NOT initiate tracking for distant or small images, or images that only appear in peripheral vision.
+
+NOTE: The UA's detailed criteria for initiating tracking are left to the UA's discretion and depend on the device and tracking system.
+
+NOTE: For example, a smartphone AR system may require that the image fills at least 25% of the camera frame's area for initial detection.
+
+NOTE: This limitation only applies to initial detection. Once an image has been determined to be suitable for tracking, the UA is free to continue reporting poses for that image even if it is distant or partially occluded.
+
+
+Acknowledgements {#ack}
+================
+
+The following individuals have contributed to the design of the WebXR Marker Tracking specification:
+
+  * <a href="mailto:bajones@google.com">Brandon Jones</a> (Google)
+  * Alex Turner (Microsoft)
+
+</section>

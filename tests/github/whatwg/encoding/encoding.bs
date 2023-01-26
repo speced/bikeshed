@@ -3,7 +3,7 @@ Group: WHATWG
 H1: Encoding
 Shortname: encoding
 Text Macro: TWITTER encodings
-Text Macro: LATESTRD 2020-12
+Text Macro: LATESTRD 2022-06
 Abstract: The Encoding Standard defines encodings and their JavaScript API.
 Translation: ja https://triple-underscore.github.io/Encoding-ja.html
 Markup Shorthands: css off
@@ -1337,7 +1337,7 @@ dictionary TextDecodeOptions {
   boolean stream = false;
 };
 
-[Exposed=(Window,Worker)]
+[Exposed=*]
 interface TextDecoder {
   constructor(optional DOMString label = "utf-8", optional TextDecoderOptions options = {});
 
@@ -1494,7 +1494,7 @@ dictionary TextEncoderEncodeIntoResult {
   unsigned long long written;
 };
 
-[Exposed=(Window,Worker)]
+[Exposed=*]
 interface TextEncoder {
   constructor();
 
@@ -1572,10 +1572,6 @@ method steps are:
 
  <li><p>Let <var>written</var> be 0.
 
- <li><p>Let <var>destinationBytes</var> be the result of
- <a lt="get a reference to the buffer source">getting a reference to the bytes held by</a>
- <var>destination</var>.
-
  <li><p>Let <var>encoder</var> be an instance of the <a>UTF-8 encoder</a>.
 
  <li>
@@ -1603,7 +1599,7 @@ method steps are:
 
     <ol>
      <li>
-      <p>If <var>destinationBytes</var>'s <a for="byte sequence">length</a> &minus;
+      <p>If <var>destination</var>'s <a for="BufferSource">byte length</a> &minus;
       <var>written</var> is greater than or equal to the number of bytes in <var>result</var>, then:
 
       <ol>
@@ -1612,7 +1608,8 @@ method steps are:
        <li><p>Otherwise, increment <var>read</var> by 1.
 
        <li>
-        <p>Write the bytes in <var>result</var> into <var>destinationBytes</var>, from byte offset
+        <p><a for="ArrayBufferView">Write</a> the bytes in <var>result</var> into
+        <var>destination</var>, with <a for="ArrayBufferView/write"><i>startingOffset</i></a> set to
         <var>written</var>.
 
         <p class=warning>See the
@@ -1662,7 +1659,7 @@ function convertString(buffer, input, callback) {
 <h3 id=interface-textdecoderstream>Interface {{TextDecoderStream}}</h3>
 
 <pre class=idl>
-[Exposed=(Window,Worker)]
+[Exposed=*]
 interface TextDecoderStream {
   constructor(optional DOMString label = "utf-8", optional TextDecoderOptions options = {});
 };
@@ -1731,7 +1728,7 @@ constructor steps are:
  <li><p>If <var>options</var>["{{TextDecoderOptions/fatal}}"] is true, then set <a>this</a>'s
  <a for=TextDecoderCommon>error mode</a> to "<code>fatal</code>".
 
- <li><p>set <a>this</a>'s <a for=TextDecoderCommon>ignore BOM</a> to
+ <li><p>Set <a>this</a>'s <a for=TextDecoderCommon>ignore BOM</a> to
  <var>options</var>["{{TextDecoderOptions/ignoreBOM}}"].
 
  <li><p>Set <a>this</a>'s <a for=TextDecoderCommon>decoder</a> to a new instance of <a>this</a>'s
@@ -1744,12 +1741,15 @@ constructor steps are:
  <li><p>Let <var>flushAlgorithm</var> be an algorithm which takes no arguments and runs the
  <a>flush and enqueue</a> algorithm with <a>this</a>.
 
- <li><p>Set <a>this</a>'s <a for=GenericTransformStream>transform</a> to the result of
- <a for=TransformStream>creating</a> a {{TransformStream}} with
- <a for=TransformStream/create><var ignore>transformAlgorithm</var></a> set to
+ <li><p>Let <var>transformStream</var> be a [=new=] {{TransformStream}}.
+
+ <li><p>[=TransformStream/Set up=] <var>transformStream</var> with
+ <a for="TransformStream/set up"><var ignore>transformAlgorithm</var></a> set to
  <var>transformAlgorithm</var> and
- <a for=TransformStream/create><var ignore>flushAlgorithm</var></a> set to
+ <a for="TransformStream/set up"><var ignore>flushAlgorithm</var></a> set to
  <var>flushAlgorithm</var>.
+
+ <li><p>Set <a>this</a>'s <a for=GenericTransformStream>transform</a> to <var>transformStream</var>.
 </ol>
 
 <p>The <dfn>decode and enqueue a chunk</dfn> algorithm, given a {{TextDecoderStream}} object
@@ -1807,30 +1807,42 @@ steps:
  <li><p>Let <var>output</var> be the <a for=/>I/O queue</a> of scalar values
  « <a>end-of-queue</a> ».
 
- <li><p>Let <var>result</var> be the result of <a>processing an item</a> with <a>end-of-queue</a>,
- <var>decoder</var>'s <a for=TextDecoderCommon>decoder</a>, <var>decoder</var>'s
- <a for=TextDecoderCommon>I/O queue</a>, <var>output</var>, and <var>decoder</var>'s
- <a for=TextDecoderCommon>error mode</a>.
-
  <li>
-  <p>If <var>result</var> is <a>finished</a>, then:
+  <p>While true:
 
   <ol>
-   <li><p>Let <var>outputChunk</var> be the result of running <a>serialize I/O queue</a> with
-   <var>decoder</var> and <var>output</var>.
+   <li><p>Let <var>item</var> be the result of <a>reading</a> from <var>decoder</var>'s
+   <a for=TextDecoderCommon>I/O queue</a>.
 
-   <li><p>If <var>outputChunk</var> is non-empty, then <a for=TransformStream>enqueue</a>
-   <var>outputChunk</var> in <var>decoder</var>'s <a for=GenericTransformStream>transform</a>.
+   <li><p>Let <var>result</var> be the result of <a>processing an item</a> with <var>item</var>,
+   <var>decoder</var>'s <a for=TextDecoderCommon>decoder</a>, <var>decoder</var>'s
+   <a for=TextDecoderCommon>I/O queue</a>, <var>output</var>, and <var>decoder</var>'s
+   <a for=TextDecoderCommon>error mode</a>.
+
+   <li>
+    <p>If <var>result</var> is <a>finished</a>, then:
+
+    <ol>
+     <li><p>Let <var>outputChunk</var> be the result of running <a>serialize I/O queue</a> with
+     <var>decoder</var> and <var>output</var>.
+
+     <li><p>If <var>outputChunk</var> is non-empty, then <a for=TransformStream>enqueue</a>
+     <var>outputChunk</var> in <var>decoder</var>'s <a for=GenericTransformStream>transform</a>.
+
+     <li><p>Return.
+    </ol>
+   </li>
+
+   <li><p>Otherwise, if <var>result</var> is <a>error</a>, <a>throw</a> a {{TypeError}}.
   </ol>
-
- <li><p>Otherwise, <a>throw</a> a {{TypeError}}.
+ </li>
 </ol>
 
 
 <h3 id=interface-textencoderstream>Interface {{TextEncoderStream}}</h3>
 
 <pre class=idl>
-[Exposed=(Window,Worker)]
+[Exposed=*]
 interface TextEncoderStream {
   constructor();
 };
@@ -1892,12 +1904,15 @@ constructor steps are:
  <li><p>Let <var>flushAlgorithm</var> be an algorithm which runs the <a>encode and flush</a>
  algorithm with <a>this</a>.
 
- <li><p>Set <a>this</a>'s <a for=GenericTransformStream>transform</a> to the result of
- <a for=TransformStream>creating</a> a {{TransformStream}} with
- <a for=TransformStream/create><var ignore>transformAlgorithm</var></a> set to
+ <li><p>Let <var>transformStream</var> be a [=new=] {{TransformStream}}.
+
+ <li><p>[=TransformStream/Set up=] <var>transformStream</var> with
+ <a for="TransformStream/set up"><var ignore>transformAlgorithm</var></a> set to
  <var>transformAlgorithm</var> and
- <a for=TransformStream/create><var ignore>flushAlgorithm</var></a> set to
+ <a for="TransformStream/set up"><var ignore>flushAlgorithm</var></a> set to
  <var>flushAlgorithm</var>.
+
+ <li><p>Set <a>this</a>'s <a for=GenericTransformStream>transform</a> to <var>transformStream</var>.
 </ol>
 
 <hr>
@@ -2826,9 +2841,7 @@ and <var>code point</var>, runs these steps:
 
    <dt><a>end-of-queue</a>
    <dd><p>Set the <a>ISO-2022-JP decoder state</a> to
-   <a lt="ISO-2022-JP decoder lead byte">lead byte</a>,
-   <a>prepend</a> <var>byte</var> to
-   <var>ioQueue</var>, and return <a>error</a>.
+   <a lt="ISO-2022-JP decoder lead byte">lead byte</a> and return <a>error</a>.
 
    <dt>Otherwise
    <dd><p>Set <a>ISO-2022-JP decoder state</a> to
@@ -2846,7 +2859,8 @@ and <var>code point</var>, runs these steps:
    <a lt="ISO-2022-JP decoder escape">escape</a>, and return
    <a>continue</a>.
 
-   <li><p><a>Prepend</a> <var>byte</var> to <var>ioQueue</var>.
+   <li><p>If <var>byte</var> is not <a>end-of-queue</a>, then <a>prepend</a>
+   <var>byte</var> to <var>ioQueue</var>.
 
    <li><p>Set <a>ISO-2022-JP output</a> to false,
    <a>ISO-2022-JP decoder state</a> to
@@ -2889,7 +2903,9 @@ and <var>code point</var>, runs these steps:
      <a>error</a> otherwise.
     </ol>
 
-   <li><p><a>Prepend</a> <var>lead</var> and <var>byte</var> to <var>ioQueue</var>.
+   <li><p>If <var>byte</var> is <a>end-of-queue</a>, then <a>prepend</a>
+   <var>lead</var> to <var>ioQueue</var>. Otherwise, <a>prepend</a>
+   <var>lead</var> and <var>byte</var> to <var>ioQueue</var>.
 
    <li><p>Set <a>ISO-2022-JP output</a> to false,
    <a>ISO-2022-JP decoder state</a> to <a>ISO-2022-JP decoder output state</a>
@@ -2922,9 +2938,8 @@ and <var>code point</var>, runs these steps:
 <ol>
  <li><p>If <var>code point</var> is <a>end-of-queue</a> and
  <a>ISO-2022-JP encoder state</a> is not
- <a lt="ISO-2022-JP encoder ASCII">ASCII</a>,
- <a>prepend</a> <var>code point</var> to
- <var>ioQueue</var>, set <a>ISO-2022-JP encoder state</a> to
+ <a lt="ISO-2022-JP encoder ASCII">ASCII</a>, set
+ <a>ISO-2022-JP encoder state</a> to
  <a lt="ISO-2022-JP encoder ASCII">ASCII</a>, and return three bytes
  0x1B 0x28 0x42.
 
@@ -3492,8 +3507,7 @@ Wolf Lammen, and
 成瀬ゆい (Yui Naruse)
 for being awesome.
 
-<p>This standard is written by
-<a href=https://annevankesteren.nl/ lang=nl>Anne van Kesteren</a>
-(<a href=https://www.mozilla.org/>Mozilla</a>,
-<a href=mailto:annevk@annevk.nl>annevk@annevk.nl</a>). The <a href=#api>API</a> chapter
-was initially written by Joshua Bell (<a href=https://www.google.com/>Google</a>).
+<p>This standard is written by <a href=https://annevankesteren.nl/ lang=nl>Anne van Kesteren</a>
+(<a href=https://www.apple.com/>Apple</a>, <a href=mailto:annevk@annevk.nl>annevk@annevk.nl</a>).
+The <a href=#api>API</a> chapter was initially written by Joshua Bell
+(<a href=https://www.google.com/>Google</a>).

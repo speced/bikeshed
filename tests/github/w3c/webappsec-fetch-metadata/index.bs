@@ -124,8 +124,6 @@ Valid `Sec-Fetch-Dest` values include "`audio`", "`audioworklet`", "`document`",
 "`report`", "`script`", "`serviceworker`", "`sharedworker`", "`style`", "`track`", "`video`",
 "`worker`", "`xslt`".
 
-ISSUE(whatwg/fetch#948): `frame` and `iframe` haven't landed in Fetch yet.
-
 In order to support forward-compatibility with as-yet-unknown request types, servers SHOULD ignore
 this header if it contains an invalid value.
 
@@ -284,27 +282,11 @@ To <dfn abstract-op lt="set-user">set the `Sec-Fetch-User` header</dfn> for a [=
 Integration with Fetch and HTML {#fetch-integration}
 ===========================================
 
-To support `Sec-Fetch-User`, [=request=] needs to be taught about requests which were
-triggered by user activation:
+To support `Sec-Fetch-User`, [=request=] has a [=request/user-activation=] which is false,
+unless otherwise populated by HTML's [=process a navigate fetch=] algorithm.
 
->   <strong>Monkeypatching [[FETCH]]:</strong>
->
->   A [=request=] has a boolean <dfn for="request">user activation</dfn>. Unless stated
->   otherwise, it is `false`.
->
->   Note: This is only used for [=navigation requests=].
-
-ISSUE(whatwg/fetch#993): This should be defined in Fetch.
-
-This flag could be populated from HTML's [=process a navigate fetch=] algorithm, perhaps by
-inserting the following step after the current algorithm's step 2:
-
->   <strong>Monkeypatching [[HTML]]:</strong>
->
->   3.  If <var ignore>sourceBrowsingContext</var>'s {{WindowProxy}}'s `[[Window]]` value has
->       [=transient activation=], then set <var ignore>request</var>'s [=request/user activation=] to true.
-
-ISSUE(whatwg/html#5203): This should be defined in HTML.
+Fetch Metadata headers are appended to outgoing requests from within Fetch's "HTTP-network-or-cache"
+algorithm, using the following steps. Consult that specification for integration details [[!FETCH]].
 
 <div algorithm="append fetch metadata headers">
 To <dfn abstract-op export>append the Fetch metadata headers for a request</dfn>, given [=request=] |r|:
@@ -322,10 +304,6 @@ To <dfn abstract-op export>append the Fetch metadata headers for a request</dfn>
 </ol>
 </div>
 
-Fetch will call into the algorithm above from within its "HTTP-network-or-cache fetch" algorithm.
-Please consult that specification for integration details [[!FETCH]].
-
-ISSUE(whatwg/fetch#993): This should be called from in Fetch.
 
 Security and Privacy Considerations {#sec-priv-considerations}
 ==============================================================
@@ -353,6 +331,12 @@ same-site with `https://example.com/` and `https://subdomain.example.com/`). If 
 redirects all the way back to `https://example.com/`, the final request's `Sec-Fetch-Site`
 value would still be `cross-site` (as the redirect chain includes `https://example.net/`, which is
 still not same-site with the other URLs.
+
+Note: For the special case of `Sec-Fetch-Site: None`, it seems reasonable to maintain that value
+through redirects in order to support the common case of copy/pasting shortlinks into the address
+bar. That is, if a user agent chooses to treat an address-bar navigation to `https://sho.rt/link`
+as `Sec-Fetch-Site: none`, a post-redirect navigation to `https://target.com/long/path/goes/here`
+should likewise assert `Sec-Fetch-Site: none`. 
 
 The `Sec-` Prefix {#sec-prefix}
 -------------------------------
@@ -411,7 +395,31 @@ would be ideal to align on behavior for those which are likely to be common. Sme
     user agent's bookmark bar, another app entirely, etc), then `Sec-Fetch-Site: none` may be
     appropriate.
 
+Extension-Initiated Requests {#extension-initiated}
+---------------------------------------------------
 
+Some user agents support extensions which are capable of making requests, and which can be empowered
+beyond regular web content in order to give users more control over their web experience. While these
+are somewhat outside the scope of the web platform, user agents are encouraged to carefully consider
+how these requests are to be represented to servers. In general, it would be ideal for user agents to
+satisfy two goals:
+
+1.  Extensions without special privileges for a given site cannot cause requests that would bypass
+    that site's server-side Fetch Metadata logic.
+
+2.  Developers can recognize extensions' requests so that they can be exempted from the server's Fetch
+    Metadata logic if it chooses to do so. This increases developers' ability to confidently deploy
+    Fetch Metadata protections without undermining legitimate user interests.
+    
+With these goals in mind, user agents are encouraged to implement the following behaviors:
+
+1.  If an extension does not have permission to access to a given URL, its requests to that URL could
+    contain a `Sec-Fetch-Site` header whose value is `cross-site`, just as a normal web request would.
+    If the extension does have access to a given URL, the `Sec-Fetch-Site` value could be `same-origin`.
+
+2.  The `Origin` header could be included with outgoing requests from extension contexts, with an
+    [=implementation-defined=] value that allows servers to distinguish extension-initiated requests
+    from web-initiated requests.
 
 Deployment Considerations {#deployment-considerations}
 ======================================================

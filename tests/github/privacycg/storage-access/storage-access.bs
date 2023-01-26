@@ -3,8 +3,11 @@ Title: The Storage Access API
 Shortname: storage-access
 Repository: privacycg/storage-access
 URL: https://privacycg.github.io/storage-access/
-Editor: Theresa O’Connor, w3cid 40614, Apple Inc. https://apple.com, hober@apple.com
-Editor: John Wilander, w3cid 89478, Apple Inc. https://apple.com/, wilander@apple.com
+Editor: Benjamin VanderSloot, w3cid 135256, Mozilla https://mozilla.org, bvandersloot@mozilla.com
+Editor: Johann Hofmann, w3cid 120436, Google https://google.com, johannhof@google.com
+Editor: Anne van Kesteren, w3cid 38001, Apple Inc. https://apple.com, annevk@annevk.nl
+Former Editor: John Wilander, w3cid 89478, Apple Inc. https://apple.com, wilander@apple.com
+Former Editor: Theresa O’Connor, w3cid 40614, Apple Inc. https://apple.com, hober@apple.com
 Abstract: The Storage Access API enables content in iframes to request access to website data (such as cookies).
 Status Text: This specification is intended to be merged into the HTML Living Standard. It is neither a WHATWG Living Standard nor is it on the standards track at W3C.
 Text Macro: LICENSE <a href=https://creativecommons.org/licenses/by/4.0/>Creative Commons Attribution 4.0 International License</a>
@@ -15,17 +18,24 @@ Markup Shorthands: markdown yes, css no
 Complain About: accidental-2119 true
 </pre>
 
+<!-- The main rSA and hSA implementations live in these files: -->
+<!-- https://trac.webkit.org/browser/webkit/trunk/Source/WebCore/dom/DocumentStorageAccess.cpp -->
+<!-- https://searchfox.org/mozilla-central/source/dom/base/Document.cpp -->
+<!-- https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/core/dom/document.cc -->
+
 <!-- File issues on HTML to export each of these -->
 <pre class=link-defaults>
-spec:html; type:dfn; text:session history; url:https://html.spec.whatwg.org/multipage/history.html#session-history
-spec:html; type:dfn; text:current entry; url:https://html.spec.whatwg.org/multipage/history.html#current-entry
+spec:html; type:dfn; for:site; text:same site
 </pre>
 
 <pre class="anchors">
-urlPrefix: https://tc39.github.io/ecma262/; spec: ECMASCRIPT
-    text: agent cluster; url: #sec-agent-clusters; type: dfn
-urlPrefix: https://infra.spec.whatwg.org/; spec: INFRA
-    text: implementation-defined; url: #implementation-defined; type: dfn
+urlPrefix: https://fetch.spec.whatwg.org/; spec: Fetch
+    text: http-network-or-cache fetch; url: #concept-http-network-or-cache-fetch; type: dfn
+spec: RFC6265; urlPrefix: https://tools.ietf.org/html/rfc6265
+    type: dfn
+        text: cookie store; url: section-5.3
+urlPrefix: https://w3c.github.io/permissions/; spec: permissions
+    text: permissions task source; url: #permissions-task-source; type: dfn
 urlPrefix: https://w3c.github.io/webdriver/webdriver-spec.html#; spec: webdriver
     type: dfn
         text: current browsing context; url: dfn-current-browsing-context
@@ -41,6 +51,20 @@ urlPrefix: https://w3c.github.io/webdriver/webdriver-spec.html#; spec: webdriver
         text: unsupported operation; url: dfn-unsupported-operation
         text: session; url: dfn-session
         text: success; url: dfn-success
+
+spec: html; urlPrefix: https://html.spec.whatwg.org/multipage/
+    type: dfn
+        text: source snapshot params; url: browsing-the-web.html#source-snapshot-params
+        text: snapshotting source snapshot params; url: browsing-the-web.html#snapshotting-source-snapshot-params
+        text: create navigation params by fetching; url: browsing-the-web.html#create-navigation-params-by-fetching
+        text: set up a window environment settings object; url: nav-history-apis.html#set-up-a-window-environment-settings-object
+        text: environment
+        text: DOM manipulation task source; url: webappapis.html#dom-manipulation-task-source
+
+spec: fetch; urlPrefix: https://fetch.spec.whatwg.org/
+    type: dfn
+        for: response
+            text: has-cross-origin-redirects; url: #response-has-cross-origin-redirects
 </pre>
 
 <pre class=biblio>
@@ -102,31 +126,20 @@ A {{Document}} is in a <dfn>first-party-site context</dfn> if it is the [=active
 
 A {{Document}} is in a <dfn>third party context</dfn> if it is not in a [=first-party-site context=].
 
-ISSUE(10): If we let nested <{iframe}>s use this API, we may have to revisit these definitions.
+<h3 id="ua-state">Changes to user agent state related to storage access</h3>
 
-<h3 id="ua-state">User Agent state related to storage access</h3>
+Modify the definition of [=environment=] in the following manner:
+1. Add a new member called <dfn for="environment">has storage access</dfn> of type [=boolean=].
 
-A <dfn>storage access map</dfn> is a [=map=] whose keys are [=partitioned storage keys=] and whose values are [=storage access flag sets=].
+Modify the definition of [=source snapshot params=] in the following manner:
+1. Add a new member called <dfn for="source snapshot params">has storage access</dfn> of type [=boolean=].
+1. Add a new member called <dfn for="source snapshot params">environment id</dfn> of type opaque [=string=].
 
-User Agents maintain a single <dfn>global storage access map</dfn>.
-
-ISSUE(2): What is the lifecycle of the [=global storage access map=]? How long do we remember its contents? Firefox and Safari differ here.
-
-ISSUE(5): When do we age out entries in the [=global storage access map=]? See also [Scope of Storage Access](https://github.com/privacycg/storage-access#scope-of-storage-access).
-
-Each [=agent cluster=] has a <dfn for="agent cluster">storage access map</dfn>.
-
-When an [=agent cluster=] is created, its [=agent cluster/storage access map=] is initialized with a [=map/clone=] of the [=global storage access map=].
-
-To <dfn type="abstract-op">obtain the storage access map</dfn> for a {{Document}} |doc|, run the following steps:
-
-1. Return the [=agent cluster/storage access map=] of |doc|'s [=relevant agent=]'s [=agent cluster=].
-
-A <dfn>partitioned storage key</dfn> is a [=tuple=] consisting of a <dfn for="partitioned storage key">top-level site</dfn> and an <dfn for="partitioned storage key">embedded site</dfn> (both [=sites=]).
+A <dfn>partitioned storage key</dfn> is a [=tuple=] consisting of a <dfn for="partitioned storage key">top-level site</dfn> (a [=site=]) and an <dfn for="partitioned storage key">embedded origin</dfn> (an [=/origin=]).
 
 <div class=example>
 
-`(("https", "news.example"), ("https", "social.example"))` is a [=partitioned storage key=] whose [=top-level site=] is `("https", "news.example")` and whose [=embedded site=] is `("https", "social.example")`.
+`(("https", "news.example"), ("https", "social.example", null, null))` is a [=partitioned storage key=] whose [=top-level site=] is `("https", "news.example")` and whose [=embedded origin=] is `("https", "social.example", null, null)`.
 
 </div>
 
@@ -137,24 +150,6 @@ To <dfn type="abstract-op">generate a partitioned storage key</dfn> for a {{Docu
 1. If |doc|'s [=Document/browsing context=] is a [=top-level browsing context=], return the [=partitioned storage key=] (|site|, |site|).
 1. Let |top-level site| be the result of [=obtain a site|obtaining a site=] from |settings|' [=top-level origin=].
 1. Return the [=partitioned storage key=] (|top-level site|, |site|).
-
-A <dfn>storage access flag set</dfn> is a set of zero or more of the following flags, which are used to gate access to client-side storage for |embedded site| when loaded in a [=third party context=] on |top-level site|:
-
-: The <dfn for="storage access flag set" id=has-storage-access-flag>has storage access flag</dfn>
-:: When set, this flag indicates |embedded site| has access to its [=unpartitioned data=] when it's loaded in a [=third party context=] on |top-level site|.
-: The <dfn for="storage access flag set" id=was-expressly-denied-storage-access-flag>was expressly denied storage access flag</dfn>
-:: When set, this flag indicates that the user expressly denied |embedded site| access to its [=unpartitioned data=] when it's loaded in a [=third party context=] on |top-level site|.
-
-To <dfn type="abstract-op">obtain a storage access flag set</dfn> for a [=partitioned storage key=] |key| from a [=/storage access map=] |map|, run the following steps:
-
-1. If |map|[|key|] [=map/exists|does not exist=], run these steps:
-    1. Let |flags| be a new [=storage access flag set=].
-    1. [=map/Set=] |map|[|key|] to |flags|.
-1. Return |map|[|key|].
-
-To <dfn type="abstract-op">save the storage access flag set</dfn> for a [=partitioned storage key=] |key| in a [=/storage access map=] |map|, run the following steps:
-
-1. [=map/Set=] [=global storage access map=][|key|] to |map|[|key|].
 
 <h3 id="the-document-object">Changes to {{Document}}</h3>
 
@@ -168,122 +163,106 @@ partial interface Document {
 When invoked on {{Document}} |doc|, the <dfn export method for=Document><code>hasStorageAccess()</code></dfn> method must run these steps:
 
 <!-- https://developer.mozilla.org/en-US/docs/Web/API/Document/hasStorageAccess -->
-<!-- https://trac.webkit.org/browser/webkit/trunk/Source/WebCore/dom/DocumentStorageAccess.cpp#L80 -->
-<!-- https://hg.mozilla.org/mozilla-central/file/tip/dom/base/Document.cpp#l15512 -->
 
 1. Let |p| be [=a new promise=].
-1. Let |map| be the result of [=obtain the storage access map|obtaining the storage access map=] for |doc|.
-1. Let |key| be the result of [=generate a partitioned storage key|generating a partitioned storage key=] from |doc|.
-1. If |key| is failure, then [=/resolve=] |p| with false and return |p|.
-1. Let |flag set| be the result of [=obtain a storage access flag set|obtaining the storage access flag set=] with |key| from |map|.
-1. If |flag set|'s [=was expressly denied storage access flag=] is set, [=/resolve=] |p| with false and return |p|. <!-- WebKit's DocumentStorageAccess.cpp#L85 -->
-1. If |doc|'s [=Document/origin=] is an [=opaque origin=], [=/resolve=] |p| with false and return |p|. <!-- WebKit's DocumentStorageAccess.cpp#L90 --> <!-- Gecko's Document.cpp#l15526 -->
-1. If |doc|'s [=Document/browsing context=] is a [=top-level browsing context=], [=/resolve=] |p| with true and return |p|. <!-- WebKit's DocumentStorageAccess.cpp#L95 --> <!-- Gecko's Document.cpp#l15531 -->
-1. Let |topDoc| be the [=active document=] of |doc|'s [=Document/browsing context=]'s [=top-level browsing context=].
-1. If |doc| is [=same origin=] with |topDoc|, [=/resolve=] |p| with true and return |p|. <!-- WebKit's DocumentStorageAccess.cpp#L102 --> <!-- Gecko's Document.cpp#l15541 -->
-1. Let |key| be the result of [=generate a partitioned storage key|generating a partitioned storage key=] from |doc|.
-1. [=/Resolve=] |p| with the result of running [=determine if a site has storage access=] with |key| and |doc|. <!-- WebKit's DocumentStorageAccess.cpp#L115 --> <!-- Gecko's Document.cpp#l15548 -->
+1. If |doc| is not [=Document/fully active=], then [=/reject=] |p| with an "{{InvalidStateError}}" {{DOMException}} and return |p|.
+1. If |doc|'s [=Document/origin=] is an [=opaque origin=], [=/resolve=] |p| with false and return |p|.
+1. Let |global| be |doc|'s [=relevant global object=].
+1. If |global| is not a [=secure context=], then [=/resolve=] |p| with false and return |p|.
+1. If |doc|'s [=Document/browsing context=] is a [=top-level browsing context=], [=/resolve=] |p| with true and return |p|.
+1. If the [=top-level origin=] of |doc|'s [=relevant settings object=] is an [=opaque origin=], [=/resolve=] |p| with false and return |p|.
+1. If |doc|'s [=Document/origin=] is [=same origin=] with the [=top-level origin=] of |doc|'s [=relevant settings object=], [=/resolve=] |p| with true and return |p|.
+1. [=Queue a global task=] on the [=permissions task source=] given |global| to [=/resolve=] |p| with |global's| [=environment/has storage access=].
 1. Return |p|.
 
-ISSUE: Shouldn't step 7 be [=same site=]?
+ISSUE: Shouldn't step 8 be [=same site=]?
 
 When invoked on {{Document}} |doc|, the <dfn export method for=Document><code>requestStorageAccess()</code></dfn> method must run these steps:
 
 <!-- https://developer.mozilla.org/en-US/docs/Web/API/Document/requestStorageAccess -->
-<!-- https://trac.webkit.org/browser/webkit/trunk/Source/WebCore/dom/DocumentStorageAccess.cpp#L123 -->
-<!-- https://hg.mozilla.org/mozilla-central/file/tip/dom/base/Document.cpp#l15629 -->
 
 1. Let |p| be [=a new promise=].
-1. [=Enqueue the following steps=] on the [=permission task source=]:
-    1. Let |map| be the result of [=obtain the storage access map|obtaining the storage access map=] for |doc|.
+1. If |doc| is not [=Document/fully active=], then [=/reject=] |p| with an "{{InvalidStateError}}" {{DOMException}} and return |p|.
+1. Let |global| be |doc|'s [=relevant global object=].
+1. If |global| is not a [=secure context=], then [=/reject=] |p| with a "{{NotAllowedError}}" {{DOMException}} and return |p|.
+1. If |doc|'s [=Document/browsing context=] is a [=top-level browsing context=], [=/resolve=] and return |p|.
+1. If |doc| is not [=allowed to use=] "`storage-access`", [=/reject=] |p| with a "{{NotAllowedError}}" {{DOMException}} and return |p|.
+1. If |doc|'s [=Document/origin=] is an [=opaque origin=], [=/reject=] |p| with a "{{NotAllowedError}}" {{DOMException}} and return |p|.
+1. If the [=top-level origin=] of |doc|'s [=relevant settings object=] is an [=opaque origin=], [=/reject=] |p| with a "{{NotAllowedError}}" {{DOMException}} and return |p|.
+1. If |doc|'s [=Document/origin=] is [=same origin=] with the [=top-level origin=] of |doc|'s [=relevant settings object=], [=/resolve=] and return |p|.
+1. If |doc|'s [=active sandboxing flag set=] has its [=sandbox storage access by user activation flag=] set, [=/reject=] |p| with a "{{NotAllowedError}}" {{DOMException}} and return |p|.
+1. If |global|'s [=environment/has storage access=] is true, [=/resolve=] |p| with {{undefined}} and return.
+1. Let |has transient activation| be whether |doc|'s {{Window}} object has [=transient activation=].
+1. Run the following steps [=in parallel=]:
+    1. Let |process permission state| be an algorithm that, given a [=permission state=] |state|, runs the following steps:
+        1. [=Queue a global task=] on the [=permission task source=] given |global| to:
+            1. If |state| is [=permission/granted=]:
+                1. Set |global|'s [=environment/has storage access=] to true.
+                1. [=/Resolve=] |p| with {{undefined}}.
+            1. Else:
+                1. [=Consume user activation=] given |global|.
+                1. [=/Reject=] |p| with a "{{NotAllowedError}}" {{DOMException}}.
+    1. Let |previous permission state| be the result of [=getting the current permission state=] given "<a permission><code>storage-access</code></a>" and |global|.
+    1. If |previous permission state| is not [=permission/prompt=]:
+        1. Run |process permission state| with |previous permission state|.
+        1. Abort these steps.
+    1. If |has transient activation| is false:
+        1. Run |process permission state| with [=permission/denied=].
+        1. Abort these steps.
     1. Let |key| be the result of [=generate a partitioned storage key|generating a partitioned storage key=] from |doc|.
-    1. If |key| is failure, [=reject=] |p|.
-    1. Let |flag set| be the result of [=obtain a storage access flag set|obtaining the storage access flag set=] with |key| from |map|.
-    1. If |flag set|'s [=was expressly denied storage access flag=] is set, [=reject=] |p|.
-    1. If |flag set|'s [=has storage access flag=] is set, [=/resolve=] |p|. <!-- WebKit's DocumentStorageAccess.cpp#L128 --> <!-- Gecko's Document.cpp#l15604 -->
-    1. If |doc|'s [=Document/origin=] is an [=opaque origin=], [=reject=] |p|. <!-- WebKit's DocumentStorageAccess.cpp#L133 --> <!-- Gecko's Document.cpp#l15618 -->
-    1. If |doc|'s [=Document/browsing context=] is a [=top-level browsing context=], [=/resolve=] |p|. <!-- WebKit's DocumentStorageAccess.cpp#L138 --> <!-- Gecko's Document.cpp#l15632 -->
-    1. Let |topDoc| be the [=active document=] of |doc|'s [=Document/browsing context=]'s [=top-level browsing context=].
-    1. If |doc| is [=same origin=] with |topDoc|, [=/resolve=] |p|. <!-- WebKit's DocumentStorageAccess.cpp#L146 --> <!-- Gecko's Document.cpp#l15604 --> <!-- Gecko's Document.cpp#l15657 -->
-    1. If |doc|'s [=active sandboxing flag set=] has its [=sandbox storage access by user activation flag=] set, [=reject=] |p|. <!-- WebKit's DocumentStorageAccess.cpp#L152 --> <!-- Gecko's Document.cpp#l15667 -->
-    1. If |doc|'s [=Document/browsing context=]'s [=parent browsing context=] is not a [=top-level browsing context=], [=reject=] |p|. <!-- WebKit's DocumentStorageAccess.cpp#L158 --> <!-- Gecko's Document.cpp#l15673 -->
-    1. If this algorithm was invoked when |doc|'s {{Window}} object did not have [=transient activation=], [=reject=] |p|. <!-- WebKit's DocumentStorageAccess.cpp#L163 --> <!-- Gecko's Document.cpp#l15680 -->
-    1. [=Determine the storage access policy=] with |key|, |doc|, and |p|. <!-- WebKit's DocumentStorageAccess.cpp#L177 --> <!-- Gecko's Document.cpp#l15685 -->
-    1. Set |flag set|'s [=has storage access flag=].
-    1. [=Save the storage access flag set=] for |key| in |map|.
-    1. [=/Resolve=] |p|. <!-- Gecko's Document.cpp#l15805 -->
+    1. Let |implicitly granted| and |implicitly denied| (each a [=boolean=]) be the result of running an [=implementation-defined=] set of steps to determine if |key|'s [=partitioned storage key/embedded origin=]'s request for storage access on |key|'s [=partitioned storage key/top-level site=] should be granted or denied without prompting the user.
+    1. If |implicitly granted| is true:
+        1. Run |process permission state| with [=permission/granted=].
+        1. Abort these steps.
+    1. If |implicitly denied| is true:
+        1. Run |process permission state| with [=permission/denied=].
+        1. Abort these steps.
+    1. Let |permissionState| be the result of [=requesting permission to use=] "<a permission><code>storage-access</code></a>".
+    1. Run |process permission state| with |permissionState|.
 1. Return |p|.
 
-ISSUE: Shouldn't step 3.7 be [=same site=]?
+NOTE: The intent of this algorithm is to always require user activation before a storage-access permission will be set. Though it is within the means of user agents to set storage-access permissions based on custom heuristics without prior user activation, this specification strongly discourages such behavior, as it could lead to interoperability issues.
 
-ISSUE(10): Remove step 3.9 if we determine that nested <{iframe}>s should be able to request storage access.
+ISSUE(privacycg/storage-access#144): We shouldn't use the permissions task source here.
 
-<h4 id="ua-policy">User Agent storage access policies</h4>
-
-Different User Agents have different policies around whether or not [=sites=] may access their [=unpartitioned data=] when they're in a [=third party context=]. User Agents check and/or modify these policies when client-side storage is accessed (see [[#storage]]) as well as when {{Document/hasStorageAccess()}} and {{Document/requestStorageAccess()}} are called.
-
-To <dfn type="abstract-op">determine if a site has storage access</dfn> with [=partitioned storage key=] |key| and {{Document}} |doc|, run these steps:
-
-1. Let |map| be the result of [=obtain the storage access map|obtaining the storage access map=] for |doc|.
-1. Let |flag set| be the result of [=obtain a storage access flag set|obtaining the storage access flag set=] with |key| from |map|.
-1. If |flag set|'s [=has storage access flag=] is set, return true.
-1. Let |has storage access| (a [=boolean=]) be the result of running an [=implementation-defined=] set of steps to determine if |key|'s [=partitioned storage key/embedded site=] has access to its [=unpartitioned data=] on |key|'s [=partitioned storage key/top-level site=].
-1. If |has storage access| is true, set |flag set|'s [=has storage access flag=].
-1. [=Save the storage access flag set=] for |key| in |map|.
-1. Return |has storage access|.
-
-To <dfn type="abstract-op">determine the storage access policy</dfn> for [=partitioned storage key=] |key| with {{Document}} |doc| and {{Promise}} |p|, run these steps:
-
-1. Let |map| be the result of [=obtain the storage access map|obtaining the storage access map=] for |doc|.
-1. Let |flag set| be the result of [=obtain a storage access flag set|obtaining the storage access flag set=] with |key| from |map|.
-1. Let |implicitly granted| and |implicitly denied| (each a [=boolean=]) be the result of running an [=implementation-defined=] set of steps to determine if |key|'s [=partitioned storage key/embedded site=]'s request for storage access on |key|'s [=partitioned storage key/top-level site=] should be granted or denied without prompting the user.
-
-    Note: These [=implementation-defined=] set of steps might result in |flag set|'s [=has storage access flag=] and [=was expressly denied storage access flag=] changing, since the User Agent could have relevant out-of-band information (e.g. a user preference that changed) that this specification is unaware of.
-1. If |implicitly granted| is true, [=/resolve=] |p| and return.
-1. If |implicitly denied| is true, [=/reject=] |p| and return.
-1. Ask the user if they would like to grant |key|'s [=partitioned storage key/embedded site=] access to its [=unpartitioned data=] when it's loaded in a [=third party context=] on |key|'s [=partitioned storage key/top-level site=], and wait for an answer. Let |expressly granted| and |expressly denied| (both [=booleans=]) be the result.
-
-    Note: While |expressly granted| and |expressly denied| cannot both be true, they could both be false in User Agents which allow users to dismiss the prompt without choosing to allow or deny the request. (Such a dismissal is interpreted in this algorithm as a denial.)
-1. If |expressly granted| is true, run these steps:
-    1. Unset |flag set|'s [=was expressly denied storage access flag=].
-    1. [=Save the storage access flag set=] for |key| in |map|.
-    1. [=/Resolve=] |p| and return. <!-- WebKit's DocumentStorageAccess.cpp#L191 -->
-1. Unset |flag set|'s [=has storage access flag=].
-1. If |expressly denied| is true, run these steps:
-    1. If |doc|'s {{Window}} object has [=transient activation=], [=consume user activation=] with it. <!-- WebKit's DocumentStorageAccess.cpp#L181 -->
-    1. Set |flag set|'s [=was expressly denied storage access flag=].
-1. [=Save the storage access flag set=] for |key| in |map|.
-1. [=/Reject=] |p| and return. <!-- WebKit's DocumentStorageAccess.cpp#L194 --> <!-- Gecko's Document.cpp#l15805 -->
-
-ISSUE: [since this is UA-defined, does it make sense to follow-up separately with a user prompt?](https://github.com/privacycg/storage-access/pull/24#discussion_r408784492)
+ISSUE: Shouldn't step 9 be [=same site=]?
 
 <h3 id="navigation">Changes to navigation</h3>
 
-Before changing the [=current entry=] of a [=session history=], run the following steps:
+When [=snapshotting source snapshot params=]:
+1. Set [=source snapshot params/has storage access=] to |sourceDocument|'s [=source snapshot params/has storage access=].
+1. Set [=source snapshot params/environment id=] to |sourceDocument|'s [=relevant settings object=]'s [=environment/id=].
 
-1. Let |doc| be [=current entry=]'s {{Document}}.
-1. Let |map| be the result of [=obtain the storage access map|obtaining the storage access map=] for |doc|'s [=Document/browsing context=]'s [=top-level browsing context=].
-1. Let |key| be the result of [=generate a partitioned storage key|generating a partitioned storage key=] from |doc|.
-1. If |key| is failure, abort these steps.
-1. Let |flag set| be the result of [=obtain a storage access flag set|obtaining the storage access flag set=] with |key| from |map|.
-1. Unset |flag set|'s [=has storage access flag=].
-1. [=Save the storage access flag set=] for |key| in |map|.
+To the [=create navigation params by fetching=] algorithm, insert the following step as step 3:
+1. Let |originalURL| be <var ignore>entry</var>'s URL.
 
-ISSUE(3): What this section should look like ultimately hinges on
+When creating |request|'s [=reserved client=] in [=create navigation params by fetching=]:
+1. Set [=reserved client=]'s [=environment/has storage access=] to |sourceSnapshotParams|'s [=source snapshot params/has storage access=] if all of the following hold:
+    1. |sourceSnapshotParams|'s [=source snapshot params/environment id=] equals <var ignore>navigable</var>'s [=active document=]'s [=relevant settings object=]'s [=environment/id=].
+    1. |originalURL|'s [=url/origin=] is [=same origin=] with <var ignore>currentURL</var>'s [=url/origin=].
+    1. |response| is null or |response|'s [=response/has-cross-origin-redirects=] is false.
+1. Otherwise, set |request|'s [=reserved client=]'s [=environment/has storage access=] to false.
+
+When [=set up a window environment settings object|setting up a window environment settings object=]:
+1. Set <var ignore>settings object</var>'s [=environment/has storage access=] to <var ignore>reserved environment</var>'s [=environment/has storage access=].
 
 <h3 id="storage">Changes to various client-side storage mechanisms</h3>
 
-ISSUE: Write this section. For each kind of client-side storage affected, modify them to invoke [=determine if a site has storage access=] & modify their behavior based on the result.
-
-ISSUE(4): Should this API affect client-side storage other than cookies?
+This API only impacts HTTP cookies. A future revision of this API might impact other client-side state. [[!RFC6265]]
 
 <h4 id="cookies">Cookies</h4>
 
-ISSUE: Write this section.
+This API is intended to be used with environments and user agent configurations that block access to unpartitioned cookies in a [=third party context=]. At the time of this writing, this concept has not yet been integrated into the [=HTTP-network-or-cache fetch=] and {{Document/cookie}} algorithms. To allow for such an integration, the [=cookie store=] will need to be modified to receive information about the top-level and embedded site of the request (to determine whether to attach cross-site, partitioned, or no cookies) as well as whether the request was made for a document that has storage access, through accessing the [=environment=]'s [=environment/has storage access=] that is defined in this specification.
+
+Once the cookie store allows for receiving information about storage access, we would update [=HTTP-network-or-cache fetch=] and {{Document/cookie}} to pass the [=environment=]'s [=environment/has storage access=] to the [=cookie store=] when retrieving cookies.
+
+When getting unpartitioned cookies from the [=cookie store=] with storage access, user agents will still follow applicable `SameSite` restrictions (i.e., not attach cookies marked `SameSite=Strict` or `SameSite=Lax` in [=third party contexts=]).
+
+Note: User agents could apply different default values for the `SameSite` cookie attribute. This could lead to unpartitioned cookies without a `SameSite` attribute being attached to requests in some user agents (where `SameSite=None` is the default), but not in others (where `SameSite=Lax` is the default). Web developers are encouraged to set the `SameSite` attribute on their cookies to not run into issues.
 
 <h3 id="sandboxing-storage-access">Sandboxing storage access</h3>
 
-A [=sandboxing flag set=] has a <dfn export>sandbox storage access by user activation flag</dfn>. This flag prevents content from requesting storage access.
+A [=/sandboxing flag set=] has a <dfn export>sandbox storage access by user activation flag</dfn>. This flag prevents content from requesting storage access.
 
 To the [=parse a sandboxing directive=] algorithm, add the following under step 3:
 
@@ -291,11 +270,72 @@ To the [=parse a sandboxing directive=] algorithm, add the following under step 
 <li>The [=sandbox storage access by user activation flag=], unless <var ignore>tokens</var> contains the <dfn export attr-value for=iframe/sandbox>allow-storage-access-by-user-activation</dfn> keyword.
 </ul>
 
-ISSUE(12): What about Feature Policy?
+<h2 id="permissions-integration">Permissions Integration</h2>
+
+The Storage Access API defines a [=powerful feature=] identified by the [=powerful feature/name=] "<dfn export permission><code>storage-access</code></dfn>". It defines the following permission-related algorithms:
+
+<dl>
+  <dt>[=powerful feature/permission query algorithm=]</dt>
+  <dd>
+    To query the "<a permission><code>storage-access</code></a>" permission, given a {{PermissionDescriptor}} |permissionDesc| and a {{PermissionStatus}} |status|:
+
+    1. Set |status|'s {{PermissionStatus/state}} to |permissionDesc|'s [=permission state=].
+    1. If |status|'s {{PermissionStatus/state}} is [=permission/denied=], set |status|'s {{PermissionStatus/state}} to [=permission/prompt=].
+
+        Note: The "denied" permission state is not revealed to avoid exposing the user's decision to developers. This is done to prevent retaliation against the user and repeated prompting to the detriment of the user experience.
+  </dd>
+  <dt>[=powerful feature/permission key type=]</dt>
+  <dd>
+    A [=permission key=] of the "<a permission><code>storage-access</code></a>" feature is a [=tuple=] consisting of a [=site=] <dfn for="permission key">top-level</dfn> and an [=/origin=] <dfn for="permission key">requester</dfn>.
+
+    ISSUE(privacycg/storage-access#147): Note that this will likely change to a (site, site) keying.
+  </dd>
+  <dt>[=powerful feature/permission key generation algorithm=]</dt>
+  <dd>
+    To generate a new [=permission key=] for the "<a permission><code>storage-access</code></a>" feature, given an [=environment settings object=] |settings|, run the following steps:
+
+    1. Let |topLevelSite| be |settings|' [=top-level site=].
+    1. Let |embeddedOrigin| be |settings|' [=environment settings object/origin=].
+    1. Return (|topLevelSite|, |embeddedOrigin|).
+  </dd>
+  <dt>[=powerful feature/permission key comparison algorithm=]</dt>
+  <dd>
+    To compare the [=permission keys=] |key1| and |key2| for the "<a permission><code>storage-access</code></a>" feature, run the following steps:
+
+    1. If |key1|'s [=permission key/top-level=] is not [=same site=] with |key2|'s [=permission key/top-level=], return false.
+    1. If |key1|'s [=permission key/requester=] is not [=same origin=] with |key2|'s [=permission key/requester=], return false.
+    1. Return true.
+  </dd>
+</dl>
+
+<h2 id="permissions-policy-integration">Permissions Policy Integration</h2>
+
+The Storage Access API defines a [=policy-controlled feature=] identified by the string `"storage-access"`. Its [=default allowlist=] is `"*"`.
+
+    Note: A {{Document}}’s [=Document/permissions policy=] determines whether any content in that document is allowed to request storage access using {{Document/requestStorageAccess()}}. If disabled in any document, calling {{Document/requestStorageAccess()}} in that document will reject.
 
 <h2 id="privacy">Privacy considerations</h2>
 
-ISSUE: Write this section.
+The Storage Access API enables the removal of cross-site cookies. Specifically, it allows the authenticated embeds use case to continue to work. As such, the API provides a way for developers to re-gain access to cross-site cookies, albeit under further constraints.
+
+A nested {{Document}} gains access to the same cookies it has as the [=active document=] of a [=top-level browsing context=] when it calls {{Document/requestStorageAccess()}} and is returned a resolving {{Promise}}. With these cookies it can authenticate itself to the server and load user-specific information.
+
+While this functionality comes with a risk of abuse by third parties for tracking purposes, it is an explicit goal of the API and a key to its design to not undermine the gains of cross-site cookie deprecation.
+Importantly, we do not degrade privacy properties when compared to pre-removal of cross-site cookies. This follows from a lack of platform-specific information used in the spec to prevent stateless tracking and the only state added being a permission scoped to the [=site|sites=] of the embedding and embedded [=Document=].
+
+Our privacy considerations are more challenging where default cross-site cookies are already deprecated. The challenge is to decide when and how to permit the Storage Access API to be used to revert a cookie-less (or cookie-partitioned) nested {{Document}} to a pre-deprecation state, giving it access to its [=unpartitioned data=].
+
+In an ideal case, a nested {{Document}} would only be able to gain access to its [=unpartitioned data=] if:
+
+1. the user interacts with the nested {{Document}}
+2. the nested {{Document}} is permitted by the embedder to use the API
+3. the nested {{Document}} is a [=secure context=]
+4. the user grants express, pairwise permission to the embeddee to use its cookies in the embedder
+5. the user is not inundated by requests for the "<code>storage-access</code>" permission so their express permission is not undermined by fatigue
+
+This specification requires the first three of implementers. This provides guarantees that the user is aware of the content of the nested {{Document}}, the embedder has not opted out of the nested {{Document}}'s authentication, and the cross-site cookies are not disclosed to network attackers, respectively.
+
+The last two points are in tension. In an ideal world, we would show a prompt to the user in every call to {{Document/requestStorageAccess()}}. But, this would allow pages to prompt the user so frequently as to put the last point at the discretion of the page– a state we find unacceptable. User agents should prevent over-prompting of the user.
 
 <figure id=example-prompt>
 <img src=images/storage-access-prompt.png
@@ -303,9 +343,29 @@ ISSUE: Write this section.
 <figcaption>An example prompt which could be shown to the user when a site calls `document.`{{Document/requestStorageAccess()}}.</figcaption>
 </figure>
 
+Thus, the last two points represent a key point of compromise. We permit [=implementation-defined=] behavior on when to grant or deny requests for [=unpartitioned data=] without requiring user choice so long as they meet all other requirements. This compromise weakens the privacy guarantees of this proposal, specifically point 4, to a degree under the control of the implementer and gives the implementer the power to render it impossible to get storage access with this API. However, this has proven necessary to enable condition 5 to be possible given our implementers' differing stances on the compromise between these two points.
+
+Developer experience suffers where user agents differ greatly in their [=implementation-defined=] behavior, and therefore user agents should aim to minimize or standardize silent grants and denies.
+
+<h3 id="site-scope">Permission scope</h3>
+
+Another tension in the design of the API is what to use to key the "<code>storage-access</code>" permission: [=/origin|origins=] or [=site|sites=]. We chose [=site|sites=] because we believe them to be acceptable boundaries for privacy while enabling existing uses of [=same site=] and cross-origin nested {{Document|Documents}} on the same page with only one user prompt.
+
 <h2 id="security">Security considerations</h2>
 
-ISSUE: Write this section.
+It is important that this spec not degrade security properties of the web platform, even when compared to post-removal of cross-site cookies. Third-party cookie removal has potential benefits for security, specifically in mitigating attacks that rely upon authenticated requests, e.g. CSRF. We do not wish the Storage Access API to be a foothold for such attacks to leverage.
+
+To this end, we limit the impact of a "<code>storage-access</code>" permission grant to only give access to [=unpartitioned data=] to the nested {{Document}} that called {{Document/requestStorageAccess()}} and only until the nested {{Document}} navigates across an [=/origin=] boundary. This ensures that only [=/origin||origins=] with a page that call {{Document/requestStorageAccess()}} will be making credentialed requests, and moreover the embedee page can control which embedder it permits via the Content Security Policy "<code>frame-ancestors</code>" directive. This retains an [=/origin=]-scoped control for security purposes by the embedee.
+
+<h3 id="reputation">Reputational attacks</h3>
+
+This also is effective at preventing another attack: one on the embedee's reputation. We consider any cross-site authenticated request to have potential reputational harm as consumers become more privacy conscious. Therefore a first-party or sibling cross-site causing an embedded resource to be requested with the user's authentication cookies would constitute an attack on the reputation of that cross-site's owner. This is also a reason we require this API to be used in a [=secure context=]: so a network adversary cannot induce an embedee to use this API.
+
+The embedder has control over which nested {{Document|Documents}} have the ability to become authenticated, or even display a permission request to the user via the Permission Policy and nested {{Document}} sandboxing.
+
+<h3 id="notification">Notification abuse</h3>
+
+Notification abuse was also considered while specifying the Storage Access API. Specifically, we require user interaction in the nested {{Document}} and consume that rejection on a denial to restrict the conditions a permission prompt will be shown to the user. This mitigates attacks such as re-requesting a permission immediately after the user denies it.
 
 <h2 id="automation">Automation</h2>
 
@@ -332,31 +392,32 @@ The [=remote end steps=] are:
 
 1. Let |blocked| be the result of [=getting a property=] from |parameters| named `blocked`.
 1. If |blocked| is not a [=boolean=] return a [=WebDriver error=] with [=WebDriver error code=] [=invalid argument=].
-1. Let |origin| be the result of [=getting a property=] from |parameters| named `origin`.
-1. If |origin| is not a single U+002A ASTERISK character (*), then:
-    1. Let |parsedURL| be the the result of running the [=URL parser=] on |origin|.
+1. Let |embedded origin| be the result of [=getting a property=] from |parameters| named `origin`.
+1. If |embedded origin| is not a single U+002A ASTERISK character (*), then:
+    1. Let |parsedURL| be the the result of running the [=URL parser=] on |embedded origin|.
     1. If |parsedURL| is failure, then return a [=WebDriver error=] with [=WebDriver error code=] [=invalid argument=].
-    1. Set |origin| to |parsedURL|'s [=url/origin=].
+    1. Set |embedded origin| to |parsedURL|'s [=url/origin=].
 1. If the [=current browsing context=] is not a [=top-level browsing context=] return a [=WebDriver error=] with [=WebDriver error code=] [=unsupported operation=].
 1. Let |doc| be the [=current browsing context=]'s [=active document=].
 1. Let |settings| be |doc|'s [=relevant settings object=].
 1. Let |top-level site| be the result of [=obtain a site|obtaining a site=] from |settings|'s [=environment settings object/origin=].
-1. If |origin| is a single U+002A ASTERISK character (*), then:
+1. If |embedded origin| is a single U+002A ASTERISK character (*), then:
     1. If |blocked| is `true`, then:
         1. Run an [=implementation-defined=] set of steps to ensure that no site has access to its [=unpartitioned data=] when loaded in a [=third party context=] on |top-level site|.
     1. Otherwise, if |blocked| is `false`, then:
         1. Run an [=implementation-defined=] set of steps to ensure that any site has access to its [=unpartitioned data=] when loaded in a [=third party context=] on |top-level site|.
 1. Otherwise:
-    1. Let |embedded site| be the result of [=obtain a site|obtaining a site=] from |origin|.
-    1. If |embedded site| is [=same site=] with |top-level site| return a [=WebDriver error=] with [=WebDriver error code=] [=unsupported operation=].
+    1. If |embedded origin| is [=same site=] with |top-level site| return a [=WebDriver error=] with [=WebDriver error code=] [=unsupported operation=].
     1. If |blocked| is `true`, then:
-        1. Run an [=implementation-defined=] set of steps to ensure that |embedded site| does not have access to its [=unpartitioned data=] when loaded in a [=third party context=] on |top-level site|.
+        1. Run an [=implementation-defined=] set of steps to ensure that |embedded origin| does not have access to its [=unpartitioned data=] when loaded in a [=third party context=] on |top-level site|.
     1. Otherwise, if |blocked| is `false`, then:
-        1. Run an [=implementation-defined=] set of steps to ensure that |embedded site| has access to its [=unpartitioned data=] when loaded in a [=third party context=] on |top-level site|.
+        1. Run an [=implementation-defined=] set of steps to ensure that |embedded origin| has access to its [=unpartitioned data=] when loaded in a [=third party context=] on |top-level site|.
 1. If the above [=implementation-defined=] step of steps resulted in failure, return a [=WebDriver error=] with [=WebDriver error code=] [=unknown error=].
 1. Return [=success=] with data `null`.
 
 <h2 id="acknowledgements" class="no-num">Acknowledgements</h2>
+
+This specification builds on the foundations created by former editors John Wilander, who invented the Storage Access API, and Theresa O’Connor, who wrote significant portions of the initial text. We are grateful for their ideas and contributions.
 
 Many thanks to
 Anne van Kesteren,
@@ -384,7 +445,6 @@ Pete Snyder,
 Rob Stone,
 Stefan Leyhane,
 Steven Englehardt,
-Theresa O'Connor,
 Travis Leithead,
 Yan Zhu,
 Zach Edwards,

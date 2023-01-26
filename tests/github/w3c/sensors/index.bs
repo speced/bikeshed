@@ -6,7 +6,6 @@ Status: ED
 Group: dap
 ED: https://w3c.github.io/sensors/
 TR: https://www.w3.org/TR/generic-sensor/
-Previous Version: https://www.w3.org/TR/2019/WD-generic-sensor-20190307/
 Editor: Rick Waldron 50572, Invited Expert&#44; formerly on behalf of Bocoup and JS Foundation
 Former Editor: Mikhail Pozdnyakov 78325, Intel Corporation, https://intel.com/
 Former Editor: Alexander Shalamov 78335, Intel Corporation, https://intel.com/
@@ -18,12 +17,14 @@ Abstract:
   It does so by defining a blueprint for writing
   specifications of concrete sensors along with an abstract Sensor interface
   that can be extended to accommodate different sensor types.
-!Feedback: <a href="https://github.com/w3c/sensors">GitHub</a> (<a href="https://github.com/w3c/sensors/issues/new">new issue</a>, <a href="https://github.com/w3c/sensors/milestone/2">level 1 issues</a>, <a href="https://github.com/w3c/sensors/issues">all issues</a>)
+Issue Tracking: Generic Sensor API Issues Repository https://github.com/w3c/sensors/issues
 !Other: <a href="https://github.com/web-platform-tests/wpt/tree/master/generic-sensor">Test suite</a>, <a href="https://github.com/w3c/sensors/commits/main/index.bs">latest version history</a>, <a href="https://github.com/w3c/sensors/commits/gh-pages/index.bs">previous version history</a>
 Indent: 2
 Repository: w3c/sensors
 Markup Shorthands: markdown on
-Boilerplate: omit issues-index, omit conformance, omit feedback-header
+Boilerplate: omit issues-index, omit conformance, omit feedback-header, repository-issue-tracking no
+Include MDN Panels: if possible
+Implementation Report: https://www.w3.org/wiki/DAS/Implementations
 Ignored Vars: activated_sensors
 Inline GitHub Issues: yes
 Default Biblio Status: current
@@ -34,67 +35,26 @@ Status Text:
   <a href="https://github.com/w3c/sensors/issues/397">GitHub issue #397</a>.
   The group does not expect to advance this specification beyond CR until
   [[PERMISSIONS-REQUEST]] moves beyond incubation.
+  This document is maintained and updated at any time. Some parts of this document are work in progress.
 </pre>
 <pre class="anchors">
-urlPrefix: https://dom.spec.whatwg.org; spec: DOM
-  type: dfn
-    text: dispatch; url: concept-event-dispatch
-    text: event; url: concept-event
-    text: event listener; url: concept-event-listener
 urlPrefix: https://html.spec.whatwg.org/multipage/; spec: HTML
   type: dfn
     urlPrefix: webappapis.html
       text: task queue
-      text: task; url: concept-task
-      text: fire a simple event
-      text: trusted; url: concept-events-trusted
       text: spin the event loop; url: spin-the-event-loop
-    urlPrefix: browsers.html
-      text: navigating; url: navigate
-      text: browsing context
-      text: nested browsing context
-    urlPrefix: iframe-embed-object.html
-      text: allowed-to-use
     urlPrefix: interaction.html
-      text: focused
       text: gains focus; url: gains-focus
-      text: DOM anchor; url: dom-anchor
-      text: focusable area; url: focusable-area
       text: currently focused area; url: currently-focused-area-of-a-top-level-browsing-context
-      text: has focus steps; url: has-focus-steps
-    urlPrefix: origin.html
-      text: origin; url: origin-2
-urlPrefix: https://www.w3.org/TR/hr-time-2/; spec: HR-TIME-2
-  type: interface
-    text: DOMHighResTimeStamp; url: dom-domhighrestimestamp
-  type: dfn
-    text: time origin; url: dfn-time-origin
-urlPrefix: https://www.w3.org/TR/page-visibility-2/; spec: PAGE-VISIBILITY
-  type: dfn
-    text: document visibility state; url: dom-visibilitystate
-    text: visibility states; url: dfn-visibility-states
-    text: steps to determine the visibility state; url: dfn-steps-to-determine-the-visibility-state
 urlPrefix: https://w3ctag.github.io/security-questionnaire/; spec: SECURITY-PRIVACY-QUESTIONNAIRE
   type: dfn
     text: same-origin policy violations; url: sop-violations
-urlPrefix: https://www.w3.org/TR/permissions/; spec: PERMISSIONS
-  type: dfn
-    text: permission name; url: enumdef-permissionname
-    text: permission state
-urlPrefix: https://w3c.github.io/webdriver/; spec: WebDriver
+urlPrefix: https://w3c.github.io/webdriver/; spec: WEBDRIVER2
   type: dfn
     text: current browsing context; url: dfn-current-browsing-context
-    text: WebDriver error; url: dfn-errors
     text: WebDriver error code; url: dfn-error-code
-    text: extension commands; url: dfn-extension-command
-    text: remote end steps; url: dfn-remote-end-steps
-    text: extension command URI template; url: dfn-extension-command-uri-template
-    text: invalid argument; url: dfn-invalid-argument
-    text: local end; url: dfn-local-end
+    text: local end; url: dfn-local-ends
     text: url variable; url: dfn-url-variables
-    text: session; url: dfn-session
-    text: success; url: dfn-success
-    text: handling errors
     text: Object; url: dfn-object
     text: no longer open; url: dfn-no-longer-open
     text: no such window; url: dfn-no-such-window
@@ -129,6 +89,7 @@ urlPrefix: https://w3c.github.io/proximity; spec: PROXIMITY
 spec: webidl; type:dfn; text:attribute
 spec: webidl; type:dfn; text:dictionary member
 spec: webidl; type:dfn; text:identifier
+spec: webdriver2; type:dfn; text:error
 </pre>
 
 <pre class=biblio>
@@ -481,8 +442,7 @@ payment service from within an iframe.
 <h4 id="visibility-state">Visibility State</h4>
 
 [=Sensor readings=] are only available for the [=active documents=] whose
-[=steps to determine the visibility state|visibility state=]
-is "visible".
+[=visibility state=] is "visible".
 
 <h4 id="permissions" oldids="permissioning">Permissions API</h4>
 
@@ -545,6 +505,20 @@ might also help mitigate certain threats,
 thus user agents should not provide
 unnecessarily verbose readouts of sensors data.
 
+Implementations of concrete sensors may define a [=threshold check algorithm=]
+so that new readings that do not differ enough from the [=latest readings=] are
+discarded.
+
+Implementations of concrete sensors may define a [=reading quantization
+algorithm=] to reduce the accuracy of the [=sensor readings=] received from a
+[=device sensor=].
+
+Note: these two mitigation measures often complement each other. An
+implementation that only executes the [=threshold check algorithm=] might
+expose readings that are too precise, while an implementation that only rounds
+readings up may provide attackers with information about more precise readings
+when raw readings are rounded to different values.
+
 Note: Inaccuracies will further increase for operations carried out on the
 [=sensor readings=], or time deltas calculated from the [=reading timestamp|timestamps=].
 So, this mitigation strategy can affect certain use cases.
@@ -590,7 +564,7 @@ A [=spatial sensor=] can be <dfn>uniaxial</dfn>, <dfn>biaxial</dfn>,
 or <dfn>triaxial</dfn>, depending on the number of orthogonal axes in
 which it can perform simultaneous measurements.
 
-Scalar physical quantities (i.e. temperature) do not require
+Scalar physical quantities (e.g. temperature) do not require
 a [=local coordinate system=] for resolution.
 
 The [=local coordinate system=] normally used in a mobile device is
@@ -744,19 +718,6 @@ define ways to uniquely identify each one.
     </pre>
 </div>
 
-## Reading change threshold ## {#concepts-reading-change-threshold}
-
-A [=platform sensor=] reports [=sensor readings|readings=] to the user agent considering
-the [=reading change threshold=].
-
-The <dfn>reading change threshold</dfn> refers to a value which indicates whether or
-not the changes in the [=device sensor=]'s measurements were significant enough to
-update the corresponding [=sensor readings=].
-
-The [=reading change threshold|threshold=] value depends on the surrounding software and hardware
-environment constraints, e.g., software power consumption optimizations or the underlying
-[=device sensor=]'s accuracy.
-
 ## Sampling Frequency and Reporting Frequency ## {#concepts-sampling-and-reporting-frequencies}
 
 For the purpose of this specification, <dfn>sampling frequency</dfn> for a [=platform sensor=] is
@@ -772,8 +733,12 @@ can support it.
 The [=sampling frequency=] differs from the [=requested sampling frequency=] in the following cases:
  - the [=requested sampling frequency=] exceeds upper or lower [=sampling frequency=] bounds
    supported by the underlying platform.
- - the [=reading change threshold|threshold=] value is significant so that some of the
-   [=device sensor=]'s measurements are skipped and the [=sensor readings=] are not updated.
+ - the operating system and/or the [=device sensor=] automatically discard
+   readings that do not differ enough (in absolute or relative terms) from the
+   previously reported ones via a hardware or operating system filter.
+ - the [=platform sensor=]'s associated [=sensor type=]'s [=threshold check
+   algorithm=] fails and the [=platform sensor=]'s [=latest readings=] are not
+   updated.
 
 The <dfn>reporting frequency</dfn> for a concrete {{Sensor}} object is defined as a frequency at which
 the "reading" event is [=fire an event|fired=] at this object.
@@ -784,22 +749,19 @@ never exceed the [=sampling frequency=] for the given [=sensor type=].
 
 ## Conditions to expose sensor readings ## {#concepts-can-expose-sensor-readings}
 
-The user agent must verify that all [=mandatory conditions=] are satisfied to ensure it
-<dfn>can expose sensor readings</dfn> to the {{Sensor}} objects of a certain
-[=sensor type|type=] that belong to a certain [=active document=].
+The user agent <dfn>can expose sensor readings</dfn> to a given |document| if and only if
+all of the following are true:
+ - |document|'s [=relevant settings object=] is a [=secure context=].
+ - |document|'s [=visibility state=] is "visible".
+ - The [=currently focused area=] belongs to a document whose origin is [=same
+   origin-domain=] with |document|'s origin.
+ - <dfn export>Specific conditions</dfn>: [=Extension specifications=] may add new
+   conditions to this list to have stricter requirements for their sensor types.
 
-The <dfn>mandatory conditions</dfn> are the following:
- - The given document is a [=responsible document=] of a [=secure context=].
- - For each [=permission name=] from the [=sensor type=]'s associated
-   [=sensor permission names=] [=ordered set|set=], the corresponding permission's
-   [=permission state|state=] is "granted".
- - [=document visibility state|Visibility state=] of the document is "visible".
- - The document is [=allowed to use=] all the [=policy-controlled features=] associated
-   with the given [=sensor type=].
- - [=Currently focused area=] belongs to a document whose origin is [=same origin-domain=]
-   with the origin of the given [=active document=].
- - <dfn>Specific conditions</dfn>: The [=extension specifications=] that add new
-   [=mandatory conditions|conditions=] hook into this specification at this point.
+Note: In addition to the conditions above, it is important to note that {{Sensor}}
+subclasses invoke the [=check sensor policy-controlled features=] operation in their
+constructors, and [[#sensor-start]] invokes [=request sensor access=]. Together, these
+checks correspond to the mitigation strategies described in [[#mitigation-strategies]].
 
 Note: In order to release hardware resources, the user agent can request underlying
 [=platform sensor=] to suspend notifications about newly available readings until it
@@ -817,16 +779,17 @@ A [=sensor type=] has a [=ordered set|set=] of <dfn export>associated sensors</d
 A [=sensor type=] may have a [=default sensor=].
 
 A [=sensor type=] has a [=set/is empty|nonempty=] [=ordered set|set=] of associated
-[=permission names=] referred to as <dfn export>sensor permission names</dfn>.
+[=powerful feature/names=] referred to as <dfn export>sensor permission names</dfn>.
 
-Note: multiple [=sensor types=] may share the same [=permission name=].
+Note: multiple [=sensor types=] may share the same [=powerful feature/name=].
 
 A [=sensor type=] has a [=permission revocation algorithm=].
 
 <div algorithm>
 
-    To invoke the <dfn lt="generic sensor permission revocation algorithm">permission revocation algorithm</dfn>
-    with {{PermissionName}} |permission_name|, run the following steps:
+    To invoke the <dfn local-lt="permission revocation algorithm" export>
+    generic sensor permission revocation algorithm</dfn>
+    with [=powerful feature/name=] |permission_name|, run the following steps:
 
     1.  For each |sensor_type| whose [=sensor permission names|permission names=] [=set/contains=] |permission_name|:
         1.  [=set/For each=] |sensor| in |sensor_type|'s [=ordered set|set=] of [=associated sensors=],
@@ -838,15 +801,27 @@ A [=sensor type=] has a [=permission request algorithm=].
 A [=sensor type=] has a [=set/is empty|nonempty=] [=ordered set|set=] of associated
 [=policy-controlled feature=] tokens referred to as <dfn export>sensor feature names</dfn>.
 
+A [=sensor type=] may have an associated <dfn export>threshold check
+algorithm</dfn>, which takes as arguments two separate [=sensor readings=] and
+determines if they differ enough to cause a [=platform sensor=]'s [=latest
+reading=] map to be updated.
+
+A [=sensor type=] may have an associated <dfn export>reading quantization
+algorithm</dfn>, which takes a [=sensor reading=] and returns a less accurate
+[=sensor reading=].
+
 <h3 id="model-sensor">Sensor</h3>
 
-The current [=browsing context=]'s [=platform sensor=] has an associated [=ordered set|set=]
-of <dfn>activated sensor objects</dfn>, which is initially [=set/is empty|empty=] and an
-associated <dfn>latest reading</dfn> [=ordered map|map=], which holds the latest available [=sensor readings=].
+The current [=browsing context=]'s [=platform sensor=] must have:
+- An associated [=ordered set|set=] of <dfn>activated sensor objects</dfn>,
+  which is initially [=set/is empty|empty=];
+- An associated <dfn>latest reading</dfn> [=ordered map|map=], which holds the
+  latest available [=sensor readings=].
+- An associated [=sensor type=].
 
 Note: User agents can share the [=latest reading=] [=ordered map|map=] and
 the [=activated sensor objects=] [=ordered set|set=] between different
-[=browsing context|contexts=] only if the [=origins=] of these contexts' [=active documents=]
+[=browsing context|contexts=] only if the [=/origins=] of these contexts' [=active documents=]
 are [=same origin-domain=].
 
 Any time a new [=sensor reading=] for a [=platform sensor=] is obtained and if the user agent
@@ -886,10 +861,10 @@ or being granted permission to access the [=platform sensor=]. -->
 
 A [=platform sensor=] has an associated [=requested sampling frequency=] which is initially null.
 
-For a non[=set/is empty|empty=] [=ordered set|set=] of [=activated sensor objects=] the
-[=requested sampling frequency=] is equal to <dfn>optimal sampling frequency</dfn>, which is estimated
-by the user agent taking into account {{[[frequency]]|provided frequencies}}
-of [=activated sensor objects|activated=] {{Sensor|Sensors}} and [=sampling frequency=] bounds
+For a non-[=set/is empty|empty=] [=ordered set|set=] of [=activated sensor objects=] the
+[=requested sampling frequency=] is equal to the <dfn>optimal sampling frequency</dfn>, which is estimated
+by the user agent by taking into account the {{[[frequency]]|provided frequencies}}
+of [=activated sensor objects|activated=] {{Sensor|Sensors}} and the [=sampling frequency=] bounds
 defined by the underlying platform.
 
 Note: For example, the user agent may estimate [=optimal sampling frequency=] as a Least Common
@@ -911,7 +886,7 @@ The {{Sensor}} object in "idle" [[#sensor-lifecycle|state]] is not among the [=p
 In this example there is a [=platform sensor=] instance per [=browsing context=].
 
 The [=latest reading=] [=ordered map|map=] is shared between {{Sensor}} objects from the
-same [=browsing context|context=] and is updated at rate equal to [=requested sampling frequency=]
+same [=browsing context|context=] and is updated at a rate equal to the [=requested sampling frequency=]
 of the corresponding [=platform sensor=].
 
 </div>
@@ -990,6 +965,17 @@ The [=task source=] for the [=tasks=] mentioned in this specification is the <df
     }
 </style>
 <svg xmlns="http://www.w3.org/2000/svg" height="79pt" viewBox="0.00 0.00 351.00 78.51" width="351pt">
+    <style>
+        @media (prefers-color-scheme: dark) {
+            path,
+            polygon {
+                filter: invert(1);
+            }
+            text {
+                fill: #fff;
+            }
+        }
+    </style>
     <g class="graph" transform="scale(1 1) rotate(0) translate(4 74.5122)">
         <title>Sensor lifecycle</title>
         <a xlink:href="#dom-sensor-state-slot">
@@ -1123,9 +1109,9 @@ with the internal slots described in the following table:
 
 <div algorithm="is sensor activated">
 
-    The getter of the {{Sensor/activated!!attribute}} attribute must run these steps:
+    The {{Sensor/activated!!attribute}} getter steps are:
 
-    1.  If <strong>this</strong>.{{[[state]]}} is "activated",
+    1.  If [=this=].{{[[state]]}} is "activated",
         return true.
     1.  Otherwise, return false.
 </div>
@@ -1134,32 +1120,39 @@ with the internal slots described in the following table:
 
 <div algorithm="sensor has reading">
 
-    The getter of the {{Sensor/hasReading!!attribute}} attribute must run these steps:
+    The {{Sensor/hasReading!!attribute}} getter steps are:
 
-    1. Let |timestamp| be the result of invoking [=get value from latest reading=] with <strong>this</strong> and "timestamp" as arguments.
+    1. Let |timestamp| be the result of invoking [=get value from latest reading=] with [=this=] and "timestamp" as arguments.
     1.  If |timestamp| is not null, return true.
     1.  Otherwise, return false.
 </div>
 
 ### Sensor.timestamp ### {#sensor-timestamp}
 
-The getter of the {{Sensor/timestamp!!attribute}} attribute returns
-the result of invoking [=get value from latest reading=] with <strong>this</strong>
-and "timestamp" as arguments. It represents a [=reading timestamp=].
+The {{Sensor/timestamp!!attribute}} getter steps are to return
+the result of invoking [=get value from latest reading=] with [=this=]
+and "timestamp" as arguments.
 
+It represents a [=reading timestamp=].
 
 ### Sensor.start() ### {#sensor-start}
 
 <div algorithm="to start a sensor">
 
-    The {{Sensor/start()}} method must run these steps:
+    The {{Sensor/start()}} method steps are:
 
-    1.  Let |sensor_state| be the value of |sensor_instance|.{{[[state]]}}.
-    1.  If |sensor_state| is either "activating"
-        or "activated", then return.
-    1.  Set |sensor_instance|.{{[[state]]}} to "activating".
+    1.  If [=this=].{{[[state]]}} is either "activating" or "activated", then
+        return.
+    1.  Set [=this=].{{[[state]]}} to "activating".
     1.  Run these sub-steps [=in parallel=]:
-        1.  let |connected| be the result of invoking [=connect to sensor=] with |sensor_instance|
+        1.  Let |permissionState| be the result of invoking
+            [=request sensor access=] with [=this=] as argument.
+        1.  If |permissionState| is "denied", then:
+            1.  Let |e| be the result of [=created|creating=]
+                a "{{NotAllowedError!!exception}}" {{DOMException}}.
+            1.  Queue a task to run [=notify error=] with [=this=] and |e| as arguments.
+            1.  Return.
+        1.  Let |connected| be the result of invoking [=connect to sensor=] with [=this=]
             as argument.
         1.  If |connected| is false, then
             1.  Let |e| be the result of [=created|creating=] a
@@ -1174,16 +1167,9 @@ and "timestamp" as arguments. It represents a [=reading timestamp=].
                 correctly diagnosing the reason for the rejection
                 and might lead to confusing instructions to the user,
                 but it is a tradeoff some User Agent might choose to make. -->
-            1.  Queue a task to run [=notify error=] with |e| and |sensor_instance| as arguments.
+            1.  Queue a task to run [=notify error=] with [=this=] and |e| as arguments.
             1.  Return.
-        1.  Let |permission_state| be the result of invoking
-            [=request sensor access=] with |sensor_instance| as argument.
-        1.  If |permission_state| is "granted",
-            1.  Invoke [=activate a sensor object=] with |sensor_instance| as argument.
-        1.  Otherwise, if |permission_state| is "denied",
-            1.  let |e| be the result of [=created|creating=]
-                a "{{NotAllowedError!!exception}}" {{DOMException}}.
-            1.  Queue a task to run [=notify error=] with |e| and |sensor_instance| as arguments.
+        1.  Invoke [=activate a sensor object=] with [=this=] as argument.
 </div>
 
 
@@ -1191,12 +1177,12 @@ and "timestamp" as arguments. It represents a [=reading timestamp=].
 
 <div algorithm="to stop a sensor">
 
-    The {{Sensor/stop()}} method must run these steps:
+    The {{Sensor/stop()}} method steps are:
 
-    1.  If |sensor_instance|.{{[[state]]}} is "idle", then return.
-    1.  Set |sensor_instance|.{{[[state]]}} to "idle".
+    1.  If [=this=].{{[[state]]}} is "idle", then return.
+    1.  Set [=this=].{{[[state]]}} to "idle".
     1.  Run these sub-steps [=in parallel=]:
-        1.  Invoke [=deactivate a sensor object=] with |sensor_instance| as argument.
+        1.  Invoke [=deactivate a sensor object=] with [=this=] as argument.
 </div>
 
 
@@ -1209,7 +1195,7 @@ to notify that new [=sensor reading|reading=] is available.
 ### Sensor.onactivate ### {#sensor-onactivate}
 
 {{Sensor/onactivate}} is an {{EventHandler}} which is called when
-<strong>this</strong>.{{[[state]]}} transitions from "activating" to "activated".
+[=this=].{{[[state]]}} transitions from "activating" to "activated".
 
 
 ### Sensor.onerror ### {#sensor-onerror}
@@ -1260,10 +1246,12 @@ dictionary SensorErrorEventInit : EventInit {
 };
 </pre>
 
+{{SensorErrorEvent}} instances are constructed by following the steps described
+in {{Event}}'s <a for="Event">constructor</a>.
 
-### SensorErrorEvent.error ### {#sensor-error-event-error}
-
-Gets the {{DOMException}} object passed to {{SensorErrorEventInit}}.
+The <dfn attribute for="SensorErrorEvent">error</dfn> attribute must return the
+value it was initialized to. It represents the {{DOMException}} object passed
+to {{SensorErrorEventInit}}.
 
 <h2 id="abstract-operations">Abstract Operations</h2>
 
@@ -1273,17 +1261,17 @@ Gets the {{DOMException}} object passed to {{SensorErrorEventInit}}.
 
     : input
     :: |sensor_instance|, a {{Sensor}} object.
-    :: |options|, a [=dictionary=] object.
+    :: |options|, a {{SensorOptions}} dictionary instance.
     : output
     :: None
 
     1.  [=map/For each=] |key| → <var ignore>value</var> of |options|
         1.  If the associated [=supported sensor options=] [=set/contains|does not contain=] |key|
             1. [=Throw=] "{{NotSupportedError!!exception}}" {{DOMException}}.
-    1.  If |options|.{{frequency!!dict-member}} is [=present=], then
-        1.  Set |sensor_instance|.{{[[frequency]]}} to |options|.{{frequency!!dict-member}}.
+    1.  If |options|["{{frequency!!dict-member}}"] [=map/exists=], then
+        1.  Set |sensor_instance|.{{[[frequency]]}} to |options|["{{frequency!!dict-member}}"].
 
-        Note: there is not guarantee that the requested |options|.{{frequency!!dict-member}}
+        Note: there is not guarantee that the requested |options|["{{frequency!!dict-member}}"]
         can be respected. The actual [=sampling frequency=] can be calculated using
         {{Sensor}} {{Sensor/timestamp!!attribute}} attributes.
 </div>
@@ -1331,8 +1319,7 @@ Gets the {{DOMException}} object passed to {{SensorErrorEventInit}}.
     1.  Return false.
 </div>
 
-
-<h3 dfn>Activate a sensor object</h3>
+<h3 dfn export>Activate a sensor object</h3>
 
 <div algorithm="activate a sensor object">
 
@@ -1348,8 +1335,7 @@ Gets the {{DOMException}} object passed to {{SensorErrorEventInit}}.
         as an argument.
 </div>
 
-
-<h3 dfn>Deactivate a sensor object</h3>
+<h3 dfn export>Deactivate a sensor object</h3>
 
 <div algorithm="deactivate a sensor object">
 
@@ -1368,7 +1354,7 @@ Gets the {{DOMException}} object passed to {{SensorErrorEventInit}}.
         1.  Set |sensor_instance|.{{[[lastEventFiredAt]]}} to null.
 </div>
 
-<h3 dfn>Revoke sensor permission</h3>
+<h3 dfn export>Revoke sensor permission</h3>
 
 <div algorithm="revoke sensor permission">
 
@@ -1382,11 +1368,10 @@ Gets the {{DOMException}} object passed to {{SensorErrorEventInit}}.
         1.  Invoke [=deactivate a sensor object=] with |s| as argument.
         1.  Let |e| be the result of [=created|creating=]
             a "{{NotAllowedError!!exception}}" {{DOMException}}.
-        1.  Queue a task to run [=notify error=] with |e| and |s| as arguments.
+        1.  Queue a task to run [=notify error=] with |s| and |e| as arguments.
 </div>
 
-
-<h3 dfn>Set sensor settings</h3>
+<h3 dfn export>Set sensor settings</h3>
 
 <div algorithm="set sensor settings">
 
@@ -1405,7 +1390,7 @@ Gets the {{DOMException}} object passed to {{SensorErrorEventInit}}.
     1.  Set [=requested sampling frequency=] to [=optimal sampling frequency=].
 </div>
 
-<h3 dfn>Update latest reading</h3>
+<h3 dfn export>Update latest reading</h3>
 
 <div algorithm="update latest reading">
 
@@ -1415,6 +1400,11 @@ Gets the {{DOMException}} object passed to {{SensorErrorEventInit}}.
     : output
     :: None
 
+    1.  Let |type| be |sensor|'s associated [=sensor type=].
+    1.  If |type|'s [=threshold check algorithm=] is defined, then:
+        1.  Let |result| be the result of invoking |type|'s [=threshold check algorithm=]
+            with |reading| and |latest reading|.
+        1.  If |result| is false, then abort these steps.
     1.  [=map/For each=] |key| → <var ignore>value</var> of [=latest reading=].
         1.  [=map/Set=] [=latest reading=][|key|] to the corresponding
             value of |reading|.
@@ -1425,7 +1415,7 @@ Gets the {{DOMException}} object passed to {{SensorErrorEventInit}}.
             1.  Invoke [=report latest reading updated=] with |s| as an argument.
 </div>
 
-<h3 dfn>Find the reporting frequency of a sensor object</h3>
+<h3 dfn export>Find the reporting frequency of a sensor object</h3>
 
 <div algorithm="find the reporting frequency of a sensor object">
 
@@ -1444,8 +1434,7 @@ Gets the {{DOMException}} object passed to {{SensorErrorEventInit}}.
     1. return |frequency|.
 </div>
 
-
-<h3 dfn>Report latest reading updated</h3>
+<h3 dfn export>Report latest reading updated</h3>
 
 <div algorithm="report latest reading updated">
 
@@ -1476,7 +1465,7 @@ Gets the {{DOMException}} object passed to {{SensorErrorEventInit}}.
         1.  Queue a task to run [=notify new reading=] with |sensor_instance| as an argument.
 </div>
 
-<h3 dfn>Notify new reading</h3>
+<h3 dfn export>Notify new reading</h3>
 
 <div algorithm="notify new reading">
 
@@ -1490,7 +1479,7 @@ Gets the {{DOMException}} object passed to {{SensorErrorEventInit}}.
     1.  [=Fire an event=] named "reading" at |sensor_instance|.
 </div>
 
-<h3 dfn>Notify activated state</h3>
+<h3 dfn export>Notify activated state</h3>
 
 <div algorithm="notify activated state">
 
@@ -1507,8 +1496,7 @@ Gets the {{DOMException}} object passed to {{SensorErrorEventInit}}.
             as an argument.
 </div>
 
-
-<h3 dfn>Notify error</h3>
+<h3 dfn export>Notify error</h3>
 
 <div algorithm="notify error">
 
@@ -1523,8 +1511,7 @@ Gets the {{DOMException}} object passed to {{SensorErrorEventInit}}.
         with its {{SensorErrorEvent/error!!attribute}} attribute initialized to |error|.
 </div>
 
-
-<h3 dfn>Get value from latest reading</h3>
+<h3 dfn export>Get value from latest reading</h3>
 
 <div algorithm="get value from latest reading">
 
@@ -1536,6 +1523,9 @@ Gets the {{DOMException}} object passed to {{SensorErrorEventInit}}.
 
     1.  If |sensor_instance|.{{[[state]]}} is "activated",
         1.  Let |readings| be the [=latest reading=] of |sensor_instance|'s related [=platform sensor=].
+        1.  Let |type| be |sensor_instance|'s associated [=platform sensor=]'s associated [=sensor type=].
+        1.  If |type|'s [=reading quantization algorithm=] is defined, then:
+            1.  Set |readings| to the result of invoking |type|'s [=reading quantization algorithm=] with |readings|.
         1.  If the [=extension specification=] defines a [=local coordinate system=] for |sensor_instance|,
             1. Remap (see [[COORDINATES-TRANSFORMATION]]) |readings| values to the
                [=local coordinate system=].
@@ -1543,8 +1533,7 @@ Gets the {{DOMException}} object passed to {{SensorErrorEventInit}}.
     1.  Otherwise, return null.
 </div>
 
-
-<h3 dfn>Request sensor access</h3>
+<h3 dfn export>Request sensor access</h3>
 
 <div algorithm="request sensor access">
 
@@ -1556,12 +1545,11 @@ Gets the {{DOMException}} object passed to {{SensorErrorEventInit}}.
     1.  Let |sensor| be the [=platform sensor=] associated with |sensor_instance|.
     1.  Let |sensor_permissions| be |sensor|'s associated [=ordered set|set=] of
         [=sensor permission names|permission names=].
-    1.  Run these sub-steps [=in parallel=]:
-        1.  [=set/For each=] |permission_name| in |sensor_permissions|,
-            1.  Let |state| be the result of [=request permission to use|requesting permission to use=] |permission_name|.
-            1.  If |state| is "denied"
-                1.  Return "denied".
-        1.  Otherwise, return "granted".
+    1.  [=set/For each=] |permission_name| in |sensor_permissions|,
+        1.  Let |state| be the result of [=request permission to use|requesting permission to use=] |permission_name|.
+        1.  If |state| is "denied"
+            1.  Return "denied".
+    1.  Return "granted".
 </div>
 
 <h2 id="automation">Automation</h2>
@@ -1569,7 +1557,7 @@ Gets the {{DOMException}} object passed to {{SensorErrorEventInit}}.
 The Generic Sensor API and its [=extension specifications=] pose a challenge
 to test authors, as fully exercising those interfaces requires physical hardware
 devices that respond in predictable ways. To address this challenge this document
-defines a number of [=extension commands=] to the [[WebDriver]] specification
+defines a number of [=extension commands=] to the [[WEBDRIVER2]] specification
 for controlling [=mock sensor=] on the host that the user agent is running on.
 With these [=extension commands=], devices with particular properties can be created
 and their responses to requests are well defined.
@@ -1751,22 +1739,20 @@ Each [=mock sensor type=] has a [=mock sensor reading values=] dictionary:
 
     The [=remote end steps=] are:
     1.  Let |configuration| be the |configuration| parameter, [=converted to an IDL value=]
-        of type {{MockSensorConfiguration}}. If this throws an exception, return a
-        [=WebDriver error=] with [=WebDriver error code=] [=invalid argument=].
+        of type {{MockSensorConfiguration}}. If this throws an exception, return an
+        [=invalid argument=] [=error=].
     1.  Let |type| be the |configuration|.{{MockSensorConfiguration/mockSensorType}}. If the [=current browsing context=]
-        already has this |type| of [=mock sensor=], return a [=WebDriver error=] with [=WebDriver error code=]
-        [=mock sensor already created=].
-    1.  If the [=current browsing context=] is [=no longer open=], return a [=WebDriver error=] with
-        [=WebDriver error code=] [=no such window=].
-    1.  [=Handle any user prompts=], and return its value if it is a [=WebDriver error=].
+        already has this |type| of [=mock sensor=], return a [=mock sensor already created=] [=error=].
+    1.  If the [=current browsing context=] is [=no longer open=], return a [=no such window=] [=error=].
+    1.  [=Handle any user prompts=], and return its value if it is an [=error=].
     1.  Run these sub-steps [=in parallel=] to create a [=mock sensor=] in the [=current browsing context=]:
         1.  Let |mock| be a new [=mock sensor=].
         1.  Set |mock|'s [=mock sensor type=] to |type|.
         1.  Let |connected| be the |configuration|.{{MockSensorConfiguration/connected}}, set |mock|'s associated
             [=connection flag=] to |connected|.
-        1.  If |configuration|.{{MockSensorConfiguration/maxSamplingFrequency}} is [=present=], then:
+        1.  If |configuration|.{{MockSensorConfiguration/maxSamplingFrequency}} [=map/exists=], then:
             1.  Set |mock|'s maximum supported sampling frequency to |configuration|.{{MockSensorConfiguration/maxSamplingFrequency}}.
-        1.  If |configuration|.{{MockSensorConfiguration/minSamplingFrequency}} is [=present=], then:
+        1.  If |configuration|.{{MockSensorConfiguration/minSamplingFrequency}} [=map/exists=], then:
             1.  Set |mock|'s minimum supported sampling frequency to |configuration|.{{MockSensorConfiguration/minSamplingFrequency}}.
         1.  Let |sensor_instance| be a |type| of {{Sensor}} object, set |sensor_instance|'s associated [=platform sensor=] to |mock|.
     1.  Return [=success=] with data `null`.
@@ -1783,7 +1769,7 @@ Each [=mock sensor type=] has a [=mock sensor reading values=] dictionary:
   }
   </pre>
   Be aware that only one [=mock sensor=] of a given [=mock sensor type=] can be created in [=current browsing context=],
-  otherwise a [=WebDriver error=] with [=WebDriver error code=] [=mock sensor already created=] will be thrown.
+  otherwise a [=mock sensor already created=] [=error=] will be thrown.
 </div>
 
 ### Get mock sensor ### {#get-mock-sensor-command}
@@ -1808,13 +1794,11 @@ Each [=mock sensor type=] has a [=mock sensor reading values=] dictionary:
 
     The [=remote end steps=] are:
     1.  Let |type| be a [=url variable=], [=converted to an IDL value=] of type {{MockSensorType}}.
-        If this throws an exception, return a [=WebDriver error=] with [=WebDriver error code=]
-        [=invalid argument=].
-    1.  If the [=current browsing context=] is [=no longer open=], return a [=WebDriver error=] with
-        [=WebDriver error code=] [=no such window=].
-    1.  [=Handle any user prompts=], and return its value if it is a [=WebDriver error=].
+        If this throws an exception, return an [=invalid argument=] [=error=].
+    1.  If the [=current browsing context=] is [=no longer open=], return a [=no such window=] [=error=].
+    1.  [=Handle any user prompts=], and return its value if it is an [=error=].
     1.  If |type| does not match a [=mock sensor type=] amongst all associated [=mock sensors=] of the
-        [=current browsing context=], return a [=WebDriver error=] with [=WebDriver error code=] [=no such mock sensor=].
+        [=current browsing context=], return a [=no such mock sensor=] [=error=].
     1.  Return [=success=] with the [=serialized mock sensor=] as data.
 </div>
 
@@ -1840,16 +1824,14 @@ Each [=mock sensor type=] has a [=mock sensor reading values=] dictionary:
 
     The [=remote end steps=] are:
     1.  Let |type| be a [=url variable=], [=converted to an IDL value=] of type {{MockSensorType}}.
-        If this throws an exception, return a [=WebDriver error=] with [=WebDriver error code=]
-        [=invalid argument=].
-    1.  If the [=current browsing context=] is [=no longer open=], return a [=WebDriver error=] with
-        [=WebDriver error code=] [=no such window=].
-    1.  [=Handle any user prompts=], and return its value if it is a [=WebDriver error=].
+        If this throws an exception, return an [=invalid argument=] [=error=].
+    1.  If the [=current browsing context=] is [=no longer open=], return a [=no such window=] [=error=].
+    1.  [=Handle any user prompts=], and return its value if it is an [=error=].
     1.  If |type| does not match a [=mock sensor type=] amongst all associated [=mock sensors=] of the
-        [=current browsing context=], return a [=WebDriver error=] with [=WebDriver error code=] [=no such mock sensor=].
+        [=current browsing context=], return a [=no such mock sensor=] [=error=].
     1.  Let |reading| be the |reading| argument, [=converted to an IDL value=] of the |type|'s
-        associated {{MockSensorReadingValues}}. If this throws an exception, return a
-        [=WebDriver error=] with [=WebDriver error code=] [=invalid argument=].
+        associated {{MockSensorReadingValues}}. If this throws an exception, return an
+        [=invalid argument=] [=error=].
     1.  [=map/For each=] |key| → <var ignore>value</var> of |reading|.
         1.  [=map/Set=] [=mock sensor reading=][|key|] to the corresponding value of |reading|.
     1.  Return [=success=] with data `null`.
@@ -1877,20 +1859,18 @@ Each [=mock sensor type=] has a [=mock sensor reading values=] dictionary:
 
     The [=remote end steps=] are:
     1.  Let |type| be a [=url variable=].
-    1.  If {{MockSensorType}} [=set/contains|does not contain=] |type|, return a [=WebDriver error=] with
-        [=WebDriver error code=] [=invalid argument=].
-    1.  If the [=current browsing context=] is [=no longer open=], return a [=WebDriver error=] with
-        [=WebDriver error code=] [=no such window=].
-    1.  [=Handle any user prompts=], and return its value if it is a [=WebDriver error=].
+    1.  If {{MockSensorType}} [=set/contains|does not contain=] |type|, return an [=invalid argument=] [=error=].
+    1.  If the [=current browsing context=] is [=no longer open=], return a [=no such window=] [=error=].
+    1.  [=Handle any user prompts=], and return its value if it is an [=error=].
     1.  If |type| does not match a [=mock sensor type=] amongst all associated [=mock sensors=] of the
-        [=current browsing context=], return a [=WebDriver error=] with [=WebDriver error code=] [=no such mock sensor=].
+        [=current browsing context=], return a [=no such mock sensor=] [=error=].
     1.  Delete |type| of [=mock sensor=] in [=current browsing context=].
     1.  Return [=success=] with data `null`.
 </div>
 
 <h3 id="extension-handling-errors">Handling errors</h3>
 
-This section extends the [=Handling Errors=] and defines extended [=WebDriver error codes=]
+This section extends the [[WEBDRIVER2#errors]] section and defines extended [=WebDriver error codes=]
 specific for [=mock sensor=] in following table.
 
 <table id="mock-sensor-error-code" class="def">
@@ -2065,8 +2045,8 @@ each [=sensor type=] in [=extension specifications=]:
     [=get value from latest reading=] with <strong>this</strong> and
     [=attribute=] [=identifier=] as arguments.
 
--   A [=permission name=], if the [=sensor type=] is not representing
-    [=sensor fusion=] (otherwise, [=permission names=]
+-   A [=powerful feature/name=], if the [=sensor type=] is not representing
+    [=sensor fusion=] (otherwise, [=powerful feature/names=]
     associated with the fusion source [=sensor types=] must be used).
 
 An [=extension specification=] may specify the following definitions
@@ -2093,8 +2073,8 @@ In order to enable user-agent automation and application testing,
 <h3 id="permission-api">Extending the Permission API</h3>
 
 An implementation of the {{Sensor}} interface for each [=sensor type=] must protect its
-[=sensor reading|reading=] by associated [=permission name=] or {{PermissionDescriptor}}.
-A [=Low-level=] {{Sensor|sensor}} may use its interface name as a [=permission name=],
+[=sensor reading|reading=] by associated [=powerful feature/name=] or {{PermissionDescriptor}}.
+A [=low-level=] {{Sensor|sensor}} may use its interface name as a [=powerful feature/name=],
 for instance, "gyroscope" or "accelerometer". [=sensor fusion|Fusion sensors=] must
 [=request permission to use|request permission to access=] each of the sensors that are
 used as a source of fusion.
@@ -2111,7 +2091,7 @@ it does not need to [=request permission to use|request permission to use=] magn
 for accuracy or [=sampling frequency=]. An example for a possible extension of the Permission API
 for accelerometer sensor is given below.
 
-<pre class=example>
+<pre class="example" highlight="idl">
     dictionary AccelerometerPermissionDescriptor : PermissionDescriptor {
         boolean highAccuracy = false;
         boolean highFrequency = false;
@@ -2125,16 +2105,16 @@ An implementation of the {{Sensor}} interface for each [=sensor type=] has one
 that control whether or not this implementation can be used in a document.
 
 The [=policy-controlled feature|features=]' [=default allowlist=] is
-<code>["self"]</code>.
+`'self'`.
 
-Note: The [=default allowlist=] of <code>["self"]</code> allows {{Sensor}} interface
+Note: The [=default allowlist=] of `'self'` allows {{Sensor}} interface
 implementation usage in same-origin nested frames but prevents third-party content
 from [=sensor readings=] access.
 
 The [=sensor feature names=] [=ordered set|set=] must contain [=policy-controlled feature=]
 tokens of every associated [=policy-controlled feature|feature=].
 
-A [=Low-level=] {{Sensor|sensor}} may use its interface name as a [=policy-controlled feature=] token,
+A [=low-level=] {{Sensor|sensor}} may use its interface name as a [=policy-controlled feature=] token,
 for instance, "gyroscope" or "accelerometer". Unless the [=extension specification=] defines
 otherwise, the [=sensor feature names=] matches the same [=sensor type|type=]-associated
 [=sensor permission names=].
@@ -2172,7 +2152,7 @@ that are required by the absolute orientation sensor.
 Here's an example WebIDL for a possible extension of this specification
 for proximity [=device sensor|sensors=].
 
-<pre class=example>
+<pre class="example" highlight="idl">
     [SecureContext, Exposed=Window]
     interface ProximitySensor : Sensor {
         constructor(optional ProximitySensorOptions proximitySensorOptions = {});

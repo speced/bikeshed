@@ -349,23 +349,33 @@ spec: SHA2; urlPrefix: http://csrc.nist.gov/publications/fips/fips180-4/fips-180
 
   ### Parse |metadata| ### {#parse-metadata}
 
-  This algorithm accepts a string, and returns either `no metadata`, or a set of
-  valid hash expressions whose hash functions are understood by
-  the user agent.
+  This algorithm accepts a string, and returns a set of hash expressions whose
+  hash functions are understood by the user agent.
 
   1.  Let |result| be the empty set.
-  2.  Let |empty| be equal to `true`.
-  3.  For each |token| returned by <a lt="strictly split">splitting |metadata| on
-      spaces</a>:
-      1.  Set |empty| to `false`.
-      2.  Parse |token| as a <a grammar>hash-with-options</a>.
-      3.  If |token| does not parse, [=continue=] to the next token.
-      4.  Let |algorithm| be the <a grammar>hash-algo</a> component of
-          |token|.
-      5.  If |algorithm| is a hash function recognized by the user
-          agent, add the parsed |token| to |result|.
-  4.  Return `no metadata` if |empty| is `true`, otherwise return
-      |result|.
+  2.  For each |item| returned by <a lt="strictly split">splitting</a>
+      |metadata| on spaces:
+      1.  Let |hash-with-opt-token-list| be the result of
+          <a lt="strictly split">splitting</a> |item| on U+003F (?).
+      2.  Let |hash-expression| be |hash-with-opt-token-list|[0].
+      3.  Let |base64-value| be the empty string.
+      4.  Let |hash-expr-token-list| be the result of
+          <a lt="strictly split">splitting</a> |hash-expression| on U+002D (-).
+      5.  Let |algorithm| be |hash-expr-token-list|[0].
+      6.  If |hash-expr-token-list|[1] <a for=list>exists</a>, set
+          |base64-value| to |hash-expr-token-list|[1].
+      7.  If |algorithm| is not a hash function recognized by the user agent,
+           [=continue=].
+      8. Let |metadata| be the ordered map  «["alg" → |algorithm|,
+         "val" → |base64-value|]».
+
+         Note: Since no `options` are defined (see the
+         [[#integrity-metadata-description]]), a corresponding entry is not set
+         in |metadata|. If `options` are defined in a future version,
+         |hash-with-opt-token-list|[1] can be utilized as `options`.
+
+      9. <a for=list>Append</a> |metadata| to |result|.
+  3.  Return |result|.
 
   ### Get the strongest metadata from |set| ### {#get-the-strongest-metadata}
 
@@ -390,21 +400,18 @@ spec: SHA2; urlPrefix: http://csrc.nist.gov/publications/fips/fips180-4/fips-180
 
   1.  Let |parsedMetadata| be the result of
       <a href="#parse-metadata">parsing |metadataList|</a>.
-  2.  If |parsedMetadata| is `no metadata`, return `true`.
-  3.  If |parsedMetadata| is the empty set, return `true`.
-  4.  Let |metadata| be the result of <a href="#get-the-strongest-metadata">
+  2.  If |parsedMetadata| [=set/is empty=] set, return `true`.
+  3.  Let |metadata| be the result of <a href="#get-the-strongest-metadata">
       getting the strongest metadata from |parsedMetadata|</a>.
-  5.  For each |item| in |metadata|:
-      1.  Let |algorithm| be the |alg| component of
-          |item|.
-      2.  Let |expectedValue| be the |val| component of
-          |item|.
+  4.  For each |item| in |metadata|:
+      1.  Let |algorithm| be the |item|["alg"].
+      2.  Let |expectedValue| be the |item|["val"].
       3.  Let |actualValue| be the result of <a
           href="#apply-algorithm-to-response">applying |algorithm| to |bytes|
           </a>.
       4.  If |actualValue| is a case-sensitive match for
           |expectedValue|, return `true`.
-  7.  Return `false`.
+  5.  Return `false`.
 
   This algorithm allows the user agent to accept multiple, valid strong hash
   functions. For example, a developer might write a `script` element such as:

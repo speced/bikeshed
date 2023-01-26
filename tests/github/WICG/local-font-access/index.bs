@@ -6,11 +6,11 @@ Status: CG-DRAFT
 Group: WICG
 ED: https://wicg.github.io/local-font-access/
 Repository: WICG/local-font-access
-Abstract: This specification documents web browser support for allowing users to grant web sites access to the full set of available system fonts for enumeration, and access to the raw table data of fonts, allowing for more detailed custom text rendering.
-Editor: Alex Russell, Google Inc. https://google.com, slightlyoff@google.com
-Editor: Joshua Bell, Google Inc. https://google.com, jsbell@google.com
-Editor: Olivier Yiptong, Google Inc. https://google.com, oyiptong@google.com
+Abstract: This specification documents web browser support for allowing users to grant web sites access to the full set of available system fonts for enumeration, and access to the raw data of fonts, allowing for more detailed custom text rendering.
+Editor: Joshua Bell, Google Inc. https://google.com, jsbell@google.com, w3cid 61302
 Former Editor: Emil A. Eklund
+Former Editor: Alex Russell
+Former Editor: Olivier Yiptong
 Assume Explicit For: yes
 Markup Shorthands: markdown yes, css yes
 Complain About: accidental-2119 yes, missing-example-ids yes
@@ -19,21 +19,13 @@ Test Suite: https://github.com/web-platform-tests/wpt/tree/master/font-access
 </pre>
 
 <pre class=anchors>
-spec: webidl; urlPrefix: https://heycam.github.io/webidl/
-    type: dfn
-        text: asynchronous iterator initialization steps; url: #TBD
-        text: get the next iteration result; url: #TBD
-spec: ECMA-262; urlPrefix: https://tc39.github.io/ecma262/
-    type: interface; for: ECMAScript
-        text: Map; url: sec-map-objects
-    type: dfn
-        text: ecma-record; url: #sec-list-and-record-specification-type
+spec: html; urlPrefix: https://html.spec.whatwg.org/multipage/
+    urlPrefix: system-state.html
+        type: dfn
+            text: a plausible language; url: a-plausible-language
 </pre>
 
 <style>
-/* Default ED/WD stylesheets set "both"; not needed for logo floated right */
-div.head h1 { clear: left; }
-
 .domintro::before {
     content: 'For web developers (non-normative)';
     text-transform: initial;
@@ -53,33 +45,42 @@ div.head h1 { clear: left; }
 </style>
 
 
-<img src="logo-font-enumeration.svg" alt="logo"
-    style="height: 100px; width: 100px; position: absolute; right: 20px; top: 30px;">
+<img id="speclogo" src="logo-font-enumeration.svg" alt="logo" width="100" height="100">
+<style>
+#speclogo { height: 100px; width: 100px; background-color: transparent; }
+main #speclogo { position: absolute; right: 20px; top: 30px; }
+.logo #speclogo { margin-top: 20px; }
+</style>
+<script>
+(function() {
+  const logo = document.querySelector('.logo');
+  if (logo) logo.appendChild(document.querySelector('#speclogo'));
+})();
+</script>
 
 <!-- ============================================================ -->
 # Introduction # {#introduction}
 <!-- ============================================================ -->
 
-This specification describes a font enumeration API for web browsers which may, optionally, allow users to grant access to the full set of available system fonts. For each font, low-level (byte-oriented) access to an SFNT [[!SFNT]] container that includes full font data.
+This specification describes a font enumeration API for web browsers which may, optionally, allow users to grant access to the full set of available system fonts. For each font, low-level (byte-oriented) access to an SFNT [[!SFNT]] container or the equivalent provides full font data.
 
 Web developers historically lack anything more than heuristic information about which local fonts are available for use in styling page content. Web developers often include complex lists of `font-family` values in their CSS to control font fallback in a heuristic way. Generating good fallbacks is such a complex task for designers that tools have been built to help "eyeball" likely-available local matches.
 
-Font enumeration helps by enabling:
+Font enumeration helps:
 
-* Logging of likely-available fonts to improve server-side font rule generation.
-* Scripts to generate style rules based on "similar" local fonts, perhaps saving a download.
-* Improving styling options for user-generated content, allowing the generation of style rules via more expressive font selection menus.
+* Improving styling options for user-generated content.
+* Matching fonts declared by existing content.
 
 While the web has its origins as a text-focused medium and user agents provide very high quality typography support, they have limitations that impact some classes of web-based applications:
 
 * System font engines (and browser stacks) may display certain glyphs differently. These differences are necessary, in general, to create fidelity with the underlying OS (so web content doesn't "look wrong"). These differences reduce consistency for applications that span across multiple platforms, e.g. when pixel-accurate layout and rendering is required.
-* Design tools need access to font bytes to do their own OpenType layout implementation and allow design tools to hook in at lower levels, for actions such as performing vector filters or transforms on the glyph shapes.
-* Developers may have custom font handling strategies for their applications that they are bringing to the web. To use these strategies, they usually require direct access to font data, something Web Fonts do not provide.
+* Design tools need access to font data to do their own layout in a platform-independent way, and for actions such as performing vector filters or transforms on the glyph shapes.
+* Developers may provide font selection UI based on metrics or themes, or automatic font matching based on metrics and other data, which require direct access to font data.
 * Some fonts may not be licensed for delivery over the web. For example, Linotype has a license for some fonts that only includes desktop use.
 
 Professional-quality design and graphics tools have historically been difficult to deliver on the web. These tools provide extensive typographic features and controls as core capabilities.
 
-This API provides these tools access to the same underlying data tables that browser layout and rasterization engines use for drawing text. Examples include the OpenType [[!OPENTYPE]] <a href="https://docs.microsoft.com/en-us/typography/opentype/spec/glyf">glyf</a> table for glyph vector data, the <a href="https://docs.microsoft.com/en-us/typography/opentype/spec/gpos">GPOS</a> table for glyph placement, and the <a href="https://docs.microsoft.com/en-us/typography/opentype/spec/gsub">GSUB</a> table for ligatures and other glyph substitution. This information is necessary for these tools in order to guarantee both platform-independence of the resulting output (by embedding vector descriptions rather than codepoints) and to enable font-based art (treating fonts as the basis for manipulated shapes).
+This API provides these tools access to the same underlying font data that browser layout and rasterization engines use for drawing text. Examples include the [[OPENTYPE|OpenType]] <a href="https://docs.microsoft.com/en-us/typography/opentype/spec/glyf">glyf</a> table for glyph vector data, the <a href="https://docs.microsoft.com/en-us/typography/opentype/spec/gpos">GPOS</a> table for glyph placement, and the <a href="https://docs.microsoft.com/en-us/typography/opentype/spec/gsub">GSUB</a> table for ligatures and other glyph substitution. This information is necessary for these tools in order to guarantee both platform-independence of the resulting output (by embedding vector descriptions rather than codepoints) and to enable font-based art (treating fonts as the basis for manipulated shapes).
 
 
 <!-- ============================================================ -->
@@ -93,16 +94,19 @@ The API should:
 * Be available from Workers
 * Allow multiple levels of privacy preservation; e.g., full access for "trusted" sites and degraded access for untrusted scenarios
 * Reflect local font access state in the Permissions API
-* Restrict access to local font data to Secure Contexts
 * Provide unique identification of families and instances (variants like "bold" and "italic"), including PostScript names
-* Shield applications from unnecessary complexity by requiring that browser implementations produce valid SFNT data in the returned data
 * Enable a memory efficient implementation, avoiding leaks and copies by design
 * Restrict access to local font data to Secure Contexts and to only the top-most frame by default via the Permissions Policy spec
-* Sort any result list by font name to reduce possible fingerprinting entropy bits; e.g. .query() returns an iterable which will be sorted by given font names
+* Sort any result list by font name to reduce possible fingerprinting entropy bits; e.g. .queryLocalFonts() returns an iterable which will be sorted by given font names
+* Provide access to the raw bytes of the font data. Most uses of this API will be to provide the full font data to existing libraries that only expect to consume entire font files. Providing only access to pre-parsed font table data would require developers to reassemble a blob containing all of the data in order to use such libraries.
+
+Issue: Although Worker support is called as a goal out above, the API as specified is currently only exposed to Window contexts.
 
 <!--
 The ability to uniquely identify a specific font in the case of conflicting names (e.g., Web Font aliases vs. local PostScript font names)
 -->
+
+
 
 <!-- ============================================================ -->
 # Examples # {#examples}
@@ -117,27 +121,22 @@ The ability to uniquely identify a specific font in the case of conflicting name
 The API allows script to enumerate local fonts, including properties about each font.
 
 <aside class=example id=example-async-query>
-The following code queries the available local fonts, and logs details about each to the console.
+The following code queries the available local fonts, and logs the names and metrics of each to the console.
 
 ```js
 showLocalFontsButton.onclick = async function() {
-  // This sketch returns individual FontMetadata instances rather than families:
-  // In the future, query() could take filters e.g. family name, and/or options
-  // e.g. locale. A user agent can return all fonts, or show UI allowing selection
-  // of a subset of fonts.
   try {
-    const array = await navigator.fonts.query();
+    const array = await self.queryLocalFonts();
 
-    array.forEach(metadata => {
-      console.log(metadata.postscriptName);
-      console.log(metadata.fullName);
-      console.log(metadata.family);
-      console.log(metadata.family);
-      console.log(metadata.style);
+    array.forEach(font => {
+      console.log(font.postscriptName);
+      console.log(\` full name: ${font.fullName}\`);
+      console.log(\` family: ${font.family}\`);
+      console.log(\` style: ${font.style}\`);
     });
    } catch(e) {
     // Handle error, e.g. user cancelled the operation.
-    console.warn(`Local font access not available: ${e.message}`);
+    console.warn(\`Local font access not available: ${e.message}\`);
   }
 };
 ```
@@ -155,11 +154,9 @@ The following code populates a drop-down selection form element with the availab
 
 ```js
 useLocalFontsButton.onclick = async function() {
-
-  // Query for allowed local fonts.
   try {
     // Query for allowed local fonts.
-    const array = await navigator.fonts.query();
+    const array = await self.queryLocalFonts();
 
     // Create an element to style.
     const exampleText = document.createElement("p");
@@ -171,24 +168,22 @@ useLocalFontsButton.onclick = async function() {
     const textStyle = document.createElement("style");
     const fontSelect = document.createElement("select");
     fontSelect.onchange = e => {
-      console.log("selected:", fontSelect.value);
+      const postscriptName = fontSelect.value;
+      console.log("selected:", postscriptName);
       // An example of styling using @font-face src: local matching.
-      textStyle.textContent = `
+      textStyle.textContent = \`
         @font-face {
           font-family: "dynamic-font";
           src: local("${postscriptName}");
-        }`;
+        }\`;
     };
 
     // Populate the list with the available fonts.
-    array.forEach(metadata => {
+    array.forEach(font => {
       const option = document.createElement("option");
-      option.text = metadata.fullName;
-      // postscriptName works well as an identifier of sorts.
-      // It is unique as returned by the API, the OpenType spec expects
-      // it to be in ASCII, and it can be used by @font-face src: local
-      // matching to be used to style elements.
-      option.value = metadata.postscriptName;
+      option.text = font.fullName;
+      // postscriptName can be used with @font-face src: local to style elements.
+      option.value = font.postscriptName;
       fontSelect.append(option);
     });
 
@@ -198,7 +193,7 @@ useLocalFontsButton.onclick = async function() {
     document.body.appendChild(fontSelect);
   } catch(e) {
     // Handle error, e.g. user cancelled the operation.
-    console.warn(`Local font access not available: ${e.message}`);
+    console.warn(\`Local font access not available: ${e.message}\`);
   }
 };
 ```
@@ -209,7 +204,7 @@ useLocalFontsButton.onclick = async function() {
 ## Accessing font data ## {#example-accessing-font-data}
 <!-- ============================================================ -->
 
-The API allows script to request font data, providing access to the internal tables of fonts.
+The API allows script to request font data.
 
 <aside class=example id=example-font-data>
 The following code queries the available local fonts, and logs details about each to the console.
@@ -218,22 +213,16 @@ Here we use enumeration to access specific local font data; we can use this to p
 
 ```js
 useLocalFontsButton.onclick = async function() {
-  // This sketch returns individual FontMetadata instances rather than families:
-  // In the future, query() could take filters e.g. family name, and/or options
-  // e.g. locale. A user agent can return all fonts, or show UI allowing selection
-  // of a subset of fonts.
   try {
-    const array = await navigator.fonts.query();
+    const array = await self.queryLocalFonts();
 
-    array.forEach(metadata => {
-      // blob() returns a Blob containing valid and complete SFNT
-      // wrapped font data.
-      const sfnt = await metadata.blob();
+    array.forEach(font => {
+      // blob() returns a Blob containing the bytes of the font.
+      const bytes = await font.blob();
 
-      // Slice out only the bytes we need: the first 4 bytes are the SFNT
-      // version info.
+      // Inspect the first four bytes, which for SFNT define the format.
       // Spec: https://docs.microsoft.com/en-us/typography/opentype/spec/otff#organization-of-an-opentype-font
-      const sfntVersion = await sfnt.slice(0, 4).text();
+      const sfntVersion = await bytes.slice(0, 4).text();
 
       let outlineFormat = "UNKNOWN";
       switch (sfntVersion) {
@@ -246,11 +235,11 @@ useLocalFontsButton.onclick = async function() {
           outlineFormat = "cff";
           break;
       }
-      console.log(`${metadata.fullName} outline format: ${outlineFormat}`);
+      console.log(\`${font.fullName} outline format: ${outlineFormat}\`);
     }
   } catch(e) {
     // Handle error. It could be a permission error.
-    console.warn(`Local font access not available: ${e.message}`);
+    console.warn(\`Local font access not available: ${e.message}\`);
   }
 };
 ```
@@ -259,104 +248,140 @@ Parsing font files in more detail, for example enumerating the contained tables,
 </aside>
 
 
-Issue: Add example with {{QueryOptions/select}}.
-
 <!-- ============================================================ -->
-## Persistent access ## {#example-persistent-access}
+## Requesting specific fonts ## {#example-requesting-specific-fonts}
 <!-- ============================================================ -->
 
-In the above examples, the `query()` call allows the user agent to prompt the user for access to some or all local fonts at the time of the call. For example, this could show a font picker interface allowing selection of fonts.
+In some cases, a web application may wish to request access to specific fonts. For example, it may be presenting previously authored content that embeds font names. The `queryLocalFonts()` call takes a `postscriptNames` option that scopes the request to fonts identified by PostScript names. Only fonts exactly matching the names in the list will be returned.
 
-Other scenarios would benefit from access to local fonts on an ongoing basis. For example, a web application could offer font selection UI showing both fonts provided by the web application's server as well as local fonts. Calling `query()` with `{persistentAccess:true}` will request a permission (`"font-access"`). If that permission is granted, then subsequent calls to `query()` with that option not prompt the user.
+User agents may provide a different user interface to support this. For example, if the fingerprinting risk is deemed minimal, the request may be satisfied without prompting the user for permission. Alternately, a picker could be shown with only the requested fonts included.
+
+<aside class=example id=example-specific-fonts>
 
 ```js
-// User activation is required.
-includeLocalFontsButton.onclick = async function() {
+// User activation is needed.
+requestFontsButton.onclick = async function() {
   try {
-    const array = await navigator.fonts.query({persistentAccess: true});
+    const array = await self.queryLocalFonts({postscriptNames: ['Verdana', 'Verdana-Bold', 'Verdana-Italic']});
 
-    // Was persistent access granted?
-    console.log('Expect granted: ' + (await navigator.permission.query('font-access')).state);
+    array.forEach(font => {
+      console.log(\`Access granted for ${font.postscriptName}\`);
+    });
 
   } catch(e) {
     // Handle error. It could be a permission error.
-    console.warn(`Local font access not available: ${e.message}`);
+    console.warn(\`Local font access not available: ${e.message}\`);
   }
 };
 ```
 
+</aside>
 
 <!-- ============================================================ -->
 # Concepts # {#concepts}
 <!-- ============================================================ -->
 
-Issue: Define any new concepts beyond just the API
+The <dfn>user language</dfn> is a valid BCP 47 language tag representing either [=/a plausible language=] or the user's most preferred language. [[!BCP47]]
 
 <!-- ============================================================ -->
 ## Font Representation ## {#concept-font-representation}
 <!-- ============================================================ -->
 
-A <dfn>font representation</dfn> is an OpenType [[!OPENTYPE]] definition of a font. Even if the font was originally described in another file format, it is assumed that if it is supported by a user agent then an OpenType representation can be derived for it. This includes True Type [[TrueType]], Web Open Font Format 1.0 [[WOFF]] and Web Open Font Format 2.0 [[WOFF2]] files.
+A <dfn>font representation</dfn> is some concrete representation of a font. Examples include [[OPENTYPE|OpenType]], [[TRUETYPE|TrueType]], bitmap fonts, Type1 fonts, SVG fonts, and future font formats. This specification defines the properties of a [=/font representation=] as:
 
 <div dfn-for="font representation">
 
-A [=/font representation=] is serialized in SFNT [[!SFNT]] format, a flexible and extensible tabled-based container format which can contain font data in a multitude of other formats.
+* The <dfn>data bytes</dfn>, which is a [=/byte sequence=] containing a serialization of the font.
 
-An SFNT [[!SFNT]] container is represented in <dfn>data bytes</dfn>, which is a [=/byte sequence=] encoding a <dfn>table list</dfn>, a [=/list=] of [=/font tables=].
+<aside class=note>
+The [=/font representation=]'s [=font representation/data bytes=] are generally expected to be the exact byte-by-byte representation of font files on the user's filesystem. UAs aren't expected to normalize the font data, so font representations would not vary across user agents for a given user on a particular OS. The lack of normalization supports the goal of enabling web applications that perform text rendering for content creation with the full fidelity of the font.
+</aside>
+
+
+* The <dfn>PostScript name</dfn>, which is a {{DOMString}}. This is commonly used as a unique identifier for the font during font loading, e.g. "Optima-Bold".
+* The <dfn>full name</dfn>, which is a {{DOMString}}. This is usually a human-readable name used to identify the font, e.g. "Optima Bold".
+* The <dfn>family name</dfn>, which is a {{DOMString}}. This defines a set of fonts that vary among attributes such as weight and slope, e.g. "Optima"
+* The <dfn>style name</dfn>, which is a {{DOMString}}. This defines the variation of the font within a family, e.g. "Bold".
+
+</div>
+
+<aside class=note>
+This specification doesn't precisely define the values of the above fields for any particular font format, so that differences between operating systems don't make UAs non-compliant. However, for an OpenType [[!OPENTYPE]] font the following values would be sensible:
+* The [=font representation/data bytes=] are the SFNT [[!SFNT]] serialization of the font.
+* The [=font representation/PostScript name=] is found in the font's <a href="https://docs.microsoft.com/en-us/typography/opentype/spec/name">name table</a>, in the name record with nameID = 6; if multiple localizations are available, the US English version is used if provided, or the first localization otherwise.
+* The [=font representation/full name=] is found in the font's <a href="https://docs.microsoft.com/en-us/typography/opentype/spec/name">name table</a>, in the name record with nameID = 4; if multiple localizations are available, the [=/user language=] version is used if provided, or the first localization otherwise.
+* The [=font representation/family name=] is found in the font's <a href="https://docs.microsoft.com/en-us/typography/opentype/spec/name">name table</a>, in the name record with nameID = 1; if multiple localizations are available, the [=/user language=] version is used if provided, or the first localization otherwise.
+* The [=font representation/style name=] is found in the font's <a href="https://docs.microsoft.com/en-us/typography/opentype/spec/name">name table</a>, in the name record with nameID = 2; if multiple localizations are available, the [=/user language=] version is used if provided, or the first localization otherwise.
+
+These name properties are exposed to align with property usage in [[CSS-FONTS-4]], e.g. ''@font-face'', 'font-family', and so on. The [=font representation/PostScript name=] can be used as a unique key, for example when specifying a font when creating content or matching fonts against existing content. The [=font representation/full name=] or [=font representation/family name=] can be used for user-visible font selection UI, and the [=font representation/style name=] can be used to provide more specific selections.
+</aside>
+
+A <dfn>valid PostScript name</dfn> is a [=/scalar value string=] with [=string/length=] less than 64 and consisting only of characters in the range U+0021 (!) to U+007E (~) except for the 10 code units
+U+005B ([),
+U+005D (]),
+U+0028 LEFT PARENTHESIS,
+U+0029 RIGHT PARENTHESIS,
+U+007B ({),
+U+007D (}),
+U+003C (&lt;),
+U+003E (&gt;),
+U+002F (/), and
+U+0025 (%).
+
+<aside class=note>
+This is intended to match the requirements for <a href="https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-ids">nameID = 6</a> in [[!OPENTYPE]].
+</aside>
+
+
+<!-- ============================================================ -->
+## System Fonts ## {#concept-system-fonts}
+<!-- ============================================================ -->
+
+A <dfn>system font</dfn> is a font that is available system-wide provided by the operating system.
+
+To <dfn lt="read as a font representation">read a system font as a font representation</dfn> is to provide a [=/font representation=] equivalent to the font. This means providing all properties of a [=/font representation=]:
+* [=font representation/Data bytes=].
+* [=font representation/PostScript name=], which must be valid.
+* [=font representation/Full name=].
+* [=font representation/Family name=].
+* [=font representation/Style name=].
+
+This operation can fail if providing a [=/font representation=] is not possible.
+
+A user agent may use any algorithm to provide a [=/font representation=] for a [=/system font=]. In practice, contemporary operating systems and system APIs support fonts that are persisted in SFNT [[!SFNT]] font file formats, such as [[OPENTYPE|OpenType]], [[TRUETYPE|TrueType]], [[WOFF|Web Open Font Format]], etc. which satisfy these requirements, as well as the means to efficiently enumerate font collections with these common name properties provided for each font.
+
+<div algorithm>
+To <dfn>get all system font representations</dfn>, run these steps:
+1. Let |fonts| be a [=/list=] of all [=/system fonts=].
+1. Let |result| be a new [=/list=].
+1. [=list/For each=] |font| in |fonts|.
+    1. Let |representation| be |font| [=/read as a font representation=]. On failure, [=iteration/continue=].
+    1. If the user agent determines that the user should never expose the font to the web, then it may [=iteration/continue=].
+    1. Append |representation| to |result|.
+1. Return |result|.
 
 </div>
 
 <!-- ============================================================ -->
-## Font Table ## {#concept-font-table}
-<!-- ============================================================ -->
-
-A <dfn>font table</dfn> is an OpenType [[!OPENTYPE]] table.
-
-<div dfn-for="font table">
-
-A [=/font table=] has a <dfn>tag</dfn>, which is a {{ByteString}} of length 4, derived from the `Tag` of the table record.
-
-</div>
-
-
-<!-- ============================================================ -->
-## Name Table ## {#concept-name-table}
-<!-- ============================================================ -->
-
-A [=/font representation=] has a <dfn for="font representation">name table</dfn>, which is the [=/font table=] in its [=font representation/table list=] with [=font table/tag=] \``name`\`.
-
-The [=font representation/name table=] has a [=/map=] <dfn for="name table">names</dfn>, which is a mapping from an {{unsigned short}} to a [=/localized string table=].
-
-A <dfn>localized string table</dfn> is a [=/map=] from a BCP 47 language tag to a {{USVString}}. [[BCP47]]
-
-<div algorithm >
-
-A [=/font representation=]'s <dfn for="font representation" lt="name string">name string |id| for |tag|</dfn> is given by these steps:
-
-1. Let |names| be the [=/font representation=]'s [=font representation/name table=]'s [=name table/names=].
-1. Let |table| be |names|[|id|].
-1. Return |table|[|tag|].
-
-Issue: What if there is no matching |id| or |tag|? Empty string? Where does fallback occur?
-
-</div>
-
-The <dfn>current language</dfn> is the BCP 47 language tag returned by the {{NavigatorLanguage}} mixin's {{NavigatorLanguage/language}} propertyy. [[BCP47]]
-
-<!-- ============================================================ -->
-# Local font access permission # {#permission}
+# Permissions Integration # {#permissions-integration}
 <!-- ============================================================ -->
 
 Enumeration of local fonts requires a permission to be granted.
 
-The <dfn for=PermissionName enum-value>"`font-access`"</dfn> [=/powerful feature=]’s permission-related flags, algorithms, and types are defaulted.
+<!-- ============================================================ -->
+## Permissions ## {#permissions}
+<!-- ============================================================ -->
 
+The Local Font Access API is a [=/default powerful feature=] that is identified by the [=powerful feature/name=] "<dfn export permission>local-fonts</dfn>".
+
+When the {{Window/queryLocalFonts()}} API is invoked, the user agent may present a list of font choices, a yes/no choice, or other interface options. The user agent should present the results of the choice in the permission in an appropriate way. For example, if the user has selected a set of fonts to expose to the site and further API calls will return the same set of fonts, the permission state could be "granted". If the user will be prompted again, the permission state could be "prompt".
 
 <aside class=example id=example-request-permission>
 Permission to enumerate local fonts can be queried using the `navigator.permissions` API:
 
 ```js
-const status = await navigator.permissions.query({ name: "font-access" });
+// This just queries the existing state of the permission, it does not change it.
+const status = await navigator.permissions.query({ name: "local-fonts" });
 if (status.state === "granted")
   console.log("permission was granted 👍");
 else if (status.state === "prompt")
@@ -367,8 +392,44 @@ else
 </aside>
 
 <!-- ============================================================ -->
+## Permissions policy ## {#permissions-policy}
+<!-- ============================================================ -->
+
+This specification defines a [=/policy-controlled feature=] identified by the string <dfn for=PermissionPolicy enum-value>"local-fonts"</dfn>. Its [=/default allowlist=] is `'self'`.
+
+<div class=note>
+  The [=/default allowlist=] of `'self'` allows usage of this feature on same-origin nested frames by default but prevents access by third-party content.
+
+  Third-party usage can be selectively enabled by adding the `allow="local-fonts"` attribute to an <{iframe}> element:
+
+  <div class=example id=example-frame-delegation>
+  ```html
+  <iframe src="https://example.com" allow="local-fonts"></iframe>
+  ```
+  </div>
+
+  Alternatively, this feature can be disabled completely in first-party contexts by specifying the permissions policy in an HTTP response header:
+
+  <div class=example id=example-header-policy>
+  ```http
+  Permissions-Policy: local-fonts 'none'
+  ```
+  </div>
+
+  See [[PERMISSIONS-POLICY]] for more details.
+</div>
+
+
+<!-- ============================================================ -->
 # API # {#api}
 <!-- ============================================================ -->
+
+<!-- ============================================================ -->
+## Font task source ## {#font-task-source-dfn}
+<!-- ============================================================ -->
+
+The <dfn>font task source</dfn> is a new generic [=/task source=] which is used for all [=/queue a task|tasks that are queued=] in this specification.
+
 
 <!-- ============================================================ -->
 ## Font manager ## {#font-manager-api}
@@ -376,97 +437,86 @@ else
 
 <div class="domintro note">
 
-: await navigator . fonts . {{FontManager/query()}})
-  :: Asynchronously query for available/allowed fonts. The returned promise resolves to an array of {{FontMetadata}} objects.
+: await self . {{Window/queryLocalFonts()}}
+: await self . {{Window/queryLocalFonts()|queryLocalFonts}}({ {{QueryOptions/postscriptNames}}: [ ... ] })
+  :: Asynchronously query for available/allowed fonts. If successful, the returned promise resolves to an array of {{FontData}} objects.
 
-     If the `{persistentAccess}` option is true, the user will be prompted for permission for ongoing access to query fonts without further prompts. If the option is not passed, the user agent will prompt the user to select fonts.
+     If the method is not called while the document has [=/transient activation=] (e.g. in response to a click event), the returned promise will be rejected.
 
-     If the `{select}` option is a non-empty array, then only fonts with matching PostScript names will be included in the results.
+     The user will be prompted for permission for access local fonts or to select fonts to provide to the site. If the permission is not granted, the returned promise will rejected.
+
+     If the {{QueryOptions/postscriptNames}} option is given, then only fonts with matching PostScript names will be included in the results.
 
 </div>
 
 
 <xmp class=idl>
 [SecureContext]
-interface mixin NavigatorFonts {
-  [SameObject] readonly attribute FontManager fonts;
-};
-Navigator includes NavigatorFonts;
-WorkerNavigator includes NavigatorFonts;
-</xmp>
-
-<div algorithm>
-Each [=/environment settings object=] has an associated {{FontManager}} object.
-
-The <dfn attribute for=NavigatorFonts>fonts</dfn> getter steps are to return [=/this=]'s [=/relevant settings object=]'s {{FontManager}} object.
-</div>
-
-<xmp class=idl>
-[SecureContext,
- Exposed=(Window,Worker)]
-interface FontManager {
-  Promise<sequence<FontMetadata>> query(QueryOptions options);
+partial interface Window {
+  Promise<sequence<FontData>> queryLocalFonts(optional QueryOptions options = {});
 };
 
 dictionary QueryOptions {
-  boolean persistentAccess = false;
-  sequence<DOMString> select = [];
+  sequence<DOMString> postscriptNames;
 };
 </xmp>
 
 <div algorithm>
-The <dfn method for=FontManager>query(|options|)</dfn> method steps are:
+The <dfn method for=Window>queryLocalFonts(|options|)</dfn> method steps are:
 
 1. Let |promise| be [=/a new promise=].
-1. If [=/this=]’s [=relevant settings object=]'s [=origin=] is an [=/opaque origin=], then [=/reject=] |promise| with a {{TypeError}}.
+1. Let |descriptor| be a {{PermissionDescriptor}} with its {{PermissionDescriptor/name}} set to {{"local-fonts"}}.
+1. If [=/this=]’s [=relevant settings object=]'s [=origin=] is an [=/opaque origin=], then [=/reject=] |promise| with a "{{SecurityError}}" {{DOMException}}, and return |promise|.
+1. If [=/this=]’s [=relevant global object=]'s [=/associated Document=] is not [=/allowed to use=] the [=/policy-controlled feature=] named {{PermissionPolicy/"local-fonts"}}, then [=/reject=] |promise| with a "{{SecurityError}}" {{DOMException}}, and return |promise|.
+1. If [=/this=]’s [=relevant global object=] does not have [=/transient activation=], then [=/reject=] |promise| with a "{{SecurityError}}" {{DOMException}}, and return |promise|.
 1. Otherwise, run these steps [=in parallel=]:
-    1. Let |select| be |options|' {{QueryOptions/"select"}} member.
-    1. If |options|' {{QueryOptions/"persistentAccess"}} member is true, then run these steps:
-        1. Let |permission| be the result of [=requesting permission to use=] {{PermissionName/"font-access"}}.
-        1. If |permission| is not {{PermissionState/"granted"}}, then [=/reject=] |promise| with a "{{NotAllowedError}}" {{DOMException}}, and abort these steps.
-        1. Let |fonts| be [=/list=] of all local fonts on the system.
-    1. Otherwise, let |fonts| be a [=/list=] of fonts on the system selected by the user.
-    1. Let |result| be an new [=/list=].
-    1. [=list/For each=] font |font| in |fonts|, run these steps:
-        1. Let |representation| be a [=/font representation=] for |font|.
-        1. Let |postscriptName| be |representation|'s [=font representation/name string=] 6 for \``en`\`.
-        1. If |select| is empty, or if |select| [=list/contains=] |postscriptName|, then [=list/append=] a new {{FontMetadata}} instance associated with |representation| to |result|.
-    1. Sort |list| in [=list/sort in ascending order|ascending order=] by using {{FontMetadata/postscriptName}} as the sort key and store the result as |list|.
-    1. [=/Resolve=] |promise| with |list|.
+    1. Let |system fonts| be the result of [=/getting all system font representations=].
+    1. Let |selectable fonts| be a new [=/list=].
+    1. [=list/For each=] font |representation| in |system fonts|, run these steps:
+        1. Let |postscriptName| be |representation|'s [=font representation/PostScript name=].
+        1. Assert: |postscriptName| is a [=/valid PostScript name=].
+        1. If |options|[{{QueryOptions/"postscriptNames"}}] [=map/exists=] and |options|[{{QueryOptions/"postscriptNames"}}] does not [=list/contain=] |postscriptName|, then [=iteration/continue=].
+        1. [=list/Append=] a new {{FontData}} instance associated with |representation| to |selectable fonts|.
+    1. [=/Prompt the user to choose=] one or more items from |selectable fonts|, with |descriptor| and <var ignore>allowMultiple</var> set to true, and let |result| be the result.
+        User agents may present a yes/no choice instead of a list of choices, and in that case they should set |result| to |selectable fonts|.
+    1. If |result| is {{PermissionState/"denied"}}, then [=/reject=] |promise| with a "{{NotAllowedError}}" {{DOMException}}, and abort these steps.
+    1. Sort |result| in [=list/sort in ascending order|ascending order=] by using {{FontData/postscriptName}} as the sort key and store the result as |result|.
+    1. [=/Queue a task=] on the [=/font task source=] to [=/resolve=] |promise| with |result|.
 1. Return |promise|.
-
-Issue: Make "selected by the user" more spec-like.
 
 </div>
 
+Issue: Move to {{WindowOrWorkerGlobalScope}} and sort out permission issues.
+
 <!-- ============================================================ -->
-## The {{FontMetadata}} interface ## {#fontmetadata-interface}
+## The {{FontData}} interface ## {#fontdata-interface}
 <!-- ============================================================ -->
 
-A {{FontMetadata}} provides details about a font face. Each {{FontMetadata}} has an associated [=/font representation=].
+A {{FontData}} provides details about a font face. Each {{FontData}} has an associated [=/font representation=].
 
 <div class="domintro note">
 
-    : |metadata| . {{FontMetadata/postscriptName}}
-    :: The PostScript name for the font. Example: "`Arial-Bold`". The OpenType spec expects this to be encoded in a subset of ASCII and is unique for |metadata|
+    : |fontdata| . {{FontData/postscriptName}}
+    :: The PostScript name for the font. Example: "`Arial-Bold`".
 
-    : |metadata| . {{FontMetadata/fullName}}
+    : |fontdata| . {{FontData/fullName}}
     :: The full font name, including family subfamily names. Example: "`Arial Bold`"
 
-    : |metadata| . {{FontMetadata/family}}
-    :: The font family name. Example: "`Arial`"
+    : |fontdata| . {{FontData/family}}
+    :: The font family name. This corresponds with the CSS 'font-family' property. Example: "`Arial`"
 
-    : |metadata| . {{FontMetadata/style}}
+    : |fontdata| . {{FontData/style}}
     :: The font style (or subfamily) name. Example: "`Regular`", "`Bold Italic`"
 
 </div>
 
 
 <xmp class=idl>
-[Exposed=(Window,Worker)]
-interface FontMetadata {
+[Exposed=Window]
+interface FontData {
   Promise<Blob> blob();
 
+  // Names
   readonly attribute USVString postscriptName;
   readonly attribute USVString fullName;
   readonly attribute USVString family;
@@ -474,44 +524,46 @@ interface FontMetadata {
 };
 </xmp>
 
-<div dfn-for="FontMetadata">
+<div dfn-for="FontData">
 
-The <dfn attribute>postscriptName</dfn> getter steps are to return [=/this=]'s associated [=/font representation=]'s [=font representation/name string=] 6 for \``en`\`.
+<div algorithm>
+The <dfn attribute>postscriptName</dfn> getter steps are:
 
-The <dfn attribute>fullName</dfn> getter steps are to return [=/this=]'s associated [=/font representation=]'s [=font representation/name string=] 4 for the [=/current language=].
-
-The <dfn attribute>family</dfn> getter steps are to return [=/this=]'s associated [=/font representation=]'s [=font representation/name string=] 1 for the [=/current language=].
-
-The <dfn attribute>style</dfn> getter steps are to return [=/this=]'s associated [=/font representation=]'s [=font representation/name string=] 2 for the [=/current language=].
+1. Let |postscriptName| be [=/this=]'s [=font representation/PostScript name=].
+1. Assert: |postscriptName| is a [=/valid PostScript name=].
+1. Return |postscriptName|.
 
 </div>
 
-<aside class=issue>
-Verify source for all of the above. See [Microsoft Typography](https://docs.microsoft.com/en-us/typography/opentype/spec/name)
+The <dfn attribute>fullName</dfn> getter steps are to return [=/this=]'s associated [=/font representation=]'s [=font representation/full name=].
 
-* Encoding - assume everything has been successfully transcoded to UTF-16 (USVStrings) ?
-* Localization - we will provide "en-us"-equivalent labels here - define that behavior.
+The <dfn attribute>family</dfn> getter steps are to return [=/this=]'s associated [=/font representation=]'s [=font representation/family name=].
 
-</aside>
+The <dfn attribute>style</dfn> getter steps are to return [=/this=]'s associated [=/font representation=]'s [=font representation/style name=].
 
-Issue: Include `name` ID 3 (Unique identifier) as well?
+</div>
 
+Issue: Consider making {{FontData}} [=/serializable objects=] so that the results of {{Window/queryLocalFonts()}} can be passed to Workers.
 
 <div class="domintro note">
 
-    : await |blob| = |metadata| . {{FontMetadata/blob()}}
-    :: Request the font data of |metadata|. The result |blob| contains [=font representation/data bytes=].
+    : await |blob| = |fontdata| . {{FontData/blob()}}
+    :: Request the underlying bytes of a font. The result |blob| contains [=font representation/data bytes=].
 
 </div>
 
 <div algorithm>
 
-The <dfn method for=FontMetadata>blob()</dfn> method steps are:
+The <dfn method for=FontData>blob()</dfn> method steps are:
 
-1. Let |promise| be [=/a new promise=].
+1. Let |realm| be [=/this=]'s [=/relevant Realm=].
+1. Let |promise| be [=/a new promise=] in |realm|.
 1. Run these steps [=in parallel=]:
-    1. Let |blob| be a new {{Blob}} whose contents are [=this=]'s [=font representation/data bytes=] and {{Blob/type}} attribute is \``application/octet-stream`\`.
-    1. [=/Resolve=] |promise| with |blob|.
+    1. Let |bytes| be [=this=]'s associated [=/font representation=]'s [=font representation/data bytes=].
+    1. Let |type| be \``application/octet-stream`\`.
+    1. [=/Queue a task=] on the [=/font task source=] to:
+       1. Let |blob| be a new {{Blob}} in |realm| whose contents are |bytes| and {{Blob/type}} attribute is |type|.
+       1. [=/Resolve=] |promise| with |blob|.
 1. Return |promise|.
 
 </div>
@@ -520,21 +572,19 @@ The <dfn method for=FontMetadata>blob()</dfn> method steps are:
 # Internationalization considerations # {#i18n}
 <!-- ============================================================ -->
 
-Issue: Document internationalization consideration, e.g. string localization
+Issue: Document internationalization considerations other than string localization, e.g. https://github.com/WICG/local-font-access/issues/72, https://github.com/WICG/local-font-access/issues/59, etc.
 
 <!-- ============================================================ -->
 ## Font Names ## {#i18n-names}
 <!-- ============================================================ -->
 
-The \``name`\` table in OpenType [[!OPENTYPE]] fonts allows names (family, subfamily, etc) to have multilingual strings, using either platform-specific numeric language identifiers or language-tag strings conforming to [[BCP47]]. For example, a font could have family name strings defined for both \``en`\` and \``zh-Hant-HK`\`.
+The \``name`\` table in [[OPENTYPE|OpenType]] fonts allows names (family, subfamily, etc) to have multilingual strings, using either platform-specific numeric language identifiers or language-tag strings conforming to [[BCP47]]. For example, a font could have family name strings defined for both \``en-US`\` and \``zh-Hant-HK`\`.
 
-The {{FontMetadata}} properties {{FontMetadata/postscriptName}}, {{FontMetadata/fullName}}, {{FontMetadata/family}}, and {{FontMetadata/style}} are provided by this API simply as strings, using the \``en`\` locale. This matches the behavior of the {{FontFace}} {{FontFace/family}} property.
-
-Issue: The above does not match the spec/implementation. Resolve the ambiguity.
+The {{FontData}} properties {{FontData/postscriptName}}, {{FontData/fullName}}, {{FontData/family}}, and {{FontData/style}} are provided by this API simply as strings, using either the US English localization or the [=/user language=] localization depending on the name, or the first localization as a fallback.
 
 Web applications that need to provide names in other languages can request and parse the \``name`\` table directly.
 
-Issue: Should we define an option to the {{FontManager/query()}} method to specify the desired language for strings (e.g. `{lang: 'zh'}`), falling back to \``en`\` if not present?
+Issue(69): Should we define an option to the {{Window/queryLocalFonts()}} method to specify the desired language for strings (e.g. `{lang: 'zh'}`), falling back to \``en-US`\` if not present? Or provide access to all the names, e.g. as a map from [[BCP47]] language tag to name?
 
 
 <!-- ============================================================ -->
@@ -557,7 +607,7 @@ There are no known security impacts of this feature.
 ## Fingerprinting ## {#privacy-fingerprinting}
 <!-- ============================================================ -->
 
-The font metadata includes:
+The font data includes:
 
 * Fonts included in the operating system distribution.
 * Fonts installed by particular applications installed on the system, for example office suites.
@@ -569,6 +619,8 @@ This provides several "bits of entropy" to distinguish users.
 User agents could mitigate this in certain cases (e.g. when the permission is denied, or in Private Browsing / "incognito" mode) by providing an enumeration of a fixed set of fonts provided with the user agent.
 
 User agents may also allow the user to select a set of fonts to make available via the API.
+
+When multiple localizations of font names are provided by a font, the user's locale is potentially exposed through the font name. User agents should ensure that if a locale is exposed in this way, it's the same locale that's exposed by <code>navigator.{{NavigatorLanguage/language}}</code>.
 
 <!-- ============================================================ -->
 ## Identification ## {#privacy-identification}
@@ -587,17 +639,20 @@ We'd like to acknowledge the contributions of:
 
 * Daniel Nishi, Owen Campbell-Moore, and Mike Tsao who helped pioneer the previous local font access proposal.
 * Evan Wallace, Biru, Leah Cassidy, Katie Gregorio, Morgan Kennedy, and Noah Levin of Figma who have patiently enumerated the needs of their ambitious web product.
-* Tab Atkins and the CSS Working Group who have provided usable base-classes which only need slight extension to enable these cases
-* Dominik Röttsches and Igor Kopylov for their thoughtful feedback
-* We would like to express our gratitude to former editor Emil A. Eklund, who passed away in 2020. Emil was instrumental in getting this proposal underway, providing technical guidance, and championing the needs of users and developers
+* Alex Russell, who drafted the initial version of this proposal.
+* Olivier Yiptong, who provided an initial implementation and iteration on the API shape.
+* Tab Atkins, Jr. and the CSS Working Group who have provided usable base-classes which only need slight extension to enable these cases.
+* Dominik Röttsches and Igor Kopylov for their thoughtful feedback.
+* We would like to express our gratitude to former editor Emil A. Eklund, who passed away in 2020. Emil was instrumental in getting this proposal underway, providing technical guidance, and championing the needs of users and developers.
 
 Special thanks (again!) to Tab Atkins, Jr. for creating and maintaining [Bikeshed](https://github.com/tabatkins/bikeshed), the specification authoring tool used to create this document.
 
 And thanks to
+Anne van Kesteren,
 Chase Phillips,
 Domenic Denicola,
 Dominik Röttsches,
-Igor Kopylov, and
-Jake Archibald
-
+Igor Kopylov,
+Jake Archibald, and
+Jeffrey Yasskin
 for suggestions, reviews, and other feedback.

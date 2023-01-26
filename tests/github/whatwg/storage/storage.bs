@@ -3,7 +3,7 @@ Group: WHATWG
 H1: Storage
 Shortname: storage
 Text Macro: TWITTER storagestandard
-Text Macro: LATESTRD 2021-02
+Text Macro: LATESTRD 2022-08
 Abstract: The Storage Standard defines an API for persistent storage and quota estimates, as well as the platform storage architecture.
 Translation: ja https://triple-underscore.github.io/storage-ja.html
 </pre>
@@ -12,6 +12,10 @@ Translation: ja https://triple-underscore.github.io/storage-ja.html
 urlPrefix: https://tc39.github.io/ecma262/; spec: ECMASCRIPT
     text: agent; url: #sec-agents; type: dfn
     text: agent cluster; url: #sec-agent-clusters; type: dfn
+</pre>
+
+<pre class=link-defaults>
+spec:infra; type:dfn; text:implementation-defined
 </pre>
 
 
@@ -129,6 +133,8 @@ either the <a>obtain a local storage bottle map</a> or the
 <p class=note>If you are defining a standard for such an API, consider filing an issue against this
 standard for assistance and review.
 
+<p><img src=assets/model-diagram.svg alt="Storage model diagram (described in the next paragraph)." width=434 height=815>
+
 <p>To isolate this data this standard defines a <a for=/>storage shed</a> which segments
 <a>storage shelves</a> by a <a>storage key</a>. A <a>storage shelf</a> in turn consists of a
 <a>storage bucket</a> and will likely consist of multiple <a>storage buckets</a> in the future to
@@ -198,23 +204,48 @@ anticipated that some APIs will be applicable to both <a>storage types</a> going
 
 <h3 id=storage-keys>Storage keys</h3>
 
-<p>A <dfn>storage key</dfn> is an <a for=/>origin</a>. [[!HTML]]
+<p>A <dfn>storage key</dfn> is a <a>tuple</a> consisting of an <dfn for="storage key">origin</dfn>
+(an <a for=/>origin</a>). [[!HTML]]
 
 <p class=XXX>This is expected to change; see
 <a href="https://privacycg.github.io/storage-partitioning/">Client-Side Storage Partitioning</a>.
 
-<p>To <dfn export>obtain a storage key</dfn>, given an <a>environment settings object</a>
+<p>To <dfn export>obtain a storage key</dfn>, given an <a for=/>environment</a>
 <var>environment</var>, run these steps:
 
 <ol>
- <li><p>Let <var>key</var> be <var>environment</var>'s
- <a for="environment settings object">origin</a>.
+ <li><p>Let <var>key</var> be the result of running
+ <a>obtain a storage key for non-storage purposes</a> with <var>environment</var>.
 
- <li><p>If <var>key</var> is an <a>opaque origin</a>, then return failure.
+ <li><p>If <var>key</var>'s <a for="storage key">origin</a> is an <a>opaque origin</a>, then return
+ failure.
 
  <li><p>If the user has disabled storage, then return failure.
 
  <li><p>Return <var>key</var>.
+</ol>
+
+<p>To <dfn export>obtain a storage key for non-storage purposes</dfn>, given an
+<a for=/>environment</a> <var>environment</var>, run these steps:
+
+<ol>
+ <li><p>Let <var>origin</var> be <var>environment</var>'s
+ <a for="environment settings object">origin</a> if <var>environment</var> is an
+ <a>environment settings object</a>; otherwise <var>environment</var>'s
+ <a for=environment>creation URL</a>'s <a for=url>origin</a>.
+
+ <li><p>Return a <a>tuple</a> consisting of <var>origin</var>.
+</ol>
+
+<p>To determine whether a <a>storage key</a> <var>A</var>
+<dfn export for="storage key" lt=equal>equals</dfn> <a>storage key</a> <var>B</var>, run these
+steps:
+
+<ol>
+ <li><p>If <var>A</var>'s <a for="storage key">origin</a> is not <a>same origin</a> with
+ <var>B</var>'s <a for="storage key">origin</a>, then return false.
+
+ <li><p>Return true.
 </ol>
 
 
@@ -229,18 +260,20 @@ It is initially empty.
 <a for=/>storage shed</a>. A user agent's <a for="user agent">storage shed</a> holds all
 <dfn>local storage</dfn> data.
 
-<p>A <a for=/>browsing session</a> holds a <dfn for="browsing session">storage shed</dfn>, which is
-a <a for=/>storage shed</a>. A <a for=/>browsing session</a>'s
-<a for="browsing session">storage shed</a> holds all <dfn>session storage</dfn> data.
+<p>A <a for=/>traversable navigable</a> holds a
+<dfn oldids="browsing-session-storage-shed" for="traversable navigable">storage shed</dfn>, which is
+a <a for=/>storage shed</a>. A <a for=/>traversable navigable</a>'s
+<a for="traversable navigable">storage shed</a> holds all <dfn>session storage</dfn> data.
 
-<p>To <dfn export>legacy-clone a browsing session storage shed</dfn>, given a
-<a for=/>browsing session</a> <var>A</var> and a <a for=/>browsing session</a> <var>B</var>, run
-these steps:
+<p>To
+<dfn export oldids="legacy-clone-a-browsing-session-storage-shed">legacy-clone a traversable storage shed</dfn>,
+given a <a for=/>traversable navigable</a> <var>A</var> and a <a for=/>traversable navigable</a>
+<var>B</var>, run these steps:
 
 <ol>
  <li>
   <p><a for=map>For each</a> <var>key</var> → <var>shelf</var> of <var>A</var>'s
-  <a for="browsing session">storage shed</a>:
+  <a for="traversable navigable">storage shed</a>:
 
   <ol>
    <li><p>Let <var>newShelf</var> be the result of running <a>create a storage shelf</a> with
@@ -251,7 +284,7 @@ these steps:
    <a for=map>clone</a> of <var>shelf</var>'s <a>bucket map</a>["<code>default</code>"]'s
    <a>bottle map</a>["<code>sessionStorage</code>"]'s <a for="storage bottle">map</a>.
 
-   <li><p>Set <var>B</var>'s <a for="browsing session">storage shed</a>[<var>key</var>] to
+   <li><p>Set <var>B</var>'s <a for="traversable navigable">storage shed</a>[<var>key</var>] to
    <var>newShelf</var>.
   </ol>
 </ol>
@@ -391,8 +424,11 @@ standard and standards using this standard can access the contents.
    <li><p>Assert: <var>type</var> is "<code>session</code>".
 
    <li><p>Set <var>shed</var> to <var>environment</var>'s
-   <a for="environment settings object">browsing session</a>'s
-   <a for="browsing session">storage shed</a>.
+   <a for=/>global object</a>'s
+   <a>associated <code>Document</code></a>'s
+   <a>node navigable</a>'s
+   <a for=navigable>traversable navigable</a>'s
+   <a for="traversable navigable">storage shed</a>.
   </ol>
 
  <li><p>Let <var>shelf</var> be the result of running <a>obtain a storage shelf</a>, with
@@ -434,12 +470,25 @@ is needed for <a href="https://github.com/whatwg/storage/issues/4">issue #4</a> 
 <a href="https://privacycg.github.io/storage-access/">Storage Access API</a>.
 
 
+<h3 id=storage-task-source>Storage task source</h2>
+
+<p>The <dfn export id=task-source>storage task source</dfn> is a <a for=/>task source</a> to be used
+for all <a for=/>tasks</a> related to a <a>storage endpoint</a>. In particular those that relate to
+a <a>storage endpoint</a>'s <a for="storage endpoint">quota</a>.
+
+<div algorithm>
+<p>To <dfn export>queue a storage task</dfn> given a <a for=/>global object</a> <var>global</var>
+and a series of steps <var>steps</var>, <a>queue a global task</a> on the <a>storage task source</a>
+with <var>global</var> and <var>steps</var>.
+</div>
+
+
 
 <h2 id=persistence>Persistence permission</h2>
 
 <p>A <a>local storage bucket</a> can only have its <a for="local storage bucket">mode</a> change to
 "<code>persistent</code>" if the user (or user agent on behalf of the user) has granted permission
-to use the "{{PermissionName/persistent-storage}}" feature.
+to use the "<code>persistent-storage</code>" <a>powerful feature</a>.
 
 <p class="note">When granted to an <a for=/>origin</a>, the persistence permission can be used to
 protect storage from the user agent's clearing policies. The user agent cannot clear storage marked
@@ -447,19 +496,19 @@ as persistent without involvement from the <a for=/>origin</a> or user. This mak
 useful for resources the user needs to have available while offline or resources the user creates
 locally.
 
-<p>The "{{PermissionName/persistent-storage}}"
-<a>powerful feature</a>'s permission-related flags, algorithms, and types are defaulted, except for:
+<p>The "<code>persistent-storage</code>" <a>powerful feature</a>'s permission-related algorithms,
+and types are defaulted, except for:
 
 <dl>
  <dt><a>permission state</a>
- <dd><p>"{{PermissionName/persistent-storage}}"'s <a>permission state</a> must have the same value for all
+ <dd><p>"<code>persistent-storage</code>"'s <a>permission state</a> must have the same value for all
  <a>environment settings objects</a> with a given <a for="environment settings object">origin</a>.
 
  <dt><a>permission revocation algorithm</a>
  <dd algorithm="permission-revocation">
   <ol>
-   <li><p>If "{{PermissionName/persistent-storage}}"'s <a>permission state</a> is {{PermissionState/"granted"}},
-   then return.
+   <li><p>If the result of <a>getting the current permission state</a> with
+   "<code>persistent-storage</code>" is "{{PermissionState/granted}}", then return.
 
    <li><p>Let <var>shelf</var> be the result of running <a>obtain a local storage shelf</a> with
    <a>current settings object</a>.
@@ -487,7 +536,7 @@ available storage space on the device.
 
 <div class=note>
  <p>User agents are strongly encouraged to consider navigation frequency, recency of visits,
- bookmarking, and <a href="#persistence">permission</a> for "{{PermissionName/persistent-storage}}" when
+ bookmarking, and <a href="#persistence">permission</a> for "<code>persistent-storage</code>" when
  determining quotas.
 
  <p>Directly or indirectly revealing available storage space can lead to fingerprinting and leaking
@@ -518,11 +567,11 @@ access them is running, unless instructed otherwise by the user.
 user and offer a way to clear the remaining <a>local storage buckets</a>, i.e., those whose
 <a for="local storage bucket">mode</a> is "<code>persistent</code>".
 
-<p><a>Session storage buckets</a> must be cleared as <a for=/>browsing sessions</a> are closed.
+<p><a>Session storage buckets</a> must be cleared as <a for=/>traversable navigables</a> are closed.
 
-<p class="note">If the user agent allows for revival of <a for=/>browsing sessions</a>, e.g.,
-through reopening <a for=/>browsing sessions</a> or continued use of them after restarting the user
-agent, then clearing necessarily involves a more complex set of heuristics.
+<p class="note">If the user agent allows for revival of <a for=/>traversable navigables</a>, e.g.,
+through reopening <a for=/>traversable navigables</a> or continued use of them after restarting the
+user agent, then clearing necessarily involves a more complex set of heuristics.
 
 
 <h3 id=ui-guidelines>User interface guidelines</h3>
@@ -570,15 +619,19 @@ dictionary StorageEstimate {
 };
 </pre>
 
+<div algorithm>
 <p>The <dfn method for=StorageManager><code>persisted()</code></dfn> method steps are:
 
 <ol>
- <li><p>Let <var>promise</var> be a new promise.
+ <li><p>Let <var>promise</var> be <a>a new promise</a>.
+
+ <li><p>Let <var>global</var> be <a>this</a>'s <a>relevant global object</a>.
 
  <li><p>Let <var>shelf</var> be the result of running <a>obtain a local storage shelf</a> with
  <a>this</a>'s <a>relevant settings object</a>.
 
- <li><p>If <var>shelf</var> is failure, then reject <var>promise</var> with a {{TypeError}}.
+ <li><p>If <var>shelf</var> is failure, then <a for=/>reject</a> <var>promise</var> with a
+ {{TypeError}}.
 
  <li>
   <p>Otherwise, run these steps <a>in parallel</a>:
@@ -591,21 +644,27 @@ dictionary StorageEstimate {
 
     <p class=note>It will be false when there's an internal error.
 
-   <li><p><a>Queue a task</a> to resolve <var>promise</var> with <var>persisted</var>.
+   <li><p><a>Queue a storage task</a> with <var>global</var> to <a for=/>resolve</a>
+   <var>promise</var> with <var>persisted</var>.
   </ol>
 
  <li><p>Return <var>promise</var>.
 </ol>
+</div>
 
+<div algorithm>
 <p>The <dfn method for=StorageManager><code>persist()</code></dfn> method steps are:
 
 <ol>
- <li><p>Let <var>promise</var> be a new promise.
+ <li><p>Let <var>promise</var> be <a>a new promise</a>.
+
+ <li><p>Let <var>global</var> be <a>this</a>'s <a>relevant global object</a>.
 
  <li><p>Let <var>shelf</var> be the result of running <a>obtain a local storage shelf</a> with
  <a>this</a>'s <a>relevant settings object</a>.
 
- <li><p>If <var>shelf</var> is failure, then reject <var>promise</var> with a {{TypeError}}.
+ <li><p>If <var>shelf</var> is failure, then <a for=/>reject</a> <var>promise</var> with a
+ {{TypeError}}.
 
  <li>
   <p>Otherwise, run these steps <a>in parallel</a>:
@@ -613,7 +672,7 @@ dictionary StorageEstimate {
   <ol>
    <li>
     <p>Let <var>permission</var> be the result of <a>requesting permission to use</a>
-    "{{PermissionName/persistent-storage}}".
+    "<code>persistent-storage</code>".
 
     <p class="note">User agents are encouraged to not let the user answer this question twice for
     the same <a for=/>origin</a> around the same time and this algorithm is not equipped to handle
@@ -628,7 +687,7 @@ dictionary StorageEstimate {
     <p class=note>It will be false when there's an internal error.
 
    <li>
-    <p>If <var>persisted</var> is false and <var>permission</var> is {{PermissionState/"granted"}},
+    <p>If <var>persisted</var> is false and <var>permission</var> is "{{PermissionState/granted}}",
     then:
 
     <ol>
@@ -638,21 +697,27 @@ dictionary StorageEstimate {
      <li><p>If there was no internal error, then set <var>persisted</var> to true.
     </ol>
 
-   <li><p><a>Queue a task</a> to resolve <var>promise</var> with <var>persisted</var>.
+   <li><p><a>Queue a storage task</a> with <var>global</var> to <a for=/>resolve</a>
+   <var>promise</var> with <var>persisted</var>.
   </ol>
 
  <li><p>Return <var>promise</var>.
 </ol>
+</div>
 
+<div algorithm>
 <p>The <dfn method for=StorageManager><code>estimate()</code></dfn> method steps are:
 
 <ol>
- <li><p>Let <var>promise</var> be a new promise.
+ <li><p>Let <var>promise</var> be <a>a new promise</a>.
+
+ <li><p>Let <var>global</var> be <a>this</a>'s <a>relevant global object</a>.
 
  <li><p>Let <var>shelf</var> be the result of running <a>obtain a local storage shelf</a> with
  <a>this</a>'s <a>relevant settings object</a>.
 
- <li><p>If <var>shelf</var> is failure, then reject <var>promise</var> with a {{TypeError}}.
+ <li><p>If <var>shelf</var> is failure, then <a for=/>reject</a> <var>promise</var> with a
+ {{TypeError}}.
 
  <li>
   <p>Otherwise, run these steps <a>in parallel</a>:
@@ -667,17 +732,20 @@ dictionary StorageEstimate {
 
    <li>
     <p>If there was an internal error while obtaining <var>usage</var> and <var>quota</var>, then
-    <a>queue a task</a> to reject <var>promise</var> with a {{TypeError}}.
+    <a>queue a storage task</a> with <var>global</var> to <a for=/>reject</a> <var>promise</var>
+    with a {{TypeError}}.
 
     <p class=note>Internal errors are supposed to be extremely rare and indicate some kind of
     low-level platform or hardware fault. However, at the scale of the web with the diversity of
     implementation and platforms, the unexpected does occur.
 
-   <li><p>Otherwise, <a>queue a task</a> to resolve <var>promise</var> with <var>dictionary</var>.
+   <li><p>Otherwise, <a>queue a storage task</a> with <var>global</var> to <a for=/>resolve</a>
+   <var>promise</var> with <var>dictionary</var>.
   </ol>
 
  <li><p>Return <var>promise</var>.
 </ol>
+</div>
 
 
 
@@ -689,6 +757,8 @@ Aislinn Grigas,
 Alex Russell,
 Ali Alabbas,
 Andrew Sutherland,
+Andrew Williams,
+Austin Sullivan,
 Ben Kelly,
 Ben Turner,
 Dale Harvey,
@@ -705,6 +775,7 @@ Kenji Baheux,
 Kinuko Yasuda,
 Luke Wagner,
 Michael Nordman,
+Mike Taylor,
 Mounir Lamouri,
 Shachar Zohar,
 黃強 (Shawn Huang),
@@ -713,5 +784,4 @@ Victor Costan
 for being awesome!
 
 <p>This standard is written by <a lang=nl href=https://annevankesteren.nl/>Anne van Kesteren</a>
-(<a href=https://www.mozilla.org/>Mozilla</a>,
-<a href=mailto:annevk@annevk.nl>annevk@annevk.nl</a>).
+(<a href=https://www.apple.com/>Apple</a>, <a href=mailto:annevk@annevk.nl>annevk@annevk.nl</a>).

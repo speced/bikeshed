@@ -1,0 +1,967 @@
+<xmp class='metadata'>
+Title: ARIA-AT Automation
+Shortname: aria-at-automation
+Level: 1
+Status: w3c/CG-DRAFT
+Group: ARIA-AT CG
+Repository: w3c/aria-at-automation
+URL: https://w3c.github.io/aria-at-automation/
+Editor: Mike Pennisi, Bocoup https://bocoup.com, mike@bocoup.com
+Former Editor: Simon Pieters, Bocoup https://bocoup.com, simon@bocoup.com
+Abstract: A protocol for introspection and remove control of assistive technology software
+Markup Shorthands: markdown yes
+</xmp>
+
+<xmp class='link-defaults'>
+spec:infra; type:dfn; for:/; text:set
+spec:infra; type:dfn; text:list
+</xmp>
+
+<style>
+table { border-collapse: collapse; border-style: hidden hidden none hidden; }
+table thead, table tbody { border-bottom: solid; }
+table tbody th { text-align: left; }
+table tbody th:first-child { border-left: solid; }
+table td, table th { border-left: solid; border-right: solid; border-bottom: solid thin; vertical-align: top; padding: 0.2em; }
+</style>
+
+<pre class='link-defaults'>
+spec:infra; type:dfn; for:/; text:set
+spec:infra; type:dfn; text:list
+</pre>
+
+<style>
+table { border-collapse: collapse; border-style: hidden hidden none hidden; }
+table thead, table tbody { border-bottom: solid; }
+table tbody th { text-align: left; }
+table tbody th:first-child { border-left: solid; }
+table td, table th { border-left: solid; border-right: solid; border-bottom: solid thin; vertical-align: top; padding: 0.2em; }
+</style>
+
+Introduction {#intro}
+=====================
+
+AT Driver defines a protocol for introspection and remote control of assistive technology software, using a bidirectional communication channel.
+
+Explainer {#explainer}
+======================
+
+Specify a protocol using WebSocket that maximally reuses concepts and conventions from [WebDriver BiDi](https://w3c.github.io/webdriver-bidi/).
+
+A connection has two endpoints: remote and local. The remote end can control and read from the screen reader, which can either be implemented as a standalone application or be implemented as part of the AT software. The local end is what the test interfaces with, usually in the form of language-specific libraries providing an API.
+
+There should only be the WebSocket form of communication -- as in [BiDi-only sessions for WebDriver BiDi](https://w3c.github.io/webdriver-bidi/#supports-bidi-only-sessions).
+
+A connection can have 0 or more [=sessions=]. Each session corresponds to an instance of an AT. We may limit the maximum number of sessions per AT to 1 initially.
+
+When a remote end supports multiple sessions, it does not necessarily mean that there will be multiple ATs running at the same time in the same instance of an OS. Some ATs might not be able to function properly if there are other ATs running at the same time. The AT Driver [=session=] concept can still be used by having the remote end run in a separate environment and each AT is run in its own OS instance (for example in a virtual machine), and the remote end proxies messages in some fashion.
+
+Commands are grouped into [=modules=]. The modules could be: Sessions, Settings, Actions.
+
+Message transport is provided using the WebSocket protocol.
+
+The protocol is defined using a Concise Data Definition Language (CDDL) definition. The serialization is JSON.
+
+Example {#explainer-example}
+----------------------------
+
+First, the local end would establish a WebSocket connection.
+
+The local end then creates a session by sending
+
+```json
+{"method":"session.new","params":{...}}
+```
+
+The local end can then send commands to change settings or send key press actions for that session. The local end assigns a command id (which is included in the message). The remote end sends a message back with the result and the command id, so the local end knows which command the message applies to.
+
+When the screen reader speaks, the remote end will send a message as to the local end with the spoken text. This could be in the form of an event, which is not tied to any particular command.
+
+Infrastructure {#infra}
+=======================
+
+This specification depends on the Infra Standard. [[!INFRA]]
+
+Network protocol messages are defined using CDDL. [[!RFC8610]]
+
+A <dfn lt="UUID">Universally Unique Identifier (UUID)</dfn> is a 128 bits long URN that requires no central registration process. <dfn>Generating a UUID</dfn> means <i>Creating a UUID From Truly Random or Pseudo-Random Numbers</i>, and converting it to the string representation. [[!RFC4122]]
+
+Where algorithms that return values are fallible, they are written in terms of returning either <dfn>success</dfn> or <dfn>error</dfn>. A [=success=] value has an associated data field which encapsulates the value returned, whereas an [=error=] response has an associated [=error code=].
+
+When calling a fallible algorithm, the construct "Let |result| be the result of <dfn lt="try|trying">trying</dfn> to call |algorithm|" is equivalent to:
+
+1. Let |temp| be the result of calling |algorithm|.
+2. If |temp| is an [=error=], then return |temp|. Otherwise, let |result| be |temp|'s data field.
+
+Note: This means that errors are propagated upwards when using "trying".
+
+Nodes {#nodes}
+==============
+
+The AT Driver protocol consists of communication between:
+
+: <dfn>local end</dfn>
+:: The local end represents the client side of the protocol, which is usually in the form of language-specific libraries providing an API on top of the AT Driver protocol. This specification does not place any restrictions on the details of those libraries above the level of the wire protocol.
+: <dfn>remote end</dfn>
+:: The remote end hosts the server side of the protocol. The remote end is responsible for driving and listening to the assistive technology and sending information to the local end as defined in this specification.
+
+Protocol {#protocol}
+====================
+
+This section defines the basic concepts of the AT Driver protocol. These terms are distinct from their representation at the transport layer.
+
+The protocol is defined using a CDDL definition. For the convenience of implementors two separate CDDL definitions are defined; the <dfn>remote end definition</dfn> which defines the format of messages produced on the [=local end=] and consumed on the [=remote end=], and the <dfn>local end definition</dfn> which defines the format of messages produced on the [=remote end=] and consumed on the [=local end=].
+
+
+Definition {#protocol-definition}
+---------------------------------
+
+This section gives the initial contents of the remote end definition and local end definition. These are augmented by the definition fragments defined in the remainder of the specification.
+
+[=Remote end definition=]
+
+<xmp class="cddl remote-cddl">
+Extensible = {
+  *text => any
+}
+
+Command = {
+  id: uint,
+  CommandData,
+  Extensible,
+}
+
+CommandData = (
+  SessionCommand //
+  VendorSettingsCommand //
+  InteractionCommand
+)
+
+EmptyParams = { Extensible }
+</xmp>
+
+[=Local end definition=]:
+
+<xmp class="cddl local-cddl">
+Extensible = {
+  *text => any
+}
+
+Message = (
+  CommandResponse //
+  ErrorResponse //
+  Event
+)
+
+CommandResponse = {
+  id: uint,
+  result: ResultData,
+  Extensible,
+}
+
+ErrorResponse = {
+  id: uint / null,
+  error: "unknown error" / "unknown command" / "invalid argument" / "session not created",
+  message: text,
+  ?stacktrace: text,
+  Extensible,
+}
+
+ResultData = (
+  EmptyResult //
+  SessionResult //
+  VendorSettingsResult
+)
+
+EmptyResult = {}
+
+Event = {
+  EventData,
+  Extensible,
+}
+
+EventData = (
+  InteractionEvent
+)
+</xmp>
+
+Capabilities {#protocol-capabilities}
+-------------------------------------
+
+<dfn>Capabilities</dfn> are used to communicate the features supported by a given implementation. The [=local end=] may use capabilities to define which features it requires the [=remote end=] to satisfy when creating a new [=session=]. Likewise, the [=remote end=] uses capabilities to describe the full feature set for a [=session=].
+
+The following table of <dfn>standard capabilities</dfn> enumerates the capabilities each implementation must support.
+
+<table>
+  <caption>Standard capabilities</caption>
+  <tr>
+    <th>Capability
+    <th>Key
+    <th>Value type
+    <th>Description
+  <tr>
+    <td><dfn for="standard capabilities">AT name</dfn>
+    <td>"`atName`"
+    <td>[=string=]
+    <td>Identifies the assistive technology.
+  <tr>
+    <td><dfn for="standard capabilities">AT version</dfn>
+    <td>"`atVersion`"
+    <td>[=string=]
+    <td>Identifies the version of the assistive technology.
+  <tr>
+    <td><dfn for="standard capabilities">Platform</dfn>
+    <td>"`platformName`"
+    <td>[=string=]
+    <td>Identifies the operating system of the [=remote end=].
+</table>
+
+[=Remote ends=] may introduce <dfn>extension capabilities</dfn> that are extra capabilities used to provide configuration or fulfill other vendor-specific needs. Extension capabilities' key must contain a "`:`" (colon) character, denoting an implementation specific namespace. The value can be arbitrary JSON types.
+
+<div algorithm>
+
+To <dfn>process capabilities</dfn> with argument |parameters|, the [=remote end=] must:
+
+1. Let |capabilities request| be |parameters|["`capabilities`"] if it <a for=map>exists</a>, else null.
+2. Let |required capabilities| be |capabilities request|["`alwaysMatch`"] if it <a for=map>exists</a>, else null.
+3. Let |matched capabilities| be the result of [=trying=] to [=match capabilities=] given |required capabilities|.
+4. If |matched capabilities| is not null, then return [=success=] with data |matched capabilities|.
+5. Return [=success=] with data null.
+
+</div>
+
+<div algorithm>
+
+To <dfn>match capabilities</dfn> given |requested capabilities|, the [=remote end=] must:
+
+1. Let |matched capabilities| be a [=map=] with the following entries:
+    : "`atName`"
+    :: [=ASCII lowercase=] name of the assistive technology as a [=string=].
+    : "`atVersion`"
+    :: The assistive technology version, as a [=string=].
+    : "`platformName`"
+    :: [=ASCII lowercase=] name of the current platform as a [=string=].
+2. Optionally add [=extension capabilities=] as entries to |matched capabilities|.
+3. [=map/For each=] |key| → |value| of |requested capabilities|:
+    1. Let |match value| be |value|.
+    2. Switch on |key|:
+        : "`atName`"
+        :: If |value| is not equal to |matched capabilities|["`atName`"], then return [=success=] with data null.
+        : "`atVersion`"
+        :: Compare |value| to |matched capabilities|["`browserVersion`"] using an [=implementation-defined=] comparison algorithm. The comparison is to accept a value that places constraints on the version using the "`<`", "`<=`", "`>`", and "`>=`" operators.
+        : "`platformName`"
+        :: If |value| is not equal to |matched capabilities|["`platformName`"], then return [=success=] with data null.
+        : Otherwise
+        :: If |key| is the key of an [=extension capability=], set |match value| to the result of [=trying=] implementation-specific steps to match on |key| with |value|. If the match is not successful, return [=success=] with data null.
+    3. [=map/Set=] |matched capabilities|[|key|] to |match value|.
+4. Return [=success=] with data |matched capabilities|.
+
+</div>
+
+Session {#protocol-session}
+---------------------------
+
+A <dfn>session</dfn> represents the connection between a [=local end=] and a specific [=remote end=].
+
+A [=remote end=] has an associated list of <dfn for="remote end">active sessions</dfn>, which is a list of all [=sessions=] that are currently started. A remote end has at most one [=active session=] at a given time.
+
+A [=session=] has an associated <dfn for="session">session ID</dfn> (a string representation of a [=UUID=]) used to uniquely identify this session. Unless stated otherwise it is null.
+
+
+Modules {#protocol-modules}
+---------------------------
+
+The AT Driver protocol is organized into modules.
+
+Each <dfn>module</dfn> represents a collection of related [=commands=] and [=events=] pertaining to a certain aspect of the assistive technology.
+
+Each module has a <dfn>module name</dfn> which is a string. The [=command name=] and [=event name=] for commands and events defined in the module start with the [=module name=] followed by a period "`.`".
+
+Modules which contain [=commands=] define [=remote end definition=] fragments.
+
+An implementation may define <dfn>extension modules</dfn>. These must have a module name that contains a single colon "`:`" character. The part before the colon is the prefix; this is typically the same for all extension modules specific to a given implementation and should be unique for a given implementation. Such modules extend the [=local end definition=] and [=remote end definition=] providing additional groups as choices for the defined [=commands=] and [=events=].
+
+Commands {#protocol-commands}
+-----------------------------
+
+A <dfn>command</dfn> is an asynchronous operation, requested by the [=local end=] and run on the [=remote end=], resulting in either a [=success=] or an [=error=] being returned to the [=local end=]. Multiple commands can run at the same time, and commands can potentially be long-running. As a consequence, commands can finish out-of-order.
+
+Each [=command=] is defined by:
+
+* A <dfn>command type</dfn> which is defined by a [=remote end definition=] fragment containing a group. Each such group has two fields:
+    * `method` which is a string literal in the form `[module name].[method name]`. This is the <dfn>command name</dfn>.
+    * `params` which defines a mapping containing data that to be passed into the command. The populated value of this map is the <dfn>command parameters</dfn>.
+* A <dfn>result type</dfn>, which is defined by the [=local end definition=] fragment.
+* A set of <dfn>remote end steps</dfn> which define the actions to take for a command given a [=session=] and [=command parameters=] and return an instance of the command [=result type=].
+
+A command that can run without an active session is a <dfn>static command</dfn>. Commands are not static commands unless stated in their definition.
+
+When commands are sent from the [=local end=] they have a command id. This is an identifier used by the [=local end=] to identify the response from a particular command. From the point of view of the [=remote end=] this identifier is opaque and cannot be used internally to identify the command.
+
+The <dfn>set of all command names</dfn> is a [=set=] containing all the defined [=command names=], including any belonging to [=extension modules=].
+
+Events {#protocol-events}
+-------------------------
+
+An <dfn>event</dfn> is a notification, sent by the [=remote end=] to the [=local end=], signaling that something of interest has occurred on the [=remote end=].
+
+* An <dfn>event type</dfn> is defined by a [=local end definition=] fragment containing a group. Each such group has two fields:
+    * `method` which is a string literal of the form `[module name].[event name]`. This is the <dfn>event name</dfn>.
+    * `params` which defines a mapping containing event data. The populated value of this map is the <dfn>event parameters</dfn>.
+* A <dfn>remote end event trigger</dfn> which defines when the event is triggered and steps to construct the [=event type=] data.
+
+Errors {#protocol-errors}
+-------------------------
+
+The following table lists each <dfn>error code</dfn>, its associated JSON `error` code, and a non-normative description of the error.
+
+<table>
+  <caption>Error codes</caption>
+  <tr>
+    <th>Error code
+    <th>JSON error code
+    <th>Description
+  <tr>
+    <td><dfn for="error code">invalid argument</dfn>
+    <td>`invalid argument`
+    <td>The arguments passed to a [=command=] are either invalid or malformed.
+  <tr>
+    <td><dfn for="error code">invalid session id</dfn>
+    <td>`invalid session id`
+    <td>The [=session=] either does not exist or it's not active.
+  <tr>
+    <td><dfn for="error code">unknown command</dfn>
+    <td>`unknown command`
+    <td>A [=command=] could not be executed because the [=remote end=] is not aware of it.
+  <tr>
+    <td><dfn for="error code">session not created</dfn>
+    <td>`session not created`
+    <td>A new [=session=] could not be created.
+  <tr>
+    <td><dfn for="error code">cannot simulate keyboard interaction</dfn>
+    <td>`cannot simulate keyboard interaction`
+    <td>The [=remote end=] cannot simulate keyboard interaction.
+  <tr>
+    <td><dfn for="error code">invalid OS focus state</dfn>
+    <td>`invalid OS focus state`
+    <td>The application that currently has OS focus is not one of the expected applications.
+</table>
+
+Security checks {#security-checks}
+----------------------------------
+
+In order to mitigate security risks when using this API, there are some security checks for certain commands.
+
+To <dfn>check that keyboard interaction can be simulated</dfn>:
+
+1. If the remote end cannot simulate keyboard interaction for any [=implementation-defined=] reason, then return an [=error=] with [=error code=] [=cannot simulate keyboard interaction=].
+2. Return [=success=] with data null.
+
+To <dfn>check that one of the expected applications has focus</dfn>:
+
+1. If the application that currently has OS focus (and so could act on simulated key presses from this API) is not one of the expected applications, then return an <a>error</a> with <a>error code</a> <a for="error code">invalid OS focus state</a>. Which applications are expected is <a>implementation-defined</a>.
+2. Return <a>success</a> with data null.
+
+To determine whether a string |text| <dfn>should be withheld</dfn>:
+
+1. If the [=remote end=] determines that it is unsafe to expose |text| to an external process for any [=implementation-defined=] reason:
+    2. Return true.
+2. Return false.
+
+Transport {#transport}
+======================
+
+Message transport is provided using the WebSocket protocol. [[!RFC6455]]
+
+A <dfn>WebSocket listener</dfn> is a network endpoint that is able to accept incoming WebSocket connections.
+
+A [=WebSocket listener=] has a <dfn for="WebSocket listener">host</dfn>,
+a <dfn for="WebSocket listener">port</dfn>,
+and a <dfn for="WebSocket listener">secure flag</dfn>.
+
+When a [=WebSocket listener=] |listener| is created, a [=remote end=] must start to listen for WebSocket connections on the host and port given by |listener|'s host and port. If |listener|'s [=secure flag=] is set, then connections established from |listener| must be TLS encrypted.
+
+A [=remote end=] has a [=set=] of [=WebSocket listeners=] <dfn for="remote end">active listeners</dfn>, which is initially empty.
+
+A [=remote end=] has a [=set=] of <dfn for="remote end">WebSocket connections not associated with a session</dfn>, which is initially empty.
+
+A <dfn>WebSocket connection</dfn> is a network connection that follows the requirements of the WebSocket protocol. [[!RFC6455]]
+
+A [=session=] has a [=set=] of <dfn for="session">session WebSocket connections</dfn> whose elements are [=WebSocket connections=]. This is initially empty.
+
+A [=session=] |session| is <dfn for="session">associated with connection</dfn> |connection| if |session|'s [=session WebSocket connections=] contains |connection|.
+
+Note: Each [=WebSocket connection=] is associated with at most one [=session=].
+
+When a client [establishes a WebSocket connection](https://tools.ietf.org/html/rfc6455#section-4.1) |connection| by connecting to one of the set of [=active listeners=] |listener|, the implementation must proceed according to the [WebSocket server-side requirements](https://tools.ietf.org/html/rfc6455#section-4.2), with the following steps run when deciding whether to accept the incoming connection:
+
+1. Let |resource name| be the resource name from [reading the client's opening handshake](https://tools.ietf.org/html/rfc6455#section-4.2.1). If |resource name| is not "`/session`", then stop running these steps and act as if the requested service is not available.
+2. Run any other [=implementation-defined=] steps to decide if the connection should be accepted, and if it is not stop running these steps and act as if the requested service is not available.
+3. Add the connection to the set of [=WebSocket connections not associated with a session=].
+
+When a [WebSocket message has been received](https://tools.ietf.org/html/rfc6455#section-6.2) for a [=WebSocket connection=] |connection| with type |type| and data |data|, a [=remote end=] must [=handle an incoming message=] given |connection|, |type| and |data|.
+
+When the [WebSocket closing handshake is started](https://tools.ietf.org/html/rfc6455#section-7.1.3) or when the [WebSocket connection is closed](https://tools.ietf.org/html/rfc6455#section-7.1.4) for a [=WebSocket connection=] |connection|, a [=remote end=] must [=handle a connection closing=] given |connection|.
+
+Note: Both conditions are needed because it is possible for a WebSocket connection to be closed without a closing handshake.
+
+To <dfn>start listening for a WebSocket connection</dfn>:
+
+1. Let |listener| be a new [=WebSocket listener=] with [=implementation-defined=] <a for="WebSocket listener">host</a>, <a for="WebSocket listener">port</a>, and <a for="WebSocket listener">secure flag</a>.
+2. <a for="set">Append</a> |listener| to the [=remote end=]'s [=active listeners=].
+3. Return |listener|.
+
+Note: a future iteration of this specification may allow multiple connections, to support [intermediary nodes like in WebDriver](https://w3c.github.io/webdriver/#dfn-intermediary-nodes).
+
+<div algorithm>
+
+To <dfn>handle an incoming message</dfn> given a [=WebSocket connection=] |connection|, type |type| and data |data|:
+
+1. If |type| is not [text](https://tools.ietf.org/html/rfc6455#section-5.2), [=send an error response=] given |connection|, null, and <a for="error code">invalid argument</a>, and finally return.
+2. [=Assert=]: |data| is a [=scalar value string=], because the [WebSocket handling errors in UTF-8-encoded data=](https://tools.ietf.org/html/rfc6455#section-8.1) would already have [failed the WebSocket connection](https://tools.ietf.org/html/rfc6455#section-7.1.7) otherwise.
+3. If there is a [=session=] [=associated with connection=] |connection|, let |session| be that session. Otherwise if |connection| is in the set of [=WebSocket connections not associated with a session=], let |session| be null. Otherwise, return.
+4. Let |parsed| be the result of [=parsing JSON into Infra values=] given |data|. If this throws an exception, then [=send an error response=] given |connection|, null, and <a for="error code">invalid argument</a>, and finally return.
+5. Match parsed against the [=remote end definition=]. If this results in a match:
+    1. Let |matched| be the map representing the matched data.
+    2. [=Assert=]: |matched| <a for=map>contains</a> "`id`", "`method`", and "`params`".
+    3. Let |command id| be |matched|["`id`"].
+    4. Let |method| be |matched|["`method`"].
+    5. Let |command| be the command with [=command name=] |method|.
+    6. If |session| is null and |command| is not a [=static command=], then [=send an error response=] given |connection|, |command id|, and [=invalid session id=], and return.
+    7. Run the following steps [=in parallel=]:
+        1. Let |result| be the result of running the [=remote end steps=] for |command| given |session| and [=command parameters=] |matched|["`params`"].
+        2. If |result| is an [=error=], then [=send an error response=] given |connection|, |command id|, and |result|'s [=error code=], and finally return.
+        3. Let |value| be |result|'s data.
+        4. [=Assert=]: |value| matches the definition for the [=result type=] corresponding to the command with [=command name=] |method|.
+        5. If |method| is "`session.new`", let [=session=] be the entry in the list of [=active sessions=] whose [=session ID=] is equal to the "`sessionId`" property of |value|, let |session|'s [=WebSocket connection=] be |connection|, and remove |connection| from the set of [=WebSocket connections not associated with a session=].
+        6. Let |response| be a new map matching the `CommandResponse` production in the [=local end definition=] with the `id` field set to |command id| and the `value` field set to |value|.
+        7. Let |serialized| be the result of [=serialize an infra value to JSON bytes=] given |response|.
+        8. [Send a WebSocket message](https://tools.ietf.org/html/rfc6455#section-6.1) comprised of |serialized| over |connection|.
+6. Otherwise:
+    1. Let |command id| be null.
+    2. If |parsed| is a [=map=] and |parsed|["`id`"] <a for=map>exists</a> and is an integer greater than or equal to zero, set |command id| to that integer.
+    3. Let |error code| be <a for="error code">invalid argument</a>.
+    4. If |parsed| is a [=map=] and |parsed|["`method`"] <a for=map>exists</a> and is a string, but |parsed|["`method`"] is not in the [=set of all command names=], set |error code| to [=unknown command=].
+    5. [=Send an error response=] given |connection|, |command id|, and |error code|.
+
+</div>
+
+<div algorithm>
+
+To <dfn>emit an event</dfn> given |session|, and |body|:
+
+  1. [=Assert=]: |body| has <a for=map>size</a> 2 and <a for=map>contains</a> "`method`" and "`params`".
+  2. Let |connection| be |session|'s [=WebSocket connection=].
+  3. If |connection| is null, return.
+  4. Let |serialized| be the result of [=serialize an infra value to JSON bytes=] given |body|.
+  5. [Send a WebSocket message](https://tools.ietf.org/html/rfc6455#section-6.1) comprised of |serialized| over |connection|.
+
+</div>
+
+<div algorithm>
+
+To <dfn>send an error response</dfn> given a [=WebSocket connection=] |connection|, |command id|, and |error code|:
+
+  1. Let |error data| be a new [=map=] matching the `ErrorResponse` production in the [=local end definition=], with the `id` field set to |command id|, the `error` field set to |error code|, the `message` field set to an [=implementation-defined=] string containing a human-readable definition of the error that occurred and the `stacktrace` field optionally set to an [=implementation-defined=] string containing a stack trace report of the active stack frames at the time when the error occurred.
+  2. Let |response| be the result of [=serialize an infra value to JSON bytes=] given |error data|.
+      Note: command id can be null, in which case the id field will also be set to null, not omitted from response.
+  3. [Send a WebSocket message](https://tools.ietf.org/html/rfc6455#section-6.1) comprised of |response| over |connection|.
+
+</div>
+
+<div algorithm>
+
+To <dfn>handle a connection closing</dfn> given a [=WebSocket connection=] |connection|:
+
+  1. If there is a [=session=] [=associated with connection=] |connection|:
+      1. Let |session| be the [=session=] [=associated with connection=] |connection|.
+      2. Remove |connection| from |session|'s [=session WebSocket connections=].
+      3. If |session|'s [=session WebSocket connections=] is [=list/empty=]:
+          1. Remove |session| from [=active sessions=].
+  2. Otherwise, if the set of [=WebSocket connections not associated with a session=] contains |connection|, remove |connection| from that set.
+
+</div>
+
+Establishing a Connection {#transport-establishing}
+----------------------------------------------------
+
+The URL to the WebSocket server is communicated out-of-band. When an implementation is ready to accept requests to start an AT Driver session, it must:
+
+1. [=Start listening for a WebSocket connection=].
+
+
+Modules {#modules}
+==================
+
+The session Module {#module-session}
+------------------------------------
+
+### Definition ### {#module-session-definition}
+
+[=Remote end definition=]:
+
+<xmp class="cddl remote-cddl">
+SessionCommand = (SessionNewCommand)
+</xmp>
+
+[=Local end definition=]
+
+<xmp class="cddl local-cddl">
+SessionResult = (SessionNewResult)
+</xmp>
+
+### Types ### {#module-session-types}
+
+#### The session.CapabilitiesRequest Type #### {#module-session-CapabilitiesRequest}
+
+[=Remote end definition=] and [=local end definition=]:
+
+<xmp class="cddl remote-cddl local-cddl">
+CapabilitiesRequest = {
+  ?atName: text,
+  ?atVersion: text,
+  ?platformName: text,
+  Extensible,
+}
+</xmp>
+
+The `CapabilitiesRequest` type represents capabilities requested for a session.
+
+### Commands ###{#module-session-commands}
+
+#### The session.new Command #### {#module-session-new}
+
+The <dfn>session.new</dfn> command allows creating a new [=session=]. This is a [=static command=].
+
+<dl>
+  <dt>[=Command Type=]
+  <dd>
+
+  <xmp class="cddl remote-cddl">
+  SessionNewCommand = {
+    method: "session.new",
+    params: {capabilities: CapabilitiesRequestParameters},
+  }
+
+  CapabilitiesRequestParameters = {
+    ?alwaysMatch: CapabilitiesRequest,
+  }
+  </xmp>
+
+  Note: `firstMatch` is not included currently to reduce complexity.
+
+  <dt>[=Result Type=]
+  <dd>
+
+  <xmp class="cddl local-cddl">
+  SessionNewResult = {
+    sessionId: text,
+    capabilities: {
+      atName: text,
+      atVersion: text,
+      platformName: text,
+      Extensible,
+    }
+  }
+  </xmp>
+
+</dl>
+
+<div algorithm="remote end steps for session.new">
+
+The [=remote end steps=] given |session| and |command parameters| are:
+
+1. If |session| is not null, return an [=error=] with error code [=session not created=].
+2. If the list of [=active sessions=] is not empty, then return [=error=] with error code [=session not created=].
+3. If the implementation is unable to start a new session for any reason, return an [=error=] with error code [=session not created=].
+4. Let |capabilities| be the result of [=trying=] to [=process capabilities=] with |command parameters|.
+5. If |capabilities| is null, return [=error=] with error code [=session not created=].
+6. Let |session id| be the result of [=generating a UUID=].
+7. Let |session| be a new [=session=] with the [=session ID=] of |session id|.
+8. Append |session| to [=active sessions=].
+9. Start an instance of the appropriate assistive technology, given |capabilities|.
+10. Let |body| be a new [=map=] matching the `SessionNewResult` production, with the `sessionId` field set to |session|'s [=session ID=], and the `capabilities` field set to |capabilities|.
+11. Return [=success=] with data |body|.
+
+</div>
+
+The &lt;vendor>:settings Module {#module-vendor-settings}
+--------------------------------------
+
+Currently, there are no standardized settings. Implementations that wish to allow controlling and reading settings through the protocol defined in this specification must support settings as an <a>extension module</a>, with the structure defined in this section. Implementations are strongly encouraged to review the security implications of each setting, and only support the settings that are deemed safe. It is not defined what constitutes a setting, however, it is intended to represent user preferences such as the default voice, or the default rate of speech.
+
+In the schema definitions in this section, `<vendor>` is a placeholder for an <a>implementation-defined</a> prefix for the <a>extension module</a>. The value of the prefix should be the name of the vendor or the assistive technology product, as appropriate.
+
+Note: The prefix could be, for example, `nvda`, `jaws`, or `macOSVoiceOver`.
+
+A [=remote end=] has an associated set of <dfn for="remote end">supported settings</dfn>, which is either null or a [=set=] of strings which contains the name of every setting that may be referenced by this [=module=].
+
+<div algorithm>
+
+To determine if a <dfn>setting name is invalid</dfn> given string |name|:
+
+1. If [=supported settings=] is null:
+    1. Return false.
+2. If [=supported settings=] [=list/contains=] |name|:
+    1. Return false.
+3. Return true.
+
+</div>
+
+<div algorithm>
+
+To <dfn>get settings</dfn> given a [=list=] of strings |names|:
+
+1. Let |items| be a new [=list=].
+2. [=list/For each=] |name| of |names|:
+    1. If [=setting name is invalid=] given |name|:
+        1. Return an [=error=] with [=error code=] <a for="error code">invalid argument</a>.
+    2. Let |value| be the value of the setting named |name|.
+    3. Let |item| be a new [=map=] matching the `VendorSettingsGetSettingsResultItem` production in the [=local end definition=] with the `name` field set to |name| and the `value` field set to |value|.
+    4. [=list/Append=] |item| to |items|.
+3. Let |body| be a new [=map=] matching the `VendorSettingsGetSettingsResult` production, with the `settings` field set to |items|.
+4. Return [=success=] with data |body|.
+
+</div>
+
+<div algorithm>
+
+To <dfn>modify setting</dfn> given string |name| and |value|:
+
+1. If [=setting name is invalid=] given |name|:
+    1. Return an [=error=] with [=error code=] <a for="error code">invalid argument</a>.
+2. Take any [=implementation-defined=] steps to change the [=remote end=] setting named |name| to the value |value|.
+3. If there is any [=implementation-defined=] indication that the setting named |name| does not hold the value |value|:
+    1. Return an [=error=] with [=error code=] <a for="error code">invalid argument</a>.
+4. Return [=success=] with data null.
+
+</div>
+
+Note: Today's implementations may not be able to detect invalid setting names or values, limiting their ability to report when operations do not model authentic interactions with the internal state. The algorithms in this [=module=] are designed to reflect this.
+
+Issue: Require implementations to maintain a static list of supported settings.
+
+### Definition ### {#module-vendor-settings-definition}
+
+<a>Remote end definition</a>
+
+<xmp class="cddl remote-cddl">
+VendorSettingsCommand = {
+  VendorSettingsSetSettingsCommand //
+  VendorSettingsGetSettingsCommand //
+  VendorSettingsGetSupportedSettingsCommand
+}
+</xmp>
+
+<a>Local end definition</a>
+
+<xmp class="cddl local-cddl">
+VendorSettingsResult = {
+  VendorSettingsGetSettingsResult
+}
+</xmp>
+
+### Types ### {#module-vendor-settings-types}
+
+#### The VendorSettingsGetSettingsResult type #### {#module-vendor-settings-get-settings-result}
+
+[=Local end definition=]:
+
+<xmp class="cddl local-cddl">
+VendorSettingsGetSettingsResult = {
+  settings: [1* VendorSettingsGetSettingsResultItem ],
+}
+
+VendorSettingsGetSettingsResultItem = {
+  name: text,
+  value: any,
+  Extensible,
+}
+</xmp>
+
+The `VendorSettingsGetSettingsResult` type contains a list of settings and their values.
+
+### Commands ### {#module-settings-commands}
+
+#### The &lt;vendor>:settings.setSettings Command #### {#command-vendor-settings-set-settings}
+
+The <dfn>&lt;vendor>:settings.setSettings</dfn> command  sets the values of one or more settings.
+
+Note: Today's implementations may not be able to detect failed modification operations. [=&lt;vendor>:settings.setSettings=] is designed to reflect that reality. Clients should therefore interpret [=successes=] with some skepticism as such results do not necessarily indicate that the referenced setting has the desired value.
+
+Issue: Require implementations to report failures in settings modification operations.
+
+<dl>
+  <dt>[=Command Type=]</dt>
+  <dd>
+    <xmp class="cddl remote-cddl">
+    VendorSettingsSetSettingsCommand = {
+      method: "<vendor>:settings.setSettings",
+      params: VendorSettingsSetSettingsParameters
+    }
+
+    VendorSettingsSetSettingsParameters = {
+      settings: [1* VendorSettingsSetSettingsParametersItem ],
+    }
+
+    VendorSettingsSetSettingsParametersItem = {
+      name: text,
+      value: any,
+      Extensible,
+    }
+    </xmp>
+  </dd>
+  <dt>[=Result Type=]</dt>
+  <dd>
+    <xmp class="cddl">
+    EmptyResult
+    </xmp>
+  </dd>
+</dl>
+
+<div algorithm="remote end steps for &lt;vendor>:settings.setSettings">
+
+The [=remote end steps=] given <var ignore>session</var> and |command parameters| are:
+
+1. Let |settings| be the value of the <code>settings</code> field of |command parameters|.
+2. [=list/For each=] |setting| of |settings|:
+    1. Let |name| be the value of the <code>name</code> field of |setting|.
+    2. Let |value| be the value of the <code>value</code> field of |setting|.
+    3. [=Try=] to [=modify setting=] with |name| and |value|.
+3. Let |body| be a new [=map=].
+4. Return [=success=] with data |body|.
+
+</div>
+
+#### The &lt;vendor>settings.getSettings Command #### {#command-vendor-settings-get-settings}
+
+The <dfn>&lt;vendor>:settings.getSettings command</dfn> returns a list of the requested settings and their values.
+
+<dl>
+  <dt>[=Command Type=]</dt>
+  <dd>
+    <xmp class="cddl remote-cddl">
+    VendorSettingsGetSettingsCommand = {
+      method: "<vendor>:settings.getSettings",
+      params: VendorSettingsGetSettingsParameters
+    }
+
+    VendorSettingsGetSettingsParameters = {
+      settings: [1* VendorSettingsGetSettingsParametersItem ],
+    }
+
+    VendorSettingsGetSettingsParametersItem = {
+      name: text,
+      Extensible,
+    }
+    </xmp>
+  </dd>
+  <dt>[=Result Type=]</dt>
+  <dd>
+    <xmp class="cddl">
+    VendorSettingsGetSettingsResult
+    </xmp>
+  </dd>
+</dl>
+
+<div algorithm="remote end steps for &lt;vendor>:settings.getSettings">
+
+The <a>remote end steps</a> given <var ignore>session</var> and |command parameters| are:
+
+1. Let |names| be the value of the <code>settings</code> field of |command parameters|.
+2. Return the result of [=get settings=] with |names|.
+
+</div>
+
+#### The &lt;vendor>settings.getSupportedSettings Command #### {#command-vendor-settings-get-supported-settings}
+
+The <dfn>&lt;vendor>:settings.getSupportedSettings command</dfn> returns a list of all settings that the [=remote end=] supports, and their values.
+
+<dl>
+  <dt>[=Command Type=]</dt>
+  <dd>
+    <xmp class="cddl remote-cddl">
+    VendorSettingsGetSupportedSettingsCommand = {
+      method: "<vendor>:settings.getSupportedSettings",
+      params: EmptyParams
+    }
+    </xmp>
+  </dd>
+  <dt>[=Result Type=]</dt>
+  <dd>
+    <xmp class="cddl">
+    VendorSettingsGetSettingsResult
+    </xmp>
+  </dd>
+</dl>
+
+
+<div algorithm="remote end steps for &lt;vendor>:settings.getSupportedSettings">
+
+The <a>remote end steps</a> given <var ignore>session</var> and <var ignore>command parameters</var> are:
+
+1. If [=supported settings=] is null:
+    1. Let |names| be a new [=list=].
+2. Otherwise:
+    1. Let |names| be [=supported settings=].
+3. Let |result| be the result of [=get settings=] with |names|.
+4. [=Assert=]: |result| is a [=success=] value.
+5. Return |result|.
+
+</div>
+
+#### Events #### {#module-vendor-settings-events}
+
+Issue: Do we need a "setting changed" event?
+
+The Interaction Module {#module-interaction}
+--------------------------------------------
+
+### Definition ### {#module-interaction-definition}
+
+[=Remote end definition=]:
+
+<xmp class="cddl remote-cddl">
+InteractionCommand = (InteractionPressKeysCommand)
+</xmp>
+
+[=Local end definition=]:
+
+<xmp class="cddl local-cddl">
+
+InteractionEvent = (InteractionCapturedOutputEvent)
+
+</xmp>
+
+### Types ### {#module-interaction-types}
+
+<xmp class="cddl local-cddl">
+InteractionCapturedOutputParameters = {
+  data: text,
+  Extensible,
+}
+</xmp>
+
+### Commands ### {#module-interaction-commands}
+
+#### The interaction.pressKeys Command #### {#module-interaction-presskeys}
+
+The <dfn>interaction.pressKeys</dfn> command simulates pressing a key combination on a keyboard.
+
+Issue(34): This command does not yet have a means for indicating a screen-reader specific modifier key (or keys).
+
+<dl>
+  <dt>[=Command Type=]
+  <dd>
+
+  <pre class="cddl remote-cddl">
+  InteractionPressKeysCommand = {
+    method: "interaction.pressKeys",
+    params: InteractionPressKeysParameters
+  }
+
+  InteractionPressKeysParameters = {
+    "keys" => KeyCombination,
+    Extensible,
+  }
+
+  KeyCombination = [
+    1* text
+  ]
+  </pre>
+
+  <dt>Result Type
+  <dd>
+
+  <pre class="cddl">
+  EmptyResult
+  </pre>
+
+</dl>
+
+Note: Each string in `KeyCombination` represents a "raw key" consisting of a
+single code point with the same meaning as in <a
+href="https://w3c.github.io/webdriver/#keyboard-actions">WebDriver's keyboard
+actions</a>. For example, `["\uE008", "a"]` means holding the left shift key
+and pressing "a", and then releasing the left shift key. [[WEBDRIVER]]
+
+The [=remote end steps=] given |session| and |command parameters| are:
+
+1. [=Try=] to [=check that keyboard interaction can be simulated=].
+2. [=Try=] to [=check that one of the expected applications has focus=].
+3. Let |keys| be the value of the <code>keys</code> field of |command
+    parameters|.
+4. [=list/For each=] |key| of |keys|:
+    1. Run [=implementation-defined=] steps to simulate depressing |key|.
+5. [=list/For each=] |key| of |keys| in reverse [=List=] order:
+    1. Run [=implementation-defined=] steps to simulate releasing |key|.
+6. Let |body| be a new [=map=].
+7. Return [=success=] with data |body|.
+
+### Events ### {#module-interaction-events}
+
+<dl>
+  <dt>Event Type
+  <dd>
+
+  <xmp class="cddl local-cddl">
+  InteractionCapturedOutputEvent = {
+    method: "interaction.capturedOutput",
+    params: InteractionCapturedOutputParameters
+  }
+  </xmp>
+
+</dl>
+
+<div algorithm="remote end event trigger for interaction.capturedOutput">
+
+The [=remote end event trigger=] is:
+
+When the assistive technology would send some text |data| (a string, without speech-specific markup or annotations) to the Text-To-Speech system, or equivalent for non-speech assistive technology software, run these steps:
+
+1. If |data| [=should be withheld=]:
+    1. Return.
+2. Let |params| be a [=map=] matching the `InteractionCapturedOutputParameters` production with the `data` field set to |data|.
+3. Let |body| be a [=map=] matching the `InteractionCapturedOutputEvent` production with the `params` field set to |params|.
+4. [=list/For each=] |session| of [=active sessions=]:
+    1. [=Emit an event=] with |session| and |body|.
+
+</div>
+
+Privacy {#privacy}
+==================
+
+It is advisable that [=remote ends=] create a new profile when creating a new session. This prevents potentially sensitive session data from being accessible to new sessions, ensuring both privacy and preventing state from bleeding through to the next session.
+
+Security {#security}
+====================
+
+An assistive technology can rely on a command-line flag or a configuration option to test whether to enable AT Driver, or alternatively make the assistive technology initiate or confirm the connection through a privileged content document or control widget, in case the assistive technology does not directly implement the WebSocket endpoints.
+
+It is strongly suggested that assistive technology require users to take explicit action to enable AT Driver, and that AT Driver remains disabled in publicly consumed versions of the assistive technology.
+
+To prevent arbitrary machines on the network from connecting and creating sessions, it is suggested that only connections from loopback devices are allowed by default.
+
+The remote end can include a configuration option to limit the accepted IP range allowed to connect and make requests. The default setting for this might be to limit connections to the IPv4 localhost CIDR range 127.0.0.0/8 and the IPv6 localhost address ::1. [[RFC4632]]
+
+It is also suggested that assistive technologies make an effort to indicate that a session that is under control of AT Driver. The indication should be accessible also for non-visual users. For example, this can be done through an OS-level notification or alert dialog.
+
+Issue: TODO sandbox (limit availability to information that apps usually can't access, e.g. login screen).
+
+Issue: TODO no HID level simulated keypresses.
+
+Issue: TODO exclude access to any security-sensitive settings.
+
+Issue: TODO exclude access to any security-sensitive commands.
+
+Appendix A: Schemas {#schemas}
+==============================
+
+The [=remote end definition=] and [=local end definition=] are available as non-normative CDDL and JSON Schema schemas:
+
+- [at-driver-remote.cddl](schemas/at-driver-remote.cddl)
+- [at-driver-local.cddl](schemas/at-driver-local.cddl)
+- [at-driver-remote.json](schemas/at-driver-remote.json)
+- [at-driver-local.json](schemas/at-driver-local.json)
+
+Issue(23): The JSON Schema files are not yet generated from the CDDL and so might be out of date.

@@ -1,0 +1,798 @@
+<pre class="metadata">
+Title: Handwriting Recognition API
+Shortname: handwriting-recognition
+Repository: WICG/handwriting-recognition
+Inline Github Issues: true
+Group: WICG
+Status: CG-DRAFT
+Level: 1
+URL: https://wicg.github.io/handwriting-recognition/
+Boilerplate: omit conformance, omit feedback-header
+Editor: Jiewei Qian, Google https://www.google.com/, qjw@google.com, https://wacky.one/, w3cid 127621
+Abstract: The handwriting recognition API enables web application to recognize handwritten texts, using existing operating system capabilities.
+!Participate: <a href="https://github.com/WICG/handwriting-recognition">GitHub WICG/handwriting-recognition</a> (<a href="https://github.com/WICG/handwriting-recognition/issues/new">new issue</a>, <a href="https://github.com/WICG/handwriting-recognition/issues?state=open">open issues</a>)
+!Commits: <a href="https://github.com/WICG/handwriting-recognition/commits/main/spec.bs">GitHub spec.bs commits</a>
+Complain About: accidental-2119 yes, missing-example-ids yes
+Indent: 2
+Default Biblio Status: current
+Markup Shorthands: markdown yes
+Assume Explicit For: yes
+</pre>
+
+<style>
+  /* domintro from https://resources.whatwg.org/standard.css */
+.domintro {
+  position: relative;
+  color: green;
+  background: #DDFFDD;
+  margin: 2.5em 0 2em 0;
+  padding: 1.5em 1em 0.5em 2em;
+}
+
+.domintro dt, .domintro dt * {
+  color: black;
+  font-size: inherit;
+}
+.domintro dd {
+  margin: 0.5em 0 1em 2em; padding: 0;
+}
+.domintro dd p {
+  margin: 0.5em 0;
+}
+.domintro::before {
+  content: 'For web developers (non-normative)';
+  background: green;
+  color: white;
+  padding: 0.15em 0.25em;
+  font-style: normal;
+  position: absolute;
+  top: -0.8em;
+  left: -0.8em;
+}
+</style>
+
+<script src="https://resources.whatwg.org/file-issue.js" async></script>
+
+<h2 id="introduction"> Introduction </h2>
+
+* This section is non-normative. *
+
+Handwriting inputs are drawings. A drawing captures the information required to recreate human’s pen-tip movements digitally.
+
+The API proposed here aims to expose operating system capabilities to the Web. We expect handwriting recognition capabilities to vary depending on the operating system, so the API aims to achieve a flexible design that can easily integrate with operating system specific features.
+
+We expect user agents to convert Web API data structure (defined in this spec) to the ones available on the host operating system, and connect the Web API with operating system APIs.
+
+The API doesn't attempt to define recognition that behaves the same on all platforms.
+
+<h2 id="introduction-handwriting"> Definitions </h3>
+In this spec, we define the following concepts, using the handwritten “WEB” for example:
+
+<img src="images/handwriting-concept.svg" alt="Handwriting Concepts" width="100%">
+
+* A <dfn>drawing</dfn> consists of multiple strokes (e.g. the above letter E consists of three strokes).
+* A <dfn>stroke</dfn> represents one continuous pen-tip movement that happens in a time period (e.g. from one <a href="https://www.w3.org/TR/touch-events/#the-touchstart-event">`touchstart`</a> to its corresponding <a href="https://www.w3.org/TR/touch-events/#the-touchend-event">`touchend`</a> event). The movement trajectory is represented by a series of [=points=].
+* A <dfn>point</dfn> is an observation of the pen-tip in space and time. It records the timestamp and position of the pen-tip on the writing surface (e.g. a <a href="https://www.w3.org/TR/touch-events/#the-touchmove-event">`touchmove`</a> event).
+* A <dfn>transcription</dfn> is a string of Unicode characters that represents the text written in a drawing (e.g. string "WEB").
+
+A <dfn data-export id="handwriting-recognizer">handwriting recognizer</dfn> is an interface (usually implemented by an external application or a service) that:
+
+* Takes a [=drawing=] as input
+* Output several [=transcriptions=] of the drawing
+* Optionally, output [=segmentation=] information about each [=transcription=]
+
+What constitutes a handwriting recognizer is at the discretion of the user agent.
+
+To <dfn data-export id="convert-data-format">convert</dfn> data into and from a suitable format for handwriting recognizer, the user agent should match what's defined in this spec to equivalent concepts used in [=handwriting recognizer=].
+
+<div class="note">
+Some handwriting recognizers available on operating systems include:
+
+* [Microsoft Windows Ink (UWP)](https://docs.microsoft.com/en-us/uwp/api/windows.ui.input.inking)
+* [Apple PencilKit](https://developer.apple.com/documentation/pencilkit)
+* [Chrome OS ML Service](https://docs.google.com/document/d/1ezUf1hYTeFS2f5JUHZaNSracu2YmSBrjLkri6k6KB_w/edit#heading=h.5ugemo7p04z9)
+
+</div>
+
+A [=handwriting recognizer=] may output extra information to help web applications better process the handwriting (e.g. delete a character from the handwriting).
+
+<dfn>Segmentation</dfn> maps graphemes (user-perceived character) to their composing strokes and points. A grapheme can span multiple Unicode code points.
+
+<div class="example" id="grapheme">
+  x is composed of one UTF-16 code point: `\u0078` <br/>
+  g̈ is composed of two UTF-16 code points: `\u0067\u0308`.<br/>
+  षि is composed of two UTF-16 code points: `\u0937\u093f`.
+</div>
+
+Take the handwritten text "int" for example:
+
+<img src="images/segmentation-concept.svg" alt="Handwriting Segmentation" width="360px">
+
+* Stroke 1 and 5 makes up letter "i"
+* Stroke 2 makes up letter "n"
+* Stroke 3 and 4 makes up letter "t"
+
+<div class="example" id="character-editing">
+  If the application wants to delete character "t", it can remove stroke 3 and 4 from the drawing.
+</div>
+
+<h2 id="api-query" data-dfn-for="Navigator">Feature Query</h2>
+
+Feature query interface provides allows web applications to query implementation-specific capabilities, so they can decide whether to use its feature.
+
+<xmp class="example" id="example-query" highlight="javascript">
+  const modelConstraint = { languages: ['zh-CN', 'en'] };
+  const modelDesc = await navigator.queryHandwritingRecognizer(modelConstraint);
+
+  // \`modelDesc\` describes the handwriting recognizer meeting the \`modelConstraint\`.
+  // If the constraints can't be satisfied, \`modelDesc\` will be null.
+  {
+    textAlternatives: true,
+    textSegmentation: true,
+    hints: {
+      alternatives: true,
+      textContext: true,
+      inputTypes: ['mouse', 'touch', 'stylus']
+    }
+  }
+</xmp>
+
+<xmp class="idl">
+[SecureContext]
+partial interface Navigator {
+  Promise<HandwritingRecognizerQueryResult?>
+      queryHandwritingRecognizer(HandwritingModelConstraint constraint);
+};
+
+dictionary HandwritingModelConstraint {
+  required sequence<DOMString> languages;
+};
+
+dictionary HandwritingRecognizerQueryResult {
+  boolean textAlternatives;
+  boolean textSegmentation;
+  HandwritingHintsQueryResult hints;
+};
+
+dictionary HandwritingHintsQueryResult {
+  sequence<HandwritingRecognitionType> recognitionType;
+  sequence<HandwritingInputType> inputType;
+  boolean textContext;
+  boolean alternatives;
+};
+
+enum HandwritingRecognitionType{
+  "text", "per-character"
+};
+
+enum HandwritingInputType {
+  "mouse", "stylus", "touch"
+};
+</xmp>
+
+<h3 id="api-query-handwriting-recognizer"><dfn data-export>{{Navigator/queryHandwritingRecognizer(constraint)}}</dfn></h3>
+
+This method offers web applications a way to query the underlying recognizer's capability and decide whether they want to use the recognizer:
+
+ * If the constraint can be satisfied, resolves to a description of the handwriting recognizer,
+ * if the constraint can't be satisfied, resolves to `null`
+
+The same {{HandwritingModelConstraint}} can be used to invoke {{Navigator/createHandwritingRecognizer(constraint)}} to create a {{HandwritingRecognizer}} that satisfies the constraint.
+
+<div algorithm="navigator-query-handwriting-recognizer">
+  When {{Navigator/queryHandwritingRecognizer(constraint)}} method is invoked, do the following:
+
+  1. If |constraint| doesn't have a {{HandwritingModelConstraint/languages}} member, [=exception/throw=] a new {{TypeError}}
+  1. Let |p| be [=a new promise=].
+  1. Run the following step [=in parallel=]
+    1. If |constraint|'s {{HandwritingModelConstraint/languages}} member is an empty array, [=/resolve=] |p| with `null` and abort.
+    1. <a lt="convert">Convert |constraint| into a suitable form for handwriting recognizer</a>.
+    1. If the user agent can't find or create a [=handwriting recognizer=] that satisfies the converted |constraint|, [=/resolve=] |p| with `null` and abort.
+    1. Let |result| be a new {{HandwritingRecognizerQueryResult}}
+    1. <a lt="convert">Convert the handwriting recognizer's feature description</a>, and fills in all members of |result|,.
+    1. [=/Resolve=] |p| with |result|.
+
+The implementation should follow these rules when converting to {{HandwritingRecognizerQueryResult}} and {{HandwritingHintsQueryResult}}:
+  * If the recognizer doesn't accept any hint, set {{HandwritingRecognizerQueryResult/hints}} to `null`.
+  * If a feature or hint isn't supported, set its attribute to `null`.
+  * If a enum hint is supported, set its attribute to the list of acceptable values.
+  * If a non-enum hint is supported, set its attribute to `true`.
+
+</div>
+
+<h3 id="api-handwriting-model-constraint">{{HandwritingModelConstraint}} attributes</h3>
+
+This describes the constraint that must be satisfied by the underlying handwriting recognizer (if it will be created).
+
+This is also used to create a handwriting recognizer in {{Navigator/createHandwritingRecognizer(constraint)}}.
+
+<dl>
+  <dt><code>languages</code></dt>
+  <dd>A list of [[!BCP47]] language tags that describes the languages that the recognizer has to recognize.</dd>
+
+  If more than one language is provided, the recognizer has to recognize all of them to satisfy the constraint.
+
+  User agents should consider all possible scripts of a given language tag. For example, a handwriting recognizer that only recognizes Azerbaijani in Latin alphabet ("az-Latn") shouldn't be used for "az" language tag, because Azerbaijani can also be written in Cyrillic alphabet ("az-Cyrl").
+
+  <p class="domintro non-normative">Consider using the most specific language tag when the distinction between scripts matters. For example, use "az-Latn" if the application only needs to work with Azerbaijani in latin scripts.</p>
+
+  <p class="domintro non-normative">Some recognizers only work with a single language. Consider creating one recognizer for each language for better interoperability.</p>
+</dl>
+
+
+<h3 id="api-handwriting-recognizer-query-result">{{HandwritingRecognizerQueryResult}} attributes </h3>
+
+This describes intrinsic features of a handwriting recognizer implementation.
+
+<dl>
+  <dt><code>textAlternatives</code></dt>
+  <dd>A boolean indicating whether the implementation returns multiple candidates [=transcriptions=] instead of a single one.</dd>
+
+  <dt><code>textSegmentation</code></dt>
+  <dd>A boolean indicating whether the implementation returns [=segmentation=] information for each transcription.</dd>
+
+  <dt><code>hints</code></dt>
+  <dd>A {{HandwritingHintsQueryResult}} object that describes acceptable hints in {{HandwritingRecognizer/startDrawing()}}.</dd>
+</dl>
+
+<h4 id="api-handwriting-hints-query-result">{{HandwritingHintsQueryResult}} attributes </h4>
+
+This describes a set of hints that can be optionally provided to {{HandwritingRecognizer/startDrawing()}} to improve accuracy or performance.
+
+Conventionally, the attribute names here matches the ones accepted in {{HandwritingRecognizer/startDrawing()}} method.
+
+<dl>
+  <dt><code>recognitionType</code></dt>
+  <dd>A list of {{HandwritingRecognitionType}} enums describing the type of text that is likely to be drawn.</dd>
+
+  Hints don't guarantee the result transcriptions meet the description.
+
+  <dl>
+    <dt><code>"text"</code></dt>
+    <dd>Free form text in typical writing prose. It means the drawing represents real words. For example, a sentence in everyday speech.</dd>
+    <dt><code>"per-character"</code></dt>
+    <dd>The handwriting is made up of individual, unrelated graphemes (user-perceived characters). For example, serial numbers, license keys.</dd>
+  </dl>
+
+  <dt><code>inputType</code></dt>
+  <dd>A list of {{HandwritingInputType}} enums describing how the drawing is made.
+  </dd>
+
+  <dl>
+    <dt><code>"touch"</code></dt>
+    <dd>Drawn with finger movements.</dd>
+    <dt><code>"stylus"</code></dt>
+    <dd>Drawn with a stylus.</dd>
+    <dt><code>"mouse"</code></dt>
+    <dd>Drawn with a mouse cursor.</dd>
+  </dl>
+
+  <dt><code>textContext</code></dt>
+  <dd>A boolean indicating if textContext is accepted. <code>textContext</code> is a string that contains the text shown to user, or previously recognized text that comes before the current drawing.</dd>
+
+  <dt><code>alternatives</code></dt>
+  <dd>A boolean indicating if the number of alternative transcriptions can be set. This limits the maximum number of alternatives returned in {{HandwritingDrawing/getPrediction}}.</dd>
+</dl>
+
+<h2 id="create-a-handwriting-recognizer" data-dfn-for="Navigator">Create a handwriting recognizer</h2>
+
+A {{HandwritingRecognizer}} manages the resources necessary for performing recognitions.
+
+<xmp class="example" id="example-create" highlight="javascript">
+  const modelConstraint = { languages: ['en'] };
+
+  try {
+    const recognizer = await navigator.createHandwritingRecognizer(modelConstraint);
+    // Use \`recognizer\` to perform recognitions.
+  } catch (err) {
+    // The provided model constraint can't be satisfied.
+  }
+</xmp>
+
+<xmp class="idl">
+[SecureContext]
+partial interface Navigator {
+  Promise<HandwritingRecognizer>
+      createHandwritingRecognizer(HandwritingModelConstraint constraint);
+};
+</xmp>
+
+<h3 id="api-create-handwriting-recognizer"><dfn data-export>{{Navigator/createHandwritingRecognizer(constraint)}}</dfn> method </h3>
+This method creates a {{HandwritingRecognizer}} object that satisfies the provided {{HandwritingModelConstraint}}, and reserves the necessary resources to perform recognitions. It represents an entry point to [=handwriting recognizer=].
+
+* If the constraint can be satisfied, and there's sufficient resource on the operating system to perform recognition, resolves to a {{HandwritingRecognizer}} object.
+* Otherwise, rejects with an error.
+
+<p class="domintro non-normative">The user agent might ask the user to install handwriting models and download handwriting models. Web applications shouldn't assume this method always resolves quickly.</p>
+
+<div algorithm="navigator-create-handwriting-recognizer">
+  When {{Navigator/createHandwritingRecognizer(constraint)}} method is invoked, do the following:
+
+  1. If |constraint| doesn't have a {{HandwritingModelConstraint/languages}} member, [=exception/throw=] a new {{TypeError}}
+  1. Let |p| be [=a new promise=].
+  1. Run the following step [=in parallel=]
+    1. If |constraint|'s {{HandwritingModelConstraint/languages}} is an empty array, [=/reject=] |p| with a new {{DOMException}} whose {{DOMException/name}} attribute is {{"NotSupportedError"}} and abort.
+    1. <a lt="convert">Convert |constraint| into a suitable form</a> for [=handwriting recognizer=].
+    1. If the user agent can't find a [=handwriting recognizer=] that satisfies the converted |constraint|, [=/reject=] |p| with a new {{DOMException}} whose {{DOMException/name}} attribute is {{"NotSupportedError"}} and abort.
+    1. If creating a [=handwriting recognizer=] would cause the user agent to exceed its limit for total number of active recognizer, [=/reject=] |p| with a new {{DOMException}} whose {{DOMException/name}} attribute is {{"QuotaExceededError"}}.
+    1. If the user agent can't prepare [=handwriting recognizer=] to perform recognitions, [=/reject=] |p| with a new {{DOMException}} object whose name depending on the failure cause and abort:
+      * If the web application shouldn't retry, {{"OperationError"}}.
+      * Otherwise {{"UnknownError"}}.
+    1. Let |result| be a new {{HandwritingRecognizer}} object, whose [=HandwritingRecognizer/active=] flag is `true`
+    1. [=/Resolve=] |p| with |result|.
+</div>
+
+<h2 id="using-a-recognizer">Use a recognizer</h2>
+
+<xmp class="example" id="example-recognizer" highlight="javascript">
+  const drawingHints = { textContext: "Hello world." }
+  const drawing = recognizer.startDrawing(textContext)
+
+  // Do something with \`drawing\`.
+
+  // Frees resources associated with recognizer.
+  recognizer.finish()
+</xmp>
+
+<h3 id="handwriting-recognizer-object">{{HandwritingRecognizer}} object </h3>
+<xmp class="idl">
+[SecureContext]
+interface HandwritingRecognizer {
+  [RaisesException]
+  HandwritingDrawing startDrawing(optional HandwritingHints hints = {});
+
+  [RaisesException] undefined finish();
+};
+
+dictionary HandwritingHints {
+  DOMString recognitionType = "text";
+  DOMString inputType = "mouse";
+  DOMString textContext;
+  unsigned long alternatives = 3;
+};
+</xmp>
+
+{{HandwritingRecognizer}} has an <dfn for="HandwritingRecognizer">active</dfn> flag, which is a boolean. [=HandwritingRecognizer/active=] flag is initially `true`, and becomes `false` when {{HandwritingRecognizer/finish()}} method is called.
+
+When the recognizer's [=HandwritingRecognizer/active=] flag is `true`, web applications can create new drawings associated with this recognizer, and perform recognitions.
+
+User agents may limit the total number of [=HandwritingRecognizer/active=] [=handwriting recognizer=]s for a website.
+
+<h3 id="handwriting-recognizer-create-drawing"><dfn data-export>{{HandwritingRecognizer/startDrawing(hints)}}</dfn></h3>
+
+This method creates a {{HandwritingDrawing}} which stores the drawing information for subsequent recognitions.
+
+{{HandwritingDrawing}} has a <dfn for="HandwritingDrawing">strokes</dfn>, which is a [=list=] of {{HandwritingStroke}}s, and initially empty.
+
+{{HandwritingDrawing}} has a <dfn for="HandwritingDrawing">recognizer</dfn>, which stores a reference to the {{HandwritingRecognizer}} creating this {{HandwritingDrawing}}.
+
+<div algorithm="handwriting-recognizer-start-drawing">
+  When {{HandwritingRecognizer/startDrawing(hints)}} is invoked, do the following:
+
+  1. If `this`.[=HandwritingRecognizer/active=] flag isn't `true`, [=exception/throw=] a new {{DOMException}} object, whose {{DOMException/name}} member is {{"InvalidStateError"}} and abort.
+  1. <a lt="convert">Convert the provided |hints| to format suitable</a> for [=handwriting recognizer=].
+  1. Create a new {{HandwritingDrawing}} as |result|, store the converted hint in it if necessary.
+  1. Set |result|.[=HandwritingDrawing/recognizer=] to `this`.
+  1. Set `this`.[=HandwritingDrawing/strokes=] to an new empty [=list=].
+  1. Return |result|.
+
+  If the provided |hints| contains features unsupported by [=handwriting recognizer=], the user agent should ignore relevant attributes.
+
+  If the |hints| isn't provided, the user agent might apply default at their own discretion.
+
+  <p class="note">user agents might create and pass the converted |hints| to an equivalent [=handwriting recognizer=] drawing object without storing it in {{HandwritingDrawing}}.</p>
+</div>
+
+<h3 id="handwriting-recognizer-finish"><dfn data-export>{{HandwritingRecognizer/finish()}}</dfn></h3>
+
+This method sets `this`'s [=HandwritingRecognizer/active=] flag to `false`, frees the allocated [=handwriting recognizer=] resources, and cause future operations involving `this`'s [=handwriting recognizer=] to fail.
+
+<div algorithm="handwriting-recognizer-finish">
+  1. If `this`.[=HandwritingRecognizer/active=] isn't `true`, abort.
+  2. Set `this`.[=HandwritingRecognizer/active=] to `false`.
+</div>
+
+The user agent should free resources associated with [=handwriting recognizer=].
+
+<p class="note">
+After calling `finish()`, subsequent {{HandwritingDrawing/getPrediction()}} calls on {{HandwritingDrawing}} created by `this` will fail.
+</p>
+
+<h2 id="handwriting-drawing">Build a {{HandwritingDrawing}}</h2>
+
+{{HandwritingDrawing}} manages contextual information about a drawing, and maintains the strokes and points making up of the drawing. It represents a [=drawing=].
+
+<p class="note">User agent can store all strokes and points in memory, the convert them to a format suitable for [=handwriting recognizer=] when {{HandwritingDrawing/getPrediction()}} is called. In this case, {{HandwritingDrawing}} and {{HandwritingStroke}} acts like a list.
+
+<div class="note" id="change-tracking">
+  Alternatively, user agent can immediately convert each stroke and point to a format suitable, and pass them to [=handwriting recognizer=] when each {{HandwritingStroke}} and {{HandwritingDrawing}} method is called. In this case, {{HandwritingDrawing}} and {{HandwritingStroke}} acts as a wrapper for platform-dependent objects of [=handwriting recognizer=].
+
+  user agent can track drawing changes to improve {{HandwritingDrawing/getPrediction()}} performance. Such change tracking can be achieved by marking strokes as "modified" when relevant methods are called. Change tracking enables user agent to perform incremental recognitions with a supported [=handwriting recognizer=].
+
+  For example, consider a drawing consists of three paragraphs of text, whose predictions from previous {{HandwritingDrawing/getPrediction()}} call is stored. The web application then adds a stroke to the third paragraph. With change tracking, the implementation will request [=handwriting recognizer=] to make a new prediction about the strokes of the third paragraph (e.g. including strokes near the changed stroke), and merge this prediction with existing ones.
+</div>
+
+<xmp class="example" id="example-drawing" highlight="javascript">
+const handwritingStroke = new HandwritingStroke()
+
+// Add points to a stroke.
+handwritingStroke.addPoint({ x: 1, y: 2, t: 0});
+handwritingStroke.addPoint({ x: 7, y: 6, t: 33});
+
+// Retrieve points of this stroke.
+// Returns a copy of all the points, modifying the returned points
+// has no effect.
+const points = handwritingStroke.getPoints();
+
+[ { x: 1:, t:2, t: 0 }, { x: 7, y: 6, t: 33} ];
+
+// Delete all points in a stroke.
+handwritingStroke.clear();
+
+// Add a stroke to the drawing.
+drawing.addStroke(handwritingStroke);
+
+// Get all strokes of the drawing.
+// Returns a list of \`HandwritingStroke\` in the drawing. Web applications can
+// modify the stroke. For example, calling HandwritingStroke.addPoint().
+drawing.getStrokes();
+
+[ HandwritingStroke, /* ... */ ]
+
+// Delete a stroke from the drawing.
+drawing.removeStroke(handwritingStroke);
+
+// Delete all strokes from the drawing.
+drawing.clear();
+</xmp>
+
+<xmp class="idl">
+[SecureContext]
+interface HandwritingDrawing {
+  undefined addStroke(HandwritingStroke stroke);
+  undefined removeStroke(HandwritingStroke stroke);
+  undefined clear();
+  sequence<HandwritingStroke> getStrokes();
+
+  Promise<sequence<HandwritingPrediction>> getPrediction();
+};
+
+[SecureContext, Exposed=Window]
+interface HandwritingStroke {
+  constructor();
+  undefined addPoint(HandwritingPoint point);
+  sequence<HandwritingPoint> getPoints();
+  undefined clear();
+};
+
+dictionary HandwritingPoint {
+  required double x;
+  required double y;
+
+  // Optional. Number of milliseconds since a reference time point for a
+  // drawing.
+  DOMHighResTimeStamp t;
+};
+</xmp>
+
+<div class="domintro non-normative">
+If web application provides `t` in {{HandwritingPoint}}, measure all of `t` values from a common starting point for a given {{HandwritingDrawing}}.
+
+For example, define `t === 0` to the time point when {{HandwritingRecognizer/startDrawing()}} is called. Or use `Date.now()` when the point is collected (e.g. when a <a href="https://www.w3.org/TR/touch-events/#the-touchmove-event">`touchmove`</a> event occurred).
+</div>
+
+<h3 id="handwriting-stroke">{{HandwritingStroke}}</h3>
+{{HandwritingStroke}} represents a [=stroke=]. It stores the information necessary to recreate one such movement.
+
+{{HandwritingStroke}} has a <dfn for="HandwritingStroke">Points</dfn> which is a [=list=] that stores the [=points=] of this stroke. [=HandwritingStroke/points=] is initially empty.
+
+<h4 id="handwriting-stroke-constructor">{{HandwritingStroke/constructor()}}</h4>
+
+<div algorithm="handwriting-stroke-constructor">
+  1. Create a new {{HandwritingStroke}} object, let it be |result|.
+  1. Set |result|'s [=HandwritingStroke/points=] to an empty [=list=].
+  1. Return |result|.
+</div>
+
+<h4 id="handwriting-stroke-add-point">{{HandwritingStroke/addPoint(point)}}</h4>
+
+<div algorithm="handwriting-stroke-add-point">
+  This method adds a [=point=] to `this`, when invoked, do the following:
+
+  1. If |point| doesn't has a `x` member, [=exception/throw=] a new {{TypeError}} and abort.
+  1. If |point|.`x` isn't a number, [=exception/throw=] a new {{TypeError}} and abort.
+  1. If |point| doesn't has a `y` member, [=exception/throw=] a new {{TypeError}} and abort.
+  1. If |point|.`y` isn't a number, [=exception/throw=] a new {{TypeError}} and abort.
+  1. If |point| has a `t` member, and `t` isn't a number, [=exception/throw=] a new {{TypeError}} and abort.
+  1. Let |p| be a new object,
+  1. Set |p|.`x` to |point|.`x`
+  1. Set |p|.`y` to |point|.`y`
+  1. If |point| has a `t` member, set |p|.`t` to |point|.`t`
+  1. [=list/Append=] |p| to `this`.[=HandwritingStroke/points=].
+
+  If |point| doesn't have `t` member, The implementation shouldn't interpolate or use a default numerical value. The implementation should reflect |point|.`t` isn't set in |p|.`t`.
+
+<p class="domintro non-normative">
+  Modifying |point| after calling {{HandwritingStroke/addPoint(point)}} has no effect on the {{HandwritingStroke}}.
+</p>
+</div>
+
+<h4 id="handwriting-stroke-get-points">{{HandwritingStroke/getPoints()}}</h4>
+
+This method returns points in this stroke.
+
+<div algorithm="handwriting-stroke-get-points">
+  When this method is invoked:
+
+  1. Let |result| be a new empty [=list=]
+  1. For each [=HandwritingStroke/points=] as |p|
+    1. Create a new {{object}} as |pt|
+    1. Set |pt|.`x` member to |p|.`x`
+    1. Set |pt|.`y` member to |p|.`y`
+    1. If |p| has `t` member, set |pt|.`t` to |p|.t
+    1. [=list/Append=] |pt| to |result|
+  1. Return |result|
+</div>
+
+<p class="note">A deep copy prevents modifications to the internal [=HandwritingStroke/points=], and enables <a href="#change-tracking">change tracking</a>.</p>
+
+<p class="domintro non-normative">
+Modifying the return value of {{HandwritingStroke/getPoints()}} has no effect on the stroke.
+</p>
+
+<h4 algorithm="stroke-clear" id="handwriting-stroke-clear">{{HandwritingStroke/clear()}}</h4>
+
+This method removes all points of this stroke, effectively making this stroke an empty one.
+
+<div algorithm="handwriting-stroke-clear">
+  When this method is invoked,
+
+  1. [=list/Empty=] `this`.[=HandwritingStroke/points=].
+</div>
+
+<h3 id="handwriting-drawing-stroke-methods">{{HandwritingDrawing}}</h3>
+
+<h4 id="handwriting-drawing-add-stroke">{{HandwritingDrawing/addStroke(stroke)}}</h4>
+
+<div algorithm="handwriting-drawing-add-stroke">
+  1. If |stroke| isn't an instance of {{HandwritingStroke}}, [=exception/throw=] a new {{TypeError}} and abort.
+  1. [=list/Append=] a reference to |stroke| to `this`.[=HandwritingDrawing/strokes=].
+</div>
+
+<h4 id="handwriting-drawing-remove-stroke">{{HandwritingDrawing/removeStroke(stroke)}}</h4>
+
+<div algorithm="handwriting-drawing-remove-stroke">
+  1. If |stroke| isn't an instance of {{HandwritingStroke}}, [=exception/throw=] a new {{TypeError}} and abort.
+  1. [=list/Remove=] items `this`.[=HandwritingDrawing/strokes=] if the item is the same object as |stroke|
+</div>
+
+<h4 id="handwriting-drawing-get-strokes">{{HandwritingDrawing/getStrokes()}}</h4>
+
+This method returns a list of strokes in this drawing.
+
+<div algorithm="handwriting-drawing-get-strokes">
+  When this method is invoked,
+
+  1. Let |result| be a new empty [=list=]
+  1. For each [=HandwritingDrawing/strokes=] as |s|
+    1. [=list/Append=] |s| to |result|
+  1. Return |result|
+</div>
+
+<h4 id="handwriting-drawing-clear">{{HandwritingDrawing/clear()}}</h4>
+<div algorithm="handwriting-drawing-clear">
+  1. [=list/Empty=] `this`.[=HandwritingDrawing/strokes=].
+</div>
+
+
+<h2 id="get-predictions-of-a-drawing">Get predictions of a {{HandwritingDrawing}}</h2>
+
+<xmp class="example" id="example-get-prediction" highlight="javascript">
+// Get predictions for the strokes in this drawing.
+const predictions = await drawing.getPrediction();
+
+// \`predictions\` is a list of \`HandwritingPrediction\`s, whose attributes
+// depends on handwriting recognizer's capability, and align with model
+// descriptor returned in queryHandwritingRecognizer().
+//
+// For example, a \`recognizer\` supports textSegmentation.
+[
+  {
+    text: "hello",
+    segmentationResult: [
+      {
+        grapheme: "h", beginIndex: "0", endIndex: "1",
+        drawingSegments: [
+          { strokeIndex: 1, beginPointIndex: 0, endPointIndex: 32 },
+          { strokeIndex: 2 , beginPointIndex: 0, endPointIndex:: 40 },
+        ]
+      },
+      {
+        grapheme: "2", beginIndex: "1", endIndex: "2",
+        drawingSegments: [
+          { strokeIndex: 2 , beginPointIndex: 41, endPointIndex:: 130 },
+        ]
+      },
+      // ...
+    ]
+  },
+  {
+    text: "he11o",
+    segmentationResult: [ /* ... */ ]
+  },
+  // Up to a total of \`alternatives\` predictions, if provided in startDrawing().
+];
+</xmp>
+
+<h3 id="handwriting-drawing-get-prediction">{{HandwritingDrawing/getPrediction()}}</h3>
+
+{{HandwritingDrawing/getPrediction()}} methods returns a list of predictions of `this` drawing, and their metadata.
+
+The predictions are ordered in decreasing confidence. If non-empty, the first prediction should be the most likely result.
+
+If the handwriting recognizer wasn't able to recognize anything, {{HandwritingDrawing/getPrediction()}} should resolve with an empty [=list=].
+
+<p class="note">
+  The user agent might perform <a href="#change-tracking">change tracking</a> and perform incremental recognition to improve performance.
+</p>
+
+<div algorithm="handwriting-drawing-get-prediction">
+  When {{HandwritingDrawing/getPrediction()}} is invoked:
+
+  1. Let |p| be a new Promise, run the following step [=in parallel=]
+    1. If `this`.[=HandwritingDrawing/recognizer=].[=HandwritingRecognizer/active=] isn't true, reject |p| with a new {{DOMException}} whose name is {{"InvalidStateError"}} and abort.
+    1. If `this`.[=HandwritingDrawing/strokes=] is empty, resolve |p| with a new empty [=list=].
+    1. Let |result| be a list.
+    1. <a lt="convert">Convert `this` drawing into a format suitable</a> for [=handwriting recognizer=].
+    1. Send the converted drawing to [=handwriting recognizer=], and retrieves its prediction.
+    1. <a lt="convert">Convert the retrieved predictions into </a> {{HandwritingPrediction}}, then [=list/append=] the converted predictions to |result|.
+    1. Resolve |p| with |result|.
+</div>
+
+<h3 id="handwriting-prediction">{{HandwritingPrediction}} attributes</h3>
+
+{{HandwritingPrediction}} represents a prediction result from [=handwriting recognizer=].
+
+<xmp class="idl">
+dictionary HandwritingPrediction {
+  required DOMString text;
+  sequence<HandwritingSegment> segmentationResult;
+};
+
+dictionary HandwritingSegment {
+  required DOMString grapheme;
+  required unsigned long beginIndex;
+  required unsigned long endIndex;
+  required sequence<HandwritingDrawingSegment> drawingSegments;
+};
+
+dictionary HandwritingDrawingSegment {
+  required unsigned long strokeIndex;
+  required unsigned long beginPointIndex;
+  required unsigned long endPointIndex;
+};
+</xmp>
+
+<dl>
+  <dt><code>text</code></dt>
+  <dd>A {{DOMString}} that represents the transcription of the drawing.</dd>
+
+  <dt><code>segmentationResult</code></dt>
+  <dd>A list of {{HandwritingSegment}} that maps each recognized grapheme (a user-perceived character) to its composing strokes and points.
+
+  If the [=handwriting recognizer=] doesn't support text [=segmentation=], `null`.
+
+  <p class="domintro non-normative">Web applications can use {{HandwritingRecognizerQueryResult/textSegmentation}} to check if this attribute will be null.</p>
+  </dd>
+</dl>
+
+<h4 id="handwriting-segment">{{HandwritingSegment}} attributes</h4>
+
+{{HandwritingSegment}} describes about a single grapheme that's [=segmentation|segmented=] from the drawing.
+
+<dl>
+  <dt><code>grapheme</code></dt>
+  <dd>A {{DOMString}} that represents grapheme.</dd>
+
+  <dt><code>beginIndex</code></dt>
+  <dd>The index where this grapheme begins in {{HandwritingPrediction/text}}.
+  </dd>
+
+  <dt><code>endIndex</code></dt>
+  <dd>
+    The index where this grapheme ends (where the next grapheme begins) in {{HandwritingPrediction/text}}.
+  </dd>
+
+  <dt><code>drawingSegments</code></dt>
+  <dd>
+    A list of {{HandwritingDrawingSegment}} that describes the portion of the drawing that makes up of this grapheme.
+  </dd>
+</dl>
+
+Slicing {{HandwritingPrediction/text}} with {{HandwritingSegment/beginIndex}} and {{HandwritingSegment/endIndex}} should result in {{HandwritingSegment/grapheme}}.
+
+<xmp class="example" id="grapheme-slicing" highlight="javascript">
+// Web applications can slice \`text\` using \`beginIndex\` and \`endIndex\`.
+// For example, a \`HandwritingPrediction\` for "घोषित" is:
+
+const prediction = {
+  // UTF-16 code points: \u0918 \u094b \u0937 \u093f \u0924
+  // Graphemes: घो, षि, त
+  text: "घोषित",
+  segmentationResult: [
+    { grapheme: "घो", beginIndex: "0", endIndex: "2" },
+    { grapheme: "षि", beginIndex: "2", endIndex: "4" },
+    { grapheme: "त", beginIndex: "4", endIndex: "5" },
+  ]
+}
+
+// The followings are true:
+prediction.text.slice(0, 1) === "घो";
+prediction.text.slice(2, 4) === "षि";
+prediction.text.slice(4, 5) === "त";
+
+// Web applications can delete the 2nd grapheme (षि) by splicing.
+const withoutSecondGrapheme = (
+  [...prediction.text]
+    .splice(
+      prediction.segmentationResult[1].beginIndex,
+      prediction.segmentationResult[1].endIndex
+    )
+    .join('')
+);
+// => "घोत"
+</xmp>
+
+<h4 id="handwriting-drawing-segment">{{HandwritingDrawingSegment}} attributes</h4>
+
+{{HandwritingDrawingSegment}} describes a continuous segment of a {{HandwritingStroke}}.
+
+The attributes are based on the {{HandwritingStroke}} in the {{HandwritingDrawing}} when {{HandwritingDrawing/getPrediction()}} is called.
+
+<dl>
+  <dt><code>strokeIndex</code></dt>
+  <dd>The index of the {{HandwritingStroke}} in {{HandwritingDrawing}}.[=HandwritingDrawing/strokes=].
+  </dd>
+
+  <dt><code>beginIndex</code></dt>
+  <dd>The index where the drawing segment begins.</dd>
+
+  <dt><code>endIndex</code></dt>
+  <dd>The index where the drawing segment ends (where the next drawing segment begins).</dd>
+</dl>
+
+<h2 id="privacy consideration">Privacy Considerations</h2>
+*This section is non-normative.*
+
+The fingerprint vector comes from two parts: feature detection and recognizer implementation.
+
+The amount of information (entropy) exposed depends on user agent's implementation. We believe there isn't a one-size-fits-all solution, and recommend the user agents decide whether privacy protections (e.g. permission prompts) are necessary for their users.
+
+**Feature detection** could expose information about:
+* User's language choices (or installed handwriting recognition models). This is also available in `navigator.languages`.
+* The recognizer implementation being used, by summarizing the set of supported features. This might lead to some conclusions about the operating system and its version.
+
+Fingerprinting can be mitigated with:
+
+* [Privacy budget](https://github.com/bslassey/privacy-budget): the user agent rejects promises, if the website issues excessive queries.
+* Permission prompts: the user agent asks user to grant unrestricted handwriting recognition features.
+* Hardcoded values: the user agent returns hard-coded values for query operations, if it's possible to determine languages and features at build time.
+
+**Recognizer implementation** might expose information about the operating system, the device, or the user's habit. This largely depends on the recognizer technology being used.
+
+Below are some types of recognizer implementations, and their associated risks:
+
+* No recognizer support: No fingerprint risk.
+* Cloud-based recognizer: Little to no risk. The website might be able to detect the cloud service being used (by comparing the prediction result against the result obtained by calling the cloud service directly). No extra information is revealed about the user or their device.
+* Stateless models (most common): Output of such models is entirely dependent on the input drawing and the model itself.
+  * Models that can only updated with the browser (e.g. entirely implemented within the browser): The website can learn about the browser's version, which can otherwise be detected by other means.
+  * Models that can be updated outside of browser (e.g. implemented by calling an operating system API), depending on the scenario, the website can learn:
+    * OS version, if the models are updated along with every OS update.
+    * OS version range, if the models are updated with some but not all OS updates.
+    * A specific update patch revision, if the models are updated out-of-band or on-demand.
+  * If the models utilizes hardware accelerators (e.g. GPU). The result might reveal information about particular hardwares.
+* Stateful / Online learning models (worst hypothetical case): These models can learn based on the previous usages. For example, an OS recognizer that adjusts its output based on user's IME habits. These models can reveal large amount of information about the user, and poses a huge risk.
+
+However, we aren't aware of any recognizer implementations that falls within this type. But we recommend using privacy protection for these models, or use a fresh / clean state for each session.
+
+**Cost of fingerprinting**: the fingerprinting solution need to craft and curate a set of handwriting drawings (adversarial samples) to exploit differences across models. The cost of generating these samples may be high, but it's safe to assume a motivated party can obtain such samples.

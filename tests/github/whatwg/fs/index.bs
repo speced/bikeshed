@@ -1,0 +1,1351 @@
+<pre class=metadata>
+Group: WHATWG
+H1: File System
+Shortname: fs
+Text Macro: TWITTER whatfilesystem
+Text Macro: LATESTRD 2022-09
+Abstract: File System defines infrastructure for file systems as well as their API.
+Indent: 2
+Markup Shorthands: css no, markdown yes
+</pre>
+
+<pre class=link-defaults>
+spec:webidl; type:dfn; text:resolve
+</pre>
+
+<pre class=anchors>
+urlPrefix: https://tc39.es/ecma262/; spec: ECMA-262
+  type: dfn; text: realm; url: realm
+urlPrefix: https://storage.spec.whatwg.org/; spec: storage
+  type: dfn; text: storage; url: site-storage
+</pre>
+
+<style>
+.domintro dt {
+    font-family: Menlo, Consolas, "DejaVu Sans Mono", Monaco, monospace;
+
+    padding-top: 0.5em;
+    padding-bottom: 1em;
+}
+.domintro dt a {
+    color: inherit; border-bottom-style: none;
+}
+.domintro dt code {
+    font-size: inherit;
+}
+.domintro::before {
+    content: 'For web developers (non-normative)';
+    text-transform: initial;
+
+}
+</style>
+
+
+# Introduction # {#introduction}
+
+*This section is non-normative.*
+
+This document defines fundamental infrastructure for file system APIs. In addition, it defines an
+API that makes it possible for websites to get access to a file system directory without having to
+first prompt the user for access. This enables use cases where a website wants to save data to disk
+before a user has picked a location to save to, without forcing the website to use a completely
+different storage mechanism with a different API for such files. The entry point for this is the
+{{StorageManager/getDirectory()|navigator.storage.getDirectory()}} method.
+
+
+# Files and Directories # {#files-and-directories}
+
+## Concepts ## {#concepts}
+
+A <dfn export id="entry">file system entry</dfn> is either a [=file entry=] or a [=directory entry=].
+
+Each [=/file system entry=] has an associated <dfn for="file system entry" id=entry-query-access>query access</dfn> algorithm, which takes "`read`"
+or "`readwrite`" <var ignore>mode</var> and returns a {{PermissionState}}. Unless specified
+otherwise it returns "{{PermissionState/denied}}". The algorithm is allowed to throw.
+
+Each [=/file system entry=] has an associated <dfn for="file system entry" id=entry-request-access>request access</dfn> algorithm, which takes
+"`read`" or "`readwrite`" <var ignore>mode</var> and returns a {{PermissionState}}. Unless specified
+otherwise it returns "{{PermissionState/denied}}". The algorithm is allowed to throw.
+
+Note: Implementations that only implement this specification and not dependent specifications do not
+need to bother implementing [=/file system entry=]'s [=file system entry/query access=] and [=file system entry/request access=].
+
+Each [=/file system entry=] has an associated <dfn for="file system entry" id=entry-name>name</dfn> (a [=string=]).
+
+A <dfn>valid file name</dfn> is a [=string=] that is not an empty string, is not equal to "." or "..",
+and does not contain '/' or any other character used as path separator on the underlying platform.
+
+Note: This means that '\' is not allowed in names on Windows, but might be allowed on
+other operating systems. Additionally underlying file systems might have further restrictions
+on what names are or aren't allowed, so a string merely being a [=valid file name=] is not
+a guarantee that creating a file or directory with that name will succeed.
+
+Issue: We should consider having further normative restrictions on file names that will
+never be allowed using this API, rather than leaving it entirely up to underlying file
+systems.
+
+A <dfn export id=file>file entry</dfn> additionally consists of
+<dfn for="file entry" export>binary data</dfn> (a [=byte sequence=]), a
+<dfn for="file entry">modification timestamp</dfn> (a number representing the number of milliseconds since the <a spec=FileAPI>Unix Epoch</a>),
+a <dfn for="file entry">lock</dfn> (a string that may exclusively be "`open`", "`taken-exclusive`" or "`taken-shared`")
+and a <dfn for="file entry">shared lock count</dfn> (a number representing the number shared locks that are taken at a given point in time).
+
+<div algorithm>
+To <dfn for="file entry/lock">take</dfn> a [=file entry/lock=] with a |value| of "`exclusive`" or "`shared`" on a given [=file entry=] |file|:
+
+1. Let |lock| be the |file|'s [=file entry/lock=].
+1. Let |count| be the |file|'s [=file entry/shared lock count=].
+1. If |value| is "`exclusive`":
+   1. If |lock| is "`open`":
+     1. Set lock to "`taken-exclusive`".
+     1. Return true.
+1. If |value| is "`shared`":
+   1. If |lock| is "`open`":
+     1. Set |lock| to "`taken-shared`".
+     1. Set |count| to 1.
+     1. Return true.
+   1. Otherwise, if |lock| is "`taken-shared`":
+     1. Increase |count| by one.
+     1. Return true.
+1. Return false.
+
+</div>
+
+<div algorithm>
+To <dfn for="file entry/lock">release</dfn> a [=file entry/lock=] on a given [=file entry=] |file|,
+run these steps:
+
+1. Let |lock| be the |file|'s associated [=file entry/lock=].
+1. Let |count| be the |file|'s [=file entry/shared lock count=].
+1. If |lock| is "`taken-shared`":
+  1. Decrease |count| by one.
+  1. If |count| is 0, set |lock| to "`open`".
+1. Otherwise, set |lock| to "`open`".
+
+</div>
+
+Note: Locks help prevent concurrent modifications to a file. A {{FileSystemWritableFileStream}}
+requires a shared lock, while a {{FileSystemSyncAccessHandle}} requires an exclusive one.
+
+A <dfn export id=directory>directory entry</dfn> additionally consists of a [=/set=] of
+<dfn for="directory entry">children</dfn>, which are themselves [=/file system entries=].
+Each member is either a [=/file entry=] or a [=/directory entry=].
+
+A [=/file system entry=] |entry| should be [=list/contained=] in the [=children=] of at most one
+[=directory entry=], and that directory entry is also known as |entry|'s
+<dfn export for="file system entry" id=entry-parent>parent</dfn>.
+A [=/file system entry=]'s [=file system entry/parent=] is null if no such directory entry exists.
+
+Note: Two different [=/file system entries=] can represent the same file or directory on disk, in which
+case it is possible for both entries to have a different parent, or for one entry to have a
+parent while the other entry does not have a parent.
+
+[=/File system entries=] can (but don't have to) be backed by files on the host operating system's local file system,
+so it is possible for the [=binary data=], [=modification timestamp=],
+and [=children=] of entries to be modified by applications outside of this specification.
+Exactly how external changes are reflected in the data structures defined by this specification,
+as well as how changes made to the data structures defined here are reflected externally
+is left up to individual user-agent implementations.
+
+A [=/file system entry=] |a| is <dfn for="entry">the same as</dfn> an [=/file system entry=] |b| if |a| is equal to |b|, or
+if |a| and |b| are backed by the same file or directory on the local file system.
+
+Issue(59): Explain better how entries map to files on disk (multiple entries can map to the same file or
+directory on disk but an entry doesn't have to map to any file on disk).
+
+<div algorithm>
+
+To <dfn for="file system entry" id=entry-resolve>resolve</dfn> a [=/file system entry=] |child| relative to a [=directory entry=] |root|,
+run these steps:
+
+1. Let |result| be [=a new promise=].
+1. Run these steps [=in parallel=]:
+  1. If |child| is [=the same as=] |root|,
+     [=/resolve=] |result| with an empty list, and abort.
+  1. Let |childPromises| be « ».
+  1. [=set/For each=] |entry| of |root|'s [=FileSystemHandle/entry=]'s [=children=]:
+    1. Let |p| be the result of [=file system entry/resolving=] |child| relative to |entry|.
+    1. [=list/Append=] |p| to |childPromises|.
+    1. [=Upon fulfillment=] of |p| with value |path|:
+      1. If |path| is not null:
+        1. [=list/Prepend=] |entry|'s [=file system entry/name=] to |path|.
+        1. [=/Resolve=] |result| with |path|.
+  1. [=Wait for all=] |childPromises|, with the these success steps:
+    1. If |result| hasn't been resolved yet, [=/resolve=] |result| with `null`.
+1. Return |result|.
+
+</div>
+
+## The {{FileSystemHandle}} interface ## {#api-filesystemhandle}
+
+<xmp class=idl>
+enum FileSystemHandleKind {
+  "file",
+  "directory",
+};
+
+[Exposed=(Window,Worker), SecureContext, Serializable]
+interface FileSystemHandle {
+  readonly attribute FileSystemHandleKind kind;
+  readonly attribute USVString name;
+
+  Promise<boolean> isSameEntry(FileSystemHandle other);
+};
+</xmp>
+
+A {{FileSystemHandle}} object represents a [=/file system entry=]. Each {{FileSystemHandle}} object is associated
+with an <dfn for=FileSystemHandle export>entry</dfn> (a [=/file system entry=]). Multiple separate objects implementing
+the {{FileSystemHandle}} interface can all be associated with the same [=/file system entry=] simultaneously.
+
+<div algorithm="serialization steps">
+{{FileSystemHandle}} objects are [=serializable objects=].
+
+Their [=serialization steps=], given |value|, |serialized| and <var ignore>forStorage</var> are:
+
+1. Set |serialized|.\[[Origin]] to |value|'s [=relevant settings object=]'s [=environment settings object/origin=].
+1. Set |serialized|.\[[Entry]] to |value|'s [=FileSystemHandle/entry=].
+
+</div>
+
+<div algorithm="deserialization steps">
+Their [=deserialization steps=], given |serialized| and |value| are:
+
+1. If |serialized|.\[[Origin]] is not [=same origin=] with
+   |value|'s [=relevant settings object=]'s [=environment settings object/origin=],
+   then [=throw=] a "{{DataCloneError}}" {{DOMException}}.
+1. Set |value|'s [=FileSystemHandle/entry=] to |serialized|.\[[Entry]]
+
+</div>
+
+<div class="note domintro">
+  : |handle| . {{FileSystemHandle/kind}}
+  :: Returns {{FileSystemHandleKind/"file"}} if |handle| is a {{FileSystemFileHandle}},
+     or {{FileSystemHandleKind/"directory"}} if |handle| is a {{FileSystemDirectoryHandle}}.
+
+     This can be used to distinguish files from directories when iterating over the contents
+     of a directory.
+
+  : |handle| . {{FileSystemHandle/name}}
+  :: Returns the [=file system entry/name=] of the entry represented by |handle|.
+</div>
+
+The <dfn attribute for=FileSystemHandle>kind</dfn> getter steps are to return
+{{FileSystemHandleKind/"file"}} if [=this=] is a [=file entry=]; otherwise
+{{FileSystemHandleKind/"directory"}}.
+
+The <dfn attribute for=FileSystemHandle>name</dfn> getter steps are to return [=this=]'s [=file system entry/name=].
+
+### The {{FileSystemHandle/isSameEntry()}} method ### {#api-filesystemhandle-issameentry}
+
+<div class="note domintro">
+  : <var ignore>same</var> = await |handle1| . {{FileSystemHandle/isSameEntry()|isSameEntry}}( |handle2| )
+  :: Returns true if |handle1| and |handle2| represent the same file or directory.
+</div>
+
+<div algorithm>
+The <dfn method for=FileSystemHandle>isSameEntry(|other|)</dfn> method steps are:
+
+1. Let |realm| be [=this=]'s [=relevant Realm=].
+1. Let |p| be [=a new promise=] in |realm|.
+1. Run these steps [=in parallel=]:
+  1. If [=this=]'s [=FileSystemHandle/entry=] is [=the same as=] |other|'s [=FileSystemHandle/entry=],
+     [=/resolve=] |p| with true.
+  1. Otherwise [=/resolve=] |p| with false.
+1. Return |p|.
+
+</div>
+
+## The {{FileSystemFileHandle}} interface ## {#api-filesystemfilehandle}
+
+<xmp class=idl>
+dictionary FileSystemCreateWritableOptions {
+  boolean keepExistingData = false;
+};
+
+[Exposed=(Window,Worker), SecureContext, Serializable]
+interface FileSystemFileHandle : FileSystemHandle {
+  Promise<File> getFile();
+  Promise<FileSystemWritableFileStream> createWritable(optional FileSystemCreateWritableOptions options = {});
+  [Exposed=DedicatedWorker]
+  Promise<FileSystemSyncAccessHandle> createSyncAccessHandle();
+};
+</xmp>
+
+A {{FileSystemFileHandle}}'s associated [=FileSystemHandle/entry=] must be a [=file entry=].
+
+{{FileSystemFileHandle}} objects are [=serializable objects=]. Their [=serialization steps=] and
+[=deserialization steps=] are the same as those for {{FileSystemHandle}}.
+
+### The {{FileSystemFileHandle/getFile()}} method ### {#api-filesystemfilehandle-getfile}
+
+<div class="note domintro">
+  : <var ignore>file</var> = await |fileHandle| . {{FileSystemFileHandle/getFile()}}
+  :: Returns a {{File}} representing the state on disk of the entry represented by |handle|.
+     If the file on disk changes or is removed after this method is called, the returned
+     {{File}} object will likely be no longer readable.
+</div>
+
+<div algorithm>
+The <dfn method for=FileSystemFileHandle>getFile()</dfn> method steps are:
+
+1. Let |result| be [=a new promise=].
+1. Run these steps [=in parallel=]:
+  1. Let |access| be the result of running [=this=]'s [=FileSystemHandle/entry=]'s
+     [=file system entry/query access=] given "`read`".
+  1. If |access| is not "{{PermissionState/granted}}",
+     [=/reject=] |result| with a "{{NotAllowedError}}" {{DOMException}} and abort.
+  1. Let |entry| be [=this=]'s [=FileSystemHandle/entry=].
+  1. Let |f| be a new {{File}}.
+  1. Set |f|'s <a spec=FileAPI>snapshot state</a> to the current state of |entry|.
+  1. Set |f|'s underlying byte sequence to a copy of |entry|'s [=binary data=].
+  1. Set |f|.{{File/name}} to |entry|'s [=file system entry/name=].
+  1. Set |f|.{{File/lastModified}} to |entry|'s [=file entry/modification timestamp=].
+  1. Set |f|.{{Blob/type}} to an [=implementation-defined=] value, based on for example |entry|'s [=file system entry/name=] or its file extension.
+
+     Issue: The reading and snapshotting behavior needs to be better specified in the [[FILE-API]] spec,
+     for now this is kind of hand-wavy.
+  1. [=/Resolve=] |result| with |f|.
+1. Return |result|.
+
+</div>
+
+### The {{FileSystemFileHandle/createWritable()}} method ### {#api-filesystemfilehandle-createwritable}
+
+<div class="note domintro">
+  : |stream| = await |fileHandle| . {{FileSystemFileHandle/createWritable()}}
+  : |stream| = await |fileHandle| . {{FileSystemFileHandle/createWritable()|createWritable}}({ {{FileSystemCreateWritableOptions/keepExistingData}}: true/false })
+  :: Returns a {{FileSystemWritableFileStream}} that can be used to write to the file. Any changes made through
+     |stream| won't be reflected in the file represented by |fileHandle| until the stream has been closed.
+     User agents try to ensure that no partial writes happen, i.e. the file represented by
+     |fileHandle| will either contain its old contents or it will contain whatever data was written
+     through |stream| up until the stream has been closed.
+
+     This is typically implemented by writing data to a temporary file, and only replacing the file
+     represented by |fileHandle| with the temporary file when the writable filestream is closed.
+
+     If {{FileSystemCreateWritableOptions/keepExistingData}} is false or not specified,
+     the temporary file starts out empty,
+     otherwise the existing file is first copied to this temporary file.
+
+     Creating a {{FileSystemWritableFileStream}} [=file entry/lock/take|takes a shared lock=] on the
+     [=FileSystemHandle/entry=] associated with |fileHandle|. This prevents the creation of
+     {{FileSystemSyncAccessHandle|FileSystemSyncAccessHandles}} for the entry, until the stream is closed.
+</div>
+
+<p class=XXX>See <a href=https://github.com/WICG/file-system-access/issues/67>WICG/file-system-access issue #67</a>
+for discussion around and desire for a "inPlace" mode for createWritable (where
+changes will be written to the actual underlying file as they are written to the
+writer, for example to support in-place modification of large files or things
+like databases). This is not currently implemented in Chrome. Implementing this
+is currently blocked on figuring out how to combine the desire to run malware
+checks with the desire to let websites make fast in-place modifications to
+existing large files. In-place writes are available for files in the [=origin
+private file system=] via the {{FileSystemSyncAccessHandle}} interface.
+
+<div algorithm>
+The <dfn method for=FileSystemFileHandle>createWritable(|options|)</dfn> method steps are:
+
+1. Let |result| be [=a new promise=].
+1. Run these steps [=in parallel=]:
+  1. Let |access| be the result of running [=this=]'s [=FileSystemHandle/entry=]'s
+     [=file system entry/request access=] given "`readwrite`".
+     If that throws an exception, [=reject=] |result| with that exception and abort.
+  1. If |access| is not "{{PermissionState/granted}}",
+     [=reject=] |result| with a "{{NotAllowedError}}" {{DOMException}} and abort.
+  1. Let |entry| be [=this=]'s [=FileSystemHandle/entry=].
+  1. Let |lockResult| be the result of [=file entry/lock/take|taking a lock=] with "`shared`" on |entry|.
+  1. If |lockResult| is false, [=reject=] |result| with a "{{NoModificationAllowedError}}" {{DOMException}} and abort.
+  1. Let |stream| be the result of [=create a new FileSystemWritableFileStream|creating a new FileSystemWritableFileStream=]
+     for |entry| in [=this=]'s [=relevant realm=].
+  1. If |options|.{{FileSystemCreateWritableOptions/keepExistingData}} is true:
+    1. Set |stream|.[=[[buffer]]=] to a copy of |entry|'s [=file entry/binary data=].
+  1. [=/Resolve=] |result| with |stream|.
+1. Return |result|.
+
+</div>
+
+### The {{FileSystemFileHandle/createSyncAccessHandle()}} method ### {#api-filesystemfilehandle-createsyncaccesshandle}
+
+<div class="note domintro">
+  : |handle| = await |fileHandle| . {{FileSystemFileHandle/createSyncAccessHandle()|createSyncAccessHandle}}()
+  :: Returns a {{FileSystemSyncAccessHandle}} that can be used to read from/write to the file.
+     Changes made through |handle| might be immediately reflected in the file represented by |fileHandle|.
+     To ensure the changes are reflected in this file, the handle can be flushed.
+
+     Creating a {{FileSystemSyncAccessHandle}} [=file entry/lock/take|takes an exclusive lock=] on the
+     [=FileSystemHandle/entry=] associated with |fileHandle|. This prevents the creation of
+     further {{FileSystemSyncAccessHandle}}s or {{FileSystemWritableFileStream}}s
+     for the entry, until the access handle is closed.
+
+     The returned {{FileSystemSyncAccessHandle}} offers synchronous methods. This allows for higher performance
+     on contexts where asynchronous operations come with high overhead, e.g., WebAssembly.
+
+     For the time being, this method will only succeed when the |fileHandle| belongs to the
+     [=origin private file system=].
+</div>
+
+<div algorithm>
+The <dfn method for=FileSystemFileHandle>createSyncAccessHandle()</dfn> method steps are:
+
+1. Let |result| be [=a new promise=].
+1. Run these steps [=in parallel=]:
+  1. Let |access| be the result of running [=this=]'s [=FileSystemHandle/entry=]'s
+     [=file system entry/request access=] given "`readwrite`".
+     If that throws an exception, [=reject=] |result| with that exception and abort.
+  1. If |access| is not "{{PermissionState/granted}}",
+     [=reject=] |result| with a "{{NotAllowedError}}" {{DOMException}} and abort.
+  1. Let |entry| be [=this=]'s [=FileSystemHandle/entry=].
+  1. If |entry| does not represent a [=/file system entry=] in an [=origin private file system=],
+     [=reject=] |result| with an "{{InvalidStateError}}" {{DOMException}} and abort.
+  1. Let |lockResult| be the result of [=file entry/lock/take|taking a lock=] with "`exclusive`" on |entry|.
+  1. If |lockResult| is false, [=reject=] |result| with a "{{NoModificationAllowedError}}" {{DOMException}} and abort.
+  1. Let |handle| be the result of [=create a new FileSystemSyncAccessHandle|creating a new FileSystemSyncAccessHandle=]
+     for |entry| in [=this=]'s [=relevant realm=].
+  1. [=/Resolve=] |result| with |handle|.
+1. Return |result|.
+
+</div>
+
+## The {{FileSystemDirectoryHandle}} interface ## {#api-filesystemdirectoryhandle}
+
+<xmp class=idl>
+dictionary FileSystemGetFileOptions {
+  boolean create = false;
+};
+
+dictionary FileSystemGetDirectoryOptions {
+  boolean create = false;
+};
+
+dictionary FileSystemRemoveOptions {
+  boolean recursive = false;
+};
+
+[Exposed=(Window,Worker), SecureContext, Serializable]
+interface FileSystemDirectoryHandle : FileSystemHandle {
+  async iterable<USVString, FileSystemHandle>;
+
+  Promise<FileSystemFileHandle> getFileHandle(USVString name, optional FileSystemGetFileOptions options = {});
+  Promise<FileSystemDirectoryHandle> getDirectoryHandle(USVString name, optional FileSystemGetDirectoryOptions options = {});
+
+  Promise<undefined> removeEntry(USVString name, optional FileSystemRemoveOptions options = {});
+
+  Promise<sequence<USVString>?> resolve(FileSystemHandle possibleDescendant);
+};
+</xmp>
+
+A {{FileSystemDirectoryHandle}}'s associated [=FileSystemHandle/entry=] must be a [=directory entry=].
+
+{{FileSystemDirectoryHandle}} objects are [=serializable objects=]. Their [=serialization steps=] and
+[=deserialization steps=] are the same as those for {{FileSystemHandle}}.
+
+### Directory iteration ### {#api-filesystemdirectoryhandle-asynciterable}
+
+<div class="note domintro">
+  : for await (let [|name|, |handle|] of |directoryHandle|) {}
+  : for await (let [|name|, |handle|] of |directoryHandle| . entries()) {}
+  : for await (let |handle| of |directoryHandle| . values()) {}
+  : for await (let |name| of |directoryHandle| . keys()) {}
+  :: Iterates over all entries whose parent is the entry represented by |directoryHandle|. Entries
+     that are created or deleted while the iteration is in progress might or might not be included.
+     No guarantees are given either way.
+</div>
+
+Issue(15): In the future we might want to add arguments to the async iterable declaration to
+support for example recursive iteration.
+
+<div algorithm="iterator initialization">
+The [=asynchronous iterator initialization steps=] for a {{FileSystemDirectoryHandle}} |handle|
+and its async iterator |iterator| are:
+
+1. Let |access| be the result of running |handle|'s [=FileSystemHandle/entry=]'s
+   [=file system entry/query access=] given "`read`".
+
+1. If |access| is not "{{PermissionState/granted}}",
+   [=throw=] a "{{NotAllowedError}}" {{DOMException}}.
+
+1. Set |iterator|'s <dfn for="FileSystemDirectoryHandle-iterator">past results</dfn> to an empty [=/set=].
+
+</div>
+
+<div algorithm="next iteration result">
+To [=get the next iteration result=] for a {{FileSystemDirectoryHandle}} |handle|
+and its async iterator |iterator|:
+
+1. Let |promise| be [=a new promise=].
+
+1. Let |directory| be |handle|'s [=FileSystemHandle/entry=].
+
+1. Let |access| be the result of running |handle|'s [=FileSystemHandle/entry=]'s
+   [=file system entry/query access=] given "`read`".
+
+1. If |access| is not "{{PermissionState/granted}}",
+   [=reject=] |promise| with a "{{NotAllowedError}}" {{DOMException}} and
+   return |promise|.
+
+1. Let |child| be a [=/file system entry=] in |directory|'s [=directory entry/children=],
+   such that |child|'s [=file system entry/name=] is not contained in |iterator|'s [=past results=],
+   or `null` if no such entry exists.
+
+   Note: This is intentionally very vague about the iteration order. Different platforms
+   and file systems provide different guarantees about iteration order, and we want it to
+   be possible to efficiently implement this on all platforms. As such no guarantees are given
+   about the exact order in which elements are returned.
+
+1. If |child| is `null`, then:
+  1. [=/Resolve=] |promise| with `undefined`.
+
+1. Otherwise:
+  1. [=set/Append=] |child|'s [=file system entry/name=] to |iterator|'s [=past results=].
+  1. If |child| is a [=file entry=]:
+    1. Let |result| be a new {{FileSystemFileHandle}} associated with |child|.
+  1. Otherwise:
+    1. Let |result| be a new {{FileSystemDirectoryHandle}} associated with |child|.
+  1. [=/Resolve=] |promise| with (|child|'s [=file system entry/name=], |result|).
+
+1. Return |promise|.
+
+</div>
+
+### The {{FileSystemDirectoryHandle/getFileHandle()}} method ### {#api-filesystemdirectoryhandle-getfilehandle}
+
+<div class="note domintro">
+  : |fileHandle| = await |directoryHandle| . {{FileSystemDirectoryHandle/getFileHandle()|getFileHandle}}(|name|)
+  : |fileHandle| = await |directoryHandle| . {{FileSystemDirectoryHandle/getFileHandle()|getFileHandle}}(|name|, { {{FileSystemGetFileOptions/create}}: false })
+  :: Returns a handle for a file named |name| in the directory represented by |directoryHandle|. If
+     no such file exists, this rejects.
+
+  : |fileHandle| = await |directoryHandle| . {{FileSystemDirectoryHandle/getFileHandle()|getFileHandle}}(|name|, { {{FileSystemGetFileOptions/create}}: true })
+  :: Returns a handle for a file named |name| in the directory represented by |directoryHandle|. If
+     no such file exists, this creates a new file. If no file with named |name| can be created this
+     rejects. Creation can fail because there already is a directory with the same name, because the
+     name uses characters that aren't supported in file names on the underlying file system, or
+     because the user agent for security reasons decided not to allow creation of the file.
+
+     This operation requires write permission, even if the file being returned already exists. If
+     this handle doesn't already have write permission, this could result in a prompt being shown to
+     the user. To get an existing file without needing write permission, call this method
+     with <code>{ {{FileSystemGetFileOptions/create}}: false }</code>.
+</div>
+
+<div algorithm>
+The <dfn method for=FileSystemDirectoryHandle>getFileHandle(|name|, |options|)</dfn> method steps are:
+
+1. Let |result| be [=a new promise=].
+1. Run these steps [=in parallel=]:
+  1. If |name| is not a [=valid file name=], [=/reject=] |result| with a {{TypeError}} and abort.
+
+  1. Let |entry| be [=this=]'s [=FileSystemHandle/entry=].
+  1. If |options|.{{FileSystemGetFileOptions/create}} is true:
+    1. Let |access| be the result of running [=this=]'s [=FileSystemHandle/entry=]'s
+       [=file system entry/request access=] given "`readwrite`".
+       If that throws an exception, [=reject=] |result| with that exception and abort.
+  1. Otherwise:
+    1. Let |access| be the result of running [=this=]'s [=FileSystemHandle/entry=]'s
+       [=file system entry/query access=] given "`read`".
+  1. If |access| is not "{{PermissionState/granted}}",
+     [=/reject=] |result| with a "{{NotAllowedError}}" {{DOMException}} and abort.
+
+  1. [=set/For each=] |child| of |entry|'s [=directory entry/children=]:
+    1. If |child|'s [=file system entry/name=] equals |name|:
+      1. If |child| is a [=directory entry=]:
+        1. [=/Reject=] |result| with a "{{TypeMismatchError}}" {{DOMException}} and abort.
+      1. [=/Resolve=] |result| with a new {{FileSystemFileHandle}} whose [=FileSystemHandle/entry=] is |child| and abort.
+  1. If |options|.{{FileSystemGetFileOptions/create}} is false:
+    1. [=/Reject=] |result| with a "{{NotFoundError}}" {{DOMException}} and abort.
+  1. Let |child| be a new [=file entry=] whose [=query access=] and [=request access=] algorithms
+     are those of |entry|.
+  1. Set |child|'s [=file system entry/name=] to |name|.
+  1. Set |child|'s [=binary data=] to an empty [=byte sequence=].
+  1. Set |child|'s [=modification timestamp=] to the current time.
+  1. [=set/Append=] |child| to |entry|'s [=directory entry/children=].
+  1. If creating |child| in the underlying file system throws an exception,
+     [=/reject=] |result| with that exception and abort.
+
+     Issue(11): Better specify what possible exceptions this could throw.
+  1. [=/Resolve=] |result| with a new {{FileSystemFileHandle}} whose [=FileSystemHandle/entry=] is |child|.
+1. Return |result|.
+
+</div>
+
+### The {{FileSystemDirectoryHandle/getDirectoryHandle()}} method ### {#api-filesystemdirectoryhandle-getdirectoryhandle}
+
+<div class="note domintro">
+  : |subdirHandle| = await |directoryHandle| . {{FileSystemDirectoryHandle/getDirectoryHandle()|getDirectoryHandle}}(|name|)
+  : |subdirHandle| = await |directoryHandle| . {{FileSystemDirectoryHandle/getDirectoryHandle()|getDirectoryHandle}}(|name|, { {{FileSystemGetDirectoryOptions/create}}: false })
+  :: Returns a handle for a directory named |name| in the directory represented by
+    |directoryHandle|. If no such directory exists, this rejects.
+
+  : |subdirHandle| = await |directoryHandle| . {{FileSystemDirectoryHandle/getDirectoryHandle()|getDirectoryHandle}}(|name|, { {{FileSystemGetDirectoryOptions/create}}: true })
+  :: Returns a handle for a directory named |name| in the directory represented by
+     |directoryHandle|. If no such directory exists, this creates a new directory. If creating the
+     directory failed, this rejects. Creation can fail because there already is a file with the same
+     name, or because the name uses characters that aren't supported in file names on the underlying
+     file system.
+
+     This operation requires write permission, even if the directory being returned already exists.
+     If this handle doesn't already have write permission, this could result in a prompt being shown
+     to the user. To get an existing directory without needing write permission, call this method
+     with <code>{ {{FileSystemGetDirectoryOptions/create}}: false }</code>.
+</div>
+
+<div algorithm>
+The <dfn method for=FileSystemDirectoryHandle>getDirectoryHandle(|name|, |options|)</dfn> method steps are:
+
+1. Let |result| be [=a new promise=].
+1. Run these steps [=in parallel=]:
+  1. If |name| is not a [=valid file name=], [=/reject=] |result| with a {{TypeError}} and abort.
+
+  1. Let |entry| be [=this=]'s [=FileSystemHandle/entry=].
+  1. If |options|.{{FileSystemGetDirectoryOptions/create}} is true:
+    1. Let |access| be the result of running [=this=]'s [=FileSystemHandle/entry=]'s
+       [=file system entry/request access=] given "`readwrite`".
+       If that throws an exception, [=reject=] |result| with that exception and abort.
+  1. Otherwise:
+    1. Let |access| be the result of running [=this=]'s [=FileSystemHandle/entry=]'s
+       [=file system entry/query access=] given "`read`".
+  1. If |access| is not "{{PermissionState/granted}}",
+     [=/reject=] |result| with a "{{NotAllowedError}}" {{DOMException}} and abort.
+
+  1. [=set/For each=] |child| of |entry|'s [=directory entry/children=]:
+    1. If |child|'s [=file system entry/name=] equals |name|:
+      1. If |child| is a [=file entry=]:
+        1. [=/Reject=] |result| with a "{{TypeMismatchError}}" {{DOMException}} and abort.
+      1. [=/Resolve=] |result| with a new {{FileSystemDirectoryHandle}} whose [=FileSystemHandle/entry=] is |child| and abort.
+  1. If |options|.{{FileSystemGetFileOptions/create}} is false:
+    1. [=/Reject=] |result| with a "{{NotFoundError}}" {{DOMException}} and abort.
+  1. Let |child| be a new [=directory entry=] whose [=query access=] and [=request access=]
+     algorithms are those of |entry|.
+  1. Set |child|'s [=file system entry/name=] to |name|.
+  1. Set |child|'s [=directory entry/children=] to an empty [=/set=].
+  1. [=set/Append=] |child| to |entry|'s [=directory entry/children=].
+  1. If creating |child| in the underlying file system throws an exception,
+     [=/reject=] |result| with that exception and abort.
+
+     Issue(11): Better specify what possible exceptions this could throw.
+  1. [=/Resolve=] |result| with a new {{FileSystemDirectoryHandle}} whose [=FileSystemHandle/entry=] is |child|.
+1. Return |result|.
+
+</div>
+
+### The {{FileSystemDirectoryHandle/removeEntry()}} method ### {#api-filesystemdirectoryhandle-removeentry}
+
+<div class="note domintro">
+  : await |directoryHandle| . {{FileSystemDirectoryHandle/removeEntry()|removeEntry}}(|name|)
+  : await |directoryHandle| . {{FileSystemDirectoryHandle/removeEntry()|removeEntry}}(|name|, { {{FileSystemRemoveOptions/recursive}}: false })
+  :: If the directory represented by |directoryHandle| contains a file named |name|, or an empty
+     directory named |name|, this will attempt to delete that file or directory.
+
+     Attempting to delete a file or directory that does not exist is considered success,
+     while attempting to delete a non-empty directory will result in a promise rejection.
+
+  : await |directoryHandle| . {{FileSystemDirectoryHandle/removeEntry()|removeEntry}}(|name|, { {{FileSystemRemoveOptions/recursive}}: true })
+  :: Removes the entry named |name| in the directory represented by |directoryHandle|.
+     If that entry is a directory, its contents will also be deleted recursively.
+
+     Attempting to delete a file or directory that does not exist is considered success.
+</div>
+
+<div algorithm>
+The <dfn method for=FileSystemDirectoryHandle>removeEntry(|name|, |options|)</dfn> method steps are:
+
+1. Let |result| be [=a new promise=].
+1. Run these steps [=in parallel=]:
+  1. If |name| is not a [=valid file name=], [=/reject=] |result| with a {{TypeError}} and abort.
+
+  1. Let |entry| be [=this=]'s [=FileSystemHandle/entry=].
+  1. Let |access| be the result of running [=this=]'s [=FileSystemHandle/entry=]'s
+     [=file system entry/request access=] given "`readwrite`".
+     If that throws an exception, [=reject=] |result| with that exception and abort.
+  1. If |access| is not "{{PermissionState/granted}}",
+     [=/reject=] |result| with a "{{NotAllowedError}}" {{DOMException}} and abort.
+
+  1. [=set/For each=] |child| of |entry|'s [=directory entry/children=]:
+    1. If |child|'s [=file system entry/name=] equals |name|:
+      1. If |child| is a [=directory entry=]:
+        1. If |child|'s [=directory entry/children=] is not [=set/is empty|empty=] and |options|.{{FileSystemRemoveOptions/recursive}} is false:
+          1. [=/Reject=] |result| with an "{{InvalidModificationError}}" {{DOMException}} and abort.
+      1. [=set/Remove=] |child| from |entry|'s [=directory entry/children=].
+      1. If removing |child| in the underlying file system throws an exception,
+         [=/reject=] |result| with that exception and abort.
+
+         Note: If {{FileSystemRemoveOptions/recursive}} is true, the removal can fail
+         non-atomically. Some files or directories might have been removed while other files
+         or directories still exist.
+
+         Issue(11): Better specify what possible exceptions this could throw.
+      1. [=/Resolve=] |result| with `undefined`.
+  1. [=/Reject=] |result| with a "{{NotFoundError}}" {{DOMException}}.
+1. Return |result|.
+
+</div>
+
+### The {{FileSystemDirectoryHandle/resolve()}} method ### {#api-filesystemdirectoryhandle-resolve}
+
+<div class="note domintro">
+  : |path| = await |directory| . {{FileSystemDirectoryHandle/resolve()|resolve}}( |child| )
+  :: If |child| is equal to |directory|, |path| will be an empty array.
+  :: If |child| is a direct child of |directory|, |path| will be an array containing |child|'s name.
+  :: If |child| is a descendant of |directory|, |path| will be an array containing the names of
+     all the intermediate directories and |child|'s name as last element.
+     For example if |directory| represents `/home/user/project`
+     and |child| represents `/home/user/project/foo/bar`, this will return
+     `['foo', 'bar']`.
+  :: Otherwise (|directory| and |child| are not related), |path| will be null.
+</div>
+
+<div class=example id=filesystemdirectoryhandle-resolve-example>
+<xmp highlight=js>
+// Assume we at some point got a valid directory handle.
+const dir_ref = current_project_dir;
+if (!dir_ref) return;
+
+// Now get a file reference:
+const file_ref = await dir_ref.getFileHandle(filename, { create: true });
+
+// Check if file_ref exists inside dir_ref:
+const relative_path = await dir_ref.resolve(file_ref);
+if (relative_path === null) {
+    // Not inside dir_ref.
+} else {
+    // relative_path is an array of names, giving the relative path
+    // from dir_ref to the file that is represented by file_ref:
+    assert relative_path.pop() === file_ref.name;
+
+    let entry = dir_ref;
+    for (const name of relative_path) {
+        entry = await entry.getDirectory(name);
+    }
+    entry = await entry.getFile(file_ref.name);
+
+    // Now |entry| will represent the same file on disk as |file_ref|.
+    assert await entry.isSameEntry(file_ref) === true;
+}
+</xmp>
+</div>
+
+<div algorithm>
+The <dfn method for=FileSystemDirectoryHandle>resolve(|possibleDescendant|)</dfn> method steps are
+to return the result of [=file system entry/resolving=]|possibleDescendant|'s [=FileSystemHandle/entry=]
+relative to [=this=]'s [=FileSystemHandle/entry=].
+
+</div>
+
+## The {{FileSystemWritableFileStream}} interface ## {#api-filesystemwritablefilestream}
+
+<xmp class=idl>
+enum WriteCommandType {
+  "write",
+  "seek",
+  "truncate",
+};
+
+dictionary WriteParams {
+  required WriteCommandType type;
+  unsigned long long? size;
+  unsigned long long? position;
+  (BufferSource or Blob or USVString)? data;
+};
+
+typedef (BufferSource or Blob or USVString or WriteParams) FileSystemWriteChunkType;
+
+[Exposed=(Window,Worker), SecureContext]
+interface FileSystemWritableFileStream : WritableStream {
+  Promise<undefined> write(FileSystemWriteChunkType data);
+  Promise<undefined> seek(unsigned long long position);
+  Promise<undefined> truncate(unsigned long long size);
+};
+</xmp>
+
+A {{FileSystemWritableFileStream}} has an associated <dfn for=FileSystemWritableFileStream>\[[file]]</dfn> (a [=file entry=]).
+
+A {{FileSystemWritableFileStream}} has an associated <dfn for=FileSystemWritableFileStream>\[[buffer]]</dfn> (a [=byte sequence=]).
+It is initially empty.
+
+Note: This buffer can get arbitrarily large, so it is expected that implementations will not keep this in memory,
+but instead use a temporary file for this. All access to \[[buffer]] is done in promise returning methods and
+algorithms, so even though operations on it seem sync, implementations can implement them async.
+
+A {{FileSystemWritableFileStream}} has an associated <dfn for=FileSystemWritableFileStream>\[[seekOffset]]</dfn> (a number).
+It is initially 0.
+
+<div class="note domintro">
+A {{FileSystemWritableFileStream}} object is a {{WritableStream}} object with additional
+convenience methods, which operates on a single file on disk.
+
+Upon creation, an underlying sink will have been created and the stream will be usable.
+All operations executed on the stream are queuable and producers will be able to respond to backpressure.
+
+The underlying sink's write method, and therefore {{WritableStreamDefaultWriter/write()|WritableStreamDefaultWriter's write()}}
+method, will accept byte-like data or {{WriteParams}} as input.
+
+The {{FileSystemWritableFileStream}} has a file position cursor initialized at byte offset 0 from the top of the file.
+When using {{FileSystemWritableFileStream/write()|write()}} or by using WritableStream capabilities through the {{WritableStreamDefaultWriter/write()|WritableStreamDefaultWriter's write()}} method, this position will be advanced based on the number of bytes written through the stream object.
+
+Similarly, when piping a {{ReadableStream}} into a {{FileSystemWritableFileStream}} object, this position is updated with the number of bytes that passed through the stream.
+
+{{WritableStream/getWriter()|getWriter()}} returns an instance of {{WritableStreamDefaultWriter}}.
+</div>
+
+<div algorithm>
+To <dfn>create a new FileSystemWritableFileStream</dfn> given a [=file entry=] |file|
+in a [=/Realm=] |realm|, run these steps:
+
+1. Let |stream| be a [=new=] {{FileSystemWritableFileStream}} in |realm|.
+1. Set |stream|.[=FileSystemWritableFileStream/[[file]]=] to |file|.
+1. Let |writeAlgorithm| be an algorithm which takes a |chunk| argument
+   and returns the result of running the [=write a chunk=] algorithm with |stream| and |chunk|.
+1. Let |closeAlgorithm| be these steps:
+   1. Let |closeResult| be [=a new promise=].
+   1. Run these steps [=in parallel=]:
+      1. Let |access| be the result of running |file|'s [=file system entry/query access=] given "`readwrite`".
+      1. If |access| is not "{{PermissionState/granted}}",
+         [=/reject=] |closeResult| with a "{{NotAllowedError}}" {{DOMException}}
+         and abort.
+      1. Run [=implementation-defined=] malware scans and safe browsing checks.
+         If these checks fail, [=/reject=] |closeResult| with an "{{AbortError}}" {{DOMException}} and abort.
+      1. Set |stream|.[=FileSystemWritableFileStream/[[file]]=]'s [=file entry/binary data=] to |stream|.[=[[buffer]]=].
+         If that throws an exception, [=/reject=] |closeResult| with that exception and abort.
+
+         Note: It is expected that this atomically updates the contents of the file on disk
+         being written to.
+
+      1. [=file entry/lock/release|Release the lock=] on |stream|.[=FileSystemWritableFileStream/[[file]]=].
+      1. [=/Resolve=] |closeResult| with `undefined`.
+   1. Return |closeResult|.
+1. Let |abortAlgorithm| be this step: [=file entry/lock/release|release the lock=] on
+   |stream|.[=FileSystemWritableFileStream/[[file]]=].
+1. Let |highWaterMark| be 1.
+1. Let |sizeAlgorithm| be an algorithm that returns `1`.
+1. [=WritableStream/Set up=] |stream| with <a for="WritableStream/set up"><var
+   ignore>writeAlgorithm</var></a> set to |writeAlgorithm|, <a for="WritableStream/set up"><var
+   ignore>closeAlgorithm</var></a> set to |closeAlgorithm|, <a for="WritableStream/set up"><var
+   ignore>abortAlgorithm</var></a> set to |abortAlgorithm|, <a for="WritableStream/set up"><var
+   ignore>highWaterMark</var></a> set to |highWaterMark|, and <a for="WritableStream/set up"><var
+   ignore>sizeAlgorithm</var></a> set to |sizeAlgorithm|.
+1. Return |stream|.
+
+</div>
+
+<div algorithm>
+The <dfn>write a chunk</dfn> algorithm,
+given a {{FileSystemWritableFileStream}} |stream| and |chunk|,
+runs these steps:
+
+1. Let |input| be the result of [=converted to an IDL value|converting=] |chunk| to a {{FileSystemWriteChunkType}}.
+   If this throws an exception, then return [=a promise rejected with=] that exception.
+1. Let |p| be [=a new promise=].
+1. Run these steps [=in parallel=]:
+   1. Let |access| be the result of running |stream|'s [=FileSystemWritableFileStream/[[file]]=]'s
+      [=file system entry/query access=] given "`readwrite`".
+   1. If |access| is not "{{PermissionState/granted}}",
+      [=/reject=] |p| with a "{{NotAllowedError}}" {{DOMException}} and abort.
+   1. Let |command| be |input|.{{WriteParams/type}} if |input| is a {{WriteParams}},
+      and {{WriteCommandType/"write"}} otherwise.
+   1. If |command| is {{WriteCommandType/"write"}}:
+      1. Let |data| be |input|.{{WriteParams/data}} if |input| is a {{WriteParams}},
+         and |input| otherwise.
+      1. If |data| is `undefined`,
+         [=/reject=] |p| with a {{TypeError}} and abort.
+      1. Let |writePosition| be |stream|.[=[[seekOffset]]=].
+      1. If |input| is a {{WriteParams}} and |input|.{{WriteParams/position}} is not `undefined`,
+         set |writePosition| to |input|.{{WriteParams/position}}.
+      1. Let |oldSize| be |stream|.[=[[buffer]]=]'s [=byte sequence/length=].
+      1. If |data| is a {{BufferSource}},
+         let |dataBytes| be [=get a copy of the buffer source|a copy of=] |data|.
+      1. Otherwise, if |data| is a {{Blob}}:
+         1. Let |dataBytes| be the result of performing the
+            <a spec=FileAPI>read operation</a> on |data|.
+            If this throws an exception, [=/reject=] |p| with that exception and abort.
+      1. Otherwise:
+         1. [=Assert=]: |data| is a {{USVString}}.
+         1. Let |dataBytes| be the result of [=UTF-8 encoding=] |data|.
+      1. If |writePosition| is larger than |oldSize|,
+         append |writePosition| - |oldSize| 0x00 (NUL) bytes to the end of |stream|.[=[[buffer]]=].
+
+         Note: Implementations are expected to behave as if the skipped over file contents
+         are indeed filled with NUL bytes. That doesn't mean these bytes have to actually be
+         written to disk and take up disk space. Instead most file systems support so called
+         sparse files, where these NUL bytes don't take up actual disk space.
+
+      1. Let |head| be a [=byte sequence=] containing the first |writePosition| bytes of |stream|.[=[[buffer]]=].
+      1. Let |tail| be an empty [=byte sequence=].
+      1. If |writePosition| + |data|.[=byte sequence/length=] is smaller than |oldSize|:
+         1. Let |tail| be a [=byte sequence=] containing the last
+            |oldSize| - (|writePosition| + |data|.[=byte sequence/length=]) bytes of |stream|.[=[[buffer]]=].
+      1. Set |stream|.[=[[buffer]]=] to the concatenation of |head|, |data| and |tail|.
+      1. If the operations modifying |stream|.[=[[buffer]]=] in the previous steps failed
+         due to exceeding the [=storage quota=], [=/reject=] |p| with a "{{QuotaExceededError}}" {{DOMException}} and abort,
+         leaving |stream|.[=[[buffer]]=] unmodified.
+
+         Note: [=Storage quota=] only applies to files stored in the [=origin private file system=].
+         However this operation could still fail for other files, for example if the disk being written
+         to runs out of disk space.
+      1. Set |stream|.[=[[seekOffset]]=] to |writePosition| + |data|.[=byte sequence/length=].
+      1. [=/Resolve=] |p|.
+   1. Otherwise, if |command| is {{WriteCommandType/"seek"}}:
+      1. If |chunk|.{{WriteParams/position}} is `undefined`,
+         [=/reject=] |p| with a {{TypeError}} and abort.
+      1. Set |stream|.[=[[seekOffset]]=] to |chunk|.{{WriteParams/position}}.
+      1. [=/Resolve=] |p|.
+   1. Otherwise, if |command| is {{WriteCommandType/"truncate"}}:
+      1. If |chunk|.{{WriteParams/size}} is `undefined`,
+         [=/reject=] |p| with a {{TypeError}} and abort.
+      1. Let |newSize| be |chunk|.{{WriteParams/size}}.
+      1. Let |oldSize| be |stream|.[=[[buffer]]=]'s [=byte sequence/length=].
+      1. If |newSize| is larger than |oldSize|:
+         1. Set |stream|.[=[[buffer]]=] to a [=byte sequence=] formed by concating
+            |stream|.[=[[buffer]]=] with a [=byte sequence=] containing |newSize|-|oldSize| `0x00` bytes.
+         1. If the operation in the previous step failed due to exceeding the [=storage quota=],
+            [=/reject=] |p| with a "{{QuotaExceededError}}" {{DOMException}} and abort,
+            leaving |stream|.[=[[buffer]]=] unmodified.
+
+            Note: [=Storage quota=] only applies to files stored in the [=origin private file system=].
+            However this operation could still fail for other files, for example if the disk being written
+            to runs out of disk space.
+      1. Otherwise, if |newSize| is smaller than |oldSize|:
+         1. Set |stream|.[=[[buffer]]=] to a [=byte sequence=] containing the first |newSize| bytes
+            in |stream|.[=[[buffer]]=].
+      1. If |stream|.[=[[seekOffset]]=] is bigger than |newSize|,
+         set |stream|.[=[[seekOffset]]=] to |newSize|.
+      1. [=/Resolve=] |p|.
+1. Return |p|.
+
+</div>
+
+### The {{FileSystemWritableFileStream/write()}} method ### {#api-filesystemwritablefilestream-write}
+
+<div class="note domintro">
+  : await |stream| . {{FileSystemWritableFileStream/write()|write}}(|data|)
+  : await |stream| . {{FileSystemWritableFileStream/write()|write}}({
+      {{WriteParams/type}}: {{WriteCommandType/"write"}},
+      {{WriteParams/data}}: |data| })
+  :: Writes the content of |data| into the file associated with |stream| at the current file
+     cursor offset.
+
+     No changes are written to the actual file on disk until the stream has been closed.
+     Changes are typically written to a temporary file instead.
+
+  : await |stream| . {{FileSystemWritableFileStream/write()|write}}({
+      {{WriteParams/type}}: {{WriteCommandType/"write"}},
+      {{WriteParams/position}}: |position|,
+      {{WriteParams/data}}: |data| })
+  :: Writes the content of |data| into the file associated with |stream| at |position|
+     bytes from the top of the file. Also updates the current file cursor offset to the
+     end of the written data.
+
+     No changes are written to the actual file on disk until the stream has been closed.
+     Changes are typically written to a temporary file instead.
+
+  : await |stream| . {{FileSystemWritableFileStream/write()|write}}({
+      {{WriteParams/type}}: {{WriteCommandType/"seek"}},
+      {{WriteParams/position}}: |position| })
+  :: Updates the current file cursor offset the |position| bytes from the top of the file.
+
+  : await |stream| . {{FileSystemWritableFileStream/write()|write}}({
+      {{WriteParams/type}}: {{WriteCommandType/"truncate"}},
+      {{WriteParams/size}}: |size| })
+  :: Resizes the file associated with |stream| to be |size| bytes long. If |size| is larger than
+     the current file size this pads the file with null bytes, otherwise it truncates the file.
+
+     The file cursor is updated when {{truncate}} is called. If the cursor is smaller than |size|,
+     it remains unchanged. If the cursor is larger than |size|, it is set to |size| to
+     ensure that subsequent writes do not error.
+
+     No changes are written to the actual file until on disk until the stream has been closed.
+     Changes are typically written to a temporary file instead.
+</div>
+
+<div algorithm>
+The <dfn method for=FileSystemWritableFileStream>write(|data|)</dfn> method steps are:
+
+1. Let |writer| be the result of [=WritableStream/getting a writer=] for [=this=].
+1. Let |result| be the result of [=WritableStreamDefaultWriter/writing a chunk=] to |writer| given
+   |data|.
+1. [=WritableStreamDefaultWriter/Release=] |writer|.
+1. Return |result|.
+
+</div>
+
+### The {{FileSystemWritableFileStream/seek()}} method ### {#api-filesystemwritablefilestream-seek}
+
+<div class="note domintro">
+  : await |stream| . {{FileSystemWritableFileStream/seek()|seek}}(|position|)
+  :: Updates the current file cursor offset the |position| bytes from the top of the file.
+</div>
+
+<div algorithm>
+The <dfn method for=FileSystemWritableFileStream>seek(|position|)</dfn> method steps are:
+
+1. Let |writer| be the result of [=WritableStream/getting a writer=] for [=this=].
+1. Let |result| be the result of [=WritableStreamDefaultWriter/writing a chunk=] to |writer| given
+    «[ "{{WriteParams/type}}" → {{WriteCommandType/"seek"}}, "{{WriteParams/position}}" →
+    |position| ]».
+1. [=WritableStreamDefaultWriter/Release=] |writer|.
+1. Return |result|.
+
+</div>
+
+### The {{FileSystemWritableFileStream/truncate()}} method ### {#api-filesystemwritablefilestream-truncate}
+
+<div class="note domintro">
+  : await |stream| . {{FileSystemWritableFileStream/truncate()|truncate}}(|size|)
+  :: Resizes the file associated with |stream| to be |size| bytes long. If |size| is larger than
+     the current file size this pads the file with null bytes, otherwise it truncates the file.
+
+     The file cursor is updated when {{truncate}} is called. If the cursor is smaller than |size|,
+     it remains unchanged. If the cursor is larger than |size|, it is set to |size| to
+     ensure that subsequent writes do not error.
+
+     No changes are written to the actual file until on disk until the stream has been closed.
+     Changes are typically written to a temporary file instead.
+</div>
+
+<div algorithm>
+The <dfn method for=FileSystemWritableFileStream>truncate(|size|)</dfn> method steps are:
+
+1. Let |writer| be the result of [=WritableStream/getting a writer=] for [=this=].
+1. Let |result| be the result of [=WritableStreamDefaultWriter/writing a chunk=] to |writer| given
+    «[ "{{WriteParams/type}}" → {{WriteCommandType/"truncate"}}, "{{WriteParams/size}}" →
+    |size| ]».
+1. [=WritableStreamDefaultWriter/Release=] |writer|.
+1. Return |result|.
+
+</div>
+
+## The {{FileSystemSyncAccessHandle}} interface ## {#api-filesystemsyncaccesshandle}
+
+<xmp class=idl>
+
+dictionary FileSystemReadWriteOptions {
+  [EnforceRange] unsigned long long at;
+};
+
+[Exposed=DedicatedWorker, SecureContext]
+interface FileSystemSyncAccessHandle {
+  unsigned long long read([AllowShared] BufferSource buffer,
+                          optional FileSystemReadWriteOptions options = {});
+  unsigned long long write([AllowShared] BufferSource buffer,
+                           optional FileSystemReadWriteOptions options = {});
+
+  undefined truncate([EnforceRange] unsigned long long newSize);
+  unsigned long long getSize();
+  undefined flush();
+  undefined close();
+};
+
+</xmp>
+
+A {{FileSystemSyncAccessHandle}} has an associated <dfn for=FileSystemSyncAccessHandle>\[[file]]</dfn>
+(a [=file entry=]).
+
+A {{FileSystemSyncAccessHandle}} has an associated <dfn for=FileSystemSyncAccessHandle>\[[state]]</dfn>,
+a string that may exclusively be "`open`" or "`closed`".
+
+A {{FileSystemSyncAccessHandle}} is an object that is capable of reading from/writing to,
+as well as obtaining and changing the size of, a single file.
+
+A {{FileSystemSyncAccessHandle}} offers synchronous methods. This allows for higher performance on
+contexts where asynchronous operations come with high overhead, e.g., WebAssembly.
+
+A {{FileSystemSyncAccessHandle}} has a <dfn for="FileSystemSyncAccessHandle">file position cursor</dfn> initialized at byte offset 0 from the top of the file.
+
+<div algorithm>
+To <dfn>create a new FileSystemSyncAccessHandle</dfn> given a [=file entry=] |file|
+in a [=/Realm=] |realm|, run these steps:
+
+1. Let |handle| be a [=new=] {{FileSystemSyncAccessHandle}} in |realm|.
+1. Set |handle|.[=FileSystemSyncAccessHandle/[[file]]=] to |file|.
+1. Set |handle|.[=FileSystemSyncAccessHandle/[[state]]=] to "`open`".
+1. Return |handle|.
+
+</div>
+
+### The {{FileSystemSyncAccessHandle/read()}} method ### {#api-filesystemsyncaccesshandle-read}
+
+<div class="note domintro">
+  : |handle| . {{FileSystemSyncAccessHandle/read()|read}}(|buffer|)
+  : |handle| . {{FileSystemSyncAccessHandle/read()|read}}(|buffer|, { {{FileSystemReadWriteOptions/at}} })
+  :: Reads the contents of the file associated with |handle| into |buffer|, optionally at a given offset.
+  :: The file cursor is updated when {{FileSystemSyncAccessHandle/read()}} is called to point to the byte after the last byte read.
+</div>
+
+Issue(35): Specify how Access Handles should react when reading from a file that has been modified externally.
+
+<div algorithm>
+The <dfn method for=FileSystemSyncAccessHandle>read(|buffer|, {{FileSystemReadWriteOptions}}: |options|)</dfn> method steps are:
+
+1. If [=this=].[=[[state]]=] is "`closed`", [=throw=] an "{{InvalidStateError}}"
+   {{DOMException}}.
+1. Let |bufferSize| be |buffer|'s [=byte length=].
+1. Let |fileContents| be [=this=].[=FileSystemSyncAccessHandle/[[file]]=]'s [=file entry/binary data=].
+1. Let |fileSize| be |fileContents|'s [=byte sequence/length=].
+1. Let |readStart| be |options|["{{FileSystemReadWriteOptions/at}}"] if
+   |options|["{{FileSystemReadWriteOptions/at}}"] [=map/exists=]; otherwise
+   [=this=]'s [=FileSystemSyncAccessHandle/file position cursor=].
+1. If the underlying file system does not support reading from a file offset of
+   |readStart|, [=throw=] a {{TypeError}}.
+1. If |readStart| is larger than |fileSize|:
+    1. Set [=this=]'s [=FileSystemSyncAccessHandle/file position cursor=] to |fileSize|.
+    1. Return 0.
+1. Let |readEnd| be |readStart| + (|bufferSize| &minus; 1).
+1. If |readEnd| is larger than |fileSize|, set |readEnd| to |fileSize|.
+1. Let |bytes| be a [=byte sequence=] containing the bytes from |readStart| to |readEnd| of |fileContents|.
+1. Let |result| be |bytes|'s [=byte sequence/length=].
+1. If the operations reading from |fileContents| in the previous steps failed:
+    1. If there were partial reads and the number of bytes that were read into |bytes| is known,
+       set |result| to the number of read bytes.
+    1. Otherwise set |result| to 0.
+1. Let |arrayBuffer| be |buffer|'s [=underlying buffer=].
+1. [=ArrayBuffer/write|Write=] |bytes| into |arrayBuffer|.
+1. Set [=this=]'s [=FileSystemSyncAccessHandle/file position cursor=] to |readStart| + |result|.
+1. Return |result|.
+
+</div>
+
+### The {{FileSystemSyncAccessHandle/write()}} method ### {#api-filesystemsyncaccesshandle-write}
+
+<div class="note domintro">
+  : |handle| . {{FileSystemSyncAccessHandle/write()|write}}(|buffer|)
+  : |handle| . {{FileSystemSyncAccessHandle/write()|write}}(|buffer|, { {{FileSystemReadWriteOptions/at}} })
+  :: Writes the content of |buffer| into the file associated with |handle|, optionally at a given offset, and returns the number of written bytes.
+     Checking the returned number of written bytes allows callers to detect and handle errors and partial writes.
+  :: The file cursor is updated when {{write}} is called to point to the byte after the last byte written.
+</div>
+
+<!-- TODO(fivedots): Figure out how to properly check the available storage quota (in this method and others) by passing the right storage shelf. -->
+<div algorithm>
+The <dfn method for=FileSystemSyncAccessHandle>write(|buffer|, {{FileSystemReadWriteOptions}}: |options|)</dfn> method steps are:
+
+1. If [=this=].[=[[state]]=] is "`closed`", [=throw=] an "{{InvalidStateError}}"
+   {{DOMException}}.
+1. Let |writePosition| be |options|["{{FileSystemReadWriteOptions/at}}"] if
+   |options|["{{FileSystemReadWriteOptions/at}}"] [=map/exists=]; otherwise
+   [=this=]'s [=FileSystemSyncAccessHandle/file position cursor=].
+1. If the underlying file system does not support writing to a file offset of
+   |writePosition|, [=throw=] a {{TypeError}}.
+1. Let |fileContents| be a copy of [=this=].[=FileSystemSyncAccessHandle/[[file]]=]'s [=file entry/binary data=].
+1. Let |oldSize| be |fileContents|'s [=byte sequence/length=].
+1. Let |bufferSize| be |buffer|'s [=byte length=].
+1. If |writePosition| is larger than |oldSize|,
+   append |writePosition| &minus; |oldSize| 0x00 (NUL) bytes to the end of |fileContents|.
+
+   Note: Implementations are expected to behave as if the skipped over file contents
+   are indeed filled with NUL bytes. That doesn't mean these bytes have to actually be
+   written to disk and take up disk space. Instead most file systems support so called
+   sparse files, where these NUL bytes don't take up actual disk space.
+
+1. Let |head| be a [=byte sequence=] containing the first |writePosition| bytes of |fileContents|.
+1. Let |tail| be an empty [=byte sequence=].
+1. If |writePosition| + |bufferSize| is smaller than |oldSize|:
+   1. Set |tail| to a [=byte sequence=] containing the last
+      |oldSize| &minus; (|writePosition| + |bufferSize|) bytes of |fileContents|.
+1. Let |newSize| be |head|'s [=byte sequence/length=] + |bufferSize| + |tail|'s [=byte sequence/length=].
+1. If |newSize| &minus; |oldSize| exceeds the available [=storage quota=],
+   [=throw=] a "{{QuotaExceededError}}" {{DOMException}}.
+1. Set [=this=].[=FileSystemSyncAccessHandle/[[file]]=]'s [=file entry/binary data=] to the concatenation of |head|, the contents of |buffer| and |tail|.
+
+  Note: The mechanism used to access buffer's contents is left purposely vague.
+  It is likely that implementations will choose to focus on performance by issuing
+  direct write calls to the host operating system (instead of creating a copy of buffer),
+  which prevents a detailed specification of the write order and the results of partial writes.
+
+1. If the operations modifying the [=this=].[=FileSystemSyncAccessHandle/[[file]]=]'s [=file entry/binary data=] in the previous steps
+   failed:
+    1. If there were partial writes and the number of bytes that were written from |buffer| is known:
+        1. Let |bytesWritten| be the number of bytes that were written from |buffer|.
+        1. Set [=this=]'s [=FileSystemSyncAccessHandle/file position cursor=] to |writePosition| + |bytesWritten|.
+        1. Return |bytesWritten|.
+    1. Otherwise [=throw=] an "{{InvalidStateError}}" {{DOMException}}.
+1. Set [=this=]'s [=FileSystemSyncAccessHandle/file position cursor=] to |writePosition| + |bufferSize|.
+1. Return |bufferSize|.
+
+</div>
+
+### The {{FileSystemSyncAccessHandle/truncate()}} method ### {#api-filesystemsyncaccesshandle-truncate}
+
+<div class="note domintro">
+  : |handle| . {{FileSystemSyncAccessHandle/truncate()|truncate}}(|newSize|)
+  :: Resizes the file associated with |handle| to be |newSize| bytes long. If |newSize| is larger than the current file size this pads the file with null bytes; otherwise it truncates the file.
+
+  :: The file cursor is updated when {{truncate}} is called. If the cursor is smaller than |newSize|, it remains unchanged. If the cursor is larger than |newSize|, it is set to |newSize|.
+</div>
+
+<div algorithm>
+The <dfn method for=FileSystemSyncAccessHandle>truncate(|newSize|)</dfn> method steps are:
+
+1. If [=this=].[=[[state]]=] is "`closed`", [=throw=] an "{{InvalidStateError}}"
+   {{DOMException}}.
+1. Let |fileContents| be a copy of [=this=].[=FileSystemSyncAccessHandle/[[file]]=]'s [=file entry/binary data=].
+1. 1. Let |oldSize| be the [=byte sequence/length=] of [=this=].[=FileSystemSyncAccessHandle/[[file]]=]'s [=file entry/binary data=].
+1. If the underlying file system does not support setting a file's size to
+   |newSize|, [=throw=] a {{TypeError}}.
+1. If |newSize| is larger than |oldSize|:
+   1. If |newSize| &minus; |oldSize| exceeds the available [=storage quota=],
+      [=throw=] a "{{QuotaExceededError}}" {{DOMException}}.
+   1. Set [=this=].[=FileSystemSyncAccessHandle/[[file]]=]'s to a [=byte sequence=] formed by concatenating
+      |fileContents| with a [=byte sequence=]
+      containing |newSize| &minus; |oldSize| 0x00 bytes.
+   1. If the operations modifying the [=this=].[=FileSystemSyncAccessHandle/[[file]]=]'s [=file entry/binary data=] in the previous steps
+      failed, [=throw=] an "{{InvalidStateError}}" {{DOMException}}.
+1. Otherwise, if |newSize| is smaller than |oldSize|:
+   1. Set [=this=].[=FileSystemSyncAccessHandle/[[file]]=]'s to a [=byte sequence=] containing the first |newSize| bytes
+      in |fileContents|.
+   1. If the operations modifying the [=this=].[=FileSystemSyncAccessHandle/[[file]]=]'s [=file entry/binary data=] in the previous steps
+      failed, [=throw=] an "{{InvalidStateError}}" {{DOMException}}.
+1. If [=this=]'s [=FileSystemSyncAccessHandle/file position cursor=] is greater than |newSize|, then set [=FileSystemSyncAccessHandle/file position cursor=] to |newSize|.
+
+</div>
+
+### The {{FileSystemSyncAccessHandle/getSize()}} method ### {#api-filesystemsyncaccesshandle-getsize}
+
+<div class="note domintro">
+  : |handle| . {{FileSystemSyncAccessHandle/getSize()}}
+  :: Returns the size of the file associated with |handle| in bytes.
+</div>
+
+<div algorithm>
+The <dfn method for=FileSystemSyncAccessHandle>getSize()</dfn> method steps are:
+
+1. If [=this=].[=[[state]]=] is "`closed`", [=throw=] an "{{InvalidStateError}}"
+   {{DOMException}}.
+1. Return [=this=].[=FileSystemSyncAccessHandle/[[file]]=]'s [=file entry/binary data=]'s [=byte sequence/length=].
+
+</div>
+
+### The {{FileSystemSyncAccessHandle/flush()}} method ### {#api-filesystemsyncaccesshandle-flush}
+
+<div class="note domintro">
+  : |handle| . {{FileSystemSyncAccessHandle/flush()}}
+  :: Ensures that the contents of the file associated with |handle| contain all the modifications done through {{FileSystemSyncAccessHandle/write()}}.
+</div>
+
+<div algorithm>
+The <dfn method for=FileSystemSyncAccessHandle>flush()</dfn> method steps are:
+
+1. If [=this=].[=[[state]]=] is "`closed`", [=throw=] an "{{InvalidStateError}}"
+   {{DOMException}}.
+1. Attempt to transfer all cached modifications of the file's content to the
+   file system's underlying storage device.
+
+   Note: This is also known as flushing. This may be a no-op on some file
+   systems, such as in-memory file systems, which do not have a "disk" to flush
+   to.
+
+</div>
+
+### The {{FileSystemSyncAccessHandle/close()}} method ### {#api-filesystemsyncaccesshandle-close}
+
+<div class="note domintro">
+  : |handle| . {{FileSystemSyncAccessHandle/close()}}
+  :: Closes the access handle or no-ops if the access handle is already closed.
+     This disables any further operations on it and
+     [=file entry/lock/release|releases the lock=] on the
+     [=FileSystemHandle/entry=] associated with |handle|.
+</div>
+
+<div algorithm>
+The <dfn method for=FileSystemSyncAccessHandle>close()</dfn> method steps are:
+
+1. If [=this=]'s [=[[state]]=] is "`closed`", return.
+1. Set [=this=]'s [=[[state]]=] to "`closed`".
+1. [=file entry/lock/release|Release the lock=] on
+   [=this=]'s [=FileSystemSyncAccessHandle/[[file]]=].
+
+Note: This method does not guarantee that all file modifications will be
+immediately reflected in the underlying storage device. Call the
+{{FileSystemSyncAccessHandle/flush()}} method first if you require this
+guarantee.
+
+</div>
+
+
+# Accessing the Origin Private File System # {#sandboxed-filesystem}
+
+The <dfn export>origin private file system</dfn> is a [=storage endpoint=] whose
+<a spec=storage for="storage endpoint">identifier</a> is `"fileSystem"`,
+<a spec=storage for="storage endpoint">types</a> are `« "local" »`,
+and <a spec=storage for="storage endpoint">quota</a> is null.
+
+Issue: Storage endpoints should be defined in [[storage]] itself, rather
+than being defined here. So merge this into the table there.
+
+Note: While user agents will typically implement this by persisting the contents of this
+[=origin private file system=] to disk, it is not intended that the contents are easily
+user accessible. Similarly there is no expectation that files or directories with names
+matching the names of children of the [=origin private file system=] exist.
+
+<xmp class=idl>
+[SecureContext]
+partial interface StorageManager {
+  Promise<FileSystemDirectoryHandle> getDirectory();
+};
+</xmp>
+
+<div class="note domintro">
+  : |directoryHandle| = await navigator . storage . {{StorageManager/getDirectory()}}
+  :: Returns the root directory of the origin private file system.
+</div>
+
+<div algorithm>
+The <dfn method for=StorageManager>getDirectory()</dfn> method steps are:
+
+1. Let |environment| be the [=current settings object=].
+
+1. Let |map| be the result of running [=obtain a local storage bottle map=]
+   with |environment| and `"fileSystem"`. If this returns failure,
+   return [=a promise rejected with=] a "{{SecurityError}}" {{DOMException}}.
+
+1. If |map|["root"] does not [=map/exist=]:
+  1. Let |dir| be a new [=directory entry=] whose [=query access=] and [=request access=] algorithms
+     always return "{{PermissionState/granted}}".
+  1. Set |dir|'s [=file system entry/name=] to the empty string.
+  1. Set |dir|'s [=directory entry/children=] to an empty [=/set=].
+  1. Set |map|["root"] to |dir|.
+
+1. Return [=a promise resolved with=] a new {{FileSystemDirectoryHandle}},
+   whose associated [=FileSystemHandle/entry=] is |map|["root"].
+
+</div>
+
+
+<h2 class=no-num id="acks">Acknowledgments</h2>
+
+<p>Many thanks to
+Alex Danilo,
+Anne van Kesteren,
+Anoesj Sadraee,
+Austin Sullivan,
+Chase Phillips,
+Daseul Lee,
+Dru Knox,
+Edgar Chen,
+Emanuel Krivoy,
+Hazim Mohamed,
+Ingvar Stepanyan,
+Jari Jalkanen,
+Joshua Bell,
+Kagami Sascha Rosylight,
+Marcos Cáceres,
+Martin Thomson,
+Olivier Yiptong,
+Philip Jägenstedt,
+Randell Jesup,
+Richard Stotz,
+Ruth John,
+Sid Vishnoi,
+Sihui Liu,
+Stefan Sauer,
+Thomas Steiner,
+Victor Costan, and
+Youenn Fablet
+for being awesome!
+
+<p>This standard is written by <span lang=nl>Marijn Kruisselbrink</span>
+(<a href=https://www.google.com/>Google</a>, <a href=mailto:mek@chromium.org>mek@chromium.org</a>).
+
+
+<p boilerplate=ipr>This Living Standard includes material copied from W3C WICG's
+<a href=https://wicg.github.io/file-system-access/><cite>File System Access</cite></a>, which is
+available under the
+<a href=https://www.w3.org/Consortium/Legal/2015/copyright-software-and-document>W3C Software and Document License</a>.

@@ -1,0 +1,644 @@
+<pre class="metadata">
+Title: FLEDGE
+Shortname: fledge
+Repository: WICG/turtledove
+Inline Github Issues: true
+Group: WICG
+Status: CG-DRAFT
+Level: 1
+URL: https://wicg.github.io/turtledove/
+Boilerplate: omit conformance, omit feedback-header
+Editor: Paul Jensen, Google https://www.google.com/, pauljensen@google.com
+Abstract: Provides a privacy advancing API to facilitate interest group based advertising.
+!Participate: <a href="https://github.com/WICG/turtledove">GitHub WICG/turtledove</a> (<a href="https://github.com/WICG/turtledove/issues/new">new issue</a>, <a href="https://github.com/WICG/turtledove/issues?state=open">open issues</a>)
+!Commits: <a href="https://github.com/WICG/turtledove/commits/main/spec.bs">GitHub spec.bs commits</a>
+Complain About: accidental-2119 yes, missing-example-ids yes
+Indent: 2
+Default Biblio Status: current
+Markup Shorthands: markdown yes
+Assume Explicit For: yes
+</pre>
+
+# Introduction # {#intro}
+
+<em>This section is non-normative</em>
+
+The FLEDGE API facilitates selecting an advertisement to display to a user based on a previous
+interaction with the advertiser or advertising network.
+
+When a user's interactions with an advertiser indicate an interest in something, the advertiser can
+ask the browser to record this interest on-device by calling
+{{Window/navigator}}.{{Navigator/joinAdInterestGroup()}}. Later, when a website wants to select an
+advertisement to show to the user, the website can call
+{{Window/navigator}}.{{Navigator/runAdAuction()}} to ask the browser to conduct an auction where
+each of these on-device recorded interests are given the chance to calculate a bid to display their
+advertisement.
+
+
+<h2 id="joining-interest-groups">Joining Interest Groups</h2>
+
+When a user's interactions with a website indicate that the user may have a particular interest, an
+advertiser or someone working on behalf of the advertiser (e.g. a demand side platform, DSP) can ask
+the user's browser to record this interest on-device by calling
+{{Window/navigator}}.{{Navigator/joinAdInterestGroup()}}. This indicates an intent to display an
+advertisement relevant to this interest to this user in the future. The user agent has an
+<dfn>interest group set</dfn>, a [=list=] of [=interest groups=] in which
+[=interest group/owner=] / [=interest group/name=] pairs are unique.
+
+
+<xmp class="idl">
+[SecureContext]
+partial interface Navigator {
+  Promise<undefined> joinAdInterestGroup(AuctionAdInterestGroup group, double durationSeconds);
+};
+
+enum WorkletExecutionMode {
+  "compatibility",
+  "groupByOrigin",
+};
+
+dictionary AuctionAd {
+  required USVString renderUrl;
+  any metadata;
+};
+
+dictionary AuctionAdInterestGroup {
+  required USVString owner;
+  required USVString name;
+
+  double priority = 0.0;
+  boolean enableBiddingSignalsPrioritization = false;
+  record<USVString, double> priorityVector;
+  record<USVString, double> prioritySignalsOverrides;
+
+  WorkletExecutionMode executionMode = "compatibility";
+  USVString biddingLogicUrl;
+  USVString biddingWasmHelperUrl;
+  USVString dailyUpdateUrl;
+  USVString trustedBiddingSignalsUrl;
+  sequence<USVString> trustedBiddingSignalsKeys;
+  any userBiddingSignals;
+  sequence<AuctionAd> ads;
+  sequence<AuctionAd> adComponents;
+};
+</xmp>
+
+<div algorithm="joinAdInterestGroup()">
+
+The <dfn for=Navigator method>joinAdInterestGroup(|group|, |durationSeconds|)</dfn> method steps are:
+
+1. If [=this=]'s [=relevant global object=]'s [=associated Document=] is not [=allowed to use=] the
+  "[=join-ad-interest-group=]" [=policy-controlled feature=], then [=exception/throw=] a
+  "{{NotAllowedError}}" {{DOMException}}.
+1. Let |interestGroup| be a new [=interest group=].
+1. Validate the given |group| and set |interestGroup|'s fields accordingly.
+  1. Set |interestGroup|'s [=interest group/expiry=] to now plus |durationSeconds|.
+  1. Let |ownerUrl| be the result of running the [=URL parser=] on
+    |group|["{{AuctionAdInterestGroup/owner}}"].
+    1. If |ownerUrl| is an error, or its [=url/scheme=] is not "`https`", [=exception/throw=] a
+      {{TypeError}}.
+    1. Set |interestGroup|'s [=interest group/owner=] to |ownerUrl|'s [=url/origin=].
+  1. Set |interestGroup|'s [=interest group/name=] to |group|["{{AuctionAdInterestGroup/name}}"].
+  1. Set |interestGroup|'s [=interest group/priority=] to
+    |group|["{{AuctionAdInterestGroup/priority}}"].
+  1. Set |interestGroup|'s [=interest group/enable bidding signals prioritization=] to
+    |group|["{{AuctionAdInterestGroup/enableBiddingSignalsPrioritization}}"].
+  1. If |group|["{{AuctionAdInterestGroup/priorityVector}}"] [=map/exists=], then set
+    |interestGroup|'s [=interest group/priority vector=] to
+    |group|["{{AuctionAdInterestGroup/priorityVector}}"].
+  1. If |group|["{{AuctionAdInterestGroup/prioritySignalsOverrides}}"] [=map/exists=], then set
+    |interestGroup|'s [=interest group/priority signals overrides=] to
+    |group|["{{AuctionAdInterestGroup/prioritySignalsOverrides}}"].
+  1. Set |interestGroup|'s [=interest group/execution mode=] to
+    |group|["{{AuctionAdInterestGroup/executionMode}}"].
+  1. For each |groupMember| and |interestGroupField| in the following table <table class="data">
+      <thead><tr><th>Group member</th><th>Interest group field</th></tr></thead>
+      <tr>
+        <td>"{{AuctionAdInterestGroup/biddingLogicUrl}}"</td>
+        <td>[=interest group/bidding url=]</td>
+      </tr>
+      <tr>
+        <td>"{{AuctionAdInterestGroup/biddingWasmHelperUrl}}"</td>
+        <td>[=interest group/bidding wasm helper url=]</td>
+      </tr>
+      <tr>
+        <td>"{{AuctionAdInterestGroup/dailyUpdateUrl}}"</td>
+        <td>[=interest group/daily update url=]</td>
+      </tr>
+      <tr>
+        <td>"{{AuctionAdInterestGroup/trustedBiddingSignalsUrl}}"</td>
+        <td>[=interest group/trusted bidding signals url=]</td>
+      </tr>
+    </table>
+    1. If |group| [=map/contains=] |groupMember|:
+      1. Let |parsedUrl| be the result of running the [=URL parser=] on |group|[|groupMember|].
+      1. [=exception/Throw=] a {{TypeError}} if any of:
+        * |parsedUrl| is an error.
+        * |parsedUrl| is not [=same origin=] with |interestGroup|'s [=interest group/owner=].
+        * |parsedUrl| [=includes credentials=].
+        * |parsedUrl| [=url/fragment=] is not null.
+      1. Set |interestGroup|'s |interestGroupField| to |parsedUrl|.
+  1. If |interestGroup|'s [=interest group/trusted bidding signals url=]'s [=url/query=] is not
+    null, then [=exception/throw=] a {{TypeError}}.
+  1. If |group|["{{AuctionAdInterestGroup/trustedBiddingSignalsKeys}}"] [=map/exists=], then set
+    |interestGroup|'s [=interest group/trusted bidding signals keys=] to
+    |group|["{{AuctionAdInterestGroup/trustedBiddingSignalsKeys}}"].
+  1. If |group|["{{AuctionAdInterestGroup/userBiddingSignals}}"] [=map/exists=]:
+    1. Let |interestGroup|'s [=interest group/user bidding signals=] be the result of
+      [=serializing a JavaScript value to a JSON string=], given
+      |group|["{{AuctionAdInterestGroup/userBiddingSignals}}"]. This can [=exception/throw=] a
+      {{TypeError}}.
+  1. For each |groupMember| and |interestGroupField| in the following table <table class="data">
+      <thead><tr><th>Group member</th><th>Interest group field</th></tr></thead>
+      <tr>
+        <td>"{{AuctionAdInterestGroup/ads}}"</td>
+        <td>[=interest group/ads=]</td>
+      </tr>
+      <tr>
+        <td>"{{AuctionAdInterestGroup/adComponents}}"</td>
+        <td>[=interest group/ad components=]</td>
+      </tr>
+    </table>
+    1. [=list/For each=] |ad| of |group|[|groupMember|]:
+      1. Let |igAd| be a new [=interest group ad=].
+      1. Let |renderUrl| be the result of running the [=URL parser=] on
+        |ad|["{{AuctionAd/renderUrl}}"].
+      1. [=exception/Throw=] a {{TypeError}} if any of:
+        * |renderUrl| is an error.
+        * |renderUrl| [=url/scheme=] is not "`https`".
+        * |renderUrl| [=includes credentials=].
+      1. Set |igAd|'s [=interest group ad/render url=] to |renderUrl|.
+      1. If |ad|["{{AuctionAd/metadata}}"] [=map/exists=], then let
+        |igAd|'s [=interest group ad/metadata=] be the result of
+        [=serializing a JavaScript value to a JSON string=], given |ad|["{{AuctionAd/metadata}}"].
+        This can [=exception/throw=] a {{TypeError}}.
+      1. [=list/Append=] |igAd| to |interestGroup|'s |interestGroupField|.
+1. If |interestGroup|'s [=interest group/estimated size=] is greater than 50 KB, then
+  [=exception/throw=] a {{TypeError}}.
+1. Let |p| be [=a new promise=].
+1. Return |p| and run the following steps [=in parallel=]: (TODO: Enqueue the steps to a
+  [=parallel queue=] instead.)
+  1. TODO: document .well-known fetches for cross-origin joins.
+  1. If the browser is currently storing an interest group with `owner` and `name` that matches
+    |interestGroup|, then remove the currently stored one.
+  1. TODO: Set |interestGroup|'s [=interest group/joining origin=] to top level page origin from
+    where the interest group was joined.
+  1. Store |interestGroup| in the browser’s [=interest group set=].
+  1. [=Queue a task=] to [=resolve=] |p| with `undefined`.
+
+</div>
+
+The <dfn for="interest group">estimated size</dfn> of an [=interest group=] |ig| is the sum of:
+1. The [=string/length=] of the [=serialization of an origin|serialization=] of |ig|'s
+  [=interest group/owner=].
+1. The [=string/length=] of |ig|'s [=interest group/name=].
+1. 8 bytes, which is the size of |ig|'s [=interest group/priority=].
+1. The [=string/length=] of |ig|'s [=interest group/execution mode=].
+1. 2 bytes, which is the size of |ig|'s [=interest group/enable bidding signals prioritization=].
+1. If |ig|'s [=interest group/priority vector=] is not null, [=map/for each=] |key| → |value| of
+  [=interest group/priority vector=]:
+  1. The [=string/length=] of |key|.
+  1. 8 bytes, which is the size of |value|.
+1. If |ig|'s [=interest group/priority signals overrides=] is not null, [=map/for each=] |key| → 
+  |value| of [=interest group/priority signals overrides=]:
+  1. The [=string/length=] of |key|.
+  1. 8 bytes, which is the size of |value|.
+1. The size of [=interest group/execution mode=].
+1. The [=string/length=] of the [=URL serializer|serialization=] of |ig|'s
+  [=interest group/bidding url=], if the field is not null.
+1. The [=string/length=] of the [=URL serializer|serialization=] of |ig|'s
+  [=interest group/bidding wasm helper url=], if the field is not null.
+1. The [=string/length=] of the [=URL serializer|serialization=] of |ig|'s
+  [=interest group/daily update url=], if the field is not null.
+1. The [=string/length=] of the [=URL serializer|serialization=] of |ig|'s
+  [=interest group/trusted bidding signals url=], if the field is not null.
+1. [=list/For each=] |key| of |ig|'s [=interest group/trusted bidding signals keys=]:
+  1. The [=string/length=] of |key|.
+1. The [=string/length=] of |ig|'s [=interest group/user bidding signals=].
+1. If |ig|'s [=interest group/ads=] is not null, [=list/for each=] |ad| of it:
+  1. The [=string/length=] of the [=URL serializer|serialization=] of |ad|'s
+    [=interest group ad/render url=].
+  1. The [=string/length=] of |ad|'s [=interest group ad/metadata=] if the field is not null..
+1. If |ig|'s [=interest group/ad components=] is not null, [=list/for each=] |ad| of it:
+  1. The [=string/length=] of the [=URL serializer|serialization=] of |ad|'s
+    [=interest group ad/render url=].
+  1. The [=string/length=] of |ad|'s [=interest group ad/metadata=] if the field is not null.
+
+
+<h2 id="running-ad-auctions">Running Ad Auctions</h2>
+
+When a website or someone working on behalf of the website (e.g. a supply side platform, SSP) wants
+to conduct an auction to select an advertisement to display to the user, they can call the
+{{Window/navigator}}.{{Navigator/runAdAuction()}} function, providing an auction configuration that
+tells the browser how to conduct the auction and which on-device recorded interests are allowed to
+bid in the auction for the chance to display their advertisement.
+  
+<xmp class="idl">
+[SecureContext]
+partial interface Navigator {
+  Promise<USVString?> runAdAuction(AuctionAdConfig config);
+};
+
+dictionary AuctionAdConfig {
+  required USVString seller;
+  required USVString decisionLogicUrl;
+  USVString trustedScoringSignalsUrl;
+  sequence<USVString> interestGroupBuyers;
+  any auctionSignals;
+  any sellerSignals;
+  USVString directFromSellerSignals;
+  unsigned long long sellerTimeout;
+  unsigned short sellerExperimentGroupId;
+  record<USVString, any> perBuyerSignals;
+  record<USVString, unsigned long long> perBuyerTimeouts;
+  record<USVString, unsigned short> perBuyerGroupLimits;
+  record<USVString, unsigned short> perBuyerExperimentGroupIds;
+  record<USVString, record<USVString, double>> perBuyerPrioritySignals;
+  sequence<AuctionAdConfig> componentAuctions = [];
+  AbortSignal? signal;
+};
+</xmp>
+
+<div algorithm="runAdAuction()">
+
+The <dfn for=Navigator method>runAdAuction(|config|)</dfn> method steps are:
+
+1. If [=this=]'s [=relevant global object=]'s [=associated Document=] is not [=allowed to use=] the
+  "[=run-ad-auction=]" [=policy-controlled feature=], then [=exception/throw=] a
+  "{{NotAllowedError}}" {{DOMException}}.
+1. Let |auctionConfig| be the result of running [=validate and convert auction ad config=] with
+  |config| and [=validate and convert auction ad config/isTopLevel=] set to true.
+1. If |config|["{{AuctionAdConfig/signal}}"] [=map/exists=]:
+  1. If |config|["{{AuctionAdConfig/signal}}"] is [=AbortSignal/aborted=], then return
+    [=a promise rejected with=] |config|["{{AuctionAdConfig/signal}}"]'s
+    [=AbortSignal/abort reason=].
+1. [=AbortSignal/Add=] an algorithm (TODO: define it) to |config|["{{AuctionAdConfig/signal}}"].
+1. Let |p| be [=a new promise=].
+1. Return |p|, and run the remaining steps [=in parallel=].
+1. Run [=start bidding and scoring=] with |auctionConfig|.
+1. TODO: add missing steps.
+
+</div>
+
+<div algorithm="validate and convert auction ad config">
+
+To <dfn>validate and convert auction ad config</dfn> given an {{AuctionAdConfig}} |config| and a
+[=boolean=] <dfn for="validate and convert auction ad config">|isTopLevel|</dfn>:
+1. Let |auctionConfig| be a new [=auction config=].
+1. Let |seller| be the result of running the [=URL parser=] on
+  |config|["{{AuctionAdConfig/seller}}"].
+  1. [=exception/Throw=] a {{TypeError}} if |seller| is an error, or its [=url/scheme=] is not
+    "`https`".
+  1. Set |auctionConfig|'s [=auction config/seller=] to |seller|.
+1. Let |decisionLogicUrl| be the result of running the [=URL parser=] on
+  |config|["{{AuctionAdConfig/decisionLogicUrl}}"].
+  1. [=exception/Throw=] a {{TypeError}} if |decisionLogicUrl| is an error, or it is not
+    [=same origin=] with |auctionConfig|'s [=auction config/seller=].
+  1. Assert: |decisionLogicUrl|'s [=url/scheme=] is "`https`".
+  1. Set |auctionConfig|'s [=auction config/decision logic url=] to |decisionLogicUrl|.
+1. If |config|["{{AuctionAdConfig/trustedScoringSignalsUrl}}"] [=map/exists=]:
+  1. Let |trustedScoringSignalsUrl| be the result of running the [=URL parser=] on
+    |config|["{{AuctionAdConfig/trustedScoringSignalsUrl}}"].
+  1. [=exception/Throw=] a {{TypeError}} if |trustedScoringSignalsUrl| is an error,
+    or it is not [=same origin=] with |auctionConfig|'s [=auction config/seller=].
+  1. Assert: |trustedScoringSignalsUrl|'s [=url/scheme=] is "`https`".
+  1. Set |auctionConfig|'s [=auction config/trusted scoring signals url=] to
+    |trustedScoringSignalsUrl|.
+1. If |config|["{{AuctionAdConfig/interestGroupBuyers}}"] [=map/exists=], let |buyers| be a new
+  [=list/is empty|empty=] [=list=].
+  1. [=list/For each=] |buyerString| in |config|["{{AuctionAdConfig/interestGroupBuyers}}"]:
+    1. Let |buyer| be the result of [=parsing an origin=] with |buyerString|. If |buyer| is an
+      error, or |buyer|'s [=url/scheme=] is not "`https`", then [=exception/throw=] a {{TypeError}}.
+      Otherwise, [=list/append=] |buyer| to |buyers|.
+  1. Set |auctionConfig|'s [=auction config/interest group buyers=] to |buyers|.
+1. If |config|["{{AuctionAdConfig/auctionSignals}}"] [=map/exists=], let |auctionConfig|'s
+  [=auction config/auction signals=] be the result of
+  [=serializing a JavaScript value to a JSON string=], given
+  |config|["{{AuctionAdConfig/auctionSignals}}"].
+1. If |config|["{{AuctionAdConfig/sellerSignals}}"] [=map/exists=], let |auctionConfig|'s
+  [=auction config/seller signals=] of be the result of
+  [=serializing a JavaScript value to a JSON string=], given
+  |config|["{{AuctionAdConfig/sellerSignals}}"].
+1. If |config|["{{AuctionAdConfig/directFromSellerSignals}}"] [=map/exists=], let
+  |directFromSellerSignalsPrefix| be the result of running the [=URL parser=] on
+  |config|["{{AuctionAdConfig/directFromSellerSignals}}"].
+  1. [=exception/Throw=] a {{TypeError}} if any of:
+    * |directFromSellerSignalsPrefix| is an error.
+    * |directFromSellerSignalsPrefix| is not [=same origin=] with |auctionConfig|'s
+      [=auction config/seller=].
+    * |directFromSellerSignalsPrefix|'s [=url/query=] is not null.
+  1. Assert: |directFromSellerSignalsPrefix|'s [=url/scheme=] is "`https`".
+  1. TODO: Figure out how to deal with DirectFromSellerSignals.
+1. If |config|["{{AuctionAdConfig/sellerTimeout}}"] [=map/exists=], set |auctionConfig|'s
+  [=auction config/seller timeout=] to min(|config|["{{AuctionAdConfig/sellerTimeout}}"], 500)
+  milliseconds.
+1. If |config|["{{AuctionAdConfig/sellerExperimentGroupId}}"] [=map/exists=]:
+  1. Set |auctionConfig|'s [=auction config/seller experiment group id=] to
+    |config|["{{AuctionAdConfig/sellerExperimentGroupId}}"].
+1. If |config|["{{AuctionAdConfig/perBuyerSignals}}"] [=map/exists=], [=map/for each=] |key| →
+  |value| of |config|["{{AuctionAdConfig/perBuyerSignals}}"]:
+  1. Let |buyer| be the result of [=parsing an origin=] with |key|. If |buyer| is an error,
+    [=exception/throw=] a {{TypeError}}.
+  1. Let |signalsString| be the result of
+    [=serializing a JavaScript value to a JSON string=], given |value|.
+  1. [=map/Set=] |auctionConfig|'s [=auction config/per buyer signals=][|buyer|] to
+    |signalsString|.
+1. If |config|["{{AuctionAdConfig/perBuyerTimeouts}}"] [=map/exists=], [=map/for each=] |key| →
+  |value| of |config|["{{AuctionAdConfig/perBuyerTimeouts}}"]:
+  1. If |key| equals to "*", then set |auctionConfig|'s [=auction config/all buyers timeout=]
+    to min(|value|, 500) milliseconds, and [=iteration/continue=].
+  1. Let |buyer| the result of [=parsing an origin=] with |key|. If |buyer| is an error,
+    [=exception/throw=] a {{TypeError}}.
+  1. [=map/Set=] |auctionConfig|'s [=auction config/per buyer timeouts=][|buyer|] to
+    min(|value|, 500) milliseconds.
+1. If |config|["{{AuctionAdConfig/perBuyerGroupLimits}}"] [=map/exists=], [=map/for each=]
+  |key| → |value| of |config|["{{AuctionAdConfig/perBuyerGroupLimits}}"]:
+  1. If |value| is 0, [=exception/throw=] a {{TypeError}}.
+  1. If |key| equals to "*", then set |auctionConfig|'s [=auction config/all buyers group limit=]
+    to |value|, and [=iteration/continue=].
+  1. Let |buyer| be the result of [=parsing an origin=] with |key|. If |buyer| is an error,
+    [=exception/throw=] a {{TypeError}}.
+  1. [=map/Set=] |auctionConfig|'s [=auction config/per buyer group limits=][|buyer|] to |value|.
+1. If |config|["{{AuctionAdConfig/perBuyerExperimentGroupIds}}"] [=map/exists=], [=map/for each=]
+  |key| → |value| of |config|["{{AuctionAdConfig/perBuyerExperimentGroupIds}}"]:
+  1. If |key| equals to "*", then set |auctionConfig|'s
+    [=auction config/all buyer experiment group id=] to |value|, and [=iteration/continue=].
+  1. Let |buyer| the result of [=parsing an origin=] with |key|. If |buyer| is an error,
+    [=exception/throw=] a {{TypeError}}.
+  1. [=map/Set=] |auctionConfig|'s [=auction config/per buyer experiment group ids=][|buyer|] to
+    |value|.
+1. If |config|["{{AuctionAdConfig/perBuyerPrioritySignals}}"] [=map/exists=], [=map/for each=]
+  |key| → |value| of |config|["{{AuctionAdConfig/perBuyerPrioritySignals}}"]:
+  1. Let |signals| be an [=ordered map=] whose [=map/keys=] are [=strings=] and whose [=map/values=]
+    are {{double}}.
+  1. [=map/for each=] |k| → |v| of |value|:
+    1. If |k| [=string/starts with=] "browserSignals.", [=exception/throw=] a {{TypeError}}.
+    1. Set |signals|[|k|] to |v|.
+  1. If |key| equals to "*", then set |auctionConfig|'s
+    [=auction config/all buyers priority signals=] to |value|, and [=iteration/continue=].
+  1. Let |buyer| be the result of [=parsing an origin=] with |key|. If it fails, [=exception/throw=]
+    a {{TypeError}}.
+  1. [=map/Set=] |auctionConfig|'s [=auction config/per buyer priority signals=][|buyer|] to
+    |signals|.
+1. [=list/For each=] |component| in |config|["{{AuctionAdConfig/componentAuctions}}"]:
+  1. If |isTopLevel| is false, [=exception/throw=] a {{TypeError}}.
+  1. Let |componentAuction| be the result of running [=validate and convert auction ad config=] with
+    |component| and [=validate and convert auction ad config/isTopLevel=] set to false.
+  1. [=list/Append=] |componentAuction| to |auctionConfig|'s [=auction config/component auctions=].
+1. Return |auctionConfig|.
+
+</div>
+
+To <dfn>parse an origin</dfn> given a [=string=] |input|:
+1. Let |url| be the result of running the [=URL parser=] on |input|.
+1. If |url| is an error, then return failure.
+1. Return |url|'s [=url/origin=].
+
+<div algorithm="start bidding and scoring">
+
+To <dfn>start bidding and scoring</dfn> given an [=auction config=] |auctionConfig|:
+1. If |auctionConfig|'s [=auction config/component auctions=] are empty:
+  1. TODO: Create a seller worklet.
+1. Otherwise:
+  1. [=list/For each=] |component| in |auctionConfig|'s [=auction config/component auctions=]:
+    1. [=Start bidding and scoring=] with |component|.
+  1. TODO: If the last |component|'s seller worklet is received, create a seller worklet.
+1. Let |bidGenerators| be a new [=ordered map=] whose [=map/keys=] are [=url/origins=] and whose
+  [=map/values=] are [=per buyer bid generators=].
+1. [=list/For each=] |buyer| in [=auction config/interest group buyers=]:
+  1. [=list/For each=] |ig| of the user agent's [=interest group set=] whose
+    [=interest group/owner=] is |buyer|:
+    1. Let |signalsUrl| be |ig|'s [=interest group/trusted bidding signals url=].
+    1. Let |joiningOrigin| be |ig|'s [=interest group/joining origin=].
+    1. If |bidGenerators| does not [=map/contain=] |buyer|:
+      1. Let |perBuyerGenerator| be a new [=per buyer bid generator=].
+      1. Let |perSignalsUrlGenerator| be a new [=per signals url bid generator=].
+      1. [=map/Set=] |perSignalsUrlGenerator|[|joiningOrigin|] to « |ig| ».
+      1. [=map/Set=] |perBuyerGenerator|[|signalsUrl|] to |perSignalsUrlGenerator|.
+      1. [=map/Set=] |bidGenerators|[|buyer|] to |perBuyerGenerator|.
+      1. TODO: add a perBiddingScriptUrlGenerator layer that replaces the list of IGs with a map
+        from biddingScriptUrl to a list of IGs.
+    1. Otherwise:
+      1. Let |perBuyerGenerator| be |bidGenerators|[|buyer|].
+      1. If |perBuyerGenerator| does not [=map/contain=] |signalsUrl|:
+        1. Let |perSignalsUrlGenerator| be a new [=per signals url bid generator=].
+        1. [=map/Set=] |perSignalsUrlGenerator|[|joiningOrigin|] to « |ig| ».
+        1. [=map/Set=] |perBuyerGenerator|[|signalsUrl|] to |perSignalsUrlGenerator|.
+      1. Otherwise:
+        1. Let |perSignalsUrlGenerator| be |perBuyerGenerator|[|signalsUrl|].
+        1. If |perSignalsUrlGenerator| does not [=map/contain=] |joiningOrigin|:
+          1. [=map/Set=] |perSignalsUrlGenerator|[|joiningOrigin|] to « |ig| ».
+        1. Otherwise:
+          1. [=list/Append=] |ig| to |perSignalsUrlGenerator|[|joiningOrigin|].
+1. [=map/For each=] |buyer| → |perBuyerGenerator| of |bidGenerators|:
+  1. [=map/For each=] |signalsUrl| -> |perSignalsUrlGenerator| of |perBuyerGenerator|:
+    1. TODO: Fetch |signalsUrl| synchronously.
+    1. [=map/For each=] |joiningOrigin| -> |groups| of |perSignalsUrlGenerator|:
+      1. [=list/For each=] |ig| of |groups|: 
+        1. Let |biddingScript| be the result of [=fetch bidding or scoring javascript=] with |ig|'s
+          [=interest group/bidding url=].
+        1. If |biddingScript| is an error, [=iteration/continue=].
+        1. TODO: [=Evaluate script=] with [=evaluate script/script=] set to |biddingScript|,
+          [=evaluate script/functionName=] set to "generateBid", and [=evaluate script/arguments=]
+          set to generateBid's arguemnts.
+
+</div>
+
+To <dfn>create a request</dfn> given a [=URL=] |url|, and a [=string=] <dfn for="create a request">
+|accept|</dfn>:
+1. Let |request| be a new [=request=] with the following properties:
+    :   [=request/URL=]
+    ::  |url|
+    :   [=request/header list=]
+    ::  A new [=header list=] containing a [=header=] named "`Accept`" whose value is |accept|
+    :   [=request/client=]
+    ::  `null`
+    :   [=request/window=]
+    ::  "`no-window`" TODO: verify
+    :   [=request/service-workers mode=]
+    ::  "`none`"
+    :   [=request/origin=]
+    ::  [=opaque origin=]
+    :   [=request/referrer=]
+    :: "`no-referrer`"
+    :   [=request/credentials mode=]
+    ::  "`omit`"
+    :   [=request/cache mode=]
+    ::  "`no-store`"
+    :   [=request/redirect mode=]
+    :: "`error`"
+1. Return |request|.
+
+To <dfn>fetch bidding or scoring javascript</dfn> with given [=URL=] |url|:
+1. Let |request| be the result of [=creating a request=] with |url|, and [=create a request/accept=]
+  set to "`application/javascript`".
+1. [=Fetch=] |request|.
+1. Wait for the [=fetch/processResponseConsumeBody=] algorithm to finish. TODO: use 
+  [=fetch/processResponseConsumeBody=] as argument to [=fetch=].
+1. Let |response| be the result of [=fetch=] when it asynchronously completes.
+1. Let |body| be |response|’s [=response/body=].
+1. If |body| is null, return failure.
+1. Let |headers| be |response|'s [=response/header list=].
+1. If [=header list/getting a structured field value=] "X-Allow-FLEDGE" from |headers| does not
+  return true, return failure.
+1. Let |mimeType| be the result of [=header list/extracting a MIME type=] from |headers|.
+1. If |mimeType| is failure or not a [=JavaScript MIME type=], return failure.
+1. If |mimeType|'s [=MIME type/parameters=]["`charset`"] [=map/exists=], and is not "utf-8" or
+  "us-ascii", return failure.
+1. Return |body|.
+
+To <dfn>evaluate script</dfn> with given [=string=] <dfn for="evaluate script">|script|</dfn>,
+[=string=] <dfn for="evaluate script">|functionName|</dfn>, and a [=list=]
+<dfn for="evaluate script">|arguments|</dfn>:
+1. TODO: Return an object or null, which is the result of evaluating |script|'s |functionName| with
+  |arguments|.
+
+
+# Permissions Policy integration # {#permissions-policy-integration}
+
+This specification defines two [=policy-controlled features=] identified by the string
+"<code><dfn noexport>join-ad-interest-group</dfn></code>", and
+"<code><dfn noexport>run-ad-auction</dfn></code>". Their [=policy-controlled feature/default allowlists=] are `'self'`.
+
+Note: In the Chromium implementation the [=policy-controlled feature/default allowlists=] for both features are
+temporarily set to `*` to ease testing.
+
+
+# Structures # {#structures}
+
+<h3 dfn-type=dfn>Interest group</h3>
+
+An interest group is a [=struct=] with the following items:
+
+<dl dfn-for="interest group">
+: <dfn>expiry</dfn>
+:: A point in time at which the browser will forget about this interest group.
+: <dfn>owner</dfn>
+:: An [=url/origin=].
+: <dfn>name</dfn>
+:: A [=string=].
+: <dfn>priority</dfn>
+:: A {{double}}. Defaulting to 0.0. Used to select which interest groups participate in an auction
+  when the number of interest groups are limited by {{AuctionAdConfig/perBuyerGroupLimits}}.
+: <dfn>enable bidding signals prioritization</dfn>
+:: A [=boolean=]. Defaulting to false. Being true if the interest group's priority should be
+  calculated using vectors from bidding signals fetch.
+: <dfn>priority vector</dfn>
+:: Null or an [=ordered map=] whose [=map/keys=] are [=strings=] and whose [=map/values=] are
+  {{double}}. Its dot product with the {{AuctionAdConfig/perBuyerPrioritySignals}} will be used
+  in place of [=interest group/priority=], if set.
+: <dfn>priority signals overrides</dfn>
+:: Null or an [=ordered map=] whose [=map/keys=] are [=strings=] and whose [=map/values=] are
+  {{double}}. Overrides the {{AuctionAdConfig}}'s corresponding priority signals.
+: <dfn>execution mode</dfn>
+:: An {{WorkletExecutionMode}}, defaulting to "compatibility".
+: <dfn>bidding url</dfn>
+:: Null or a [=URL=]. The URL to fetch the buyer's Javascript from.
+: <dfn>bidding wasm helper url</dfn>
+:: Null or a [=URL=]. Lets the bidder provide computationally-expensive subroutines in WebAssembly,
+  rather than JavaScript, to be driven from the JavaScript function provided by
+  [=interest group/bidding url=].
+: <dfn>daily update url</dfn>
+:: Null or a [=URL=]. Provides a mechanism for the group's owner to periodically update the
+  attributes of the interest group.
+: <dfn>trusted bidding signals url</dfn>
+:: Null or a [=URL=]. Provide a mechanism for making real-time data available for use at bidding
+  time.
+: <dfn>trusted bidding signals keys</dfn>
+:: Null or a [=list=] of [=string=].
+: <dfn>user bidding signals</dfn>
+:: Null or a [=string=]. Additional metadata that the owner can use during on-device bidding.
+: <dfn>ads</dfn>
+:: Null or a [=list=] of [=interest group ad=]. Contains various ads that the interest group might
+  show.
+: <dfn>ad components</dfn>
+:: Null or a [=list=] of [=interest group ad=]. Contains various ad components (or "products") that
+  can be used to construct ads composed of multiple pieces — a top-level ad template "container"
+  which includes some slots that can be filled in with specific "products".
+: <dfn>joining origin</dfn>
+:: An [=url/origin=].The top level page origin from where the interest group was joined.
+
+</dl>
+
+TODO: Update the short descriptions of some fields above, and add links when runAdAuction() section
+is ready.
+
+<h3 dfn-type=dfn>Interest group ad</h3>
+
+An interest group ad is a [=struct=] with the following items:
+
+<dl dfn-for="interest group ad">
+: <dfn>render url</dfn>
+:: A [=URL=].
+: <dfn>metadata</dfn>
+:: Null or a [=string=].
+
+</dl>
+
+<h3 dfn-type=dfn>Auction config</h3>
+
+An auction config is a [=struct=] with the following items:
+
+<dl dfn-for="auction config">
+: <dfn>seller</dfn>
+:: An [=url/origin=].
+: <dfn>decision logic url</dfn>
+:: A [=URL=].
+: <dfn>trusted scoring signals url</dfn>
+:: Null or a [=URL=].
+: <dfn>interest group buyers</dfn>
+:: Null or a [=list=] of [=url/origin=].
+: <dfn>auction signals</dfn>
+:: Null or a [=string=].
+: <dfn>seller signals</dfn>
+:: Null or a [=string=].
+: <dfn>seller timeout</dfn>
+:: A duration. Defaulting to 50.
+: <dfn>per buyer signals</dfn>
+:: Null or an [=ordered map=] whose [=map/keys=] are [=url/origins=] and whose [=map/values=] are
+  [=strings=].
+: <dfn>per buyer timeouts</dfn>
+:: Null or an [=ordered map=] whose [=map/keys=] are [=url/origins=] and whose [=map/values=] are
+  durations.
+: <dfn>all buyers timeout</dfn>
+:: A duration. Defaulting to 50.
+: <dfn>per buyer group limits</dfn>
+:: Null or an [=ordered map=] whose [=map/keys=] are [=url/origins=] and whose [=map/values=] are
+  non-negative 16-bit integers.
+: <dfn>per buyer priority signals</dfn>
+:: Null or an [=ordered map=] whose [=map/keys=] are [=url/origins=] and whose [=map/values=] are
+  [=ordered maps=], whose [=map/keys=] are [=strings=] and whose [=map/values=] are {{double}}.
+: <dfn>all buyers priority signals</dfn>
+:: Null or an [=ordered map=] whose [=map/keys=] are [=strings=] and whose [=map/values=] are
+  {{double}}.
+: <dfn>all buyers group limit</dfn>
+:: A non-negative 16-bit integer.
+: <dfn>component auctions</dfn>
+:: A [=list=] of [=auction config=]s.
+: <dfn>seller experiment group id</dfn>
+:: A non-negative 16-bit integer.
+: <dfn>all buyer experiment group id</dfn>
+:: A non-negative 16-bit integer.
+: <dfn>per buyer experiment group ids</dfn>
+:: An [=ordered map=] whose [=map/keys=] are [=url/origins=] and whose [=map/values=] are
+  non-negative 16-bit integers.
+
+</dl>
+
+<h3 dfn-type=dfn>Per buyer bid generator</h3>
+
+A per buyer bid generator is an [=ordered map=] whose [=map/keys=] are [=URLs=] representing
+[=interest group/trusted bidding signals urls=], and whose [=map/values=] are
+[=per signals url bid generators=].
+
+</dl>
+
+<h3 dfn-type=dfn>Per signals url bid generator</h3>
+
+A per signals url bid generator is an [=ordered map=] whose [=map/keys=] are [=url/origins=]
+representing [=interest group/joining origins=], and whose [=map/values=] are [=lists=] of
+[=interest groups=].
+
+</dl>
+
+TODO: Add short descriptions for fields of each structure above.

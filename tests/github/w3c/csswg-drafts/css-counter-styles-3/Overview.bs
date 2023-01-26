@@ -7,6 +7,7 @@ Work Status: Testing
 Group: csswg
 ED: https://drafts.csswg.org/css-counter-styles/
 TR: https://www.w3.org/TR/css-counter-styles-3/
+Previous Version: https://www.w3.org/TR/2017/CR-css-counter-styles-3-20171214/
 Previous Version: https://www.w3.org/TR/2015/CR-css-counter-styles-3-20150611/
 Previous Version: https://www.w3.org/TR/2014/WD-css-counter-styles-3-20140826/
 Previous Version: https://www.w3.org/TR/2013/WD-css-counter-styles-3-20130718/
@@ -156,14 +157,19 @@ Defining Custom Counter Styles: the ''@counter-style'' rule</h2>
 
 	The general form of an ''@counter-style'' rule is:
 
-	<pre>@counter-style <<counter-style-name>> { <<declaration-list>> }</pre>
+	<pre class=prod>
+		@counter-style <<counter-style-name>> { <<declaration-list>> }
+	</pre>
 
 	<dfn>&lt;counter-style-name></dfn> is a <<custom-ident>>
-	that is not an <a>ASCII case-insensitive</a> match for "none".
+	that is not an <a>ASCII case-insensitive</a> match for ''list-style-type/none''.
+	The <<counter-style-name>> is a [=tree-scoped name=].
 
-	Additionally, in the context of the prelude of an ''@counter-style'' rule,
-	an <a>ASCII case-insensitive</a> match for "decimal" or "disc" is also an invalid <<counter-style-name>>
-	and makes the ''@counter-style'' rule invalid.
+	The keywords ''decimal'', ''disc'', ''square'', ''circle'', ''disclosure-open'', and ''disclosure-closed''
+	are valid <<counter-style-name>>s,
+	but are invalid when used here to name a counter style rule;
+	doing so makes the rule invalid.
+	(They can be used in other contexts, such as in the ''extend'' system.)
 
 	Note: Note that <<custom-ident>> also automatically excludes the <a spec=css-values>CSS-wide keywords</a>.
 	In addition, some names, like ''inside'',
@@ -235,6 +241,13 @@ Counter algorithms: the 'system' descriptor</h3>
 	build their representation accordingly.
 	The systems are defined in the following subsections.
 
+	Each 'system' value is associated with either the 'symbols' or 'additive-symbols' descriptors,
+	and has a minimum length that the appropriate descriptor must have;
+	each entry below defines what this is.
+	If a ''@counter-style'' rule fails to meet this requirement,
+	it does not define a [=counter style=].
+	(The rule is still syntactically valid, but has no effect.)
+
 <!--
  ██████  ██    ██  ██████  ██       ████  ██████
 ██    ██  ██  ██  ██    ██ ██        ██  ██    ██
@@ -257,8 +270,7 @@ Cycling Symbols: the ''cyclic'' system</h4>
 	the second <a>counter symbol</a> (if it exists) is used as the representation of the value 2, etc.
 
 	If the system is ''cyclic'',
-	the 'symbols' descriptor must contain at least one <a>counter symbol</a>,
-	or else the ''@counter-style'' rule is invalid.
+	the 'symbols' descriptor must contain at least one <a>counter symbol</a>.
 	This system is defined over all counter values.
 
 	<div class=example>
@@ -307,8 +319,7 @@ Exhaustible Symbols: the ''system/fixed'' system</h4>
 	such as circled digits.
 
 	If the system is ''system/fixed'',
-	the 'symbols' descriptor must contain at least one <a>counter symbol</a>,
-	or else the ''@counter-style'' rule is invalid.
+	the 'symbols' descriptor must contain at least one <a>counter symbol</a>.
 	This system is defined over counter values in a finite range,
 	starting with the <a>first symbol value</a> and having a length equal to the length of the list of <a>counter symbols</a>.
 
@@ -368,8 +379,7 @@ Repeating Symbols: the ''symbolic'' system</h4>
 	and is also sometimes used for alphabetic-style lists for a slightly different presentation than what the ''system/alphabetic'' system presents.
 
 	If the system is ''symbolic'',
-	the 'symbols' descriptor must contain at least one <a>counter symbol</a>,
-	or else the ''@counter-style'' rule is invalid.
+	the 'symbols' descriptor must contain at least one <a>counter symbol</a>.
 	This system is defined only over strictly positive counter values.
 
 	<div class=example>
@@ -457,8 +467,7 @@ Bijective Numerals: the ''alphabetic'' system</h4>
 	and so on.
 
 	If the system is ''system/alphabetic'',
-	the 'symbols' descriptor must contain at least two <a>counter symbols</a>,
-	or else the ''@counter-style'' rule is invalid.
+	the 'symbols' descriptor must contain at least two <a>counter symbols</a>.
 	This system is defined only over strictly positive counter values.
 
 	<div class=example>
@@ -530,8 +539,7 @@ Positional Numerals: the ''numeric'' system</h4>
 	and so on.
 
 	If the system is ''system/numeric'',
-	the 'symbols' descriptor must contain at least two <a>counter symbols</a>,
-	or else the ''@counter-style'' rule is invalid.
+	the 'symbols' descriptor must contain at least two <a>counter symbols</a>.
 	This system is defined over all counter values.
 
 	<div class=example>
@@ -602,8 +610,7 @@ Accumulating Numerals: the ''additive'' system</h4>
 	and other numbering systems around the world.
 
 	If the system is ''additive'',
-	the 'additive-symbols' descriptor must contain at least one <a>additive tuple</a>,
-	or else the ''@counter-style'' rule is invalid.
+	the 'additive-symbols' descriptor must contain at least one <a>additive tuple</a>.
 	This system is nominally defined over all counter values
 	(see algorithm, below, for exact details).
 
@@ -631,33 +638,41 @@ Accumulating Numerals: the ''additive'' system</h4>
 		</pre>
 	</div>
 
-	To construct the representation, run this algorithm:
+	<div algorithm="additive representation">
+		To construct the representation:
 
+		1. Let |value| initially be the counter value,
+			|S| initially be the empty string,
+			and |symbol list| initially be the list of <a>additive tuples</a>.
 
-	Let <var>value</var> initially be the counter value,
-	<var>S</var> initially be the empty string,
-	and <var>symbol list</var> initially be the list of <a>additive tuples</a>.
+		2. If |value| is zero:
 
-	<ol>
-		<li>If <var>value</var> is initially 0, and there is an <a>additive tuple</a> with a weight of 0, append that tuple's <a>counter symbol</a> to S and return S.
+			1. If |symbol list| contains a tuple with a weight of zero,
+				append that tuple's <a>counter symbol</a> to |S| and return |S|.
 
-		<li>While <var>value</var> is greater than 0 and there are elements left in the <var>symbol list</var>:
+			2. Otherwise, the given counter value cannot be represented by this counter style,
+				and must instead be represented by the fallback counter style.
 
-			<ol>
-				<li>Pop the first <a>additive tuple</a> from the <var>symbol list</var>.
-				This is the <dfn>current tuple</dfn>.
+		3. For each |tuple| in |symbol list|:
 
-				<li>Append the <a>current tuple</a>’s <a>counter symbol</a> to <var>S</var>
-				<code>floor( <var>value</var> / <var><a>current tuple</a>’s weight</var> )</code>
-				times (this may be 0).
+			1. Let |symbol| and |weight| be |tuple|'s [=counter symbol=] and weight, respectively.
 
-				<li>Decrement <var>value</var> by the <var><a>current tuple</a>’s weight</var> multiplied
-				by the number of times the <a>current tuple</a> was appended to <var>S</var>
-				in the previous step.
-			</ol>
+			2. If |weight| is zero, or |weight| is greater than |value|,
+				[=iteration/continue=].
 
-		<li>If the loop ended because <var>value</var> is 0, return S.  Otherwise, the given counter value cannot be represented by this counter style, and must instead be represented by the fallback counter style.
-	</ol>
+			3. Let |reps| be <code>floor( |value| / |weight| )</code>.
+
+			4. Append |symbol| to |S| |reps| times.
+
+			5. Decrement |value| by <code>|weight| * |reps|</code>.
+
+			6. If |value| is zero, return |S|.
+
+		4. Assertion: |value| is still non-zero.
+
+			The given counter value cannot be represented by this counter style,
+			and must instead be represented by the fallback counter style.
+	</div>
 
 	Note: All of the predefined additive ''@counter-style'' rules in this specification
 	produce representations for every value in their range,
@@ -691,11 +706,18 @@ Building from Existing Counter Styles: the ''extends'' system
 	any unspecified descriptors must be taken from the extended counter style specified,
 	rather than taking their initial values.
 
-	If a @counter-style uses the ''extends'' system,
+	If a ''@counter-style'' uses the ''extends'' system,
 	it must not contain a 'symbols' or 'additive-symbols' descriptor,
 	or else the ''@counter-style'' rule is invalid.
 
-	If the specified counter style name isn't the name of any currently-defined counter style,
+	If the specified <<counter-style-name>> is an [=ASCII case-insensitive=] match
+	for ''disc'', ''circle'', ''square'', ''disclosure-open'', or ''disclosure-closed''
+	(any of the predefined symbolic counter styles),
+	using ''extend'' extends from the “standard” definition of the rules
+	provided in the normative stylesheet
+	(rather than the exception allowing them to be drawn in a different, user-agent-specific fashion.)
+
+	If the specified counter style name isn't the name of any defined counter style,
 	it must be treated as if it was extending the ''decimal'' counter style.
 	If one or more ''@counter-style'' rules form a cycle with their ''extends'' values,
 	all of the counter styles participating in the cycle
@@ -992,7 +1014,7 @@ Defining fallback: the 'fallback' descriptor</h3>
 	value, etc.).
 
 	If the value of the 'fallback' descriptor isn't the name of any
-	currently-defined counter style, the used value of the 'fallback' descriptor
+	defined counter style, the used value of the 'fallback' descriptor
 	is ''decimal'' instead.  Similarly, while following fallbacks to find
 	a counter style that can render the given counter value, if a loop in the
 	specified fallbacks is detected, the ''decimal'' style must be used instead.
@@ -1048,7 +1070,7 @@ Marker characters: the 'symbols' and 'additive-symbols' descriptors</h3>
 	Some counter systems specify that the 'symbols' descriptor must have at least two entries.
 	If the counter style's system is such,
 	and the 'symbols' descriptor has only a single entry,
-	the descriptor is invalid and must be ignored.
+	the ''@counter-style'' rule does not define a [=counter style=].
 
 	Each entry in the 'symbols' descriptor's value defines a <dfn export>counter symbol</dfn>,
 	which is interpreted differently based on the counter style's system.
@@ -1111,9 +1133,12 @@ Speech Synthesis: the '@counter-style/speak-as' descriptor</h3>
 	</pre>
 
 	A counter style can be constructed with a meaning that is obvious visually,
-	but impossible to meaningfully represent via a speech synthesizer,
-	or possible but nonsensical when naively read out.
+	but impossible to meaningfully represent via a speech synthesizer or other non-visual means,
+	or possible but nonsensical when naively read out loud.
 	The '@counter-style/speak-as' descriptor describes how to synthesize the spoken form of a counter formatted with the given counter style.
+	Assistive technologies should use this spoken form when reading out the counter style,
+	and may use the '@counter-style/speak-as' value
+	to inform transformations to outputs other than speech.
 	Values have the following meanings:
 
 	<dl dfn-for="@counter-style/speak-as" dfn-type=value>
@@ -1133,20 +1158,22 @@ Speech Synthesis: the '@counter-style/speak-as' descriptor</h3>
 
 		<dt><dfn>numbers</dfn>
 		<dd>
-			The counter's value is spoken as a number in the <a>content language</a>.
+			The counter's numeric value is spoken as a number in the <a>content language</a>.
 
 		<dt><dfn>words</dfn>
 		<dd>
 			<a>Generate a counter representation</a> for the value as normal,
 			then speak it as normal text in the <a>content language</a>.
-
+			If the counter representation contains images,
+			instead handle the value as for ''numbers''.
 
 		<dt><dfn>spell-out</dfn>
 		<dd>
 			<a>Generate a counter representation</a> for the value as normal,
 			then spell it out letter-by-letter in the <a>content language</a>.
-			If the UA does not know how to pronounce the symbols,
-			it may handle it as ''numbers''.
+			If the UA does not know how to pronounce the symbols
+			(or the counter representation contains images),
+			it must instead handle the value as for ''numbers''.
 
 			For example, ''lower-greek'' in English would be read out as "alpha", "beta", "gamma", etc.
 			Conversely, ''upper-latin'' in French would be read out as (in phonetic notation) /a/, /be/, /se/, etc.
@@ -1202,8 +1229,8 @@ Defining Anonymous Counter Styles: the ''symbols()'' function</h2>
 	The syntax of the ''symbols()'' rule is:
 
 	<pre class='prod'>
-		<dfn>symbols()</dfn> = symbols( <<symbols-type>>? [ <<string>> | <<image>> ]+ );
-		<dfn>&lt;symbols-type></dfn> = cyclic | numeric | alphabetic | symbolic | fixed;
+		<dfn>symbols()</dfn> = symbols( <<symbols-type>>? [ <<string>> | <<image>> ]+ )
+		<dfn>&lt;symbols-type></dfn> = cyclic | numeric | alphabetic | symbolic | fixed
 	</pre>
 
 	The ''symbols()'' function defines an anonymous counter style
@@ -1280,12 +1307,14 @@ Extending 'list-style-type', ''counter()'', and ''counters()''</h2>
 	This module extends these features to take instead the <<counter-style>> type, defined below:
 
 	<pre class='prod'>
-		<dfn type>&lt;counter-style></dfn> = <<counter-style-name>> | <<symbols()>>;
+		<dfn type>&lt;counter-style></dfn> = <<counter-style-name>> | <<symbols()>>
 	</pre>
 
 	If a <<counter-style-name>> is used that does not refer to any existing counter style,
 	it must act identically to the ''decimal'' counter style
 	(but does not <em>[=computed value|compute=]</em> to ''decimal'').
+
+	When used in these contexts, a <<counter-style-name>> is a [=tree-scoped reference=].
 
 
 <!--
@@ -1445,9 +1474,6 @@ Numeric: ''decimal'', ''decimal-leading-zero'', ''arabic-indic'', ''armenian'', 
 			Tibetan numbering
 			(e.g., ༡, ༢, ༣, ..., ༩༨, ༩༩, ༡༠༠).
 	</dl>
-
-	The ''decimal'' counter-style must not be overridable with a ''@counter-style'' rule,
-	so that it is always available as the ultimate fallback style.
 
 	The following stylesheet fragment provides the normative definition of these predefined counter styles:
 
@@ -1740,7 +1766,7 @@ Symbolic: ''disc'', ''circle'', ''square'', ''disclosure-open'', ''disclosure-cl
 		<dd>A hollow circle, similar to ◦ U+25E6 WHITE BULLET.
 
 		<dt><dfn id=square>square</dfn>
-		<dd>A filled square, similar to ◾ U+25FE BLACK MEDIUM SMALL SQUARE.
+		<dd>A filled square, similar to ▪ U+25AA BLACK SMALL SQUARE.
 
 		<dt><dfn id=disclosure-open>disclosure-open</dfn>
 		<dt><dfn id=disclosure-closed>disclosure-closed</dfn>
@@ -1748,9 +1774,6 @@ Symbolic: ''disc'', ''circle'', ''square'', ''disclosure-open'', ''disclosure-cl
 			Symbols appropriate for indicating an open or closed disclosure widget,
 			such as the HTML <{details}> element.
 	</dl>
-
-	The ''disc'' counter-style must not be overridable with a ''@counter-style'' rule,
-	so that the initial value of 'list-style-type' is well-known to the user agent.
 
 	The following stylesheet fragment provides the normative definition of these predefined counter styles:
 
@@ -1771,8 +1794,8 @@ Symbolic: ''disc'', ''circle'', ''square'', ''disclosure-open'', ''disclosure-cl
 
 	@counter-style square {
 		system: cyclic;
-		symbols: \25FE;
-		/* ◾ */
+		symbols: \25AA;
+		/* ▪ */
 		suffix: " ";
 	}
 
@@ -1789,8 +1812,10 @@ Symbolic: ''disc'', ''circle'', ''square'', ''disclosure-open'', ''disclosure-cl
 	}
 	</pre>
 
-	Alternately, a browser may render these styles using a browser-generated image instead of the defined character.
-	If so, the image must look similar to the character,
+	When used in 'list-style-type',
+	a UA may instead render these styles using a UA-generated image or a UA-chosen font
+	instead of rendering the specified character in the element’s own font.
+	If using an image, it must look similar to the character,
 	and must be sized to attractively fill a 1em by 1em square.
 
 	For the ''disclosure-open'' and ''disclosure-closed'' counter styles,
@@ -2482,10 +2507,10 @@ Ethiopic Numeric Counter Style: ''ethiopic-numeric''</h3>
 -->
 
 <h2 id='additional-predefined'>
-Additional Predefined Counter Styles</h2>
+Additional “Ready-made” Counter Styles</h2>
 
-	The Internationalization Working Group maintains a large list of predefined ''@counter-style'' rules for various world languages
-	in their <a href="https://www.w3.org/TR/predefined-counter-styles/">Predefined Counter Styles</a> document.
+	The Internationalization Working Group maintains a large list of ready-made ''@counter-style'' rules for various world languages
+	in their <a href="https://www.w3.org/TR/predefined-counter-styles/">Ready-made Counter Styles</a> document.
 	[[predefined-counter-styles]]
 
 	These additional counter styles are not intended to be supported by user-agents by default,
@@ -2610,19 +2635,55 @@ Sample style sheet for HTML</h2>
 <h2 class='no-num' id='changes'>
 Changes</h2>
 
+<h3 id='changes-2017'>
+Changes since the December 2017 Candidate Recommendation</h3>
+
+	Significant changes since the <a href="https://www.w3.org/TR/2017/CR-css-counter-styles-3-20171214/">December 14 2017 Candidate Recommendation</a>:
+
+	* Made ''list-style-type/none'', ''decimal'', ''disc'', ''circle'', ''square'', ''disclosure-open'', ''disclosure-close'' non-overridable.
+		(<a href="https://github.com/w3c/csswg-drafts/issues/3584">Issue 3584</a>)
+	* Clarified counter-style lookups in Shadow DOM.
+		(<a href="https://github.com/w3c/csswg-drafts/issues/5693">Issue 5693</a>)
+	* Clarified what happens in various invalid ''@counter-style'' situations.
+		(<a href="https://github.com/w3c/csswg-drafts/issues/5698">Issue 5698</a>,
+		 <a href="https://github.com/w3c/csswg-drafts/issues/5717">Issue 5717</a>)
+	* Fixed divide-by-zero error in additive algorithm.
+		(<a href="https://github.com/w3c/csswg-drafts/issues/5784">Issue 5784</a>)
+	* Fixed ''square'' symbol to not use an emoji symbol.
+		(<a href="https://github.com/w3c/csswg-drafts/issues/6200">Issue 6200</a>)
+	* Allowed UAs to override the font choice of predefined symbolic counter styles.
+		(<a href="https://github.com/w3c/csswg-drafts/issues/6201">Issue 6201</a>)
+	* Restricted special rendering of predefined symbolic counter styles
+		to usage as a list marker via 'list-style-type'.
+		(<a href="https://github.com/w3c/csswg-drafts/issues/6201">Issue 6201</a>)
+	* Clarified that '@counter-style/speak-as' represents spoken output; it may be used for other AT.
+		(<a href="https://github.com/w3c/csswg-drafts/issues/6040">Issue 6040</a>)
+		<blockquote>
+			<p>A counter style can be constructed with a meaning that is obvious visually,
+			but impossible to meaningfully represent via a speech synthesizer or other non-visual means,
+			or possible but nonsensical when naively read out <ins>loud</ins>.
+			The '@counter-style/speak-as' descriptor describes how to synthesize
+			the spoken form of a counter formatted with the given counter style.
+			<ins>Assistive technologies should use this spoken form when reading out the counter style,
+			and may use the '@counter-style/speak-as' value
+			to inform transformations to outputs other than speech.</ins>
+		</blockquote>
+
+	A <a href="https://drafts.csswg.org/css-counter-styles-3/issues-cr-2017">Disposition of Comments</a> is available.
+
 <h3 id='changes-jun-2015'>
-Changes since the Jun 2015 Candidate Recommendation</h3>
+Changes since the June 2015 Candidate Recommendation</h3>
 
-	Significant changes since the <a href="https://www.w3.org/TR/2015/CR-css-counter-styles-3-20150611/">June 11 2015 CR</a> draft:
+	Significant changes since the <a href="https://www.w3.org/TR/2015/CR-css-counter-styles-3-20150611/">June 11 2015 Candidate Recommendation</a>:
 
-	* Exclude "none" and "disc" from being the name of a counter style.
+	* Exclude ''list-style-type/none'' and ''disc'' from being the name of a counter style.
 	* When setting CSSCounterStyle.name, take the string directly; don't [=CSS/parse=] it as an ident.
 	* Clarify that counter styles are read out in the element's <a>content language</a>.
 	* Clarified that 'additive-symbols' tuples must be of <em>strictly</em> decreasing weight.
 	* Specified that invalid values just invalidate the declaration, not the whole rule.
 	* ''@counter-style'' rules that are invalid due to missing descriptors just fail to create a <a>counter style</a>;
 		they're otherwise still valid rules.
-	* Changed syntax to use <a>bracketed range notation</a> to reflect
+	* Changed syntax to use [=CSS bracketed range notation=] to reflect
 		the prose restrictions on negative values.
 
 	A <a href="https://drafts.csswg.org/css-counter-styles-3/issues-cr-20150611">Disposition of Comments</a> is available.

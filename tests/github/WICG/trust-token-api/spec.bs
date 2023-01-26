@@ -1,0 +1,559 @@
+<pre class='metadata'>
+Title: Private State Token API
+H1: Private State Token API
+Shortname: private-state-token-api
+Level: 1
+Status: CG-DRAFT
+Group: WICG
+Repository: WICG/trust-token-api
+URL: https://wicg.github.io/trust-token-api/
+Editor: Aykut Bulut, Google https://www.google.com/, aykutb@google.com
+Editor: Steven Valdez, Google https://www.google.com/, svaldez@google.com
+Abstract: Private State Token API is a web platform API that allows propagating a limited amount of anti-fraud signals across sites, using the Privacy Pass protocol as an underlying primitive.
+!Participate: <a href="https://github.com/WICG/trust-token-api">GitHub WICG/trust-token-api</a> (<a href="https://github.com/WICG/trust-token-api/issues/new">new issue</a>, <a href="https://github.com/WICG/trust-token-api/issues?state=open">open issues</a>)
+!Commits: <a href="https://github.com/WICG/trust-token-api/commits/main/spec.bs">GitHub spec.bs commits</a>
+Markup Shorthands: css no, markdown yes
+Ignored Terms: h1, h2, h3, h4, h5, h6, xmp
+</pre>
+
+
+<pre class='biblio'>
+{
+    "PRIVACY-PASS-ARCHITECTURE": {
+        "authors": ["A. Davidson", "J. Iyengar", "C. A. Wood"],
+        "href": "https://www.ietf.org/archive/id/draft-ietf-privacypass-architecture-06.html",
+        "publisher": "IETF",
+        "title": "Privacy Pass Architectural Framework"
+    },
+    "PRIVACY-PASS-AUTH-SCHEME": {
+        "authors": ["T. Pauly", "S. Valdez", "C. A. Wood"],
+        "href" : "https://www.ietf.org/archive/id/draft-ietf-privacypass-auth-scheme-05.html",
+        "publisher": "IETF",
+        "title": "The Privacy Pass HTTP Authentication Scheme"
+    },
+    "PRIVACY-PASS-ISSUANCE-PROTOCOL": {
+        "authors": ["S. Celi", "A. Davidson", "A. Faz-Hernandez", "S. Valdez", "C. A. Wood"],
+        "href": "https://www.ietf.org/archive/id/draft-ietf-privacypass-protocol-06.html",
+        "publisher": "IETF",
+        "title": "Privacy Pass Issuance Protocol"
+    },
+    "PRIVACY-PASS-WG": {
+        "href": "https://datatracker.ietf.org/wg/privacypass/about/"
+    },
+    "PMB": {
+        "authors": ["Ben Kreuter", "Tancrede Lepoint", "Michele Orru", "Mariana Raykova"],
+        "href": "https://eprint.iacr.org/2020/072",
+        "publisher": "Cryptology ePrint Archive",
+        "title": "Anonymous Tokens with Private Metadata Bit"
+    },
+    "VOPRF": {
+        "authors": ["A. Davidson", "A. Faz-Hernandez",  "N. Sullivan", "C. A. Wood"],
+        "href": "https://www.ietf.org/archive/id/draft-irtf-cfrg-voprf-13.html",
+        "publisher": "IETF",
+        "title": "Oblivious Pseudorandom Functions (OPRFs) using Prime-Order Groups"
+    }
+}
+</pre>
+
+
+**This is a working version and is subject to change.**
+
+
+Goals {#goals}
+==============
+
+The goal of the Private State Token API is to transfer a limited amount of signals across
+sites through time in a privacy preserving manner. It achieves this using
+privacy pass protocol [[PRIVACY-PASS-ISSUANCE-PROTOCOL]] specified in working
+documents of privacy pass working group of IETF [[PRIVACY-PASS-WG]]. Private
+State Tokens can be considered as a web platform implementation of Privacy
+Pass.
+
+<!--
+
+In a real-world
+system relying on anonymous tokens without private metadata bit, if the issuer stops providing
+malicious users with tokens, the attacker will know that they have been detected as malicious.
+In fact, this information could serve as an incentive to corrupt more users, or to train machine
+learning models that detect which malicious behavior goes un-noticed.
+
+https://eprint.iacr.org/2020/072.pdf
+
+-->
+
+
+Background {#background}
+========================
+
+The Private State Token API provides a mechanism for anonymous authentication. The
+API provided by the browser does not authenticate clients, instead it facilitates
+transfer of authentication information.
+
+Authentication of the clients and token signing are both carried by the same
+entity referred to as the **issuer**. This is the joint attester and issuer
+architecture described in [[PRIVACY-PASS-ARCHITECTURE]],
+[[PRIVACY-PASS-AUTH-SCHEME]].
+
+Browsers store tokens in persistent storage. Navigated origins might fetch/spend
+tokens in first party contexts or include third party code that fetch/spend
+tokens. Spending tokens is called **redeeming**.
+
+Origins may ask browser to fetch tokens from the issuers of their
+choice. Tokens can be redeemed from a different origin than the fetching one.
+
+Private State Tokens API performs cross site anonymous authentication without
+using linkable state carrying cookies [[RFC6265]]. Cookies do provide cross
+site authentication, however, fail to provide anonymity.
+
+Cookies store large amount of information. [[RFC6265]] requires at least 4096
+bytes per cookie and 50 cookies per domain. This means an origin has
+50 x 4096 x 2^8 unique identifiers at its disposal. When backed with back end
+databases, a server can store arbitrary data for that many unique
+users/sessions.
+
+Compared to a cookie, amount of data stored in a Private State Token is very
+limited. A token stores a value from a set of six values (think of a value of
+an enum type of six possible values). Hence a token stores data between 2 and 3
+bits (4 < 6 < 8). This is very small compared to 4096 bytes a cookie can store.
+
+Moreover, Private State Tokens API use cryptographic protocols that prevents
+origins to track which tokens they issue to which user. When presented with
+their tokens, issuers can verify they issued them, however, can not link the
+tokens to the contex they are issued. Cookies do not have this property.
+
+Unlike cookies, storing multiple tokens from an issuer does not deteriorate
+privacy of the user due to unlinkability property of the tokens. Private
+State Token API allows at most 2 different issuers in a top level origin. This
+is to limit the information stored for a user when the issuers are
+collaborating.
+
+Private State Token operations rely on [[FETCH]]. A fetch request corresponding to a
+specific Private State Token operation can be created and used as a parameter to the
+fetch function.
+
+<!--
+* how this is not as powerful like cookies, privacy guarantees?
+* Between first and second para there is some gap. We should fill in.
+* Level of details in privacy is good and important. A high level approach of this before API details.
+* Start with use case and scenarios. This would help with people confused with API.
+* how do we refer to unsigned/signed bind/clear tokens?
+-->
+
+
+Issuer Public Keys {#issuer-public-keys}
+========================================
+
+This section describes the public interfaces that an issuer is required to
+support to provide public keys to be used by Private State Token protocols.
+
+An issuer needs to maintain a set of keys and implement the **Issue** and
+**Redeem** cryptographic functions to sign and validate tokens. Issuers are
+required to serve a **key commitment** endpoint. Key commitments are
+collections of cryptographic keys and associated metadata necessary for
+executing the issuance and redemption operations. Issuers make these available
+through secure HTTP [[RFC8446]] endpoints. Browsers should fetch the key
+commitments periodically.
+
+Requests to key commitment endpoints should result in a JSON response
+[[RFC8259]] of the following format.
+
+```javascript
+{
+  <cryptographic protocol_version>: {
+    "protocol_version": <cryptographic protocol version>,
+    "id": <key commitment identifier>
+    "batchsize": <batch size>,
+    "keys": {
+      <keyID>: { "Y": <base64-encoded public key>,
+                 "expiry": <key expirion data>},
+      <keyID>: { "Y": <base64-encoded public key>,
+                 "expiry": <key expirion data}, ...
+    }
+  },
+  ...
+}
+```
+
+* `<cryptographic protocol version>` is a string identifier for the Private State Token
+    protocol version used. The same string is used as a value of the inner
+    `"protocol_version"` field. Protocol version string identifier is either
+    `"PrivateStateTokenV3PMB"` or `"PrivateStateTokenV3VOPRF"`. Both protocols have similar
+    properties in terms of privacy implications.
+
+    * Protocol version `“PrivateStateTokenV3PMB”` implements [[PMB]] cryptographic
+               protocol. In this protocol, each token contains a private
+               metadata bit.
+
+    * Protocol version `“PrivateStateTokenV2VOPRF”` implements [[VOPRF]] cryptographic
+               protocol. Contrary to PMB, tokens do not contain private
+               metadata bits. However, issuers can use twice as many
+               concurrently valid token signing keys (six compared to three of
+               PMB).
+
+* `"id"` field provides the identifier of the key commitment. It is a string
+         representation of a non-negative integer that is within the range of
+         an unsigned 32 bit integer type. Values should be montonically
+         increasing.
+
+* `"batchsize"` specifies the maximum number of blinded tokens that the issuer
+                supports for each token issuance operation. Its value is a
+                string representation of a positive integer. Maximum value
+                allowed is 100. If a larger value is specified, 100 will be
+                used. Browser might send fewer tokens in a single operation,
+                but will generally default to sending `batchsize` many tokens
+                per operation.
+
+* `"keys"` field is a dictionary of public keys listed by their identifiers.
+
+         * `<keyID>` is a string representation of a non-negative integer that
+               is within the range of an unsigned 32 bit integer type.
+
+         * Each key has a `"Y"` field which is a string representation of a
+                big-endian base64 encoding [[RFC4648]] of the byte string of
+                the key.
+
+         * `"expiry"` field specifies how long the underlying key is valid. It
+                      is a string representation of a nonnegative integer that
+                      is within the range of an unsigned 64 bit integer type.
+                      Underlying key expires if this amount many or more
+                      microseconds are elapsed since the POSIX epoch
+                      [[RFC8536]].
+
+All field names and their values are strings. When new key commitments are
+fetched for an issuer, previous commitments are discarded.
+
+Issuing Protocol {#issuing-protocol}
+====================================
+
+This section explains the issuing protocol. It has two sections that explains
+the issuing protocol steps happenning in browsers and issuers.
+
+Browser Steps For Creating Issue Request {#browser-issue-steps}
+---------------------------------------------------------------
+
+An issue request is created and fetched as demostrated in the following snippet.
+
+```javascript
+issueRequest = new Request("https://example.issuer:1234/issuer_path?public=0&private=0", {
+  privateStateToken: {
+    type: "token-request",
+    issuer: "https://example.issuer"
+  }
+});
+fetch(issueRequest);
+```
+
+An issuance request is parameterized by issuer and top level origins. The following
+steps are carried out when an issue request is fetched.
+
+ 1. Reject if the document is not in a secure context [[secure-contexts]].
+ 2. Reject if associating the issuer with the top level origin would exceed the
+           top level’s number-of-issuers limit of 2.
+ 3. Associate the issuer with the top level origin.
+ 4. Reject if the number of tokens from the issuer is already at capacity
+           which is 500.
+ 5. Reject if there are no key commitments stored for the issuer.
+ 6. Pass issuer public keys to cryptographic procedures. Reject if keys are
+         malformed.
+ 7. Discard tokens from issuer that are signed with keys other than those from
+            the issuer's most recent commitments.
+ 8. Compare issuer's max batch size to global limit of 100 on batch size. Use
+            the smaller value.
+ 9. Look up the key commitments from storage. Error out if key commitments are
+         unavailable.
+ 10. Identify right number of tokens considering issuer batch size and current
+     number of tokens from the issuer.
+ 11. Generate the right number of blinded tokens identified in Step 10.
+ 12. Configure the HTTP request.
+               a. Set a load flag to bypass the HTTP cache.
+               b. Add `Sec-Private-State-Token` request header containing a
+                      base64-encoded version of the bytestring of tokens
+                      generated in Step 11.
+               c. Add `Sec-Private-State-Token-Version` request header that specifies
+                      the version of the cryptographic protocol used.
+
+Private State Token HTTP request headers created for a typical fetch is as follows.
+
+```
+Sec-Private-State-Token: <blinded tokens encoded as base64 string>
+Sec-Private-State-Token-Version: <cryptographic protocol version, VOPRF or PMB>
+```
+
+
+Issuer Signing Tokens {#issuer-signing-tokens}
+----------------------------------------------
+
+This section explains the signing of tokens that happens in the issuer
+servers. Information to be encoded in the tokens are passed in the URL `public`
+and `private` parameters. VOPRF can only encode a value from set {0,1,2,3,4,5}
+passed in the URL `public` parameter. PMB can encode a value from set {0,1,2}
+in `public` and a value from set {0,1} in `private` parameter.
+
+Using its private keys, issuer signs the blinded tokens obtained in the
+`Sec-Private-State-Token` request header value. Issuer uses the cryptographic protocol
+specified in the request `Sec-Private-State-Token-Version` header. Encoding the values
+passed in URL `private` and `public` parameters happens in this signing
+step. Issuer returns the signed tokens in the `Sec-Private-State-Token` response header
+value encoded as a base64 byte string. The number of tokens issued is returned
+in `Sec-TT-Count` header. Value of this header is the string message of
+
+```
+Issuing <number of tokens> tokens.
+```
+
+with the right nonnegative integer value that specifies the tokens issued.
+
+Following snippet displays a typical response demonstrating the Private State Token
+related headers.
+
+```
+Sec-Private-State-Token: <token encoded as base64 string>
+Sec-PST-Count: Issuing 3 tokens.
+```
+
+
+Browser Steps For Issue Response {#browser-issue-response}
+----------------------------------------------------------
+
+To process a response to an issue request, browser carries out the following steps.
+
+ 1. If the response has no `Sec-Private-State-Token` header, return an error.
+ 2. If the response has an empty `Sec-Private-State-Token` header, return; this is a
+       `Success` response bearing 0 tokens.
+ 3. Strip the `Sec-Private-State-Token` header from the response and carry out the
+    cryptographic procedures to obtain a list of unblinded tokens.
+    a. If the cryptographic procedure succeeds, associate the tokens with the
+          issuing key’s label and store the tokens.
+    b. Else, return an error.
+
+
+Redeeming Tokens {#redeeming-tokens}
+====================================
+
+When browser navigates to an origin, top level origin or a third party site
+embedded on the top level origin may redeem tokens stored in browser from a
+specific issuer to learn `public` and/or `private` data encoded in the
+tokens. Redemption is carried through fetch as demonstrated in the following
+snippet.
+
+```javascript
+redemptionRequest = new Request('https://example.issuer:1234/redemption_path', {
+  privateStateToken: {
+    type: 'token-redemption',
+    issuer: 'https://example.issuer',
+    refreshPolicy: {'none', 'refresh'}
+  }
+});
+```
+
+Default value for refreshPolicy is `'none'`.
+
+<!--
+checking fetch syntax, malformed input etc?
+
+When `refreshPolicy` is `'none'`,
+browser uses the previously cached redemption record instead of redeeming a new
+token.
+-->
+
+Browser carries out the following steps when a redemption request is fetched.
+
+ 1. Reject if the document is not in a secure context [[secure-contexts]].
+ 2. Reject if associating the issuer with the top level origin would exceed the
+           top level’s number-of-issuers limit of 2.
+ 3. Associate the issuer with the top level origin.
+ 4. If `refreshPolicy` is `'none'`,
+        a. If an unexpired redemption record exists in permenant storage,
+              return early, add this redemption record to corresponding
+              header value. Go to step 11.
+        b. Else continue redemption.
+ 5. If this is the third token exhausting redemption request within the
+       last 48 hours, return error.
+ 6. Look up the key commitments from storage. Error out if key commitments are
+         unavailable.
+ 7. Discard tokens from issuer that are signed with keys other than those from
+            the issuer's most recent commitments.
+ 8. Return error if there are no tokens stored to redeem.
+ 9. Retrieve a single token from persistent storage.
+ 10. Pass token to cryptographic redemption procedure, if procedure fails
+         return error.
+ 11. Set redemption procedure result in `Sec-Private-State-Token` request header.
+ 12. Set `Sec-Private-State-Token-Version` header value to the cryptographic protocol
+          used.
+ 13. Optionally, set `Sec-Private-State-Token-Lifetime` header.
+ 14. Configure the HTTP request. Set a load flag to bypass the HTTP cache.
+
+`Sec-Private-State-Token-Lifetime` response header indicates how long (in seconds) the
+RR should be cached for. When `Sec-Private-State-Token-Lifetime` response header value
+is invalid (too large, a negative number or non-numeric), UA should ignore the
+`Sec-Private-State-Token-Lifetime` header. When `Sec-Private-State-Token-Lifetime` header value
+is zero, UA should treat the record as expired. In case of multiple
+`Sec-Private-State-Token-Lifetime` headers, UA uses the last one. If
+`Sec-Private-State-Token-Lifetime` header is omitted, the lifetime of the RR will be
+tied to the lifetime of the Private State Token verification key that confirmed the
+redeemed token's issuance. The RR is HTTP-only and JavaScript is only able to
+access/send the RR via Private State Token Fetch APIs. The RR is treated as an
+arbitrary blob of bytes from the issuer, that may have semantic meaning to
+downstream consumers.
+
+
+Redemption Records {#redemption-records}
+----------------------------------------
+
+To reduce communication overhead, the browser might cache blobs returned in
+`Sec-Private-State-Token` header value in redemption responses. These blobs are
+referred as *Redemption Records*. Browsers might choose to store these records
+to include them in subsequent requests to the origins that can verify its
+validity. Issuer might choose to include optional `Sec-Private-State-Token-Lifetime`
+header in the redemption response. The value of this header indicates the
+expiration time for the redemption record provided. This expiration is
+specified as number of seconds in the `Sec-Private-State-Token-Lifetime` HTTP response
+header value.
+
+
+Query APIs {#query-apis}
+========================
+
+Token Query {#token-query}
+--------------------------
+
+An origin might query whether the browser has any tokens from a specific issuer
+using the following API.
+
+```javascript
+document.hasPrivateTokens(<issuer>)
+```
+
+Browser carries out the following steps on this query.
+
+ 1. Reject if the document is not in a secure context [[secure-contexts]].
+ 2. Reject if associating the issuer with the top level origin would exceed the
+           top level’s number-of-issuers limit of 2.
+ 3. Associate the issuer with the top level origin.
+ 4. Look up the key commitments from storage. If there are key commitments,
+         discard tokens from issuer that are signed with keys other than those
+         from the issuer's most recent commitments.
+ 5. Return true if there are tokens stored for the given issuer, false
+           otherwise.
+
+Note that this query modifies the browser state. It associates the issuer
+argument with the current origin. Browser allows at most 2 issuers associated
+with an origin. This is to prevent leaking information through the issers a
+user has tokens from. Note that token query triggers removal of stale tokens
+at Step 4.
+
+Redemption Record Query {#redemption-record-query}
+--------------------------------------------------
+
+Similar to token query, an origin can check whether browser has a valid
+redemption record for a specific issuer using following API.
+
+```javascript
+document.hasRedemptionRecord(<issuer>)
+```
+
+Browser carries out the following steps on redemption query.
+
+ 1. Reject if the document is not in a secure context [[secure-contexts]].
+ 2. If the issuer is not associated with the top level origin, return false.
+ 3. Look up the key commitments from storage. If there are key commitments,
+         discard tokens from issuer that are signed with keys other than those
+         from the issuer's most recent commitments.
+ 4. If there is a redemption record for the issuer and topl level pair,
+       return true, return false otherwise.
+
+Similar to token query, redemption query might modify the browser state. Unlike
+token query, redemption query does not associate issuer with the top level
+origin. There is no need to associate the issuer queried with the top level
+origin, because, answer to the redemption query does not leak information about
+the issuers of the currently stored tokens. Similar to token query, redemption
+query clears stale tokens.
+
+
+Privacy Considerations {#privacy}
+=================================
+
+Unlinkability {#unlinkability}
+------------------------------
+
+Cryptographic protocols [[VOPRF]] and [[PMB]] provide blind signatures. At
+redemption time, issuers can recognize their signature on the provided token,
+however they can not determine at what time and context they signed the token.
+This prevents issuers to correlate their issuances on an origin with
+redemptions on another origin. Issuers learn only the aggregate information
+about the origins users visit.
+
+
+Limiting Encoded Information {#limit-encoded-info}
+--------------------------------------------------
+
+Browsers enforce limit on the number of keys for an issuer. For [[VOPRF]]
+number of keys are limited to six and for [[PMB]] number of keys are limited to
+three. This is to prevent issuers de-anonymizing the clients by using a unique
+keys for each clients. At issuance time, when using [[VOPRF]], the issuer can
+label browser by one of the six available labels by using one of the six keys.
+Similarly, when using [[PMB]], the issuer labels the browser in of the three
+labels by using its three keys and store an additional private bit value.  This
+indicates it also places browser into one of six buckets (2 x 3 = 6). Both
+[[VOPRF]] and [[PMB]] encode the same amount of information in a token. The
+difference is [[PMB]] having a private bit.
+
+### Potential Attack: Side Channel Fingerprinting
+
+Unlinkability is lost if the issuer is able to use network-level fingerprinting
+or any other side-channel and can associate the browser at redemption time with
+the browser at token issuance time, even though the Private State Token API
+itself has only stored and revealed limited amount of information about the
+browser.
+
+Cross-site Information Transfer {#cross-site-info}
+--------------------------------------------------
+
+Private State Tokens transfer limited information between first-party contexts.
+Underlying cryptographic protocols guarantee that each token only contains a
+small amount of information. Still, if we allow many token redemptions on a
+single page, the first-party cookie for user U on domain A can be encoded in
+the Private State Token information channel and decoded on domain B, allowing
+domain B to learn the user's domain A cookie until either 1p cookie is cleared.
+Separate from the concern of channels allowing arbitrary communication between
+domains, some identification attacks---for instance, a malicious redeemer
+attempting to learn the exact set of issuers that have granted tokens to a
+particular user, which could be identifying---have similar mitigations.
+
+### Mitigation: Dynamic Issuance/Redemption Limits
+
+To mitigate this attack, browser places limits on both issuance and redemption.
+User activation with the issuing site is required in the issuing operation. The
+browser does not allow a third redemption in a 48 hour window.
+
+### Mitigation: Per-Site Issuer Limits
+
+The rate of identity leakage from one origin to another increases with the
+number of issuers allowed in an origin. To avoid abuse, the browser allows
+association of at most two issers per top level origin. Issuers are associated
+with top level origins for token query API as well, see [[#token-query]].
+
+Security Considerations {#security}
+===================================
+
+Preventing Token Exhaustion {#token-exhaustion}
+-----------------------------------------------
+
+Malicious origins might attempt to exhaust all tokens stored in the browser by
+redeeming them all. To prevent this, the browser limits number of redemption
+operations. In an origin first two redemptions are allowed, however, the third
+redemption is not allowed in a 48 hour window. The third redemption is allowed
+once more than 48 hours have elapsed since the first redemption.
+
+Preventing Double Spending {#preventing-double-spend}
+-----------------------------------------------------
+
+Issuers can verify that each token is seen only once, because every redemption
+is sent to the same token issuer. This means that even if a malicious piece of
+malware exfiltrates all of a user's tokens, the tokens will run out over time.
+Issuers can sign fewer tokens at a time to mitigate the risk.
+
+<h2 id=acknowledgments class=no-num>Acknowledgments</h2>
+
+Thanks to Charlie Harrison, David Van Cleve and Kaustubha Govind for their
+contributions. Thanks to Chris Wilson for reviewing and mentoring this spec.

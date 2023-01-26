@@ -59,13 +59,13 @@ discontinuity in the {{presentedFrames}}).
 Note: A web author could know if a callback is late by checking whether {{expectedDisplayTime}} is equal
 to *now*, as opposed to roughly one v-sync in the future.
 
-The {{VideoFrameRequestCallback}} also provides useful {{VideoFrameMetadata|metadata}} about the video
+The {{VideoFrameRequestCallback}} also provides useful {{VideoFrameCallbackMetadata|metadata}} about the video
 frame that was most recently presented for composition, which can be used for automated metrics analysis.
 
-# VideoFrameMetadata #    {#video-frame-metadata}
+# VideoFrameCallbackMetadata #    {#video-frame-callback-metadata}
 
 <pre class='idl'>
-  dictionary VideoFrameMetadata {
+  dictionary VideoFrameCallbackMetadata {
     required DOMHighResTimeStamp presentationTime;
     required DOMHighResTimeStamp expectedDisplayTime;
 
@@ -82,24 +82,24 @@ frame that was most recently presented for composition, which can be used for au
   };
 </pre>
 
-## Definitions ## {#video-frame-metadata-definitions}
+## Definitions ## {#video-frame-callback-metadata-definitions}
 
 <dfn>media pixels</dfn> are defined as a media resource's visible decoded pixels, without pixel aspect
 ratio adjustments. They are different from [=CSS pixels=], which account for pixel aspect ratio
 adjustments.
 
-## Attributes ## {#video-frame-metadata-attributes}
+## Attributes ## {#video-frame-callback-metadata-attributes}
 
-: <dfn for="VideoFrameMetadata" dict-member>presentationTime</dfn>
+: <dfn for="VideoFrameCallbackMetadata" dict-member>presentationTime</dfn>
 :: The time at which the user agent submitted the frame for composition.
 
-: <dfn for="VideoFrameMetadata" dict-member>expectedDisplayTime</dfn>
+: <dfn for="VideoFrameCallbackMetadata" dict-member>expectedDisplayTime</dfn>
 :: The time at which the user agent expects the frame to be visible.
 
-: <dfn for="VideoFrameMetadata" dict-member>width</dfn>
+: <dfn for="VideoFrameCallbackMetadata" dict-member>width</dfn>
 :: The width of the video frame, in [=media pixels=].
 
-: <dfn for="VideoFrameMetadata" dict-member>height</dfn>
+: <dfn for="VideoFrameCallbackMetadata" dict-member>height</dfn>
 :: The height of the video frame, in [=media pixels=].
 
 Note: {{width}} and {{height}} might differ from {{HTMLVideoElement/videoWidth|videoWidth}} and
@@ -110,17 +110,17 @@ have rectangular pixels). When a calling
 while {{HTMLVideoElement/videoWidth|videoWidth}} and {{HTMLVideoElement/videoHeight|videoHeight}} can
 be used to determine the aspect ratio to use, when using the texture.
 
-: <dfn for="VideoFrameMetadata" dict-member>mediaTime</dfn>
+: <dfn for="VideoFrameCallbackMetadata" dict-member>mediaTime</dfn>
 ::  The media presentation timestamp (PTS) in seconds of the frame presented (e.g.
   its timestamp on the {{HTMLMediaElement/currentTime|video.currentTime}} timeline).
   MAY have a zero value for live-streams or WebRTC applications.
 
-: <dfn for="VideoFrameMetadata" dict-member>presentedFrames</dfn>
+: <dfn for="VideoFrameCallbackMetadata" dict-member>presentedFrames</dfn>
 ::  A count of the number of frames submitted for composition. Allows clients
   to determine if frames were missed between {{VideoFrameRequestCallback}}s. MUST be monotonically
   increasing.
 
-: <dfn for="VideoFrameMetadata" dict-member>processingDuration</dfn>
+: <dfn for="VideoFrameCallbackMetadata" dict-member>processingDuration</dfn>
 ::  The elapsed duration in seconds from submission of the encoded packet with the same
   presentation timestamp (PTS) as this frame (e.g. same as the {{mediaTime}}) to the decoder
   until the decoded frame was ready for presentation.
@@ -131,7 +131,7 @@ be used to determine the aspect ratio to use, when using the texture.
 :: SHOULD be present. In some cases, user-agents might not be able to surface this information since
   portions of the media pipeline might be owned by the OS.
 
-: <dfn for="VideoFrameMetadata" dict-member>captureTime</dfn>
+: <dfn for="VideoFrameCallbackMetadata" dict-member>captureTime</dfn>
 ::  For video frames coming from a local source, this is the time at which
   the frame was captured by the camera.
   For video frames coming from remote source, the capture time is based on
@@ -142,7 +142,7 @@ be used to determine the aspect ratio to use, when using the texture.
 
 :: SHOULD be present for WebRTC or getUserMedia applications, and absent otherwise.
 
-: <dfn for="VideoFrameMetadata" dict-member>receiveTime</dfn>
+: <dfn for="VideoFrameCallbackMetadata" dict-member>receiveTime</dfn>
 ::  For video frames coming from a remote source, this is the
   time the encoded frame was received by the platform, i.e., the time at
   which the last packet belonging to this frame was received over the network.
@@ -150,7 +150,7 @@ be used to determine the aspect ratio to use, when using the texture.
 :: SHOULD be present for WebRTC applications that receive data from a remote source,
   and absent otherwise.
 
-: <dfn for="VideoFrameMetadata" dict-member>rtpTimestamp</dfn>
+: <dfn for="VideoFrameCallbackMetadata" dict-member>rtpTimestamp</dfn>
 ::  The RTP timestamp associated with this video frame.
 
 :: SHOULD be present for WebRTC applications that receive data from a remote source,
@@ -159,7 +159,7 @@ be used to determine the aspect ratio to use, when using the texture.
 # VideoFrameRequestCallback #    {#video-frame-request-callback}
 
 <pre class='idl'>
-  callback VideoFrameRequestCallback = undefined(DOMHighResTimeStamp now, VideoFrameMetadata metadata);
+  callback VideoFrameRequestCallback = undefined(DOMHighResTimeStamp now, VideoFrameCallbackMetadata metadata);
 </pre>
 
 Each {{VideoFrameRequestCallback}} object has a <dfn>canceled</dfn> boolean initially set to false.
@@ -175,7 +175,7 @@ Each {{VideoFrameRequestCallback}} object has a <dfn>canceled</dfn> boolean init
 ## Methods ## {#video-rvfc-methods}
 
 Each {{HTMLVideoElement}} has a <dfn>list of video frame request callbacks</dfn>, which is initially
-empty. It also has a <dfn>last presented frame indentifier</dfn> and a <dfn>video frame request
+empty. It also has a <dfn>last presented frame identifier</dfn> and a <dfn>video frame request
 callback identifier</dfn>, which are both numbers which are initially zero.
 
 : <dfn for="HTMLVideoElement" method>requestVideoFrameCallback(|callback|)</dfn>
@@ -235,10 +235,10 @@ callbacks at 25Hz; a 120fps video in that same 60Hz browser would fire callbacks
 To <dfn>run the video frame request callbacks</dfn> for a {{HTMLVideoElement}} |video| with a timestamp |now|, run the following steps:
 
 1. If |video|'s [=list of video frame request callbacks=] is empty, abort these steps.
-1. Let |metadata| be the {{VideoFrameMetadata}} dictionary built from |video|'s latest presented frame.
+1. Let |metadata| be the {{VideoFrameCallbackMetadata}} dictionary built from |video|'s latest presented frame.
 1. Let |presentedFrames| be the value of |metadata|'s {{presentedFrames}} field.
-1. If the [=last presented frame indentifier=] is equal to |presentedFrames|, abort these steps.
-1. Set the [=last presented frame indentifier=] to |presentedFrames|.
+1. If the [=last presented frame identifier=] is equal to |presentedFrames|, abort these steps.
+1. Set the [=last presented frame identifier=] to |presentedFrames|.
 1. Let |callbacks| be the [=list of video frame request callbacks=].
 1. Set |video|'s [=list of video frame request callbacks=] to be empty.
 1. For each entry in |callbacks|

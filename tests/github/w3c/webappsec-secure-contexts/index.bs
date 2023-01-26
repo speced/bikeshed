@@ -1,0 +1,923 @@
+<h1>Secure Contexts</h1>
+<pre class="metadata">
+Status: ED
+ED: https://w3c.github.io/webappsec-secure-contexts/
+Issue Tracking: GitHub https://github.com/w3c/webappsec-secure-contexts/issues
+Implementation Report: https://wpt.fyi/results/secure-contexts
+Shortname: secure-contexts
+Level: None
+TR: https://www.w3.org/TR/secure-contexts/
+Editor: Mike West 56384, Google Inc., mkwst@google.com
+Former Editor: Yan Zhu, Brave
+Group: webappsec
+Abstract:
+  This specification defines "secure contexts", thereby allowing user agent
+  implementers and specification authors to enable certain features only when
+  certain minimum standards of authentication and confidentiality are met.
+Version History: https://github.com/w3c/webappsec-secure-contexts/commits/main/index.bs
+!Participate: <a href="https://github.com/w3c/webappsec-secure-contexts/issues/new">File an issue</a> (<a href="https://github.com/w3c/webappsec-secure-contexts/issues">open issues</a>)
+Indent: 2
+Markup Shorthands: markdown on
+Boilerplate: omit conformance, omit feedback-header
+</pre>
+<pre class="link-defaults">
+spec:html; type:attribute; text:isSecureContext
+spec:html; type:dfn; text:environment
+</pre>
+<pre class="anchors">
+urlPrefix: https://www.w3.org/TR/geolocation-API/; spec: GEOLOCATION-API
+  type: method
+    text: getCurrentPosition(); url: get-current-position
+    text: watchPosition(); url: watch-position
+urlPrefix: https://www.w3.org/2017/Process-20170301/; spec: W3C-PROCESS
+  type: dfn
+    text: modify a specification; url: rec-modify
+</pre>
+<pre class="biblio">
+{
+  "COMCAST": {
+      "href": "https://arstechnica.com/tech-policy/2014/09/why-comcasts-javascript-ad-injections-threaten-security-net-neutrality/",
+      "title": "Comcast Wi-Fi serving self-promotional ads via JavaScript injection",
+      "publisher": "Ars Technica",
+      "authors": [ "David Kravets" ]
+  },
+  "VERIZON": {
+      "href": "http://adage.com/article/digital/verizon-target-mobile-subscribers-ads/293356/",
+      "title": "Verizon looks to target its mobile subscribers with ads",
+      "publisher": "Advertising Age",
+      "authors": [ "Mark Bergen", "Alex Kantrowitz" ]
+  },
+  "POWERFUL-NEW-FEATURES": {
+    "authors": [ "Chrome Security Team" ],
+    "href": "https://www.chromium.org/Home/chromium-security/prefer-secure-origins-for-powerful-new-features",
+    "title": "Prefer Secure Origins For Powerful New Features"
+  },
+  "W3C-PROCESS": {
+    "authors": [ "Charles McCathie Nevile" ],
+    "title": "World Wide Web Consortium Process Document",
+    "href": "https://www.w3.org/20145/Process-20150901/",
+    "publisher": "W3C"
+  },
+  "let-localhost-be-localhost": {
+    "authors": [ "Mike West" ],
+    "title": "Let 'localhost' be localhost.",
+    "href": "https://tools.ietf.org/html/draft-west-let-localhost-be-localhost",
+    "publisher": "IETF"
+  }
+}
+</pre>
+<!--
+████ ██    ██ ████████ ████████   ███████
+ ██  ███   ██    ██    ██     ██ ██     ██
+ ██  ████  ██    ██    ██     ██ ██     ██
+ ██  ██ ██ ██    ██    ████████  ██     ██
+ ██  ██  ████    ██    ██   ██   ██     ██
+ ██  ██   ███    ██    ██    ██  ██     ██
+████ ██    ██    ██    ██     ██  ███████
+-->
+<section>
+  <h2 id="intro">Introduction</h2>
+
+  <em>This section is not normative.</em>
+
+  As the web platform is extended to enable more useful and powerful
+  applications, it becomes increasingly important to ensure that the features
+  which enable those applications are enabled only in contexts which meet a minimum
+  security level. As an extension of the TAG's recommendations in [[SECURING-WEB]],
+  this document describes threat models for feature abuse on the web (see
+  [[#threat-models]]) and outlines normative requirements which should be
+  incorporated into documents specifying new features (see
+  [[#implementation-considerations]]).
+
+  The most obvious of the requirements discussed here is that application code
+  with access to sensitive or private data be delivered confidentially over
+  authenticated channels that guarantee data integrity. Delivering code securely
+  cannot ensure that an application will always meet a user's security and
+  privacy requirements, but it is a necessary precondition.
+
+  Less obviously, application code delivered over an authenticated and confidential
+  channel isn't enough in and of itself to limit the use of powerful features by
+  non-secure contexts. As [[#ancestors]] explains, cooperative frames can be
+  abused to bypass otherwise solid restrictions on a feature. The algorithms
+  defined below ensure that these bypasses are difficult and user-visible.
+
+  The following examples summarize the normative text which follows:
+
+  <style>
+    .secure {
+      fill: #8F8;
+    }
+    .non-secure {
+      fill: #F88;
+      stroke-dasharray: 5,5;
+    }
+    rect, circle {
+      stroke-width: 2;
+      stroke: black;
+      fill-opacity: 0.75;
+    }
+    text {
+      font-family: monospace;
+    }
+    text.rejection {
+      fill: #F00;
+      font-weight: 700;
+      font-size: 2em;
+    }
+    g path {
+      stroke-width: 2px;
+      stroke: #666;
+      fill-opacity: 0;
+      stroke-dasharray: 5px, 5px;
+    }
+  </style>
+
+  <h3 id="examples-top-level">Top-level Documents</h3>
+
+  <div class="example">
+    <p><code>http://example.com/</code> opened in a <a>top-level browsing
+    context</a> is not a <a>secure context</a>, as it was not delivered over
+    an authenticated and encrypted channel.</p>
+
+    <svg width="400" height="200">
+      <g transform="translate(10,10)">
+        <rect height="175" width="297" y="0" x="0" class="non-secure" />
+        <text transform="translate(10, 20)">http://example.com/</text>
+      </g>
+    </svg>
+  </div>
+
+  <div class="example">
+    <p><code>https://example.com/</code> opened in a <a>top-level browsing
+    context</a> is a <a>secure context</a>, as it was delivered over
+    an authenticated and encrypted channel.</p>
+
+    <svg width="400" height="200">
+      <g transform="translate(10,10)">
+        <rect height="175" width="297" y="0" x="0" class="secure" />
+        <text transform="translate(10, 20)">https://example.com/</text>
+      </g>
+    </svg>
+  </div>
+
+  <div class="example">
+    <p>If a secure context opens <code>https://example.com/</code> in a new
+    window, that new window will be a secure context, as it is secure on
+    its own merits:</p>
+
+    <svg width="400" height="400">
+      <g transform="translate(10,10)">
+        <rect height="175" width="297" y="0" x="0" class="secure" />
+        <text transform="translate(10, 20)">https://secure.example.com/</text>
+      </g>
+      <g transform="translate(10,210)">
+        <rect height="175" width="297" y="0" x="0" class="secure" />
+        <text transform="translate(10, 20)">https://another.example.com/</text>
+      </g>
+      <g>
+        <path d="M150, 87 C 200 75, 350 75, 150 287"></path>
+      </g>
+    </svg>
+  </div>
+
+  <div class="example" id="example-4ec7a126">
+    <p>Likewise, if a non-secure context opens <code>https://example.com/</code> in a new window,
+    that new window will be a secure context, even though its opener was non-secure:</p>
+
+    <svg width="400" height="400">
+      <g transform="translate(10,10)">
+        <rect height="175" width="297" y="0" x="0" class="non-secure" />
+        <text transform="translate(10, 20)">http://non-secure.example.com/</text>
+      </g>
+      <g transform="translate(10,210)">
+        <rect height="175" width="297" y="0" x="0" class="secure" />
+        <text transform="translate(10, 20)">https://another.example.com/</text>
+      </g>
+      <g>
+        <path d="M150, 87 C 200 75, 350 75, 150 287"></path>
+      </g>
+    </svg>
+  </div>
+
+  <h3 id="examples-framed">Framed Documents</h3>
+
+  Framed documents can be <a>secure contexts</a> if they are delivered from
+  <a>potentially trustworthy origins</a>, <em>and</em> if they're embedded
+  in a <a>secure context</a>. That is:
+
+  <div class="example">
+    If <code>https://example.com/</code> opened in a <a>top-level browsing
+    context</a> opens <code>https://sub.example.com/</code> in a frame, then
+    both are <a>secure contexts</a>, as both were delivered over
+    authenticated and encrypted channels.</p>
+
+    <svg width="400" height="200">
+      <g transform="translate(10,10)">
+        <rect height="175" width="300" y="0" x="0" class="secure" />
+        <text transform="translate(10, 20)">https://example.com/</text>
+        <g transform="translate(20, 50)">
+          <rect height="105" width="250" y="0" x="0" class="secure" />
+          <text transform="translate(10, 20)">https://sub.example.com/</text>
+        </g>
+      </g>
+    </svg>
+  </div>
+  <div class="example">
+    <p>If <code>https://example.com/</code> was somehow able to frame
+    <code>http://non-secure.example.com/</code> (perhaps the user has
+    overridden mixed content checking?), the top-level frame would remain
+    secure, but the framed content is not</em> a secure context.</p>
+
+    <svg width="400" height="200">
+      <g transform="translate(10,10)">
+        <rect height="175" width="300" y="0" x="0" class="secure" />
+        <text transform="translate(10, 20)">https://example.com/</text>
+        <g transform="translate(20, 50)">
+          <rect height="105" width="250" y="0" x="0" class="non-secure" />
+          <text transform="translate(10, 20)">http://non-secure.example.com/</text>
+        </g>
+      </g>
+    </svg>
+  </div>
+  <div class="example">
+    <p>If, on the other hand, <code>https://example.com/</code> is framed
+    inside of <code>http://non-secure.example.com/</code>, then it is
+    <em>not</em> a secure context, as its ancestor is not delivered over an
+    authenticated and encrypted channel.</p>
+
+    <svg width="400" height="200">
+      <g transform="translate(10,10)">
+        <rect height="175" width="300" y="0" x="0" class="non-secure" />
+        <text transform="translate(10, 20)">http://non-secure.example.com/</text>
+        <g transform="translate(20, 50)">
+          <rect height="105" width="250" y="0" x="0" class="non-secure" />
+          <text transform="translate(10, 20)">https://example.com/</text>
+        </g>
+      </g>
+    </svg>
+  </div>
+
+  <h3 id="examples-workers">Web Workers</h3>
+
+  Dedicated Workers are similar in nature to framed documents. They're
+  <a>secure contexts</a> when they're delivered from <a>potentially
+  trustworthy origins</a>, only if their owner is itself a <a>secure
+  context</a>:
+
+  <div class="example">
+    <p>If <code>https://example.com/</code> in a <a>top-level browsing
+    context</a> runs <code>https://example.com/worker.js</code>, then
+    both the document and the worker are <a>secure contexts</a>.</p>
+
+    <svg width="600" height="200">
+      <g transform="translate(10,10)">
+        <rect height="175" width="300" y="0" x="0" class="secure" />
+        <text transform="translate(10, 20)">https://example.com/</text>
+        <g transform="translate(400, 110)">
+          <circle r="50" class="secure" />
+          <text transform="translate(-75, -55)">https://example.com/worker.js</text>
+        </g>
+        <g>
+          <path d="M150, 87 C 200 75, 350 75, 405 110"></path>
+        </g>
+      </g>
+    </svg>
+  </div>
+
+  <div class="example">
+    <p>If <code>http://non-secure.example.com/</code> in a <a>top-level browsing
+    context</a> frames <code>https://example.com/</code>, which runs
+    <code>https://example.com/worker.js</code>, then neither the framed document
+    nor the worker are <a>secure contexts</a>.</p>
+
+    <svg width="600" height="200">
+      <g transform="translate(10,10)">
+        <rect height="175" width="297" y="0" x="0" class="non-secure" />
+        <text transform="translate(10, 20)">http://non-secure.example.com/</text>
+        <g transform="translate(20, 50)">
+          <rect height="105" width="250" y="0" x="0" class="non-secure" />
+          <text transform="translate(10, 20)">https://example.com/</text>
+        </g>
+        <g transform="translate(400, 110)">
+          <circle r="50" class="non-secure" />
+          <text transform="translate(-75, -55)">https://example.com/worker.js</text>
+        </g>
+        <g>
+          <path d="M150, 87 C 200 75, 350 75, 405 110"></path>
+        </g>
+      </g>
+    </svg>
+  </div>
+
+  <h3 id="examples-shared-workers">Shared Workers</h3>
+
+  Multiple contexts may attach to a Shared Worker. If a <a>secure context</a>
+  creates a Shared Worker, then it is a <a>secure context</a>, and may only be
+  attached to by other <a>secure contexts</a>. If a non-secure context creates
+  a Shared Worker, then it is <em>not</em> a <a>secure context</a>, and may only
+  be attached to by other non-secure contexts.
+
+  <div class="example">
+    <p>If <code>https://example.com/</code> in a <a>top-level browsing
+    context</a> runs <code>https://example.com/worker.js</code> as a Shared
+    Worker, then both the document and the worker are considered secure
+    contexts.</p>
+
+    <svg width="600" height="200">
+      <g transform="translate(10,10)">
+        <rect height="175" width="300" y="0" x="0" class="secure" />
+        <text transform="translate(10, 20)">https://example.com/</text>
+        <g transform="translate(400, 110)">
+          <circle r="50" class="secure" />
+          <text transform="translate(-75, -55)">https://example.com/worker.js</text>
+        </g>
+        <g>
+          <path d="M150, 87 C 200 75, 350 75, 405 110"></path>
+        </g>
+      </g>
+    </svg>
+  </div>
+
+  <div class="example">
+    <p><code>https://example.com/</code> in a different <a>top-level
+    browsing context</a> (e.g. in a new window) is a secure context, so it may
+    access the secure shared worker:</p>
+
+    <svg width="600" height="400">
+      <g transform="translate(10,10)">
+        <rect height="175" width="300" y="0" x="0" class="secure" />
+        <text transform="translate(10, 20)">https://example.com/</text>
+        <g transform="translate(400, 110)">
+          <circle r="50" class="secure" />
+          <text transform="translate(-75, -55)">https://example.com/worker.js</text>
+        </g>
+        <g>
+          <path d="M150, 87 C 200 75, 350 75, 405 110"></path>
+        </g>
+      </g>
+      <g transform="translate(10,200)">
+        <rect height="175" width="300" y="0" x="0" class="secure" />
+        <text transform="translate(10, 20)">https://example.com/</text>
+        <g>
+          <path d="M150, 87 C 200 75, 350 75, 405 -80"></path>
+        </g>
+      </g>
+    </svg>
+  </div>
+
+  <div class="example">
+    <p><code>https://example.com/</code> nested in
+    <code>http://non-secure.example.com/</code> may not connect to the secure
+    worker, as it is not a secure context.</p>
+
+    <svg width="600" height="400">
+      <g transform="translate(10,10)">
+        <rect height="175" width="300" y="0" x="0" class="secure" />
+        <text transform="translate(10, 20)">https://example.com/</text>
+        <g transform="translate(400, 110)">
+          <circle r="50" class="secure" />
+          <text transform="translate(-75, -55)">https://example.com/worker.js</text>
+        </g>
+        <g>
+          <path d="M150, 87 C 200 75, 350 75, 405 110"></path>
+        </g>
+      </g>
+      <g transform="translate(10,200)">
+        <rect height="175" width="300" y="0" x="0" class="non-secure" />
+        <text transform="translate(10, 20)">http://non-secure.example.com/</text>
+        <g transform="translate(20, 50)">
+          <rect height="105" width="250" y="0" x="0" class="non-secure" />
+          <text transform="translate(10, 20)">https://example.com/</text>
+        </g>
+        <g>
+          <path d="M150, 87 C 200 75, 350 75, 405 20"></path>
+          <text transform="translate(405, 20)" class="rejection">X</text>
+        </g>
+      </g>
+    </svg>
+
+  </div>
+
+  <div class="example">
+    <p>Likewise, if <code>https://example.com/</code> nested in
+    <code>http://non-secure.example.com/</code> runs
+    <code>https://example.com/worker.js</code> as a Shared
+    Worker, then both the document and the worker are considered non-secure.</p>
+
+    <svg width="600" height="400">
+      <g transform="translate(10,10)">
+        <rect height="175" width="300" y="0" x="0" class="non-secure" />
+        <text transform="translate(10, 20)">http://non-secure.example.com/</text>
+        <g transform="translate(20, 50)">
+          <rect height="105" width="250" y="0" x="0" class="non-secure" />
+          <text transform="translate(10, 20)">https://example.com/</text>
+        </g>
+        <g transform="translate(400, 110)">
+          <circle r="50" class="non-secure" />
+          <text transform="translate(-75, -55)">https://example.com/worker.js</text>
+        </g>
+        <g>
+          <path d="M150, 87 C 200 75, 350 75, 405 110"></path>
+        </g>
+      </g>
+      <g transform="translate(10,200)">
+        <rect height="175" width="300" y="0" x="0" class="secure" />
+        <text transform="translate(10, 20)">https://example.com/</text>
+        <g>
+          <path d="M150, 87 C 200 75, 350 75, 405 20"></path>
+          <text transform="translate(405, 20)" class="rejection">X</text>
+        </g>
+      </g>
+    </svg>
+  </div>
+
+  <h3 id="examples-service-workers">Service Workers</h3>
+
+  Service Workers are always <a>secure contexts</a>. Only <a>secure contexts</a>
+  may register them, and they may only have clients which are <a>secure
+  contexts</a>.
+
+  <div class="example">
+    <p>If <code>https://example.com/</code> in a <a>top-level browsing
+    context</a> registers <code>https://example.com/service.js</code>,
+    then both the document and the Service Worker are considered secure
+    contexts.</p>
+
+    <svg width="600" height="200">
+      <g transform="translate(10,10)">
+        <rect height="175" width="300" y="0" x="0" class="secure" />
+        <text transform="translate(10, 20)">https://example.com/</text>
+        <g transform="translate(400, 110)">
+          <circle r="50" class="secure" />
+          <text transform="translate(-75, -55)">https://example.com/service.js</text>
+        </g>
+        <g>
+          <path d="M150, 87 C 200 75, 350 75, 405 110"></path>
+        </g>
+      </g>
+    </svg>
+  </div>
+</section>
+
+<section class="non-normative">
+  <h2 id="framework">Framework</h2>
+
+  <em>This section is non-normative.</em>
+
+  <h3 id="integration-idl">Integration with WebIDL</h3>
+
+  A new [{{SecureContext}}] attribute is available for operators, which
+  ensures that they will only be <a>exposed</a> into secure contexts. The
+  following example should help:
+
+  <div class="example">
+    <pre class="idl">
+      interface ExampleFeature {
+        // This call will succeed in all contexts.
+        Promise &lt;double&gt; calculateNotSoSecretResult();
+
+        // This operation will not be exposed to a non-secure context.
+        [<a extended-attribute>SecureContext</a>] Promise&lt;double&gt; calculateSecretResult();
+
+        // The same applies here: the operation will not be exposed to a non-secure context.
+        [<a extended-attribute>SecureContext</a>] boolean getSecretBoolean();
+      };
+
+      [<a extended-attribute>SecureContext</a>]
+      interface SecureFeature {
+        // This interface will not be exposed to non-secure contexts.
+        Promise&lt;any&gt; doAmazingThing();
+      };
+    </pre>
+  </div>
+
+  Specification authors are encouraged to use this attribute when defining new
+  features.
+
+  <h3 id="monkey-patching-html">Integrations with HTML</h3>
+
+  <h4 id="shared-workers" class="non-normative">Shared Workers</h4>
+
+  The {{SharedWorker}} constructor will throw a "{{SecurityError}}"
+  {{DOMException}} exception if a <a>secure context</a> attempts to attach to
+  a Worker which is not a <a>secure context</a>, and if a non-secure context
+  attempts to attach to a Worker which is a <a>secure context</a>.
+
+  <h4 id="monkey-patching-global-object">Feature Detection</h4>
+
+  An application can determine whether it's executing in a
+  [=secure context=] by checking the
+  {{WindowOrWorkerGlobalScope/isSecureContext}} boolean defined on
+  {{WindowOrWorkerGlobalScope}}.
+
+  <h4 id="is-settings-object-contextually-secure">Secure and non-secure contexts</h4>
+
+  The HTML Standard defines whether an [=environment=] is a [=secure context=]
+  or a [=non-secure context=]. This is the primary mechanism used by other
+  specifications.
+
+  Given a [=/global object=], specifications can check whether its
+  [=relevant settings object=] (which is an [=environment=]) is a
+  [=secure context=].
+
+</section>
+
+<section>
+  <h2 id="algorithms">Algorithms</h2>
+
+  <h3 id="is-origin-trustworthy">
+    Is |origin| potentially trustworthy?
+  </h3>
+
+  A <dfn export>potentially trustworthy origin</dfn> is one which a user agent
+  can generally trust as delivering data securely.
+
+  This algorithms considers certain hosts, scheme, and origins as potentially
+  trustworthy, even though they might not be authenticated and encrypted in the
+  traditional sense. In particular, the user agent SHOULD treat `file` URLs
+  as potentially trustworthy. In principle the user agent could treat local
+  files as untrustworthy, but, <em>given the information that is available to
+  the user agent at runtime</em>, the resources appear to have been transported
+  securely from disk to the user agent. Additionally, treating such resources as
+  potentially trustworthy is convenient for developers building an application
+  before deploying it to the public.
+
+  This developer-friendlyness is not without risk, however. User agents which
+  prioritize security over such niceties MAY choose to more strictly assign
+  trust in a way which excludes `file`.
+
+  On the other hand, the user agent MAY choose to extend this trust to other,
+  vendor-specific URL schemes like `app:` or `chrome-extension:` which it can
+  determine <i lang="la">a priori</i> to be trusted (see
+  [[#packaged-applications]] for detail).
+
+  Given an <a for="/">origin</a> (|origin|), the following algorithm
+  returns "`Potentially Trustworthy`" or "`Not Trustworthy`" as appropriate.
+
+  1.  If |origin| is an <a>opaque origin</a>, return "`Not Trustworthy`".
+
+  2.  Assert: |origin| is a <a>tuple origin</a>.
+
+  3.  If |origin|'s <a for="origin">scheme</a> is either "`https`" or "`wss`",
+      return "`Potentially Trustworthy`".
+
+      Note: This is meant to be analog to the <a><i lang="la">a priori</i>
+      authenticated URL</a> concept in [[MIX]].
+
+  4.  If |origin|'s <a for="origin">host</a> matches one of the CIDR
+      notations `127.0.0.0/8` or `::1/128` [[!RFC4632]], return "`Potentially
+      Trustworthy`".
+
+  5.  If the user agent conforms to the name resolution rules in
+      [[!let-localhost-be-localhost]] and one of the following is true:
+
+      * |origin|'s <a for="origin">host</a> is "`localhost`" or "`localhost.`"
+
+      * |origin|'s <a for="origin">host</a> ends with "`.localhost`" or "`.localhost.`"
+
+      then return "`Potentially Trustworthy`".
+
+      Note: See [[#localhost]] for details on the requirements here.
+
+  6.  If |origin|'s <a for="origin">scheme</a> is "`file`", return
+      "`Potentially Trustworthy`".
+
+  7.  If |origin|'s <a for="origin">scheme</a> component is one which the user
+      agent considers to be authenticated, return "`Potentially Trustworthy`".
+
+      Note: See [[#packaged-applications]] for detail here.
+
+  8.  If |origin| has been configured as a trustworthy origin, return
+      "`Potentially Trustworthy`".
+
+      Note: See [[#development-environments]] for detail here.
+
+  9.  Return "`Not Trustworthy`".
+
+  Note: Neither |origin|'s <a for="origin">domain</a> nor <a for="origin">port</a>
+  has any effect on whether or not it is considered to be a <a>secure context</a>.
+
+  <h3 id="is-url-trustworthy">
+    Is |url| potentially trustworthy?
+  </h3>
+
+  A <dfn export>potentially trustworthy URL</dfn> is one which either inherits
+  context from its creator (`about:blank`, `about:srcdoc`, `data`) or one whose
+  <a for="url">origin</a> is a <a>potentially trustworthy origin</a>.
+  Given a [=URL record=] (|url|), the following algorithm returns "`Potentially
+  Trustworthy`" or "`Not Trustworthy`" as appropriate:
+
+  1.  If |url| is "`about:blank`" or "`about:srcdoc`", return "`Potentially
+      Trustworthy`".
+
+  2.  If |url|'s <a for="url">scheme</a> is "`data`", return "`Potentially
+      Trustworthy`".
+
+  3.  Return the result of executing [[#is-origin-trustworthy]] on |url|'s
+      <a for="url">origin</a>.
+
+      Note: The origin of `blob:` URLs is the origin of the
+      context in which they were created. Therefore, blobs created in a
+      trustworthy origin will themselves be potentially trustworthy.
+</section>
+
+<section>
+  <h2 id="threat-models-risks">
+    Threat models and risks
+  </h2>
+
+  <em>This section is non-normative.</em>
+
+  <h3 id="threat-models">Threat Models</h3>
+
+  Granting permissions to unauthenticated origins is, in the presence of a
+  network attacker, equivalent to granting the permissions to any origin. The
+  state of the Internet is such that we must indeed assume that a network
+  attacker is present. Generally, network attackers fall into 2 classes:
+  passive and active.
+
+  <h4 id="threat-passive">Passive Network Attacker</h4>
+
+  A "Passive Network Attacker" is a party who is able to observe traffic
+  flows but who lacks the ability or chooses not to modify traffic at
+  the layers which this specification is concerned with.
+
+  Surveillance of networks in this manner "subverts the intent of communicating
+  parties without the agreement of these parties" and one "cannot defend against
+  the most nefarious actors while allowing monitoring by other actors no matter
+  how benevolent some might consider them to be." [[RFC7258]] Therefore, the
+  algorithms defined in this document require mechanisms that provide for the
+  privacy of data at the application layer, not simply integrity.
+
+  <h4 id="threat-active">Active Network Attacker</h4>
+
+  An "Active Network Attacker" has all the capabilities of a "Passive Network
+  Attacker" and is additionally able to modify, block or replay any data
+  transiting the network.  These capabilities are available to potential
+  adversaries at many levels of capability, from compromised devices offering
+  or simply participating in public wireless networks, to Internet Service
+  Providers indirectly introducing security and privacy vulnerabilities while
+  manipulating traffic for financial gain ([[VERIZON]] and [[COMCAST]] are
+  recent examples), to parties with direct intent to compromise security or
+  privacy who are able to target individual users, organizations or even
+  entire populations.
+
+  <h3 id="ancestors">Ancestral Risk</h3>
+
+  The [=secure context=] algorithm walks
+  through all the ancestors of a particular context in order to determine whether or not the
+  context itself is secure. Why wouldn't we consider a securely-delivered document in an
+  <{iframe}> to be secure, in and of itself?
+
+  The short answer is that this model would enable abuse. Chrome's
+  implementation of [[WEBCRYPTOAPI]] was an early experiment in locking APIs to
+  secure contexts, and it did not walk through a context's ancestors. The
+  assumption was that locking the API to a resource which was itself delivered
+  securely would be enough to ensure secure usage. The result, however, was
+  that entities like Netflix built <{iframe}>- and `postMessage()`-based shims
+  that exposed the API to non-secure contexts. The restriction was little more
+  than a speed-bump, slowing down non-secure access to the API, but completely
+  ineffective in preventing such access.
+
+  While the algorithms in this document do not perfectly isolate non-secure
+  contexts from <a>secure contexts</a> (as discussed in [[#isolation]]), the
+  ancestor checks provide a fairly robust protection for the guarantees of
+  authentication, confidentiality, and integrity that such contexts ought to
+  provide.
+
+  <h3 id="threat-risks">Risks associated with non-secure contexts</h3>
+
+  Certain web platform features that have a distinct impact on a user's
+  security or privacy should be available for use only in <a>secure
+  contexts</a> in order to defend against the threats above. Features
+  available in non-secure contexts risk exposing these capabilities to
+  network attackers:
+
+  <ol>
+    <li>
+      The ability to read and modify sensitive data (personally-identifying
+      information, credentials, payment instruments, and so on).
+      [[CREDENTIAL-MANAGEMENT-1]] is an example of an API that handles sensitive
+      data.
+    </li>
+    <li>
+      The ability to read and modify input from sensors on a user's device
+      (camera, microphone, and GPS being particularly noteworthy, but
+      certainly including less obviously dangerous sensors like the
+      accelerometer). [[GEOLOCATION-API]] and [[MEDIACAPTURE-STREAMS]] are
+      historical examples of features that use sensor input.
+    </li>
+    <li>
+      The ability to access information about other devices to which a user has
+      access. [[DISCOVERY-API]] and [[WEB-BLUETOOTH]] are good examples.
+    </li>
+    <li>
+      The ability to track users using temporary or persistent identifiers,
+      including identifiers which reset themselves after some period of time
+      (e.g. `window.sessionStorage`), identifiers the user can manually reset
+      (e.g. [[ENCRYPTED-MEDIA]], Cookies [[RFC6265]], and [[IndexedDB]]),
+      as well as identifying hardware features the user can't easily reset.
+    </li>
+    <li>
+      The ability to introduce some state for an origin which persists across
+      browsing sessions. [[SERVICE-WORKERS]] is a great example.
+    </li>
+    <li>
+      The ability to manipulate a user agent's native UI in some way which
+      removes, obscures, or manipulates details relevant to a user's
+      understanding of their context. [[FULLSCREEN]] is a good example.
+    </li>
+    <li>
+      The ability to introduce some functionality for which user permission will
+      be required.
+    </li>
+  </ol>
+
+  This list is non-exhaustive, but should give you a feel for the types of
+  risks we should consider when writing or implementing specifications.
+
+  Note: While restricting a feature itself to <a>secure contexts</a> is
+  critical, we ought not forget that facilities that carry such information
+  (such as new network access mechanisms, or other generic functions with access
+  to network data) are equally sensitive.
+</section>
+
+<section>
+  <h2 id="security-considerations">Security Considerations</h2>
+
+  <h3 id="isolation">Incomplete Isolation</h3>
+
+  The <a>secure context</a> definition in this document does not completely
+  isolate a "secure" view on an origin from a "non-secure" view on the same
+  origin. Exfiltration will still be possible via increasingly esoteric
+  mechanisms such as the contents of `localStorage`/`sessionStorage`,
+  `storage` events, `BroadcastChannel`, and others.
+
+  <h3 id="localhost">`localhost`</h3>
+
+  Section 6.3 of [[RFC6761]] lays out the resolution of `localhost.` and
+  names falling within `.localhost.` as special, and suggests that local
+  resolvers SHOULD/MAY treat them specially. For better or worse, resolvers
+  often ignore these suggestions, and will send `localhost` to the network
+  for resolution in a number of circumstances.
+
+  Given that uncertainty, user agents MAY treat localhost names as having
+  <a>potentially trustworthy origins</a> if and only if they also adhere to the
+  localhost name resolution rules spelled out in [[!let-localhost-be-localhost]]
+  (which boil down to ensuring that `localhost` never resolves to a
+  non-loopback address).
+</section>
+
+<section>
+  <h2 id="privacy-considerations">Privacy Considerations</h2>
+
+  The <a>secure context</a> definition in this document does not in itself have
+  any privacy impact. It does, however, enable other features which do have
+  interesting privacy implications to lock themselves into contexts which
+  ensures that specific guarantees can be made regarding integrity,
+  authenticity, and confidentiality.
+
+  From a privacy perspective, specification authors are encouraged to consider
+  requiring secure contexts for the features they define.
+</section>
+
+<section>
+  <h2 id="implementation-considerations">Implementation Considerations</h2>
+
+  <h3 id="packaged-applications">Packaged Applications</h3>
+
+  A user agent that support packaged applications MAY consider as "secure"
+  specific URL schemes whose contents are authenticated by the user agent.
+  For example, FirefoxOS application resources are referred to by a URL whose
+  <a for="url">scheme</a> component is `app:`. Likewise, Chrome's extensions
+  and apps live on `chrome-extension:` schemes. These could reasonably be
+  considered trusted origins.
+
+  <h3 id="development-environments">Development Environments</h3>
+
+  In order to support developers who run staging servers on non-loopback hosts,
+  the user agent MAY allow users to configure specific sets of origins as
+  trustworthy, even though [[#is-origin-trustworthy]] would normally return
+  "`Not Trustworthy`".
+
+  <h3 id="new">Restricting New Features</h3>
+
+  <em>This section is non-normative.</em>
+
+  When writing a specification for new features, we recommend that authors
+  and editors guard sensitive APIs with checks against <a>secure contexts</a>.
+  For example, something like the following might be a good approach:
+
+  <div class="example">
+    <ol>
+      <li>
+        If the <a>current settings object</a> is <em>not</em> a <a>secure
+        context</a>, then:
+
+        <ol>
+          <li>
+            [<i>insert something appropriate here: perhaps a Promise could be
+            rejected with a `SecurityError`, an error callback could be called,
+            a permission request denied, etc.</i>].
+          </li>
+        </ol>
+      </li>
+    </ol>
+  </div>
+
+  Authors could alternatively ensure that sensitive APIs are only exposed to
+  <a>secure contexts</a> by guarding them with the [{{SecureContext}}] attribute.
+
+  <div class="example">
+    <pre class="idl">
+      [<a extended-attribute>SecureContext</a>]
+      interface SensitiveFeature {
+        Promise&lt;double> getTheSecretDouble();
+      };
+
+      // Or:
+
+      interface AnotherSensitiveFeature {
+        [<a extended-attribute>SecureContext</a>] void doThatPowerfulThing();
+      };
+    </pre>
+  </div>
+
+  <section class="non-normative">
+    <h3 id="legacy">Restricting Legacy Features</h3>
+
+    <em>This section is non-normative.</em>
+
+    The list above clearly includes some existing functionality that is currently
+    available to the web over non-secure channels. We recommend that such legacy
+    functionality be modified to begin requiring a <a>secure context</a> as
+    quickly as is reasonably possible [[!W3C-PROCESS]].
+
+    1.  If such a feature is not widely implemented, we recommend that the
+        specification be immediately
+        <a lt="modify a specification">modified</a> to include a restriction
+        to <a>secure contexts</a>.
+
+    2.  If such a feature is widely implemented, but not yet in wide use, we
+        recommend that it be quickly restricted to <a>secure contexts</a> by
+        adding a check as described in [[#new]] to existing implementations, and
+        <a lt="modify a specification">modifying the specification</a>
+        accordingly.
+
+    3.  If such a feature is in wide use, we recommend that the existing
+        functionality be deprecated; the specification should be
+        <a lt="modify a specification">modified</a> to note that it does not
+        conform to the restrictions outlined in this document, and a plan should
+        be developed to both offer a conformant version of the feature and to
+        migrate existing users into that new version.
+
+    <h4 id="legacy-example">Example: Geolocation</h4>
+
+    The [[GEOLOCATION-API]] is a good concrete example of such a feature; it is
+    widely implemented and used on a large number of non-secure sites. A reasonable
+    path forward might look like this:
+
+    1.  <a lt="modify a specification">Modify</a> the specification to include
+        checks against <a>secure context</a> before executing the algorithms for
+        {{getCurrentPosition()}} and {{watchPosition()}}.
+
+        If the <a>current settings object</a> is not a <a>secure context</a>,
+        then the algorithm should be aborted, and the `errorCallback`
+        invoked with a `code` of `PERMISSION_DENIED`.
+
+    2.  The user agent should announce clear intentions to disable the API for
+        non-secure contexts on a specific date, and warn developers accordingly
+        (via console messages, for example).
+
+    3.  Leading up to the flag day, the user agent should announce a deprecation
+        schedule to ensure both that site authors recognize the need to modify
+        their code before it simply stops working altogether, and to protect
+        users in the meantime. Such a plan might include any or all of:
+
+        1.  Disallowing persistent permission grants to non-secure origins
+
+        2.  Coarsening the accuracy of the API for non-secure origins (perhaps
+            consistently returning city-level data rather than high-accuracy
+            data)
+
+            3.  UI modifications to inform users and site authors of the risk
+  </section>
+</section>
+
+<!--
+   ███     ██████  ██    ██ ██    ██  ███████  ██      ██ ██       ████████ ████████   ██████   ████████ ██     ██ ████████ ██    ██ ████████  ██████
+  ██ ██   ██    ██ ██   ██  ███   ██ ██     ██ ██  ██  ██ ██       ██       ██     ██ ██    ██  ██       ███   ███ ██       ███   ██    ██    ██    ██
+ ██   ██  ██       ██  ██   ████  ██ ██     ██ ██  ██  ██ ██       ██       ██     ██ ██        ██       ████ ████ ██       ████  ██    ██    ██
+██     ██ ██       █████    ██ ██ ██ ██     ██ ██  ██  ██ ██       ██████   ██     ██ ██   ████ ██████   ██ ███ ██ ██████   ██ ██ ██    ██     ██████
+█████████ ██       ██  ██   ██  ████ ██     ██ ██  ██  ██ ██       ██       ██     ██ ██    ██  ██       ██     ██ ██       ██  ████    ██          ██
+██     ██ ██    ██ ██   ██  ██   ███ ██     ██ ██  ██  ██ ██       ██       ██     ██ ██    ██  ██       ██     ██ ██       ██   ███    ██    ██    ██
+██     ██  ██████  ██    ██ ██    ██  ███████   ███  ███  ████████ ████████ ████████   ██████   ████████ ██     ██ ████████ ██    ██    ██     ██████
+-->
+<section>
+  <h2 id="acknowledgements">Acknowledgements</h2>
+
+  This document is largely based on the Chrome Security team's work on
+  [[POWERFUL-NEW-FEATURES]]. Chris Palmer, Ryan Sleevi, and David Dorwin have
+  been particularly engaged. Anne van Kesteren, Jonathan Watt, Boris Zbarsky, and
+  Henri Sivonen have also provided very helpful feedback.
+</section>

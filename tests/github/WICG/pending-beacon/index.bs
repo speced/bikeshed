@@ -1,0 +1,406 @@
+<pre class="metadata">
+Title: Pending Beacon
+Status: UD
+ED: http://wicg.github.io/pending-beacon/
+Shortname: pending-beacon
+Level: 1
+Editor: Ian Clelland, Google
+Abstract: This document introduces an API for registering data to be sent to a predetermined server
+    at the point that a page is unloaded.
+Group: WebPerf
+Repository: WICG/pending-beacon
+</pre>
+
+Introduction {#introduction}
+============================
+
+This is an introduction.
+
+Issue: This introduction needs to be more of an introduction.
+
+Pending Beacon Framework {#pending-beacon-framework}
+====================================================
+
+Concepts {#concepts}
+--------------------
+
+A <dfn>pending beacon</dfn> represents a piece of data which has been
+registered with the user agent for later sending to an origin server.
+
+A [=pending beacon=] has a <dfn for="pending beacon">url</dfn>, which is a
+[=/URL=].
+
+A [=pending beacon=] has a <dfn for="pending beacon">method</dfn>, which is a
+string, which is initally <code>"POST"</code>.
+
+A [=pending beacon=] has a <dfn for="pending beacon">foreground timeout</dfn>, which is
+either null or an integer, and which is initially null.
+
+A [=pending beacon=] has a <dfn for="pending beacon">background timeout</dfn>, which is
+either null or an integer, and which is initially null.
+
+A [=pending beacon=] has an <dfn for="pending beacon">is_pending</dfn> flag,
+which is a [=boolean=], which is initially true.
+
+A [=pending beacon=] has a <dfn for="pending beacon">payload</dfn>, which is a
+[=byte sequence=].  It is initially empty.
+
+A [=Document=] has a <dfn for="Document">pending beacon set</dfn>, which is an
+[=ordered set=] of [=pending beacons=].
+
+Issue: Add worker beacons as well?
+
+Note: In this spec, the [=pending beacon set=] is associated with a [=Document=].
+In an actual implementation, this set will likely need to be stored in the user
+agent, separate from the document itself, in order to be able to send beacons
+when the document is destroyed (either by being unloaded, or because of a crash).
+
+Issue: Define these to be part of the user agent formally.
+
+Updating beacons {#updating-beacons}
+------------------------------------
+
+<div algorithm>
+  To <dfn for="pending beacon">set the url</dfn> of a pending beacon |beacon| to a [=/URL=] |url|:
+  1. If |beacon|'s [=pending beacon/is_pending=] is false, return false.
+  1. If |url| is not a valid [=/URL=], return false.
+  1. If |url| is not a [=potentially trustworthy URL=], return false.
+  1. Set |beacon|'s [=pending beacon/url=] to |url|.
+  1. Return true.
+
+</div>
+
+<div algorithm>
+  To <dfn for="pending beacon">set the foreground timeout</dfn> of a pending beacon |beacon| to an integer |timeout|:
+  1. If |beacon|'s [=pending beacon/is_pending=] is false, return false.
+  1. If |timeout| is negative, return false.
+  1. Set |beacon|'s [=pending beacon/foreground timeout=] to |timeout|.
+  1. Return true.
+
+Issue: This algorithm should also synchronously set or clear a timer to send the beacon.
+</div>
+
+<div algorithm>
+  To <dfn for="pending beacon">set the background timeout</dfn> of a pending beacon |beacon| to an integer |timeout|:
+  1. If |beacon|'s [=pending beacon/is_pending=] is false, return false.
+  1. If |timeout| is negative, return false.
+  1. Set |beacon|'s [=pending beacon/background timeout=] to |timeout|.
+  1. Return true.
+
+</div>
+
+<div algorithm>
+  To <dfn for="pending beacon">set the payload</dfn> of a pending beacon |beacon| to a [=byte sequence=] |payload|,
+  1. If |beacon|'s [=pending beacon/is_pending=] is false, return false.
+  1. Set |beacon|'s [=pending beacon/payload=] to |payload|.
+  1. Return true.
+
+</div>
+
+<div algorithm>
+  To <dfn for="pending beacon">cancel</dfn> a [=pending beacon=] |beacon|, set |beacon|'s [=pending beacon/is_pending=] to false.
+
+  Note: Once canceled, a [=pending beacon=]'s payload will no longer be used,
+  and it is safe for a user agent to discard that, and to cancel any associated
+  timers. However, other attributes may still be read, and so this algorithm
+  does not destroy the beacon itself.
+</div>
+
+Sending beacons {#sending-beacons}
+----------------------------------
+
+Note: This is written as though Fetch were used as the underlying mechanism.
+However, since these are sent out-of-band, an implementation might not use the
+actual web-exposed Fetch API, and may instead use the underlying HTTP primitives
+directly.
+
+<div algorithm>
+  To <dfn>send a document's beacons</dfn>, given a Document |document|, run these steps:
+
+  1. For each [=pending beacon=] |beacon| in |document|'s [=pending beacon set=],
+    1. Call [=send a queued pending beacon=] with |beacon|.
+
+</div>
+
+<div algorithm>
+   To <dfn>send a queued pending beacon</dfn> |beacon|, run these steps:
+
+  1. If |beacon|'s [=pending beacon/is_pending=] flag is false, then return.
+  1. Set |beacon|'s [=pending beacon/is_pending=] flag to false.
+  1. Check permission.
+  1. If |beacon|'s [=pending beacon/method=] is "GET", then call [=send a pending beacon over GET=] with |beacon|.
+  1. Else call [=send a pending beacon over POST=] with |beacon|.
+
+Issue: "Check permission" is not defined. A specific permission should be used
+here, and this should integrate with the permissions API.
+</div>
+
+<div algorithm>
+  To <dfn>send a pending beacon over GET</dfn>, given a pending beacon |beacon|:
+
+  1. Let |pairs| be the [=/list=]  « ("data", |beacon|'s [=pending beacon/payload=]) ».
+  1. Let |query| be the result of running the [=urlencoded serializer=] with |pairs|.
+  1. Let |url| be a clone of |beacon|'s [=pending beacon/url=].
+  1. Set |url|'s query component to |query|.
+  1. Let |req| be a new [=/request=] initialized as follows:
+
+      : method
+      :: <code>GET</code>
+      : client
+      :: The <a spec="html">entry settings object</a>
+      : url
+      :: |url|
+      : credentials mode
+      :: same-origin
+
+  1. Fetch |req|.
+
+</div>
+
+<div algorithm>
+  To <dfn>send a pending beacon over POST</dfn>, given a pending beacon |beacon|:
+
+  1. Let |transmittedData| be the result of serializing |beacon|'s [=pending beacon/payload=].
+  1. Let |req| be a new [=/request=] initialized as follows:
+
+      : method
+      :: <code>POST</code>
+      : client
+      :: The <a spec="html">entry settings object</a>
+      : url
+      :: |beacon|'s [=pending beacon/url=]
+      : header list
+      :: headerList
+      : origin
+      :: The <a spec="html">entry settings object</a>'s [=/origin=]
+      : keep-alive flag
+      :: true
+      : body
+      :: |transmittedData|
+      : mode
+      :: cors
+      : credentials mode
+      :: same-origin
+
+    1. Fetch |req|.
+
+Issue: headerList is not defined.
+</div>
+
+
+
+Integration with HTML {#integration}
+====================================
+
+Note: The following sections modify the [[HTML]] standard to enable sending of
+beacons automatically by the user agent. These should be removed from this spec
+as appropriate changes are made to [[HTML]].
+
+When a document with a non-empty [=pending beacon set=] is to be discarded, <a
+lt="send a document's beacons">send the document's pending beacons</a>.
+
+Issue: "discarded" is not well defined.
+
+When a process hosting a document with a non-empty [=pending beacon set=] crashes,
+<a lt="send a document's beacons">send the document's pending beacons</a>.
+
+Issue: The concepts of "process" and "crashes" are not well defined.
+
+<div algorithm="on visibility state change">
+When a [=Document=] |document| is to become hidden (visibility state change), run these steps:
+
+1. For each [=pending beacon=] |beacon| in |document|'s [=pending beacon set=],
+  1. Let |timeout| be |beacon|'s [=pending beacon/background timeout=].
+  1. If |timeout| is not null, start a timer to run a task in |timeout| ms.
+
+    Note: The user agent may choose to coalesce multiple timers in order to send
+    multiple beacons at the same time.
+
+  1. When the timer expires, call [=send a queued pending beacon=] with |beacon|.
+
+    Note: The pending beacons may have been sent before this time, in cases
+    where the document is unloaded, or its hosting process crashes before the
+    timer fires. In that case, if the user agent still reaches this step, then
+    the beacons will not be sent again, as their [=pending beacon/is_pending=]
+    flag will be false.
+
+Issue: "visibility state change" should be more specific here, and should refer
+to specific steps in either [[PAGE-VISIBILITY]] or [[HTML]]
+
+Issue: This should also disable any foreground timers for the document's beacons,
+and there should be a step to reinstate them if the document becomes visible
+again before they are sent.
+</div>
+
+The PendingBeacon interface {#pendingbeacon-interface}
+======================================================
+
+<pre class=idl>
+enum BeaconMethod {
+    "POST",
+    "GET"
+};
+
+dictionary PendingBeaconOptions {
+    unsigned long timeout;
+    unsigned long backgroundTimeout;
+};
+
+[Exposed=(Window, Worker)]
+interface PendingBeacon {
+    readonly attribute USVString url;
+    readonly attribute BeaconMethod method;
+    attribute unsigned long timeout;
+    attribute unsigned long backgroundTimeout;
+    readonly attribute boolean pending;
+
+    undefined deactivate();
+    undefined sendNow();
+};
+
+[Exposed=(Window, Worker)]
+interface PendingGetBeacon : PendingBeacon {
+    constructor(USVString url, optional PendingBeaconOptions options = {});
+
+    undefined setURL(USVString url);
+};
+
+[Exposed=(Window, Worker)]
+interface PendingPostBeacon : PendingBeacon {
+    constructor(USVString url, optional PendingBeaconOptions options = {});
+
+    undefined setData(object data);
+};
+</pre>
+
+A {{PendingBeacon}} object has an associated <dfn for=PendingBeacon>beacon</dfn>, which is a [=pending beacon=].
+
+<div algorithm>
+  The <dfn constructor for="PendingGetBeacon" lt="PendingGetBeacon(url, options)"><code>new PendingGetBeacon(|url|, |options|)</code></dfn> [=constructor steps=] are:
+
+  1. Let |beacon| be a new [=pending beacon=].
+  1. Set [=this=]'s [=PendingBeacon/beacon=] to |beacon|.
+  1. Call the [=common beacon initialization steps=] with [=this=], "GET", |url| and |options|.
+  1. Insert |beacon| into the user agent's pending beacon set.
+
+</div>
+
+<div algorithm>
+  The <dfn constructor for="PendingPostBeacon" lt="PendingPostBeacon(url, options)"><code>new PendingPostBeacon(|url|, |options|)</code></dfn> [=constructor steps=] are:
+
+  1. Let |beacon| be a new [=pending beacon=].
+  1. Set [=this=]'s [=PendingBeacon/beacon=] to |beacon|.
+  1. Call the [=common beacon initialization steps=] with [=this=], "POST", |url| and |options|.
+  1. Insert |beacon| into the user agent's pending beacon set.
+
+</div>
+
+<div algorithm>
+  The <dfn for="PendingBeacon">common beacon initialization steps</dfn>, given a {{PendingBeacon}} |pendingBeacon|, a string |method|, a {{USVString}} |url|, and a {{PendingBeaconOptions}} |options|, are:
+  1. Let |beacon| be |pendingBeacon|'s [=PendingBeacon/beacon=].
+  1. If |url| is not a [=valid URL string=], throw a {{TypeError}}.
+  1. Let |base| be the <a spec="html">entry settings object</a>'s [=API base URL=].
+  1. Let |parsedUrl| be the result of running the [=URL parser=] on |url| and |base|.
+  1. If |parsedUrl| is failure, throw a {{TypeError}}.
+  1. If the result of <a lt="set the url">setting</a> |beacon|'s [=pending beacon/url=] to |parsedUrl| is false, throw a {{TypeError}}.
+  1. Set |beacon|'s [=pending beacon/method=] to |method|.
+  1. If |options| has a {{PendingBeaconOptions/timeout}} member, then set |pendingBeacon|'s {{PendingBeacon/timeout}} to |options|'s {{PendingBeaconOptions/timeout}}.
+  1. If |options| has a {{PendingBeaconOptions/backgroundTimeout}} member, then set |pendingBeacon|'s {{PendingBeacon/backgroundTimeout}} to |options|'s {{PendingBeaconOptions/backgroundTimeout}}.
+
+</div>
+
+<div algorithm>
+   The <dfn attribute for="PendingBeacon"><code>url</code></dfn> getter steps are to return [=this=]'s [=PendingBeacon/beacon=]'s [=pending beacon/url=].
+
+</div>
+
+<div algorithm>
+  The <dfn attribute for="PendingBeacon">method</code></dfn> getter steps are to return [=this=]'s [=PendingBeacon/beacon=]'s [=pending beacon/method=].
+
+</div>
+
+<div algorithm>
+  The <dfn attribute for="PendingBeacon"><code>timeout</code></dfn> getter steps are to return [=this=]'s [=PendingBeacon/beacon=]'s [=pending beacon/foreground timeout=].
+
+</div>
+
+<div algorithm="set timeout" data-algorithm-for="PendingBeacon">
+  The {{PendingBeacon/timeout}} setter steps are:
+  1. Let |beacon| be [=this=]'s [=PendingBeacon/beacon=].
+  1. If |beacon|'s [=pending beacon/is_pending=] is not true, throw a {{"NoModificationAllowedError"}} {{DOMException}}.
+  1. Let |timeout| be the argument to the setter.
+  1. If |timeout| is not a non-negative integer, throw a {{TypeError}}.
+  1. If the result of <a lt="set the foreground timeout">setting</a> |beacon|'s [=pending beacon/foreground timeout=] to |timeout| is false, throw a {{TypeError}}.
+
+</div>
+
+<div algorithm>
+  The <dfn attribute for="PendingBeacon"><code>backgroundTimeout</code></dfn> getter steps are to return [=this=]'s [=PendingBeacon/beacon=]'s [=pending beacon/background timeout=].
+
+</div>
+
+<div algorithm="set backgroundTimeout" data-algorithm-for="PendingBeacon">
+  The {{PendingBeacon/backgroundTimeout}} setter steps are:
+  1. Let |beacon| be [=this=]'s [=PendingBeacon/beacon=].
+  1. If |beacon|'s [=pending beacon/is_pending=] is not true, throw a {{"NoModificationAllowedError"}} {{DOMException}}.
+  1. Let |timeout| be the argument to the setter.
+  1. If |timeout| is not a non-negative integer, throw a {{TypeError}}.
+  1. If the result of <a lt="set the background timeout">setting</a> |beacon|'s [=pending beacon/background timeout=] to |timeout| is false, throw a {{TypeError}}.
+
+</div>
+
+<div algorithm>
+  The <dfn attribute for="PendingBeacon"><code>pending</code></dfn> getter steps are to return [=this=]'s [=PendingBeacon/beacon=]'s [=pending beacon/is_pending=] flag.
+
+</div>
+
+<div algorithm>
+  The <dfn method for="PendingBeacon"><code>deactivate()</code></dfn> steps are:
+  1. Let |beacon| be [=this=]'s [=PendingBeacon/beacon=].
+  1. If |beacon|'s [=pending beacon/is_pending=] is not true, throw an {{"InvalidStateError"}} {{DOMException}}.
+  1. [=pending beacon/cancel=] |beacon|.
+
+</div>
+
+<div algorithm>
+  The <dfn method for="PendingBeacon"><code>sendNow()</code></dfn> steps are:
+  1. Let |beacon| be [=this=]'s [=PendingBeacon/beacon=].
+  1. If |beacon|'s [=pending beacon/is_pending=] is not true, throw an {{"InvalidStateError"}} {{DOMException}}.
+  1. Call [=send a queued pending beacon=] with |beacon|.
+
+</div>
+
+<div algorithm>
+  The <dfn method for="PendingGetBeacon"><code>setURL(|url|)</code></dfn> steps are:
+  1. Let |beacon| be [=this=]'s [=PendingBeacon/beacon=].
+  1. If |beacon|'s [=pending beacon/is_pending=] is not true, throw a {{"NoModificationAllowedError"}} {{DOMException}}.
+  1. If |url| is not a [=valid URL string=], throw a {{TypeError}}.
+  1. Let |base| be the <a spec="html">entry settings object</a>'s [=API base URL=].
+  1. Let |parsedUrl| be the result of running the [=URL parser=] on |url| and |base|.
+  1. If |parsedUrl| is failure, throw a {{TypeError}}.
+  1. If the result of <a lt="set the url">setting</a> |beacon|'s [=pending beacon/url=] to |parsedUrl| is false, throw a {{TypeError}}.
+
+</div>
+
+<div algorithm>
+  The <dfn method for="PendingPostBeacon"><code>setData(|data|)</code></dfn> steps are:
+  1. Let |beacon| be [=this=]'s [=PendingBeacon/beacon=].
+  1. If |beacon|'s [=pending beacon/is_pending=] is not true, throw a {{"NoModificationAllowedError"}} {{DOMException}}.
+  1. Let (|body|, <var ignore>contentType</var>) be the result of <a for="BodyInit" lt="extract">extracting</a> a [=body with type=] from |data| with keepalive set to true.
+  1. Let |bytes| be the [=byte sequence=] obtained by reading |body|'s stream.
+  1. If the result of <a lt="set the payload">setting</a> |beacon|'s [=pending beacon/payload=] to |bytes| is false, throw a {{TypeError}}.
+
+</div>
+
+Privacy {#privacy}
+==================
+
+Issue: This section is woefully incomplete. These all need to be fleshed out in
+enough detail to accurately describe the privacy issues and suggested or
+prescribed mitigations.
+
+* When the network changes, drop all queued beacons
+
+* Clear-site-data?
+
+* Incognito?

@@ -3,20 +3,36 @@ Group: WHATWG
 H1: Notifications API
 Shortname: notifications
 Text Macro: TWITTER notifyapi
-Text Macro: LATESTRD 2021-01
+Text Macro: LATESTRD 2023-01
 Abstract: This standard defines an API to display notifications to the end user, typically outside the top-level browsing context's viewport. It is designed to be compatible with existing notification systems, while remaining platform-independent.
 Translation: ja https://triple-underscore.github.io/notifications-ja.html
 Translation: zh-cn https://w3c-html-ig-zh.github.io/notifications/whatwg/
 </pre>
 
+<pre class=anchors>
+urlPrefix: https://w3c.github.io/vibration/
+    urlPrefix: #dfn-; type: dfn
+        text: perform vibration
+        text: validate and normalize
+    urlPrefix: #idl-def-; type: interface
+        text: VibratePattern; url: vibratepattern
+urlPrefix: https://tc39.github.io/ecma262/#sec-object.; type: dfn
+    text: freeze
+urlPrefix: https://w3c.github.io/hr-time/#
+    type: typedef; text: EpochTimeStamp; urlPrefix: dom-
+    type: dfn; text: epoch-relative timestamp; urlPrefix: dfn-
+</pre>
+
+
 <h2 id=terminology>Terminology</h2>
 
 <p>This specification depends on the Infra Standard. [[!INFRA]]
 
-<p>Some terms used in this specification are defined in the DOM, Fetch, HTML, IDL, Service Workers,
-URL, and Vibration API Standards.
+<p>Some terms used in this specification are defined in the DOM, Fetch, High Resolution Time, HTML,
+IDL, Service Workers, URL, and Vibration API Standards.
 [[!DOM]]
 [[!FETCH]]
+[[!HR-TIME]]
 [[!HTML]]
 [[!WEBIDL]]
 [[!SERVICE-WORKERS]]
@@ -53,8 +69,7 @@ representing either a valid BCP 47 language tag or the empty string.
 <dfn for=notification id=data>data</dfn>.
 
 <p>A <a>notification</a> has an associated <dfn for=notification id=timestamp>timestamp</dfn> which
-is a {{DOMTimeStamp}} representing the time, in milliseconds since 00:00:00 UTC on 1 January 1970,
-of the event for which the notification was created.
+is an {{EpochTimeStamp}} representing the time.
 
 <p class=note>Timestamps can be used to indicate the time at which a notification
 is actual. For example, this could be in the past when a notification is used for
@@ -65,18 +80,20 @@ or in the future for a meeting that is about to start.
 <dfn for=notification id=concept-origin>origin</dfn>.
 
 <p>A <a>notification</a> has an associated
-<dfn for=notification id=renotify-preference-flag>renotify preference flag</dfn> which is initially
-unset. When set indicates that the end user should be alerted after the <a>show steps</a> have run
-with a new notification that has the same <a for=notification>tag</a> as an existing notification.
+<dfn for=notification id=renotify-preference-flag>renotify preference</dfn> boolean, which is
+initially false. When true, indicates that the end user should be alerted after the
+<a>show steps</a> have run with a new notification that has the same <a for=notification>tag</a> as
+an existing notification.
 
 <p>A <a>notification</a> has an associated
-<dfn for=notification id=silent-preference-flag>silent preference flag</dfn> which is initially
-unset. When set indicates that no sounds or vibrations should be made.
+<dfn for=notification id=silent-preference-flag>silent preference</dfn> boolean, which is initially
+false. When true, indicates that no sounds or vibrations should be made.
 
 <p>A <a>notification</a> has an associated
-<dfn for=notification id=require-interaction-preference-flag>require interaction preference flag</dfn>
-which is initially unset. When set, indicates that on devices with a sufficiently large screen, the
-notification should remain readily available until the user activates or dismisses the notification.
+<dfn for=notification id=require-interaction-preference-flag>require interaction preference</dfn>
+boolean, which is initially false. When true, indicates that on devices with a sufficiently large
+screen, the notification should remain readily available until the user activates or dismisses the
+notification.
 
 <p>A <a>notification</a> <em>can</em> have these associated graphics: an
 <dfn for=notification id=image-url>image URL</dfn>,
@@ -100,8 +117,8 @@ not enough space to display the <a>notification</a> itself. It <em>may</em> also
 the <a>notification</a>, but then it should have less visual priority than the
 <a for=notification>image resource</a> and <a for=notification>icon resource</a>.
 
-<p>A <a>notification</a> <em>can</em> have a
-<dfn for=notification id=vibration-pattern>vibration pattern</dfn>.
+<p>A <a>notification</a> has an associated
+<dfn for=notification id=vibration-pattern>vibration pattern</dfn>, which is initially « ».
 
 <p class=note>Developers are encouraged to not convey information through an
 <a for=notification lt="image resource">image</a>, <a for=notification lt="icon resource">icon</a>,
@@ -142,116 +159,109 @@ clipped corners.
 <hr>
 
 <p>To <dfn lt="create a notification|creating a notification">create a notification</dfn>, given a
-<var>title</var>, <var>options</var>, and optionally a <var>serviceWorkerRegistration</var>, run
-these steps:
+string <var>title</var>, {{NotificationOptions}} <a for=/>dictionary</a> <var>options</var>,
+<a for=/>environment settings object</a> <var>settings</var>, and optionally a
+{{ServiceWorkerRegistration}} object <var>serviceWorkerRegistration</var>, run these steps:
 
 <ol>
-  <li><p>Let <var>notification</var> be a new
-  <a>notification</a>.
+ <li><p>Let <var>notification</var> be a new <a>notification</a>.
 
-  <li><p>If a <var>serviceWorkerRegistration</var> was provided, set
-  <var>notification</var>'s <a for=notification>service worker registration</a> to
-  <var>serviceWorkerRegistration</var>.
+ <li><p>If a <var>serviceWorkerRegistration</var> was provided, then set <var>notification</var>'s
+ <a for=notification>service worker registration</a> to <var>serviceWorkerRegistration</var>.
 
-  <li><p>If a <var>serviceWorkerRegistration</var> was not provided and
-  <var>options</var>'s <code>actions</code> is not empty, <a>throw</a> a
-  <code>TypeError</code> exception.
+ <li>
+  <p>If a <var>serviceWorkerRegistration</var> was not provided and
+  <var>options</var>["{{NotificationOptions/actions}}"] is not <a for=list>empty</a>, then
+  <a>throw</a> a {{TypeError}}.
 
-  <p class=note><a>Actions</a> are only currently supported for
-  <a>persistent notifications</a>.
+  <p class=note><a>Actions</a> are only currently supported for <a>persistent notifications</a>.
 
-  <li><p>If <var>options</var>'s <code>silent</code> is true and <var>options</var>'s
-  <code>vibrate</code> is present, <a>throw</a> a <code>TypeError</code>
-  exception.
+ <li><p>If <var>options</var>["{{NotificationOptions/silent}}"] is true and
+ <var>options</var>["{{NotificationOptions/vibrate}}"] <a for=map>exists</a>, then <a>throw</a> a
+ {{TypeError}}.
 
-  <li><p>If <var>options</var>'s <code>renotify</code> is true and
-  <var>options</var>'s <code>tag</code> is the empty string, <a>throw</a> a
-  <code>TypeError</code> exception.
+ <li><p>If <var>options</var>["{{NotificationOptions/renotify}}"] is true and
+ <var>options</var>["{{NotificationOptions/tag}}"] is the empty string, then <a>throw</a> a
+ {{TypeError}}.
 
-  <li><p>Set <var>notification</var>'s <a for=notification>data</a> to
-  <a abstract-op>StructuredSerializeForStorage</a>(<var>options</var>'s <code>data</code>). Rethrow
-  any exceptions.
+ <li><p>Set <var>notification</var>'s <a for=notification>data</a> to
+ <a abstract-op>StructuredSerializeForStorage</a>(<var>options</var>["{{NotificationOptions/data}}"]).
 
-  <li><p>Set <var>notification</var>'s <a for=notification>title</a> to <var>title</var>.
+ <li><p>Set <var>notification</var>'s <a for=notification>title</a> to <var>title</var>.
 
-  <li><p>Set <var>notification</var>'s
-  <a for=notification>direction</a> to <var>options</var>'s
-  <code>dir</code>.
+ <li><p>Set <var>notification</var>'s <a for=notification>direction</a> to
+ <var>options</var>["{{NotificationOptions/dir}}"].
 
-  <li><p>Set <var>notification</var>'s <a for=notification>language</a> to
-  <var>options</var>'s <code>lang</code>.
+ <li><p>Set <var>notification</var>'s <a for=notification>language</a> to
+ <var>options</var>["{{NotificationOptions/lang}}"].
 
-  <li><p>Set <var>notification</var>'s <a for=notification>origin</a> to the
-  <a>entry settings object</a>'s <a for="environment settings object">origin</a>.
+ <li><p>Set <var>notification</var>'s <a for=notification>origin</a> to <var>settings</var>'s
+ <a for="environment settings object">origin</a>.
 
-  <li><p>Set <var>notification</var>'s <a for=notification>body</a> to <var>options</var>'s
-  <code>body</code>.
+ <li><p>Set <var>notification</var>'s <a for=notification>body</a> to
+ <var>options</var>["{{NotificationOptions/body}}"].
 
-  <li><p>Set <var>notification</var>'s <a for=notification>tag</a> to <var>options</var>'s
-  <code>tag</code>.
+ <li><p>Set <var>notification</var>'s <a for=notification>tag</a> to
+ <var>options</var>["{{NotificationOptions/tag}}"].
 
-  <li><p>Let <var>baseURL</var> be the API base URL specified by the
-  <a>entry settings object</a>. <span class=XXX>Or incumbent?</span>
+ <li><p>Let <var>baseURL</var> be <var>settings</var>'s
+ <a for="environment settings object">API base URL</a>.
 
-  <li><p>If <var>options</var>'s <code>image</code> is present,
-  <a lt="url parser">parse</a> it using <var>baseURL</var>, and if that does not
-  return failure, set <var>notification</var>'s <a>image URL</a> to the return
-  value. (Otherwise <a>image URL</a> is not set.)
+ <li><p>If <var>options</var>["{{NotificationOptions/image}}"] <a for=map>exists</a>, then
+ <a lt="url parser">parse</a> it using <var>baseURL</var>, and if that does not return failure, set
+ <var>notification</var>'s <a>image URL</a> to the return value. (Otherwise <a>image URL</a> is not
+ set.)
 
-  <li><p>If <var>options</var>'s <code>icon</code> is present,
-  <a lt="url parser">parse</a> it using <var>baseURL</var>, and if that does not
-  return failure, set <var>notification</var>'s <a for=notification>icon URL</a> to the return
-  value. (Otherwise <a for=notification>icon URL</a> is not set.)
+ <li><p>If <var>options</var>["{{NotificationOptions/icon}}"] <a for=map>exists</a>, then
+ <a lt="url parser">parse</a> it using <var>baseURL</var>, and if that does not return failure, set
+ <var>notification</var>'s <a for=notification>icon URL</a> to the return value. (Otherwise
+ <a for=notification>icon URL</a> is not set.)
 
-  <li><p>If <var>options</var>'s <code>badge</code> is present,
-  <a lt="url parser">parse</a> it using <var>baseURL</var>, and if that does not
-  return failure, set <var>notification</var>'s <a for=notification>badge URL</a> to the return
-  value. (Otherwise <a for=notification>badge URL</a> is not set.)
+ <li><p>If <var>options</var>["{{NotificationOptions/badge}}"] <a for=map>exists</a>, then
+ <a lt="url parser">parse</a> it using <var>baseURL</var>, and if that does not return failure, set
+ <var>notification</var>'s <a for=notification>badge URL</a> to the return value. (Otherwise
+ <a for=notification>badge URL</a> is not set.)
 
-  <li><p>If <var>options</var>'s <code>vibrate</code> is present,
-  <a>validate and normalize</a> it and set <var>notification</var>'s
-  <a for=notification>vibration pattern</a> to the return value. (Otherwise
-  <a for=notification>vibration pattern</a> is not set.)
+ <li><p>If <var>options</var>["{{NotificationOptions/vibrate}}"] <a for=map>exists</a>, then
+ <a>validate and normalize</a> it and set <var>notification</var>'s
+ <a for=notification>vibration pattern</a> to the return value.
 
-  <li><p>If <var>options</var>'s <code>timestamp</code> is present, set
-  <var>notification</var>'s <a for=notification>timestamp</a> to the value. Otherwise, set
-  <var>notification</var>'s <a for=notification>timestamp</a> to the number of milliseconds that
-  passed between 00:00:00 UTC on 1 January 1970 and the time at which the
-  <code>Notification</code> constructor was called.
+ <li><p>If <var>options</var>["{{NotificationOptions/timestamp}}"] <a for=map>exists</a>, then set
+ <var>notification</var>'s <a for=notification>timestamp</a> to the value. Otherwise, set
+ <var>notification</var>'s <a for=notification>timestamp</a> to the <a>epoch-relative timestamp</a>.
 
-  <li><p>If <var>options</var>'s <code>renotify</code> is true, set
-  <var>notification</var>'s <a for=notification>renotify preference flag</a>.
+ <li><p>Set <var>notification</var>'s <a for=notification>renotify preference</a> to
+ <var>options</var>["{{NotificationOptions/renotify}}"].
 
-  <li><p>If <var>options</var>'s <code>silent</code> is true, set
-  <var>notification</var>'s <a for=notification>silent preference flag</a>.
+ <li><p>Set <var>notification</var>'s <a for=notification>silent preference</a> to
+ <var>options</var>["{{NotificationOptions/silent}}"].
 
-  <li><p>If <var>options</var>'s <code>requireInteraction</code> is true, set
-  <var>notification</var>'s <a for=notification>require interaction preference flag</a>.
+ <li><p>Set <var>notification</var>'s <a for=notification>require interaction preference</a> to
+ <var>options</var>["{{NotificationOptions/requireInteraction}}"].
 
-  <li><p>Set <var>notification</var>'s list of <a>actions</a> to an empty list,
-  then for each <var>entry</var> in <var>options</var>'s <code>actions</code>,
-  up to the <a>maximum number of actions</a> supported (skip any excess
-  entries), perform the following steps:
+ <li>
+  <p>Set <var>notification</var>'s list of <a>actions</a> to an empty list, then for each
+  <var>entry</var> in <var>options</var>["{{NotificationOptions/actions}}"], up to the
+  <a>maximum number of actions</a> supported (skip any excess entries):
 
   <ol>
-    <li><p>Let <var>action</var> be a new <a lt="actions">action</a>.
+   <li><p>Let <var>action</var> be a new <a lt="actions">action</a>.
 
-    <li><p>Set <var>action</var>'s <a for=action>name</a> to the <var>entry</var>'s
-    <code>action</code>.
+   <li><p>Set <var>action</var>'s <a for=action>name</a> to
+   <var>entry</var>["{{NotificationAction/action}}"].
 
-    <li><p>Set <var>action</var>'s <a for=action>title</a> to the
-    <var>entry</var>'s <code>title</code>.
+   <li><p>Set <var>action</var>'s <a for=action>title</a> to
+   <var>entry</var>["{{NotificationAction/title}}"].
 
-    <li><p>If <var>entry</var>'s <code>icon</code> is present,
-    <a lt="url parser">parse</a> it using <var>baseURL</var>, and if that does
-    not return failure, set <var>action</var>'s <a for=action>icon URL</a> to the
-    return value. (Otherwise <a for=action>icon URL</a> is not set.)
+   <li><p>If <var>entry</var>["{{NotificationAction/icon}}"] <a for=map>exists</a>, then
+   <a lt="url parser">parse</a> it using <var>baseURL</var>, and if that does not return failure,
+   set <var>action</var>'s <a for=action>icon URL</a> to the return value. (Otherwise
+   <a for=action>icon URL</a> is not set.)
 
-    <li><p>Append <var>action</var> to <var>notification</var>'s list of
-    <a>actions</a>.
+   <li><p>Append <var>action</var> to <var>notification</var>'s list of <a>actions</a>.
   </ol>
 
-  <li><p>Return <var>notification</var>.
+ <li><p>Return <var>notification</var>.
 </ol>
 
 
@@ -277,31 +287,22 @@ removed from the <a>list of notifications</a>.
 "notification center" (if available).
 
 
-<h3 id=permission-model>Permission model</h3>
+<h3 id="permissions-integration">Permissions integration</h3>
 
-<p><a>Notifications</a> can only be displayed if the
-user (or user agent on behalf of the user) has granted <dfn>permission</dfn>.
-The <a>permission</a> to show <a>notifications</a>
-for a given <a for=/>origin</a> is one of three strings:
+<p>The Notifications API is a <a>powerful feature</a> which is identified by the
+<a for="powerful feature">name</a> "<dfn export permission><code>notifications</code></dfn>".
+[[!Permissions]]
 
-<dl>
-  <dt>"<code>default</code>"
-  <dd><p>This is equivalent to "<code>denied</code>", but the user has made no
-  explicit choice thus far.
+<p>To <dfn>get the notifications permission state</dfn>, run these steps:
 
-  <dt>"<code>denied</code>"
-  <dd><p>This means the user does not want
-  <a>notifications</a>.
+<ol>
+ <li><p>Let <var>permissionState</var> be the result of <a>getting the current permission state</a>
+ with "<a permission><code>notifications</code></a>".
 
-  <dt>"<code>granted</code>"
-  <dd><p>This means <a>notifications</a> can be
-  displayed.
-</dl>
+ <li><p>If <var>permissionState</var> is "<code>prompt</code>", then return "<code>default</code>".
 
-<p class=note>There is no equivalent to "<code>default</code>"
-meaning "<code>granted</code>". In that case
-"<code>granted</code>" is simply returned as there would be no reason
-for the application to ask for <a>permission</a>.
+ <li><p>Return <var>permissionState</var>.
+</ol>
 
 
 <h3 id=direction>Direction</h3>
@@ -339,7 +340,7 @@ the notification platform displays them side by side.
 <a>notification</a>'s <a for=notification>title</a>, <a for=notification>body</a> and the
 <a for=notification>title</a> of each of its <a for=notification>actions</a>. Its value is a string.
 The empty string indicates that the primary language is unknown. Any other string must be
-interpreted as a language tag. Validity or well-formedness are not enforced. [[!LANG]]
+interpreted as a language tag. Validity or well-formedness are not enforced. [[!BCP47]]
 
 <p class=note>Developers are encouraged to only use valid language tags.
 
@@ -496,9 +497,9 @@ interpreted as a language tag. Validity or well-formedness are not enforced. [[!
    notification platform API).
   </ol>
 
- <li><p>If <var>shown</var> is false or <var>oldNotification</var> is non-null and
- <var>notification</var>'s <a for=notification>renotify preference flag</a> has been set, then run
- the <a>alert steps</a> for <var>notification</var>.
+ <li><p>If <var>shown</var> is false or <var>oldNotification</var> is non-null, and
+ <var>notification</var>'s <a for=notification>renotify preference</a> is true, then run the
+ <a>alert steps</a> for <var>notification</var>.
 
  <li><p>If <var>notification</var> is a <a>non-persistent notification</a>, then <a>queue a task</a>
  to <a>fire an event</a> named <code>show</code> on the {{Notification}} object representing
@@ -614,7 +615,7 @@ interface Notification : EventTarget {
   readonly attribute USVString icon;
   readonly attribute USVString badge;
   [SameObject] readonly attribute FrozenArray&lt;unsigned long> vibrate;
-  readonly attribute DOMTimeStamp timestamp;
+  readonly attribute EpochTimeStamp timestamp;
   readonly attribute boolean renotify;
   readonly attribute boolean silent;
   readonly attribute boolean requireInteraction;
@@ -633,7 +634,7 @@ dictionary NotificationOptions {
   USVString icon;
   USVString badge;
   VibratePattern vibrate;
-  DOMTimeStamp timestamp;
+  EpochTimeStamp timestamp;
   boolean renotify = false;
   boolean silent = false;
   boolean requireInteraction = false;
@@ -681,76 +682,80 @@ object and can be created through {{Notification}}'s
 
 <h3 id=constructors>Constructors</h3>
 
-<p>The <dfn constructor for=Notification><code>Notification(title, options)</code></dfn>
-constructor, when invoked, must run these steps:
+<p>The
+<dfn constructor for=Notification lt="Notification(title, options)"><code>new Notification(<var>title</var>, <var>options</var>)</code></dfn>
+constructor steps are:
 
 <ol>
-  <li><p>If the <a>current global object</a> is a {{ServiceWorkerGlobalScope}} object, then
-  <a>throw</a> a <code>TypeError</code> exception.
+ <li><p>If <a>this</a>'s <a>relevant global object</a> is a {{ServiceWorkerGlobalScope}} object,
+ then <a>throw</a> a {{TypeError}}.
 
-  <li><p>Let <var>notification</var> be the result of <a>creating a notification</a> given
-  <var>title</var> and <var>options</var>. Rethrow any exceptions.
+ <li><p>Let <var>notification</var> be the result of <a>creating a notification</a> given
+ <var>title</var>, <var>options</var>, and <a>this</a>'s <a>relevant settings object</a>.
 
-  <li><p>Let <var>n</var> be a new {{Notification}} object associated with
-  <var>notification</var>.
-
-  <li><p>Run these steps <a>in parallel</a>:
-
-  <ol>
-    <li><p>If <a>permission</a> for <var>notification</var>'s <a for=notification>origin</a> is not
-    "<code>granted</code>", then <a>queue a task</a> to <a>fire an event</a> named
-    <code>error</code> on <var>n</var>, and abort these steps.
-
-    <li><p>Run the <a>fetch steps</a> for <var>notification</var>.
-
-    <li><p>Run the <a>show steps</a> for <var>notification</var>.
-  </ol>
-
-  <li><p>Return <var>n</var>.
-</ol>
-
-
-<h3 id=static-members>Static members</h3>
-
-<p>The static <dfn attribute for=Notification><code>permission</code></dfn>
-attribute's getter must return <a>permission</a> for the
-<a>entry settings object</a>'s <a for="environment settings object">origin</a>.
-
-<p class=note>If you edit standards please refrain from copying the above. Synchronous
-permissions are like synchronous IO, a bad idea.
-
-<p>The static
-<dfn method for=Notification><code>requestPermission(<var>deprecatedCallback</var>)</code></dfn>
-method, when invoked, must run these steps:
-
-<ol>
- <li><p>Let <var>promise</var> be a new promise.
+ <li><p>Associate <a>this</a> with <var>notification</var>.
 
  <li>
   <p>Run these steps <a>in parallel</a>:
 
   <ol>
-   <li><p>Let <var>permission</var> be <a>permission</a> for
-   <a>entry settings object</a>'s <a for="environment settings object">origin</a>.
-   <!-- XXX context object's global object's environment settings object's origin -->
+   <li><p>If the result of <a>getting the notifications permission state</a> is not
+   "<code>granted</code>", then <a>queue a task</a> to <a>fire an event</a> named
+   <code>error</code> on <a>this</a>, and abort these steps.
 
-   <li><p>If <var>permission</var> is "<code>default</code>", ask the user whether showing
-   notifications for the <a>entry settings object</a>'s
-   <a for="environment settings object">origin</a> is acceptable. If it is, set
-   <var>permission</var> to "<code>granted</code>", and "<code>denied</code>" otherwise.
+   <li><p>Run the <a>fetch steps</a> for <var>notification</var>.
+
+   <li><p>Run the <a>show steps</a> for <var>notification</var>.
+  </ol>
+</ol>
+
+
+<h3 id=static-members>Static members</h3>
+
+<p>The static <dfn attribute for=Notification><code>permission</code></dfn> getter steps are to
+return the result of <a>getting the notifications permission state</a>.
+
+<div class=note>
+ <p>If you edit standards please refrain from copying the above. Synchronous permissions are like
+ synchronous IO, a bad idea.
+
+ <p>Developers are encouraged to use the Permissions {{Permissions/query()}} method
+ instead. [[Permissions]]
+
+ <pre class="example" id="permissions-query-example">
+    const permission = await navigator.permissions.query({name: "notifications"});
+    if (permission.state === "granted") {
+       // We have permission to use the API…
+    }
+ </pre>
+</div>
+
+<p>The static
+<dfn method for=Notification><code>requestPermission(<var>deprecatedCallback</var>)</code></dfn>
+method steps are:
+
+<ol>
+ <li><p>Let <var>global</var> be the <a>current global object</a>.
+
+ <li><p>Let <var>promise</var> be <a for=/>a new promise</a> in <a>this</a>'s <a>relevant Realm</a>.
+
+ <li>
+  <p>Run these steps <a>in parallel</a>:
+
+  <ol>
+   <li><p>Let <var>permissionState</var> be the result of
+   <a>requesting permission to use</a> "<a permission><code>notifications</code></a>".
 
    <li>
-    <p><a>Queue a task</a> to run these steps:
+    <p><a>Queue a global task</a> on the <a>DOM manipulation task source</a> given <var>global</var>
+    to run these steps:
 
     <ol>
-     <li><p>Set <a>permission</a> for the <a>entry settings object</a>'s
-     <a for="environment settings object">origin</a> to <var>permission</var>.
+     <li><p>If <var>deprecatedCallback</var> is given, then <a for=/>invoke</a>
+     <var>deprecatedCallback</var> with « <var>permissionState</var> ». If this throws an
+     exception, then <a>report the exception</a>.
 
-     <li><p>If <var>deprecatedCallback</var> is given, invoke
-     <var>deprecatedCallback</var> with <var>permission</var> as single argument. If this
-     throws an exception, <a>report the exception</a>.
-
-     <li><p>Fullfil <var>promise</var> with <var>permission</var>.
+     <li><p><a for=/>Resolve</a> <var>promise</var> with <var>permissionState</var>.
     </ol>
   </ol>
 
@@ -763,8 +768,8 @@ pattern and instead employ one of the
 <a href="http://robert.ocallahan.org/2011/06/permissions-for-web-applications_30.html">
 many more suitable alternatives</a>.
 
-<p>The static <dfn attribute for=Notification><code>maxActions</code></dfn>
-attribute's getter must return the <a>maximum number of actions</a> supported.
+<p>The static <dfn attribute for=Notification><code>maxActions</code></dfn> getter steps are to
+return the <a>maximum number of actions</a> supported.
 
 <h3 id=object-members>Object members</h3>
 
@@ -792,92 +797,108 @@ attribute's getter must return the <a>maximum number of actions</a> supported.
    <td><code>close</code>
 </table>
 
-<p>The <dfn method for=Notification><code>close()</code></dfn> method, when
-invoked, must run the <a>close steps</a> for the
-<a>notification</a>.
+<p>The <dfn method for=Notification><code>close()</code></dfn> method steps are to run the
+<a>close steps</a> for <a>this</a>'s <a>notification</a>.
 
-<p>The <dfn attribute for=Notification><code>title</code></dfn> attribute's getter must return the
-<a>notification</a>'s <a for=notification>title</a>.
+<p>The <dfn attribute for=Notification><code>title</code></dfn> getter steps are to return
+<a>this</a>'s <a>notification</a>'s <a for=notification>title</a>.
 
-<p>The <dfn attribute for=Notification><code>dir</code></dfn> attribute's getter must return the
-<a>notification</a>'s <a for=notification>direction</a>.
+<p>The <dfn attribute for=Notification><code>dir</code></dfn> getter steps are to return
+<a>this</a>'s <a>notification</a>'s <a for=notification>direction</a>.
 
-<p>The <dfn attribute for=Notification><code>lang</code></dfn> attribute's getter must return the
-<a>notification</a>'s <a for=notification>language</a>.
+<p>The <dfn attribute for=Notification><code>lang</code></dfn> getter steps are to return
+<a>this</a>'s <a>notification</a>'s <a for=notification>language</a>.
 
-<p>The <dfn attribute for=Notification><code>body</code></dfn> attribute's getter must return the
-<a>notification</a>'s <a for=notification>body</a>.
+<p>The <dfn attribute for=Notification><code>body</code></dfn> getter steps are to return
+<a>this</a>'s <a>notification</a>'s <a for=notification>body</a>.
 
-<p>The <dfn attribute for=Notification><code>tag</code></dfn> attribute's getter must return the
-<a>notification</a>'s <a for=notification>tag</a>.
+<p>The <dfn attribute for=Notification><code>tag</code></dfn> getter steps are to return
+<a>this</a>'s <a>notification</a>'s <a for=notification>tag</a>.
 
-<p>The <dfn attribute dfn-for=Notification><code>image</code></dfn> attribute's getter must return
-the <a>notification</a>'s <a for=notification>image URL</a>, <a lt="url serializer">serialized</a>,
-and the empty string if there is no <a>notification</a>'s <a for=notification>image URL</a>
-otherwise.
-
-<p>The <dfn attribute for=Notification><code>icon</code></dfn> attribute's getter must return the
-<a>notification</a>'s <a for=notification>icon URL</a>, <a lt="url serializer">serialized</a>, and
-the empty string if there is no <a>notification</a>'s <a for=notification>icon URL</a> otherwise.
-
-<p>The <dfn attribute for=Notification><code>badge</code></dfn> attribute's getter must return the
-<a>notification</a>'s <a for=notification>badge URL</a>, <a lt="url serializer">serialized</a>, and
-the empty string if there is no <a>notification</a>'s <a for=notification>badge URL</a> otherwise.
-
-<p>The <dfn attribute for=Notification><code>vibrate</code></dfn> attribute's getter must return the
-<a>notification</a>'s <a for=notification>vibration pattern</a>, if any, and the empty list
-otherwise.
-
-<p>The <dfn attribute for=Notification><code>timestamp</code></dfn> attribute's getter must return
-the <a>notification</a>'s <a for=notification>timestamp</a>.
-
-<p>The <dfn attribute for=Notification><code>renotify</code></dfn> attribute's getter must return
-the <a>notification</a>'s <a for=notification>renotify preference flag</a>.
-
-<p>The <dfn attribute for=Notification><code>silent</code></dfn> attribute's getter must return the
-<a>notification</a>'s <a for=notification>silent preference flag</a>.
-
-<p>The <dfn attribute for=Notification><code>requireInteraction</code></dfn> attribute's getter must
-return the <a>notification</a>'s <a for=notification>require interaction preference flag</a>.
-
-<p>The <dfn attribute for=Notification><code>data</code></dfn> attribute's getter must return
-<a abstract-op>StructuredDeserialize</a>(<a>notification</a>'s <a for=notification>data</a>,
-<a>context object</a>'s <a>relevant Realm</a>). If this throws an exception, then return null.
-<!-- Relies on SameObject becoming Cached as proposed -->
-
-<p>The <dfn attribute for=Notification><code>actions</code></dfn> attribute's getter must return the
-result of the following steps:
+<p>The <dfn attribute dfn-for=Notification><code>image</code></dfn> getter steps are:
 
 <ol>
-  <li><p>Let <var>frozenActions</var> be an empty list of type {{NotificationAction}}.
+ <li><p>If there is no <a>this</a>'s <a>notification</a>'s <a for=notification>image URL</a>, then
+ return the empty string.
 
-  <li><p>For each <var>entry</var> in the <a>notification</a>'s list of
-  <a for=notification>actions</a>, perform the following steps:
+ <li><p>Return <a>this</a>'s <a>notification</a>'s <a for=notification>image URL</a>,
+ <a lt="URL serializer">serialized</a>.
+</ol>
+
+<p>The <dfn attribute for=Notification><code>icon</code></dfn> getter steps are:
+
+<ol>
+ <li><p>If there is no <a>this</a>'s <a>notification</a>'s <a for=notification>icon URL</a>, then
+ return the empty string.
+
+ <li><p>Return <a>this</a>'s <a>notification</a>'s <a for=notification>icon URL</a>,
+ <a lt="URL serializer">serialized</a>.
+</ol>
+
+<p>The <dfn attribute for=Notification><code>badge</code></dfn> getter steps are:
+
+<ol>
+ <li><p>If there is no <a>this</a>'s <a>notification</a>'s <a for=notification>badge URL</a>, then
+ return the empty string.
+
+ <li><p>Return <a>this</a>'s <a>notification</a>'s <a for=notification>badge URL</a>,
+ <a lt="URL serializer">serialized</a>.
+</ol>
+
+<p>The <dfn attribute for=Notification><code>vibrate</code></dfn> getter steps are to return
+<a>this</a>'s <a>notification</a>'s <a for=notification>vibration pattern</a>.
+
+<p>The <dfn attribute for=Notification><code>timestamp</code></dfn> getter steps are to return
+<a>this</a>'s <a>notification</a>'s <a for=notification>timestamp</a>.
+
+<p>The <dfn attribute for=Notification><code>renotify</code></dfn> getter steps are to return
+<a>this</a>'s <a>notification</a>'s <a for=notification>renotify preference</a>.
+
+<p>The <dfn attribute for=Notification><code>silent</code></dfn> getter steps are to return
+<a>this</a>'s <a>notification</a>'s <a for=notification>silent preference</a>.
+
+<p>The <dfn attribute for=Notification><code>requireInteraction</code></dfn> getter steps are to
+return <a>this</a>'s <a>notification</a>'s <a for=notification>require interaction preference</a>.
+
+<p>The <dfn attribute for=Notification><code>data</code></dfn> getter steps are to return
+<a abstract-op>StructuredDeserialize</a>(<a>this</a>'s <a>notification</a>'s
+<a for=notification>data</a>, <a>this</a>'s <a>relevant Realm</a>). If this throws an exception,
+then return null.
+<!-- Relies on SameObject becoming Cached as proposed -->
+
+<p>The <dfn attribute for=Notification><code>actions</code></dfn> getter steps are:
+
+<ol>
+ <li><p>Let <var>frozenActions</var> be an empty list of type {{NotificationAction}}.
+
+ <li>
+  <p><a for=list>For each</a> <var>entry</var> of <a>this</a>'s <a>notification</a>'s list of
+  <a for=notification>actions</a>:
 
   <ol>
-    <li><p>Let <var>action</var> be a new {{NotificationAction}}.
+   <li><p>Let <var>action</var> be a new {{NotificationAction}}.
 
-    <li><p>Set <var>action</var>'s {{NotificationAction/action}} to
-    <var>entry</var>'s <a for=action>name</a>.
+   <li><p>Set <var>action</var>["{{NotificationAction/action}}"] to <var>entry</var>'s
+   <a for=action>name</a>.
 
-    <li><p>Set <var>action</var>'s {{NotificationAction/title}} to
-    <var>entry</var>'s <a for=action>title</a>.
+   <li><p>Set <var>action</var>["{{NotificationAction/title}}"] to <var>entry</var>'s
+   <a for=action>title</a>.
 
-    <li><p>Set <var>action</var>'s {{NotificationAction/icon}} to
-    <var>entry</var>'s <a for=action>icon URL</a>.
+   <li><p>Set <var>action</var>["{{NotificationAction/icon}}"] <var>entry</var>'s
+   <a for=action>icon URL</a>.
 
-    <!-- XXX IDL dictionaries are usually returned by value, so don't need to be
-         immutable. But FrozenArray reifies the dictionaries to mutable JS
-         objects accessed by reference, so we explicitly freeze them.
-         It would be better to do this with IDL primitives instead of JS - see
-         https://www.w3.org/Bugs/Public/show_bug.cgi?id=29004 -->
-    <li><p>Call <a lt="freeze">Object.freeze</a> on <var>action</var>, to
-    prevent accidental mutation by scripts.
+   <!-- XXX IDL dictionaries are usually returned by value, so don't need to be
+        immutable. But FrozenArray reifies the dictionaries to mutable JS
+        objects accessed by reference, so we explicitly freeze them.
+        It would be better to do this with IDL primitives instead of JS - see
+        https://www.w3.org/Bugs/Public/show_bug.cgi?id=29004 -->
+   <li><p>Call <a lt="freeze">Object.freeze</a> on <var>action</var>, to
+   prevent accidental mutation by scripts.
 
-    <li><p>Append <var>action</var> to <var>frozenActions</var>.
+   <li><p>Append <var>action</var> to <var>frozenActions</var>.
   </ol>
 
-  <li><p><a>Create a frozen array</a> from <var>frozenActions</var>.
+ <li><p>Return the result of <a>create a frozen array</a> from <var>frozenActions</var>.
 </ol>
 
 <h3 id=examples>Examples</h3>
@@ -1002,69 +1023,89 @@ partial interface ServiceWorkerGlobalScope {
 };
 </pre>
 
-<p>The
-<dfn method for=ServiceWorkerRegistration><code>showNotification(title, options)</code></dfn>
-method, when invoked, must run these steps:
+<p>The <dfn method for=ServiceWorkerRegistration><code>showNotification(title, options)</code></dfn>
+method steps are:
 
 <ol>
-  <li><p>Let <var>promise</var> be a new promise.
+ <li><p>Let <var>global</var> be <a>this</a>'s <a>relevant global object</a>.
 
-  <li><p>If the <a>context object</a>'s <a for="service worker registration">active worker</a> is
-  null, then reject <var>promise</var> with a <code>TypeError</code> exception and return
-  <var>promise</var>.
+ <li><p>Let <var>promise</var> be <a>a new promise</a> in <a>this</a>'s <a>relevant Realm</a>.
 
-  <li><p>Let <var>serviceWorkerRegistration</var> be the <a>context object</a>.
+ <li><p>If <a>this</a>'s <a for="service worker registration">active worker</a> is null, then
+ <a for=/>reject</a> <var>promise</var> with a {{TypeError}} and return <var>promise</var>.
+ <!-- We might have to throw directly here and below, see
+      https://github.com/web-platform-tests/wpt/pull/24601 -->
 
-  <li><p>Let <var>notification</var> be the result of <a>creating a notification</a> given
-  <var>title</var>, <var>options</var>, and <var>serviceWorkerRegistration</var>. If this threw an
-  exception, reject <var>promise</var> with that exception and return <var>promise</var>.
+ <li><p>Let <var>serviceWorkerRegistration</var> be <a>this</a>.
 
-  <li><p>Run these steps <a>in parallel</a>:
+ <li><p>Let <var>notification</var> be the result of <a>creating a notification</a> given
+ <var>title</var>, <var>options</var>, <a>this</a>'s <a>relevant settings object</a>, and
+ <var>serviceWorkerRegistration</var>. If this threw an exception, then <a for=/>reject</a>
+ <var>promise</var> with that exception and return <var>promise</var>.
+
+ <li>
+  <p>Run these steps <a>in parallel</a>:
 
   <ol>
-    <li><p>If <a>permission</a> for <var>notification</var>'s <a for=notification>origin</a> is not
-    "<code>granted</code>", then reject <var>promise</var> with a <code>TypeError</code> exception,
-    and abort these steps.
+   <li><p>If the result of <a>getting the notifications permission state</a> is not
+   "<code>granted</code>", then <a>queue a global task</a> on the
+   <a>DOM manipulation task source</a> given <var>global</var> to <a for=/>reject</a>
+   <var>promise</var> with a {{TypeError}}, and abort these steps.
 
-    <li><p>Run the <a>fetch steps</a> for <var>notification</var>.
+   <li><p>Run the <a>fetch steps</a> for <var>notification</var>.
 
-    <li><p>Run the <a>show steps</a> for <var>notification</var>.
+   <li><p>Run the <a>show steps</a> for <var>notification</var>.
 
-    <li><p>Resolve <var>promise</var> with undefined.
+   <li><p><a>Queue a global task</a> on the <a>DOM manipulation task source</a> given
+   <var>global</var> to <a for=/>resolve</a> <var>promise</var> with undefined.
   </ol>
 
-  <li><p>Return <var>promise</var>.
+ <li><p>Return <var>promise</var>.
 </ol>
 
 <p>The
 <dfn method for=ServiceWorkerRegistration><code>getNotifications(<var>filter</var>)</code></dfn>
-method, when invoked, must run these steps:
+method steps are:
 
 <ol>
-  <li><p>Let <var>promise</var> be a new promise.
+ <li><p>Let <var>global</var> be <a>this</a>'s <a>relevant global object</a>.
 
-  <li><p>Run these steps <a>in parallel</a>:
+ <li><p>Let <var>realm</var> be <a>this</a>'s <a>relevant Realm</a>.
+
+ <li><p>Let <var>origin</var> be <a>this</a>'s <a>relevant settings object</a>'s
+ <a for="environment settings object">origin</a>.
+ <!-- Arguably this should snapshot origin somehow so that changes to it do not impact the
+      in parallel part. -->
+
+ <li><p>Let <var>promise</var> be <a for=/>a new promise</a> in <var>realm</var>.
+
+ <li>
+  <p>Run these steps <a>in parallel</a>:
 
   <ol>
-    <li><p>Let <var>tag</var> be <var>filter</var>'s <code>tag</code>.
+   <li><p>Let <var>tag</var> be <var>filter</var>["{{GetNotificationOptions/tag}}"].
 
-    <li><p>Let <var>notifications</var> be a <a for=/>list</a> of all <a>notifications</a> in the
-    <a>list of notifications</a> whose <a for=notification>origin</a> is the
-    <a>entry settings object</a>'s <a for="environment settings object">origin</a>, whose
-    <a for=notification>service worker registration</a> is the <a>context object</a>, and whose
-    <a for=notification>tag</a>, if <var>tag</var> is not the empty string, is <var>tag</var>.
+   <li><p>Let <var>notifications</var> be a <a for=/>list</a> of all <a>notifications</a> in the
+   <a>list of notifications</a> whose <a for=notification>origin</a> is <a>same origin</a> with
+   <var>origin</var>, whose <a for=notification>service worker registration</a> is <a>this</a>, and
+   whose <a for=notification>tag</a>, if <var>tag</var> is not the empty string, is <var>tag</var>.
 
-    <li><p>Let <var>objects</var> be an empty JavaScript array.
+   <li>
+    <p><a>Queue a global task</a> on the <a>DOM manipulation task source</a> given <var>global</var>
+    to run these steps:</p>
 
-    <li><p><a for=list>For each</a> <a>notification</a> in
-    <var>notifications</var>, in creation order, create a new {{Notification}}
-    object representing <a>notification</a> and push
-    that object to <var>objects</var>.
+    <ol>
+     <li><p>Let <var>objects</var> be a <a for=/>list</a>.
 
-    <li><p>Resolve <var>promise</var> with <var>objects</var>.
+     <li><p><a for=list>For each</a> <a>notification</a> in <var>notifications</var>, in creation
+     order, create a <a for=/>new</a> {{Notification}} object with <var>realm</var> representing
+     <a>notification</a>, and <a for=list>append</a> it to <var>objects</var>.
+
+     <li><p><a for=/>Resolve</a> <var>promise</var> with <var>objects</var>.
+    </ol>
   </ol>
 
-  <li><p>Return <var>promise</var>.
+ <li><p>Return <var>promise</var>.
 </ol>
 
 <p class=note>This method returns zero or more new {{Notification}} objects which might represent
@@ -1085,11 +1126,10 @@ defaulting to the empty string), <a>Fire Functional Event</a> <var>name</var> us
  <dd><var>action</var>
 </dl>
 
-<p>The {{NotificationEvent/notification}} attribute's getter must return the
-value it was initialized to.
+<p>The {{NotificationEvent/notification}} getter steps are to return the value it was initialized
+to.
 
-<p>The {{NotificationEvent/action}} attribute's getter must return the value it
-was initialized to.
+<p>The {{NotificationEvent/action}} getter steps are to return the value it was initialized to.
 
 <p>The following is the <a>event handler</a> (and its corresponding
 <a>event handler event type</a>) that must be supported as attribute by the
@@ -1134,6 +1174,7 @@ Michael Cooper,
 Michael Henretty,
 Michael™ Smith,
 Michael van Ouwerkerk,
+Mike Taylor,
 Nicolás Satragno,
 Olli Pettay,
 Peter Beverloo,
@@ -1148,31 +1189,7 @@ timeless, and
 triple-underscore
 for being awesome.
 
-<p>This standard is written by
-<a lang=nl href=https://annevankesteren.nl/>Anne van Kesteren</a>
-(<a href=https://www.mozilla.org/>Mozilla</a>,
-<a href=mailto:annevk@annevk.nl>annevk@annevk.nl</a>). An earlier iteration was written
-by John Gregg (<a href=https://www.google.com/>Google</a>,
+<p>This standard is written by <a lang=nl href=https://annevankesteren.nl/>Anne van Kesteren</a>
+(<a href=https://www.apple.com/>Apple</a>, <a href=mailto:annevk@annevk.nl>annevk@annevk.nl</a>). An
+earlier iteration was written by John Gregg (<a href=https://www.google.com/>Google</a>,
 <a href=mailto:johnnyg@google.com>johnnyg@google.com</a>).
-
-<pre class="anchors">
-urlPrefix: https://html.spec.whatwg.org/multipage/
-    urlPrefix: webappapis.html; type: dfn
-        text: entry settings object
-urlPrefix: https://w3c.github.io/vibration/
-    urlPrefix: #dfn-; type: dfn
-        text: perform vibration
-        text: validate and normalize
-    urlPrefix: #idl-def-; type: interface
-        text: VibratePattern; url: vibratepattern
-urlPrefix: https://tc39.github.io/ecma262/#sec-object.; type: dfn
-    text: freeze
-</pre>
-
-<pre class="biblio">
-{
-    "LANG": {
-        "aliasOf" : "BCP47"
-    }
-}
-</pre>

@@ -1,0 +1,661 @@
+<pre class="metadata">
+Title: Subresource Loading with Web Bundles
+Shortname: web-package-subresource-loading
+Level: none
+Status: CG-DRAFT
+Group: WICG
+Repository: WICG/webpackage
+URL: https://wicg.github.io/webpackage/subresource-loading.html
+Editor: Hayato Ito, Google Inc. https://google.com/, hayato@google.com
+Editor: Hiroshige Hayashizaki, Google https://google.com/, hiroshige@google.com
+Abstract: How UAs load subresources from Web Bundles.
+Complain About: accidental-2119 yes, missing-example-ids yes
+Indent: 2
+Markup Shorthands: markdown yes, css no
+Assume Explicit For: yes
+</pre>
+<pre class='biblio'>
+{
+  "draft-ietf-wpack-bundled-responses-latest": {
+    "href": "https://wpack-wg.github.io/bundled-responses/draft-ietf-wpack-bundled-responses.html",
+    "title": "Web Bundles"
+  }
+}
+</pre>
+<pre class='anchors'>
+spec: fetch; urlPrefix: https://fetch.spec.whatwg.org/#
+  type: dfn
+    text: fetch params; url: fetch-params
+  type: dfn
+    text: processResponse; url: process-response
+  type: dfn
+    text: incrementally reading; url: body-incrementally-read
+spec: csp; urlPrefix: https://w3c.github.io/webappsec-csp/#
+  type: dfn
+    text: policy; url: content-security-policy-object
+spec: url; urlPrefix: https://url.spec.whatwg.org/#
+  type: dfn
+    text: shortening; url: shorten-a-urls-path
+spec: infra; urlPrefix: https://infra.spec.whatwg.org/#
+  type: dfn
+    text: continue; url: iteration-continue
+spec: html; urlPrefix: https://html.spec.whatwg.org/#
+  type: dfn
+    text: the script's type; url: concept-script-type
+  type: dfn
+    text: the script's result; url: concept-script-result
+  type: dfn
+    text: delay the load event; url: delay-the-load-event
+</pre>
+<pre class="link-defaults">
+spec:fetch; type:dfn; for:/; text:request
+spec:fetch; type:dfn; for:/; text:response
+spec:html; type:element; text:link
+spec:url; type:dfn; for:/; text:url
+</pre>
+
+# Introduction # {#intro}
+
+<em>This section is non-normative.</em>
+
+The Subresource Loading with Web Bundles specification describes a way to load a
+large number of resources efficiently using a format that allows multiple
+resources to be bundled, [Web Bundles](https://web.dev/web-bundles/). This
+specification describes how web browsers load those resources. It is expressed
+as several monkeypatches to the [[HTML]], [[FETCH]] and [[CSP]] specification
+which call algorithms defined here.
+
+Note: This specification is under construction. See
+<a href="https://github.com/WICG/webpackage/issues/708">#708</a>.
+
+# Structures # {#structures}
+
+A <dfn>fetched web bundle</dfn> is a representation of a web bundle format
+defined in [[draft-ietf-wpack-bundled-responses-latest]].
+
+A <dfn>web bundle fetch entry</dfn> is a [=struct=] with the following
+[=struct/items=]:
+
+- <dfn for="web bundle fetch entry">source</dfn>, a [=URL=] of a web bundle.
+- <dfn for="web bundle fetch entry">credentials</dfn>, a [=request/credentials
+  mode=].
+- <dfn for="web bundle fetch entry">state</dfn>, an internal state which is
+  "fetching", "fetched", or "failed". Initially "fetching".
+- <dfn for="web bundle fetch entry">fetched bundle</dfn>, a [=fetched web
+  bundle=] or null.
+
+ISSUE: A better name for [=web bundle fetch entry=]?
+
+A [=web bundle fetch entry=] |entry| is <dfn for="web bundle fetch entry">used
+by a registration</dfn> in [=Document=] |document| if |document|'s
+[=Document/web bundle registration list=] [=list/contains=] a [=web bundle
+registration=] whose [=web bundle registration/fetch entry=] is |entry|.
+
+A <dfn>bundle rule</dfn> is a [=struct=] with the following [=struct/items=]:
+
+- <dfn for="bundle rule">resources</dfn>, a [=list=] of [=URLs=].
+- <dfn for="bundle rule">scopes</dfn>, a [=list=] of [=URLs=].
+
+A <dfn>web bundle registration</dfn> is a [=struct=] with the following
+[=struct/items=]:
+
+- <dfn for="web bundle registration">fetch entry</dfn>, a [=web bundle fetch
+  entry=].
+- <dfn for="web bundle registration">rule</dfn>, a [=bundle rule=].
+
+A <dfn>web bundle parse result</dfn> is a [=struct=] with the following
+[=struct/items=]:
+
+- <dfn for="web bundle parse result">source</dfn>, a [=URL=] of a web bundle.
+- <dfn for="web bundle parse result">credentials</dfn>, a [=request/credentials
+  mode=].
+- <dfn for="web bundle parse result">rule</dfn>, a [=bundle rule=].
+
+Each [=environment settings object=] will get a
+<dfn for="environment settings object">web bundle registration list</dfn>
+algorithm, which returns a [=list=] of [=web bundle registrations=].
+
+A {{Document}} has a <dfn for=Document>web bundle registration list</dfn>, which
+is a [=list=] of [=web bundle registrations=]. It is initially empty.
+
+In <a spec="html">set up a window environment settings object</a>,
+<var ignore>settings object</var>'s [=environment settings object/web bundle
+registration list=] returns the [=Document/web bundle registration list=] of
+<var ignore>window</var>'s <a>associated <code>Document</code></a>.
+
+In <a spec="html">set up a worker environment settings object</a>,
+<var ignore>settings object</var>'s [=environment settings object/web bundle
+registration list=] returns an empty [=list=].
+
+A {{Document}} has a <dfn for=Document>web bundle fetch entry list</dfn>, which
+is a [=list=] of [=web bundle fetch entries=]. It is initially empty.
+
+ISSUE: While [=list=] is used for [=Document/web bundle fetch entry list=], the
+order shouldn't be important.
+
+ISSUE: Not supported for workers.
+
+# HTML monkeypatches # {#html-monkeypatches}
+
+To process web bundles in the <a spec="html">prepare the script element</a>
+algorithm consistently with existing script types (i.e. classic or module), we
+make the following changes:
+
+- <a spec="html">the script's type</a> should be either "classic", "module", or
+  "webbundle"
+- Introduce <dfn>web bundle result</dfn>, which is a [=struct=] with two
+  [=struct/items=]:
+  - a <dfn for="web bundle result">registration</dfn>, a [=web bundle
+    registration=]; and
+  - an <dfn for="web bundle result">error to rethrow</dfn>, a JavaScript value
+    representing a parse error when non-null.
+- <a spec="html">the script's result</a> is either "uninitiated", null,
+  <a href="https://html.spec.whatwg.org/multipage/webappapis.html#concept-script">script</a>,
+  or a [=web bundle result=].
+
+Note: Because we don't make [=web bundle result=] a new subclass of
+<a href="https://html.spec.whatwg.org/multipage/webappapis.html#concept-script">script</a>,
+other script execution-related specs are left unaffected.
+
+## Prepare the script element ## {#prepare-the-script-element}
+
+Inside the <a spec="html">prepare the script element</a> algorithm, we make the
+following changes:
+
+- Insert the following step to <a spec="html">prepare the script element</a>
+  step 10:
+
+  - If the script block's type string is an [=ASCII case-insensitive=] match for
+    the string "`webbundle`", then set el's type to "`webbundle`".
+
+- Insert the following case to <a spec="html">prepare the script element</a>
+  step 26.7:
+
+  - "`webbundle`":
+
+    1. [=Queue a task=] to [=fire an event=] named `error` at the element, and
+       return.
+
+       Note: `<script type="webbundle" src=...>` is not supported. There are no
+       specific requirements for the error handling here, so currently an
+       `error` event is fired similarly to the case of an empty `src` attribute.
+
+- Insert the following case to <a spec="html">prepare the script element</a>
+  step 27.2:
+
+  - "`webbundle`":
+
+    1. [=Prepare a web bundle=] given <var ignore>element</var>,
+       <var ignore>source text</var> and <var ignore>base URL</var>.
+
+- Insert the following case to <a spec="html">prepare the script element</a>
+  step 28:
+
+  - If <a spec="html">the script's type</a> is "`webbundle`":
+
+    1. Assert: script's <a spec="html">ready to be parser-executed</a> is true.
+    1. [=In parallel=], [=process events for a web bundle=] given
+       <var ignore>element</var>.
+
+NOTE: CSPs are applied to inline web bundles at Step 15 of
+<a spec="html">prepare the script element</a>, just like applied to
+classic/module scripts.
+
+To <dfn>prepare a web bundle</dfn>, given an {{HTMLScriptElement}} |element|, a
+[=string=] |sourceText| and a [=URL=] |baseURL|:
+
+1. Let |parse result| be the result of [=parse a web bundle string=] given
+   |sourceText| and |baseURL|.
+1. If this throws an exception:
+   1. Set [=the script's result=] to a new [=web bundle result=] with its [=web
+      bundle result/registration=] is null and its [=web bundle result/error to
+      rethrow=] is the exception thrown.
+   1. <a spec="html">Mark as ready</a>.
+   1. Return.
+1. Let |document| be |element|'s <a spec="html">node document</a>.
+1. Set |fetch entry| to null.
+1. For each |r| in |document|'s [=Document/web bundle fetch entry list=]:
+
+   1. If |r|'s [=web bundle fetch entry/source=] is |parse result|'s [=web
+      bundle parse result/source=] and |r|'s [=web bundle fetch
+      entry/credentials=] is |parse result|'s [=web bundle parse
+      result/credentials=], then:
+
+      1. If |r| is not [=web bundle fetch entry/used by a registration=] in
+         |document|, then set |fetch entry| to |r|.
+
+         NOTE: This implies that another script element whose [=the script's
+         result=]'s [=web bundle result/registration=]'s [=web bundle
+         registration/fetch entry=] is |r| was removed. This is to ensure that
+         [=web bundle fetch entries=] are not destructed and re-fetched when
+         {{HTMLScriptElement}}s with the same web bundle [=web bundle fetch
+         entry/source=] and [=web bundle fetch entry/credentials=] are removed
+         and added.
+
+1. If |fetch entry| is null:
+   1. Set |fetch entry| to a new [=web bundle fetch entry=] with its [=web
+      bundle fetch entry/source=] is |parse result|'s [=web bundle parse
+      result/source=], its [=web bundle fetch entry/credentials=] is |parse
+      result|'s [=web bundle parse result/credentials=], its [=web bundle fetch
+      entry/state=] is "fetching", and its [=web bundle fetch entry/fetched
+      bundle=] is null.
+   1. [=list/Append=] |fetch entry| to |document|'s [=Document/web bundle fetch
+      entry list=].
+   1. [=In parallel=], [=fetch a web bundle=] |fetch entry|.
+1. Let |registration| be a new [=web bundle registration=] with its [=web bundle
+   registration/fetch entry=] is |fetch entry| and its [=web bundle
+   registration/rule=] is |parse result|'s [=web bundle parse result/rule=].
+1. [=list/Append=] |registration| to |document|'s [=Document/web bundle
+   registration list=].
+1. Set [=the script's result=] to a new [=web bundle result=] with its [=web
+   bundle result/registration=] is |registration| and its [=web bundle
+   result/error to rethrow=] is null.
+1. <a spec="html">Mark as ready</a>.
+
+## Firing events ## {#firing-events}
+
+In <a spec="html">execute the script element</a>, add the following case to Step
+6:
+
+- "`webbundle`":
+
+      1. Assert: Never reached.
+
+         Note: Web bundles are processed by [=process events for a web bundle=] instead of <a spec="html">execute the script element</a>.
+
+To <dfn>process events for a web bundle</dfn> given an {{HTMLScriptElement}}
+|element|:
+
+1. Let |result| be [=the script's result=] of |element|.
+1. Assert: |element|'s <a spec="html">the script's type</a> is "`webbundle`".
+1. Assert: |result| is an [=web bundle result=].
+1. Await asynchronously until either of the following conditions met:
+
+   - |result|'s [=web bundle result/error to rethrow=] is not null, or
+   - |result|'s [=web bundle result/registration=] is not null and |result|'s
+     [=web bundle result/registration=]'s [=web bundle registration/fetch
+     entry=]'s [=web bundle fetch entry/state=] becomes "fetched" or "failed".
+
+   Note: Unlike other script types, we wait asynchronously here for [=fetch web
+   bundle=] before firing `load` events at {{HTMLScriptElement}}. We don't
+   <a spec="html">delay the load event</a> here, because we <a spec="html">mark
+   as ready</a> synchronously in <a spec="html">prepare the script element</a>.
+   This is intentional because [=fetch a web bundle=] is similar to preloading.
+
+1. If [=the script's result=] of |element| is null, then return.
+
+   Note: This can happen when |element| was
+   <a spec="html" href="https://html.spec.whatwg.org/multipage/infrastructure.html#remove-an-element-from-a-document">removed
+   from the document</a> during the previous step.
+
+   Note: This is specified consistently with
+   <a href="https://github.com/whatwg/html/pull/2673">whatwg/html#2673</a>.
+   Currently we don't fire `error` events in this case. If we change the
+   decision at
+   <a href="https://github.com/whatwg/html/pull/2673">whatwg/html#2673</a> to
+   fire `error` events, then change this step accordingly.
+
+1. Assert: |element|'s <a spec="html">node document</a> is equal to |element|'s
+   <a href="spec">preparation-time document</a>.
+1. If |result|'s [=web bundle result/error to rethrow=] is not null, then:
+
+   1. <a spec="html">Report the exception</a> given |result|'s [=web bundle
+      result/error to rethrow=].
+
+      ISSUE: There are no relevant
+      <a href="https://html.spec.whatwg.org/multipage/webappapis.html#concept-script">script</a>,
+      because [=web bundle result=] isn't a
+      <a href="https://html.spec.whatwg.org/multipage/webappapis.html#concept-script">script</a>.
+      This needs to wait for
+      <a href="https://github.com/whatwg/html/issues/958">whatwg/html#958</a>
+      before it is fixable.
+
+   1. Return.
+
+1. Assert: |result|'s [=web bundle result/registration=] is not null.
+1. If |result|'s [=web bundle result/registration=]'s [=web bundle
+   registration/fetch entry=]'s [=web bundle fetch entry/state=] is "failed":
+   1. [=Fire an event=] named `error` at |element|.
+   1. Return.
+1. Assert: |result|'s [=web bundle result/registration=]'s [=web bundle
+   registration/fetch entry=]'s [=web bundle fetch entry/state=] is "fetched".
+1. [=Fire an event=] named `load` at |element|.
+
+## Removing ## {#removing}
+
+If `script` element is
+<a spec="html" href="https://html.spec.whatwg.org/multipage/infrastructure.html#remove-an-element-from-a-document">removed
+from the document</a>, user agents must run the following algorithm:
+
+1. If <a spec="html">the script's type</a> is not "`webbundle`", then return.
+1. If [=the script's result=] is null, then return.
+1. Assert: [=the script's result=] is an [=web bundle result=].
+1. Let |registration| be [=the script's result=]'s [=web bundle
+   result/registration=].
+1. Set [=the script's result=] to null.
+1. If |registration| is null, then return.
+1. Let |document| be the <a spec="html">node document</a>.
+1. Assert: |document|'s [=Document/web bundle registration list=]
+   [=list/contains=] |registration|.
+1. [=list/Remove=] |registration| from |document|'s [=Document/web bundle
+   registration list=].
+1. [=Queue a microtask=] to perform the following steps:
+
+   1. Let |fetch entry| be |registration|'s [=web bundle registration/fetch
+      entry=].
+   1. If |fetch entry| is [=web bundle fetch entry/used by a registration=] in
+      |document|, then return.
+
+   1. [=list/Remove=] |fetch entry| from |document|'s [=Document/web bundle
+      fetch entry list=].
+
+      Note: It is possible that |document|'s [=Document/web bundle fetch entry
+      list=] doesn't [=list/contain=] |fetch entry| even before this step, if
+      |fetch entry| is used by [=web bundle registrations=] of multiple `script`
+      elements and the `script elements` are removed.
+
+      Note: At this point, |fetch entry| can no longer used by subsequent
+      subresource fetches nor subsequent [=prepare a web bundle=] calls, but its
+      [=web bundle fetch entry/fetched bundle=] can be still in use by ongoing
+      fetches.
+
+# Fetch monkeypatches # {#fetch-monkeypatches}
+
+## Monkeypatch fetch ## {#monkeypatch-fetch}
+
+In <a spec="fetch">fetch</a>, before
+
+> 2. Let taskDestination be null.
+
+add the following step:
+
+2. If the result of [=find a matching web bundle registration=] given |request|
+   is null, set |request|'s [=request/service-workers mode=] to "`none`".
+
+Note: This means that no service workers will get events for a subresource
+loading from a webbundle.
+
+## Monkeypatch fetch scheme ## {#monkeypatch-fetch-scheme}
+
+Add "`uuid-in-package`" to the schemes listed in <a spec="fetch">fetch
+scheme</a>.
+
+Note: This ensures that the <a spec="html">navigate</a> algorithm uses the
+<a spec="html">process a navigate fetch</a> algorithm for `uuid-in-package:`
+URLs.
+
+Note: The [=url/origin=] of a URL whose scheme is "`uuid-in-package`" is an
+opaque origin.
+
+## Monkeypatch HTTP-network-or-cache fetch ## {#monkeypatch-http-network-or-cache-fetch}
+
+In <a spec="fetch">HTTP-network-or-cache fetch</a>, before
+
+> 8.22. Set httpCache to the result of determining the HTTP cache partition,
+> given |httpRequest|.
+
+add the following steps:
+
+22. Set the |response| to the result of [=fetch a subresource from web bundle=],
+    given |httpRequest|.
+
+    1. If |response| is [=network error=], return [=network error=].
+
+    2. If |response| is non-null, skip the steps 8.22-8.24 and goto the step 9.
+
+       Note: That means a subresource from a webbundle never interacts with
+       HttpCache. We plan to support HttpCache as a feature enhancement in the
+       future.
+
+# CSP monkeypatches # {#csp-monkeypatches}
+
+## Monkeypatch Does request match source list? ## {#monkeypatch-match-request-to-source-list}
+
+Rewrite
+<a href="https://w3c.github.io/webappsec-csp/#match-request-to-source-list">Does
+|request| match |source list|?</a> to run these steps:
+
+1. Let |url| be |request|'s [=request/current url=].
+
+2. If |url|'s [=url/scheme=] is "`uuid-in-package`", then:
+
+   1. Let |registration| be the result of running [=find a matching web bundle
+      registration=] given |request|.
+
+   2. If |registration| is not null, then set |url| to |registration|'s [=web
+      bundle registration/fetch entry=]'s [=web bundle fetch entry/source=].
+
+3. Returns the result of executing
+   <a href="https://w3c.github.io/webappsec-csp/#match-url-to-source-list">Does
+   url match source list in origin with redirect count?</a> on |url|, |source
+   list|, |policy|'s [=policy/self-origin=], and |request|'s [=request/redirect
+   count=].
+
+Note: This means that CSP restrictions are evaluated against the bundle's URL
+instead of to the `uuid-in-package:` URL. See
+<a href="https://github.com/WICG/webpackage/issues/651">#651</a> for the
+detailed motivation.
+
+## Monkeypatch Does response to request match source list? ## {#monkeypatch-match-response-to-source-list}
+
+Rewrite
+<a href="https://w3c.github.io/webappsec-csp/#match-response-to-source-list">Does
+|response| to |request| match |source list|?</a> to run these steps:
+
+1. Let |url| be |response|'s [=response/url=].
+
+2. If |url|'s [=url/scheme=] is "`uuid-in-package`", then:
+
+   1. Let |registration| be the result of running [=find a matching web bundle
+      registration=] given |request|.
+
+   2. If |registration| is not null, then set |url| to |registration|'s [=web
+      bundle registration/fetch entry=]'s [=web bundle fetch entry/source=].
+
+3. Returns the result of executing
+   <a href="https://w3c.github.io/webappsec-csp/#match-url-to-source-list">Does
+   url match source list in origin with redirect count?</a> on |url|, |source
+   list|, |policy|'s [=policy/self-origin=], and |request|'s [=request/redirect
+   count=].
+
+Note: This means that CSP restrictions are evaluated against the bundle's URL
+instead of to the `uuid-in-package:` URL. See
+<a href="https://github.com/WICG/webpackage/issues/651">#651</a> for the
+detailed motivation.
+
+# Algorithms # {#algorithms}
+
+## Parsing ## {#parsing}
+
+To <dfn>parse a web bundle string</dfn>, given a [=string=] |sourceText| and a
+[=URL=] |baseURL|:
+
+1.  Let |parsed| be the result of [=parse JSON into Infra values|parsing JSON
+    into Infra values=] given |sourceText|.
+1.  If |parsed| is not a [=map=], then throw a {{TypeError}} indicating that the
+    top-level value needs to be a JSON object.
+1.  If |parsed|["`source`"] does not [=map/exist=], then throw a {{TypeError}}.
+1.  If |parsed|["`source`"] is not a [=string=], then throw a {{TypeError}}.
+1.  Let |source| be the result of [=URL parser|parsing=] |parsed|["`source`"]
+    with |baseURL| as the base URL.
+1.  If |source| is null, then throw a {{TypeError}}.
+1.  Let |credentials| be "`same-origin`".
+1.  If |parsed|["`credentials`"] [=map/exists=], then:
+    1. If |parsed|["`credentials`"] is "`omit`", then set |credentials| to
+       "`omit`".
+    1. Otherwise, if |parsed|["`credentials`"] is "`include`", then set
+       |credentials| to "`include`".
+1.  Let |resources| be an empty [=list=].
+1.  If |parsed|["`resources`"] [=map/exists=], then:
+    1. If |parsed|["`resources`"] is not a [=list=], then throw a {{TypeError}}.
+    1. Set |resources| to the result of [=parsing a url list=] given
+       |parsed|["`resources`"] and |source|.
+1.  Let |scopes| be an empty [=list=].
+1.  If |parsed|["`scopes`"] [=map/exists=], then:
+    1. If |parsed|["`scopes`"] is not a [=list=], then throw a {{TypeError}}.
+    1. Set |scopes| to the result of [=parsing a url list=] given
+       |parsed|["`scopes`"] and |source|.
+1.  If |parsed|'s [=map/get the keys|keys=] [=set/contains=] any items besides
+    "`source`", "`credentials`", "`resources`" or "`scopes`", [=report a warning
+    to the console=] that an invalid top-level key was present in the web bundle
+    string.
+
+    Note: This can help detect typos. It is not an error, because that would
+    prevent any future extensions from being added backward-compatibly.
+
+1.  Let |rule| be [=bundle rule=] whose [=bundle rule/resources=] are
+    |resources| and whose [=bundle rule/scopes=] are |scopes|.
+1.  Return the [=web bundle parse result=] whose [=web bundle parse
+    result/source=] is |source|, whose [=web bundle parse result/credentials=]
+    are |credentials| and whose [=web bundle parse result/rule=] is |rule| .
+
+To <dfn>parse a URL list</dfn>, given a [=list=] |originalList| and a [=URL=]
+|baseURL|:
+
+1. Let |parsed URL list| be an empty [=list=].
+1. [=list/For each=] |item| of |originalList|,
+   1. If |item| is a [=string=], then
+      1. Let |URL| be the result of [=URL parser|parsing=] |item| with |baseURL|
+         as the base URL.
+      1. If |URL| is not null, [=list/append=] |URL| to |parsed URL list|.
+1. Return |parsed URL list|.
+
+## Fetching a web bundle ## {#fetching-web-bundle}
+
+To <dfn>fetch a web bundle</dfn> given [=web bundle fetch entry=] |fetch entry|
+and [=fetch params=] |fetch params|:
+
+1. Assert: |fetch entry|'s [=web bundle fetch entry/state=] is "fetching".
+
+1. Let |request| be |fetch params|'s [=request=].
+
+1. Set |request|'s [=request/url=] to |fetch entry|'s [=web bundle fetch
+   entry/source=].
+
+   Note: Source URL is resolved on document's base URL.
+
+1. Set |request|'s [=request/destination=] to "webbundle",
+
+1. Set |request|'s [=request/mode=] to "cors",
+
+1. Set |request|'s [=request/credentials mode=] to |fetch entry|'s [=web bundle
+   fetch entry/credentials=].
+
+1. Set |request|'s [=request/service-workers mode=] to "`none`".
+
+1. Append a [=header=], a tuple of ("Accept", "application/webbundle;v=b2"), to
+   |request|'s [=request/header list=].
+
+   Note: The final [[draft-ietf-wpack-bundled-responses-latest]] will use a
+   version of `1`, but this specification tracks what’s actually implemented in
+   browsers, which still uses draft versions.
+
+1. [=Fetch=] |request| with [=processResponse=] algorithm set to [=process web
+   bundle response=] which is partially applied with |fetch entry|.
+
+   Note: Chromium's current implementation doesn't allow a nested bundle. A Web
+   bundle is never fetched from other web bundles.
+
+## Process web bundle response ## {#process-web-bundle-response}
+
+To <dfn id="concept-process-web-bundle-response">process web bundle
+response</dfn> given [=web bundle fetch entry=] |fetch entry| and [=response=]
+|response|:
+
+1. If |response|'s [=response/status=] is an [=ok status=],
+
+   1. Parse |response|'s [=response/body=] as a Web Bundle
+      ([[draft-ietf-wpack-bundled-responses-latest]]).
+
+      Note: |response|'s body might not be fully available at this moment. UA
+      might parse the bundle by [=incrementally reading=] a body asynchronously
+      in order to serve a subresource as early as possible.
+
+      Note: In parsing, Chromium's experimental implementation only accepts "b2"
+      as a web bundle format version number
+      ([[draft-ietf-wpack-bundled-responses-latest]]).
+
+   2. When the parse algorithm asynchronously completes, set |fetch entry|'s
+      [=web bundle fetch entry/fetched bundle=] to the result of parsing and
+      |fetch entry|'s [=web bundle fetch entry/state=] be "fetched". If parsing
+      fails, or any other conformance is violated, set [=web bundle fetch
+      entry/fetched bundle=] to null and [=web bundle fetch entry/state=] to
+      "failed".
+
+1. Otherwise, set |fetch entry|'s [=web bundle fetch entry/state=] to "failed".
+
+## Fetching subresources from a web bundle ## {#fetching-subresources}
+
+To <dfn>fetch a subresource from web bundle</dfn> given [=request=]
+|httpRequest|:
+
+1. Let |registration| be the result of running [=find a matching web bundle
+   registration=] given |httpRequest|.
+
+2. If |registration| is not null:
+
+   1. Let |response| be the result of [=get response from web bundle fetch
+      entry=] given |httpRequest|'s [=request/url=] and |registration|'s [=web
+      bundle registration/fetch entry=].
+
+   2. If |response| is null, return a [=network error=].
+
+      Note: This means a browser does not fallback to fetch a subresource from
+      network.
+
+   3. Otherwise, return |response|.
+
+3. Return null.
+
+Note: Returning null here can fallback to HTTP cache and ordinal network fetch,
+unlike returning a [=network error=] above.
+
+To <dfn>get response from web bundle fetch entry</dfn> given [=url=] |url| and
+[=web bundle fetch entry=] |fetch entry|:
+
+1. If |fetch entry|'s [=web bundle fetch entry/state=] is "fetching", await
+   until [=web bundle fetch entry/state=] becomes "fetched" or "failed"
+   asynchronously.
+
+2. If |fetch entry|'s [=web bundle fetch entry/state=] is "failed", return null.
+
+3. Assert: |fetch entry|'s [=web bundle fetch entry/fetched bundle=] is
+   non-null.
+
+4. Returns [=response=] from |fetch entry|'s [=web bundle fetch entry/fetched
+   bundle=] given |url| ([[draft-ietf-wpack-bundled-responses-latest]]). If a
+   representation of |url| is not found in [=web bundle fetch entry/fetched
+   bundle=], return null.
+
+## Finding a matching registration ## {#matching-registration}
+
+To <dfn>find a matching web bundle registration</dfn> given [=request=]
+|httpRequest|:
+
+1. Let |url| be |httpRequest|'s [=request/url=].
+
+2. For each |registration| of |httpRequest|'s [=request/client=]'s [=environment
+   settings object/web bundle registration list=]:
+
+   1. Let |rule| be |registration|'s [=web bundle registration/rule=].
+
+   2. If |url|'s [=url/scheme=] is not "`uuid-in-package`", then
+
+      1. If |url|'s [=url/origin=] and |registration|'s [=web bundle
+         registration/fetch entry=]'s [=web bundle fetch entry/source=]'s
+         [=url/origin=] are not [=same origin=], then [=continue=].
+
+      1. Let |allowed path| be the result of [=shortening=] |registration|'s
+         [=web bundle registration/fetch entry=]'s [=web bundle fetch
+         entry/source=]'s [=url/path=].
+
+      1. If |url|'s [=url/path=] doesn't start with |allowed path|, then
+         [=continue=].
+
+   3. If |rule|'s [=bundle rule/resources=] [=list/contains=] |url|, then return
+      |registration|.
+
+   4. If |url| starts with any of |rule|'s [=bundle rule/scopes=], then return
+      |registration|.
+
+3. Return null.

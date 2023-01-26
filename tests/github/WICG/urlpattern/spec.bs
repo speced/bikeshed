@@ -1,0 +1,1838 @@
+<pre class="metadata">
+Title: URLPattern API
+Shortname: urlpattern
+Repository: WICG/urlpattern
+Inline Github Issues: true
+Group: WICG
+Status: CG-DRAFT
+Level: 1
+URL: https://wicg.github.io/urlpattern/
+Boilerplate: omit conformance, omit feedback-header
+Editor: Ben Kelly, Google https://www.google.com/, wanderview@chromium.org
+Abstract: The URLPattern API provides a web platform primitive for matching URLs based on a convenient pattern syntax.
+Status Text: This proposal will hopefully move into the WHATWG URL workstream in the future.
+!Participate: <a href="https://github.com/WICG/urlpattern">GitHub WICG/urlpattern</a> (<a href="https://github.com/WICG/urlpattern/issues/new">new issue</a>, <a href="https://github.com/WICG/urlpattern/issues?state=open">open issues</a>)
+!Commits: <a href="https://github.com/WICG/urlpattern/commits/main/spec.bs">GitHub spec.bs commits</a>
+Complain About: accidental-2119 yes, missing-example-ids yes
+Indent: 2
+Default Biblio Status: current
+Markup Shorthands: markdown yes
+</pre>
+
+<pre class="link-defaults">
+spec:infra; type:dfn; text:list
+spec:webidl; type:dfn; text:record
+</pre>
+
+<pre class="anchors">
+spec: ECMASCRIPT; urlPrefix: https://tc39.es/ecma262/
+  type: abstract-op
+    text: Get; url: #sec-get-o-p
+    text: RegExpBuiltinExec; url: #sec-regexpbuiltinexec
+    text: RegExpCreate; url: #sec-regexpcreate
+    text: ToString; url: #sec-tostring
+  type: dfn
+    text: IdentifierPart; url: #prod-IdentifierPart
+    text: IdentifierStart; url: #prod-IdentifierStart
+  type: interface
+    text: RegExp; url: #sec-regexp-regular-expression-objects
+spec: url; urlPrefix: https://url.spec.whatwg.org/
+  type: dfn
+    text: default port; url: #default-port
+    text: fragment state; url: #fragment-state
+    text: hostname state; url: #hostname-state
+    text: path start state; url: #path-start-state
+    text: port state; url: #port-state
+    text: query state; url: #query-state
+    text: special scheme; url: #special-scheme
+    text: scheme start state; url: #scheme-start-state
+</pre>
+
+<style>
+.selected-text-file-an-issue {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  background: rgba(255, 255, 255, 0.8);
+  font-size: smaller;
+  padding: 4px 10px;
+  z-index: 4;
+}
+
+dfn var {
+  font-style: italic;
+}
+
+table {
+  margin: 1em 0;
+}
+
+/* WHATWG-style <hr>s, instead of WICG-style. Specific selector is necessary to override WICG styles. */
+:not(.head) > :not(.head) + hr {
+  display: block;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 3em 0;
+  height: auto;
+}
+:not(.head) > :not(.head) + hr::before {
+  content: none;
+}
+
+/* domintro from https://resources.whatwg.org/standard.css */
+.domintro {
+  position: relative;
+  color: green;
+  background: #DDFFDD;
+  margin: 2.5em 0 2em 0;
+  padding: 1.5em 1em 0.5em 2em;
+}
+
+.domintro dt, .domintro dt * {
+  color: black;
+  font-size: inherit;
+}
+.domintro dd {
+  margin: 0.5em 0 1em 2em; padding: 0;
+}
+.domintro dd p {
+  margin: 0.5em 0;
+}
+.domintro::before {
+  content: 'For web developers (non-normative)';
+  background: green;
+  color: white;
+  padding: 0.15em 0.25em;
+  font-style: normal;
+  position: absolute;
+  top: -0.8em;
+  left: -0.8em;
+}
+</style>
+
+<script src="https://resources.whatwg.org/file-issue.js" async></script>
+
+<h2 id=urlpattern-class>The {{URLPattern}} class </h2>
+
+<xmp class="idl">
+typedef (USVString or URLPatternInit) URLPatternInput;
+
+[Exposed=(Window,Worker)]
+interface URLPattern {
+  constructor(URLPatternInput input, USVString baseURL, optional URLPatternOptions options = {});
+  constructor(optional URLPatternInput input = {}, optional URLPatternOptions options = {});
+
+  boolean test(optional URLPatternInput input = {}, optional USVString baseURL);
+
+  URLPatternResult? exec(optional URLPatternInput input = {}, optional USVString baseURL);
+
+  readonly attribute USVString protocol;
+  readonly attribute USVString username;
+  readonly attribute USVString password;
+  readonly attribute USVString hostname;
+  readonly attribute USVString port;
+  readonly attribute USVString pathname;
+  readonly attribute USVString search;
+  readonly attribute USVString hash;
+};
+
+dictionary URLPatternInit {
+  USVString protocol;
+  USVString username;
+  USVString password;
+  USVString hostname;
+  USVString port;
+  USVString pathname;
+  USVString search;
+  USVString hash;
+  USVString baseURL;
+};
+
+dictionary URLPatternOptions {
+  boolean ignoreCase = false;
+};
+
+dictionary URLPatternResult {
+  sequence<URLPatternInput> inputs;
+
+  URLPatternComponentResult protocol;
+  URLPatternComponentResult username;
+  URLPatternComponentResult password;
+  URLPatternComponentResult hostname;
+  URLPatternComponentResult port;
+  URLPatternComponentResult pathname;
+  URLPatternComponentResult search;
+  URLPatternComponentResult hash;
+};
+
+dictionary URLPatternComponentResult {
+  USVString input;
+  record<USVString, (USVString or undefined)> groups;
+};
+</xmp>
+
+Each {{URLPattern}} object has an associated <dfn for=URLPattern>protocol component</dfn>, a [=component=], which must be set upon creation.
+
+Each {{URLPattern}} object has an associated <dfn for=URLPattern>username component</dfn>, a [=component=], which must be set upon creation.
+
+Each {{URLPattern}} object has an associated <dfn for=URLPattern>password component</dfn>, a [=component=], which must be set upon creation.
+
+Each {{URLPattern}} object has an associated <dfn for=URLPattern>hostname component</dfn>, a [=component=], which must be set upon creation.
+
+Each {{URLPattern}} object has an associated <dfn for=URLPattern>port component</dfn>, a [=component=], which must be set upon creation.
+
+Each {{URLPattern}} object has an associated <dfn for=URLPattern>pathname component</dfn>, a [=component=], which must be set upon creation.
+
+Each {{URLPattern}} object has an associated <dfn for=URLPattern>search component</dfn>, a [=component=], which must be set upon creation.
+
+Each {{URLPattern}} object has an associated <dfn for=URLPattern>hash component</dfn>, a [=component=], which must be set upon creation.
+
+<dl class="domintro non-normative">
+  <dt><code>|urlPattern| = new {{URLPattern/constructor(input, baseURL, options)|URLPattern}}(|input|)</code></dt>
+  <dd>
+    Constructs a new {{URLPattern}} object.  The |input| is an object containing separate patterns for each URL component; e.g. hostname, pathname, etc.  Missing components will default to a wildcard pattern.  In addition, |input| can contain a {{URLPatternInit/baseURL}} property that provides static text patterns for any missing components.
+  </dd>
+
+  <dt><code>|urlPattern| = new {{URLPattern/constructor(input, baseURL, options)|URLPattern}}(|patternString|, |baseURL|)</code></dt>
+  <dd>
+    Constructs a new {{URLPattern}} object.  |patternString| is a URL string containing pattern syntax for one or more components.  If |baseURL| is provided, then |patternString| can be relative.  This constructor will always set at least an empty string value and does not default any components to wildcard patterns.
+  </dd>
+
+  <dt><code>|urlPattern| = new {{URLPattern/constructor(input, baseURL, options)|URLPattern}}(|input|, |options|)</code></dt>
+  <dd>
+    Constructs a new {{URLPattern}} object.  The |options| is an object containing the additional configuration options that can affect how the components are matched.  Currently it has only one property {{URLPatternOptions/ignoreCase}} which can be set to true to enable case-insensitive matching.
+
+    Note that by default, that is in the absence of the |options| argument, matching is always case-sensitive.
+  </dd>
+
+  <dt><code>|urlPattern| = new {{URLPattern/constructor(input, baseURL, options)|URLPattern}}(|patternString|, |baseURL|, |options|)</code></dt>
+  <dd>
+    Constructs a new {{URLPattern}} object.  This overrides supports a {{URLPatternOptions}} object when constructing a pattern from a |patternString| object, describing the patterns for individual components, and base URL.
+  </dd>
+
+  <dt><code>|matches| = |urlPattern|.{{URLPattern/test(input, baseURL)|test}}(|input|)</code></dt>
+  <dd>
+    Tests if |urlPattern| matches the given arguments.  The |input| is an object containing strings representing each URL component; e.g. hostname, pathname, etc.  Missing components are treated as empty strings.  In addition, |input| can contain a {{URLPatternInit/baseURL}} property that provides values for any missing components.  If |urlPattern| matches the |input| on a component-by-component basis then true is returned.  Otherwise, false is returned.
+  </dd>
+
+  <dt><code>|matches| = |urlPattern|.{{URLPattern/test(input, baseURL)|test}}(|url|, |baseURL|)</code></dt>
+  <dd>
+    Tests if |urlPattern| matches the given arguments.  |url| is a URL string.  If |baseURL| is provided, then |url| can be relative.
+
+    If |urlPattern| matches the |input| on a component-by-component basis then true is returned.  Otherwise, false is returned.
+  </dd>
+
+  <dt><code>|result| = |urlPattern|.{{URLPattern/exec(input, baseURL)|exec}}(|input|)</code></dt>
+  <dd>
+    Executes the |urlPattern| against the given arguments.  The |input| is an object containing strings representing each URL component; e.g. hostname, pathname, etc.  Missing components are treated as empty strings.  In addition, |input| can contain a baseURL property that provides values for any missing components.
+
+    If |urlPattern| matches the |input| on a component-by-component basis then an object is returned containing the results.  Matched group values are contained in per-component group objects within the |result| object; e.g. `matches.pathname.groups.id`.  If |urlPattern| does not match the |input|, then |result| is null.
+  </dd>
+
+  <dt><code>|result| = |urlPattern|.{{URLPattern/exec(input, baseURL)|exec}}(|url|, |baseURL|)</code></dt>
+  <dd>
+    Executes the |urlPattern| against the given arguments.  |url| is a URL string.  If |baseURL| is provided, then |input| can be relative.
+
+    If |urlPattern| matches the |input| on a component-by-component basis then an object is returned containing the results.  Matched group values are contained in per-component group objects within the |result| object; e.g. `matches.pathname.groups.id`.  If |urlPattern| does not match the |input|, then |result| is null.
+  </dd>
+
+  <dt><code>|urlPattern|.{{URLPattern/protocol}}</code></dt>
+  <dd>
+    <p>Returns |urlPattern|'s normalized protocol pattern string.
+  </dd>
+
+  <dt><code>|urlPattern|.{{URLPattern/username}}</code></dt>
+  <dd>
+    <p>Returns |urlPattern|'s normalized username pattern string.
+  </dd>
+
+  <dt><code>|urlPattern|.{{URLPattern/password}}</code></dt>
+  <dd>
+    <p>Returns |urlPattern|'s normalized password pattern string.
+  </dd>
+
+  <dt><code>|urlPattern|.{{URLPattern/hostname}}</code></dt>
+  <dd>
+    <p>Returns |urlPattern|'s normalized hostname pattern string.
+  </dd>
+
+  <dt><code>|urlPattern|.{{URLPattern/port}}</code></dt>
+  <dd>
+    <p>Returns |urlPattern|'s normalized port pattern string.
+  </dd>
+
+  <dt><code>|urlPattern|.{{URLPattern/pathname}}</code></dt>
+  <dd>
+    <p>Returns |urlPattern|'s normalized pathname pattern string.
+  </dd>
+
+  <dt><code>|urlPattern|.{{URLPattern/search}}</code></dt>
+  <dd>
+    <p>Returns |urlPattern|'s normalized search pattern string.
+  </dd>
+
+  <dt><code>|urlPattern|.{{URLPattern/hash}}</code></dt>
+  <dd>
+    <p>Returns |urlPattern|'s normalized hash pattern string.
+  </dd>
+</dl>
+
+<div algorithm>
+  The <dfn constructor for=URLPattern lt="URLPattern(input, baseURL, options)">new URLPattern(|input|, |baseURL|, |options|)</dfn> constructor steps are:
+
+  1. Run [=initialize=] given [=this=], |input|, |baseURL|, and |options|.
+</div>
+
+<div algorithm>
+  The <dfn constructor for=URLPattern lt="URLPattern(input, options)">new URLPattern(|input|, |options|)</dfn> constructor steps are:
+
+  1. Run [=initialize=] given [=this=], |input|, null, and |options|.
+</div>
+
+<div algorithm>
+  To <dfn for=URLPattern>initialize</dfn> a {{URLPattern}} given a {{URLPattern}} |this|, {{URLPatternInput}} |input|, string or null |baseURL|, and {{URLPatternOptions}} |options|:
+
+  1. Let |init| be null.
+  1. If |input| is a [=scalar value string=] then:
+    1. Set |init| to the result of running [=parse a constructor string=] given |input|.
+    1. If |baseURL| is null and |init|["{{URLPatternInit/protocol}}"] is null, then throw a {{TypeError}}.
+    1. Set |init|["{{URLPatternInit/baseURL}}"] to |baseURL|.
+  1. Else:
+    1. [=Assert=]: |input| is a {{URLPatternInit}}.
+    1. If |baseURL| is not null, then throw a {{TypeError}}.
+    1. Set |init| to |input|.
+  1. Let |processedInit| be the result of [=process a URLPatternInit=] given |init|, "`pattern`", null, null, null, null, null, null, null, and null.
+  1. If |processedInit|["{{URLPatternInit/protocol}}"] is a [=special scheme=] and |processedInit|["{{URLPatternInit/port}}"] is its corresponding [=default port=], then set |processedInit|["{{URLPatternInit/port}}"] to the empty string.
+  1. Set |this|'s [=URLPattern/protocol component=] to the result of [=compiling a component=] given |processedInit|["{{URLPatternInit/protocol}}"], [=canonicalize a protocol=], and [=default options=].
+  1. Set |this|'s [=URLPattern/username component=] to the result of [=compiling a component=] given |processedInit|["{{URLPatternInit/username}}"], [=canonicalize a username=], and [=default options=].
+  1. Set |this|'s [=URLPattern/password component=] to the result of [=compiling a component=] given |processedInit|["{{URLPatternInit/password}}"], [=canonicalize a password=], and [=default options=].
+  1. If the result running [=hostname pattern is an IPv6 address=] given |processedInit|["{{URLPatternInit/hostname}}"] is true, then set |this|'s [=URLPattern/hostname component=] to the result of [=compiling a component=] given |processedInit|["{{URLPatternInit/hostname}}"], [=canonicalize an IPv6 hostname=], and [=hostname options=].
+  1. Else, set |this|'s [=URLPattern/hostname component=] to the result of [=compiling a component=] given |processedInit|["{{URLPatternInit/hostname}}"], [=canonicalize a hostname=], and [=hostname options=].
+  1. Set |this|'s [=URLPattern/port component=] to the result of [=compiling a component=] given |processedInit|["{{URLPatternInit/port}}"], [=canonicalize a port=], and [=default options=].
+  1. Let |compileOptions| be a copy of the [=default options=] with the [=options/ignore case=] property set to |options|["{{URLPatternOptions/ignoreCase}}"].
+  1. If the result of running [=protocol component matches a special scheme=] given |this|'s [=URLPattern/protocol component=] is true, then:
+    1. Let |pathCompileOptions| be copy of the [=pathname options=] with the the [=options/ignore case=] property set to |options|["{{URLPatternOptions/ignoreCase}}"].
+    1. Set |this|'s [=URLPattern/pathname component=] to the result of [=compiling a component=] given |processedInit|["{{URLPatternInit/pathname}}"], [=canonicalize a pathname=], and |pathCompileOptions|.
+  1. Else set |this|'s [=URLPattern/pathname component=] to the result of [=compiling a component=] given |processedInit|["{{URLPatternInit/pathname}}"], [=canonicalize an opaque pathname=], and |compileOptions|.
+  1. Set |this|'s [=URLPattern/search component=] to the result of [=compiling a component=] given |processedInit|["{{URLPatternInit/search}}"], [=canonicalize a search=], and |compileOptions|.
+  1. Set |this|'s [=URLPattern/hash component=] to the result of [=compiling a component=] given |processedInit|["{{URLPatternInit/hash}}"], [=canonicalize a hash=], and |compileOptions|.
+</div>
+
+<div algorithm>
+  The <dfn attribute for="URLPattern">protocol</dfn> getter steps are:
+
+  1. Return [=this=]'s [=URLPattern/protocol component=]'s [=component/pattern string=].
+</div>
+
+<div algorithm>
+  The <dfn attribute for="URLPattern">username</dfn> getter steps are:
+
+  1. Return [=this=]'s [=URLPattern/username component=]'s [=component/pattern string=].
+</div>
+
+<div algorithm>
+  The <dfn attribute for="URLPattern">password</dfn> getter steps are:
+
+  1. Return [=this=]'s [=URLPattern/password component=]'s [=component/pattern string=].
+</div>
+
+<div algorithm>
+  The <dfn attribute for="URLPattern">hostname</dfn> getter steps are:
+
+  1. Return [=this=]'s [=URLPattern/hostname component=]'s [=component/pattern string=].
+</div>
+
+<div algorithm>
+  The <dfn attribute for="URLPattern">port</dfn> getter steps are:
+
+  1. Return [=this=]'s [=URLPattern/port component=]'s [=component/pattern string=].
+</div>
+
+<div algorithm>
+  The <dfn attribute for="URLPattern">pathname</dfn> getter steps are:
+
+  1. Return [=this=]'s [=URLPattern/pathname component=]'s [=component/pattern string=].
+</div>
+
+<div algorithm>
+  The <dfn attribute for="URLPattern">search</dfn> getter steps are:
+
+  1. Return [=this=]'s [=URLPattern/search component=]'s [=component/pattern string=].
+</div>
+
+<div algorithm>
+  The <dfn attribute for="URLPattern">hash</dfn> getter steps are:
+
+  1. Return [=this=]'s [=URLPattern/hash component=]'s [=component/pattern string=].
+</div>
+
+<div algorithm>
+  The <dfn method for="URLPattern">test(|input|, |baseURL|)</dfn> method steps are:
+
+  1. Let |result| be the result of [=match=] given [=this=], |input|, and |baseURL| if given.
+  1. If |result| is null, return false.
+  1. Return true.
+</div>
+
+<div algorithm>
+  The <dfn method for="URLPattern">exec(|input|, |baseURL|)</dfn> method steps are:
+
+  1. Return the result of [=match=] given [=this=], |input|, and |baseURL| if given.
+</div>
+
+<h3 id=urlpattern-internals>Internals</h3>
+
+A {{URLPattern}} is associated with multiple <dfn>component</dfn> [=structs=].
+
+A [=component=] has an associated <dfn for=component>pattern string</dfn>, a [=pattern string/well formed=] [=/pattern string=], which must be set upon creation.
+
+A [=component=] has an associated <dfn for=component>regular expression</dfn>, a {{RegExp}}, which must be set upon creation.
+
+A [=component=] has an associated <dfn for=component>group name list</dfn>, a [=list=] of strings, which must be set upon creation.
+
+<div algorithm>
+  To <dfn>compile a component</dfn> given a string |input|, [=/encoding callback=] |encoding callback|, and [=/options=] |options|:
+
+  1. If |input| is null, then set |input| to "`*`".
+  1. Let |part list| be the result of running [=parse a pattern string=] given |input|, |options|, and |encoding callback|.
+  1. Let (|regular expression string|, |name list|) be the result of running [=generate a regular expression and name list=] given |part list| and |options|.
+  1. Let |flags| be an empty string.
+  1. If |options|'s [=options/ignore case=] is true then set |flags| to "`ui`".
+  1. Else set |flags| to "`u`"
+  1. Let |regular expression| be [$RegExpCreate$](|regular expression string|, |flags|).  If this throws an exception, catch it, and throw a {{TypeError}}.
+    <p class="note allow-2119">The specification uses regular expressions to perform all matching, but this is not required.  Implementations are free to perform matching directly against the [=/part list=] when possible; e.g. when there are no custom regexp matching groups.  If there are custom regular expressions, however, its important that they should be immediately evaluated in the [=compile a component=] algorithm so an error can be thrown if they are invalid.
+  1. Let |pattern string| be the result of running [=generate a pattern string=] given |part list| and |options|.
+  1. Return a new [=component=] whose [=component/pattern string=] is |pattern string|, [=component/regular expression=] is |regular expression|, and [=component/group name list=] is |name list|.
+</div>
+
+<div algorithm>
+  To perform a <dfn>match</dfn> given a {{URLPattern}} |urlpattern|, a {{URLPatternInput}} |input|, and an optional string |baseURLString|:
+
+  1. Let |protocol| be the empty string.
+  1. Let |username| be the empty string.
+  1. Let |password| be the empty string.
+  1. Let |hostname| be the empty string.
+  1. Let |port| be the empty string.
+  1. Let |pathname| be the empty string.
+  1. Let |search| be the empty string.
+  1. Let |hash| be the empty string.
+  1. Let |inputs| be an empty [=list=].
+  1. [=list/Append=] |input| to |inputs|.
+  1. If |input| is a {{URLPatternInit}} then:
+    1. If |baseURLString| was given, throw a {{TypeError}}.
+    1. Let |applyResult| be the result of [=process a URLPatternInit=] given |input|, "url", |protocol|, |username|, |password|, |hostname|, |port|, |pathname|, |search|, and |hash|. If this throws an exception, catch it, and return null.
+    1. Set |protocol| to |applyResult|["{{URLPatternInit/protocol}}"].
+    1. Set |username| to |applyResult|["{{URLPatternInit/username}}"].
+    1. Set |password| to |applyResult|["{{URLPatternInit/password}}"].
+    1. Set |hostname| to |applyResult|["{{URLPatternInit/hostname}}"].
+    1. Set |port| to |applyResult|["{{URLPatternInit/port}}"].
+    1. Set |pathname| to |applyResult|["{{URLPatternInit/pathname}}"].
+    1. Set |search| to |applyResult|["{{URLPatternInit/search}}"].
+    1. Set |hash| to |applyResult|["{{URLPatternInit/hash}}"].
+  1. Else:
+    1. Let |baseURL| be null.
+    1. If |baseURLString| was given, then:
+      1. Set |baseURL| to the result of [=URL parser|parsing=] |baseURLString|.
+      1. If |baseURL| is failure, return null.
+      1. [=list/Append=] |baseURLString| to |inputs|.
+    1. Let |url| be the result of [=URL parser|parsing=] |input| given |baseURL|.
+    1. If |url| is failure, return null.
+    1. Set |protocol| to |url|'s [=url/scheme=].
+    1. Set |username| to |url|'s [=url/username=].
+    1. Set |password| to |url|'s [=url/password=].
+    1. Set |hostname| to |url|'s [=url/host=] or the empty string if the value is null.
+    1. Set |port| to |url|'s [=url/port=] or the empty string if the value is null.
+    1. Set |pathname| to the result of [=URL path serializing=] |url|.
+    1. Set |search| to |url|'s [=url/query=] or the empty string if the value is null.
+    1. Set |hash| to |url|'s [=url/fragment=] or the empty string if the value is null.
+  1. Let |protocolExecResult| be [$RegExpBuiltinExec$](|urlpattern|'s [=URLPattern/protocol component=]'s [=component/regular expression=], |protocol|).
+  1. Let |usernameExecResult| be [$RegExpBuiltinExec$](|urlpattern|'s [=URLPattern/username component=]'s [=component/regular expression=], |username|).
+  1. Let |passwordExecResult| be [$RegExpBuiltinExec$](|urlpattern|'s [=URLPattern/password component=]'s [=component/regular expression=], |password|).
+  1. Let |hostnameExecResult| be [$RegExpBuiltinExec$](|urlpattern|'s [=URLPattern/hostname component=]'s [=component/regular expression=], |hostname|).
+  1. Let |portExecResult| be [$RegExpBuiltinExec$](|urlpattern|'s [=URLPattern/port component=]'s [=component/regular expression=], |port|).
+  1. Let |pathnameExecResult| be [$RegExpBuiltinExec$](|urlpattern|'s [=URLPattern/pathname component=]'s [=component/regular expression=], |pathname|).
+  1. Let |searchExecResult| be [$RegExpBuiltinExec$](|urlpattern|'s [=URLPattern/search component=]'s [=component/regular expression=], |search|).
+  1. Let |hashExecResult| be [$RegExpBuiltinExec$](|urlpattern|'s [=URLPattern/hash component=]'s [=component/regular expression=], |hash|).
+  1. If |protocolExecResult|, |usernameExecResult|, |passwordExecResult|, |hostnameExecResult|, |portExecResult|, |pathnameExecResult|, |searchExecResult|, or |hashExecResult| are null then return null.
+  1. Let |result| be a new {{URLPatternResult}}.
+  1. Set |result|["{{URLPatternResult/inputs}}"] to |inputs|.
+  1. Set |result|["{{URLPatternResult/protocol}}"] to the result of [=creating a component match result=] given |urlpattern|'s [=URLPattern/protocol component=], |protocol|, and |protocolExecResult|.
+  1. Set |result|["{{URLPatternResult/username}}"] to the result of [=creating a component match result=] given |urlpattern|'s [=URLPattern/username component=], |username|, and |usernameExecResult|.
+  1. Set |result|["{{URLPatternResult/password}}"] to the result of [=creating a component match result=] given |urlpattern|'s [=URLPattern/password component=], |password|, and |passwordExecResult|.
+  1. Set |result|["{{URLPatternResult/hostname}}"] to the result of [=creating a component match result=] given |urlpattern|'s [=URLPattern/hostname component=], |hostname|, and |hostnameExecResult|.
+  1. Set |result|["{{URLPatternResult/port}}"] to the result of [=creating a component match result=] given |urlpattern|'s [=URLPattern/port component=], |port|, and |portExecResult|.
+  1. Set |result|["{{URLPatternResult/pathname}}"] to the result of [=creating a component match result=] given |urlpattern|'s [=URLPattern/pathname component=], |pathname|, and |pathnameExecResult|.
+  1. Set |result|["{{URLPatternResult/search}}"] to the result of [=creating a component match result=] given |urlpattern|'s [=URLPattern/search component=], |search|, and |searchExecResult|.
+  1. Set |result|["{{URLPatternResult/hash}}"] to the result of [=creating a component match result=] given |urlpattern|'s [=URLPattern/hash component=], |hash|, and |hashExecResult|.
+  1. Return |result|.
+</div>
+
+<div algorithm>
+  To <dfn>create a component match result</dfn> given a [=component=] |component|, a string |input|, and an array representing the output of [$RegExpBuiltinExec$] |execResult|:
+
+  1. Let |result| be a new {{URLPatternComponentResult}}.
+  1. Set |result|["{{URLPatternComponentResult/input}}"] to |input|.
+  1. Let |groups| be a <code>[=record=]<{{USVString}}, ({{USVString}} or {{undefined}})></code>.
+  1. Let |index| be 1.
+  1. While |index| is less than [$Get$](|execResult|, "`length`"):
+    1. Let |name| be |component|'s [=component/group name list=][|index| &minus; 1].
+    1. Let |value| be [$Get$](|execResult|, [$ToString$](|index|)).
+    1. Set |groups|[|name|] to |value|.
+    1. Increment |index| by 1.
+  1. Set |result|["{{URLPatternComponentResult/groups}}"] to |groups|.
+  1. Return |result|.
+</div>
+
+The <dfn>default options</dfn> is an [=options=] [=struct=] with [=options/delimiter code point=] set to the empty string and [=options/prefix code point=] set to the empty string.
+
+The <dfn>hostname options</dfn> is an [=options=] [=struct=] with [=options/delimiter code point=] set "`.`" and [=options/prefix code point=] set to the empty string.
+
+The <dfn>pathname options</dfn> is an [=options=] [=struct=] with [=options/delimiter code point=] set "`/`" and [=options/prefix code point=] set to "`/`".
+
+<div algorithm>
+  To determine if a <dfn>protocol component matches a special scheme</dfn> given a [=component=] |protocol component|:
+
+  1. Let |special scheme list| be a [=list=] populated with all of the [=special schemes=].
+  1. [=list/For each=] |scheme| of |special scheme list|:
+    1. Let |test result| be [$RegExpBuiltinExec$](|protocol component|'s [=component/regular expression=], |scheme|).
+    1. If |test result| is not null, then return true.
+  1. Return false.
+</div>
+
+<div algorithm>
+  To determine if a <dfn>hostname pattern is an IPv6 address</dfn> given a [=/pattern string=] |input|:
+
+  1. If |input|'s [=string/code point length=] is less than 2, then return false.
+  1. Let |input code points| be |input| interpreted as a [=list=] of [=/code points=].
+  1. If |input code points|[0] is U+005B (`[`), then return true.
+  1. If |input code points|[0] is U+007B (`{`) and |input code points|[1] is U+005B (`[`), then return true.
+  1. If |input code points|[0] is U+005C (<code>\</code>) and |input code points|[1] is U+005B (`[`), then return true.
+  1. Return false.
+</div>
+
+<h3 id=constructor-string-parsing>Constructor String Parsing</h3>
+
+A <dfn export>constructor string parser</dfn> is a [=struct=].
+
+A [=constructor string parser=] has an associated <dfn export for="constructor string parser">input</dfn>, a string, which must be set upon creation.
+
+A [=constructor string parser=] has an associated <dfn export for="constructor string parser">token list</dfn>, a [=/token list=], which must be set upon creation.
+
+A [=constructor string parser=] has an associated <dfn export for="constructor string parser">result</dfn>, a {{URLPatternInit}}, initially set to a new {{URLPatternInit}}.
+
+A [=constructor string parser=] has an associated <dfn export for="constructor string parser">component start</dfn>, a number, initially set to 0.
+
+A [=constructor string parser=] has an associated <dfn export for="constructor string parser">token index</dfn>, a number, initially set to 0.
+
+A [=constructor string parser=] has an associated <dfn export for="constructor string parser">token increment</dfn>, a number, initially set to 1.
+
+A [=constructor string parser=] has an associated <dfn export for="constructor string parser">group depth</dfn>, a number, initially set to 0.
+
+A [=constructor string parser=] has an associated <dfn export for="constructor string parser">hostname IPv6 bracket depth</dfn>, a number, initially set to 0.
+
+A [=constructor string parser=] has an associated <dfn export for="constructor string parser">protocol matches a special scheme flag</dfn>, a boolean, initially set to false.
+
+A [=constructor string parser=] has an associated <dfn export for="constructor string parser">state</dfn>, a string, initially set to "<a for="constructor string parser/state">`init`</a>".  It must be one of the following:
+
+<ul>
+  <li>"<dfn for="constructor string parser/state">`init`</dfn>"</li>
+  <li>"<dfn export for="constructor string parser/state">`protocol`</dfn>"</li>
+  <li>"<dfn export for="constructor string parser/state">`authority`</dfn>"</li>
+  <li>"<dfn export for="constructor string parser/state">`username`</dfn>"</li>
+  <li>"<dfn export for="constructor string parser/state">`password`</dfn>"</li>
+  <li>"<dfn export for="constructor string parser/state">`hostname`</dfn>"</li>
+  <li>"<dfn export for="constructor string parser/state">`port`</dfn>"</li>
+  <li>"<dfn export for="constructor string parser/state">`pathname`</dfn>"</li>
+  <li>"<dfn export for="constructor string parser/state">`search`</dfn>"</li>
+  <li>"<dfn export for="constructor string parser/state">`hash`</dfn>"</li>
+  <li>"<dfn export for="constructor string parser/state">`done`</dfn>"</li>
+</ul>
+
+<div class=note>
+  <p>The URLPattern constructor string algorithm is very similar to the [=basic URL parser=] algorithm, but some differences prevent us from using that algorithm directly.
+  <p>First, the URLPattern constructor string parser operates on [=tokens=] generated using the "`lenient`" [=tokenize policy=].  In constrast, [=basic URL parser=] operates on code points.  Operating on [=tokens=] allows the URLPattern constructor string parser to more easily distinguish between code points that are significant pattern syntax and code points that might be a URL component separator.  For example, it makes it trivial to handle named groups like "`:hmm`" in "`https://a.c:hmm.example.com:8080`" without getting confused with the port number.
+  <p>Second, the URLPattern constructor string parser needs to avoid applying URL canonicalization to all code points like [=basic URL parser=] does.  Instead we perform canonicalization on only parts of the pattern string we know are safe later when compiling each component pattern string.
+  <p class=allow-2119>Finally, the URLPattern constructor string parser does not handle some parts of the [=basic URL parser=] state machine.  For example, it does not treat backslashes specially as they would all be treated as pattern characters and would require excessive escaping.  In addition, this parser may not handle some more esoteric parts of the URL parsing algorithm like file URLs with a hostname.  The goal with this parser was to handle the most common URLs while allowing any niche case to be handled instead via the {{URLPatternInit}} constructor.
+</div>
+
+<div algorithm>
+To <dfn>parse a constructor string</dfn> given a string |input|:
+
+  1. Let |parser| be a new [=constructor string parser=] whose [=constructor string parser/input=] is |input| and [=constructor string parser/token list=] is the result of running [=tokenize=] given |input| and "<a for="tokenize policy">`lenient`</a>".
+    <div class=note>
+      <p>When constructing a pattern using a {{URLPatternInit}} like `new URLPattern({ pathname: 'foo' })` any missing components will be defaulted to wildcards.  In the constructor string case, however, all components are precisely defined as either empty string or a longer value.  This is due to there being no way to simply "leave out" a component when writing a URL.
+      <p>To implement this we initialize components in |parser|'s [=constructor string parser/result=] with empty string in advance.
+      <p>We can't, however, do this immediately.  We want to allow the `baseURL` to provide information for relative URLs, so we only want to set the default empty string values for components following the first component in the relative URL.  We therefore wait to set the default component values until after we exit the "<a for="constructor string parser/state">`init`</a>" [=constructor string parser/state=].
+    </div>
+  1. [=While=] |parser|'s [=constructor string parser/token index=] is less than |parser|'s [=constructor string parser/token list=] [=list/size=]:
+    1. Set |parser|'s [=constructor string parser/token increment=] to 1.
+      <p class="note allow-2119">On every iteration of the parse loop the |parser|'s [=constructor string parser/token index=] will be incremented by its [=constructor string parser/token increment=] value.  Typically this means incrementing by 1, but at certain times it is set to zero.  The [=constructor string parser/token increment=] is then always reset back to 1 at the top of the loop.
+    1. If |parser|'s [=constructor string parser/token list=][|parser|'s [=constructor string parser/token index=]]'s [=token/type=] is "<a for=token/type>`end`</a>" then:
+      1. If |parser|'s [=constructor string parser/state=] is "<a for="constructor string parser/state">`init`</a>":
+        <div class=note>
+          <p class=allow-2119>If we reached the end of the string in the "<a for="constructor string parser/state">`init`</a>" [=constructor string parser/state=], then we failed to find a protocol terminator and this must be a relative URLPattern constructor string.
+        </div>
+        1. Run [=rewind=] given |parser|.
+          <p class=note>We next determine at which component the relative pattern begins.  Relative pathnames are most common, but URLs and URLPattern constructor strings can begin with the search or hash components as well.
+        1. If the result of running [=is a hash prefix=] given |parser| is true, then run [=change state=] given |parser|, "<a for="constructor string parser/state">`hash`</a>" and 1.
+        1. Else if the result of running [=is a search prefix=] given |parser| is true:
+          1. Run [=change state=] given |parser|, "<a for="constructor string parser/state">`search`</a>" and 1.
+          1. Set |parser|'s [=constructor string parser/result=]["{{URLPattern/hash}}"] to the empty string.
+        1. Else:
+          1. Run [=change state=] given |parser|, "<a for="constructor string parser/state">`pathname`</a>" and 0.
+          1. Set |parser|'s [=constructor string parser/result=]["{{URLPattern/search}}"] to the empty string.
+          1. Set |parser|'s [=constructor string parser/result=]["{{URLPattern/hash}}"] to the empty string.
+        1. Increment |parser|'s [=constructor string parser/token index=] by |parser|'s [=constructor string parser/token increment=].
+        1. [=Continue=].
+      1. If |parser|'s [=constructor string parser/state=] is "<a for="constructor string parser/state">`authority`</a>":
+        <p class=note>If we reached the end of the string in the "<a for="constructor string parser/state">`authority`</a>" [=constructor string parser/state=], then we failed to find an "`@`".  Therefore there is no username or password.
+        1. Run [=rewind and set state=] given |parser|, and "<a for="constructor string parser/state">`hostname`</a>".
+        1. Increment |parser|'s [=constructor string parser/token index=] by |parser|'s [=constructor string parser/token increment=].
+        1. [=Continue=].
+      1. Run [=change state=] given |parser|, "<a for="constructor string parser/state">`done`</a>" and 0.
+      1. [=Break=].
+    1. If the result of running [=is a group open=] given |parser| is true:
+      <div class=note>
+        <p>We ignore all code points within "`{ ... }`" pattern groupings.  It would not make sense to allow a URL component boundary to lie within a grouping; e.g. "`https://example.c{om/fo}o`".  While not supported within [=well formed=] [=/pattern strings=], we handle nested groupings here to avoid parser confusion.
+        <p>It is not necessary to perform this logic for regexp or named groups since those values are collapsed into individual [=tokens=] by the [=tokenize=] algorithm.
+      </div>
+      1. Increment |parser|'s [=constructor string parser/group depth=] by 1.
+      1. Increment |parser|'s [=constructor string parser/token index=] by |parser|'s [=constructor string parser/token increment=].
+      1. [=Continue=].
+    1. If |parser|'s [=constructor string parser/group depth=] is greater than 0:
+      1. If the result of running [=is a group close=] given |parser| is true, then decrement |parser|'s [=constructor string parser/group depth=] by 1.
+      1. Else:
+        1. Increment |parser|'s [=constructor string parser/token index=] by |parser|'s [=constructor string parser/token increment=].
+        1. [=Continue=].
+    1. Switch on |parser|'s [=constructor string parser/state=] and run the associated steps:
+      <dl class=switch>
+        <dt>"<a for="constructor string parser/state">`init`</a>"</dt>
+        <dd>
+          1. If the result of running [=is a protocol suffix=] given |parser| is true:
+            <p class="note allow-2119">We found a protocol suffix, so this must be an absolute URLPattern constructor string.  Therefore initialize all component to the empty string.
+            1. Set |parser|'s [=constructor string parser/result=]["{{URLPatternInit/username}}"] to the empty string.
+            1. Set |parser|'s [=constructor string parser/result=]["{{URLPatternInit/password}}"] to the empty string.
+            1. Set |parser|'s [=constructor string parser/result=]["{{URLPatternInit/hostname}}"] to the empty string.
+            1. Set |parser|'s [=constructor string parser/result=]["{{URLPatternInit/port}}"] to the empty string.
+            1. Set |parser|'s [=constructor string parser/result=]["{{URLPatternInit/pathname}}"] to the empty string.
+            1. Set |parser|'s [=constructor string parser/result=]["{{URLPatternInit/search}}"] to the empty string.
+            1. Set |parser|'s [=constructor string parser/result=]["{{URLPatternInit/hash}}"] to the empty string.
+            1. Run [=rewind and set state=] given |parser| and "<a for="constructor string parser/state">`protocol`</a>".
+        </dd>
+        <dt>"<a for="constructor string parser/state">`protocol`</a>"</dt>
+        <dd>
+          1. If the result of running [=is a protocol suffix=] given |parser| is true:
+            1. Run [=compute protocol matches a special scheme flag=] given |parser|.
+              <p class="note">We need to eagerly compile the protocol component to determine if it matches any [=special schemes=].  If it does then certain special rules apply.  It determines if the pathname defaults to a "`/`" and also whether we will look for the username, password, hostname, and port components.  Authority slashes can also cause us to look for these components as well.  Otherwise we treat this as an "opaque path URL" and go straight to the pathname component.
+            1. If |parser|'s [=constructor string parser/protocol matches a special scheme flag=] is true, then set |parser|'s [=constructor string parser/result=]["{{URLPatternInit/pathname}}"] to "`/`".
+            1. Let |next state| be "<a for="constructor string parser/state">`pathname`</a>".
+            1. Let |skip| be 1.
+            1. If the result of running [=next is authority slashes=] given |parser| is true:
+              1. Set |next state| to "<a for="constructor string parser/state">`authority`</a>".
+              1. Set |skip| to 3.
+            1. Else if |parser|'s [=constructor string parser/protocol matches a special scheme flag=] is true, then set |next state| to "<a for="constructor string parser/state">`authority`</a>".
+            1. Run [=change state=] given |parser|, |next state|, and |skip|.
+        </dd>
+        <dt>"<a for="constructor string parser/state">`authority`</a>"</dt>
+        <dd>
+          1. If the result of running [=is an identity terminator=] given |parser| is true, then run [=rewind and set state=] given |parser| and "<a for="constructor string parser/state">`username`</a>".
+          1. Else if any of the following are true:
+            <ul>
+              <li>the result of running [=is a pathname start=] given |parser|;</li>
+              <li>the result of running [=is a search prefix=] given |parser|; or</li>
+              <li>the result of running [=is a hash prefix=] given |parser|,</li>
+            </ul>
+            <p>then run [=rewind and set state=] given |parser| and "<a for="constructor string parser/state">`hostname`</a>".
+        </dd>
+        <dt>"<a for="constructor string parser/state">`username`</a>"</dt>
+        <dd>
+          1. If the result of running [=is a password prefix=] given |parser| is true, then run [=change state=] given |parser|, "<a for="constructor string parser/state">`password`</a>", and 1.
+          1. Else if the result of running [=is an identity terminator=] given |parser| is true, then run [=change state=] given |parser|, "<a for="constructor string parser/state">`hostname`</a>", and 1.
+        </dd>
+        <dt>"<a for="constructor string parser/state">`password`</a>"</dt>
+        <dd>
+          1. If the result of running [=is an identity terminator=] given |parser| is true, then run [=change state=] given |parser|, "<a for="constructor string parser/state">`hostname`</a>", and 1.
+        </dd>
+        <dt>"<a for="constructor string parser/state">`hostname`</a>"</dt>
+        <dd>
+          1. If the the result of running [=is an IPv6 open=] given |parser| is true, then increment |parser|'s [=constructor string parser/hostname IPv6 bracket depth=] by 1.
+          1. Else if the the result of running [=is an IPv6 close=] given |parser| is true, then decrement |parser|'s [=constructor string parser/hostname IPv6 bracket depth=] by 1.
+          1. Else if the result of running [=is a port prefix=] given |parser| is true and |parser|'s [=constructor string parser/hostname IPv6 bracket depth=] is zero, then run [=change state=] given |parser|, "<a for="constructor string parser/state">`port`</a>", and 1.
+          1. Else if the result of running [=is a pathname start=] given |parser| is true, then run [=change state=] given |parser|, "<a for="constructor string parser/state">`pathname`</a>", and 0.
+          1. Else if the result of running [=is a search prefix=] given |parser| is true, then run [=change state=] given |parser|, "<a for="constructor string parser/state">`search`</a>", and 1.
+          1. Else if the result of running [=is a hash prefix=] given |parser| is true, then run [=change state=] given |parser|, "<a for="constructor string parser/state">`hash`</a>", and 1.
+        </dd>
+        <dt>"<a for="constructor string parser/state">`port`</a>"</dt>
+        <dd>
+          1. If the result of running [=is a pathname start=] given |parser| is true, then run [=change state=] given |parser|, "<a for="constructor string parser/state">`pathname`</a>", and 0.
+          1. Else if the result of running [=is a search prefix=] given |parser| is true, then run [=change state=] given |parser|, "<a for="constructor string parser/state">`search`</a>", and 1.
+          1. Else if the result of running [=is a hash prefix=] given |parser| is true, then run [=change state=] given |parser|, "<a for="constructor string parser/state">`hash`</a>", and 1.
+        </dd>
+        <dt>"<a for="constructor string parser/state">`pathname`</a>"</dt>
+        <dd>
+          1. If the result of running [=is a search prefix=] given |parser| is true, then run [=change state=] given |parser|, "<a for="constructor string parser/state">`search`</a>", and 1.
+          1. Else if the result of running [=is a hash prefix=] given |parser| is true, then run [=change state=] given |parser|, "<a for="constructor string parser/state">`hash`</a>", and 1.
+        </dd>
+        <dt>"<a for="constructor string parser/state">`search`</a>"</dt>
+        <dd>
+          1. If the result of running [=is a hash prefix=] given |parser| is true, then run [=change state=] given |parser|, "<a for="constructor string parser/state">`hash`</a>", and 1.
+        </dd>
+        <dt>"<a for="constructor string parser/state">`hash`</a>"</dt>
+        <dd>
+          1. Do nothing.
+        </dd>
+        <dt>"<a for="constructor string parser/state">`done`</a>"</dt>
+        <dd>
+          1. [=Assert=]: This step is never reached.
+        </dd>
+      </dl>
+    1. Increment |parser|'s [=constructor string parser/token index=] by |parser|'s [=constructor string parser/token increment=].
+  1. Return |parser|'s [=constructor string parser/result=].
+</div>
+
+<div algorithm>
+To <dfn>change state</dfn> given a [=constructor string parser=] |parser|, a [=constructor string parser/state=] |new state|, and a number |skip|:
+
+  1. If |parser|'s [=constructor string parser/state=] is not "<a for="constructor string parser/state">`init`</a>", not "<a for="constructor string parser/state">`authority`</a>", and not "<a for="constructor string parser/state">`done`</a>", then set |parser|'s [=constructor string parser/result=][|parser|'s [=constructor string parser/state=]] to the result of running [=make a component string=] given |parser|.
+  1. Set |parser|'s [=constructor string parser/state=] to |new state|.
+  1. Increment |parser|'s [=constructor string parser/token index=] by |skip|.
+  1. Set |parser|'s [=constructor string parser/component start=] to |parser|'s [=constructor string parser/token index=].
+  1. Set |parser|'s [=constructor string parser/token increment=] to 0.
+</div>
+
+<div algorithm>
+To <dfn>rewind</dfn> given a [=constructor string parser=] |parser|:
+
+  1. Set |parser|'s [=constructor string parser/token index=] to |parser|'s [=constructor string parser/component start=].
+  1. Set |parser|'s [=constructor string parser/token increment=] to 0.
+</div>
+
+<div algorithm>
+To <dfn>rewind and set state</dfn> given a [=constructor string parser=] |parser| and a [=constructor string parser/state=] |state|:
+
+  1. Run [=rewind=] given |parser|.
+  1. Set |parser|'s [=constructor string parser/state=] to |state|.
+</div>
+
+<div algorithm>
+To <dfn>get a safe token</dfn> given a [=constructor string parser=] |parser| and a number |index|:
+
+  1. If |index| is less than |parser|'s [=constructor string parser/token list=]'s [=list/size=], then return |parser|'s [=constructor string parser/token list=][|index|].
+  1. [=Assert=]: |parser|'s [=constructor string parser/token list=]'s [=list/size=] is greater than or equal to 1.
+  1. Let |last index| be |parser|'s [=constructor string parser/token list=]'s [=list/size=] &minus; 1.
+  1. Let |token| be |parser|'s [=constructor string parser/token list=][|last index|].
+  1. [=Assert=]: |token|'s [=token/type=] is "<a for=token/type>`end`</a>".
+  1. Return |token|.
+</div>
+
+<div algorithm>
+To run <dfn>is a non-special pattern char</dfn> given a [=constructor string parser=] |parser|, a number |index|, and a string |value|:
+
+  1. Let |token| be the result of running [=get a safe token=] given |parser| and |index|.
+  1. If |token|'s [=token/value=] is not |value|, then return false.
+  1. If any of the following are true:
+    <ul>
+      <li>|token|'s [=token/type=] is "<a for=token/type>`char`</a>";
+      <li>|token|'s [=token/type=] is "<a for=token/type>`escaped-char`</a>"; or
+      <li>|token|'s [=token/type=] is "<a for=token/type>`invalid-char`</a>",
+    </ul>
+    <p>then return true.
+  1. Return false.
+</div>
+
+<div algorithm>
+To run <dfn>is a protocol suffix</dfn> given a [=constructor string parser=] |parser|:
+
+  1. Return the result of running [=is a non-special pattern char=] given |parser|, |parser|'s [=constructor string parser/token index=], and "`:`".
+</div>
+
+<div algorithm>
+To run <dfn>next is authority slashes</dfn> given a [=constructor string parser=] |parser|:
+
+  1. If the result of running [=is a non-special pattern char=] given |parser|, |parser|'s [=constructor string parser/token index=] + 1, and "`/`" is false, then return false.
+  1. If the result of running [=is a non-special pattern char=] given |parser|, |parser|'s [=constructor string parser/token index=] + 2, and "`/`" is false, then return false.
+  1. Return true.
+</div>
+
+<div algorithm>
+To run <dfn>is an identity terminator</dfn> given a [=constructor string parser=] |parser|:
+
+  1. Return the result of running [=is a non-special pattern char=] given |parser|, |parser|'s [=constructor string parser/token index=], and "`@`".
+</div>
+
+<div algorithm>
+To run <dfn>is a password prefix</dfn> given a [=constructor string parser=] |parser|:
+
+  1. Return the result of running [=is a non-special pattern char=] given |parser|, |parser|'s [=constructor string parser/token index=], and "`:`".
+</div>
+
+<div algorithm>
+To run <dfn>is a port prefix</dfn> given a [=constructor string parser=] |parser|:
+
+  1. Return the result of running [=is a non-special pattern char=] given |parser|, |parser|'s [=constructor string parser/token index=], and "`:`".
+</div>
+
+<div algorithm>
+To run <dfn>is a pathname start</dfn> given a [=constructor string parser=] |parser|:
+
+  1. Return the result of running [=is a non-special pattern char=] given |parser|, |parser|'s [=constructor string parser/token index=], and "`/`".
+</div>
+
+<div algorithm>
+To run <dfn>is a search prefix</dfn> given a [=constructor string parser=] |parser|:
+
+  1. If result of running [=is a non-special pattern char=] given |parser|, |parser|'s [=constructor string parser/token index=] and "`?`" is true, then return true.
+  1. If |parser|'s [=constructor string parser/token list=][|parser|'s [=constructor string parser/token index=]]'s [=token/value=] is not "`?`", then return false.
+  1. Let |previous index| be |parser|'s [=constructor string parser/token index=] &minus; 1.
+  1. If |previous index| is less than 0, then return true.
+  1. Let |previous token| be the result of running [=get a safe token=] given |parser| and |previous index|.
+  1. If any of the following are true, then return false:
+    <ul>
+      <li>|previous token|'s [=token/type=] is "<a for=token/type>`name`</a>".</li>
+      <li>|previous token|'s [=token/type=] is "<a for=token/type>`regexp`</a>".</li>
+      <li>|previous token|'s [=token/type=] is "<a for=token/type>`close`</a>".</li>
+      <li>|previous token|'s [=token/type=] is "<a for=token/type>`asterisk`</a>".</li>
+    </ul>
+  1. Return true.
+</div>
+
+<div algorithm>
+To run <dfn>is a hash prefix</dfn> given a [=constructor string parser=] |parser|:
+
+  1. Return the result of running [=is a non-special pattern char=] given |parser|, |parser|'s [=constructor string parser/token index=] and "`#`".
+</div>
+
+<div algorithm>
+To run <dfn>is a group open</dfn> given a [=constructor string parser=] |parser|:
+  1. If |parser|'s [=constructor string parser/token list=][|parser|'s [=constructor string parser/token index=]]'s [=token/type=] is "<a for=token/type>`open`</a>", then return true.
+  1. Else return false.
+</div>
+
+<div algorithm>
+To run <dfn>is a group close</dfn> given a [=constructor string parser=] |parser|:
+  1. If |parser|'s [=constructor string parser/token list=][|parser|'s [=constructor string parser/token index=]]'s [=token/type=] is "<a for=token/type>`close`</a>", then return true.
+  1. Else return false.
+</div>
+
+<div algorithm>
+To run <dfn>is an IPv6 open</dfn> given a [=constructor string parser=] |parser|:
+
+  1. Return the result of running [=is a non-special pattern char=] given |parser|, |parser|'s [=constructor string parser/token index=], and "`[`".
+</div>
+
+<div algorithm>
+To run <dfn>is an IPv6 close</dfn> given a [=constructor string parser=] |parser|:
+
+  1. Return the result of running [=is a non-special pattern char=] given |parser|, |parser|'s [=constructor string parser/token index=], and "`]`".
+</div>
+
+<div algorithm>
+To run <dfn>make a component string</dfn> given a [=constructor string parser=] |parser|:
+
+  1. [=Assert=]: |parser|'s [=constructor string parser/token index=] is less than |parser|'s [=constructor string parser/token list=]'s [=list/size=].
+  1. Let |token| be |parser|'s [=constructor string parser/token list=][|parser|'s [=constructor string parser/token index=]].
+  1. Let |component start token| be the result of running [=get a safe token=] given |parser| and |parser|'s [=constructor string parser/component start=].
+  1. Let |component start input index| be |component start token|'s [=token/index=].
+  1. Let |end index| be |token|'s [=token/index=].
+  1. Return the [=code point substring by positions|code point substring=] from |component start input index| to |end index| within |parser|'s [=constructor string parser/input=].
+</div>
+
+<div algorithm>
+To <dfn>compute protocol matches a special scheme flag</dfn> given a [=constructor string parser=] |parser|:
+
+  1. Let |protocol string| be the result of running [=make a component string=] given |parser|.
+  1. Let |protocol component| be the result of [=compiling a component=] given |protocol string|, [=canonicalize a protocol=], and [=default options=].
+  1. If the result of running [=protocol component matches a special scheme=] given |protocol component| is true, then set |parser|'s [=constructor string parser/protocol matches a special scheme flag=] to true.
+</div>
+
+<h2 id=patterns>Patterns</h2>
+
+A <dfn>pattern string</dfn> is a string that is written to match a set of target strings.  A <dfn for="pattern string">well formed</dfn> pattern string conforms to a particular pattern syntax.  This pattern syntax is directly based on the syntax used by the popular [path-to-regexp](https://github.com/pillarjs/path-to-regexp) JavaScript library.
+
+<h3 id=parsing-patterns>Parsing Patterns</h3>
+
+<h4 id=tokens>Tokens</h4>
+
+A <dfn>token list</dfn> is a [=list=] containing zero or more [=token=] [=structs=].
+
+A <dfn>token</dfn> is a [=struct=] representing a single lexical token within a [=/pattern string=].
+
+A [=token=] has an associated <dfn for=token>type</dfn>, a string, initially "<a for=token/type>`invalid-char`</a>".  It must be one of the following:
+
+<dl>
+  <dt>"<dfn for=token/type>`open`</dfn>"</dt>
+  <dd>The [=token=] represents a U+007B (`{`) code point.
+  <dt>"<dfn for=token/type>`close`</dfn>"</dt>
+  <dd>The [=token=] represents a U+007D (`}`) code point.
+  <dt>"<dfn for=token/type>`regexp`</dfn>"</dt>
+  <dd>The [=token=] represents a string of the form "`(<regular expression>)`".  The regular expression is required to consist of only ASCII code points.
+  <dt>"<dfn for=token/type>`name`</dfn>"</dt>
+  <dd>The [=token=] represents a string of the form "`:<name>`".  The name value is restricted to code points that are consistent with JavaScript identifiers.
+  <dt>"<dfn for=token/type>`char`</dfn>"</dt>
+  <dd>The [=token=] represents a valid pattern code point without any special syntactical meaning.
+  <dt>"<dfn for=token/type>`escaped-char`</dfn>"</dt>
+  <dd>The [=token=] represents a code point escaped using a backslash like "`\<char>`".
+  <dt>"<dfn for=token/type>`other-modifier`</dfn>"</dt>
+  <dd>The [=token=] represents a matching group modifier that is either the U+003F (`?`) or U+002B (`+`) code points.
+  <dt>"<dfn for=token/type>`asterisk`</dfn>"</dt>
+  <dd>The [=token=] represents a U+002A (`*`) code point that can be either a wildcard matching group or a matching group modifier.
+  <dt>"<dfn for=token/type>`end`</dfn>"</dt>
+  <dd>The [=token=] represents the end of the [=/pattern string=].
+  <dt>"<dfn for=token/type>`invalid-char`</dfn>"</dt>
+  <dd>The [=token=] represents a code point that is invalid in the pattern.  This could be because of the code point value itself or due to its location within the pattern relative to other syntactic elements.
+</dl>
+
+A [=token=] has an associated <dfn for=token>index</dfn>, a number, initially 0.  It is the position of the first code point in the [=/pattern string=] represented by the [=token=].
+
+A [=token=] has an associated <dfn for=token>value</dfn>, a string, initially the empty string.  It contains the code points from the [=/pattern string=] represented by the [=token=].
+
+<h4 id=tokenizing>Tokenizing</h4>
+
+A <dfn>tokenize policy</dfn> is a string that must be either "<dfn for="tokenize policy">`strict`</dfn>" or "<dfn for="tokenize policy">`lenient`</dfn>".
+
+A <dfn>tokenizer</dfn> is a [=struct=].
+
+A [=tokenizer=] has an associated <dfn for=tokenizer>input</dfn>, a [=/pattern string=], initially the empty string.
+
+A [=tokenizer=] has an associated <dfn for=tokenizer>policy</dfn>, a [=tokenize policy=], initially "<a for="tokenize policy">`strict`</a>".
+
+A [=tokenizer=] has an associated <dfn for=tokenizer>token list</dfn>, a [=/token list=], initially an empty [=list=].
+
+A [=tokenizer=] has an associated <dfn for=tokenizer>index</dfn>, a number, initially 0.
+
+A [=tokenizer=] has an associated <dfn for=tokenizer>next index</dfn>, a number, initially 0.
+
+A [=tokenizer=] has an associated <dfn for=tokenizer>code point</dfn>, a Unicode code point, initially null.
+
+<div algorithm>
+  To <dfn>tokenize</dfn> a given string |input| and [=tokenize policy=] |policy|:
+
+  1. Let |tokenizer| be a new [=tokenizer=].
+  1. Set |tokenizer|'s [=tokenizer/input=] to |input|.
+  1. Set |tokenizer|'s [=tokenizer/policy=] to |policy|.
+  1. While |tokenizer|'s [=tokenizer/index=] is less than |tokenizer|'s [=tokenizer/input=]'s [=string/code point length=]:
+    1. Run [=seek and get the next code point=] given |tokenizer| and |tokenizer|'s [=tokenizer/index=].
+    1. If |tokenizer|'s [=tokenizer/code point=] is U+002A (`*`):
+      1. Run [=add a token with default position and length=] given |tokenizer| and "<a for=token/type>`asterisk`</a>".
+      1. [=Continue=].
+    1. If |tokenizer|'s [=tokenizer/code point=] is U+002B (`+`) or U+003F (`?`):
+      1. Run [=add a token with default position and length=] given |tokenizer| and "<a for=token/type>`other-modifier`</a>".
+      1. [=Continue=].
+    1. If |tokenizer|'s [=tokenizer/code point=] is U+005C (<code>\</code>):
+      1. If |tokenizer|'s [=tokenizer/index=] is equal to |tokenizer|'s [=tokenizer/input=]'s [=string/code point length=] &minus; 1:
+        1. Run [=process a tokenizing error=] given |tokenizer|, |tokenizer|'s [=tokenizer/next index=], and |tokenizer|'s [=tokenizer/index=].
+        1. [=Continue=].
+      1. Let |escaped index| be |tokenizer|'s [=tokenizer/next index=].
+      1. Run [=get the next code point=] given |tokenizer|.
+      1. Run [=add a token with default length=] given |tokenizer|, "<a for=token/type>`escaped-char`</a>", |tokenizer|'s [=tokenizer/next index=], and |escaped index|.
+      1. [=Continue=].
+    1. If |tokenizer|'s [=tokenizer/code point=] is U+007B (`{`):
+      1. Run [=add a token with default position and length=] given |tokenizer| and "<a for=token/type>`open`</a>".
+      1. [=Continue=].
+    1. If |tokenizer|'s [=tokenizer/code point=] is U+007D (`}`):
+      1. Run [=add a token with default position and length=] given |tokenizer| and "<a for=token/type>`close`</a>".
+      1. [=Continue=].
+    1. If |tokenizer|'s [=tokenizer/code point=] is U+003A (`:`):
+      1. Let |name position| be |tokenizer|'s [=tokenizer/next index=].
+      1. Let |name start| be |name position|.
+      1. While |name position| is less than |tokenizer|'s [=tokenizer/input=]'s [=string/code point length=]:
+        1. Run [=seek and get the next code point=] given |tokenizer| and |name position|.
+        1. Let |first code point| be true if |name position| equals |name start| and false otherwise.
+        1. Let |valid code point| be the result of running [=is a valid name code point=] given |tokenizer|'s [=tokenizer/code point=] and |first code point|.
+        1. If |valid code point| is false [=break=].
+        1. Set |name position| to |tokenizer|'s [=tokenizer/next index=].
+      1. If |name position| is less than or equal to |name start|:
+        1. Run [=process a tokenizing error=] given |tokenizer|, |name start|, and |tokenizer|'s [=tokenizer/index=].
+        1. [=Continue=].
+      1. Run [=add a token with default length=] given |tokenizer|, "<a for=token/type>`name`</a>", |name position|, and |name start|.
+      1. [=Continue=].
+    1. If |tokenizer|'s [=tokenizer/code point=] is U+0028 (`(`):
+      1. Let |depth| be 1.
+      1. Let |regexp position| be |tokenizer|'s [=tokenizer/next index=].
+      1. Let |regexp start| be |regexp position|.
+      1. Let |error| be false.
+      1. While |regexp position| is less than |tokenizer|'s [=tokenizer/input=]'s [=string/code point length=]:
+        1. Run [=seek and get the next code point=] given |tokenizer| and |regexp position|.
+        1. If the result of running [=is ASCII=] given |tokenizer|'s [=tokenizer/code point=] is false:
+          1. Run [=process a tokenizing error=] given |tokenizer|, |regexp start|, and |tokenizer|'s [=tokenizer/index=].
+          1. Set |error| to true.
+          1. [=Break=].
+        1. If |regexp position| equals |regexp start| and |tokenizer|'s [=tokenizer/code point=] is U+003F (`?`):
+          1. Run [=process a tokenizing error=] given |tokenizer|, |regexp start|, and |tokenizer|'s [=tokenizer/index=].
+          1. Set |error| to true.
+          1. [=Break=].
+        1. If |tokenizer|'s [=tokenizer/code point=] is U+005C (<code>\</code>):
+          1. If |regexp position| equals |tokenizer|'s [=tokenizer/input=]'s [=string/code point length=] &minus; 1:
+            1. Run [=process a tokenizing error=] given |tokenizer|, |regexp start|, and |tokenizer|'s [=tokenizer/index=].
+            1. Set |error| to true.
+            1. [=Break=]
+          1. Run [=get the next code point=] given |tokenizer|.
+          1. If the result of running [=is ASCII=] given |tokenizer|'s [=tokenizer/code point=] is false:
+            1. Run [=process a tokenizing error=] given |tokenizer|, |regexp start|, and |tokenizer|'s [=tokenizer/index=].
+            1. Set |error| to true.
+            1. [=Break=].
+          1. Set |regexp position| to |tokenizer|'s [=tokenizer/next index=].
+          1. [=Continue=].
+        1. If |tokenizer|'s [=tokenizer/code point=] is U+0029 (`)`):
+          1. Decrement |depth| by 1.
+          1. If |depth| is 0:
+            1. Set |regexp position| to |tokenizer|'s [=tokenizer/next index=].
+            1. [=Break=].
+        1. Else if |tokenizer|'s [=tokenizer/code point=] is U+0028 (`(`):
+          1. Increment |depth| by 1.
+          1. If |regexp position| equals |tokenizer|'s [=tokenizer/input=]'s [=string/code point length=] &minus; 1:
+            1. Run [=process a tokenizing error=] given |tokenizer|, |regexp start|, and |tokenizer|'s [=tokenizer/index=].
+            1. Set |error| to true.
+            1. [=Break=]
+          1. Let |temporary position| be |tokenizer|'s [=tokenizer/next index=].
+          1. Run [=get the next code point=] given |tokenizer|.
+          1. If |tokenizer|'s [=tokenizer/code point=] is not U+003F (`?`):
+            1. Run [=process a tokenizing error=] given |tokenizer|, |regexp start|, and |tokenizer|'s [=tokenizer/index=].
+            1. Set |error| to true.
+            1. [=Break=].
+          1. Set |tokenizer|'s [=tokenizer/next index=] to |temporary position|.
+        1. Set |regexp position| to |tokenizer|'s [=tokenizer/next index=].
+      1. If |error| is true [=continue=].
+      1. If |depth| is not zero:
+        1. Run [=process a tokenizing error=] given |tokenizer|, |regexp start|, and |tokenizer|'s [=tokenizer/index=].
+        1. [=Continue=].
+      1. Let |regexp length| be |regexp position| &minus; |regexp start| &minus; 1.
+      1. If |regexp length| is zero:
+        1. Run [=process a tokenizing error=] given |tokenizer|, |regexp start|, and |tokenizer|'s [=tokenizer/index=].
+        1. [=Continue=].
+      1. Run [=add a token=] given |tokenizer|, "<a for=token/type>`regexp`</a>", |regexp position|, |regexp start|, and |regexp length|.
+      1. [=Continue=].
+    1. Run [=add a token with default position and length=] given |tokenizer| and "<a for=token/type>`char`</a>".
+  1. Run [=add a token with default length=] given |tokenizer|, "<a for=token/type>`end`</a>", |tokenizer|'s [=tokenizer/index=], and |tokenizer|'s [=tokenizer/index=].
+  1. Return |tokenizer|'s [=tokenizer/token list=].
+</div>
+
+<div algorithm>
+  To <dfn>get the next code point</dfn> for a given [=tokenizer=] |tokenizer|:
+
+  1. Set |tokenizer|'s [=tokenizer/code point=] to the Unicode code point in |tokenizer|'s [=tokenizer/input=] at the position indicated by |tokenizer|'s [=tokenizer/next index=].
+  1. Increment |tokenizer|'s [=tokenizer/next index=] by 1.
+</div>
+
+<div algorithm>
+  To <dfn>seek and get the next code point</dfn> for a given [=tokenizer=] |tokenizer| and number |index|:
+
+  1. Set |tokenizer|'s [=tokenizer/next index=] to |index|.
+  1. Run [=get the next code point=] given |tokenizer|.
+</div>
+
+<div algorithm>
+  To <dfn>add a token</dfn> for a given [=tokenizer=] |tokenizer|, [=token/type=] |type|, number |next position|, number |value position|, and number |value length|:
+
+  1. Let |token| be a new [=token=].
+  1. Set |token|'s [=token/type=] to |type|.
+  1. Set |token|'s [=token/index=] to |tokenizer|'s [=tokenizer/index=].
+  1. Set |token|'s [=token/value=] to the [=code point substring=] from |value position| with length |value length| within |tokenizer|'s [=tokenizer/input=].
+  1. [=list/Append=] |token| to the back of |tokenizer|'s [=tokenizer/token list=].
+  1. Set |tokenizer|'s [=token/index=] to |next position|.
+</div>
+
+<div algorthm>
+  To <dfn>add a token with default length</dfn> for a given [=tokenizer=] |tokenizer|, [=token/type=] |type|, number |next position|, and number |value position|:
+
+  1. Let |computed length| be |next position| &minus; |value position|.
+  1. Run [=add a token=] given |tokenizer|, |type|, |next position|, |value position|, and |computed length|.
+</div>
+
+<div algorithm>
+  To <dfn>add a token with default position and length</dfn> for a given [=tokenizer=] |tokenizer| and [=token/type=] |type|:
+
+  1. Run [=add a token with default length=] given |tokenizer|, |type|, |tokenizer|'s [=tokenizer/next index=], and |tokenizer|'s [=tokenizer/index=].
+</div>
+
+<div algorithm>
+  To <dfn>process a tokenizing error</dfn> for a given [=tokenizer=] |tokenizer|, a number |next position|, and a number |value position|:
+
+  1. If |tokenizer|'s [=tokenizer/policy=] is "<a for="tokenize policy">`strict`</a>", then throw a {{TypeError}}.
+  1. [=Assert=]: |tokenizer|'s [=tokenizer/policy=] is "<a for="tokenize policy">`lenient`</a>".
+  1. Run [=add a token with default length=] given |tokenizer|, "<a for=token/type>`invalid-char`</a>", |next position|, and |value position|.
+</div>
+
+<div algorithm>
+  To perform <dfn>is a valid name code point</dfn> given a Unicode |code point| and a boolean |first|:
+
+  1. If |first| is true return the result of checking if |code point| is contained in the [=IdentifierStart=] set of code points.
+  1. Else return the result of checking if |code point| is contained in the [=IdentifierPart=] set of code points.
+</div>
+
+<div algorithm>
+  To determine if a Unicode |code point| <dfn>is ASCII</dfn>:
+
+  1. If |code point| is between U+0000 and U+007F inclusive, then return true.
+  1. Otherwise return false.
+</div>
+
+<h4 id=parts>Parts</h4>
+
+A <dfn>part list</dfn> is a [=list=] of zero or more [=parts=].
+
+A <dfn>part</dfn> is a [=struct=] representing one piece of a parser [=/pattern string=].  It can contain at most one matching group, a fixed text prefix, a fixed text suffix, and a modifier.  It can contain as little as a single fixed text string or a single matching group.
+
+A [=part=] has an associated <dfn export for=part>type</dfn>, a string, which must be set upon creation.  It must be one of the following:
+
+<dl>
+  <dt>"<dfn for=part/type>`fixed-text`</dfn>"</dt>
+  <dd>The [=part=] represents a simple fixed text string.</dd>
+  <dt>"<dfn for=part/type>`regexp`</dfn>"</dt>
+  <dd>The [=part=] represents a matching group with a custom regular expression.</dd>
+  <dt>"<dfn for=part/type>`segment-wildcard`</dfn>"</dt>
+  <dd>The [=part=] represents a matching group that matches code points up to the next separator code point. This is typically used for a named group like "`:foo`" that does not have a custom regular expression.</dd>
+  <dt>"<dfn for=part/type>`full-wildcard`</dfn>"</dt>
+  <dd>The [=part=] represents a matching group that greedily matches all code points.  This is typically used for the "`*`" wildcard matching group.</dd>
+</dl>
+
+A [=part=] has an associated <dfn for=part>value</dfn>, a string, which must be set upon creation.
+
+A [=part=] has an associated <dfn for=part>modifier</dfn> a string, which must be set upon creation.  It must be one of the following:
+
+<dl>
+  <dt>"<dfn for=part/modifier>`none`</dfn>"</dt>
+  <dd>The [=part=] does not have a [=part/modifier=].</dd>
+  <dt>"<dfn for=part/modifier>`optional`</dfn>"</dt>
+  <dd>The [=part=] has an optional [=part/modifier=] indicated by the U+003F (`?`) code point.</dd>
+  <dt>"<dfn for=part/modifier>`zero-or-more`</dfn>"</dt>
+  <dd>The [=part=] has a "zero or more" [=part/modifier=] indicated by the U+002A (`*`) code point.</dd>
+  <dt>"<dfn for=part/modifier>`one-or-more`</dfn>"</dt>
+  <dd>The [=part=] has a "one or more" [=part/modifier=] indicated by the U+002B (`+`) code point.</dd>
+</dl>
+
+A [=part=] has an associated <dfn for=part>name</dfn>, a string, initially the empty string.
+
+A [=part=] has an associated <dfn for=part>prefix</dfn>, a string, initially the empty string.
+
+A [=part=] has an associated <dfn for=part>suffix</dfn>, a string, initially the empty string.
+
+<h4 id=options-header>Options</h4>
+
+An <dfn>options</dfn> [=struct=] contains different settings that control how [=/pattern string=] behaves.  These options originally come from [path-to-regexp](https://github.com/pillarjs/path-to-regexp).  We only include the options that are modified within the URLPattern specification and exclude the other options.  For the purposes of comparison, this specification acts like [path-to-regexp](https://github.com/pillarjs/path-to-regexp) where `strict`, `start`, and `end` are always set to false.
+
+An [=/options=] has an associated <dfn for=options>delimiter code point</dfn>, a string, which must be set upon creation.  It must contain one [=ASCII code point=] or the empty string.  This code point is treated as a segment separator and is used for determining how far a `:foo` named group should match by default.  For example, if the [=options/delimiter code point=] is "`/`" then "`/:foo`" will match "`/bar`", but not "`/bar/baz`".  If the [=options/delimiter code point=] is the empty string then the example pattern would match both strings.
+
+An [=/options=] has an associated <dfn for=options>prefix code point</dfn>, a string, which must be set upon creation.  It must contain one [=ASCII code point=] or the empty string.  The code point is treated as an automatic prefix if found immediately preceding a match group.  This matters when a match group is modified to be optional or repeating.  For example, if [=options/prefix code point=] is "`/`" then "`/foo/:bar?/baz`" will treat the "`/`" before "`:bar`" as a prefix that becomes optional along with the named group.  So in this example the pattern would match "`/foo/baz`".
+
+An [=/options=] has an associated <dfn for=options>ignore case</dfn>, a boolean, which must be set up upon creation.  It defaults to false.  Depending on the set value, true or false, this flag enables case-sensitive or case-insensitive matches, respectively.  For the purpose of comparison, this case be thought of as the negated `sensitive` option in [path-to-regexp](https://github.com/pillarjs/path-to-regexp).
+
+<h4 id=parsing>Parsing</h4>
+
+<div algorithm>
+An <dfn>encoding callback</dfn> is an abstract algorithm that takes a given string |input|.  The |input| will be a simple text piece of a [=/pattern string=].  An implementing algorithm will validate and encode the |input|.  It must return the encoded string or throw an exception.
+</div>
+
+A <dfn>pattern parser</dfn> is a [=struct=].
+
+A [=pattern parser=] has an associated <dfn for="pattern parser">token list</dfn>, a [=/token list=], initially an empty [=list=].
+
+A [=pattern parser=] has an associated <dfn for="pattern parser">encoding callback</dfn>, a [=/encoding callback=], that must be set upon creation.
+
+A [=pattern parser=] has an associated <dfn for="pattern parser">segment wildcard regexp</dfn>, a string, that must be set upon creation.
+
+A [=pattern parser=] has an associated <dfn for="pattern parser">part list</dfn>, a [=/part list=], initially an empty [=list=].
+
+A [=pattern parser=] has an associated <dfn for="pattern parser">pending fixed value</dfn>, a string, initially the empty string.
+
+A [=pattern parser=] has an associated <dfn for="pattern parser">index</dfn>, a number, initially 0.
+
+A [=pattern parser=] has an associated <dfn for="pattern parser">next numeric name</dfn>, a number, initially 0.
+
+<div algorithm>
+To <dfn>parse a pattern string</dfn> given a [=/pattern string=] |input|, [=/options=] |options|, and [=/encoding callback=] |encoding callback|:
+
+  1. Let |parser| be a new [=pattern parser=] whose [=pattern parser/encoding callback=] is |encoding callback| and [=pattern parser/segment wildcard regexp=] is the result of running [=generate a segment wildcard regexp=] given |options|.
+  1. Set |parser|'s [=pattern parser/token list=] to the result of running [=tokenize=] given |input| and "<a for="tokenize policy">`strict`</a>".
+  1. While |parser|'s [=pattern parser/index=] is less than |parser|'s [=pattern parser/token list=]'s [=list/size=]:
+    <div class="note">
+     <p>This first section is looking for the sequence: `<prefix char><name><regexp><modifier>`.  There could be zero to all of these tokens.
+      <dl class="example" id="parse-example-1">
+        <dt>"`/:foo(bar)?`"</dt>
+        <dd>All four [=tokens=].</dd>
+        <dt>"`/`"</dt>
+        <dd>One "<a for=token/type>`char`</a>" [=token=].
+        <dt>"`:foo`"</dt>
+        <dd>One "<a for=token/type>`name`</a>" [=token=].
+        <dt>"`(bar)`"</dt>
+        <dd>One "<a for=token/type>`regexp`</a>" [=token=].
+        <dt>"`/:foo`"</dt>
+        <dd>"<a for=token/type>`char`</a>" and "<a for=token/type>`name`</a>" [=tokens=].
+        <dt>"`/(bar)`"</dt>
+        <dd>"<a for=token/type>`char`</a>" and "<a for=token/type>`regexp`</a>" [=tokens=].
+        <dt>"`/:foo?`"</dt>
+        <dd>"<a for=token/type>`char`</a>", "<a for=token/type>`name`</a>", and "<a for=token/type>`other-modifier`</a>" [=tokens=].
+        <dt>"`/(bar)?`"</dt>
+        <dd>"<a for=token/type>`char`</a>", "<a for=token/type>`regexp`</a>", and "<a for=token/type>`other-modifier`</a>" [=tokens=].
+      </dl>
+    </div>
+    1. Let |char token| be the result of running [=try to consume a token=] given |parser| and "<a for=token/type>`char`</a>".
+    1. Let |name token| be the result of running [=try to consume a token=] given |parser| and "<a for=token/type>`name`</a>".
+    1. Let |regexp or wildcard token| be the result of running [=try to consume a regexp or wildcard token=] given |parser| and |name token|.
+    1. If |name token| is not null or |regexp or wildcard token| is not null:
+      <p class=note>If there is a matching group, we need to add the [=part=] immediately.
+      1. Let |prefix| be the empty string.
+      1. If |char token| is not null then set |prefix| to |char token|'s [=token/value=].
+      1. If |prefix| is not the empty string and not |options|'s [=options/prefix code point=]:
+        1. Append |prefix| to the end of |parser|'s [=pattern parser/pending fixed value=].
+        1. Set |prefix| to the empty string.
+      1. Run [=maybe add a part from the pending fixed value=] given |parser|.
+      1. Let |modifier token| be the result of running [=try to consume a modifier token=] given |parser|.
+      1. Run [=add a part=] given |parser|, |prefix|, |name token|, |regexp or wildcard token|, the empty string, and |modifier token|.
+      1. [=Continue=].
+    1. Let |fixed token| be |char token|.
+      <p class=note>If there was no matching group, then we need to buffer any fixed text.  We want to collect as much text as possible before adding it as a "<a for=part/type>`fixed-text`</a>" [=part=].
+    1. If |fixed token| is null, then set |fixed token| to the result of running [=try to consume a token=] given |parser| and "<a for=token/type>`escaped-char`</a>".
+    1. If |fixed token| is not null:
+      1. Append |fixed token|'s [=token/value=] to |parser|'s [=pattern parser/pending fixed value=].
+      1. [=Continue=].
+    1. Let |open token| be the result of running [=try to consume a token=] given |parser| and "<a for=token/type>`open`</a>".
+      <div class=note>
+        <p class=allow-2119>Next we look for the sequence `<open><char prefix><name><regexp><char suffix><close><modifier>`.  The open and close are required, but the other tokens are optional.
+        <dl class=example id=parsing-example-2>
+          <dt>"`{a:foo(bar)b}?`"</dt>
+          <dd>All [=tokens=] are present.
+          <dt>"`{:foo}?`"</dt>
+          <dd>"<a for=token/type>`open`</a>", "<a for=token/type>`name`</a>", "<a for=token/type>`close`</a>", and "<a for=token/type>`other-modifier`</a>" [=tokens=].</dd>
+          <dt>"`{(bar)}?`"</dt>
+          <dd>"<a for=token/type>`open`</a>", "<a for=token/type>`regexp`</a>", "<a for=token/type>`close`</a>", and "<a for=token/type>`other-modifier`</a>" [=tokens=].</dd>
+          <dt>"`{ab}?`"</dt>
+          <dd>"<a for=token/type>`open`</a>", "<a for=token/type>`char`</a>", "<a for=token/type>`close`</a>", and "<a for=token/type>`other-modifier`</a>" [=tokens=].</dd>
+        </dl>
+      </div>
+    1. If |open token| is not null:
+      1. Set |prefix| be the result of running [=consume text=] given |parser|.
+      1. Set |name token| to the result of running [=try to consume a token=] given |parser| and "<a for=token/type>`name`</a>".
+      1. Set |regexp or wildcard token| to the result of running [=try to consume a regexp or wildcard token=] given |parser| and |name token|.
+      1. Let |suffix| be the result of running [=consume text=] given |parser|.
+      1. Run [=consume a required token=] given |parser| and "<a for=token/type>`close`</a>".
+      1. Set |modifier token| to the result of running [=try to consume a modifier token=] given |parser|.
+      1. Run [=add a part=] given |parser|, |prefix|, |name token|, |regexp or wildcard token|, |suffix|, and |modifier token|.
+      1. [=Continue=].
+    1. Run [=maybe add a part from the pending fixed value=] given |parser|.
+    1. Run [=consume a required token=] given |parser| and "<a for=token/type>`end`</a>".
+  1. Return |parser|'s [=pattern parser/part list=].
+</div>
+
+The <dfn>full wildcard regexp value</dfn> is the string "`.*`".
+
+<div algorithm>
+To <dfn>generate a segment wildcard regexp</dfn> given an [=/options=] |options|:
+
+  1. Let |result| be "`[^`".
+  1. Append the result of running [=escape a regexp string=] given |options|'s [=options/delimiter code point=] to the end of |result|.
+  1. Append "`]+?`" to the end of |result|.
+  1. Return |result|.
+</div algorithm>
+
+<div algorithm>
+To <dfn>try to consume a token</dfn> given a [=pattern parser=] |parser| and [=token/type=] |type|:
+
+  1. [=Assert=]: |parser|'s [=pattern parser/index=] is less than |parser|'s [=pattern parser/token list=] [=list/size=].
+  1. Let |next token| be |parser|'s [=pattern parser/token list=][|parser|'s [=pattern parser/index=]].
+  1. If |next token|'s [=token/type=] is not |type| return null.
+  1. Increment |parser|'s [=pattern parser/index=] by 1.
+  1. Return |next token|.
+</div>
+
+<div algorithm>
+To <dfn>try to consume a modifier token</dfn> given a [=pattern parser=] |parser|:
+
+  1. Let |token| be the result of running [=try to consume a token=] given |parser| and "<a for=token/type>`other-modifier`</a>".
+  1. If |token| is not null, then return |token|.
+  1. Set |token| to the result of running [=try to consume a token=] given |parser| and "<a for=token/type>`asterisk`</a>".
+  1. Return |token|.
+</div>
+
+<div algorithm>
+To <dfn>try to consume a regexp or wildcard token</dfn> given a [=pattern parser=] |parser| and [=token=] |name token|:
+
+  1. Let |token| be the result of running [=try to consume a token=] given |parser| and "<a for=token/type>`regexp`</a>".
+  1. If |name token| is null and |token| is null, then set |token| to the result of running [=try to consume a token=] given |parser| and "<a for=token/type>`asterisk`</a>".
+  1. Return |token|.
+</div>
+
+<div algorithm>
+To <dfn>consume a required token</dfn> given a [=pattern parser=] |parser| and [=token/type=] |type|:
+
+  1. Let |result| be the result of running [=try to consume a token=] given |parser| and |type|.
+  1. If |result| is null, then throw a {{TypeError}}.
+  1. Return |result|.
+</div>
+
+<div algorithm>
+To <dfn>consume text</dfn> given a [=pattern parser=] |parser|:
+
+  1. Let |result| be the empty string.
+  1. While true:
+    1. Let |token| be the result of running [=try to consume a token=] given |parser| and "<a for=token/type>`char`</a>".
+    1. If |token| is null, then set |token| to the result of running [=try to consume a token=] given |parser| and "<a for=token/type>`escaped-char`</a>".
+    1. If |token| is null, then [=break=].
+    1. Append |token|'s [=token/value=] to the end of |result|.
+  1. Return |result|.
+</div>
+
+<div algorithm>
+To <dfn>maybe add a part from the pending fixed value</dfn> given a [=pattern parser=] |parser|:
+
+  1. If |parser|'s [=pattern parser/pending fixed value=] is the empty string, then return.
+  1. Let |encoded value| be the result of running |parser|'s [=pattern parser/encoding callback=] given |parser|'s [=pattern parser/pending fixed value=].
+  1. Set |parser|'s [=pattern parser/pending fixed value=] to the empty string.
+  1. Let |part| be a new [=part=] whose [=part/type=] is "<a for=part/type>`fixed-text`</a>", [=part/value=] is |encoded value|, and [=part/modifier=] is "<a for=part/modifier>`none`</a>".
+  1. [=list/Append=] |part| to |parser|'s [=pattern parser/part list=].
+</div>
+
+<div algorithm>
+To <dfn>add a part</dfn> given a [=pattern parser=] |parser|, a string |prefix|, a [=token=] |name token|, a [=token=] |regexp or wildcard token|, a string |suffix|, and a [=token=] |modifier token|:
+
+  1. Let |modifier| be "<a for=part/modifier>`none`</a>".
+  1. If |modifier token| is not null:
+    1. If |modifier token|'s [=token/value=] is "`?`" then set |modifier| to "<a for=part/modifier>`optional`</a>".
+    1. Else if |modifier token|'s [=token/value=] is "`*`" then set |modifier| to "<a for=part/modifier>`zero-or-more`</a>".
+    1. Else if |modifier token|'s [=token/value=] is "`+`" then set |modifier| to "<a for=part/modifier>`one-or-more`</a>".
+  1. If |name token| is null and |regexp or wildcard token| is null and |modifier| is "<a for=part/modifier>`none`</a>":
+    <p class=note>This was a "`{foo}`" grouping.  We add this to the [=pattern parser/pending fixed value=] so that it will be combined with any previous or subsequent text.</p>
+    1. Append |prefix| to the end of |parser|'s [=pattern parser/pending fixed value=].
+    1. Return.
+  1. Run [=maybe add a part from the pending fixed value=] given |parser|.
+  1. If |name token| is null and |regexp or wildcard token| is null:
+    <p class=note>This was a "`{foo}?`" grouping.  The modifier means we cannot combine it with other text.  Therefore we add it as a [=part=] immediately.</p>
+    1. [=Assert=]: |suffix| is the empty string.
+    1. If |prefix| is the empty string, then return.
+    1. Let |encoded value| be the result of running |parser|'s [=pattern parser/encoding callback=] given |prefix|.
+    1. Let |part| be a new [=part=] whose [=part/type=] is "<a for=part/type>`fixed-text`</a>", [=part/value=] is |encoded value|, and [=part/modifier=] is |modifier|.
+    1. [=list/Append=] |part| to |parser|'s [=pattern parser/part list=].
+    1. Return.
+  1. Let |regexp value| be the empty string.
+    <p class=note>Next, we convert the |regexp or wildcard token| into a regular expression.
+  1. If |regexp or wildcard token| is null, then set |regexp value| to |parser|'s [=pattern parser/segment wildcard regexp=].
+  1. Else if |regexp or wildcard token|'s [=token/type=] is "<a for=token/type>`asterisk`</a>", then set |regexp value| to the [=full wildcard regexp value=].
+  1. Else set |regexp value| to |regexp or wildcard token|'s [=token/value=].
+  1. Let |type| be "<a for=part/type>`regexp`</a>".
+    <p class=note>Next, we convert |regexp value| into a [=part=] [=part/type=].  We make sure to go to a regular expression first so that an equivalent "<a for=token/type>`regexp`</a>" [=token=] will be treated the same as a "<a for=token/type>`name`</a>" or "<a for=token/type>`asterisk`</a>" [=token=].</p>
+  1. If |regexp value| is |parser|'s [=pattern parser/segment wildcard regexp=]:
+    1. Set |type| to "<a for=part/type>`segment-wildcard`</a>".
+    1. Set |regexp value| to the empty string.
+  1. Else if |regexp value| is the [=full wildcard regexp value=]:
+    1. Set |type| to "<a for=part/type>`full-wildcard`</a>".
+    1. Set |regexp value| to the empty string.
+  1. Let |name| be the empty string.
+    <p class=note>Next, we determine the [=part=] [=part/name=].  This can be explicitly provided by a "<a for=token/type>`name`</a>" [=token=] or be automatically assigned.</a>
+  1. If |name token| is not null, then set |name| to |name token|'s [=token/value=].
+  1. Else if |regexp or wildcard token| is not null:
+    1. Set |name| to |parser|'s [=pattern parser/next numeric name=].
+    1. Increment |parser|'s [=pattern parser/next numeric name=] by 1.
+  1. If the result of running [=is a duplicate name=] given |parser| and |name| is true, then throw a {{TypeError}}.
+  1. Let |encoded prefix| be the result of running |parser|'s [=pattern parser/encoding callback=] given |prefix|.
+    <p class=note>Finally, we encode the fixed text values and create the [=part=].
+  1. Let |encoded suffix| be the result of running |parser|'s [=pattern parser/encoding callback=] given |suffix|.
+  1. Let |part| be a new [=part=] whose [=part/type=] is |type|, [=part/value=] is |regexp value|, [=part/modifier=] is |modifier|, [=part/name=] is |name|, [=part/prefix=] is |encoded prefix|, and [=part/suffix=] is |encoded suffix|.
+  1. [=list/Append=] |part| to |parser|'s [=pattern parser/part list=].
+</div>
+
+<div algorithm>
+To determine if a value <dfn>is a duplicate name</dfn> given a [=pattern parser=] |parser| and a string |name|:
+
+  1. [=list/For each=] |part| of |parser|'s [=pattern parser/part list=]:
+    1. If |part|'s [=part/name=] is |name|, then return true.
+  1. Return false.
+</div>
+
+<h3 id=converting-part-lists-to-regular-expressions>Converting Part Lists to Regular Expressions</h3>
+
+<div algorithm>
+To <dfn export>generate a regular expression and name list</dfn> from a given [=/part list=] |part list| and [=/options=] |options|:
+
+  1. Let |result| be "`^`".
+  1. Let |name list| be a new [=list=].
+  1. [=list/For each=] |part| of |part list|:
+    1. If |part|'s [=part/type=] is "<a for=part/type>`fixed-text`</a>":
+      1. If |part|'s [=part/modifier=] is "<a for=part/modifier>`none`</a>", then append the result of running [=escape a regexp string=] given |part|'s [=part/value=] to the end of |result|.
+      1. Else:
+        <div class=note>
+        <p>A "<a for=part/type>`fixed-text`</a>" |part| with a modifier uses a non capturing group.  It uses the following form.
+        <p>`(?:<fixed text>)<modifier>`
+        </div>
+        1. Append "`(?:`" to the end of |result|.
+        1. Append the result of running [=escape a regexp string=] given |part|'s [=part/value=] to the end of |result|.
+        1. Append "`)`" to the end of |result|.
+        1. Append the result of running [=convert a modifier to a string=] given |part|'s [=part/modifier=] to the end of |result|.
+      1. [=Continue=].
+    1. [=Assert=]: |part|'s [=part/name=] is not the empty string.
+    1. [=list/Append=] |part|'s [=part/name=] to |name list|.
+      <p class=note>We collect the list of matching group names in a parallel list.  This is largely done for legacy reasons to match [path-to-regexp](https://github.com/pillarjs/path-to-regexp).  We could attempt to convert this to use regular expression named captured groups, but given the complexity of this algorithm there is a real risk of introducing unintended bugs.  In addition, if we ever end up exposing the generated regular expressions to the web we would like to maintain compability with [path-to-regexp](https://github.com/pillarjs/path-to-regexp) which has indicated its unlikely to switch to using named capture groups.
+    1. Let |regexp value| be |part|'s [=part/value=].
+    1. If |part|'s [=part/type=] is "<a for=part/type>`segment-wildcard`</a>", then set |regexp value| to the result of running [=generate a segment wildcard regexp=] given |options|.
+    1. Else if |part|'s [=part/type=] is "<a for=part/type>`full-wildcard`</a>", then set |regexp value| to [=full wildcard regexp value=].
+    1. If |part|'s [=part/prefix=] is the empty string and |part|'s [=part/suffix=] is the empty string:
+      <div class=note>
+      <p class=allow-2119>If there is no [=part/prefix=] or [=part/suffix=] then generation depends on the modifier.  If there is no modifier or just the optional modifier, it uses the following simple form:
+      <p>`(<regexp value>)<modifier>`
+      <p>If there is a repeating modifier, however, we will use the more complex form:
+      <p>`((?:<regexp value>)<modifier>)`
+      </div>
+      1. If |part|'s [=part/modifier=] is "<a for=part/modifier>`none`</a>" or "<a for=part/modifier>`optional`</a>", then:
+        1. Append "`(`" to the end of |result|.
+        1. Append |regexp value| to the end of |result|.
+        1. Append "`)`" to the end of |result|.
+        1. Append the result of running [=convert a modifier to a string=] given |part|'s [=part/modifier=] to the end of |result|.
+      1. Else:
+        1. Append "`((?:`" to the end of |result|.
+        1. Append |regexp value| to the end of |result|.
+        1. Append "`)`" to the end of |result|.
+        1. Append the result of running [=convert a modifier to a string=] given |part|'s [=part/modifier=] to the end of |result|.
+        1. Append "`)`" to the end of |result|.
+      1. [=Continue=].
+    1. If |part|'s [=part/modifier=] is "<a for=part/modifier>`none`</a>" or "<a for=part/modifier>`optional`</a>":
+      <div class=note>
+      <p>This section handles non-repeating parts with a [=part/prefix=] and/or [=part/suffix=].  There is an inner capturing group that contains the primary |regexp value|.  The inner group is then combined with the [=part/prefix=] and/or [=part/suffix=] in an outer non-capturing group.  Finally the modifier is applied.  The resulting form is as follows.
+      <p>`(?:<prefix>(<regexp value>)<suffix>)<modifier>`
+      </div>
+      1. Append "`(?:`" to the end of |result|.
+      1. Append the result of running [=escape a regexp string=] given |part|'s [=part/prefix=] to the end of |result|.
+      1. Append "`(`" to the end of |result|.
+      1. Append |regexp value| to the end of |result|.
+      1. Append "`)`" to the end of |result|.
+      1. Append the result of running [=escape a regexp string=] given |part|'s [=part/suffix=] to the end of |result|.
+      1. Append "`)`" to the end of |result|.
+      1. Append the result of running [=convert a modifier to a string=] given |part|'s [=part/modifier=] to the end of |result|.
+      1. [=Continue=].
+    1. [=Assert=]: |part|'s [=part/modifier=] is "<a for=part/modifier>`zero-or-more`</a>" or "<a for=part/modifier>`one-or-more`</a>".
+    1. [=Assert=]: |part|'s [=part/prefix=] is not the empty string or |part|'s [=part/suffix=] is not the empty string.
+      <div class=note>
+      <p class=allow-2119>Repeating parts with a [=part/prefix=] and/or [=part/suffix=] are dramatically more complicated.  We want to exclude the initial [=part/prefix=] and the final [=part/suffix=], but include them between any repeated elements.  To achieve this we provide a separate initial expression that excludes the [=part/prefix=].  Then the expression is duplicated with the [=part/prefix=]/[=part/suffix=] values included in an optional repeating element.  If zero values are permitted then a final optional modifier may be appended.  The resulting form is as follows.
+      <p>`(?:<prefix>((?:<regexp value>)(?:<suffix><prefix>(?:<regexp value>))*)<suffix>)?`
+      </div>
+    1. Append "`(?:`" to the end of |result|.
+    1. Append the result of running [=escape a regexp string=] given |part|'s [=part/prefix=] to the end of |result|.
+    1. Append "`((?:`" to the end of |result|.
+    1. Append |regexp value| to the end of |result|.
+    1. Append "`)(?:`" to the end of |result|.
+    1. Append the result of running [=escape a regexp string=] given |part|'s [=part/suffix=] to the end of |result|.
+    1. Append the result of running [=escape a regexp string=] given |part|'s [=part/prefix=] to the end of |result|.
+    1. Append "`(?:`" to the end of |result|.
+    1. Append |regexp value| to the end of |result|.
+    1. Append "`))*)`" to the end of |result|.
+    1. Append the result of running [=escape a regexp string=] given |part|'s [=part/suffix=] to the end of |result|.
+    1. Append "`)`" to the end of |result|.
+    1. If |part|'s [=part/modifier=] is "<a for=part/modifier>`zero-or-more`</a>" then append "`?`" to the end of |result|.
+  1. Append "`$`" to the end of |result|.
+  1. Return (|result|, |name list|).
+</div>
+
+<div algorithm>
+To <dfn>escape a regexp string</dfn> given a string |input|:
+
+  1. [=Assert=]: |input| is an [=ASCII string=].
+  1. Let |result| be the empty string.
+  1. Let |index| be 0.
+  1. While |index| is less than |input|'s [=string/length=]:
+    1. Let |c| be |input|[|index|].
+    1. Increment |index| by 1.
+    1. If |c| is one of:
+      <ul>
+        <li>U+002E (`.`);</li>
+        <li>U+002B (`+`);</li>
+        <li>U+002A (`*`);</li>
+        <li>U+003F (`?`);</li>
+        <li>U+005E (`^`);</li>
+        <li>U+0024 (`$`);</li>
+        <li>U+007B (`{`);</li>
+        <li>U+007D (`}`);</li>
+        <li>U+0028 (`(`);</li>
+        <li>U+0029 (`)`);</li>
+        <li>U+005B (`[`);</li>
+        <li>U+005D (`]`);</li>
+        <li>U+007C (`|`);</li>
+        <li>U+002F (`/`); or</li>
+        <li>U+005C (<code>\</code>),</li>
+      </ul>
+      <p>then append "<code>\</code>" to the end of |result|.
+    1. Append |c| to the end of |result|.
+  1. Return |result|.
+</div algorithm>
+
+<h3 id=converting-part-lists-to-pattern-strings>Converting Part Lists to Pattern Strings</h3>
+
+<div algorithm>
+To <dfn export>generate a [=/pattern string=]</dfn> from a given [=/part list=] |part list| and [=/options=] |options|:
+
+  1. Let |result| be the empty string.
+  1. Let |index list| be the result of [=list/getting the indices=] for |part list|.
+  1. [=list/For each=] |index| of |index list|:
+    1. Let |part| be |part list|[|index|].
+    1. Let |previous part| be |part list|[|index| - 1] if |index| is greater than 0, otherwise let it be null.
+    1. Let |next part| be |part list|[|index| + 1] if |index| is less than |index list|'s [=list/size=] - 1, otherwise let it be null.
+    1. If |part|'s [=part/type=] is "<a for=part/type>`fixed-text`</a>" then:
+      1. If |part|'s [=part/modifier=] is "<a for=part/modifier>`none`</a>" then:
+        1. Append the result of running [=escape a pattern string=] given |part|'s [=part/value=] to the end of |result|.
+        1. [=Continue=].
+      1. Append "`{`" to the end of |result|.
+      1. Append the result of running [=escape a pattern string=] given |part|'s [=part/value=] to the end of |result|.
+      1. Append "`}`" to the end of |result|.
+      1. Append the result of running [=convert a modifier to a string=] given |part|'s [=part/modifier=] to the end of |result|.
+      1. [=Continue=].
+    1. Let |custom name| be true if |part|'s [=part/name=][0] is not an [=ASCII digit=]; otherwise false.
+    1. Let |needs grouping| be true if at least one of the following are true, otherwise let it be false:
+      <ul>
+        <li>|part|'s [=part/suffix=] is not the empty string.</li>
+        <li>|part|'s [=part/prefix=] is not the empty string and is not |options|'s [=options/prefix code point=].</li>
+      </ul>
+    1. If all of the following are true:
+      <ul>
+        <li>|needs grouping| is false; and</li>
+        <li>|custom name| is true; and</li>
+        <li>|part|'s [=part/type=] is "<a for=part/type>`segment-wildcard`</a>"; and</li>
+        <li>|part|'s [=part/modifier=] is "<a for=part/modifier>`none`</a>"; and</li>
+        <li>|next part| is not null; and</li>
+        <li>|next part|'s [=part/prefix=] is the empty string; and</li>
+        <li>|next part|'s [=part/suffix=] is the empty string</li>
+      </ul>
+      then:
+      1. If |next part|'s [=part/type=] is "<a for=part/type>`fixed-text`</a>":
+        1. Set |needs grouping| to true if the result of running [=is a valid name code point=] given |next part|'s [=part/value=]'s first [=/code point=] and the boolean false is true.
+      1. Else:
+        1. Set |needs grouping| to true if |next part|'s [=part/name=][0] is an [=ASCII digit=].
+    1. If all of the following are true:
+      <ul>
+        <li>|needs grouping| is false; and</li>
+        <li>|part|'s [=part/prefix=] is the empty string; and</li>
+        <li>|previous part| is not null; and</li>
+        <li>|previous part|'s [=part/type=] is "<a for=part/type>`fixed-text`</a>"; and</li>
+        <li>|previous part|'s [=part/value=]'s last [=/code point=] is |options|'s [=options/prefix code point=].</li>
+      </ul>
+      then set |needs grouping| to true.
+    1. [=Assert=]: |part|'s [=part/name=] is not the empty string or null.
+    1. If |needs grouping| is true, then append "`{`" to the end of |result|.
+    1. Append the result of running [=escape a pattern string=] given |part|'s [=part/prefix=] to the end of |result|.
+    1. If |custom name| is true:
+      1. Append "`:`" to the end of |result|.
+      1. Append |part|'s [=part/name=] to the end of |result|.
+    1. If |part|'s [=part/type=] is "<a for=part/type>`regexp`</a>" then:
+      1. Append "`(`" to the end of |result|.
+      1. Append |part|'s [=part/value=] to the end of |result|.
+      1. Append "`)`" to the end of |result|.
+    1. Else if |part|'s [=part/type=] is "<a for=part/type>`segment-wildcard`</a>" and |custom name| is false:
+      1. Append "`(`" to the end of |result|.
+      1. Append the result of running [=generate a segment wildcard regexp=] given |options| to the end of |result|.
+      1. Append "`)`" to the end of |result|.
+    1. Else if |part|'s [=part/type=] is "<a for=part/type>`full-wildcard`</a>":
+      1. If |custom name| is false and one of the following is true:
+        <ul>
+          <li>|previous part| is null; or</li>
+          <li>|previous part|'s [=part/type=] is "<a for=part/type>`fixed-text`</a>"; or</li>
+          <li>|previous part|'s [=part/modifier=] is not "<a for=part/modifier>`none`</a>"; or</li>
+          <li>|needs grouping| is true; or</li>
+          <li>|part|'s [=part/prefix=] is not the empty string</li>
+        </ul>
+        then append "`*`" to the end of |result|.
+      1. Else:
+        1. Append "`(`" to the end of |result|.
+        1. Append [=full wildcard regexp value=] to the end of |result|.
+        1. Append "`)`" to the end of |result|.
+    1. If all of the following are true:
+      <ul>
+        <li>|part|'s [=part/type=] is "<a for=part/type>`segment-wildcard`</a>"; and</li>
+        <li>|custom name| is true; and</li>
+        <li>|part|'s [=part/suffix=] is not the empty string; and</li>
+        <li>The result of running [=is a valid name code point=] given |part|'s [=part/suffix=]'s first [=/code point=] and the boolean false is true</li>
+      </ul>
+      then append U+005C (<code>\</code>) to the end of |result|.
+    1. Append the result of running [=escape a pattern string=] given |part|'s [=part/suffix=] to the end of |result|.
+    1. If |needs grouping| is true, then append "`}`" to the end of |result|.
+    1. Append the result of running [=convert a modifier to a string=] given |part|'s [=part/modifier=] to the end of |result|.
+  1. Return |result|.
+</div>
+
+<div algorithm>
+To <dfn>escape a pattern string</dfn> given a string |input|:
+
+  1. [=Assert=]: |input| is an [=ASCII string=].
+  1. Let |result| be the empty string.
+  1. Let |index| be 0.
+  1. While |index| is less than |input|'s [=string/length=]:
+    1. Let |c| be |input|[|index|].
+    1. Increment |index| by 1.
+    1. If |c| is one of:
+      <ul>
+        <li>U+002B (`+`);</li>
+        <li>U+002A (`*`);</li>
+        <li>U+003F (`?`);</li>
+        <li>U+003A (`:`);</li>
+        <li>U+007B (`{`);</li>
+        <li>U+007D (`}`);</li>
+        <li>U+0028 (`(`);</li>
+        <li>U+0029 (`)`); or</li>
+        <li>U+005C (<code>\</code>),</li>
+      </ul>
+      <p>then append U+005C (<code>\</code>) to the end of |result|.
+    1. Append |c| to the end of |result|.
+  1. Return |result|.
+</div>
+
+<div algorithm>
+To <dfn>convert a modifier to a string</dfn> given a [=part/modifier=] |modifier|:
+
+  1. If |modifier| is "<a for=part/modifier>`zero-or-more`</a>", then return "`*`".
+  1. If |modifier| is "<a for=part/modifier>`optional`</a>", then return "`?`".
+  1. If |modifier| is "<a for=part/modifier>`one-or-more`</a>", then return "`+`".
+  1. Return the empty string.
+</div>
+
+<h2 id=canon>Canonicalization</h2>
+
+<h3 id=canon-encoding-callbacks>Encoding Callbacks</h3>
+
+<div algorithm>
+  To <dfn>canonicalize a protocol</dfn> given a string |value|:
+
+  1. If |value| is the empty string, return |value|.
+  1. Let |dummyURL| be a new [=URL record=].
+  1. Let |parseResult| be the result of running the [=basic URL parser=] given |value| followed by "`://dummy.test`", with |dummyURL| as <i>[=basic URL parser/url=]</i>.
+     <p class="note">Note, [=basic URL parser/state override=] is not used here because it enforces restrictions that are only appropriate for the {{URL/protocol}} setter.  Instead we use the protocol to parse a dummy URL using the normal parsing entry point.</p>
+  1. If |parseResult| is failure, then throw a {{TypeError}}.
+  1. Return |dummyURL|'s [=url/scheme=].
+</div>
+
+<div algorithm>
+  To <dfn>canonicalize a username</dfn> given a string |value|:
+
+  1. If |value| is the empty string, return |value|.
+  1. Let |dummyURL| be a new [=URL record=].
+  1. [=Set the username=] given |dummyURL| and |value|.
+  1. Return |dummyURL|'s [=url/username=].
+</div>
+
+<div algorithm>
+  To <dfn>canonicalize a password</dfn> given a string |value|:
+
+  1. If |value| is the empty string, return |value|.
+  1. Let |dummyURL| be a new [=URL record=].
+  1. [=Set the password=] given |dummyURL| and |value|.
+  1. Return |dummyURL|'s [=url/password=].
+</div>
+
+<div algorithm>
+  To <dfn>canonicalize a hostname</dfn> given a string |value|:
+
+  1. If |value| is the empty string, return |value|.
+  1. Let |dummyURL| be a new [=URL record=].
+  1. Let |parseResult| be the result of running the [=basic URL parser=] given |value| with |dummyURL| as <i>[=basic URL parser/url=]</i> and [=hostname state=] as <i>[=basic URL parser/state override=]</i>.
+  1. If |parseResult| is failure, then throw a {{TypeError}}.
+  1. Return |dummyURL|'s [=url/host=].
+</div>
+
+<div algorithm>
+  To <dfn>canonicalize an IPv6 hostname</dfn> given a string |value|:
+
+  1. Let |result| be the empty string.
+  1. [=list/For each=] |code point| in |value| interpreted as a [=list=] of [=/code points=]:
+    1. If all of the following are true:
+      <ul>
+        <li>|code point| is not an [=ASCII hex digit=];</li>
+        <li>|code point| is not U+005B (`[`);</li>
+        <li>|code point| is not U+005D (`]`); and</li>
+        <li>|code point| is not U+003A (`:`),</li>
+      </ul>
+      <p>then throw a {{TypeError}}.
+    1. Append the result of running [=ASCII lowercase=] given |code point| to the end of |result|.
+  1. Return |result|.
+</div>
+
+<div algorithm>
+  To <dfn>canonicalize a port</dfn> given a string |portValue| and optionally a string |protocolValue|:
+
+  1. If |value| is the empty string, return |value|.
+  1. Let |dummyURL| be a new [=URL record=].
+  1. If |protocolValue| was given, then set |dummyURL|'s [=url/scheme=] to |protocolValue|.
+     <p class="note">Note, we set the [=URL record=]'s [=url/scheme=] in order for the [=basic URL parser=] to recognize and normalize default port values.</p>
+  1. Let |parseResult| be the result of running [=basic URL parser=] given |portValue| with |dummyURL| as <i>[=basic URL parser/url=]</i> and [=port state=] as <i>[=basic URL parser/state override=]</i>.
+  1. If |parseResult| is failure, then throw a {{TypeError}}.
+  1. Return |dummyURL|'s [=url/port=] or empty string if it is null.
+</div>
+
+<div algorithm>
+  To <dfn>canonicalize a pathname</dfn> given a string |value|:
+
+  1. If |value| is the empty string, then return |value|.
+  1. Let |leading slash| be true if the first [=/code point=] in |value| is U+002F (`/`) and otherwise false.
+  1. Let |modified value| be "`/-`" if |leading slash| is false and otherwise the empty string.
+    <div class=note>
+      <p>The URL parser will automatically prepend a leading slash to the canonicalized pathname.  This does not work here unfortunately.  This algorithm is called for pieces of the pathname, instead of the entire pathname, when used as an encoding callback.  Therefore we disable the prepending of the slash by inserting our own. An additional character is also inserted here in order to avoid inadvertantly collapsing a leading dot due to the fake leading slash being interpreted as a "`/.`" sequence.  These inserted characters are then removed from the result below.
+      <p>Note, implementations are free to simply disable slash prepending in their URL parsing code instead of paying the performance penalty of inserting and removing characters in this algorithm.
+    </div>
+  1. Append |value| to the end of |modified value|.
+  1. Let |dummyURL| be a new [=URL record=].
+  1. Let |parseResult| be the result of running [=basic URL parser=] given |modified value| with |dummyURL| as </i>[=basic URL parser/url=]</i> and [=path start state=] as <i>[=basic URL parser/state override=]</i>.
+  1. If |parseResult| is failure, then throw a {{TypeError}}.
+  1. Let |result| be the result of [=URL path serializing=] |dummyURL|.
+  1. If |leading slash| is false, then set |result| to the [=code point substring to the end of the string|code point substring=] from 2 to the end of the string within |result|.
+  1. Return |result|.
+</div>
+
+<div algorithm>
+  To <dfn>canonicalize an opaque pathname</dfn> given a string |value|:
+
+  1. If |value| is the empty string, return |value|.
+  1. Let |dummyURL| be a new [=URL record=].
+  1. Set |dummyURL|'s [=url/path=] to the empty string.
+  1. Let |parseResult| be the result of running [=basic URL parser|URL parsing=] given |value| with |dummyURL| as <i>[=basic URL parser/url=]</i> and [=basic URL parser/opaque path state=] as <i>[=basic URL parser/state override=]</i>.
+  1. If |parseResult| is failure, then throw a {{TypeError}}.
+  1. Return the result of [=URL path serializing=] |dummyURL|.
+</div>
+
+<div algorithm>
+  To <dfn>canonicalize a search</dfn> given a string |value|:
+
+  1. If |value| is the empty string, return |value|.
+  1. Let |dummyURL| be a new [=URL record=].
+  1. Set |dummyURL|'s [=url/query=] to the empty string.
+  1. Let |parseResult| be the result of running [=basic URL parser=] given |value| with |dummyURL| as <i>[=basic URL parser/url=]</i> and [=query state=] as <i>[=basic URL parser/state override=]</i>.
+  1. If |parseResult| is failure, then throw a {{TypeError}}.
+  1. Return |dummyURL|'s [=url/query=].
+</div>
+
+<div algorithm>
+  To <dfn>canonicalize a hash</dfn> given a string |value|:
+
+  1. If |value| is the empty string, return |value|.
+  1. Let |dummyURL| be a new [=URL record=].
+  1. Set |dummyURL|'s [=url/fragment=] to the empty string.
+  1. Let |parseResult| be the result of running [=basic URL parser=] given |value| with |dummyURL| as <i>[=basic URL parser/url=]</i> and [=fragment state=] as <i>[=basic URL parser/state override=]</i>.
+  1. If |parseResult| is failure, then throw a {{TypeError}}.
+  1. Return |dummyURL|'s [=url/fragment=].
+</div>
+
+<h3 id=canon-processing-for-init>{{URLPatternInit}} Processing</h3>
+
+<div algorithm>
+  To <dfn>process a URLPatternInit</dfn> given a {{URLPatternInit}} |init|, a string |type|, a string or null |protocol|, a string or null |username|, a string or null |password|, a string or null |hostname|, a string or null |port|, a string or null |pathname|, a string or null |search|, and a string or null |hash|:
+
+  1. Let |result| be the result of creating a new {{URLPatternInit}}.
+  1. Set |result|["{{URLPatternInit/protocol}}"] to |protocol|.
+  1. Set |result|["{{URLPatternInit/username}}"] to |username|.
+  1. Set |result|["{{URLPatternInit/password}}"] to |password|.
+  1. Set |result|["{{URLPatternInit/hostname}}"] to |hostname|.
+  1. Set |result|["{{URLPatternInit/port}}"] to |port|.
+  1. Set |result|["{{URLPatternInit/pathname}}"] to |pathname|.
+  1. Set |result|["{{URLPatternInit/search}}"] to |search|.
+  1. Set |result|["{{URLPatternInit/hash}}"] to |hash|.
+  1. Let |baseURL| be null.
+  1. If |init|["{{URLPatternInit/baseURL}}"] is not null:
+    1. Set |baseURL| to the result of [=URL parser|parsing=] |init|["{{URLPatternInit/baseURL}}"].
+    1. If |baseURL| is failure, then throw a {{TypeError}}.
+    1. Set |result|["{{URLPatternInit/protocol}}"] to the result of [=processing a base URL string=] given |baseURL|'s [=url/scheme=] and |type|.
+    1. Set |result|["{{URLPatternInit/username}}"] to the result of [=processing a base URL string=] given |baseURL|'s [=url/username=] and |type|.
+    1. Set |result|["{{URLPatternInit/password}}"] to the result of [=processing a base URL string=] given |baseURL|'s [=url/password=] and |type|.
+    1. Set |result|["{{URLPatternInit/hostname}}"] to the result of [=processing a base URL string=] given |baseURL|'s [=url/host=] and |type|.
+    1. Set |result|["{{URLPatternInit/port}}"] to the result of [=processing a base URL string=] given |baseURL|'s [=url/port=] and |type|.
+    1. Set |result|["{{URLPatternInit/pathname}}"] to the result of [=processing a base URL string=] given the result of [=URL path serializing=] |baseURL| and |type|.
+    1. Set |result|["{{URLPatternInit/search}}"] to the result of [=processing a base URL string=] given |baseURL|'s [=url/query=] and |type|.
+    1. Set |result|["{{URLPatternInit/hash}}"] to the result of [=processing a base URL string=] given |baseURL|'s [=url/fragment=] and |type|.
+  1. If |init|["{{URLPatternInit/protocol}}"] is not null then set |result|["{{URLPatternInit/protocol}}"] to the result of [=process protocol for init=] given |init|["{{URLPatternInit/protocol}}"] and |type|.
+  1. If |init|["{{URLPatternInit/username}}"] is not null then set |result|["{{URLPatternInit/username}}"] to the result of [=process username for init=] given |init|["{{URLPatternInit/username}}"] and |type|.
+  1. If |init|["{{URLPatternInit/password}}"] is not null then set |result|["{{URLPatternInit/password}}"] to the result of [=process password for init=] given |init|["{{URLPatternInit/password}}"] and |type|.
+  1. If |init|["{{URLPatternInit/hostname}}"] is not null then set |result|["{{URLPatternInit/hostname}}"] to the result of [=process hostname for init=] given |init|["{{URLPatternInit/hostname}}"] and |type|.
+  1. If |init|["{{URLPatternInit/port}}"] is not null then set |result|["{{URLPatternInit/port}}"] to the result of [=process port for init=] given |init|["{{URLPatternInit/port}}"], |result|["{{URLPatternInit/protocol}}"], and |type|.
+  1. If |init|["{{URLPatternInit/pathname}}"] is not null:
+    1. Set |result|["{{URLPatternInit/pathname}}"] to |init|["{{URLPatternInit/pathname}}"].
+    1. If the following are all true:
+      <ul>
+        <li>|baseURL| is not null;</li>
+        <li>|baseURL| has an [=url/opaque path=]; and</li>
+        <li>the result of running [=is an absolute pathname=] given |result|["{{URLPatternInit/pathname}}"] and |type| is false,
+      </ul>
+      <p>then:
+      1. Let |baseURLPath| be the result of running [=process a base URL string=] given the result of [=URL path serializing=] |baseURL| and |type|.
+      1. Let |slash index| be the index of the last U+002F (`/`) code point found in |baseURLPath|, interpreted as a sequence of [=/code points=], or null if there are no instances of the code point.
+      1. If |slash index| is not null:
+        1. Let |new pathname| be the [=code point substring by positions|code point substring=] from 0 to |slash index| + 1 within |baseURLPath|.
+        1. Append |result|["{{URLPatternInit/pathname}}"] to the end of |new pathname|.
+        1. Set |result|["{{URLPatternInit/pathname}}"] to |new pathname|.
+    1. Set |result|["{{URLPatternInit/pathname}}"] to the result of [=process pathname for init=] given |result|["{{URLPatternInit/pathname}}"], |result|["{{URLPatternInit/protocol}}"], and |type|.
+  1. If |init|["{{URLPatternInit/search}}"] is not null then set |result|["{{URLPatternInit/search}}"] to the result of [=process search for init=] given |init|["{{URLPatternInit/search}}"] and |type|.
+  1. If |init|["{{URLPatternInit/hash}}"] is not null then set |result|["{{URLPatternInit/hash}}"] to the result of [=process hash for init=] given |init|["{{URLPatternInit/hash}}"] and |type|.
+  1. Return |result|.
+</div>
+
+<div algorithm>
+  To <dfn>process a base URL string</dfn> given a string |input| and a string |type|:
+
+  1. [=Assert=]: |input| is not null.
+  1. If |type| is not "`pattern`" return |input|.
+  1. Return the result of [=escaping a pattern string=] given |input|.
+</div>
+
+<div algorithm>
+  To run <dfn>is an absolute pathname</dfn> given a [=/pattern string=] |input| and a string |type|:
+
+  1. If |input| is the empty string, then return false.
+  1. If |input|[0] is U+002F (`/`), then return true.
+  1. If |type| is "`url`", then return false.
+  1. If |input|'s [=string/code point length=] is less than 2, then return false.
+  1. If |input|[0] is U+005C (<code>\</code>) and |input|[1] is U+002F (`/`), then return true.
+  1. If |input|[0] is U+007B (`{`) and |input|[1] is U+002F (`/`), then return true.
+  1. Return false.
+</div>
+
+<div algorithm>
+  To <dfn>process protocol for init</dfn> given a string |value| and a string |type|:
+
+  1. Let |strippedValue| be the given |value| with a single trailing U+003A (`:`) removed, if any.
+  1. If |type| is "`pattern`" then return |strippedValue|.
+  1. Return the result of running [=canonicalize a protocol=] given |strippedValue|.
+</div algorithm>
+
+<div algorithm>
+  To <dfn>process username for init</dfn> given a string |value| and a string |type|:
+
+  1. If |type| is "`pattern`" then return |value|.
+  1. Return the result of running [=canonicalize a username=] given |value|.
+</div algorithm>
+
+<div algorithm>
+  To <dfn>process password for init</dfn> given a string |value| and a string |type|:
+
+  1. If |type| is "`pattern`" then return |value|.
+  1. Return the result of running [=canonicalize a password=] given |value|.
+</div algorithm>
+
+<div algorithm>
+  To <dfn>process hostname for init</dfn> given a string |value| and a string |type|:
+
+  1. If |type| is "`pattern`" then return |value|.
+  1. Return the result of running [=canonicalize a hostname=] given |value|.
+</div algorithm>
+
+<div algorithm>
+  To <dfn>process port for init</dfn> given a string |portValue|, a string |protocolValue|, and a string |type|:
+
+  1. If |type| is "`pattern`" then return |portValue|.
+  1. Return the result of running [=canonicalize a port=] given |portValue| and |protocolValue|.
+</div algorithm>
+
+<div algorithm>
+  To <dfn>process pathname for init</dfn> given a string |pathnameValue|, a string |protocolValue|, and a string |type|:
+
+  1. If |type| is "`pattern`" then return |pathnameValue|.
+  1. If |protocolValue| is a [=special scheme=] or the empty string, then return the result of running [=canonicalize a pathname=] given |pathnameValue|.
+    <p class=note>If the |protocolValue| is the empty string then no value was provided for {{URLPatternInit/protocol}} in the constructor dictionary.  Normally we do not special case empty string dictionary values, but in this case we treat it as a [=special scheme=] in order to default to the most common pathname canonicalization.
+  1. Return the result of running [=canonicalize an opaque pathname=] given |pathnameValue|.
+</div algorithm>
+
+<div algorithm>
+  To <dfn>process search for init</dfn> given a string |value| and a string |type|:
+
+  1. Let |strippedValue| be the given |value| with a single leading U+003F (`?`) removed, if any.
+  1. If |type| is "`pattern`" then return |strippedValue|.
+  1. Return the result of running [=canonicalize a search=] given |strippedValue|.
+</div algorithm>
+
+<div algorithm>
+  To <dfn>process hash for init</dfn> given a string |value| and a string |type|:
+
+  1. Let |strippedValue| be the given |value| with a single leading U+0023 (`#`) removed, if any.
+  1. If |type| is "`pattern`" then return |strippedValue|.
+  1. Return the result of running [=canonicalize a hash=] given |strippedValue|.
+</div algorithm>

@@ -1,0 +1,311 @@
+<pre class='metadata'>
+Title: Capability Delegation
+Shortname: capability-delegation
+Level: none
+Status: CG-DRAFT
+Group: WICG
+Repository: WICG/capability-delegation
+URL: https://wicg.github.io/capability-delegation/spec.html
+Editor: Mustaq Ahmed, Google Canada https://google.com/, mustaq@chromium.org, w3cid 75206
+Abstract: Transferring the ability to use restricted APIs to another window.
+
+Complain About: accidental-2119 yes, broken-links no, missing-example-ids yes
+Markup Shorthands: markdown yes, css no
+Assume Explicit For: yes
+</pre>
+
+<section class="non-normative">
+
+# Introduction # {#intro}
+
+*This section is non-normative.*
+
+This specification defines a mechanism through which a script can delegate its
+ability to call a restricted API to another [=browsing context=] it trusts.  The
+focus here is a dynamic delegation mechanism that exposes the delegated
+capability to the target [=browsing context=] in a time-constrained manner.
+
+
+## What is capability delegation? ## {#what-is-capability-delegation}
+
+Many capabilities in the Web are usable from JS in restricted manners.  For
+example:
+- Most browsers allow popups (through {{Window/open(url, target,
+    features)|Window.open()}} only if the user has either interacted with the
+    page recently or allowed the browser to open popups from the page's origin.
+
+- A sandboxed [[html#the-iframe-element|iframe]] cannot make itself full-screen
+    (though {{Element/requestFullscreen()}} without a specific sandbox attribute
+    or a user interaction within the frame.
+
+Capability delegation means allowing a frame to dynamically relinquish its
+ability to call a restricted API and transfer the ability to another (sub)frame
+it can trust.  The word "dynamic" here means the effect of the delegation lasts
+for a limited time as defined by the capability being delegated.  This is
+different from static (load-time) exposure of a capability to a [=browsing
+context=] through [[html#the-iframe-element|iframe]] {{HTMLIFrameElement/allow}}
+attribute where the capability becomes exposed to a subframe in a
+time-unconstrained manner.
+
+
+## Initiating a delegation vs using a capability ## {#initiate-vs-use}
+
+Capability delegation needs two distinct steps to be effective.  The first step
+is "initiation" where one [=browsing context=] notifies another [=browsing
+context=] about a specific capability being delegated.  After initiation, the
+second (i.e. the receiver) [=browsing context=] would "use" the delegated
+capability, which typically means calling a capability-defined method.  While
+the capability delegation specification here does not define the API interface
+used in the second step, it redefines the API's internal behavior.
+
+Because of this, this specification consists of two distinct parts: defining an
+API for the initiation step, and then defining delegated behavior for one
+specific "user" API.  For the second part, this specification focuses on
+behavior changes needed in [[payment-request|Payment Request API]], which would
+serve as a guide for similar changes in any other APIs that would utilize
+capability delegation in future.
+
+
+## Transient availability ## {#transient-availability}
+
+Both the steps mentioned above are time-constrained in nature:
+
+1. The initiation step is [[html#user-activation-gated-apis|activation
+    consuming]], so the step is allowed only after a recent user activation.
+    Moreover, the consumption of user activation here guarantees that the
+    delegation mechanism can't be used more than once per user activation.  This
+    prevents malicous uses of capability delegation, like repeated delegation
+    attempts to multiple frames to effectively bypass the user activation
+    restriction for the delegated API.
+
+2. After a successful completion of the initiation step, the delegated API
+    becomes available for use in the target [=browsing context=] for a few
+    seconds only.  The exact time limit here depends on how a delegated API
+    defines the delegated behavior in its own specification.  For an API that
+    does not define its own time limit, the default limit will be the same as
+    [user activation
+    expiry](https://html.spec.whatwg.org/multipage/interaction.html#activation-expiry).
+
+
+# Examples # {#examples}
+
+<div class="example" id="example-payment-request">
+  When a site wants to delegate the capability to call [[payment-request]]
+  {{PaymentRequest/show()}} from a subframe after a mouse click, it will
+  [[html#posting-messages|post a message]] to the subframe with an additional
+  option to specify the delegated capability:
+
+  ```javascript
+  window.onclick = () => {
+    targetWindow.postMessage('a_message', {delegate: "payment"});
+  };
+  ```
+
+  Upon receiving the message, the subframe would be able to use
+  {{PaymentRequest/show()}} even though the frame hasn't received a user
+  activation:
+
+  ```javascript
+  window.onmessage = () => {
+    const payRequest = new PaymentRequest(...);
+    const payResponse = await payRequest.show();
+    ...
+  }
+  ```
+</div>
+
+</section>
+
+
+# Initiating capability delegation # {#initiating-delegation}
+
+When a [=browsing context=] wants to delegate a capability to another [=browsing
+context=], it posts a message to the second [=browsing context=] with an extra
+{{WindowPostMessageOptions}} called `delegate` specifying the capability.  The
+value of this option MUST be a
+[[permissions-policy#ascii-serialization|feature-identifier]].  The option MUST
+be ignored if the value does not correspond to any [features supported by the
+user
+agent](https://w3c.github.io/webappsec-permissions-policy/#supported-features).
+
+<div class="note">
+  A list of possible
+  [[permissions-policy#ascii-serialization|feature-identifier]] values appears
+  [here](https://github.com/w3c/webappsec-permissions-policy/blob/main/features.md).
+</div>
+
+
+## Monkey-patch to HTML spec ## {#monkey-patch-to-html-initiating-delegation}
+
+The {{WindowPostMessageOptions}} IDL definition will include an additional field as follows:
+
+```IDL
+  DOMString? delegate;
+```
+
+In the algorithm for [window post
+message](https://html.spec.whatwg.org/multipage/web-messaging.html#window-post-message-steps),
+the following step:
+
+> 6. Let <var ignore>transfer</var> be <var>options</var>["transfer"].
+
+will be followed by two additional steps as follows:
+
+7. Let <var>delegate</var> be <var>options</var>["delegate"].
+
+8. If <var>delegate</var> is not null, then:
+
+    1. If the user agent does not support delegating the feature indicated by <var>delegate</var>,
+        then throw a "NotSupportedError" DOMException.
+
+    2. If <var ignore="">targetWindow</var>'s [associated
+        Document](https://html.spec.whatwg.org/multipage/window-object.html#concept-document-window)
+        is not
+        [allowed-to-use](https://html.spec.whatwg.org/multipage/iframe-embed-object.html#allowed-to-use)
+        the feature indicated by <var>delegate</var>, then throw a a
+        "NotAllowedError" DOMException.
+
+    2. If <var ignore="">targetOrigin</var> is a single U+002A ASTERISK character (*), then throw a
+        a "NotAllowedError" DOMException.
+
+        <div class="note">
+          The default value of
+          [targetOrigin](https://html.spec.whatwg.org/multipage/window-object.html#dom-windowpostmessageoptions-targetorigin)
+          is "/", restricting the message to same-origin targets. The additional requirement to use a string other than "*" means
+          that cross-origin messages has to specify the specific origin for which they are intended.
+        </div>
+
+    3. Let <var>source</var> be <var ignore="">incumbentSettings</var>'s [=environment settings
+        object/global object=].
+
+    4. If <var>source</var> does not have [transient
+        activation](https://html.spec.whatwg.org/multipage/interaction.html#transient-activation),
+        then throw a "NotAllowedError" DOMException.
+
+    5. [Consume user
+        activation](https://html.spec.whatwg.org/multipage/interaction.html#consume-user-activation)
+        in <var>source</var>.
+
+
+# Tracking delegated capability # {#tracking-delegation}
+
+Capabilities delegated to a [=browsing context=] will be tracked using a map
+named {{Window}}.[=DELEGATED_CAPABILITY_TIMESTAMPS=]. Each time a capability is
+delegated to a {{Window}}, an entry will be added in
+[=DELEGATED_CAPABILITY_TIMESTAMPS=] with a key equal to the
+[[permissions-policy#ascii-serialization|feature-identifier]] representing the
+capability, and a value equal to current {{DOMHighResTimeStamp}}.  If the map
+already has an entry for the same key, the existing value will be updated to
+current {{DOMHighResTimeStamp}}.
+
+
+## Monkey-patch to HTML spec ## {#monkey-patch-to-html-tracking-delegation}
+
+Right before the algorithm for [window post
+message](https://html.spec.whatwg.org/multipage/web-messaging.html#window-post-message-steps),
+a new paragraph will be inserted, as follow:
+
+> For the purpose of tracking capabilities delegated to a [=browsing context=],
+> each {{Window}} has a [=map=] called
+> <dfn>DELEGATED_CAPABILITY_TIMESTAMPS</dfn> from
+> [[permissions-policy#ascii-serialization|feature-identifier]] to
+> {{DOMHighResTimeStamp}}.  The map is initialized with an empty map.
+
+In the algorithm for [window post
+message](https://html.spec.whatwg.org/multipage/web-messaging.html#window-post-message-steps),
+two additional sub-steps will be added to current Step 8.  The first additional
+sub-step will be inserted after the following sub-step:
+
+> 8. Queue a global task ...
+>     2. Let origin be the serialization of incumbentSettings's origin.
+
+as follows:
+
+8. Queue a global task ... *(unchanged)*
+
+    3. Let <var>delegate</var> be <var>options</var>["delegate"].
+
+The second additional sub-step will be inserted after the following sub-step:
+
+> 8. Queue a global task ...
+>     6. Let newPorts be a new frozen array consisting of ...
+
+as follows:
+
+8. Queue a global task ... *(unchanged)*
+
+    7. Let newPorts be a new frozen array consisting of ... *(unchanged except
+        for numbering)*
+
+    8. If <var>delegate</var> is not null, AND the user agent supports
+        delegating <var>delegate</var>, then set
+        [=DELEGATED_CAPABILITY_TIMESTAMPS=][<var>delegate</var>] to [current
+        high resolution
+        time](https://w3c.github.io/hr-time/#dfn-current-high-resolution-time).
+
+
+# Defining delegated capability behavior # {#defining-delegated-behavior}
+
+Any capability that defines a delegated behavior uses the corresponding entry in
+{{Window}}.[=DELEGATED_CAPABILITY_TIMESTAMPS=] in a manner appropriate for the
+capability.  Below is the spec change needed for one particular capability.
+
+
+## Monkey-patch to Payment Request spec ## {#monkey-patch-to-payment-req}
+
+In the algorithm for {{PaymentRequest/show()}}, the following steps will be
+replaced to implement the delegated behavior:
+
+The two steps:
+
+> 2. If the relevant global object of request does not have transient activation:
+>     1. Return a promise rejected with a "SecurityError" DOMException.
+>
+> 3. Consume user activation of the relevant global object.
+
+will be replaced by the following three steps:
+
+2. If the relevant global object of request does not have [transient
+    activation](https://html.spec.whatwg.org/multipage/interaction.html#transient-activation),
+    AND the timestamp [=DELEGATED_CAPABILITY_TIMESTAMPS=]["payment"] in the
+    relevant global object is either undefined or
+    [expired](https://html.spec.whatwg.org/multipage/interaction.html#activation-expiry):
+     1. Return a promise rejected with a "SecurityError" DOMException.
+
+3. If the relevant global object of request does not have transient activation,
+    then clear the map entry [=DELEGATED_CAPABILITY_TIMESTAMPS=]["payment"].
+
+4. Otherwise, [consume user
+    activation](https://html.spec.whatwg.org/multipage/interaction.html#consume-user-activation)
+    of the relevant global object.
+
+## Monkey-patch to Fullscreen spec ## {#monkey-patch-to-fullscreen}
+
+In the algorithm for {{Element/requestFullscreen()}}, the following changes will be
+done to implement the delegated behavior:
+
+The last condition in Step 5:
+
+> 5.  If any of the following conditions are false, then set error to true: ...
+>      - This’s relevant global object has transient activation or
+>         the algorithm is triggered by a user generated orientation change.
+
+will be replaced by:
+
+5.  If any of the following conditions are false, then set error to true: ... *(unchanged)*
+     - This’s relevant global object has transient activation, or
+        the timestamp [=DELEGATED_CAPABILITY_TIMESTAMPS=]["fullscreen"] in this's
+        relevant global object is neither undefined nor
+        [expired](https://html.spec.whatwg.org/multipage/interaction.html#activation-expiry), or
+        the algorithm is triggered by a user generated orientation change.
+
+Right before the Step 10:
+
+> 10. Let fullscreenElements be an ordered set initially consisting of this.
+
+the following new step will be inserted:
+
+10. If this’s relevant global object does not have transient activation, then clear the map entry
+     [=DELEGATED_CAPABILITY_TIMESTAMPS=]["fullscreen"] in this's relevant global object.
+11. Let fullscreenElements be an ordered set initially consisting of this. *(unchanged except
+     for numbering)*

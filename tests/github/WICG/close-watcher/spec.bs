@@ -1,0 +1,327 @@
+<pre class="metadata">
+Title: Close Watcher API
+Shortname: close-watcher
+Repository: WICG/close-watcher
+Inline Github Issues: true
+Group: WICG
+Status: CG-DRAFT
+Level: 1
+URL: https://wicg.github.io/close-watcher/
+Boilerplate: omit conformance, omit feedback-header
+Metadata Include: This version off
+Editor: Domenic Denicola, Google https://www.google.com/, d@domenic.me, https://domenic.me/
+Abstract: The close watcher API provides a platform-agnostic way of handling close signals.
+!Participate: <a href="https://github.com/WICG/close-watcher">GitHub WICG/close-watcher</a> (<a href="https://github.com/WICG/close-watcher/issues/new">new issue</a>, <a href="https://github.com/WICG/close-watcher/issues?state=open">open issues</a>)
+!Commits: <a href="https://github.com/WICG/close-watcher/commits/master/spec.bs">GitHub spec.bs commits</a>
+Complain About: accidental-2119 yes, missing-example-ids yes
+Indent: 2
+Default Biblio Status: current
+Markup Shorthands: markdown yes
+Assume Explicit For: yes
+</pre>
+<pre class="anchors">
+spec: ui-events; urlPrefix: https://w3c.github.io/uievents/#
+  text: keydown; type: event; url: event-type-keydown
+  text: keyup; type: event; url: event-type-keyup
+</pre>
+
+<style>
+.selected-text-file-an-issue {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  background: rgba(255, 255, 255, 0.8);
+  font-size: smaller;
+  padding: 4px 10px;
+  z-index: 4;
+}
+
+dfn var {
+  font-style: italic;
+}
+
+table {
+  margin: 1em 0;
+}
+
+/* WHATWG-style <hr>s, instead of WICG-style. Specific selector is necessary to override WICG styles. */
+:not(.head) > :not(.head) + hr {
+  display: block;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 3em 0;
+  height: auto;
+}
+:not(.head) > :not(.head) + hr::before {
+  content: none;
+}
+
+/* domintro from https://resources.whatwg.org/standard.css */
+.domintro {
+  position: relative;
+  color: green;
+  background: #DDFFDD;
+  margin: 2.5em 0 2em 0;
+  padding: 1.5em 1em 0.5em 2em;
+}
+
+.domintro dt, .domintro dt * {
+  color: black;
+  font-size: inherit;
+}
+.domintro dd {
+  margin: 0.5em 0 1em 2em; padding: 0;
+}
+.domintro dd p {
+  margin: 0.5em 0;
+}
+.domintro::before {
+  content: 'For web developers (non-normative)';
+  background: green;
+  color: white;
+  padding: 0.15em 0.25em;
+  font-style: normal;
+  position: absolute;
+  top: -0.8em;
+  left: -0.8em;
+}
+</style>
+
+<script src="https://resources.whatwg.org/file-issue.js" async></script>
+
+<h2 id="close-signals">Close signals</h2>
+
+(This section could be introduced as a new subsection of [[!HTML]]'s <a href="https://html.spec.whatwg.org/#editing">User interaction</a> section.)
+
+In an [=implementation-defined=] (and likely device-specific) manner, a user can send a <dfn export>close signal</dfn> to the user agent. This indicates that the user wishes to close something which is currently being shown on the screen, such as a popup, menu, dialog, picker, or display mode.
+
+<div class="example" id="example-close-signals">
+  Some example close signals are:
+
+  * The <kbd>Esc</kbd> key on desktop platforms
+  * The back button on Android
+  * The two-finger scrub "z" gesture on iOS when using VoiceOver (or, more generally, any assistive technology dismiss gesture)
+  * The square button on a DualShock (PlayStation) controller
+</div>
+
+Whenever the user agent receives a potential close signal targeted at a {{Document}} |document|, it must perform the following <dfn export>close signal steps</dfn>:
+
+1. If |document|'s [=fullscreen element=] is non-null, then <a spec="FULLSCREEN">fully exit fullscreen</a> and return.
+   <p class="note">This does <em>not</em> fire any relevant event, such as {{keydown}}; it only fires {{Document/fullscreenchange}}.
+1. Fire any relevant event, per <cite>UI Events</cite> or other relevant specifications. [[!UI-EVENTS]]
+   <p class="note">As an example of a relevant event that is outside of the model given in <cite>UI Events</cite>, current thinking is that assistive technology would <a href="https://github.com/WICG/aom/blob/gh-pages/explainer.md#user-action-events-from-assistive-technology">synthesize</a> an <kbd>Esc</kbd> {{keydown}} and {{keyup}} event sequence when the user sends a [=close signal=] by using a dimiss gesture.</p>
+   If multiple such events are fired, the user agent must pick one for the purposes of the following steps.
+   <p class="note">For example, it is typical on desktop platforms for pressing <em>down</em> on the <kbd>Esc</kbd> key to be a [=close signal=]. So, if assistive technology is synthesizing both {{keydown}} and {{keyup}} events, then it would likely pick the {{keydown}} event for the next steps, to better match behavior of desktop platforms without assistive technology in play.</p>
+1. If such an event was fired, and its [=Event/canceled flag=] is set, then return.
+1. If such an event was fired, then perform the following steps within the same task as that event was fired in, immediately after firing the event. Otherwise, [=queue a global task=] on the [=user interaction task source=] given |document|'s [=relevant global object=] to perform the following steps.
+1. If |document| is not [=Document/fully active=], then return.
+1. Let |closedSomething| be the result of [=signaling close watchers=] on |document|'s [=relevant global object=].
+1. If |closedSomething| was true, then return.
+1. Otherwise, there was nothing watching for a close signal. The user agent may instead interpret this interaction as some other action, instead of as a close signal.
+
+<p class="example" id="example-desktop-esc-sequence">On a desktop platform where <kbd>Esc</kbd> is the close signal, the user agent will first fire an appropriately-initialized {{keydown}} event. If the web developer intercepts this event and calls {{Event/preventDefault()}}, then nothing further happens. But if the event is fired without being canceled, then the user agent proceeds to [=signal close watchers=].
+
+<p class="example" id="example-android-back-sequence">On Android where the back button is a potential close signal, no event is involved, so when the user agent determines that the back button represents a close signal, it [=queues a task=] to [=signal close watchers=]. If there is a [=close watcher=] on the [=close watcher stack=], then that will get triggered; otherwise, the user agent will interpret the back button press as a request to <a spec="HTML">traverse the history by a delta</a> of &minus;1.
+
+<h3 id="close-watchers">Close watcher infrastructure</h3>
+
+Each {{Window}} has a <dfn export>close watcher stack</dfn>, a [=list=] of [=close watchers=], initially empty.
+
+<p class="note">It isn't quite a proper [=stack=], as [=list/items=] can get [=list/removed=] from the middle of it if a [=close watcher=] is [=close watcher/destroyed=] or [=close watcher/closed=] via web developer code. User-initiated [=close signals=] always act on the top of the [=close watcher stack=], however.
+
+Each {{Window}} has a <dfn export>timestamp of last activation used for close watchers</dfn>. This is either a {{DOMHighResTimeStamp}} value, positive infinity, or negative infinity (i.e. the same value space as the <a spec="HTML">last activation timestamp</a>). It is initially positive infinity.
+
+<p class="note">This value is used to ensure that a given user activation only enables a single {{CloseWatcher}} {{CloseWatcher/cancel}} or <{dialog}> {{HTMLElement/cancel}} event to be fired, per user activation. This is different than requiring [=transient activation=] to fire the event, because we want to allow the event to happen arbitrarily long after the user activation.
+
+A <dfn export>close watcher</dfn> is a [=struct=] with the following [=struct/items=]:
+
+* A <dfn for="close watcher">window</dfn>, a {{Window}}.
+* A <dfn for="close watcher">cancel action</dfn>, a list of steps. These steps can never throw an exception, and return either true (to indicate the caller will proceed to the [=close watcher/close action=]) or false (to indicate the caller will bail out).
+* A <dfn for="close watcher">close action</dfn>, a list of steps. These steps can never throw an exception.
+* An <dfn for="close watcher">was created with user activation</dfn> boolean.
+* An <dfn for="close watcher">is grouped with previous</dfn> boolean.
+* An <dfn for="close watcher">is running cancel action</dfn> boolean, initially false.
+
+<p class="note">The [=close watcher/is grouped with previous=] boolean is set if a [=close watcher=] is created without [=transient activation=]. (Except the very first [=close watcher=] in the [=close watcher stack=] that is created without transient activation, which gets a pass on this restriction.) It causes a user-triggered [=close signal=] to close all such grouped-together [=close watchers=], thus ensuring that web developers can't make [=close signals=] ineffective by creating an excessive number of [=close watchers=] which all intercept the signal.
+
+<div algorithm="create a close watcher">
+  To <dfn>create a close watcher</dfn> given a {{Window}} |window|, a list of steps <dfn for="create a close watcher">|cancelAction|</dfn>, and a list of steps <dfn for="create a close watcher">|closeAction|</dfn>:
+
+  1. [=Assert=]: |window|'s [=associated Document=] is [=Document/fully active=].
+  1. Let |stack| be |window|'s [=close watcher stack=].
+  1. Let |wasCreatedWithUserActivation| and |groupedWithPrevious| be null.
+  1. If |window| has [=transient activation=], then:
+    1. [=Consume user activation=] given |window|.
+    1. Set |wasCreatedWithUserActivation| to true.
+    1. Set |groupedWithPrevious| to false.
+  1. Otherwise, if there is no [=close watcher=] in |stack| whose [=close watcher/was created with user activation=] is false, then:
+    1. Set |wasCreatedWithUserActivation| to false.
+    1. Set |groupedWithPrevious| to false.
+
+    <p class="note">This will be the one "free" close watcher created without user activation, which is useful for cases like session inactivity timeout dialogs or notifications from the server.
+  1. Otherwise:
+    1. Set |wasCreatedWithUserActivation| to false.
+    1. Set |groupedWithPrevious| to true.
+  1. Set |window|'s [=timestamp of last activation used for close watchers=] to |window|'s <a spec="HTML">last activation timestamp</a>.
+  1. Let |closeWatcher| be a new [=close watcher=] whose [=close watcher/window=] is |window|, [=close watcher/cancel action=] is |cancelAction|, [=close watcher/close action=] is |closeAction|, [=close watcher/was created with user activation=] is |wasCreatedWithUserActivation|, and [=close watcher/is grouped with previous=] is |groupedWithPrevious|.
+  1. [=stack/Push=] |closeWatcher| onto |stack|.
+  1. Return |closeWatcher|.
+</div>
+
+<div algorithm>
+  <p>A [=close watcher=] |closeWatcher| <dfn for="close watcher" lt="is active|is not active">is active</dfn> if |closeWatcher|'s [=close watcher/window=]'s [=close watcher stack=] [=list/contains=] |closeWatcher|.
+</div>
+
+<div algorithm>
+  <p>To <dfn for="close watcher">destroy</dfn> a [=close watcher=] |closeWatcher|, [=list/remove=] |closeWatcher| from |closeWatcher|'s [=close watcher/window=]'s [=close watcher stack=].
+</div>
+
+<div algorithm>
+  To <dfn for="close watcher">close</dfn> a [=close watcher=] |closeWatcher|:
+
+  1. If |closeWatcher| [=close watcher/is not active=], then return.
+  1. If |closeWatcher|'s [=close watcher/is running cancel action=] is true, then return.
+  1. Let |window| be |closeWatcher|'s [=close watcher/window=].
+  1. If |window|'s [=associated Document=] is [=Document/fully active=], and |window|'s [=timestamp of last activation used for close watchers=] does not equal |window|'s <a spec="HTML">last activation timestamp</a>, then:
+    1. Set |window|'s [=timestamp of last activation used for close watchers=] to |window|'s <a spec="HTML">last activation timestamp</a>.
+    1. Set |closeWatcher|'s [=close watcher/is running cancel action=] to true.
+    1. Let |shouldContinue| be the result of running |closeWatcher|'s [=close watcher/cancel action=].
+    1. Set |closeWatcher|'s [=close watcher/is running cancel action=] to false.
+    1. If |shouldContinue| is false, then return.
+  1. If |closeWatcher| [=close watcher/is not active=], then return.
+  1. If |window|'s [=associated Document=] is not [=Document/fully active=], then return.
+  1. [=list/Remove=] |closeWatcher| from |window|'s [=close watcher stack=].
+  1. Run |closeWatcher|'s [=close watcher/close action=].
+</div>
+
+<div algorithm>
+  To <dfn>signal close watchers</dfn> given a {{Window}} |window|:
+
+  1. Let |processedACloseWatcher| be false.
+  1. While |window|'s [=close watcher stack=] is not empty:
+    1. Let |closeWatcher| be the last item in |window|'s [=close watcher stack=].
+    1. [=close watcher/Close=] |closeWatcher|.
+    1. Set |processedACloseWatcher| to true.
+    1. If |closeWatcher|'s [=close watcher/is grouped with previous=] is false, then [=iteration/break=].
+  1. Return |processedACloseWatcher|.
+</div>
+
+<h3 id="close-watcher-api">Close watcher API</h3>
+
+<xmp class="idl">
+[Exposed=Window]
+interface CloseWatcher : EventTarget {
+  constructor(optional CloseWatcherOptions options = {});
+
+  undefined destroy();
+  undefined close();
+
+  attribute EventHandler oncancel;
+  attribute EventHandler onclose;
+};
+
+dictionary CloseWatcherOptions {
+  AbortSignal signal;
+};
+</xmp>
+
+<dl class="domintro non-normative">
+  <dt><code><var ignore>watcher</var> = new {{CloseWatcher/constructor()|CloseWatcher}}()</code></dt>
+  <dt><code><var ignore>watcher</var> = new {{CloseWatcher/constructor()|CloseWatcher}}({ {{CloseWatcherOptions/signal}} })</code></dt>
+  <dd>
+    <p>Attempts to create a new {{CloseWatcher}} instance.
+
+    <p>If the {{CloseWatcherOptions/signal}} option is provided, <var ignore>watcher</var> can be destroyed (as if by <code><var ignore>watcher</var>.{{CloseWatcher/destroy()}}</code>) by aborting the given {{AbortSignal}}.
+
+    <p>If any [=close watcher=] (including both {{CloseWatcher}} objects and modal <{dialog}> elements) is already active, and the {{Window}} does not have [=transient activation|transient user activation=], then the resulting {{CloseWatcher}} will be closed together with that already-active [=close watcher=] in response to any [=close signal=].
+  </dd>
+
+  <dt><code><var ignore>watcher</var>.{{CloseWatcher/destroy()|destroy}}()</code></dt>
+  <dd>
+    <p>Deactivates this {{CloseWatcher}} instance, so that it will no longer receive {{CloseWatcher/close}} events and so that new independent {{CloseWatcher}} instances can be constructed.
+
+    <p>This is intended to be called if the relevant UI element is closed in some other way than via a [=close signal=], e.g. by pressing an explicit "Close" button.
+  </dd>
+
+  <dt><code><var ignore>watcher</var>.{{CloseWatcher/close()|close}}()</code></dt>
+  <dd>
+    <p>Acts as if a [=close signal=] was sent targeting this {{CloseWatcher}} instance, by firing a {{CloseWatcher/cancel}} and {{CloseWatcher/close}} event, and deactivating the close watcher as if {{CloseWatcher/destroy()}} was called.
+
+    <p>This is a helper utility that can be used to consolidate closing logic into the {{CloseWatcher/close}} event handler, by having all non-[=close signal=] closing affordances call {{CloseWatcher/close()}}.
+  </dd>
+</dl>
+
+Each {{CloseWatcher}} has an <dfn for="CloseWatcher">internal close watcher</dfn>, which is a [=close watcher=].
+
+<div algorithm>
+  The <dfn constructor for="CloseWatcher" lt="CloseWatcher()">new CloseWatcher(|options|)</dfn> constructor steps are:
+
+  1. If [=this=]'s [=relevant global object=]'s [=associated Document=] is not [=Document/fully active=], then throw an "{{InvalidStateError}}" {{DOMException}}.
+  1. Let |closeWatcher| be the result of [=creating a close watcher=] given [=this=]'s [=relevant global object=], with:
+    * <i>[=create a close watcher/cancelAction=]</i> being to return the result of [=firing an event=] named {{CloseWatcher/cancel}} at [=this=], with the {{Event/cancelable}} attribute initialized to true.
+    * <i>[=create a close watcher/closeAction=]</i> being to [=fire an event=] named {{CloseWatcher/close}} at [=this=].
+  1. If |options|["{{CloseWatcherOptions/signal}}"] [=map/exists=], then:
+    1. If |options|["{{CloseWatcherOptions/signal}}"] is [=AbortSignal/aborted=], then [=close watcher/destroy=] |closeWatcher|.
+    1. [=AbortSignal/add|Add the following abort steps=] to |options|["{{CloseWatcherOptions/signal}}"]:
+      1. [=close watcher/Destroy=] |closeWatcher|.
+  1. Set [=this=]'s [=CloseWatcher/internal close watcher=] to |closeWatcher|.
+</div>
+
+<p algorithm>
+  The <dfn method for="CloseWatcher">destroy()</dfn> method steps are to [=close watcher/destroy=] [=this=]'s [=CloseWatcher/internal close watcher=].
+</p>
+
+<p algorithm>
+  The <dfn method for="CloseWatcher">close()</dfn> method steps are to [=close watcher/close=] [=this=]'s [=CloseWatcher/internal close watcher=].
+</p>
+
+Objects implementing the {{CloseWatcher}} interface must support the <dfn attribute for="CloseWatcher">oncancel</dfn> and <dfn attribute for="CloseWatcher">onclose</dfn> [=event handler IDL attribute=], whose [=event handler event types=] are respectively <dfn event for="CloseWatcher">cancel</dfn> and <dfn event for="CloseWatcher">close</dfn>.
+
+<h2 id="patches">Updates to other specifications</h2>
+
+<h3 id="patch-fullscreen">Fullscreen</h3>
+
+Replace the sentence about "If the end user instructs..." in [[FULLSCREEN#ui]] with the following:
+
+If the user initiates a [=close signal=], this will trigger the <a spec="FULLSCREEN">fully exit fullscreen</a> algorithm as part of the [=close signal steps=]. This takes precedence over any [=close watchers=].
+
+<h3 id="patch-dialog">The <{dialog}> element</h3>
+
+Update <cite>HTML</cite>'s <a href="https://html.spec.whatwg.org/multipage/interactive-elements.html#the-dialog-element">The `dialog` element</a> section as follows: [[!HTML]]
+
+Each <{dialog}> element has a <dfn for="HTMLDialogElement">close watcher</dfn>, which is a [=close watcher=] or null, initially null.
+
+<div algorithm="showModal patch">
+  In the {{HTMLDialogElement/showModal()}} steps, after adding |subject| to the [=top layer=], append the following step:
+
+  1. Set |subject|'s [=HTMLDialogElement/close watcher=] to the result of [=creating a close watcher=] given |subject|'s [=relevant global object=], with:
+    * <i>[=create a close watcher/cancelAction=]</i> being to return the result of [=firing an event=] named {{HTMLElement/cancel}} at |subject|, with the {{Event/cancelable}} attribute initialized to true.
+    * <i>[=create a close watcher/closeAction=]</i> being to <a spec="HTML" lt="close">Close the dialog</a> |subject| with no return value.
+
+  <p class="note">The resultant [=close watcher=] might be [=close watcher/is grouped with previous|grouped=] with others on the stack, so that it responds alongside them to a single [=close signal=]. For example, opening multiple modal dialogs from a single user activation can cause this. The {{HTMLDialogElement/showModal()}} method proceeds without any exception or other indication of this, although the browser could [=report a warning to the console=].
+</div>
+
+Remove the "Canceling dialogs" section entirely. It is now handled entirely by the infrastructure in [[#close-signals]] and the creation of a [=close watcher=].
+
+Modify the <a spec="HTML" lt="close">close the dialog</a> steps to [=close watcher/destroy=] the <{dialog}>'s [=HTMLDialogElement/close watcher=] and set it to null, if it is not already null.
+
+Similarly, modify the "If at any time a <{dialog}> element is remo  ved from a Document" steps to do the same.
+
+<h2 id="security-and-privacy">Security and privacy considerations</h2>
+
+<h3 id="security">Security considerations</h3>
+
+The main security consideration with this API is preventing abusive pages from hijacking the fallback behavior in the last part of the [=close signal steps=]. A concrete example is on Android, where the [=close signal=] is the software back button, and this fallback behavior is to <a spec="HTML">traverse the history by a delta</a> of &minus;1. If developers could always intercept Android back button presses via {{CloseWatcher}} instances and <{dialog}> elements, then they could effectively break the back button by never letting it pass through to the fallback behavior.
+
+Much of the complexity of this specification is designed around preventing such abuse. Without it, the API could consist of a single event. (Although that would make it ergonomically difficult for developers to coordinate on which component of their application should handle the [=close signal=].) But with this constraint, we need an API surface such as the {{CloseWatcher/CloseWatcher()}} constructor which can note whether [=transient activation=] was present at construction time, as well as the [=close watcher stack=] to ensure that we remove at least one [=close watcher=] per [=close signal=].
+
+Concretely, the mechanism of [=creating a close watcher=] ensures that web developers can only create {{CloseWatcher}} instances, or call {{Event/preventDefault()}} on {{CloseWatcher/cancel}} events, by attempting to [=transient activation-consuming API|consume user activation=]. If a {{CloseWatcher}} instance is created without [=transient activation=], then after one "free" [=close watcher=], any such close watcher is [=close watcher/is grouped with previous|grouped=] together with the currently-top close watcher in the [=close watcher stack|stack=], so that both of them are closed by a single [=close signal=]. This gives similar protections to what browsers have in place today, where back button UI skips entries that were added without user activation. Similarly, if there hasn't been any [=transient activation=], the {{CloseWatcher/cancel}} event is not fired.
+
+We do allow one "free" ungrouped {{CloseWatcher}} to be created, even without [=transient activation=], to handle cases like session inactivity timeout dialogs, or urgent notifications of server-triggered events. The end result is that this specification expands the number of Android back button presses that a maximally-abusive page could require to escape from <var>number of user activations</var> + 1 to <var>number of user activations</var> + 2. (See <a href="https://github.com/WICG/close-watcher#abuse-analysis">the explainer</a> for a full analysis.) We believe this tradeoff is worthwhile.
+
+<h3 id="privacy">Privacy considerations</h3>
+
+We believe the privacy impact of this API is minimal. The only information it gives about the user to the web developer is that a close signal has occurred, which is a very infrequent and coarse piece of user input.
+
+In all cases we're aware of today, such close signals are already detectable by web developers (e.g., by using {{keydown!!event}} listeners on desktop or {{Window/popstate}} listeners on Android). In theory, by correlating these existing events with the {{CloseWatcher}}'s {{CloseWatcher/close}} event, a web developer could determine some information about the platform. (I.e., if they correlate with {{keydown!!event}} events, the user is likely on desktop, or at least on a keyboard-attached mobile device.) This is similar to existing techniques which detect whether touch events or mouse events are fired, and user agents which want to emulate a different platform in order to mask the user's choice might want to apply similar mitigation techniques for close watchers as they do for other platform-revealing events.

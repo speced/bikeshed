@@ -5,17 +5,18 @@ Group: immersivewebwg
 Status: ED
 TR: https://www.w3.org/TR/webxr-gamepads-module-1/
 ED: https://immersive-web.github.io/webxr-gamepads-module/
-Previous Version: https://www.w3.org/TR/2019/WD-webxr-gamepads-module-1-20191010/
 Repository: immersive-web/webxr-gamepads-module
 Level: 1
-Mailing List Archives: https://lists.w3.org/Archives/Public/public-immersive-web/
+Mailing List Archives: https://lists.w3.org/Archives/Public/public-immersive-web-wg/
 
 !Participate: <a href="https://github.com/immersive-web/webxr-gamepads/issues/new">File an issue</a> (<a href="https://github.com/immersive-web/webxr-gamepads-module/issues">open issues</a>)
-!Participate: <a href="https://lists.w3.org/Archives/Public/public-immersive-web/">Mailing list archive</a>
+!Participate: <a href="https://lists.w3.org/Archives/Public/public-immersive-web-wg/">Mailing list archive</a>
 !Participate: <a href="irc://irc.w3.org:6665/">W3C's #immersive-web IRC</a>
 
-Editor: Brandon Jones 87824, Google http://google.com/, bajones@google.com
-Editor: Nell Waliczek 93109, Amazon [Microsoft until 2018] https://amazon.com/, nhw@amazon.com
+Editor: Brandon Jones 87824, Google https://google.com/, bajones@google.com
+Former Editor: Nell Waliczek 93109, Amazon [Microsoft until 2018] https://amazon.com/, nhw@amazon.com
+Editor: Manish Goregaokar 109489, Google [Mozilla until 2020], manishearth@google.com
+Editor: Rik Cabanier 106988, Meta https://facebook.com, cabanier@fb.com
 
 Abstract: This specification module describes support for accessing button, trigger, thumbstick, and touchpad data associated with virtual reality (VR) and augmented reality (AR) devices on the Web.
 
@@ -34,16 +35,18 @@ spec:webxr-1;
     type: dfn; text: primary action
     type: dfn; text: xr animation frame
     type: dfn; text: primary squeeze action
+    type: dfn; text: trusted ui
 </pre>
 
 <pre class="anchors">
 spec: WebXR Device API - Level 1; urlPrefix: https://www.w3.org/TR/webxr/#
     type: dfn; text: list of frame updates; for: XRSession; url: xrsession-list-of-frame-updates
     type: dfn; text: time; for: XRFrame; url: xrframe-time
-spec: Gamepad; urlPrefix: https://w3c.github.io/gamepad/#
+spec: Gamepad; urlPrefix: https://www.w3.org/TR/gamepad/#
     type: interface; text: Gamepad; url: dom-gamepad
     type: interface; text: GamepadButton; url: dom-gamepadbutton
     type: enum; text: GamepadMappingType; url: dom-gamepadmappingtype
+    type: enum-value; text: "xr-standard"; for: GamepadMappingType; url: dfn-xr-standard
     type: method; text: navigator.getGamepads(); url: dom-navigator-getgamepads
     type: attribute; text: id; for: Gamepad; url: dom-gamepad-id
     type: attribute; text: index; for: Gamepad; url: dom-gamepad-index
@@ -56,6 +59,7 @@ spec: Gamepad; urlPrefix: https://w3c.github.io/gamepad/#
     type: attribute; text: value; for: GamepadButton; url: dom-gamepadbutton-value
     type: dfn; text: gamepadconnected; for: Window; url: dfn-gamepadconnected
     type: dfn; text: gamepaddisconnected; for: Window; url: dfn-gamepaddisconnected
+    type: dfn; text: select an unused gamepad index; url: dfn-selecting-an-unused-gamepad-index
 </pre>
 
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
@@ -98,19 +102,18 @@ spec: Gamepad; urlPrefix: https://w3c.github.io/gamepad/#
   .tg th {
     border-style: solid;
     border-width: 1px;
-    background: #90b8de;
-    color: #fff;
+    background: var(--def-bg);
     font-family: sans-serif;
     font-weight: bold;
-    border-color: grey;
+    border-color: var(--def-border);
   }
   .tg td {
     padding: 4px 5px;
-    background-color: rgb(221, 238, 255);
+    background-color: var(--def-bg);
     font-family: monospace;
     border-style: solid;
     border-width: 1px;
-    border-color: grey;
+    border-color: var(--def-border);
     overflow: hidden;
     word-break: normal;
   }
@@ -187,6 +190,10 @@ Gamepad API Integration {#gamepad-api-integration}
 
 {{Gamepad}} instances returned by an {{XRInputSource}}'s {{XRInputSource/gamepad}} attribute behave as described by the <a href="https://www.w3.org/TR/gamepad/">Gamepad API</a>, with several additional behavioral restrictions.
 
+An {{XRInputSource}}'s associated {{Gamepad}} MAY be exposed via {{navigator.getGamepads()}}, even if there is no active XR session by user agent choice. This allows XR devices to be used as "regular" gamepads if the user agent wishes to allow this.
+
+Note: Hand tracking {{XRInputSource}}s as described in [[WEBXR-HAND-INPUT-1]] may contain a {{Gamepad}} if the user agent wishes to allow hand-based input sources to be used with gamepad-based content.
+
 Navigator {#navigator-differences}
 -----------------------
 
@@ -198,7 +205,7 @@ Gamepad {#gamepad-differences}
 The following {{Gamepad}} attributes MUST exhibit the following behavioral restrictions when the {{Gamepad}} has been returned by an {{XRInputSource}}'s {{XRInputSource/gamepad}} attribute.
 
   - {{XRInputSource/gamepad}}'s {{Gamepad/id}} attribute MUST be an empty string (<code>""</code>).
-  - {{XRInputSource/gamepad}}'s {{Gamepad/index}} attribute MUST be <code>-1</code>.
+  - {{XRInputSource/gamepad}}'s {{Gamepad/index}} attribute MUST be <code>-1</code> if it is not exposed via {{navigator.getGamepads()}}, otherwise it should be assigned as specified by [=select an unused gamepad index|selecting an unused gamepad index=].
   - {{XRInputSource/gamepad}}'s {{Gamepad/connected}} attribute MUST be <code>true</code> until the {{XRInputSource}} is removed from the [=list of active XR input sources=] or the {{XRSession}} is ended.
   - If an axis reported by the {{XRInputSource/gamepad}}'s {{Gamepad/axes}} array represents an axis of a touchpad, the value MUST be <code>0</code> when the associated {{GamepadButton}}'s {{GamepadButton/touched}} is <code>false</code>.
 
@@ -275,10 +282,21 @@ In order to report a {{Gamepad/mapping}} of {{GamepadMappingType/"xr-standard"}}
 
 Devices that lack one of the optional inputs listed in the tables above MUST preserve their place in the {{Gamepad/buttons}} or {{Gamepad/axes}} array, reporting a [=placeholder button=] or [=placeholder axis=], respectively. A <dfn>placeholder button</dfn> MUST report <code>0</code> for {{GamepadButton/value}}, <code>false</code> for {{GamepadButton/pressed}}, and <code>false</code> for {{GamepadButton/touched}}. A <dfn>placeholder axis</dfn> MUST report <code>0</code>. [=Placeholder buttons=] and [=placeholder axis|axes=] MUST be omitted if they are the last element in the array or all following elements are also [=placeholder buttons=] or [=placeholder axis|axes=].
 
-Additional buttons or axes may be exposed after these reserved indices, and SHOULD appear in order of decreasing importance. Related axes (such as both axes of a thumbstick) MUST be grouped and, if applicable, MUST appear in X, Y, Z order. Buttons reserved by the UA or platform MUST NOT be exposed.
+Additional buttons or axes may be exposed after these reserved indices, and SHOULD appear in order of decreasing importance. Related axes (such as both axes of a thumbstick) MUST be grouped and, if applicable, MUST appear in X, Y, Z order.
+
+UA/Platform reserved buttons {#reserved-buttons}
+-----------------------------
+User Agents SHOULD reserve at least one physical button, when possible, for performing unspoofable actions as part of a [=trusted UI=]. For example, the User Agent could designate the "menu" or "app" button present on many controllers as a dedicated button for exiting immersive presentation.
+
+Additionally, many XR platforms also reserve a button for platform specific actions, such as returning to a home environment.
+
+Buttons reserved by the UA or platform MUST NOT be exposed on the {{Gamepad}}. Additionally, User Agents SHOULD make an effort to coordinate which buttons are reserved for a given XR platform. The <a href="https://github.com/immersive-web/webxr-input-profiles/tree/master/packages/registry">WebXR Input Profiles Registry</a> is the recommended location for coordinating button reservations.
+
+Example Mappings {#example-mappings}
+-----------------------------
 
 <section class="note">
-This diagram demonstrates how two example controllers would be exposed with the {{GamepadMappingType/"xr-standard"}} mapping. Images are not intended to represent any particular device and are used for reference purposes only. <img src="images/xr-standard-mapping.svg" alt="Simple 'xr-standard' controller and Advanced 'xr-standard' controller">
+This diagram demonstrates how two example controllers would be exposed with the {{GamepadMappingType/"xr-standard"}} mapping. Images are not intended to represent any particular device and are used for reference purposes only. <img src="images/xr-standard-mapping.svg" width="2100" height="2530" style="width: 750px; height: auto;" alt="Simple 'xr-standard' controller and Advanced 'xr-standard' controller">
 </section>
 
 
@@ -291,6 +309,20 @@ Fingerprinting {#fingerprinting-security}
 --------------
 
 Given that the API describes hardware available to the user and its capabilities it will inevitably provide additional surface area for fingerprinting. While it's impossible to completely avoid this, user agents should take steps to mitigate the issue. As defined in the WebXR Device API, {{XRInputSource}}s are only reported after an {{XRSession}} has been created, which requires additional protections when [=sensitive information=] will be exposed. In addition, this module requires {{XRInputSource}}'s {{XRInputSource/gamepad}}.{{Gamepad/id}} to not report a string identifiers.
+
+
+<h2 id="changes" class="no-num">
+Changes</h2>
+
+<h3 id="changes-from-20191010" class="no-num">
+Changes from the <a href="https://www.w3.org/TR/2019/WD-webxr-gamepads-module-1-20191010/">First Public Working Draft 10 October 2019</a></h3>
+
+- Explicitly leave Gamepad API Integration up to the user agent (<a href="https://github.com/immersive-web/webxr-gamepads-module/pull/49">GitHub #49</a>)
+- Added spec text specifying that reserved buttons are not exposed (<a href="https://github.com/immersive-web/webxr-gamepads-module/pull/48">GitHub #48</a>)
+- Relaxed definitions of gamepad.index (<a href="https://github.com/immersive-web/webxr-gamepads-module/pull/46">GitHub #46</a>, <a href="https://github.com/immersive-web/webxr-gamepads-module/pull/47">GitHub #47</a>)
+- Defined primary trigger and linked buttons (<a href="https://github.com/immersive-web/webxr-gamepads-module/pull/24">GitHub #24</a>)
+- Clarified operations when the gamepad state is updated (<a href="https://github.com/immersive-web/webxr-gamepads-module/pull/22">GitHub #22</a>)
+
 
 Acknowledgements {#ack}
 ================

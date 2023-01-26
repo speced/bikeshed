@@ -1,0 +1,165 @@
+<pre class='metadata'>
+Title: Ink API
+Shortname: ink-api
+Level: 1
+Status: CG-DRAFT
+Group: WICG
+TR: https://www.w3.org/TR/2021/ink-api
+URL: https://wicg.github.io/ink-enhancement
+Editor: Ben Mathwig, Microsoft Corporation https://microsoft.com, benjamin.mathwig@microsoft.com, https://github.com/bmathwig
+Abstract: Provides a Web API for progressive enhancement of web inking latency.
+</pre>
+
+<pre class=link-defaults>
+spec:html; type:attribute; for:CanvasRenderingContext2D; text:canvas
+</pre>
+
+Introduction {#intro}
+=====================
+
+Achieving low latency is critical to a great inking experience on the web. Generally, inking on the web involves consuming {{PointerEvent}} events and rendering strokes to {{canvas}}, WebGL, or even SVG.
+
+While there are currently progressive enhancements available today, such as {{PointerEvent/getPredictedEvents()}} and Desyncronized canvas, none of these take advantage of system compositors provided by the operating system to achieve better latency. Operating system compositors typically introduce a frame of latency in order to compose all of the windows together. During this frame of latency, input may be delivered to an application but the application will not be able to update the rendered frame with this new input until the next frame. System compositors may have the ability to handle this input on behalf of the application and update the current frame accordingly. The purpose of the Ink API is to expose this functionality of the system compositor to web applications as a progressive enhancement option that can achieve latency parity with native applications on supported systems. It is not a replacement for the existing progressive ink enhancements already in existance, but provides another option.
+
+Scope {#scope}
+==============
+
+Ink API {#ink-api}
+==================
+
+## Introduction ## {#ink-api-introduction}
+In order for the system compositor to be able to draw the subsequence input points with enough fidelity, the application needs to describe the last rendered point to the compositor. If the system knows the last rendered point, it can produce segments of an ink trail for pen input events that have been delivered to the web application but have not been rendered yet.
+
+For example, consider an application that has rendered all ink strokes up to the current frame of input:
+
+<img src="enhanced-ink-flow-1.png" width="700" />
+
+<p>Here, the pen has continued to move on the digitizer, but the application has not had a chance to process this input for rendering. To achieve a "superwet" inking experience, the system compositor needs to overlay ink segments for these inputs:</p>
+
+<img src="enhanced-ink-flow-2.png" width="700" />
+
+<p>When the {{PointerEvent}} is delivered to the web application, the application can seamlessly replace the system compositor ink with application rendered strokes and update the compositor on the last event point that it rendered:</p>
+
+<img src="enhanced-ink-flow-3.png" width="700">
+
+<p>The Ink API provides the {{InkPresenter}} interface to expose the underlying operating system API to achieve this and keeps the extensibility open in order to support additonal presenters in the future.</p>
+
+
+## {{Ink}} interface ## {#ink-interface}
+<pre class="idl lang-idl">
+[Exposed=Window]
+interface Ink {
+    Promise&lt;InkPresenter&gt; requestPresenter(
+        optional InkPresenterParam? param = null);
+};
+</pre>
+
+<dl dfn-type="method" dfn-for="Ink">
+    : <dfn>requestPresenter(param)</dfn>
+    :: This method returns an instance of an InkPresenter object within a Promise that can be used to render ink strokes in-between {{PointerEvent}} dispatches. Each time this method is called, a new InkPresenter instance must be created.
+</dl>
+
+## {{InkPresenterParam}} dictionary ## {#ink-presenter-param}
+<pre class="idl lang-idl">
+dictionary InkPresenterParam {
+    Element? presentationArea = null;
+};
+</pre>
+
+<dl dfn-type="dict-member" dfn-for="InkPresenterParam">
+    : <dfn>presentationArea</dfn>
+    :: An optional {{Element}} that confines the rendering of ink trails to the area bound by the element. presentationArea must either be null or be in the same document as the Ink interface, otherwise throw an error and abort.
+</dl>
+
+## {{InkPresenter}} interface ## {#ink-presenter}
+<pre class="idl lang-idl">
+[Exposed=Window]
+interface InkPresenter {
+    readonly attribute Element? presentationArea;
+    readonly attribute unsigned long expectedImprovement;
+
+    undefined updateInkTrailStartPoint(PointerEvent event, InkTrailStyle style);
+};
+</pre>
+
+<dl dfn-type="attribute" dfn-for="InkPresenter">
+    : <dfn>presentationArea</dfn>
+    :: A reference to the DOM element to which the presenter is scoped to prevent ink presentation outside of the provided area. This area is always the client coordinates for the element's border box, so moving the element or scrolling the element requires no recalculation on the author's part. If this is not provided, the default is to use the containing viewport. This element must be in the same document that the InkPresenter is associated with and the same document that is receiving the {{PointerEvent}}s, otherwise an error is thrown. If presentationArea is ever removed from the document, the next updateInkTrailStartPoint must throw an error and abort.
+    : <dfn>expectedImprovement</dfn>
+    :: This attribute provides information regarding the perceived latency improvements, in milliseconds, that can be expected by using this presenter.
+</dl>
+
+<dl dfn-type="method" dfn-for="InkPresenter">
+    : <dfn>updateInkTrailStartPoint(event, style)</dfn>
+    :: This method indicates to the presenter which {{PointerEvent}} was used as the last rendering point for the current frame. This must be a trusted event that is in the same document as the {{InkPresenter}}. The produced delegated ink trail must be rendered for the duration of the next animation frame and then removed.
+</dl>
+
+## {{InkTrailStyle}} dictionary ## {#ink-trail-style}
+<pre class="idl lang-idl">
+dictionary InkTrailStyle {
+    required DOMString color;
+    required unrestricted double diameter;
+};
+</pre>
+
+<dl dfn-type="dict-member" dfn-for="InkTrailStyle">
+    : <dfn>color</dfn>
+    :: This specifies a CSS color code for the presenter to use when rendering the ink trail. It must be a valid CSS color, otherwise throw an error and abort.
+    : <dfn>diameter</dfn>
+    :: This specifies the diameter of that the presenter should use when displaying the ink trail. It must be greater than 0, otherwise throw an error and abort.
+</dl>
+
+## {{Ink}} Navigator interface extension ## {#navigator-interface-extensions}
+This partial interface defines an extension to the Navigator interface
+
+<pre class="idl lang-idl">
+[Exposed=Window]
+partial interface Navigator {
+    [SameObject] readonly attribute Ink ink;
+};
+</pre>
+
+<dl dfn-type="attribute" dfn-for="Navigator">
+    : <dfn>ink</dfn>
+    :: An instance of {{Ink}} for the current document. It must be associated with the same document that will contain the {{presentationArea}} and that will receive the {{PointerEvent}}s to draw.
+</dl>
+
+Usage Examples {#usage-examples}
+================================
+
+<pre class="javascript lang-javascript">
+const MIN_EXPECTED_IMPROVEMENT = 16;
+
+function renderInkStroke(x, y, canvas) {
+    // ... Render an ink stroke to the canvas ...
+}
+
+try {
+    let canvas = document.querySelector("#canvas");
+    let presenter = await navigator.ink.requestPresenter({presentationArea: canvas});
+
+    // With 'pointerraw' events and JavaScript prediction, we can reduce latency by 16ms, so
+    // fallback if InkPresenter is not capable of providing a benefit.
+    if (presenter.expectedImprovement < MIN_EXPECTED_IMPROVEMENT) {
+        throw new Error("No expected improvment using InkPresenter over prediction.");
+    }
+
+    window.addEventListener('pointermove', function(event) {
+        // Render all of the points that have come from the queue of events.
+        let points = event.getCoalescedEvents();
+
+        points.forEach( p => {
+            renderInkStroke(p.x, p.y, canvas);
+        });
+
+        // Render the ink stroke belonging to the dispatched event
+        renderInkStroke(event.x, event.y, canvas);
+
+        // Update the presenter with the last rendered point and give it a style
+        presenter.updateInkTrailStartPoint(event, {
+            color: "#7851A9",
+            diameter: event.pressure * 4
+        });
+    });
+}
+</pre>

@@ -1,0 +1,221 @@
+<pre class="metadata">
+Title: The Login Status API
+Shortname: login-status
+Repository: privacycg/is-logged-in
+URL: https://privacycg.github.io/is-logged-in/
+Editor: John Wilander, w3cid 89478, Apple Inc. https://apple.com/, wilander@apple.com
+Former Editor: Melanie Richards, w3cid 96078, Microsoft https://microsoft.com/, Melanie.Richards@microsoft.com
+Abstract: This specification defines the Login Status API
+Status Text: This specification is intended to be migrated to the W3C standards track. It is not a W3C standard.
+Text Macro: LICENSE <a href=http://www.w3.org/Consortium/Legal/2015/copyright-software-and-document>W3C Software and Document License</a>
+Group: privacycg
+Status: CG-DRAFT
+Level: None
+</pre>
+
+<section class="non-normative">
+<h2 id="intro">Introduction</h2>
+
+<em>This section is non-normative.</em>
+
+Currently, user agents have no way of knowing if the user is logged in
+to a particular website. Neither the existence of cookies nor
+frequent/recent user interaction can provide that signal, since most users
+have cookies for and interact with plenty of websites they are not
+logged in to. Additionally, cookies and other kinds of storage may carry
+login state, but there is no way to tell general storage and
+authentication tokens apart.
+
+At the same time, some user agents may wish to offer means to clear
+long-term storage where not the user is logged in, considering it a
+privacy issue that websites can store data virtually forever on the
+device. A logged-in signal could also enable a user agent to offer
+powerful browser features, or to create a seamless user experience by
+relaxing particular restrictions on websites where the user is logged in.
+
+</section>
+
+<h2 id="infra">Infrastructure</h2>
+
+This specification depends on the Infra standard. [[!INFRA]]
+
+<h2 id="the-login-status-api">The Login Status API</h2>
+<div id="the-isloggedin-api"></div>
+
+The Login Status API creates a clear signal to the user agent that the
+user is logged into a website. It does <em>not</em> create a mechanism
+for the web developer to manage a user's identity or log the user in or
+out.
+
+This specification defines:
+
+  * A method for a website to signal to the browser that the user is logged in ({{Navigator/recordLogin()}})
+  * A method to signal that the user is logged out ({{Navigator/recordLogout()}})
+  * A method for third-party iframes to check whether the user is a logged-in user ({{Navigator/checkLoginStatus()}})
+
+ISSUE: Update "website" with a more precise term
+
+<h3 id="recordLogin">Logged-in signal: <dfn export method for=Navigator><code>recordLogin()</code></dfn></h3>
+<div id="setLoggedIn"></div>
+
+ISSUE: Flesh out section with explanatory text, an example, more formal/algorithmic language.
+
+```
+Navigator.recordLogin(
+    username: non-whitespace string of limited length,
+    credentialTokenType: “cookie”,
+    optionalParams { }
+) –> Promise<void>
+```
+
+The returned promise would resolve if the status was set and reject if
+not. The API could potentially take an expiry parameter but here we’re
+assuming that a designated cookie manages the expiry of the login.
+
+<h3 id="recordLogout">Logged-out signal: <dfn export method for=Navigator><code>recordLogout()</code></dfn></h3>
+<div id="setLoggedOut"></div>
+
+ISSUE: Flesh out section with explanatory text, an example, more formal/algorithmic language.
+
+```
+Navigator.recordLogout(optionalUsername) –> Promise<void>
+```
+
+The optional username parameter highlights that we might want to support
+concurrent logins on the same website which would require the site to
+keep track of who to log out and credential tokens to be scoped to user
+names.
+
+<h3 id="checkLoginStatus">Checking for a logged-in signal: <dfn export method for=Navigator><code>checkLoginStatus()</code></dfn></h3>
+<div id="isLoggedIn"></div>
+
+ISSUE: Flesh out section with explanatory text, an example, more formal/algorithmic language.
+
+```
+Navigator.checkLoginStatus() –> Promise<bool>
+```
+
+<h2 id="defending-against-abuse">Defending Against Abuse</h2>
+
+<em>This section is non-normative.</em>
+
+If websites were allowed to set login status whenever they want, it
+would not constitute a trustworthy signal and would most likely be
+abused for user tracking. We must therefore make sure that login status
+can only be set when the browser is convinced that the user meant to log
+in or the user is already logged in and wants to stay logged in.
+
+Another potential for abuse is if websites don’t call the logout API
+when they should. This could allow them to maintain the privileges tied
+to login status even after the user logged out.
+
+There are several ways the browser could make sure the login status
+is trustworthy:
+
+  * Require websites to use WebAuthn or a password manager (including
+    Credential Management) before calling the API.
+  * Require websites to take the user through a login flow according to
+    rules that the browser can check. This would be the escape hatch for
+    websites who can’t or don’t want to use WebAuthn or a password manager
+    but still want to set login status.
+  * Show browser UI acquiring user intent when login status is set.
+    Example: A prompt.
+  * Continuously show browser UI indicating an active login session on
+    the particular website. Example: Some kind of indicator in the URL
+    bar.
+  * Delayed browser UI acquiring user intent to stay logged in, shown some
+    time after the login status was set. Example: Seven days after login
+    status was set – “Do you want to stay logged in to news.example?”
+  * Requiring engagement to maintain login status. Example: Require user
+    interaction as first party website at least every N days to stay
+    logged in. The browser can hide instead of delete the credential token
+    past this kind of expiry to allow for quick resurrection of the login
+    session.
+
+<h2 id="credential-tokens">Credential Tokens</h2>
+
+<em>This section is non-normative.</em>
+
+Ideally, a new Logon Status API like this would only work with modern
+login credentials. The proposed
+[HTTP State
+Tokens](https://mikewest.github.io/http-state-tokens/draft-west-http-state-tokens.html)
+could become such a modern piece. However, to ensure a smooth path for
+adoption, we should support cookies.
+
+Both HTTP State Tokens and cookies would have to be explicitly set up
+for authentication purposes to work with the Login Status API. In the
+case of both of these token types, we could introduce an __auth- prefix
+as a signal that both the server and client consider the user to be
+logged in. Or we could allow HTTP State Token request and response
+headers to convey login status. Note that sending metadata in requests
+differs from how cookies work.
+
+The expiry of the cookie or token should be picked up as recordLogout().
+
+Cookies have the capability to span a full registrable domain and thus
+log the user in to all subdomains at once. HTTP State Tokens have a
+proper connection to origins but can be declared to span the full
+registrable domain too. We should probably let the credential token
+control the scope of the login status.
+
+Explicitly logging out should clear all website data for the website,
+not just the credential token. The reverse, the user clearing the
+credential token (individually or as part of a larger clearing of
+website data), should also log them out for the purposes of the Login
+Status API.
+
+<h2 id="federated-logins">Federated Logins</h2>
+
+<em>This section is non-normative.</em>
+
+Some websites allow the user to use an existing account with a federated
+login provider to bootstrap a new local user account and subsequently
+log in. The Login Status API needs to support such logins.
+
+This could be achieved through integration between the Login Status API
+and the proposed [WebID](https://github.com/WICG/WebID).
+
+If federated logins were to be supported by the Login Status API alone,
+it could look like this:
+
+First, the federated login provider needs to call the API on its side,
+possibly after the user has clicked a “Log in with X” button:
+
+```
+navigator.initiateRecordFederatedLogin(destination: secure origin) –> Promise<void>
+```
+
+For the promise to resolve, the user needs to already have login
+status set for the federated login provider, i.e. the user needs to
+be logged in to the provider first.
+
+Then the destination website has to call the API on its side:
+
+```
+navigator.recordFederatedLogin(
+    loginProvider: secure origin,
+    username,
+    credentialTokenType,
+    optionalParams { }
+) –> Promise<void>
+```
+
+The promise would only resolve if the `loginProvider` had recently
+called `initiateRecordFederatedLogin()` for this destination website.
+
+</div>
+
+<h2 id="privacy">Privacy considerations</h2>
+
+ISSUE: Write this section.
+
+<h2 id="security">Security considerations</h2>
+
+ISSUE: Write this section.
+
+<h2 id="acknowledgements">Acknowledgements</h2>
+
+Melanie Richards, formerly at Microsoft, was co-editor July 2020 - August 2021.
+We'd like to thank her for contributions to the spec and for working to get
+consensus on challenging issues.

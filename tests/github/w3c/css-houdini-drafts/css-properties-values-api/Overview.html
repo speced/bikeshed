@@ -893,6 +893,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
         <li><a href="#fallbacks-in-var-references"><span class="secno">2.7.1</span> <span class="content">Fallbacks In <span class="css">var()</span> References</span></a>
         <li><a href="#dependency-cycles"><span class="secno">2.7.2</span> <span class="content">Dependency Cycles via Relative Units</span></a>
        </ol>
+      <li><a href="#shadow-dom"><span class="secno">2.8</span> <span class="content">Shadow DOM</span></a>
      </ol>
     <li>
      <a href="#at-property-rule"><span class="secno">3</span> <span class="content">The <span>@property</span> Rule</span></a>
@@ -1265,6 +1266,73 @@ and the <a class="property css" data-link-type="property" href="https://drafts.c
 </pre>
     <p>and <span class="css">font-size</span> will behave as if the value <a class="css" data-link-type="maybe" href="https://drafts.csswg.org/css-cascade-5/#valdef-all-unset" id="ref-for-valdef-all-unset">unset</a> was specified.</p>
    </div>
+   <h3 class="heading settled" data-level="2.8" id="shadow-dom"><span class="secno">2.8. </span><span class="content">Shadow DOM</span><a class="self-link" href="#shadow-dom"></a></h3>
+   <p>Unlike many concepts in CSS
+(see <a href="https://drafts.csswg.org/css-scoping-1/#shadow-names"><cite>CSS Scoping 1</cite> § 3.5 Name-Defining Constructs and Inheritance</a>),
+property registrations are <strong>not</strong> scoped to a tree scope.
+All registrations,
+whether they appear in the outermost document
+or within a shadow tree,
+interact in a single global registration map for the <code class="idl"><a data-link-type="idl" href="https://dom.spec.whatwg.org/#document" id="ref-for-document③">Document</a></code>.</p>
+   <details class="note">
+    <summary>Why can’t registrations be scoped?</summary>
+    <p>There are clear use-cases for property registrations to be scoped—<wbr>a component using Shadow DOM
+	and registering some custom properties
+	for its own internal use
+	probably doesn’t intend for the outer page
+	to see the registration,
+	since the outer page doesn’t even know the component is using that property.</p>
+    <p>However, there are also reasons to not scope the registration—<wbr>custom properties are used to pipe data <em>into</em> a component,
+	and it’s useful for the outer page
+	to be able to set such custom properties
+	and have them syntax-checked by the registration;
+	similarly, concepts such as a property’s initial value
+	don’t make much sense
+	unless the property registration exists globally,
+	so it applies to the property even at the document’s root.</p>
+    <p>But the above just means that registration scope
+	might be something that should be controllable,
+	not that it should be forced to be global.</p>
+    <p>The reason registrations must be global
+	is because elements can exist in multiple tree scopes
+	at the same time,
+	with styles from each tree scope
+	intermingling and cascading together.
+	This applies to the <a data-link-type="dfn" href="https://www.w3.org/TR/css-scoping-1/#host-element0" id="ref-for-host-element0">host element</a>,
+	which lives in the outer tree
+	but is stylable from the shadow tree
+	by the <a class="css" data-link-type="maybe" href="https://drafts.csswg.org/css-scoping-1/#selectordef-host" id="ref-for-selectordef-host">:host</a> selector,
+	but also elements inside a shadow DOM
+	that are targetable from the outer tree
+	by the <a class="css" data-link-type="maybe" href="https://drafts.csswg.org/css-shadow-parts-1/#selectordef-part" id="ref-for-selectordef-part">::part()</a> pseudo-element.</p>
+    <p>If registrations could be scoped to a tree scope,
+	and a single property was registered
+	both inside and outside,
+	it’s not clear which registration should be applied
+	to parse the value.
+	Even if we tracked which tree a value came from
+	(something we do for other tree-scoped values)
+	and applied the corresponding registration,
+	it’s not clear that this would give a reasonable result—<wbr>the shadow DOM might expect a property to have a particular value space,
+	and be surprised when it receives something completely different
+	due to the outer tree winning the cascade
+	and applying its own registration.</p>
+   </details>
+   <p>When custom properties are exposed
+as part of a Shadow DOM-using component’s public API,
+this global registration behavior works as intended.
+If the outer page is using a custom property of the same name
+for different purposes,
+that is already a conflict that needs to be resolved,
+and the registration behavior does not make it worse.</p>
+   <p>If a custom property is intended for private internal usage for a component, however,
+it is recommended that the property
+be given a likely-unique name,
+to minimize the possibility of a clash with any other context.
+This can be done, for example,
+by including the project name,
+or some short random string of text,
+in the name of the property.</p>
    <h2 class="heading settled" data-level="3" id="at-property-rule"><span class="secno">3. </span><span class="content">The <dfn class="dfn-paneled css" data-dfn-type="at-rule" data-export id="at-ruledef-property">@property</dfn> Rule</span><a class="self-link" href="#at-property-rule"></a></h2>
    <div class="mdn-anno wrapped after">
     <button class="mdn-anno-btn"><b class="less-than-two-engines-flag" title="This feature is in less than two current engines.">⚠</b><span>MDN</span></button>
@@ -1293,10 +1361,10 @@ as if <code class="idl"><a data-link-type="idl" href="#dom-css-registerproperty"
 </pre>
    <p>A valid <a class="css" data-link-type="maybe" href="#at-ruledef-property" id="ref-for-at-ruledef-property⑦">@property</a> rule represents a <a data-link-type="dfn" href="#custom-property-registration" id="ref-for-custom-property-registration③">custom property registration</a>,
 with the property name being the serialization of the <a class="production css" data-link-type="type" href="https://drafts.csswg.org/css-variables-2/#typedef-custom-property-name" id="ref-for-typedef-custom-property-name①">&lt;custom-property-name></a> in the rule’s prelude.</p>
-   <p><a class="css" data-link-type="maybe" href="#at-ruledef-property" id="ref-for-at-ruledef-property⑧">@property</a> rules require a <a class="property css" data-link-type="property">syntax</a> and <a class="property css" data-link-type="property">inherits</a> descriptor;
+   <p><a class="css" data-link-type="maybe" href="#at-ruledef-property" id="ref-for-at-ruledef-property⑧">@property</a> rules require a <a class="property" data-link-type="propdesc" href="#descdef-property-syntax" id="ref-for-descdef-property-syntax">syntax</a> and <a class="property" data-link-type="propdesc" href="#descdef-property-inherits" id="ref-for-descdef-property-inherits">inherits</a> descriptor;
 if either are missing,
 the entire rule is invalid and must be ignored.
-The <a class="property css" data-link-type="property">initial-value</a> descriptor is optional
+The <a class="property" data-link-type="propdesc" href="#descdef-property-initial-value" id="ref-for-descdef-property-initial-value">initial-value</a> descriptor is optional
 only if the syntax is the <a data-link-type="dfn" href="#universal-syntax-definition" id="ref-for-universal-syntax-definition①">universal syntax definition</a>,
 otherwise the descriptor is required;
 if it’s missing, the entire rule is invalid and must be ignored.</p>
@@ -1312,7 +1380,7 @@ and must be ignored.</p>
    <p class="issue" id="issue-14fa952d"><a class="self-link" href="#issue-14fa952d"></a> This will likely change in the future,
 as the behavior of concept-defining at-rules in shadow trees
 becomes more consistently defined. <a href="https://github.com/w3c/css-houdini-drafts/issues/939">[Issue #939]</a></p>
-   <h3 class="heading settled" data-level="3.1" id="the-syntax-descriptor"><span class="secno">3.1. </span><span class="content">The <a class="property css" data-link-type="property">syntax</a> Descriptor</span><a class="self-link" href="#the-syntax-descriptor"></a></h3>
+   <h3 class="heading settled" data-level="3.1" id="the-syntax-descriptor"><span class="secno">3.1. </span><span class="content">The <a class="property" data-link-type="propdesc" href="#descdef-property-syntax" id="ref-for-descdef-property-syntax①">syntax</a> Descriptor</span><a class="self-link" href="#the-syntax-descriptor"></a></h3>
    <div class="mdn-anno wrapped after">
     <button class="mdn-anno-btn"><b class="less-than-two-engines-flag" title="This feature is in less than two current engines.">⚠</b><span>MDN</span></button>
     <div class="feature">
@@ -1333,7 +1401,7 @@ becomes more consistently defined. <a href="https://github.com/w3c/css-houdini-d
     <tbody>
      <tr>
       <th>Name:
-      <td><dfn class="css" data-dfn-for="@property" data-dfn-type="descriptor" data-export id="descdef-property-syntax">syntax<a class="self-link" href="#descdef-property-syntax"></a></dfn>
+      <td><dfn class="dfn-paneled css" data-dfn-for="@property" data-dfn-type="descriptor" data-export id="descdef-property-syntax">syntax</dfn>
      <tr>
       <th>For:
       <td><a class="css" data-link-type="at-rule" href="#at-ruledef-property" id="ref-for-at-ruledef-property①③">@property</a> 
@@ -1346,11 +1414,11 @@ becomes more consistently defined. <a href="https://github.com/w3c/css-houdini-d
    </table>
    <p>Specifies the syntax of the <a data-link-type="dfn" href="#custom-property-registration" id="ref-for-custom-property-registration④">custom property registration</a> represented by the <a class="css" data-link-type="maybe" href="#at-ruledef-property" id="ref-for-at-ruledef-property①④">@property</a> rule,
 controlling how the property’s value is parsed at <a data-link-type="dfn" href="https://drafts.csswg.org/css-cascade-5/#computed-value" id="ref-for-computed-value⑥">computed value</a> time.</p>
-   <p>The <a class="property css" data-link-type="property">syntax</a> descriptor is required for the <a class="css" data-link-type="maybe" href="#at-ruledef-property" id="ref-for-at-ruledef-property①⑤">@property</a> rule to be valid;
+   <p>The <a class="property" data-link-type="propdesc" href="#descdef-property-syntax" id="ref-for-descdef-property-syntax②">syntax</a> descriptor is required for the <a class="css" data-link-type="maybe" href="#at-ruledef-property" id="ref-for-at-ruledef-property①⑤">@property</a> rule to be valid;
 if it’s missing, the <a class="css" data-link-type="maybe" href="#at-ruledef-property" id="ref-for-at-ruledef-property①⑥">@property</a> rule is invalid.</p>
    <p>If the provided string is not a valid <a data-link-type="dfn" href="#syntax-string" id="ref-for-syntax-string①">syntax string</a> (if it returns failure when <a data-link-type="dfn" href="#consume-a-syntax-definition" id="ref-for-consume-a-syntax-definition">consume a syntax definition</a> is called on it),
 the descriptor is invalid and must be ignored.</p>
-   <h3 class="heading settled" data-level="3.2" id="inherits-descriptor"><span class="secno">3.2. </span><span class="content">The <a class="property css" data-link-type="property">inherits</a> Descriptor</span><a class="self-link" href="#inherits-descriptor"></a></h3>
+   <h3 class="heading settled" data-level="3.2" id="inherits-descriptor"><span class="secno">3.2. </span><span class="content">The <a class="property" data-link-type="propdesc" href="#descdef-property-inherits" id="ref-for-descdef-property-inherits①">inherits</a> Descriptor</span><a class="self-link" href="#inherits-descriptor"></a></h3>
    <div class="mdn-anno wrapped after">
     <button class="mdn-anno-btn"><b class="less-than-two-engines-flag" title="This feature is in less than two current engines.">⚠</b><span>MDN</span></button>
     <div class="feature">
@@ -1371,7 +1439,7 @@ the descriptor is invalid and must be ignored.</p>
     <tbody>
      <tr>
       <th>Name:
-      <td><dfn class="css" data-dfn-for="@property" data-dfn-type="descriptor" data-export id="descdef-property-inherits">inherits<a class="self-link" href="#descdef-property-inherits"></a></dfn>
+      <td><dfn class="dfn-paneled css" data-dfn-for="@property" data-dfn-type="descriptor" data-export id="descdef-property-inherits">inherits</dfn>
      <tr>
       <th>For:
       <td><a class="css" data-link-type="at-rule" href="#at-ruledef-property" id="ref-for-at-ruledef-property①⑦">@property</a> 
@@ -1384,9 +1452,9 @@ the descriptor is invalid and must be ignored.</p>
    </table>
    <p>Specifies the inherit flag of the <a data-link-type="dfn" href="#custom-property-registration" id="ref-for-custom-property-registration⑤">custom property registration</a> represented by the <a class="css" data-link-type="maybe" href="#at-ruledef-property" id="ref-for-at-ruledef-property①⑧">@property</a> rule,
 controlling whether or not the property inherits by default.</p>
-   <p>The <a class="property css" data-link-type="property">inherits</a> descriptor is required for the <a class="css" data-link-type="maybe" href="#at-ruledef-property" id="ref-for-at-ruledef-property①⑨">@property</a> rule to be valid;
+   <p>The <a class="property" data-link-type="propdesc" href="#descdef-property-inherits" id="ref-for-descdef-property-inherits②">inherits</a> descriptor is required for the <a class="css" data-link-type="maybe" href="#at-ruledef-property" id="ref-for-at-ruledef-property①⑨">@property</a> rule to be valid;
 if it’s missing, the <a class="css" data-link-type="maybe" href="#at-ruledef-property" id="ref-for-at-ruledef-property②⓪">@property</a> rule is invalid.</p>
-   <h3 class="heading settled" data-level="3.3" id="initial-value-descriptor"><span class="secno">3.3. </span><span class="content">The <a class="property css" data-link-type="property">initial-value</a> Descriptor</span><a class="self-link" href="#initial-value-descriptor"></a></h3>
+   <h3 class="heading settled" data-level="3.3" id="initial-value-descriptor"><span class="secno">3.3. </span><span class="content">The <a class="property" data-link-type="propdesc" href="#descdef-property-initial-value" id="ref-for-descdef-property-initial-value①">initial-value</a> Descriptor</span><a class="self-link" href="#initial-value-descriptor"></a></h3>
    <div class="mdn-anno wrapped after">
     <button class="mdn-anno-btn"><b class="less-than-two-engines-flag" title="This feature is in less than two current engines.">⚠</b><span>MDN</span></button>
     <div class="feature">
@@ -1407,7 +1475,7 @@ if it’s missing, the <a class="css" data-link-type="maybe" href="#at-ruledef-p
     <tbody>
      <tr>
       <th>Name:
-      <td><dfn class="css" data-dfn-for="@property" data-dfn-type="descriptor" data-export id="descdef-property-initial-value">initial-value<a class="self-link" href="#descdef-property-initial-value"></a></dfn>
+      <td><dfn class="dfn-paneled css" data-dfn-for="@property" data-dfn-type="descriptor" data-export id="descdef-property-initial-value">initial-value</dfn>
      <tr>
       <th>For:
       <td><a class="css" data-link-type="at-rule" href="#at-ruledef-property" id="ref-for-at-ruledef-property②①">@property</a> 
@@ -1420,19 +1488,19 @@ if it’s missing, the <a class="css" data-link-type="maybe" href="#at-ruledef-p
    </table>
    <p>Specifies the initial value of the <a data-link-type="dfn" href="#custom-property-registration" id="ref-for-custom-property-registration⑥">custom property registration</a> represented by the <a class="css" data-link-type="maybe" href="#at-ruledef-property" id="ref-for-at-ruledef-property②②">@property</a> rule,
 controlling the property’s <a data-link-type="dfn" href="https://drafts.csswg.org/css-cascade-5/#initial-value" id="ref-for-initial-value">initial value</a>.</p>
-   <p>If the value of the <a class="property css" data-link-type="property">syntax</a> descriptor is the <a data-link-type="dfn" href="#universal-syntax-definition" id="ref-for-universal-syntax-definition②">universal syntax definition</a>,
-then the <a class="property css" data-link-type="property">initial-value</a> descriptor is optional.
+   <p>If the value of the <a class="property" data-link-type="propdesc" href="#descdef-property-syntax" id="ref-for-descdef-property-syntax③">syntax</a> descriptor is the <a data-link-type="dfn" href="#universal-syntax-definition" id="ref-for-universal-syntax-definition②">universal syntax definition</a>,
+then the <a class="property" data-link-type="propdesc" href="#descdef-property-initial-value" id="ref-for-descdef-property-initial-value②">initial-value</a> descriptor is optional.
 If omitted, the <a data-link-type="dfn" href="https://drafts.csswg.org/css-cascade-5/#initial-value" id="ref-for-initial-value①">initial value</a> of the property is the <a data-link-type="dfn" href="https://drafts.csswg.org/css-variables-2/#guaranteed-invalid-value" id="ref-for-guaranteed-invalid-value②">guaranteed-invalid value</a>.</p>
    <p>Otherwise,
-if the value of the <a class="property css" data-link-type="property">syntax</a> descriptor is not the <a data-link-type="dfn" href="#universal-syntax-definition" id="ref-for-universal-syntax-definition③">universal syntax definition</a>,
+if the value of the <a class="property" data-link-type="propdesc" href="#descdef-property-syntax" id="ref-for-descdef-property-syntax④">syntax</a> descriptor is not the <a data-link-type="dfn" href="#universal-syntax-definition" id="ref-for-universal-syntax-definition③">universal syntax definition</a>,
 the following conditions must be met for the <a class="css" data-link-type="maybe" href="#at-ruledef-property" id="ref-for-at-ruledef-property②③">@property</a> rule to be valid:</p>
    <ul>
     <li data-md>
-     <p>The <a class="property css" data-link-type="property">initial-value</a> descriptor must be present.</p>
+     <p>The <a class="property" data-link-type="propdesc" href="#descdef-property-initial-value" id="ref-for-descdef-property-initial-value③">initial-value</a> descriptor must be present.</p>
     <li data-md>
-     <p>The <a class="property css" data-link-type="property">initial-value</a> descriptor’s value must <a data-link-type="dfn" href="#consume-a-syntax-definition" id="ref-for-consume-a-syntax-definition①">parse successfully</a> according to the grammar specified by the <a data-link-type="dfn" href="#syntax-definition" id="ref-for-syntax-definition①">syntax definition</a>.</p>
+     <p>The <a class="property" data-link-type="propdesc" href="#descdef-property-initial-value" id="ref-for-descdef-property-initial-value④">initial-value</a> descriptor’s value must <a data-link-type="dfn" href="#consume-a-syntax-definition" id="ref-for-consume-a-syntax-definition①">parse successfully</a> according to the grammar specified by the <a data-link-type="dfn" href="#syntax-definition" id="ref-for-syntax-definition①">syntax definition</a>.</p>
     <li data-md>
-     <p>The <a class="property css" data-link-type="property">initial-value</a> must be <a data-link-type="dfn" href="#computationally-independent" id="ref-for-computationally-independent">computationally independent</a>.</p>
+     <p>The <a class="property" data-link-type="propdesc" href="#descdef-property-initial-value" id="ref-for-descdef-property-initial-value⑤">initial-value</a> must be <a data-link-type="dfn" href="#computationally-independent" id="ref-for-computationally-independent">computationally independent</a>.</p>
    </ul>
    <p>If the above conditions are not met, the <a class="css" data-link-type="maybe" href="#at-ruledef-property" id="ref-for-at-ruledef-property②④">@property</a> rule is invalid.</p>
    <h2 class="heading settled" data-level="4" id="registering-custom-properties"><span class="secno">4. </span><span class="content">Registering Custom Properties in JS</span><a class="self-link" href="#registering-custom-properties"></a></h2>
@@ -1449,7 +1517,7 @@ the <code class="idl"><a data-link-type="idl">CSS</a></code> object is extended 
   <a class="idl-code" data-link-type="interface" href="https://webidl.spec.whatwg.org/#idl-undefined" id="ref-for-idl-undefined"><c- b>undefined</c-></a> <a class="idl-code" data-link-type="method" href="#dom-css-registerproperty" id="ref-for-dom-css-registerproperty⑥"><c- g>registerProperty</c-></a>(<a data-link-type="idl-name" href="#dictdef-propertydefinition" id="ref-for-dictdef-propertydefinition①"><c- n>PropertyDefinition</c-></a> <dfn class="idl-code" data-dfn-for="CSS/registerProperty(definition)" data-dfn-type="argument" data-export id="dom-css-registerproperty-definition-definition"><code><c- g>definition</c-></code><a class="self-link" href="#dom-css-registerproperty-definition-definition"></a></dfn>);
 };
 </pre>
-   <p>Additional, the <code class="idl"><a data-link-type="idl" href="https://dom.spec.whatwg.org/#document" id="ref-for-document③">Document</a></code> object gains a new <dfn class="dfn-paneled idl-code" data-dfn-for="Window" data-dfn-type="attribute" data-export id="dom-window-registeredpropertyset-slot"><code>[[registeredPropertySet]]</code></dfn> private slot,
+   <p>Additional, the <code class="idl"><a data-link-type="idl" href="https://dom.spec.whatwg.org/#document" id="ref-for-document④">Document</a></code> object gains a new <dfn class="dfn-paneled idl-code" data-dfn-for="Window" data-dfn-type="attribute" data-export id="dom-window-registeredpropertyset-slot"><code>[[registeredPropertySet]]</code></dfn> private slot,
 which is a set of records that describe registered custom properties.</p>
    <h3 class="heading settled" data-level="4.1" id="the-registerproperty-function"><span class="secno">4.1. </span><span class="content">The <code class="idl"><a data-link-type="idl" href="#dom-css-registerproperty" id="ref-for-dom-css-registerproperty⑦">registerProperty()</a></code> Function</span><a class="self-link" href="#the-registerproperty-function"></a></h3>
    <div class="mdn-anno wrapped after">
@@ -1747,7 +1815,7 @@ while matching the value <a class="css" data-link-type="maybe" href="https://dra
    <dl>
     <dt data-md><dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="data-type-name">data type name</dfn>
     <dd data-md>
-     <p>A sequence of <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#code-point" id="ref-for-code-point">code points</a> consisting of a U+003C LESS-THAN SIGN (&lt;), followed be zero or more <a data-link-type="dfn">name code points</a>, and terminated by U+003E GREATER-THAN SIGN (>).</p>
+     <p>A sequence of <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#code-point" id="ref-for-code-point">code points</a> consisting of a U+003C LESS-THAN SIGN (&lt;), followed be zero or more <a data-link-type="dfn" href="https://drafts.csswg.org/css-syntax-3/#ident-code-point" id="ref-for-ident-code-point">ident code points</a>, and terminated by U+003E GREATER-THAN SIGN (>).</p>
     <dt data-md><dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="pre-multiplied-data-type-name">pre-multiplied data type name</dfn>
     <dd data-md>
      <p>A <a data-link-type="dfn" href="#data-type-name" id="ref-for-data-type-name">data type name</a> that represents another <a data-link-type="dfn" href="#syntax-component" id="ref-for-syntax-component⑤">syntax component</a> with a <a href="#multipliers">multiplier</a> already included.</p>
@@ -1816,10 +1884,10 @@ otherwise, <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#list-app
       <p><a data-link-type="dfn" href="#consume-a-data-type-name" id="ref-for-consume-a-data-type-name">Consume a data type name</a> from <var>stream</var>.
 If it returned a <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#string" id="ref-for-string②">string</a>, set <var>component</var>’s <var>name</var> to the returned value.
 Otherwise, return failure.</p>
-     <dt data-md><a data-link-type="dfn" href="https://drafts.csswg.org/css-syntax-3/#ident-start-code-point" id="ref-for-ident-start-code-point">name-start code point</a>
+     <dt data-md><a data-link-type="dfn" href="https://drafts.csswg.org/css-syntax-3/#ident-start-code-point" id="ref-for-ident-start-code-point">ident-start code point</a>
      <dt data-md>U+005C REVERSE SOLIDUS (\)
      <dd data-md>
-      <p>If the stream <a data-link-type="dfn">starts with an identifier</a>, <a data-link-type="dfn" href="https://drafts.csswg.org/css-syntax-3/#reconsume-the-current-input-code-point" id="ref-for-reconsume-the-current-input-code-point">reconsume the current input code point</a> from <var>stream</var> then <a data-link-type="dfn">consume a name</a> from <var>stream</var>,
+      <p>If the stream <a data-link-type="dfn" href="https://drafts.csswg.org/css-syntax-3/#check-if-three-code-points-would-start-an-ident-sequence" id="ref-for-check-if-three-code-points-would-start-an-ident-sequence">starts with an ident sequence</a>, <a data-link-type="dfn" href="https://drafts.csswg.org/css-syntax-3/#reconsume-the-current-input-code-point" id="ref-for-reconsume-the-current-input-code-point">reconsume the current input code point</a> from <var>stream</var> then <a data-link-type="dfn" href="https://drafts.csswg.org/css-syntax-3/#consume-an-ident-sequence" id="ref-for-consume-an-ident-sequence">consume an ident sequence</a> from <var>stream</var>,
 and set <var>component</var>’s <var>name</var> to the returned value.
 Otherwise return failure.</p>
       <p>If <var>component</var>’s <var>name</var> does not <a data-link-type="dfn" href="https://drafts.csswg.org/css-syntax-3/#css-parse-something-according-to-a-css-grammar" id="ref-for-css-parse-something-according-to-a-css-grammar④">parse</a> as a <a class="production css" data-link-type="type" href="https://drafts.csswg.org/css-values-4/#identifier-value" id="ref-for-identifier-value④">&lt;custom-ident></a>,
@@ -1849,7 +1917,7 @@ return failure.</p>
 If <var>name</var> is a <a data-link-type="dfn" href="#css-supported-syntax-component-name" id="ref-for-css-supported-syntax-component-name">supported syntax component name</a>,
 return <var>name</var>.
 Otherwise return failure.</p>
-     <dt data-md><a data-link-type="dfn">name code point</a>
+     <dt data-md><a data-link-type="dfn" href="https://drafts.csswg.org/css-syntax-3/#ident-code-point" id="ref-for-ident-code-point①">ident code point</a>
      <dd data-md>
       <p>Append the <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#code-point" id="ref-for-code-point⑨">code point</a> to <var>name</var>.</p>
      <dt data-md>anything else
@@ -1860,7 +1928,7 @@ Otherwise return failure.</p>
    <h2 class="heading settled" data-level="6" id="cssom"><span class="secno">6. </span><span class="content">CSSOM</span><a class="self-link" href="#cssom"></a></h2>
    <div class="note" role="note"> The value specified for a registered custom property is not
 	interpreted until computed-value time. This means that only APIs that
-	retrieve computed values are affected. Other APIs must ignore the <code class="idl"><a data-link-type="idl" href="#dom-window-registeredpropertyset-slot" id="ref-for-dom-window-registeredpropertyset-slot③">[[registeredPropertySet]]</a></code> slot of the associated <code class="idl"><a data-link-type="idl" href="https://dom.spec.whatwg.org/#document" id="ref-for-document④">Document</a></code>, and
+	retrieve computed values are affected. Other APIs must ignore the <code class="idl"><a data-link-type="idl" href="#dom-window-registeredpropertyset-slot" id="ref-for-dom-window-registeredpropertyset-slot③">[[registeredPropertySet]]</a></code> slot of the associated <code class="idl"><a data-link-type="idl" href="https://dom.spec.whatwg.org/#document" id="ref-for-document⑤">Document</a></code>, and
 	treat all custom properties as unregistered. </div>
    <h3 class="heading settled" data-level="6.1" id="the-css-property-rule-interface"><span class="secno">6.1. </span><span class="content">The <dfn class="dfn-paneled idl-code" data-dfn-type="interface" data-export id="csspropertyrule"><code>CSSPropertyRule</code></dfn> Interface</span><a class="self-link" href="#the-css-property-rule-interface"></a></h3>
    <div class="mdn-anno wrapped after">
@@ -1982,12 +2050,12 @@ LEFT CURLY BRACKET (U+007B), followed by a SPACE (U+0020).</p>
      <li data-md>
       <p>The string <code>"syntax:"</code>, followed by a single SPACE (U+0020).</p>
      <li data-md>
-      <p>The result of performing <a data-link-type="dfn" href="https://drafts.csswg.org/cssom-1/#serialize-a-string" id="ref-for-serialize-a-string">serialize a string</a> on the rule’s <a class="property css" data-link-type="property">syntax</a>, followed by a single SEMICOLON (U+003B), followed by a
+      <p>The result of performing <a data-link-type="dfn" href="https://drafts.csswg.org/cssom-1/#serialize-a-string" id="ref-for-serialize-a-string">serialize a string</a> on the rule’s <a class="property" data-link-type="propdesc" href="#descdef-property-syntax" id="ref-for-descdef-property-syntax⑤">syntax</a>, followed by a single SEMICOLON (U+003B), followed by a
 SPACE (U+0020).</p>
      <li data-md>
       <p>The string <code>"inherits:"</code>, followed by a single SPACE (U+0020).</p>
      <li data-md>
-      <p>For the rule’s <a class="property css" data-link-type="property">inherits</a> attribute, one of the following depending on
+      <p>For the rule’s <a class="property" data-link-type="propdesc" href="#descdef-property-inherits" id="ref-for-descdef-property-inherits③">inherits</a> attribute, one of the following depending on
 the attribute’s value:</p>
       <dl class="switch">
        <dt data-md>true
@@ -2000,12 +2068,12 @@ SEMICOLON (U+003B), followed by a SPACE (U+0020).</p>
 SEMICOLON (U+003B), followed by a SPACE (U+0020).</p>
       </dl>
      <li data-md>
-      <p>If the rule’s <a class="property css" data-link-type="property">initial-value</a> is present, follow these substeps:</p>
+      <p>If the rule’s <a class="property" data-link-type="propdesc" href="#descdef-property-initial-value" id="ref-for-descdef-property-initial-value⑥">initial-value</a> is present, follow these substeps:</p>
       <ol>
        <li data-md>
         <p>The string <code>"initial-value:"</code>.</p>
        <li data-md>
-        <p>The result of performing <a data-link-type="dfn" href="https://drafts.csswg.org/cssom-1/#serialize-a-css-value" id="ref-for-serialize-a-css-value①">serialize a CSS value</a> in the rule’s <a class="property css" data-link-type="property">initial-value</a> followed by a single SEMICOLON (U+003B), followed by
+        <p>The result of performing <a data-link-type="dfn" href="https://drafts.csswg.org/cssom-1/#serialize-a-css-value" id="ref-for-serialize-a-css-value①">serialize a CSS value</a> in the rule’s <a class="property" data-link-type="propdesc" href="#descdef-property-initial-value" id="ref-for-descdef-property-initial-value⑦">initial-value</a> followed by a single SEMICOLON (U+003B), followed by
 a SPACE (U+0020).</p>
       </ol>
      <li data-md>
@@ -2348,6 +2416,24 @@ registerPaint<c- p>(</c-><c- t>'circle'</c-><c- p>,</c-> <c- a>class</c-> <c- p>
     <li><a href="#ref-for-computed-image">2.4. Computed Value-Time Behavior</a>
    </ul>
   </aside>
+  <aside class="dfn-panel" data-for="term-for-selectordef-host">
+   <a href="https://drafts.csswg.org/css-scoping-1/#selectordef-host">https://drafts.csswg.org/css-scoping-1/#selectordef-host</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-selectordef-host">2.8. Shadow DOM</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-host-element0">
+   <a href="https://www.w3.org/TR/css-scoping-1/#host-element0">https://www.w3.org/TR/css-scoping-1/#host-element0</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-host-element0">2.8. Shadow DOM</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-selectordef-part">
+   <a href="https://drafts.csswg.org/css-shadow-parts-1/#selectordef-part">https://drafts.csswg.org/css-shadow-parts-1/#selectordef-part</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-selectordef-part">2.8. Shadow DOM</a>
+   </ul>
+  </aside>
   <aside class="dfn-panel" data-for="term-for-typedef-declaration-list">
    <a href="https://drafts.csswg.org/css-syntax-3/#typedef-declaration-list">https://drafts.csswg.org/css-syntax-3/#typedef-declaration-list</a><b>Referenced in:</b>
    <ul>
@@ -2367,22 +2453,35 @@ registerPaint<c- p>(</c-><c- t>'circle'</c-><c- p>,</c-> <c- a>class</c-> <c- p>
     <li><a href="#ref-for-typedef-dimension-token">2.7. Substitution via var()</a>
    </ul>
   </aside>
+  <aside class="dfn-panel" data-for="term-for-consume-an-ident-sequence">
+   <a href="https://drafts.csswg.org/css-syntax-3/#consume-an-ident-sequence">https://drafts.csswg.org/css-syntax-3/#consume-an-ident-sequence</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-consume-an-ident-sequence">5.4.3. Consume a Syntax Component</a>
+   </ul>
+  </aside>
   <aside class="dfn-panel" data-for="term-for-current-input-code-point">
    <a href="https://drafts.csswg.org/css-syntax-3/#current-input-code-point">https://drafts.csswg.org/css-syntax-3/#current-input-code-point</a><b>Referenced in:</b>
    <ul>
     <li><a href="#ref-for-current-input-code-point">5.4.3. Consume a Syntax Component</a>
    </ul>
   </aside>
-  <aside class="dfn-panel" data-for="term-for-input-stream">
-   <a href="https://drafts.csswg.org/css-syntax-3/#input-stream">https://drafts.csswg.org/css-syntax-3/#input-stream</a><b>Referenced in:</b>
+  <aside class="dfn-panel" data-for="term-for-ident-code-point">
+   <a href="https://drafts.csswg.org/css-syntax-3/#ident-code-point">https://drafts.csswg.org/css-syntax-3/#ident-code-point</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-input-stream">5.4.2. Consume a Syntax Definition</a>
+    <li><a href="#ref-for-ident-code-point">5.4.1. Definitions</a>
+    <li><a href="#ref-for-ident-code-point①">5.4.4. Consume a Data Type Name</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-ident-start-code-point">
    <a href="https://drafts.csswg.org/css-syntax-3/#ident-start-code-point">https://drafts.csswg.org/css-syntax-3/#ident-start-code-point</a><b>Referenced in:</b>
    <ul>
     <li><a href="#ref-for-ident-start-code-point">5.4.3. Consume a Syntax Component</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-input-stream">
+   <a href="https://drafts.csswg.org/css-syntax-3/#input-stream">https://drafts.csswg.org/css-syntax-3/#input-stream</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-input-stream">5.4.2. Consume a Syntax Definition</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-next-input-code-point">
@@ -2406,6 +2505,12 @@ registerPaint<c- p>(</c-><c- t>'circle'</c-><c- p>,</c-> <c- a>class</c-> <c- p>
    <a href="https://drafts.csswg.org/css-syntax-3/#reconsume-the-current-input-code-point">https://drafts.csswg.org/css-syntax-3/#reconsume-the-current-input-code-point</a><b>Referenced in:</b>
    <ul>
     <li><a href="#ref-for-reconsume-the-current-input-code-point">5.4.3. Consume a Syntax Component</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-check-if-three-code-points-would-start-an-ident-sequence">
+   <a href="https://drafts.csswg.org/css-syntax-3/#check-if-three-code-points-would-start-an-ident-sequence">https://drafts.csswg.org/css-syntax-3/#check-if-three-code-points-would-start-an-ident-sequence</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-check-if-three-code-points-would-start-an-ident-sequence">5.4.3. Consume a Syntax Component</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-whitespace">
@@ -2756,8 +2861,9 @@ registerPaint<c- p>(</c-><c- t>'circle'</c-><c- p>,</c-> <c- a>class</c-> <c- p>
    <ul>
     <li><a href="#ref-for-document">2. Registered Custom Properties</a>
     <li><a href="#ref-for-document①">2.1. Determining the Registration</a> <a href="#ref-for-document②">(2)</a>
-    <li><a href="#ref-for-document③">4. Registering Custom Properties in JS</a>
-    <li><a href="#ref-for-document④">6. CSSOM</a>
+    <li><a href="#ref-for-document③">2.8. Shadow DOM</a>
+    <li><a href="#ref-for-document④">4. Registering Custom Properties in JS</a>
+    <li><a href="#ref-for-document⑤">6. CSSOM</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-concept-shadow-tree">
@@ -2955,17 +3061,31 @@ registerPaint<c- p>(</c-><c- t>'circle'</c-><c- p>,</c-> <c- a>class</c-> <c- p>
      <li><span class="dfn-paneled" id="term-for-computed-image">computed &lt;image></span>
     </ul>
    <li>
+    <a data-link-type="biblio">[CSS-SCOPING-1]</a> defines the following terms:
+    <ul>
+     <li><span class="dfn-paneled" id="term-for-selectordef-host">:host</span>
+     <li><span class="dfn-paneled" id="term-for-host-element0">host element</span>
+    </ul>
+   <li>
+    <a data-link-type="biblio">[CSS-SHADOW-PARTS-1]</a> defines the following terms:
+    <ul>
+     <li><span class="dfn-paneled" id="term-for-selectordef-part">::part()</span>
+    </ul>
+   <li>
     <a data-link-type="biblio">[CSS-SYNTAX-3]</a> defines the following terms:
     <ul>
      <li><span class="dfn-paneled" id="term-for-typedef-declaration-list">&lt;declaration-list></span>
      <li><span class="dfn-paneled" id="term-for-typedef-declaration-value">&lt;declaration-value></span>
      <li><span class="dfn-paneled" id="term-for-typedef-dimension-token">&lt;dimension-token></span>
+     <li><span class="dfn-paneled" id="term-for-consume-an-ident-sequence">consume an ident sequence</span>
      <li><span class="dfn-paneled" id="term-for-current-input-code-point">current input code point</span>
+     <li><span class="dfn-paneled" id="term-for-ident-code-point">ident code point</span>
+     <li><span class="dfn-paneled" id="term-for-ident-start-code-point">ident-start code point</span>
      <li><span class="dfn-paneled" id="term-for-input-stream">input stream</span>
-     <li><span class="dfn-paneled" id="term-for-ident-start-code-point">name-start code point</span>
      <li><span class="dfn-paneled" id="term-for-next-input-code-point">next input code point</span>
      <li><span class="dfn-paneled" id="term-for-css-parse-something-according-to-a-css-grammar">parse</span>
      <li><span class="dfn-paneled" id="term-for-reconsume-the-current-input-code-point">reconsume the current input code point</span>
+     <li><span class="dfn-paneled" id="term-for-check-if-three-code-points-would-start-an-ident-sequence">starts with an ident sequence</span>
      <li><span class="dfn-paneled" id="term-for-whitespace">whitespace</span>
     </ul>
    <li>
@@ -3107,6 +3227,8 @@ registerPaint<c- p>(</c-><c- t>'circle'</c-><c- p>,</c-> <c- a>class</c-> <c- p>
    <dd>Tab Atkins Jr.; Elika Etemad; Lea Verou. <a href="https://drafts.csswg.org/css-images-3/"><cite>CSS Images Module Level 3</cite></a>. URL: <a href="https://drafts.csswg.org/css-images-3/">https://drafts.csswg.org/css-images-3/</a>
    <dt id="biblio-css-images-4">[CSS-IMAGES-4]
    <dd>Tab Atkins Jr.; Elika Etemad; Lea Verou. <a href="https://drafts.csswg.org/css-images-4/"><cite>CSS Image Values and Replaced Content Module Level 4</cite></a>. URL: <a href="https://drafts.csswg.org/css-images-4/">https://drafts.csswg.org/css-images-4/</a>
+   <dt id="biblio-css-scoping-1">[CSS-SCOPING-1]
+   <dd>Tab Atkins Jr.; Elika Etemad. <a href="https://drafts.csswg.org/css-scoping/"><cite>CSS Scoping Module Level 1</cite></a>. URL: <a href="https://drafts.csswg.org/css-scoping/">https://drafts.csswg.org/css-scoping/</a>
    <dt id="biblio-css-syntax-3">[CSS-SYNTAX-3]
    <dd>Tab Atkins Jr.; Simon Sapin. <a href="https://drafts.csswg.org/css-syntax/"><cite>CSS Syntax Module Level 3</cite></a>. URL: <a href="https://drafts.csswg.org/css-syntax/">https://drafts.csswg.org/css-syntax/</a>
    <dt id="biblio-css-transforms-1">[CSS-TRANSFORMS-1]
@@ -3144,6 +3266,8 @@ registerPaint<c- p>(</c-><c- t>'circle'</c-><c- p>,</c-> <c- a>class</c-> <c- p>
    <dd>Greg Whitworth; et al. <a href="https://drafts.css-houdini.org/css-layout-api-1/"><cite>CSS Layout API Level 1</cite></a>. URL: <a href="https://drafts.css-houdini.org/css-layout-api-1/">https://drafts.css-houdini.org/css-layout-api-1/</a>
    <dt id="biblio-css-paint-api-1">[CSS-PAINT-API-1]
    <dd>Ian Kilpatrick; Dean Jackson. <a href="https://drafts.css-houdini.org/css-paint-api-1/"><cite>CSS Painting API Level 1</cite></a>. URL: <a href="https://drafts.css-houdini.org/css-paint-api-1/">https://drafts.css-houdini.org/css-paint-api-1/</a>
+   <dt id="biblio-css-shadow-parts-1">[CSS-SHADOW-PARTS-1]
+   <dd>Tab Atkins Jr.; Fergal Daly. <a href="https://drafts.csswg.org/css-shadow-parts/"><cite>CSS Shadow Parts</cite></a>. URL: <a href="https://drafts.csswg.org/css-shadow-parts/">https://drafts.csswg.org/css-shadow-parts/</a>
    <dt id="biblio-css3-animations">[CSS3-ANIMATIONS]
    <dd>Dean Jackson; et al. <a href="https://drafts.csswg.org/css-animations/"><cite>CSS Animations Level 1</cite></a>. URL: <a href="https://drafts.csswg.org/css-animations/">https://drafts.csswg.org/css-animations/</a>
    <dt id="biblio-css3-transitions">[CSS3-TRANSITIONS]
@@ -3161,15 +3285,15 @@ registerPaint<c- p>(</c-><c- t>'circle'</c-><c- p>,</c-> <c- a>class</c-> <c- p>
       <th scope="col">Initial
     <tbody>
      <tr>
-      <th scope="row"><a class="css" data-link-type="descriptor" href="#descdef-property-inherits" id="ref-for-descdef-property-inherits">inherits</a>
+      <th scope="row"><a class="css" data-link-type="descriptor" href="#descdef-property-inherits" id="ref-for-descdef-property-inherits④">inherits</a>
       <td>true | false
       <td>n/a (see prose)
      <tr>
-      <th scope="row"><a class="css" data-link-type="descriptor" href="#descdef-property-initial-value" id="ref-for-descdef-property-initial-value">initial-value</a>
+      <th scope="row"><a class="css" data-link-type="descriptor" href="#descdef-property-initial-value" id="ref-for-descdef-property-initial-value⑧">initial-value</a>
       <td>&lt;declaration-value>
       <td>the guaranteed-invalid value (but see prose)
      <tr>
-      <th scope="row"><a class="css" data-link-type="descriptor" href="#descdef-property-syntax" id="ref-for-descdef-property-syntax">syntax</a>
+      <th scope="row"><a class="css" data-link-type="descriptor" href="#descdef-property-syntax" id="ref-for-descdef-property-syntax⑥">syntax</a>
       <td>&lt;string>
       <td>n/a (see prose)
    </table>
@@ -3237,6 +3361,31 @@ becomes more consistently defined. <a href="https://github.com/w3c/css-houdini-d
     <li><a href="#ref-for-at-ruledef-property②①">3.3. The initial-value Descriptor</a> <a href="#ref-for-at-ruledef-property②②">(2)</a> <a href="#ref-for-at-ruledef-property②③">(3)</a> <a href="#ref-for-at-ruledef-property②④">(4)</a>
     <li><a href="#ref-for-at-ruledef-property②⑤">6.1. The CSSPropertyRule Interface</a> <a href="#ref-for-at-ruledef-property②⑥">(2)</a> <a href="#ref-for-at-ruledef-property②⑦">(3)</a> <a href="#ref-for-at-ruledef-property②⑧">(4)</a> <a href="#ref-for-at-ruledef-property②⑨">(5)</a>
     <li><a href="#ref-for-at-ruledef-property③⓪">7.2. Example 2: Using @property to register a property</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="descdef-property-syntax">
+   <b><a href="#descdef-property-syntax">#descdef-property-syntax</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-descdef-property-syntax">3. The @property Rule</a>
+    <li><a href="#ref-for-descdef-property-syntax①">3.1. The syntax Descriptor</a> <a href="#ref-for-descdef-property-syntax②">(2)</a>
+    <li><a href="#ref-for-descdef-property-syntax③">3.3. The initial-value Descriptor</a> <a href="#ref-for-descdef-property-syntax④">(2)</a>
+    <li><a href="#ref-for-descdef-property-syntax⑤">6.1. The CSSPropertyRule Interface</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="descdef-property-inherits">
+   <b><a href="#descdef-property-inherits">#descdef-property-inherits</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-descdef-property-inherits">3. The @property Rule</a>
+    <li><a href="#ref-for-descdef-property-inherits①">3.2. The inherits Descriptor</a> <a href="#ref-for-descdef-property-inherits②">(2)</a>
+    <li><a href="#ref-for-descdef-property-inherits③">6.1. The CSSPropertyRule Interface</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="descdef-property-initial-value">
+   <b><a href="#descdef-property-initial-value">#descdef-property-initial-value</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-descdef-property-initial-value">3. The @property Rule</a>
+    <li><a href="#ref-for-descdef-property-initial-value①">3.3. The initial-value Descriptor</a> <a href="#ref-for-descdef-property-initial-value②">(2)</a> <a href="#ref-for-descdef-property-initial-value③">(3)</a> <a href="#ref-for-descdef-property-initial-value④">(4)</a> <a href="#ref-for-descdef-property-initial-value⑤">(5)</a>
+    <li><a href="#ref-for-descdef-property-initial-value⑥">6.1. The CSSPropertyRule Interface</a> <a href="#ref-for-descdef-property-initial-value⑦">(2)</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="dom-window-registeredpropertyset-slot">

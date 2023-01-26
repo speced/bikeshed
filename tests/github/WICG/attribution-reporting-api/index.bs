@@ -1,0 +1,2255 @@
+<pre class='metadata'>
+Title: Attribution Reporting
+Shortname: attribution-reporting
+Level: 1
+Status: CG-DRAFT
+Group: wicg
+Repository: WICG/attribution-reporting-api
+URL: https://wicg.github.io/attribution-reporting-api
+Editor: Charlie Harrison, Google Inc. https://google.com, csharrison@chromium.org
+Editor: John Delaney, Google Inc. https://google.com, johnidel@chromium.org
+Editor: Andrew Paseltiner, Google Inc. https://google.com, apaseltiner@chromium.org
+Abstract: An API to report that an event may have been caused by another cross-site event. These reports are designed to transfer little enough data between sites that the sites can't use them to track individual users.
+
+Markup Shorthands: markdown on
+Complain About: accidental-2119 on, missing-example-ids on
+Assume Explicit For: on
+</pre>
+<pre class=link-defaults>
+spec:html; type:element; text:a
+spec:html; type:element; text:script
+</pre>
+<pre class="anchors">
+spec: hr-time; type: dfn; urlPrefix: https://w3c.github.io/hr-time/
+    text: current wall time; url: #dfn-moment
+    text: duration; url: #dfn-duration
+    text: moment; url: #dfn-moment
+spec: uuid; type: dfn; urlPrefix: https://wicg.github.io/uuid/
+    text: generate a random UUID; url: #dfn-generate-a-random-uuid
+</pre>
+
+Introduction {#intro}
+=====================
+
+<em>This section is non-normative</em>
+
+This specification describes how web browsers can provide a mechanism to the
+web that supports measuring and attributing conversions (e.g. purchases) to ads
+a user interacted with on another site. This mechanism should remove one need
+for cross-site identifiers like third-party cookies.
+
+## Overview ## {#overview}
+
+Pages/embedded sites are given the ability to register [=attribution sources=] and
+[=attribution triggers=], which can be linked by the User Agent to generate and
+send [=attribution reports=] containing information from both of those events.
+
+A reporter `https://reporter.example` embedded on `https://source.example` is able to
+measure whether an iteraction on the page lead to an action on `https://destination.example`
+by registering an [=attribution source=] with [=attribution source/attribution destinations=]
+of « `https://destination.example` ». Reporters are able to register sources through a variety
+of surfaces, but ultimately the reporter is required to provide the User Agent with an
+HTTP-response header which allows the source to be eligible for attribution.
+
+At a later point in time, the reporter, now embedded on `https://destination.example`,
+may register an [=attribution trigger=]. Reporters can register triggers by sending an
+HTTP-response header containing information about the action/event that occurred. Internally,
+the User Agent attempts to match the trigger to previously registered source events based on
+where the sources/triggers were registered and configurations provided by the reporter.
+
+If the User Agent is able to attribute the trigger to a source, it will generate and
+send an [=attribution report=] to the reporter via an HTTP POST request at a later point
+in time.
+
+# HTML monkeypatches # {#html-monkeypatches}
+
+<h3 id="monkeypatch-attributionsrc">API for elements</h3>
+
+<pre class="idl">
+interface mixin HTMLAttributionSrcElementUtils {
+    [CEReactions] attribute USVString attributionSrc;
+};
+
+HTMLAnchorElement includes HTMLAttributionSrcElementUtils;
+HTMLImageElement includes HTMLAttributionSrcElementUtils;
+HTMLScriptElement includes HTMLAttributionSrcElementUtils;
+</pre>
+
+Add the following <a spec=html>content attributes</a>:
+
+: <{a}>
+:: `attributionsrc` - [=URL=] for attribution registration
+: <{img}>
+:: `attributionsrc` - [=URL=] for attribution registration
+: <{script}>
+:: `attributionsrc` - [=URL=] for attribution registration
+
+Add the following content attribute descriptions:
+: <{a}>
+:: The <dfn for="a" element-attr>attributionsrc</dfn> attribute is a [=string=]
+    representing the [=URL=] of the resource that will register an
+    [=attribution source=] when the <{a}> is navigated.
+: <{img}>
+:: The <dfn for="img" element-attr>attributionsrc</dfn> attribute is a
+    [=string=] representing the [=URL=] of the resource that will register an
+    [=attribution source=] or [=attribution trigger=] when set.
+: <{script}>
+:: The <dfn for="script" element-attr>attributionsrc</dfn> attribute is a
+    [=string=] representing the [=URL=] of the resource that will register an
+    [=attribution source=] or [=attribution trigger=] when set.
+
+The IDL attribute {{HTMLAttributionSrcElementUtils/attributionSrc}}
+must <a spec=html>reflect</a> the respective content attribute of the same
+name.
+
+<h3 id="monkeypatch-window-open">Window open steps</h4>
+
+Issue: Monkeypatch `window.open()`.
+
+# Fetch monkeypatches # {#fetch-monkeypatches}
+
+Issue: Specify monkeypatches for source/trigger registration.
+
+# Permissions Policy integration # {#permission-policy-integration}
+
+This specification defines a [=policy-controlled feature=] identified by the string "<code><dfn noexport>attribution-reporting</dfn></code>". Its [=policy-controlled feature/default allowlist=] is `'self'`.
+
+Note: In the Chromium implementation the [=policy-controlled feature/default allowlist=] is temporarily set to `*` to ease testing.
+
+# Structures # {#structures}
+
+<h3 dfn-type=dfn>Trigger state</h3>
+
+A trigger state is a [=struct=] with the following items:
+
+<dl dfn-for="trigger state">
+: <dfn>trigger data</dfn>
+:: A non-negative 64-bit integer.
+: <dfn>report window</dfn>
+:: A non-negative integer.
+
+</dl>
+
+<h3 dfn-type=dfn>Randomized source response</h3>
+
+A randomized source response is null or a [=set=] of [=trigger states=].
+
+<h3 id="attribution-filtering">Attribution filtering</h3>
+
+A <dfn>filter value</dfn> is an [=ordered set=] of [=strings=].
+
+A <dfn>filter map</dfn> is an [=ordered map=] whose [=map/key|keys=] are [=strings=] and whose
+[=map/value|values=] are [=filter values=].
+
+<h3 dfn-type=dfn>Suitable origin</h3>
+
+A suitable origin is an [=origin=] that is [=check if an origin is suitable|suitable=].
+
+<h3 id="source-type-header">Source type</h3>
+
+A <dfn>source type</dfn> is one of the following:
+
+<dl dfn-for="source type">
+: "<dfn><code>navigation</code></dfn>"
+:: The source was associated with a top-level navigation.
+: "<dfn><code>event</code></dfn>"
+:: The source was not associated with a top-level navigation.
+
+</dl>
+
+<h3 dfn-type=dfn>Attribution source</h3>
+
+An attribution source is a [=struct=] with the following items:
+
+<dl dfn-for="attribution source">
+: <dfn>source identifier</dfn>
+:: A [=string=].
+: <dfn>source origin</dfn>
+:: A [=suitable origin=].
+: <dfn>event ID</dfn>
+:: A non-negative 64-bit integer.
+: <dfn>attribution destinations</dfn>
+:: An [=ordered set=] of [=sites=].
+: <dfn>reporting endpoint</dfn>
+:: A [=suitable origin=].
+: <dfn>source type</dfn>
+:: A [=source type=].
+: <dfn>expiry</dfn>
+:: A [=duration=].
+: <dfn>event report window</dfn>
+:: A [=duration=].
+: <dfn>aggregatable report window</dfn>
+:: A [=duration=].
+: <dfn>priority</dfn>
+:: A 64-bit integer.
+: <dfn>source time</dfn>
+:: A [=moment=].
+: <dfn>number of event-level reports</dfn>
+:: Number of [=event-level reports=] created for this [=attribution source=].
+: <dfn>event-level attributable</dfn> (default true)
+:: A [=boolean=].
+: <dfn>dedup keys</dfn>
+:: [=ordered set=] of [=event-level trigger configuration/dedup keys=] associated with this [=attribution source=].
+: <dfn>randomized response</dfn>
+:: A [=randomized source response=].
+: <dfn>randomized trigger rate</dfn>
+:: A number between 0 and 1 (both inclusive).
+: <dfn>filter data</dfn>
+:: A [=filter map=].
+: <dfn>debug key</dfn>
+:: Null or a non-negative 64-bit integer.
+: <dfn>aggregation keys</dfn>
+:: An [=ordered map=] whose [=map/key|keys=] are [=strings=] and whose [=map/value|values=] are
+    non-negative 128-bit integers.
+: <dfn>aggregatable budget consumed</dfn>
+:: A non-negative integer, total [=aggregatable contribution/value=] of all [=aggregatable contributions=] created with this [=attribution source=].
+: <dfn>aggregatable dedup keys</dfn>
+:: [=ordered set=] of [=attribution trigger/aggregatable dedup keys=] associated with this [=attribution source=].
+: <dfn>debug reporting enabled</dfn>
+:: A [=boolean=].
+
+</dl>
+
+An [=attribution source=] |source|'s <dfn for="attribution source">expiry time</dfn> is |source|'s [=attribution source/source time=] + |source|'s [=attribution source/expiry=].
+
+An [=attribution source=] |source|'s <dfn for="attribution source">event report window time</dfn> is |source|'s [=attribution source/source time=] + |source|'s [=attribution source/event report window=].
+
+An [=attribution source=] |source|'s <dfn for="attribution source">aggregatable report window time</dfn> is |source|'s [=attribution source/source time=] + |source|'s [=attribution source/aggregatable report window=].
+
+An [=attribution source=] |source|'s <dfn for="attribution source">source site</dfn> is the result
+of [=obtain a site|obtaining a site=] from |source|'s [=attribution source/source origin=].
+
+<h3 dfn-type=dfn>Aggregatable trigger data</h3>
+
+An aggregatable trigger data is a [=struct=] with the following items:
+
+<dl dfn-for="aggregatable trigger data">
+: <dfn>key piece</dfn>
+:: A non-negative 128-bit integer.
+: <dfn>source keys</dfn>
+:: An [=ordered set=] of [=strings=].
+: <dfn>filters</dfn>
+:: A [=filter map=].
+: <dfn>negated filters</dfn>
+:: A [=filter map=].
+
+</dl>
+
+<h3 dfn-type=dfn>Event-level trigger configuration</h3>
+
+An event-level trigger configuration is a [=struct=] with the following items:
+
+<dl dfn-for="event-level trigger configuration">
+: <dfn>trigger data</dfn>
+:: A non-negative 64-bit integer.
+: <dfn>dedup key</dfn>
+:: Null or a non-negative 64-bit integer.
+: <dfn>priority</dfn>
+:: A 64-bit integer.
+: <dfn>filters</dfn>
+:: A [=filter map=].
+: <dfn>negated filters</dfn>
+:: A [=filter map=].
+
+</dl>
+
+<h3 id="aggregation-coordinator-header">Aggregation coordinator</h3>
+
+An <dfn>aggregation coordinator</dfn> is one of a user-agent-determined [=set=]
+of [=strings=] that specifies which aggregation service deployment to use.
+
+<h3 dfn-type=dfn>Attribution trigger</h3>
+
+An attribution trigger is a [=struct=] with the following items:
+
+<dl dfn-for="attribution trigger">
+: <dfn>attribution destination</dfn>
+:: A [=site=].
+: <dfn>trigger time</dfn>
+:: A [=moment=].
+: <dfn>reporting endpoint</dfn>
+:: A [=suitable origin=].
+: <dfn>filters</dfn>
+:: A [=filter map=].
+: <dfn>negated filters</dfn>
+:: A [=filter map=].
+: <dfn>debug key</dfn>
+:: Null or a non-negative 64-bit integer.
+: <dfn>event-level trigger configurations</dfn>
+:: A [=set=] of [=event-level trigger configuration=].
+: <dfn>aggregatable trigger data</dfn>
+:: A [=list=] of [=aggregatable trigger data=].
+: <dfn>aggregatable values</dfn>
+:: An [=ordered map=] whose [=map/key|keys=] are [=strings=] and whose
+    [=map/value|values=] are non-negative 32-bit integers.
+: <dfn>aggregatable dedup key</dfn>
+:: Null or a non-negative 64-bit integer.
+: <dfn>serialized private state token</dfn>
+:: A [=byte sequence=].
+: <dfn>debug reporting enabled</dfn>
+:: A [=boolean=].
+: <dfn>aggregation coordinator</dfn>
+:: Null or an [=aggregation coordinator=].
+
+</dl>
+
+<h3 dfn-type=dfn>Attribution report</h3>
+
+An attribution report is a [=struct=] with the following items:
+
+<dl dfn-for="attribution report, aggregatable report, event-level report">
+: <dfn>reporting endpoint</dfn>
+:: A [=suitable origin=].
+: <dfn>report time</dfn>
+:: A [=moment=].
+: <dfn>original report time</dfn>
+:: A [=moment=].
+: <dfn>delivered</dfn> (default false)
+:: A [=boolean=].
+: <dfn>report ID</dfn>
+:: A [=string=].
+: <dfn>source debug key</dfn>
+:: Null or a non-negative 64-bit integer.
+: <dfn>trigger debug key</dfn>
+:: Null or a non-negative 64-bit integer.
+
+</dl>
+
+<h3 dfn-type=dfn>Event-level report</h3>
+
+An event-level report is an [=attribution report=] with the following additional items:
+
+<dl dfn-for="event-level report">
+: <dfn>event ID</dfn>
+:: A non-negative 64-bit integer.
+: <dfn>source type</dfn>
+:: A [=source type=].
+: <dfn>trigger data</dfn>
+:: A non-negative 64-bit integer.
+: <dfn>randomized trigger rate</dfn>
+:: A number between 0 and 1 (both inclusive).
+: <dfn>trigger priority</dfn>
+:: A 64-bit integer.
+: <dfn>trigger time</dfn>
+:: A [=moment=].
+: <dfn>source identifier</dfn>
+:: A string.
+: <dfn>attribution destinations</dfn>
+:: An [=ordered set =] of [=sites=].
+
+</dl>
+
+<h3 dfn-type=dfn>Aggregatable contribution</h3>
+
+An aggregatable contribution is a [=struct=] with the following items:
+
+<dl dfn-for="aggregatable contribution">
+: <dfn>key</dfn>
+:: A non-negative 128-bit integer.
+: <dfn>value</dfn>
+:: A non-negative 32-bit integer.
+
+</dl>
+
+<h3 dfn-type=dfn>Aggregatable report</h3>
+
+An aggregatable report is an [=attribution report=] with the following additional items:
+
+<dl dfn-for="aggregatable report">
+: <dfn>source time</dfn>
+:: A [=moment=].
+: <dfn>contributions</dfn>
+:: A [=list=] of [=aggregatable contributions=].
+: <dfn>effective attribution destination</dfn>
+:: A [=site=].
+: <dfn>serialized private state token</dfn>
+:: A [=byte sequence=].
+: <dfn>aggregation coordinator</dfn>
+:: Null or an [=aggregation coordinator=].
+
+</dl>
+
+<h3 id="attribution-rate-limits">Attribution rate-limits</h3>
+
+A <dfn>rate-limit scope</dfn> is one of the following:
+
+<ul dfn-for="rate-limit scope">
+<li>"<dfn><code>source</code></dfn>"
+<li>"<dfn><code>attribution</code></dfn>"
+</ul>
+
+An <dfn>attribution rate-limit record</dfn> is a [=struct=] with the following items:
+
+<dl dfn-for="attribution rate-limit record">
+: <dfn>scope</dfn>
+:: A [=rate-limit scope=].
+: <dfn>source site</dfn>
+:: A [=site=].
+: <dfn>attribution destination</dfn>
+:: A [=site=].
+: <dfn>reporting endpoint</dfn>
+:: A [=suitable origin=].
+: <dfn>time</dfn>
+:: A [=moment=].
+: <dfn>expiry time</dfn>
+:: Null or a [=moment=].
+
+</dl>
+
+<h3 dfn-type=dfn>Attribution debug data</h3>
+
+A <dfn>debug data type</dfn> is a non-empty string that specifies the set of data that is
+contained in the [=attribution debug data/body=] of an [=attribution debug data=].
+
+A <dfn>source debug data type</dfn> is a [=debug data type=] for source registrations.
+Possible values are:
+
+<ul dfn-for="source debug data type">
+<li>"<dfn><code>source-destination-limit</code></dfn>"
+<li>"<dfn><code>source-noised</code></dfn>"
+<li>"<dfn><code>source-storage-limit</code></dfn>"
+<li>"<dfn><code>source-unknown-error</code></dfn>"
+</ul>
+
+A <dfn>trigger debug data type</dfn> is a [=debug data type=] for trigger registrations.
+Possible values are:
+
+<ul dfn-for="trigger debug data type">
+<li>"<dfn><code>trigger-aggregate-deduplicated</code></dfn>"
+<li>"<dfn><code>trigger-aggregate-no-contributions</code></dfn>"
+<li>"<dfn><code>trigger-aggregate-insufficient-budget</code></dfn>"
+<li>"<dfn><code>trigger-aggregate-storage-limit</code></dfn>"
+<li>"<dfn><code>trigger-aggregate-report-window-passed</code></dfn>"
+<li>"<dfn><code>trigger-attributions-per-source-destination-limit</code></dfn>"
+<li>"<dfn><code>trigger-event-deduplicated</code></dfn>"
+<li>"<dfn><code>trigger-event-excessive-reports</code></dfn>"
+<li>"<dfn><code>trigger-event-low-priority</code></dfn>"
+<li>"<dfn><code>trigger-event-no-matching-configurations</code></dfn>"
+<li>"<dfn><code>trigger-event-noise</code></dfn>"
+<li>"<dfn><code>trigger-event-report-window-passed</code></dfn>"
+<li>"<dfn><code>trigger-event-storage-limit</code></dfn>"
+<li>"<dfn><code>trigger-no-matching-source</code></dfn>"
+<li>"<dfn><code>trigger-no-matching-filter-data</code></dfn>"
+<li>"<dfn><code>trigger-reporting-origin-limit</code></dfn>"
+<li>"<dfn><code>trigger-unknown-error</code></dfn>"
+</ul>
+
+An attribution debug data is a [=struct=] with the following items:
+
+<dl dfn-for="attribution debug data">
+: <dfn>data type</dfn>
+:: A [=debug data type=].
+: <dfn>body</dfn>
+:: A [=map=] whose fields are determined by the [=attribution debug data/data type=].
+
+</dl>
+
+<h3 dfn-type=dfn>Attribution debug report</h3>
+
+An attribution debug report is a [=struct=] with the following items:
+
+<dl dfn-for="attribution debug report">
+: <dfn>data</dfn>
+:: A [=list=] of [=attribution debug data=].
+: <dfn>reporting endpoint</dfn>
+:: A [=suitable origin=].
+
+</dl>
+
+<h3 dfn-type=dfn>Triggering result</h3>
+
+A <dfn>triggering status</dfn> is one of the following:
+
+<ul dfn-for="triggering status">
+<li>"<dfn><code>dropped</code></dfn>"
+<li>"<dfn><code>noised</code></dfn>"
+<li>"<dfn><code>attributed</code></dfn>"
+</ul>
+
+Note: "<code>[=triggering status/noised=]</code>" only applies for [=triggering event-level attribution=] when it is attributed
+successfully but dropped as the noise was applied to the source.
+
+A triggering result is a [=tuple=] with the following items:
+
+<dl dfn-for="triggering result">
+: <dfn>status</dfn>
+:: A [=triggering status=].
+: <dfn>debug data</dfn>
+:: Null or an [=attribution debug data=].
+
+</dl>
+
+# Storage # {#storage}
+
+A user agent holds an <dfn>attribution source cache</dfn>, which is an [=ordered set=] of [=attribution sources=].
+
+A user agent holds an <dfn>event-level report cache</dfn>, which is an [=ordered set=] of [=event-level reports=].
+
+A user agent holds an <dfn>aggregatable report cache</dfn>, which is an [=ordered set=] of [=aggregatable reports=].
+
+A user agent holds an <dfn>attribution rate-limit cache</dfn>, which is an [=ordered set=] of [=attribution rate-limit records=].
+
+The above caches are collectively known as the <dfn>attribution caches</dfn>. The [=attribution caches=] are
+shared among all [=environment settings objects=].
+
+Note: This would ideally use <a spec=storage>storage bottles</a> to provide access to the attribution caches.
+However attribution data is inherently cross-site, and operations on storage would need to span across all storage bottle maps.
+
+# Vendor-Specific Values # {#vendor-specific-values}
+
+<dfn>Source event ID cardinality</dfn> is a positive integer that controls the
+maximum value that can be used as an [=attribution source/event id=].
+
+<dfn>Max source expiry</dfn> is a positive [=duration=] that controls the
+maximum value that can be used as an [=attribution source/expiry=]. It must be
+greater than or equal to 30 days.
+
+<dfn>Max entries per filter map</dfn> is a positive integer that controls the
+maximum [=map/size=] of a [=filter map=].
+
+<dfn>Max values per filter entry</dfn> is a positive integer that
+controls the maximum [=set/size=] of a [=filter map=] entry.
+
+<dfn>Max aggregation keys per attribution</dfn> is a positive integer that
+controls the maximum [=map/size=] of an [=attribution source=]'s
+[=attribution source/aggregation keys=], the maximum [=set/size=] of an
+[=aggregatable trigger data=]'s [=aggregatable trigger data/source keys=],
+and the maximum [=map/size=] of an [=attribution trigger=]'s
+[=attribution trigger/aggregatable values=].
+
+<dfn>Max aggregatable trigger data per trigger</dfn> is a positive integer that
+controls the maximum [=list/size=] of an [=attribution trigger=]'s
+[=attribution trigger/aggregatable trigger data=].
+
+<dfn>Max pending sources per source origin</dfn> is a positive integer that
+controls how many [=attribution sources=] can be in the
+[=attribution source cache=] per [=attribution source/source origin=].
+
+<dfn>Navigation-source trigger data cardinality</dfn> is a positive integer
+that controls the valid range of
+[=event-level trigger configuration/trigger data=] for triggers that are
+attributed to an [=attribution source=] whose
+[=attribution source/source type=] is "<code>[=source type/navigation=]</code>":
+0 <= [=event-level trigger configuration/trigger data=] < [=navigation-source trigger data cardinality=].
+
+<dfn>Event-source trigger data cardinality</dfn> is a positive integer that
+controls the valid range of [=event-level trigger configuration/trigger data=]
+for triggers that are attributed to an [=attribution source=] whose
+[=attribution source/source type=] is "<code>[=source type/event=]</code>":
+0 <= [=event-level trigger configuration/trigger data=] < [=event-source trigger data cardinality=].
+
+<dfn>Randomized navigation-source trigger rate</dfn> is a double between 0 and
+1 (both inclusive) that controls the randomized response probability of an
+[=attribution source=] whose [=attribution source/source type=] is
+"<code>[=source type/navigation=]</code>".
+
+<dfn>Randomized event-source trigger rate</dfn> is a double between 0 and 1
+(both inclusive) that controls the randomized response probability of an
+[=attribution source=] whose [=attribution source/source type=] is "<code>[=source type/event=]</code>".
+
+<dfn>Max event-level reports per attribution destination</dfn> is a positive integer that
+controls how many [=event-level reports=] can be in the
+[=event-level report cache=] per [=site=] in
+[=event-level report/attribution destinations=].
+
+<dfn>Max aggregatable reports per attribution destination</dfn> is a positive integer that controls how
+many [=aggregatable reports=] can be in the [=aggregatable report cache=] per
+[=aggregatable report/effective attribution destination=].
+
+<dfn>Max attributions per navigation source</dfn> is a positive integer that
+controls how many times a single [=attribution source=] whose
+[=attribution source/source type=] is "<code>[=source type/navigation=]</code>" can create an
+[=event-level report=].
+
+<dfn>Max attributions per event source</dfn> is a positive integer that
+controls how many times a single [=attribution source=] whose
+[=attribution source/source type=] is "<code>[=source type/event=]</code>" can create an
+[=event-level report=].
+
+<dfn>Max destinations covered by unexpired sources</dfn> is a positive
+integer that controls the maximum number of distinct [=sites=] across all [=attribution source/attribution destinations=]
+for unexpired [=attribution sources=] with a given ([=attribution source/source site=], [=attribution source/reporting endpoint=]).
+
+<dfn>Attribution rate-limit window</dfn> is a positive [=duration=] that
+controls the rate-limiting window for attribution.
+
+<dfn>Max source reporting endpoints per rate-limit window</dfn> is a positive
+integer that controls the maximum number of distinct
+[=attribution source/reporting endpoint|reporting endpoints=] for a
+([=attribution rate-limit record/source site=],
+[=attribution rate-limit record/attribution destination=]) that can create
+[=attribution sources=] per [=attribution rate-limit window=].
+
+<dfn>Max attribution reporting endpoints per rate-limit window</dfn> is a
+positive integer that controls the maximum number of distinct
+[=attribution trigger/reporting endpoint|reporting endpoints=] for a
+([=attribution rate-limit record/source site=],
+[=attribution rate-limit record/attribution destination=]) that can create
+[=event-level reports=] per [=attribution rate-limit window=].
+
+<dfn>Max attributions per rate-limit window</dfn> is a positive integer that
+controls the maximum number of attributions for a
+([=attribution rate-limit record/source site=],
+[=attribution rate-limit record/attribution destination=],
+[=attribution rate-limit record/reporting endpoint=]) per
+[=attribution rate-limit window=].
+
+<dfn>Allowed aggregatable budget per source</dfn> is a positive integer that controls the total
+[=aggregatable report/required aggregatable budget=] of all [=aggregatable reports=] created for
+an [=attribution source=].
+
+<dfn>Min aggregatable report delay</dfn> is a non-negative [=duration=] that controls the minimum
+delay to deliver an [=aggregatable report=].
+
+<dfn>Randomized aggregatable report delay</dfn> is a positive [=duration=] that controls the
+random delay to deliver an [=aggregatable report=].
+
+# General Algorithms # {#general-algorithms}
+
+<h3 id="serialize-integer">Serialize an integer</h3>
+
+To <dfn>serialize an integer</dfn>, represent it as a string of the shortest possible decimal number.
+
+Issue: This would ideally be replaced by a more descriptive algorithm in Infra. See
+<a href="https://github.com/whatwg/infra/issues/201">infra/201</a>
+
+<h3 id="serialize-destinations">Serialize attribution destinations</h3>
+
+To <dfn>serialize [=event-level report/attribution destinations=]</dfn> |destinations|, run the following steps:
+
+1. [=Assert=]: |destinations| is not [=set/is empty|empty=].
+1. Let |destinationStrings| be a [=list=].
+1. [=list/iterate|For each=] |destination| in |destinations|:
+    1. [=Assert=]: |destination| is not the [=opaque origin=].
+    1. [=list/Append=] |destination| <a href="https://html.spec.whatwg.org/multipage/origin.html#serialization-of-a-site">serialized</a> to |destinationStrings|.
+1. If |destinationStrings|'s [=set/size=] is equal to 1, return |destinationStrings|[0].
+1. Return |destinationStrings|.
+
+
+To <dfn>check if an origin is suitable</dfn> given an [=origin=] |origin|:
+
+1. If |origin| is not a [=potentially trustworthy origin=], return false.
+1. If |origin|'s [=origin/scheme=] is not "`http`" or "`https`", return false.
+1. Return true.
+
+<h3 id="parsing-filter-data">Parsing filter data</h3>
+
+To <dfn>parse filter data</dfn> given a |value|:
+
+1. If |value| is not a [=map=], return null.
+1. If |value|'s [=map/size=] is greater than the user agent's
+    [=max entries per filter map=], return null.
+1. Let |result| be a new [=filter map=].
+1. [=map/iterate|For each=] |filter| → |data| of |value|:
+    1. If |data| is not a [=list=], return null.
+    1. Let |set| be a new [=ordered set=].
+    1. [=list/iterate|For each=] |d| of |data|:
+        1. If |d| is not a [=string=], return null.
+        1. [=set/Append=] |d| to |set|.
+    1. If |set|'s [=set/size=] is greater than the user agent's
+        [=max values per filter entry=], return null.
+    1. [=map/Set=] |result|[|filter|] to |set|.
+1. Return |result|.
+
+Issue: Determine whether to limit [=string/length=] or
+[=string/code point length=] for |filter| and |d| above.
+
+<h3 id="debug-keys">Cookie-based debugging</h3>
+
+To <dfn>check if cookie-based debugging is allowed</dfn> given a
+[=suitable origin=] |reportingOrigin|:
+
+1. Let |domain| be the
+    <a href="https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis#name-canonicalized-host-names">canonicalized domain name</a>
+    of |reportingOrigin|'s [=origin/host=].
+1. For each |cookie| of the user agent's <a href="https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis#name-storage-model">cookie store</a>:
+    1. If |cookie|'s name is not "`ar_debug`", [=iteration/continue=].
+    1. If |cookie|'s http-only-flag is false, [=iteration/continue=].
+    1. If |cookie|'s secure-flag is false, [=iteration/continue=].
+    1. If |cookie|'s same-site-flag is not "`None`", [=iteration/continue=].
+    1. If |cookie|'s host-only-flag is true and |domain| is not
+        identical to |cookie|'s domain, [=iteration/continue=].
+    1. If |cookie|'s host-only-flag is false and |domain| does not
+        <a href="https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis#name-domain-matching">domain-match</a>
+        |cookie|'s domain, [=iteration/continue=].
+    1. If "`/`" does not
+        <a href="https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis#name-paths-and-path-match">path-match</a>
+        |cookie|'s path, [=iteration/continue=].
+    1. Return <strong>allowed</strong>.
+1. Return <strong>blocked</strong>.
+
+Issue: Ideally this would use the
+<a href="https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis#name-retrieval-algorithm">cookie-retrieval algorithm</a>,
+but it cannot: There is no way to consider *only* cookies whose http-only-flag
+is true and whose same-site-flag is "`None`"; there is no way to prevent the
+last-access-time from being modified; and the return value is a string that
+would have to be further processed to check for the "`ar_debug`" cookie.
+
+<h3 id="obtaining-randomized-response">Obtaining a randomized response</h3>
+
+To <dfn>obtain a randomized response</dfn> given |trueValue|, a [=set=] |possibleValues|, and a
+double |randomPickRate|:
+
+1. [=Assert=]: |randomPickRate| is between 0 and 1 (both inclusive).
+1. Let |r| be a random double between 0 (inclusive) and 1 (exclusive) with uniform probability.
+1. If |r| is less than |randomPickRate|, return a random item from |possibleValues| with uniform
+    probability.
+1. Otherwise, return |trueValue|.
+
+<h3 algorithm id="parsing-aggregation-key-piece">Parsing aggregation key piece</h3>
+
+To <dfn>parse an aggregation key piece</dfn> given a [=string=] |input|, perform the following steps.
+This algorithm will return either a non-negative 128-bit integer or an error.
+
+1. If |input|'s [=string/code point length=] is not between 3 and 34 (both inclusive), return an error.
+1. If the first character is not a U+0030 DIGIT ZERO (0), return an error.
+1. If the second character is not a U+0058 LATIN CAPITAL LETTER X character (X) and not a
+    U+0078 LATIN SMALL LETTER X character (x), return an error.
+1. Let |value| be the [=code point substring=] from 2 to the end of |input|.
+1. If the characters within |value| are not all [=ASCII hex digits=], return an error.
+1. Interpret |value| as a hexadecimal number and return as a non-negative 128-bit integer.
+
+<h3 dfn id="can-attribution-rate-limit-record-be-removed">Can attribution rate-limit record be removed</h3>
+
+Given an [=attribution rate-limit record=] |record| and a [=moment=] |now|:
+1. If |record|'s [=attribution rate-limit record|time=] is after |now|, return false.
+1. If |record|'s [=attribution rate-limit record/scope=] is "<code>[=rate-limit scope/attribution=]</code>", return true.
+1. If |record|'s [=attribution rate-limit record/expiry time=] is after |now|, return false.
+1. Return true.
+
+<h3 id="obtaining-and-delivering-debug-report">Obtaining and delivering an attribution debug report</h3>
+
+To <dfn>obtain and deliver a debug report</dfn> given a [=list=] of [=attribution debug data=] |data|
+and a [=suitable origin=] |reportingEndpoint|:
+
+1. Let |debugReport| be an [=attribution debug report=] with the items:
+    : [=attribution debug report/data=]
+    :: |data|
+    : [=attribution debug report/reporting endpoint=]
+    :: |reportingEndpoint|
+1. [=Queue a task=] to [=attempt to deliver a verbose debug report=] with |debugReport|.
+
+# Source Algorithms # {#source-algorithms}
+
+<h3 algorithm id="obtaining-randomized-source-response">Obtaining a randomized source response</h3>
+
+To <dfn>obtain a randomized source response</dfn> given a positive integer
+|triggerDataCardinality|, a positive integer |maxAttributionsPerSource|, a positive integer
+|numReportWindows|, and a double |randomPickRate|:
+
+1. Let |possibleTriggerStates| be a new [=list/is empty|empty=] [=set=].
+1. For each integer |triggerData| between 0 (inclusive) and |triggerDataCardinality| (exclusive):
+    1. For each integer |reportWindow| between 0 (inclusive) and |numReportWindows| (exclusive):
+        1. Let |state| be a new [=trigger state=] with the items:
+            : [=trigger state/trigger data=]
+            :: |triggerData|
+            : [=trigger state/report window=]
+            :: |reportWindow|
+        1. [=set/Append=] |state| to |possibleTriggerStates|.
+1. Let |possibleValues| be a new [=list/is empty|empty=] [=set=].
+1. For each integer |attributions| between 0 (inclusive) and |maxAttributionsPerSource| (inclusive):
+    1. [=set/Append=] to |possibleValues| all distinct |attributions|-length combinations of
+        |possibleTriggerStates|.
+1. Return the result of [=obtaining a randomized response=] with null, |possibleValues|, and
+    |randomPickRate|.
+
+<h3 algorithm id="obtaining-attribution-source-anchor">Obtaining an attribution source from an <code>a</code> element</h3>
+
+To <dfn>obtain an attribution source from an anchor</dfn> given an <{a}> element |anchor|:
+
+1. If |anchor| does not have an <{a/attributionsrc}> attribute, return null.
+1. Return null.
+
+Issue: Specify the steps for making attributionsrc request.
+
+<h3 algorithm id="obtaining-attribution-source-window-features">Obtaining an attribution source from window features</h3>
+
+To <dfn>obtain an attribution source from window features</dfn> given an [=ordered map=] |tokenizedFeatures|:
+
+1. If |tokenizedFeatures|["attributionsrc"] does not [=map/exists|exist=], return null.
+1. Let |decodedSrcBytes| be the result of [=string/percent-decode|percent-decoding=] |tokenizedFeatures|["attributionsrc"].
+1. Let |decodedSrc| be the [=UTF-8 decode without BOM=] of |decodedSrcBytes|.
+1. Return null.
+
+Issue: Check for transient activation.
+
+Issue: Specify the steps for making an attributionsrc request with |decodedSrc|.
+
+<h3 algorithm id="parsing-source-registration">Parsing source-registration JSON</h3>
+
+To <dfn>parse an attribution destination</dfn> from a [=string=] |str|:
+1. Let |url| be the result of running the [=URL parser=] on the value of
+    the |str|.
+1. If |url| is failure or null, return null.
+1. If |url|'s [=url/origin=] is not [=check if an origin is suitable|suitable=],
+    return null.
+1. Return the result of [=obtain a site|obtaining a site=] from |url|'s
+    [=url/origin=].
+
+To <dfn>parse attribution destinations</dfn> from a value |val|:
+1. Let |result| be an [=ordered set=].
+1. If |val| is a [=string=], [=set/append=] the result of [=parse an attribution destination=] to |result|, and return |result|.
+1. If |val| is not a [=list=], return null.
+1. [=list/iterate|For each=] |value| of |val|:
+    1. If |value| is not a [=string=], return null.
+    1. Let |destination| be the result of [=parse an attribution destination=] with |value|.
+    1. If |destination| is null, return null.
+    1. [=set/Append=] |destination| to |result|.
+1. If |result|'s [=set/size=] is greater than 3, return null.
+1. If |result| [=set/is empty=], return null.
+1. return |result|.
+
+Issue: Confirm that the maximum destinations size is workable.
+
+To <dfn>obtain a source expiry</dfn> given a |value|:
+
+1. If |value| is not a [=string=], return null.
+1. Let |expirySeconds| be the result of applying the
+    <a spec="html">rules for parsing integers</a> to |value|.
+1. If |expirySeconds| is an error, return null.
+1. Let |expiry| be |expirySeconds| seconds.
+1. If |expiry| is less than 1 day, set |expiry| to 1 day.
+1. If |expiry| is greater than the user agent's [=max source expiry=], set
+    |expiry| to that value.
+1. Return |expiry|.
+
+To <dfn>parse aggregation keys</dfn> given an [=ordered map=] |map|:
+
+1. Let |aggregationKeys| be a new [=ordered map=].
+1. If |map|["`aggregation_keys`"] does not [=map/exist=], return |aggregationKeys|.
+1. Let |values| be |map|["`aggregation_keys`"].
+1. If |values| is not an [=ordered map=], return null.
+1. If |values|'s [=map/size=] is greater than the user agent's
+    [=max aggregation keys per attribution=], return null.
+1. [=map/iterate|For each=] |key| → |value| of |values|:
+    1. If |value| is not a [=string=], return null.
+    1. Let |keyPiece| be the result of running [=parse an aggregation key piece=] with |value|.
+    1. If |keyPiece| is an error, return null.
+    1. [=map/Set=] |aggregationKeys|[|key|] to |keyPiece|.
+1. Return |aggregationKeys|.
+
+Issue: Determine whether to limit [=string/length=] or [=string/code point length=] for |key| above.
+
+To <dfn noexport>parse source-registration JSON</dfn> given a [=string=]
+|json|, a [=suitable origin=] |sourceOrigin|, a [=suitable origin=] |reportingOrigin|, a
+[=source type=] |sourceType|, and a [=moment=] |sourceTime|:
+
+1. Let |value| be the result of running
+    [=parse a JSON string to an Infra value=] with |json|.
+1. If |value| is not an [=ordered map=], return null.
+1. Let |sourceEventId| be 0.
+1. If |value|["`source_event_id`"] [=map/exists=] and is a [=string=]:
+    1. Set |sourceEventId| to the result of applying the
+        <a spec="html">rules for parsing non-negative integers</a> to
+        |value|["`source_event_id`"] modulo the user agent's
+        [=source event ID cardinality=].
+    1. If |sourceEventId| is an error, set |sourceEventId| to 0.
+1. If |value|["`destination`"] does not [=map/exists|exist=], return null.
+1. Let |attributionDestinations| be the result of running
+    [=parse attribution destinations=] with |value|["`destination`"].
+1. If |attributionDestinations| is null, return null.
+1. Let |expiry| be the result of running [=obtain a source expiry=] on |value|["`expiry`"].
+1. If |expiry| is null, set |expiry| to 30 days.
+1. Let |eventReportWindow| be the result of running [=obtain a source expiry=] on |value|["`event_report_window`"].
+1. If |eventReportWindow| is null or greater than |expiry|, set |eventReportWindow| to |expiry|.
+1. Let |aggregatableReportWindow| be the result of running [=obtain a source expiry=] on |value|["`aggregatable_report_window`"].
+1. If |aggregatableReportWindow| is null or greater than |expiry|, set |aggregatableReportWindow| to |expiry|.
+1. Let |priority| be 0.
+1. If |value|["`priority`"] [=map/exists=] and is a [=string=]:
+    1. Set |priority| to the result of applying the
+        <a spec="html">rules for parsing integers</a> to |value|["`priority`"].
+    1. If |priority| is an error, set |priority| to 0.
+1. Let |filterData| be a new [=filter map=].
+1. If |value|["`filter_data`"] [=map/exists=]:
+    1. Set |filterData| to the result of running [=parse filter data=] with
+        |value|["`filter_data`"].
+    1. If |filterData| is null, return null.
+    1. If |filterData|["`source_type`"] [=map/exists=], return null.
+1. [=map/Set=] |filterData|["`source_type`"] to « |sourceType| ».
+1. Let |debugKey| be null.
+1. If |value|["`debug_key`"] [=map/exists=] and is a [=string=]:
+    1. Set |debugKey| to the result of applying the
+        <a spec="html">rules for parsing non-negative integers</a> to
+        |value|["`debug_key`"].
+    1. If |debugKey| is an error, set |debugKey| to null.
+    1. If the result of running [=check if cookie-based debugging is allowed=] with
+        |reportingOrigin| is <strong>blocked</strong>, set |debugKey| to null.
+1. Let |aggregationKeys| be the result of running [=parse aggregation keys=] with |value|.
+1. If |aggregationKeys| is null, return null.
+1. If |aggregatableExpiry| is null, set |aggregatableExpiry| to |expiry|.
+1. Let |triggerDataCardinality| be the user agent's
+    [=navigation-source trigger data cardinality=].
+1. Let |randomizedTriggerRate| be the user agent's
+    [=randomized navigation-source trigger rate=].
+1. Let |maxAttributionsPerSource| be the user agent's
+    [=max attributions per navigation source=].
+1. If |sourceType| is "<code>[=source type/event=]</code>":
+    1. Round |expiry| away from zero to the nearest day (86400 seconds).
+    1. Set |triggerDataCardinality| to the user agent's
+        [=event-source trigger data cardinality=].
+    1. Set |randomizedTriggerRate|'s to the user agent's
+        [=randomized event-source trigger rate=].
+    1. Set |maxAttributionsPerSource| to the user agent's
+        [=max attributions per event source=].
+1. Let |numReportWindows| be the result of running
+    [=obtain the number of report windows=] with |sourceType|.
+1. Let |debugReportingEnabled| be false.
+1. If |value|["`debug_reporting`"] [=map/exists=] and is a [=boolean=], set
+    |debugReportingEnabled| to |value|["`debug_reporting`"].
+1. Let |source| be a new [=attribution source=] struct whose items are:
+
+    : [=attribution source/source identifier=]
+    :: A new unique [=string=]
+    : [=attribution source/source origin=]
+    :: |sourceOrigin|
+    : [=attribution source/event ID=]
+    :: |sourceEventId|
+    : [=attribution source/attribution destinations=]
+    :: |attributionDestinations|
+    : [=attribution source/reporting endpoint=]
+    :: |reportingOrigin|
+    : [=attribution source/expiry=]
+    :: |expiry|
+    : [=attribution source/event report window=]
+    :: |eventReportWindow|
+    : [=attribution source/aggregatable report window=]
+    :: |aggregatableReportWindow|
+    : [=attribution source/priority=]
+    :: |priority|
+    : [=attribution source/source time=]
+    :: |sourceTime|
+    : [=attribution source/source type=]
+    :: |sourceType|
+    : [=attribution source/randomized response=]
+    :: The result of [=obtaining a randomized source response=] with
+        |triggerDataCardinality|, |maxAttributionsPerSource|,
+        |numReportWindows|, and |randomizedTriggerRate|.
+    : [=attribution source/randomized trigger rate=]
+    :: |randomizedTriggerRate|
+    : [=attribution source/filter data=]
+    :: |filterData|
+    : [=attribution source/debug key=]
+    :: |debugKey|
+    : [=attribution source/aggregation keys=]
+    :: |aggregationKeys|
+    : [=attribution source/aggregatable budget consumed=]
+    :: 0
+    : [=attribution source/debug reporting enabled=]
+    :: |debugReportingEnabled|
+1. Return |source|.
+
+<h3 id="processing-an-attribution-source">Processing an attribution source</h3>
+
+To <dfn>check if an [=attribution source=] exceeds the unexpired destination limit</dfn> given an
+[=attribution source=] |source|, run the following steps:
+
+1. Let |unexpiredSources| be all [=attribution rate-limit records=] |record| in the [=attribution rate-limit cache=] where all of the following are true:
+     * |record|'s [=attribution rate-limit record/scope=] is "<code>[=rate-limit scope/source=]</code>"
+     * |record|'s [=attribution rate-limit record/source site=] and |source|'s [=attribution source/source site=] are equal
+     * |record|'s [=attribution rate-limit record/reporting endpoint=] and |source|'s [=attribution source/reporting endpoint=] are equal
+     * |record|'s [=attribution rate-limit record/expiry time=] is greater than |source|'s [=attribution source/source time=]
+1. Let |unexpiredDestinations| be an [=set/is empty|empty=] [=set=].
+1. For each [=attribution rate-limit record=] |unexpiredRecord| of |unexpiredSources|:
+    1. [=set/Append=] |unexpiredRecord|'s [=attribution rate-limit record/attribution destination=] to |unexpiredDestinations|.
+1. Let |newDestinations| be the result of taking the [=set/union=] of |unexpiredDestinations| and |source|'s [=attribution source/attribution destinations=].
+1. Return whether |newDestinations|'s [=set/size=] is greater than the user agent's [=max destinations covered by unexpired sources=].
+
+To <dfn>obtain a fake report</dfn> given an [=attribution source=] |source| and
+a [=trigger state=] |triggerState|:
+
+1. Let |fakeConfig| be a new [=event-level trigger configuration=] with the items:
+    : [=event-level trigger configuration/trigger data=]
+    :: |triggerState|'s [=trigger state/trigger data=]
+    : [=event-level trigger configuration/dedup key=]
+    :: null
+    : [=event-level trigger configuration/priority=]
+    :: 0
+    : [=event-level trigger configuration/filters=]
+    :: «[ "`source_type`" → « |source|'s [=attribution source/source type=] » ]»
+1. Let |fakeTrigger| be a new [=attribution trigger=] with the items:
+    : [=attribution trigger/attribution destinations=]
+    :: |source|'s [=attribution source/attribution destinations=]
+    : [=attribution trigger/trigger time=]
+    :: |source|'s [=attribution source/source time=]
+    : [=attribution trigger/reporting endpoint=]
+    :: |source|'s [=attribution source/reporting endpoint=]
+    : [=attribution trigger/filters=]
+    :: «[]»
+    : [=attribution trigger/debug key=]
+    :: null
+    : [=attribution trigger/event-level trigger configurations=]
+    :: « |fakeConfig| »
+    : [=attribution trigger/aggregatable trigger data=]
+    :: «»
+    : [=attribution trigger/aggregatable values=]
+    :: «[]»
+    : [=attribution trigger/aggregatable dedup key=]
+    :: null
+    : [=attribution trigger/debug reporting enabled=]
+    :: false
+    : [=attribution trigger/aggregation coordinator=]
+    :: null
+1. Let |fakeReport| be the result of running [=obtain an event-level report=] with |source|,
+    |fakeTrigger|, and |fakeConfig|.
+1. Set |fakeReport|'s [=event-level report/report time=] to the result of
+    running [=obtain the report time at a window=] with |source| and
+    |triggerState|'s [=trigger state/report window=].
+1. Return |fakeReport|.
+
+To <dfn>check if debug reporting is allowed</dfn> given a [=source debug data type=] |dataType|
+and a [=suitable origin=] |reportingOrigin|:
+1. If |dataType| is:
+    <dl class="switch">
+    : "<code>[=source debug data type/source-destination-limit=]</code>"
+    :: Return <strong>allowed</strong>.
+    : "<code>[=source debug data type/source-noised=]</code>"
+    : "<code>[=source debug data type/source-storage-limit=]</code>"
+    : "<code>[=source debug data type/source-unknown-error=]</code>"
+    :: Return the result of running [=check if cookie-based debugging is allowed=] with |reportingOrigin|.
+
+    </dl>
+
+To <dfn>obtain and deliver a debug report on source registration</dfn> given a
+[=source debug data type=] |dataType| and an [=attribution source=] |source|:
+
+1. If |source|'s [=attribution source/debug reporting enabled=] is false, return.
+1. If the result of running [=check if debug reporting is allowed=] with |dataType| and |source|'s
+    [=attribution source/reporting endpoint=] is <strong>blocked</strong>, return.
+1. Let |body| be a new [=map=] with the following key/value pairs:
+    : "`attribution_destination`"
+    :: |source|'s [=attribution source/attribution destinations=], [=serialize attribution destinations|serialized=].
+    : "`source_event_id`"
+    :: |source|'s [=attribution source/event ID=], [=serialize an integer|serialized=].
+    : "`source_site`"
+    :: |source|'s [=attribution source/source site=], <a href="https://html.spec.whatwg.org/multipage/origin.html#serialization-of-a-site">serialized</a>.
+1. If |source|'s [=attribution source/debug key=] is not null, [=map/set=] |body|["`source_debug_key`"]
+    to |source|'s [=attribution source/debug key=], [=serialize an integer|serialized=].
+
+1. If |dataType| is:
+    <dl class="switch">
+    : "<code>[=source debug data type/source-destination-limit=]</code>"
+    :: [=map/Set=] |body|["`limit`"] to the user agent's [=max destinations covered by unexpired sources=],
+         [=serialize an integer|serialized=].
+    : "<code>[=source debug data type/source-storage-limit=]</code>"
+    :: [=map/Set=] |body|["`limit`"] to the user agent's [=max pending sources per source origin=],
+         [=serialize an integer|serialized=].
+
+    </dl>
+1. Let |data| be a new [=attribution debug data=] with the items:
+    : [=attribution debug data/data type=]
+    :: |dataType|
+    : [=attribution debug data/body=]
+    :: |body|
+1. Run [=obtain and deliver a debug report=] with « |data| » and |source|'s [=attribution source/reporting endpoint=].
+
+To <dfn>process an attribution source</dfn> given an [=attribution source=] |source|:
+
+1. Let |cache| be the user agent's [=attribution source cache=].
+1. [=list/Remove=] all [=attribution sources=] |entry| in |cache| where |entry|'s [=attribution source/expiry time=] is less than |source|'s [=attribution source/source time=].
+1. Let |pendingSourcesForSourceOrigin| be the [=set=] of all
+    [=attribution sources=] |pendingSource| of |cache| where |pendingSource|'s
+    [=attribution source/source origin=] and |source|'s
+    [=attribution source/source origin=] are [=same origin=].
+1. If |pendingSourcesForSourceOrigin|'s [=list/size=] is greater than or equal
+    to the user agent's [=max pending sources per source origin=]:
+    1. Run [=obtain and deliver a debug report on source registration=] with "<code>[=source debug data type/source-storage-limit=]</code>" and |source|.
+    1. Return.
+1. If the result of running [=check if an attribution source exceeds the unexpired destination limit=]
+    with |source| is true:
+    1. Run [=obtain and deliver a debug report on source registration=] with "[=source debug data type/source-destination-limit=]</code>" and |source|.
+    1. Return.
+1. [=set/iterate|For each=] |destination| in |source|'s [=attribution source/attribution destinations=]:
+    1. Let |rateLimitRecord| be a new [=attribution rate-limit record=] with the items:
+        : [=attribution rate-limit record/scope=]
+        :: "<code>[=rate-limit scope/source=]</code>"
+        : [=attribution rate-limit record/source site=]
+        :: |source|'s [=attribution source/source site=]
+        : [=attribution rate-limit record/attribution destination=]
+        :: |destination|
+        : [=attribution rate-limit record/reporting endpoint=]
+        :: |source|'s [=attribution source/reporting endpoint=]
+        : [=attribution rate-limit record/time=]
+        :: |source|'s [=attribution source/source time=]
+        : [=attribution rate-limit record/expiry time=]
+        :: |source|'s [=attribution source/expiry time=]
+    1. If the result of running [=should processing be blocked by reporting-endpoint limit=] with
+        |rateLimitRecord| is <strong>blocked</strong>, return.
+    1. [=set/Append=] |rateLimitRecord| to the [=attribution rate-limit cache=].
+1. [=list/Remove=] all [=attribution rate-limit records=] |entry| from the [=attribution rate-limit cache=] if the result of running
+    [=can attribution rate-limit record be removed=] with |entry| and |source|'s [=attribution source/source time=] is true.
+1. If |source|'s [=attribution source/randomized response=] is not null and is a [=set=]:
+    1. [=set/iterate|For each=] [=trigger state=] |triggerState| of |source|'s
+        [=attribution source/randomized response=]:
+        1. Let |fakeReport| be the result of running [=obtain a fake report=]
+            with |source| and |triggerState|.
+        1. [=set/Append=] |fakeReport| to the [=event-level report cache=].
+    1. If |source|'s [=attribution source/randomized response=] is not [=set/is empty|empty=],
+        then set |source|'s [=attribution source/event-level attributable=] value to false.
+    1. [=map/iterate|For each=] |destination| in [=source=]'s [=attribution source/attribution destinations=]:
+        1. Let |rateLimitRecord| be a new [=attribution rate-limit record=] with the items:
+            : [=attribution rate-limit record/scope=]
+            :: "<code>[=rate-limit scope/attribution=]</code>"
+            : [=attribution rate-limit record/source site=]
+            :: |source|'s [=attribution source/source site=]
+            : [=attribution rate-limit record/attribution destination=]
+            :: |destination|
+            : [=attribution rate-limit record/reporting endpoint=]
+            :: |source|'s [=attribution source/reporting endpoint=]
+            : [=attribution rate-limit record/time=]
+            :: |source|'s [=attribution source/source time=]
+            : [=attribution rate-limit record/expiry time=]
+            :: null
+        1. [=set/Append=] |rateLimitRecord| to the [=attribution rate-limit cache=].
+    1. Run [=obtain and deliver a debug report on source registration=] with "<code>[=source debug data type/source-noised=]</code>" and |source|.
+1. [=set/Append=] |source| to |cache|.
+
+Note: Because a fake report does not have a "real" effective destination, we need to subtract from the
+privacy budget of all possible destinations.
+
+Issue: Should fake reports respect the user agent's [=max event-level reports per attribution destination=]?
+
+# Triggering Algorithms # {#trigger-algorithms}
+
+<h3 algorithm id="attribution-trigger-creation">Creating an attribution trigger</h3>
+
+To <dfn>parse event triggers</dfn> given an [=ordered map=] |map|:
+
+1. Let |eventTriggers| be a new [=set=].
+1. If |map|["`event_trigger_data`"] does not [=map/exists|exist=], return
+    |eventTriggers|.
+1. Let |values| be |map|["`event_trigger_data`"].
+1. If |values| is not a [=list=], return null.
+1. [=list/iterate|For each=] |value| of |values|:
+    1. If |value| is not an [=ordered map=], return null.
+    1. Let |triggerData| be 0.
+    1. If |value|["`trigger_data`"] [=map/exists=] and is a [=string=]:
+        1. Set |triggerData| to the result of applying the
+            <a spec="html">rules for parsing non-negative integers</a> to
+            |value|["`trigger_data`"].
+        1. If |triggerData| is an error, set |triggerData| to 0.
+    1. Let |dedupKey| be null.
+    1. If |value|["`deduplication_key`"] [=map/exists=] and is a [=string=]:
+        1. Set |dedupKey| to the result of applying the
+            <a spec="html">rules for parsing non-negative integers</a> to
+            |value|["`deduplication_key`"].
+        1. If |dedupKey| is an error, set |dedupKey| to null.
+    1. Let |priority| be 0.
+    1. If |value|["`priority`"] [=map/exists=] and is a [=string=]:
+        1. Set |priority| to the result of applying the
+            <a spec="html">rules for parsing integers</a> to
+            |value|["`priority`"].
+        1. If |priority| is an error, set |priority| to 0.
+    1. Let |filters| be a new [=filter map=].
+    1. If |value|["`filters`"] [=map/exists=]:
+        1. Set |filters| to the result of running [=parse filter data=] with
+            |value|["`filters`"].
+        1. If |filters| is null, return null.
+    1. Let |negatedFilters| be a new [=filter map=].
+    1. If |value|["`not_filters`"] [=map/exists=]:
+        1. Set |negatedFilters| to the result of running [=parse filter data=]
+            with |value|["`not_filters`"].
+        1. If |negatedFilters| is null, return null.
+    1. Let |eventTrigger| be a new [=event-level trigger configuration=] with
+        the items:
+        : [=event-level trigger configuration/trigger data=]
+        :: |triggerData|
+        : [=event-level trigger configuration/dedup key=]
+        :: |dedupKey|
+        : [=event-level trigger configuration/priority=]
+        :: |priority|
+        : [=event-level trigger configuration/filters=]
+        :: |filters|
+        : [=event-level trigger configuration/negated filters=]
+        :: |negatedFilters|
+    1. [=set/Append=] |eventTrigger| to |eventTriggers|.
+1. Return |eventTriggers|.
+
+Issue: Allow the user agent to return null if |values|'s [=list/size=] is
+greater than some constant.
+
+To <dfn>parse aggregatable trigger data</dfn> given an [=ordered map=] |map|:
+
+1. Let |aggregatableTriggerData| be a new [=list=].
+1. If |map|["`aggregatable_trigger_data`"] does not [=map/exist=], return |aggregatableTriggerData|.
+1. Let |values| be |map|["`aggregatable_trigger_data`"].
+1. If |values| is not a [=list=], return null.
+1. If |values|'s [=list/size=] is greater than the user agent's
+    [=max aggregatable trigger data per trigger=], return null.
+1. [=list/iterate|For each=] |value| of |values|:
+    1. If |value| is not an [=ordered map=], return null.
+    1. If |value|["`key_piece`"] does not [=map/exist=] or is not a [=string=], return null.
+    1. Let |keyPiece| be the result of running [=parse an aggregation key piece=] with |value|["`key_piece`"].
+    1. If |keyPiece| is an error, return null.
+    1. Let |sourceKeys| be a new [=ordered set=].
+    1. If |value|["`source_keys`"] [=map/exists=]:
+        1. If |value|["`source_keys`"] is not a [=list=], return null.
+        1. If |value|["`source_keys`"]'s [=list/size=] is greater than the user agent's
+            [=max aggregation keys per attribution=], return null.
+        1. [=list/iterate|For each=] |sourceKey| of |value|["`source_keys`"]:
+            1. If |sourceKey| is not a [=string=], return null.
+            1. [=set/Append=] |sourceKey| to |sourceKeys|.
+    1. Let |filters| be a new [=filter map=].
+    1. If |value|["`filters`"] [=map/exists=]:
+        1. Set |filters| to the result of running [=parse filter data=] with
+            |value|["`filters`"].
+        1. If |filters| is null, return null.
+    1. Let |negatedFilters| be a new [=filter map=].
+    1. If |value|["`not_filters`"] [=map/exists=]:
+        1. Set |negatedFilters| to the result of running [=parse filter data=]
+            with |value|["`not_filters`"].
+        1. If |negatedFilters| is null, return null.
+    1. Let |aggregatableTrigger| be a new [=aggregatable trigger data=] with the items:
+        : [=aggregatable trigger data/key piece=]
+        :: |keyPiece|
+        : [=aggregatable trigger data/source keys=]
+        :: |sourceKeys|
+        : [=aggregatable trigger data/filters=]
+        :: |filters|
+        : [=aggregatable trigger data/negated filters=]
+        :: |negatedFilters|
+    1. [=list/Append=] |aggregatableTrigger| to |aggregatableTriggerData|.
+1. Return |aggregatableTriggerData|.
+
+Issue: Determine whether to limit [=string/length=] or [=string/code point length=] for |sourceKey| above.
+
+To <dfn>parse aggregatable values</dfn> given an [=ordered map=] |map|:
+
+1. If |map|["`aggregatable_values`"] does not [=map/exist=], return «[]».
+1. Let |values| be |map|["`aggregatable_values`"].
+1. If |values| is not an [=ordered map=], return null.
+1. If |values|'s [=map/size=] is greater than the user agent's
+    [=max aggregation keys per attribution=], return null.
+1. [=map/iterate|For each=] |key| → |value| of |values|:
+     1. If |value| is not an integer, return null.
+     1. If |value| is less than or equal to 0, return null.
+1. Return |values|.
+
+Issue: Determine whether to limit [=string/length=] or [=string/code point length=] for |key| above.
+
+To <dfn noexport>serialize a private state token</dfn> given a [=string=] |encodedBlindedPrivateStateToken|:
+1. If |encodedBlindedPrivateStateToken| is null, return null.
+1. Let |decoded| be the result of [=forgiving-base64 decoding=] |encodedBlindedPrivateStateToken|.
+1. If |decoded| is failure, return null.
+1. Let |tokens| be the result of finishing issuance of |decoded|.
+
+ISSUE: properly define the "finishing issuance" operation.
+
+1. If |tokens| is null, or has [=list/size=] not equal to 1, return null.
+1. Let |token| be |tokens|[0].
+1. Let |redeemedBytes| be the result of "beginning redemption" with |token|,
+    the empty [=byte sequence=] (data), and 0 (the null timestamp).
+
+ISSUE: properly define "begin redemption" operation. Consider running the algorithm at report sending time.
+
+1. Return the result of [=forgiving-base64 encoding=] |redeemedBytes|.
+
+To <dfn noexport>create an attribution trigger</dfn> given a [=string=]
+|json|, a [=site=] |destination|, a [=suitable origin=] |reportingOrigin|, a [=string=] |privateStateToken|,
+and a [=moment=] |triggerTime|:
+
+1. Let |value| be the result of running
+    [=parse a JSON string to an Infra value=] with |json|.
+1. If |value| is not an [=ordered map=], return null.
+1. Let |eventTriggers| be the result of running [=parse event triggers=]
+    with |value|.
+1. If |eventTriggers| is null, return null.
+1. Let |aggregatableTriggerData| be the result of running [=parse aggregatable trigger data=]
+    with |value|.
+1. If |aggregatableTriggerData| is null, return null.
+1. Let |aggregatableValues| be the result of running [=parse aggregatable values=] with |value|.
+1. If |aggregatableValues| is null, return null.
+1. Let |aggregatableDedupKey| be null.
+1. If |value|["`aggregatable_deduplication_key`"] [=map/exists=] and is a [=string=]:
+    1. Set |aggregatableDedupKey| to the result of applying the
+        <a spec="html">rules for parsing non-negative integers</a> to
+        |value|["`aggregatable_deduplication_key`"].
+    1. If |aggregatableDedupKey| is an error, set |aggregatableDedupKey| to null.
+1. Let |debugKey| be null.
+1. If |value|["`debug_key`"] [=map/exists=] and is a [=string=]:
+    1. Set |debugKey| to the result of applying the
+        <a spec="html">rules for parsing non-negative integers</a> to
+        |value|["`debug_key`"].
+    1. If |debugKey| is an error, set |debugKey| to null.
+    1. If the result of running [=check if cookie-based debugging is allowed=] with
+        |reportingOrigin| is <strong>blocked</strong>, set |debugKey| to null.
+1. Let |filters| be a new [=filter map=].
+1. If |value|["`filters`"] exists:
+    1. Set |filters| to the result of running [=parse filter data=] with
+        |value|["`filters`"].
+    1. If |filters| is null, return null.
+1. Let |negatedFilters| be a new [=filter map=].
+1. If |value|["`not_filters`"] exists:
+    1. Set |negatedFilters| to the result of running [=parse filter data=] with
+        |value|["`not_filters`"].
+    1. If |negatedFilters| is null, return null.
+1. Let |debugReportingEnabled| be false.
+1. If |value|["`debug_reporting`"] [=map/exists=] and is a [=boolean=], set
+    |debugReportingEnabled| to value["`debug_reporting`"].
+1. Let |aggregationCoordinator| be null.
+1. If |value|["`aggregation_coordinator_identifier`"] [=map/exists=]:
+    1. If |value|["`aggregation_coordinator_identifier`"] is not a [=string=], return null.
+    1. If |value|["`aggregation_coordinator_identifier`"] is not an [=aggregation coordinator=], return null.
+    1. Set |aggregationCoordinator| to |value|["`aggregation_coordinator_identifier`"].
+1. Let |trigger| be a new [=attribution trigger=] with the items:
+    : [=attribution trigger/attribution destination=]
+    :: |destination|
+    : [=attribution trigger/trigger time=]
+    :: |triggerTime|
+    : [=attribution trigger/reporting endpoint=]
+    :: |reportingOrigin|
+    : [=attribution trigger/filters=]
+    :: |filters|
+    : [=attribution trigger/negated filters=]
+    :: |negatedFilters|
+    : [=attribution trigger/debug key=]
+    :: |debugKey|
+    : [=attribution trigger/event-level trigger configurations=]
+    :: |eventTriggers|
+    : [=attribution trigger/aggregatable trigger data=]
+    :: |aggregatableTriggerData|
+    : [=attribution trigger/aggregatable values=]
+    :: |aggregatableValues|
+    : [=attribution trigger/aggregatable dedup key=]
+    :: |aggregatableDedupKey|
+    : [=attribution trigger/serialized private state token=]
+    :: The result of [=serializing a private state token=] with |privateStateToken|
+    : [=attribution trigger/debug reporting enabled=]
+    :: |debugReportingEnabled|
+    :: [=attribution trigger/aggregation coordinator=]
+    :: |aggregationCoordinator|
+1. Return |trigger|.
+
+<h3 dfn id="does-filter-data-match">Does filter data match</h3>
+
+To <dfn>match [=filter values=]</dfn> given a [=filter value=] |a| and a [=filter value=] |b|:
+1. If |b| [=set/is empty=], then:
+    1. If |a| [=set/is empty=], then return true.
+    1. Otherwise, return false.
+1. Let |i| be the [=set/intersection=] of |a| and |b|.
+1. If |i| [=set/is empty=], then return false.
+1. Return true.
+
+To <dfn>match [=filter values=] with negation</dfn> given a [=filter value=] |a| and a [=filter value=] |b|:
+1. If |b| [=set/is empty=], then:
+    1. If |a| is not [=set/is empty|empty=], then return true.
+    1. Otherwise, return false.
+1. Let |i| be the [=set/intersection=] of |a| and |b|.
+1. If |i| is not [=set/is empty|empty=], then return false.
+1. Return true.
+
+To <dfn>match an attribution source's filter data against filters</dfn> given an
+[=attribution source=] |source|, a [=filter map=] |filters|, and a [=boolean=]
+<dfn for="match an attribution source's filter data against filters"><var>isNegated</var></dfn>:
+
+1. Let |sourceData| be |source|'s [=attribution source/filter data=].
+1. [=map/iterate|For each=] |key| → |filterValues| of |filters|:
+    1. If |sourceData|[|key|] does not [=map/exist=], [=iteration/continue=].
+    1. Let |sourceValues| be |sourceData|[|key|].
+    1. If |isNegated| is:
+        <dl class="switch">
+        <dt>false</dt>
+        <dd> If the result of running [=match filter values=] with |sourceValues| and |filterValues|
+             is false, return false.</dd>
+
+        <dt>true</dt>
+        <dd>If the result of running [=match filter values with negation=] with |sourceValues| and
+            |filterValues| is false, return false.</dd>
+        </dl>
+1. Return true.
+
+To <dfn>match an attribution source's filter data against filters and negated filters</dfn> given an
+[=attribution source=] |source|, a [=filter map=] |filters|, and a [=filter map=] |notFilters|:
+
+1. If the result of running [=match an attribution source's filter data against filters=] with
+    |source|, |filters|, and [=match an attribution source's filter data against filters/isNegated=] set to false is false, return false.
+1. If the result of running [=match an attribution source's filter data against filters=] with
+    |source|, |notFilters|, and [=match an attribution source's filter data against filters/isNegated=] set to true is false, return false.
+1. Return true.
+
+<h3 dfn id="should-block-attribution-for-attribution-limit">Should attribution be blocked by attribution rate limit</h3>
+
+Given an [=attribution trigger=] |trigger| and [=attribution source=] |sourceToAttribute|:
+
+1. Let |matchingRateLimitRecords| be all [=attribution rate-limit records=] |record| of [=attribution rate-limit cache=] where all of the following are true:
+     * |record|'s [=attribution rate-limit record/scope=] is "<code>[=rate-limit scope/attribution=]</code>"
+     * |record|'s [=attribution rate-limit record/source site=] and |sourceToAttribute|'s [=attribution source/source site=] are equal
+     * |record|'s [=attribution rate-limit record/attribution destination=] and |trigger|'s [=attribution trigger/attribution destination=] are equal
+     * |record|'s [=attribution rate-limit record/reporting endpoint=] and |trigger|'s [=attribution trigger/reporting endpoint=] are [=same origin=]
+     * |record|'s [=attribution rate-limit record/time=] is at least [=attribution rate-limit window=] before |trigger|'s [=attribution trigger/trigger time=]
+1. If |matchingRateLimitRecords|'s [=list/size=] is greater than or equal to [=max attributions per rate-limit window=], return <strong>blocked</strong>.
+1. Return <strong>allowed</strong>.
+
+<h3 dfn id="should-block-processing-for-reporting-endpoint-limit">Should processing be blocked by reporting-endpoint limit</h3>
+
+Given an [=attribution rate-limit record=] |newRecord|:
+
+1. Let |max| be [=max source reporting endpoints per rate-limit window=].
+1. If |newRecord|'s [=attribution rate-limit record/scope=] is "<code>[=rate-limit scope/attribution=]</code>", set |max| to
+     [=max attribution reporting endpoints per rate-limit window=].
+1. Let |matchingRateLimitRecords| be all [=attribution rate-limit records=] |record| in the [=attribution rate-limit cache=] where all of the following are true:
+     * |record|'s [=attribution rate-limit record/scope=] and |newRecord|'s [=attribution rate-limit record/scope=] are equal
+     * |record|'s [=attribution rate-limit record/source site=] and |newRecord|'s [=attribution rate-limit record/source site=] are equal
+     * |record|'s [=attribution rate-limit record/attribution destination=] and |newRecord|'s [=attribution rate-limit record/attribution destination=] are equal
+     * |record|'s [=attribution rate-limit record/time=] is at least [=attribution rate-limit window=] before |newRecord|'s [=attribution rate-limit record/time=]
+1. Let |distinctReportingEndpoints| be a new empty [=ordered set=].
+1. [=set/iterate|For each=] |record| of |matchingRateLimitRecords|, [=set/append=] |record|'s
+     [=attribution rate-limit record/reporting endpoint=] to |distinctReportingEndpoints|.
+1. If |distinctReportingEndpoints| [=list/contains=] |newRecord|'s
+    [=attribution rate-limit record/reporting endpoint=], return <strong>allowed</strong>.
+1. If |distinctReportingEndpoints|'s [=list/size=] is greater than or equal to |max|, return
+    <strong>blocked</strong>.
+1. Return <strong>allowed</strong>.
+
+<h3 dfn id="should-block-attribution-for-rate-limits">Should attribution be blocked by rate limits</h3>
+
+Given an [=attribution trigger=] |trigger|, an [=attribution source=]
+|sourceToAttribute|, and an [=attribution rate-limit record=] |newRecord|:
+
+1. If the result of running [=should attribution be blocked by attribution rate limit=] with |trigger| and
+    |sourceToAttribute| is <strong>blocked</strong>:
+    1. Let |debugData| be the result of running [=obtain debug data on trigger registration=]
+        with "<code>[=trigger debug data type/trigger-attributions-per-source-destination-limit=]</code>", |trigger|, |sourceToAttribute| and
+        [=obtain debug data on trigger registration/report=] set to null.
+    1. Return the [=triggering result=] ("<code>[=triggering status/dropped=]</code>", |debugData|).
+1. If the result of running [=should processing be blocked by reporting-endpoint limit=] with
+    |newRecord| is <strong>blocked</strong>:
+    1. Let |debugData| be the result of running [=obtain debug data on trigger registration=]
+        with "<code>[=trigger debug data type/trigger-reporting-origin-limit=]</code>", |trigger|, |sourceToAttribute| and
+        [=obtain debug data on trigger registration/report=] set to null.
+    1. Return the [=triggering result=] ("<code>[=triggering status/dropped=]</code>", |debugData|).
+1. Return null.
+
+<h3 algorithm id="creating-aggregatable-contributions">Creating aggregatable contributions</h3>
+
+To <dfn>create [=aggregatable contributions=]</dfn> given an [=attribution source=] |source| and an
+ [=attribution trigger=] |trigger|, run the following steps:
+
+1. Let |aggregationKeys| be the result of [=map/clone|cloning=] |source|'s [=attribution source/aggregation keys=].
+1. [=list/iterate|For each=] |triggerData| of |trigger|'s [=attribution trigger/aggregatable trigger data=]:
+    1. If the result of running [=match an attribution source's filter data against filters and negated filters=] with
+        |source|, |triggerData|'s [=aggregatable trigger data/filters=], and
+        |triggerData|'s [=aggregatable trigger data/negated filters=]
+        is false, [=iteration/continue=].
+    1. [=set/iterate|For each=] |sourceKey| of |triggerData|'s [=aggregatable trigger data/source keys=]:
+        1. If |aggregationKeys|[|sourceKey|] does not [=map/exist=], [=iteration/continue=].
+        1. Set |aggregationKeys|[|sourceKey|] to |aggregationKeys|[|sourceKey|] OR |triggerData|'s
+            [=aggregatable trigger data/key piece=].
+1. Let |aggregatableValues| be |trigger|'s [=attribution trigger/aggregatable values=].
+1. Let |contributions| be a new empty [=list=].
+1. [=map/iterate|For each=] |id| → |key| of |aggregationKeys|:
+    1. If |aggregatableValues|[|id|] does not [=map/exist=], [=iteration/continue=].
+    1. Let |contribution| be a new [=aggregatable contribution=] with the items:
+        : [=aggregatable contribution/key=]
+        :: |key|
+        : [=aggregatable contribution/value=]
+        :: |aggregatableValues|[|id|]
+    1. [=list/Append=] |contribution| to |contributions|.
+1. Return |contributions|.
+
+<h3 id="can-source-create-aggregatable-contributions">Can source create aggregatable contributions</h3>
+
+To <dfn>check if an [=attribution source=] can create [=aggregatable contributions=]</dfn> given an
+[=aggregatable report=] |report| and an [=attribution source=] |sourceToAttribute|, run the following steps:
+
+1. Let |remainingAggregatableBudget| be [=allowed aggregatable budget per source=] minus |sourceToAttribute|'s
+    [=attribution source/aggregatable budget consumed=].
+1. [=Assert=]: |remainingAggregatableBudget| is greater than or equal to 0.
+1. If |report|'s [=aggregatable report/required aggregatable budget=] is greater than
+    |remainingAggregatableBudget|, return false.
+1. Return true.
+
+<h3 id="obtaining-trigger-debug-data">Obtaining debug data on trigger registration</h3>
+
+To <dfn>obtain debug data body on trigger registration</dfn> given a
+[=trigger debug data type=] |dataType|, an [=attribution trigger=] |trigger|,
+an optional [=attribution source=] <dfn for="obtain debug data body on trigger registration">
+<var>sourceToAttribute</var></dfn>, and an optional [=attribution report=]
+<dfn for="obtain debug data body on trigger registration"><var>report</var></dfn>:
+
+1. Let |body| be a new [=map/is empty|empty=] [=map=].
+1. If |dataType| is:
+    <dl class="switch">
+    : "<code>[=trigger debug data type/trigger-attributions-per-source-destination-limit=]</code>"
+    :: [=map/Set=] |body|["`limit`"] to the user agent's [=max attributions per rate-limit window=],
+         [=serialize an integer|serialized=].
+    : "<code>[=trigger debug data type/trigger-reporting-origin-limit=]</code>"
+    :: [=map/Set=] |body|["`limit`"] to the user agent's [=max attribution reporting endpoints per rate-limit window=],
+         [=serialize an integer|serialized=].
+    : "<code>[=trigger debug data type/trigger-event-storage-limit=]</code>"
+    :: [=map/Set=] |body|["`limit`"] to [=max event-level reports per attribution destination=],
+         [=serialize an integer|serialized=].
+    : "<code>[=trigger debug data type/trigger-aggregate-storage-limit=]</code>"
+    :: [=map/Set=] |body|["`limit`"] to [=max aggregatable reports per attribution destination=],
+         [=serialize an integer|serialized=].
+    : "<code>[=trigger debug data type/trigger-aggregate-insufficient-budget=]</code>"
+    :: [=map/Set=] |body|["`limit`"] to [=allowed aggregatable budget per source=],
+         [=serialize an integer|serialized=].
+    : "<code>[=trigger debug data type/trigger-event-low-priority=]</code>"
+    : "<code>[=trigger debug data type/trigger-event-excessive-reports=]</code>"
+    ::
+        1. [=Assert=]: |report| is not null and is an [=event-level report=].
+        1. Return the result of running [=obtain an event-level report body=] with |report|.
+
+    </dl>
+
+1. [=map/Set=] |body|["`attribution_destination`"] to |trigger|'s [=attribution trigger/attribution destination=],
+    <a href="https://html.spec.whatwg.org/multipage/origin.html#serialization-of-a-site">serialized</a>.
+1. If |trigger|'s [=attribution trigger/debug key=] is not null, [=map/set=] |body|["`trigger_debug_key`"]
+    to |trigger|'s [=attribution trigger/debug key=], [=serialize an integer|serialized=].
+1. If |sourceToAttribute| is not null:
+    1. [=map/Set=] |body|["`source_event_id`"] to |source|'s [=attribution source/event ID=], [=serialize an integer|serialized=].
+    1. [=map/Set=] |body|["`source_site`"] to |source|'s [=attribution source/source site=], <a href="https://html.spec.whatwg.org/multipage/origin.html#serialization-of-a-site">serialized</a>.
+    1. If |sourceToAttribute|'s [=attribution source/debug key=] is not null, [=map/set=]
+        |body|["`source_debug_key`"] to |sourceToAttribute|'s [=attribution source/debug key=],
+        [=serialize an integer|serialized=].
+1. Return |body|.
+
+To <dfn>obtain debug data on trigger registration</dfn> given a [=trigger debug data type=] |dataType|,
+an [=attribution trigger=] |trigger|, an optional [=attribution source=]
+<dfn for="obtain debug data on trigger registration"><var>sourceToAttribute</var></dfn>,
+and an optional [=attribution report=] <dfn for="obtain debug data on trigger registration"><var>report</var></dfn>:
+
+1. If |trigger|'s [=attribution trigger/debug reporting enabled=] is false, return null.
+1. If the result of running [=check if cookie-based debugging is allowed=] with |trigger|'s
+    [=attribution trigger/reporting endpoint=] is <strong>blocked</strong>, return null.
+1. Let |data| be a new [=attribution debug data=] with the items:
+    : [=attribution debug data/data type=]
+    :: |dataType|.
+    : [=attribution debug data/body=]
+    :: The result of running [=obtain debug data body on trigger registration=] with |dataType|, |trigger|, |sourceToAttribute| and |report|.
+1. Return |data|.
+
+<h3 algorithm id="triggering-event-level-attribution">Triggering event-level attribution</h3>
+
+To <dfn>trigger event-level attribution</dfn> given an [=attribution trigger=] |trigger|, an
+[=attribution source=] |sourceToAttribute|, and an
+[=attribution rate-limit record=] |rateLimitRecord|, run the following steps:
+
+1. If |trigger|'s [=attribution trigger/event-level trigger configurations=]
+    [=list/is empty=], return the [=triggering result=]
+    ("<code>[=triggering status/dropped=]</code>", null).
+1. If |sourceToAttribute|'s [=attribution source/randomized response=] is not null and is not [=set/is empty|empty=]:
+    1. [=Assert=]: |sourceToAttribute|'s [=attribution source/event-level attributable=] is false.
+    1. Let |debugData| be the result of running [=obtain debug data on trigger registration=]
+        with "<code>[=trigger debug data type/trigger-event-noise=]</code>", |trigger|, |sourceToAttribute| and
+        [=obtain debug data on trigger registration/report=] set to null.
+    1. Return the [=triggering result=] ("<code>[=triggering status/dropped=]</code>", |debugData|).
+1. If |sourceToAttribute|'s [=attribution source/event report window time=] is less than |trigger|'s [=attribution trigger/trigger time=]:
+    1. Let |debugData| be the result of running [=obtain debug data on trigger registration=]
+        with "<code>[=trigger debug data type/trigger-event-report-window-passed=]</code>",
+        |trigger|, |sourceToAttribute| and [=obtain debug data on trigger registration/report=] set to null.
+    1. Return the [=triggering result=] ("<code>[=triggering status/dropped=]</code>", |debugData|).
+1. Let |matchedConfig| be null.
+1. [=set/iterate|For each=] [=event-level trigger configuration=] |config| of |trigger|'s
+    [=attribution trigger/event-level trigger configurations=]:
+    1. If the result of running
+        [=match an attribution source's filter data against filters and negated filters=] with |sourceToAttribute|,
+        |config|'s [=event-level trigger configuration/filters=], and
+        |config|'s [=event-level trigger configuration/negated filters=]
+        is false, [=iteration/continue=].
+    1. Set |matchedConfig| to |config|.
+    1. [=iteration/Break=].
+1. If |matchedConfig| is null:
+    1. Let |debugData| be the result of running
+        [=obtain debug data on trigger registration=] with "<code>[=trigger debug data type/trigger-event-no-matching-configurations=]</code>",
+        |trigger|, |sourceToAttribute| and [=obtain debug data on trigger registration/report=] set to null.
+    1. Return the [=triggering result=] ("<code>[=triggering status/dropped=]</code>", |debugData|).
+1. If |matchedConfig|'s [=event-level trigger configuration/dedup key=] is not null and
+    |sourceToAttribute|'s [=attribution source/dedup keys=] [=list/contains=] it:
+     1. Let |debugData| be the result of running [=obtain debug data on trigger registration=]
+         with "<code>[=trigger debug data type/trigger-event-deduplicated=]</code>", |trigger|, |sourceToAttribute| and
+         [=obtain debug data on trigger registration/report=] set to null.
+     1. Return the [=triggering result=] ("<code>[=triggering status/dropped=]</code>", |debugData|).
+1. Let |numMatchingReports| be the number of entries in the [=event-level report cache=] whose
+    [=event-level report/attribution destinations=] [=set/contains=] |trigger|'s [=attribution trigger/attribution destination=].
+1. If |numMatchingReports| is greater than or equal to the user agent's [=max event-level reports per attribution destination=]:
+    1. Let |debugData| be the result of running [=obtain debug data on trigger registration=]
+        with "<code>[=trigger debug data type/trigger-event-storage-limit=]</code>", |trigger|, |sourceToAttribute| and
+        [=obtain debug data on trigger registration/report=] set to null.
+    1. Return the [=triggering result=] ("<code>[=triggering status/dropped=]</code>", |debugData|).
+1. If the result of running [=should attribution be blocked by rate limits=]
+    with |trigger|, |sourceToAttribute|, and |rateLimitRecord| is not null,
+    return it.
+1. Let |report| be the result of running [=obtain an event-level report=] with |sourceToAttribute|, |trigger|,
+    and |matchedConfig|.
+1. If |sourceToAttribute|'s [=attribution source/event-level attributable=] value
+    is false:
+     1. Let |debugData| be the result of running [=obtain debug data on trigger registration=]
+         with "<code>[=trigger debug data type/trigger-event-excessive-reports=]</code>", |trigger|, |sourceToAttribute| and |report|.
+     1. Return the [=triggering result=] ("<code>[=triggering status/dropped=]</code>", |debugData|).
+1. Let |maxAttributionsPerSource| be the user agent's [=max attributions per navigation source=].
+1. If |sourceToAttribute|'s [=attribution source/source type=] is "<code>[=source type/event=]</code>", set
+    |maxAttributionsPerSource| to the user agent's [=max attributions per event source=].
+1. If |sourceToAttribute|'s [=attribution source/number of event-level reports=] value is equal to
+    |maxAttributionsPerSource|, then:
+    1. Let |matchingReports| be all entries in the [=event-level report cache=] where all of the following are true:
+         * entry's [=event-level report/report time=] and |report|'s [=event-level report/report time=] are equal.
+         * entry's [=event-level report/source identifier=] [=string/is=] |report|'s [=event-level report/source identifier=]
+    1. If |matchingReports| is empty:
+        1. Set |sourceToAttribute|'s [=attribution source/event-level attributable=] value to false.
+        1. Let |debugData| be the result of running [=obtain debug data on trigger registration=]
+            with "<code>[=trigger debug data type/trigger-event-excessive-reports=]</code>", |trigger|, |sourceToAttribute| and |report|.
+        1. Return the [=triggering result=] ("<code>[=triggering status/dropped=]</code>", |debugData|).
+    1. Set |matchingReports| to the result of [=list/sort in ascending order|sorting=] |matchingReports|
+        in ascending order, with |a| being less than |b| if any of the following are true:
+             * |a|'s [=event-level report/trigger priority=] is less than |b|'s [=event-level report/trigger priority=].
+             * |a|'s [=event-level report/trigger priority=] is equal to |b|'s [=event-level report/trigger priority=]
+                and |a|'s [=event-level report/trigger time=] is greater than |b|'s [=event-level report/trigger time=].
+    1. Let |lowestPriorityReport| be the first item in |matchingReports|.
+    1. If |report|'s [=event-level report/trigger priority=] is less than or equal to
+        |lowestPriorityReport|'s [=event-level report/trigger priority=]:
+         1. Let |debugData| be the result of running [=obtain debug data on trigger registration=]
+             with "<code>[=trigger debug data type/trigger-event-low-priority=]</code>", |trigger|, |sourceToAttribute| and |report|.
+         1. Return the [=triggering result=] ("<code>[=triggering status/dropped=]</code>", |debugData|).
+    1. [=list/Remove=] |lowestPriorityReport| from the [=event-level report cache=].
+    1. Decrement |sourceToAttribute|'s [=attribution source/number of event-level reports=] value by 1.
+1. Let |triggeringStatus| be "<code>[=triggering status/attributed=]</code>".
+1. Let |debugData| be null.
+1. If |sourceToAttribute|'s [=attribution source/randomized response=] is:
+    <dl class="switch">
+    : null
+    :: [=set/Append=] |report| to the [=event-level report cache=].
+    : not null
+    ::
+        1. Set |triggeringStatus| to "<code>[=triggering status/noised=]</code>".
+        1. Set |debugData| to the result of running [=obtain debug data on trigger registration=]
+            with "<code>[=trigger debug data type/trigger-event-noise=]</code>", |trigger|, |sourceToAttribute| and
+            [=obtain debug data on trigger registration/report=] set to null.
+
+    </dl>
+1. Increment |sourceToAttribute|'s [=attribution source/number of event-level reports=] value by 1.
+1. If |matchedConfig|'s [=event-level trigger configuration/dedup key=] is not null,
+    [=list/append=] it to |sourceToAttribute|'s [=attribution source/dedup keys=].
+1. If |report|'s [=event-level report/source debug key=] is not null and |report|'s
+    [=event-level report/trigger debug key=] is not null, [=queue a task=] to
+    [=attempt to deliver a debug report=] with |report|.
+1. Return the [=triggering result=] (|triggeringStatus|, |debugData|).
+
+<h3 algorithm id="triggering-aggregatable-attribution">Triggering aggregatable attribution</h3>
+
+To <dfn>trigger aggregatable attribution</dfn> given an [=attribution trigger=] |trigger|, an
+[=attribution source=] |sourceToAttribute|, and an
+[=attribution rate-limit record=] |rateLimitRecord|, run the following steps:
+
+1. If |trigger|'s [=attribution trigger/aggregatable trigger data=] [=list/is empty=]
+    and |trigger|'s [=attribution trigger/aggregatable values=] [=map/is empty=],
+    return the [=triggering result=] ("<code>[=triggering status/dropped=]</code>", null).
+1. If |sourceToAttribute|'s [=attribution source/aggregatable report window time=] is less than |trigger|'s [=attribution trigger/trigger time=]:
+    1. Let |debugData| be the result of running [=obtain debug data on trigger registration=]
+        with "<code>[=trigger debug data type/trigger-aggregate-report-window-passed=]</code>", |trigger|, |sourceToAttribute|
+        and [=obtain debug data on trigger registration/report=] set to null.
+    1. Return the [=triggering result=] ("<code>[=triggering status/dropped=]</code>", |debugData|).
+1. Let |report| be the result of running [=obtain an aggregatable report=] with |sourceToAttribute| and |trigger|.
+1. If |report|'s [=aggregatable report/contributions=] [=list/is empty=]:
+    1. Let |debugData| be the result of running [=obtain debug data on trigger registration=] with
+        "<code>[=trigger debug data type/trigger-aggregate-no-contributions=]</code>", |trigger|, |sourceToAttribute| and
+        [=obtain debug data on trigger registration/report=] set to null.
+    1. Return the [=triggering result=] ("<code>[=triggering status/dropped=]</code>", |debugData|).
+1. If |trigger|'s [=attribution trigger/aggregatable dedup key=] is not null and
+    |sourceToAttribute|'s [=attribution source/aggregatable dedup keys=]
+    [=list/contains=] it:
+     1. Let |debugData| be the result of running [=obtain debug data on trigger registration=]
+         with "<code>[=trigger debug data type/trigger-aggregate-deduplicated=]</code>", |trigger|, |sourceToAttribute|
+         and [=obtain debug data on trigger registration/report=] set to null.
+     1. Return the [=triggering result=] ("<code>[=triggering status/dropped=]</code>", |debugData|).
+1. Let |numMatchingReports| be the number of entries in the [=aggregatable report cache=] whose
+    [=aggregatable report/effective attribution destination=] equals |trigger|'s [=attribution trigger/attribution destination=].
+1. If |numMatchingReports| is greater than or equal to the user agent's
+    [=max aggregatable reports per attribution destination=]:
+     1. Let |debugData| be the result of running [=obtain debug data on trigger registration=]
+         with "<code>[=trigger debug data type/trigger-aggregate-storage-limit=]</code>", |trigger|, |sourceToAttribute| and
+         [=obtain debug data on trigger registration/report=] set to null.
+    1. Return the [=triggering result=] ("<code>[=triggering status/dropped=]</code>", |debugData|).
+1. If the result of running [=should attribution be blocked by rate limits=]
+    with |trigger|, |sourceToAttribute|, and |rateLimitRecord| is not null,
+    return it.
+1. If the result of running [=check if an attribution source can create aggregatable contributions=]
+    with |report| and |sourceToAttribute| is false:
+     1. Let |debugData| be the result of running [=obtain debug data on trigger registration=]
+         with "<code>[=trigger debug data type/trigger-aggregate-insufficient-budget=]</code>", |trigger|, |sourceToAttribute| and
+        [=obtain debug data on trigger registration/report=] set to null.
+    1. Return the [=triggering result=] ("<code>[=triggering status/dropped=]</code>", |debugData|).
+1. Add |report| to the [=aggregatable report cache=].
+1. Increment |sourceToAttribute|'s [=attribution source/aggregatable budget consumed=] value by
+    |report|'s [=aggregatable report/required aggregatable budget=].
+1. If |trigger|'s [=attribution trigger/aggregatable dedup key=] is not null,
+    [=list/append=] it to |sourceToAttribute|'s [=attribution source/aggregatable dedup keys=].
+1. If |report|'s [=aggregatable report/source debug key=] is not null and |report|'s
+    [=aggregatable report/trigger debug key=] is not null, [=queue a task=] to
+    [=attempt to deliver a debug report=] with |report|.
+1. Return the [=triggering result=] ("<code>[=triggering status/attributed=]</code>", null).
+
+<h3 algorithm id="triggering-attribution">Triggering attribution</h3>
+
+To <dfn>obtain and deliver a debug report on trigger registration</dfn> given a [=trigger debug data type=] |dataType|,
+an [=attribution trigger=] |trigger| and an optional [=attribution source=]
+<dfn for="obtain and deliver a debug report on trigger registration"><var>sourceToAttribute</var></dfn>:
+
+1. Let |debugData| be the result of running [=obtain debug data on trigger registration=]
+    with |dataType|, |trigger|, |sourceToAttribute| and
+    [=obtain debug data on trigger registration/report=] set to null.
+1. If |debugData| is null, return.
+1. Run [=obtain and deliver a debug report=] with « |debugData| » and |trigger|'s [=attribution trigger/reporting endpoint=].
+
+To <dfn>find matching sources</dfn> given an [=attribution trigger=] |trigger|:
+
+1. Let |matchingSources| be a new [=list/is empty|empty=] [=list=].
+1. [=set/iterate|For each=] |source| of the [=attribution source cache=]:
+    1. If |source|'s [=attribution source/attribution destinations=] does not [=set/contains|contain=] |trigger|'s [=attribution trigger/attribution destination=], [=iteration/continue=].
+    1. If |source|'s [=attribution source/reporting endpoint=] and |trigger|'s [=attribution trigger/reporting endpoint=] are not [=same origin=], [=iteration/continue=].
+    1. If |source|'s [=attribution source/expiry time=] is less than or equal to |trigger|'s [=attribution trigger/trigger time=], [=iteration/continue=].
+    1. [=list/Append=] |source| to |matchingSources|.
+1. Set |matchingSources| to the result of [=list/sort in descending order|sorting=] |matchingSources|
+    in descending order, with |a| being less than |b| if any of the following are true:
+      * |a|'s [=attribution source/priority=] is less than |b|'s [=attribution source/priority=].
+      * |a|'s [=attribution source/priority=] is equal to |b|'s [=attribution source/priority=] and |a|'s
+         [=attribution source/source time=] is less than |b|'s [=attribution source/source time=].
+1. Return |matchingSources|.
+
+To <dfn noexport>trigger attribution</dfn> given an [=attribution trigger=] |trigger|, run the following steps:
+
+1. If |trigger|'s [=attribution trigger/event-level trigger configurations=]
+    [=set/is empty=] and |trigger|'s
+    [=attribution trigger/aggregatable trigger data=] [=list/is empty=] and
+    |trigger|'s [=attribution trigger/aggregatable values=] [=map/is empty=],
+    return.
+1. Let |matchingSources| be the result of running [=find matching sources=] with |trigger|.
+1. If |matchingSources| [=list/is empty=]:
+    1. Run [=obtain and deliver a debug report on trigger registration=]
+        with "<code>[=trigger debug data type/trigger-no-matching-source=]</code>", |trigger| and [=obtain and deliver a debug report on trigger registration/sourceToAttribute=] set to null.
+    1. Return.
+1. Let |sourceToAttribute| be |matchingSources|[0].
+1. If the result of running
+    [=match an attribution source's filter data against filters and negated filters=] with
+    |sourceToAttribute|, |trigger|'s [=attribution trigger/filters=], and
+    |trigger|'s [=attribution trigger/negated filters=] is false,
+    1. Run [=obtain and deliver a debug report on trigger registration=]
+        with "<code>[=trigger debug data type/trigger-no-matching-filter-data=]</code>",
+        |trigger|, and |sourceToAttribute|.
+    1. Return.
+1. Let |rateLimitRecord| be a new [=attribution rate-limit record=] with the items:
+    : [=attribution rate-limit record/scope=]
+    :: "<code>[=rate-limit scope/attribution=]</code>"
+    : [=attribution rate-limit record/source site=]
+    :: |sourceToAttribute|'s [=attribution source/source site=]
+    : [=attribution rate-limit record/attribution destination=]
+    :: |trigger|'s [=attribution trigger/attribution destination=]
+    : [=attribution rate-limit record/reporting endpoint=]
+    :: |sourceToAttribute|'s [=attribution source/reporting endpoint=]
+    : [=attribution rate-limit record/time=]
+    :: |sourceToAttribute|'s [=attribution source/source time=]
+    : [=attribution rate-limit record/expiry time=]
+    :: null
+1. Let |eventLevelResult| be the result of running [=trigger event-level attribution=]
+    with |trigger|, |sourceToAttribute|, and |rateLimitRecord|.
+1. Let |aggregatableResult| be the result of running [=trigger aggregatable attribution=]
+    with |trigger|, |sourceToAttribute|, and |rateLimitRecord|.
+1. Let |eventLevelDebugData| be |eventLevelResult|'s [=triggering result/debug data=].
+1. Let |aggregatableDebugData| be |aggregatableResult|'s [=triggering result/debug data=].
+1. Let |debugDataList| be an [=list/is empty|empty=] [=list=].
+1. If |eventLevelDebugData| is not null, then [=list/append=] |eventLevelDebugData| to |debugDataList|.
+1. If |aggregatableDebugData| is not null:
+    1. If |debugDataList| [=list/is empty=] or |aggregatableDebugData|'s [=attribution debug data/data type=]
+        does not equal |eventLevelDebugData|'s [=attribution debug data/data type=],
+        then [=list/append=] |aggregatableDebugData| to |debugDataList|.
+1. If |debugDataList| is not [=list/is empty|empty=], then run [=obtain and deliver a debug report=]
+    with |debugDataList| and |trigger|'s [=attribution trigger/reporting endpoint=].
+1. If both |eventLevelResult|'s [=triggering result/status=] and |aggregatableResult|'s
+    [=triggering result/status=] are "<code>[=triggering status/dropped=]</code>", return.
+1. [=list/Remove=] |sourceToAttribute| from |matchingSources|.
+1. For each |item| of |matchingSources|:
+    1. [=set/Remove=] |item| from the [=attribution source cache=].
+1. If neither |eventLevelResult|'s [=triggering result/status=] nor |aggregatableResult|'s
+    [=triggering result/status=] is "<code>[=triggering status/attributed=]</code>", return.
+1. [=set/Append=] |rateLimitRecord| to the [=attribution rate-limit cache=].
+1. [=list/Remove=] all [=attribution rate-limit records=] |entry| from the [=attribution rate-limit cache=] if the result of running
+    [=can attribution rate-limit record be removed=] with |entry| and |trigger|'s [=attribution trigger/trigger time=] is true.
+
+<h3 algorithm id="delivery-time">Establishing report delivery time</h3>
+
+To <dfn>obtain early deadlines</dfn> given a [=source type=] |sourceType|:
+
+1. If |sourceType| is "<code>[=source type/event=]</code>", return «».
+1. Return « 2 days, 7 days ».
+
+To <dfn>obtain the number of report windows</dfn> given a [=source type=]
+|sourceType|:
+
+1. Let |earlyDeadlines| be the result of running [=obtain early deadlines=]
+    with |sourceType|.
+1. Return the [=list/size=] of |earlyDeadlines| + 1.
+
+To <dfn>obtain a report time from deadline</dfn> given a [=moment=] |sourceTime| and
+a [=duration=] |deadline|:
+
+1. Return |sourceTime| + |deadline| + 1 hour.
+
+To <dfn>obtain the report time at a window</dfn> given an
+[=attribution source=] |source| and a non-negative integer |window|:
+
+1. Let |earlyDeadlines| be the result of running [=obtain early deadlines=]
+    with |source|'s [=attribution source/source type=].
+1. Let |deadline| be |source|'s [=attribution source/event report window=].
+1. If |earlyDeadlines|[|window|] [=list/exists=], set |deadline| to it.
+1. Return the result of running [=obtain a report time from deadline=] with
+    |source|'s [=attribution source/source time=] and |deadline|.
+
+To <dfn>obtain an event-level report delivery time</dfn> given an [=attribution source=]
+|source| and a [=moment=] |triggerTime|:
+
+1. Let |deadlineToUse| be |source|'s [=attribution source/event report window=].
+1. Let |earlyDeadlines| be the result of running [=obtain early deadlines=]
+    with |source|'s [=attribution source/source type=].
+1. [=list/iterate|For each=] |earlyDeadline| of |earlyDeadlines|:
+    1. Let |time| be |source|'s [=attribution source/source time=] +
+        |earlyDeadline|.
+    1. If |time| is less than |triggerTime|, [=iteration/continue=].
+    1. If |earlyDeadline| is greater than or equal to |deadlineToUse|,
+        [=iteration/continue=].
+    1. Set |deadlineToUse| to |earlyDeadline|.
+    1. [=iteration/Break=].
+1. Return the result of running [=obtain a report time from deadline=] with
+    |source|'s [=attribution source/source time=] and |deadlineToUse|.
+
+To <dfn>obtain an aggregatable report delivery time</dfn> given a [=moment=]
+|triggerTime|, perform the following steps. They return a [=moment=].
+
+1. Let |r| be a random double between 0 (inclusive) and 1 (exclusive) with uniform probability.
+1. Return |triggerTime| + [=min aggregatable report delay=] + |r| * [=randomized aggregatable report delay=].
+
+<h3 algorithm id="obtaining-an-event-level-report">Obtaining an event-level report</h3>
+
+To <dfn>obtain an event-level report</dfn> given an [=attribution source=] |source|, an [=attribution trigger=]
+|trigger|, and an [=event-level trigger configuration=] |config|:
+
+1. Let |triggerDataCardinality| be the user agent's [=navigation-source trigger data cardinality=].
+1. If |source|'s [=attribution source/source type=] is "<code>[=source type/event=]</code>", set |triggerDataCardinality| to
+    the user agent's [=event-source trigger data cardinality=].
+1. Let |reportTime| be the result of running [=obtain an event-level report delivery time=] with |source| and |trigger|'s [=attribution trigger/trigger time=].
+1. Let |report| be a new [=event-level report=] struct whose items are:
+
+    : [=event-level report/event ID=]
+    :: |source|'s [=attribution source/event ID=].
+    : [=event-level report/trigger data=]
+    :: The remainder when dividing |config|'s [=event-level trigger configuration/trigger data=] by
+        |triggerDataCardinality|.
+    : [=event-level report/randomized trigger rate=]
+    :: |source|'s [=attribution source/randomized trigger rate=].
+    : [=event-level report/reporting endpoint=]
+    :: |source|'s [=attribution source/reporting endpoint=].
+    : [=event-level report/attribution destinations=]
+    :: |source|'s [=attribution source/attribution destinations=].
+    : [=event-level report/report time=]
+    :: |reportTime|
+    : [=event-level report/original report time=]
+    :: |reportTime|
+    : [=event-level report/trigger priority=]
+    :: |config|'s [=event-level trigger configuration/priority=].
+    : [=event-level report/trigger time=]
+    :: |trigger|'s [=attribution trigger/trigger time=].
+    : [=event-level report/source identifier=]
+    :: |source|'s [=attribution source/source identifier=].
+    : [=event-level report/report id=]
+    :: The result of [=generating a random UUID=].
+    : [=event-level report/source debug key=]
+    :: |source|'s [=attribution source/debug key=].
+    : [=event-level report/trigger debug key=]
+    :: |trigger|'s [=attribution trigger/debug key=].
+1. Return |report|.
+
+<h3 id="obtaining-required-aggregatable-budget">Obtaining an aggregatable report's required budget</h3>
+
+An [=aggregatable report=] |report|'s <dfn for="aggregatable report">
+required aggregatable budget</dfn> is the total [=aggregatable contribution/value=] of |report|'s
+[=aggregatable report/contributions=].
+
+<h3 algorithm id="obtaining-an-aggregatable-report">Obtaining an aggregatable report</h3>
+
+To <dfn>obtain an aggregatable report</dfn> given an [=attribution source=] |source| and
+an [=attribution trigger=] |trigger|:
+
+1. Let |reportTime| be the result of running [=obtain an aggregatable report delivery time=] with |trigger|'s [=attribution trigger/trigger time=].
+1. Let |report| be a new [=aggregatable report=] struct whose items are:
+
+    : [=aggregatable report/reporting endpoint=]
+    :: |source|'s [=attribution source/reporting endpoint=].
+    : [=aggregatable report/effective attribution destination=]
+    :: |trigger|'s [=attribution trigger/attribution destination=].
+    : [=aggregatable report/source time=]
+    :: |source|'s [=attribution source/source time=].
+    : [=aggregatable report/original report time=]
+    :: |reportTime|.
+    : [=aggregatable report/report time=]
+    :: |reportTime|.
+    : [=aggregatable report/report id=]
+    :: The result of [=generating a random UUID=].
+    : [=aggregatable report/source debug key=]
+    :: |source|'s [=attribution source/debug key=].
+    : [=aggregatable report/trigger debug key=]
+    :: |trigger|'s [=attribution trigger/debug key=].
+    : [=aggregatable report/contributions=]
+    :: The result of running [=create aggregatable contributions=] with |source| and |trigger|.
+    : [=aggregatable report/serialized private state token=]
+    :: |trigger|'s [=attribution trigger/serialized private state token=]
+    : [=aggregatable report/aggregation coordinator=]
+    :: |trigger|'s [=attribution trigger/aggregation coordinator=]
+1. Return |report|.
+
+# Report delivery # {#report-delivery}
+
+The user agent MUST periodically [=set/iterate=] over its [=event-level report cache=] and
+[=aggregatable report cache=] and run [=queue a report for delivery=] on each item.
+
+To <dfn>queue a report for delivery</dfn> given an [=attribution report=] |report|
+and an [=environment settings objects=] |context|, run the following steps [=in parallel=]:
+
+1. If |report|'s [=attribution report/delivered=] value is true, return.
+1. Set |report|'s [=attribution report/delivered=] value to true.
+1. If |report|'s [=attribution report/report time=] is less than |context|'s [=current wall time=], add an [=implementation-defined=] random non-negative [=duration=] to |report|'s [=attribution report/report time=].
+
+    Note: On startup, it is possible the user agent will need to send many reports whose report times passed while the browser was
+     closed. Adding random delay prevents temporal joining of reports from different [=attribution source/source origin=]s.
+1. Wait until |context|'s [=current wall time=] is equal to |report|'s [=attribution report/report time=].
+1. Optionally, wait a further [=implementation-defined=] [=duration=].
+
+    Note: This is intended to allow user agents to optimize device resource usage.
+1. Run [=attempt to deliver a report=] with |report|.
+
+<h3 id="encode-integer">Encode an unsigned k-bit integer</h3>
+
+To <dfn>encode an unsigned k-bit integer</dfn>, represent it as a big-endian [=byte sequence=]
+of length k / 8, left padding with zero as necessary.
+
+<h3 id="obtain-aggregatable-report-debug-mode">Obtaining an aggregatable report's debug mode</h3>
+
+An [=aggregatable report=] |report|'s <dfn for="aggregatable report">debug mode</dfn> is the result
+of running the following steps:
+
+1. If |report|'s [=aggregatable report/source debug key=] is null, return <strong>disabled</strong>.
+1. If |report|'s [=aggregatable report/trigger debug key=] is null, return <strong>disabled</strong>.
+1. Return <strong>enabled</strong>.
+
+<h3 id="obtain-aggregatable-report-shared-info">Obtaining an aggregatable report's shared info</h3>
+
+An [=aggregatable report=] |report|'s <dfn for="aggregatable report">shared info</dfn> is the result
+of running the following steps:
+
+1. Let |reportingOrigin| be |report|'s [=aggregatable report/reporting endpoint=].
+1. Let |sharedInfo| be an [=ordered map=] of the following key/value pairs:
+
+    : "`api`"
+    :: "`attribution-reporting`"
+    : "`attribution destination`"
+    :: |report|'s [=aggregatable report/effective attribution destination=], <a href="https://html.spec.whatwg.org/multipage/origin.html#serialization-of-a-site">serialized</a>
+    : "`report_id`"
+    :: |report|'s [=aggregatable report/report ID=]
+    : "`reporting_origin`"
+    :: |reportingOrigin|, [=serialization of an origin|serialized=]
+    : "`scheduled_report_time`"
+    :: |report|'s [=aggregatable report/original report time=] in seconds since the UNIX epoch, [=serialize an integer|serialized=]
+    : "`source_registration_time`"
+    :: |report|'s [=aggregatable report/source time=] in seconds since the UNIX epoch, rounded down
+        to a multiple of a whole day (86400 seconds), [=serialize an integer|serialized=]
+    : "`version`"
+    :: A [=string=], API version.
+
+1. If |report|'s [=aggregatable report/debug mode=] is <strong>enabled</strong>,
+    set |sharedInfo|["`debug_mode`"] to "`enabled`".
+1. Return the [=string=] resulting from executing [=serialize an infra value to a json string=] on |sharedInfo|.
+
+<h3 id="obtain-aggregatable-report-aggregation-service-payloads">Obtaining an aggregatable report's aggregation service payloads</h3>
+
+To <dfn>obtain the public key for encryption</dfn> given an optional [=aggregation coordinator=]
+|aggregationCoordinator|, asynchronously return a user-agent-determined public key
+or an error in the event that the user agent failed to obtain the public key.
+A user-agent-determined default [=aggregation coordinator=] should be used if
+|aggregationCoordinator| is null.
+
+Note: The user agent might enforce weekly key rotation. If there are multiple keys, the user agent
+might independently pick a key uniformly at random for every encryption operation.
+The key should be uniquely identifiable.
+
+An [=aggregatable report=] |report|'s <dfn for="aggregatable report">plaintext payload</dfn>
+is the result of running the following steps:
+
+1. Let |payloadData| be a new [=list/is empty|empty=] [=list=].
+1. [=list/iterate|For each=] |contribution| of |report|'s [=aggregatable report/contributions=]:
+    1. Let |contributionData| be a [=map=] of the following key/value pairs:
+
+        : "`bucket`"
+        :: |contribution|'s [=aggregatable contribution/key=], [=encode an unsigned k-bit integer|encoded=]
+        : "`value`"
+        :: |contribution|'s [=aggregatable contribution/value=], [=encode an unsigned k-bit integer|encoded=]
+
+    1. [=list/Append=] |contributionData| to |payloadData|.
+1. Let |payload| be a [=map=] of the following key/value pairs:
+
+    : "`data`"
+    :: |payloadData|
+    : "`operation`"
+    :: "`histogram`"
+
+1. Return the [=byte sequence=] resulting from [[!RFC8949|CBOR encoding]] |payload|.
+
+To <dfn>obtain the encrypted payload</dfn> given an [=aggregatable report=] |report| and
+a public key |pkR|, run the following steps:
+
+1. Let |plaintext| be |report|'s [=aggregatable report/plaintext payload=].
+1. Let |encodedSharedInfo| be |report|'s [=aggregatable report/shared info=], [=utf-8 encode|encoded=].
+1. Let |info| be the [=string/concatenate|concatenation=] of «"`aggregation_service`", |encodedSharedInfo|».
+1. Set up [[RFC9180|HPKE]] [[RFC9180#name-encryption-to-a-public-key|sender's context]]
+    with |pkR| and |info|.
+1. Return the [=byte sequence=] or an error resulting from [[RFC9180#name-encryption-and-decryption|encrypting]]
+    |plaintext| with the [[RFC9180#name-encryption-to-a-public-key|sender's context]].
+
+To <dfn>obtain the aggregation service payloads</dfn> given an [=aggregatable report=] |report|,
+run the following steps:
+
+1. Let |pkR| be the result of running [=obtain the public key for encryption=]
+    with |report|'s [=aggregatable report/aggregation coordinator=].
+1. If |pkR| is an error, return |pkR|.
+1. Let |encryptedPayload| be the result of running [=obtain the encrypted payload=] with |report| and |pkR|.
+1. If |encryptedPayload| is an error, return |encryptedPayload|.
+1. Let |aggregationServicePayloads| be a new [=list/is empty|empty=] [=list=].
+1. Let |aggregationServicePayload| be a [=map=] of the following key/value pairs:
+
+    : "`payload`"
+    :: |encryptedPayload|, [=forgiving-base64 encode|base64 encoded=]
+    : "`key_id`"
+    :: A [=string=] identifying |pkR|
+
+1. If |report|'s [=aggregatable report/debug mode=] is <strong>enabled</strong>,
+    set |aggregationServicePayload|["`debug_cleartext_payload`"] to |report|'s
+    [=aggregatable report/plaintext payload=], [=forgiving-base64 encode|base64 encoded=].
+1. [=list/Append=] |aggregationServicePayload| to |aggregationServicePayloads|.
+1. Return |aggregationServicePayloads|.
+
+<h3 id="serialize-report-body">Serialize attribution report body</h3>
+
+To <dfn>obtain an event-level report body</dfn> given an [=attribution report=] |report|, run the following steps:
+
+1. Let |data| be a [=map=] of the following key/value pairs:
+
+    : "`attribution_destination`"
+    :: |report|'s [=event-level report/attribution destinations=], [=serialize attribution destinations|serialized=].
+    : "`randomized_trigger_rate`"
+    :: |report|'s [=event-level report/randomized trigger rate=]
+    : "`source_type`"
+    :: |report|'s [=event-level report/source type=]
+    : "`source_event_id`"
+    :: |report|'s [=event-level report/event ID=], [=serialize an integer|serialized=]
+    : "`trigger_data`"
+    :: |report|'s [=event-level report/trigger data=], [=serialize an integer|serialized=]
+    : "`report_id`"
+    :: |report|'s [=event-level report/report ID=]
+    : "`scheduled_report_time`"
+    :: |report|'s [=event-level report/original report time=] in seconds since the UNIX epoch, [=serialize an integer|serialized=]
+
+1. If |report|'s [=event-level report/source debug key=] is not null, [=map/set=]
+    |data|["`source_debug_key`"] to |report|'s [=event-level report/source debug key=],
+    [=serialize an integer|serialized=].
+1. If |report|'s [=event-level report/trigger debug key=] is not null, [=map/set=]
+    |data|["`trigger_debug_key`"] to |report|'s [=event-level report/trigger debug key=],
+    [=serialize an integer|serialized=].
+1. Return |data|.
+
+To <dfn>serialize an [=event-level report=]</dfn> |report|, run the following steps:
+
+1. Let |data| be the result of running [=obtain an event-level report body=] with |report|.
+1. Return the [=byte sequence=] resulting from executing [=serialize an infra value to JSON bytes=] on |data|.
+
+To <dfn>serialize an [=aggregatable report=] </dfn> |report|, run the following steps:
+
+1. [=Assert=]: |report|'s [=aggregatable report/effective attribution destination=] is not the [=opaque origin=].
+1. Let |aggregationServicePayloads| be the result of running [=obtain the aggregation service payloads=].
+1. If |aggregationServicePayloads| is an error, return |aggregationServicePayloads|.
+1. Let |data| be a [=map=] of the following key/value pairs:
+
+    : "`shared_info`"
+    :: |report|'s [=aggregatable report/shared info=].
+    : "`aggregation_service_payloads`"
+    :: |aggregationServicePayloads|
+
+1. If |report|'s [=aggregatable report/source debug key=] is not null, [=map/set=]
+    |data|["`source_debug_key`"] to |report|'s [=aggregatable report/source debug key=],
+    [=serialize an integer|serialized=].
+1. If |report|'s [=aggregatable report/trigger debug key=] is not null, [=map/set=]
+    |data|["`trigger_debug_key`"] to |report|'s [=aggregatable report/trigger debug key=],
+    [=serialize an integer|serialized=].
+1. Return the [=byte sequence=] resulting from executing [=serialize an infra value to JSON bytes=] on |data|.
+
+To <dfn>serialize an [=attribution report=]</dfn> |report|, run the following steps:
+
+1. If |report| is an:
+    <dl class="switch">
+    <dt>[=event-level report=]</dt>
+    <dd>Return the result of running [=serialize an event-level report=] with |report|.</dd>
+
+    <dt>[=aggregatable report=]</dt>
+    <dd>Return the result of running [=serialize an aggregatable report=] with |report|.</dd>
+    <dl>
+
+Note: The inclusion of "`report_id`" in the report body is intended to allow the report recipient
+to perform deduplication and prevent double counting, in the event that the user agent retries
+reports on failure. To prevent the report recipient from learning additional information about
+whether a user is online, retries might be limited in number and subject to random delays.
+
+<h3 id="serialize-debug-report-body">Serialize attribution debug report body</h3>
+
+To <dfn>serialize an [=attribution debug report=]</dfn> |report|, run the following steps:
+
+1. Let |collection| be an [=list/is empty|empty=] [=list=].
+1. [=list/iterate|For each=] |debugData| of |report|'s [=attribution debug report/data=]:
+    1. Let |data| be a [=map=] of the following key/value pairs:
+        : "`type`"
+        :: |debugData|'s [=attribution debug data/data type=]
+        : "`body`"
+        :: |debugData|'s [=attribution debug data/body=]
+    1. [=list/Append=] |data| to |collection|.
+1. Return the [=byte sequence=] resulting from executing [=serialize an Infra value to JSON bytes=] on |collection|.
+
+<h3 id="get-report-url">Get report request URL</h3>
+
+To <dfn>generate a report URL</dfn> given a [=suitable origin=] |reportingOrigin| and a [=list=] of [=strings=] |path|:
+
+1. Let |reportUrl| be a new [=URL=] record.
+1. Set |reportUrl|'s [=url/scheme=] to |reportingOrigin|'s [=origin/scheme=].
+1. Set |reportUrl|'s [=url/host=] to |reportingOrigin|'s [=origin/host=].
+1. Set |reportUrl|'s [=url/port=] to |reportingOrigin|'s [=origin/port=].
+1. Let |fullPath| be «"`.well-known`", "`attribution-reporting`"».
+1. [=list/Append=] |path| to |fullPath|.
+1. Set |reportUrl|'s [=url/path=] to |path|.
+1. Return |reportUrl|.
+
+To <dfn>generate an attribution report URL</dfn> given an [=attribution report=] |report| and an optional
+[=boolean=] <dfn for="generate an attribution report URL"><var>isDebugReport</var></dfn> (default false):
+
+1. Let |path| be an [=list/is empty|empty=] [=list=].
+1. If |isDebugReport| is true, [=list/append=] "`debug`" to |path|.
+1. If |report| is an:
+    <dl class="switch">
+    <dt>[=event-level report=]</dt>
+    <dd>[=list/Append=] "`report-event-attribution`" to |path|.</dd>
+
+    <dt>[=aggregatable report=]</dt>
+    <dd>[=list/Append=] "`report-aggregate-attribution`" to |path|.</dd>
+    </dl>
+1. Return the result of running [=generate a report URL=] with |report|'s
+    [=attribution report/reporting endpoint=] and |path|.
+
+To <dfn>generate an attribution debug report URL</dfn> given an [=attribution debug report=] |report|:
+
+1. Let |path| be «"`debug`", "`verbose`"».
+1. Return the result of running [=generate a report URL=] with |report|'s
+    [=attribution debug report/reporting endpoint=] and |path|.
+
+<h3 id="create-report-request">Creating a report request</h3>
+
+To <dfn>create a report request</dfn> given a [=URL=] |url|, a [=byte sequence=] |body|,
+and a [=header list=] |newHeaders| (defaults to an empty [=list=]):
+
+1. Let |headers| be a new [=header list=] containing a [=header=] named
+    "`Content-Type`" whose value is "`application/json`".
+1. [=list/iterate|For each=] |header| in |newHeaders|:
+    1. [=header list/Append=] |header| to |headers|.
+1. Let |request| be a new [=request=] with the following properties:
+    :   [=request/method=]
+    ::  "`POST`"
+    :   [=request/URL=]
+    ::  |url|
+    :   [=request/header list=]
+    ::  |headers|
+    :   [=request/body=]
+    ::  A [=/body=] whose [=body/source=] is |body|.
+    :   [=request/referrer=]
+    :: "`no-referrer`"
+    :   [=request/client=]
+    ::  `null`
+    :   [=request/window=]
+    ::  "`no-window`"
+    :   [=request/service-workers mode=]
+    ::  "`none`"
+    :   [=request/initiator=]
+    ::  ""
+    :   [=request/mode=]
+    ::  "`cors`"
+    :   [=request/unsafe-request flag=]
+    ::  set
+    :   [=request/credentials mode=]
+    ::  "`omit`"
+    :   [=request/cache mode=]
+    ::  "`no-store`"
+1. Return |request|.
+
+<h3 id="issue-report-request">Issuing a report request</h3>
+
+This algorithm constructs a [=request=] and attempts to deliver it to a [=suitable origin=].
+
+To <dfn>remove a report from the cache</dfn> given an [=attribution report=] |report|:
+
+1. If |report| is an:
+    <dl class="switch">
+    <dt>[=event-level report=]</dt>
+    <dd>[=Queue a task=] to [=list/remove=] |report| from the [=event-level report cache=].</dd>
+
+    <dt>[=aggregatable report=]</dt>
+    <dd>[=Queue a task=] to [=list/remove=] |report| from the [=aggregatable report cache=].</dd>
+    </dl>
+
+To <dfn>attempt to deliver a report</dfn> given an [=attribution report=] |report|, run the following steps:
+
+1. Let |url| be the result of executing [=generate an attribution report URL=] on |report|.
+1. Let |data| be the result of executing [=serialize an attribution report=] on |report|.
+1. If |data| is an error, run [=remove a report from the cache=] with |report| and return.
+1. Let |newHeaders| be a new [=header list=].
+1. If |report| is an [=aggregatable report=]:
+    1. If |report|'s [=aggregatable report/serialized private state token=] is not null,
+        [=header list/append=] a new [=header=] named "`Sec-Attribution-Reporting-Private-State-Token`" to |newHeaders|
+        whose value is |report|'s [=aggregatable report/serialized private state token=].
+1. Let |request| be the result of executing [=create a report request=] on |url|, |data|, and |newHeaders|.
+1. [=Queue a task=] to [=fetch=] |request| with [=fetch/processResponse=] being [=remove a report from the cache=] with |report|.
+
+Issue(220): This fetch should use a network partition key for an opaque origin.
+
+A user agent MAY retry this algorithm in the event that there was an error.
+
+<h3 id="issue-debug-report-request">Issuing a debug report request</h3>
+
+To <dfn>attempt to deliver a debug report</dfn> given an [=attribution report=] |report|:
+
+1. Let |url| be the result of executing [=generate an attribution report URL=] on |report| with
+    [=generate an attribution report URL/isDebugReport=] set to true.
+1. Let |data| be the result of executing [=serialize an attribution report=] on |report|.
+1. If |data| is an error, return.
+1. Let |request| be the result of executing [=create a report request=] on |url| and |data|.
+1. [=Fetch=] |request|.
+
+<h3 id="issue-verbose-debug-report-request">Issuing a verbose debug request</h3>
+
+To <dfn>attempt to deliver a verbose debug report</dfn> given an [=attribution debug report=] |report|:
+
+1. Let |url| be the result of executing [=generate an attribution debug report URL=] on |report|.
+1. Let |data| be the result of executing [=serialize an attribution debug report=] on |report|.
+1. Let |request| be the result of executing [=create a report request=] on |url| and |data|.
+1. [=Fetch=] |request|.
+
+Issue(220): This fetch should use a network partition key for an opaque origin.
+
+A user agent MAY retry this algorithm in the event that there was an error.
+
+# Security considerations # {#security-considerations}
+TODO
+
+# Privacy consideration # {#privacy-considerations}
+TODO
+
+<h3 id="clearing-attribution-storage">Clearing attribution storage</h3>
+
+A user agent's [=attribution caches=] contain data about a user's web activity. When a user agent clears an origin's storage,
+it MUST also [=list/remove=] entries in the [=attribution caches=] whose [=attribution source/source origin=],
+[=attribution source/attribution destinations=], [=attribution source/reporting endpoint=],
+[=event-level report/attribution destinations=], or [=event-level report/reporting endpoint=]
+is the [=same origin|same=] as the cleared origin.
+
+A user agent MAY clear [=attribution cache=] entries at other times. For example, when a user agent clears
+an origin from a user's browsing history.

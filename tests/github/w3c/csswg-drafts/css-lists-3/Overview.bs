@@ -744,7 +744,8 @@ Automatic Numbering With Counters</h2>
 	which are inherited through the document tree in a way similar to inherited property values.
 	[=Counters=] have a <dfn export for="CSS counter">name</dfn> and <dfn export for="CSS counter">creator</dfn>,
 	which identify the counter,
-	and an integer <dfn export for="CSS counter">value</dfn>.
+	a boolean <dfn export for="CSS counter">reversed</dfn> (false by default),
+	and an integer <dfn export for="CSS counter">value</dfn> (optional when the counter is <a>reversed</a>).
 	They are created and manipulated with
 	the <dfn export>counter properties</dfn> 'counter-increment', 'counter-set' and 'counter-reset',
 	and used with the ''counter()'' and ''counters()'' [=functional notations=].
@@ -754,6 +755,13 @@ Automatic Numbering With Counters</h2>
 	which represents their name as a <<custom-ident>>.
 	A <<counter-name>> name cannot match the keyword ''counter-reset/none'';
 	such an identifier is [=invalid=] as a <<counter-name>>.
+
+	A <a>reversed</a> counter is created with the ''reversed()'' [=functional notation=],
+	which is defined as follows:
+
+	<pre class="prod">
+		<dfn><<reversed-counter-name>></dfn> = reversed( <<counter-name>> )
+	</pre>
 
 	Resolving [=counter=] values on a given element is a multi-step process:
 
@@ -774,12 +782,12 @@ Creating Counters: the 'counter-reset' property</h3>
 
 	<pre class="propdef">
 	Name: counter-reset
-	Value: [ <<counter-name>> <<integer>>? ]+ | none
+	Value: [ <<counter-name>> <<integer>>? | <<reversed-counter-name>> <<integer>>? ]+ | none
 	Initial: none
 	Applies to: all elements
 	Inherited: no
 	Percentages: n/a
-	Computed value: the keyword ''counter-reset/none'' or a list, each item an identifier paired with an integer
+	Computed value: the keyword ''counter-reset/none'' or a list, each item an identifier or a ''reversed()'' function paired with an integer
 	Animation type: by computed value type
 	</pre>
 
@@ -799,6 +807,12 @@ Creating Counters: the 'counter-reset' property</h3>
 			[=Instantiates=] a counter of the given <<counter-name>>
 			with a starting value of the given <<integer>>,
 			defaulting to ''0''.
+
+		<dt><dfn><<reversed-counter-name>> <<integer>>?</dfn>
+		<dd>
+			[=Instantiates=] a <a>reversed</a> counter of the given <<counter-name>>
+			with a starting value of the given <<integer>>,
+			or no starting value if not given.
 	</dl>
 
 	<div class='example' highlight=css>
@@ -858,7 +872,7 @@ Manipulating Counter Values: the 'counter-increment' and 'counter-set' propertie
 	if there is no counter of the given name on the element yet.
 	Their values are defined as follows:
 
-	<dl dfn-type=value dfn-for="counter-set counter-increment">
+	<dl dfn-type=value dfn-for="counter-set,counter-increment">
 		<dt><dfn>none</dfn>
 		<dd>
 			This element does not alter the value of any counters.
@@ -993,7 +1007,8 @@ Creating and Inheriting Counters</h3>
 	whose values are each a [=tuple=] of:
 	a [=string=] (representing a counter’s [=name=]),
 	an element (representing the counter’s [=creator=]),
-	and an integer (representing the counter’s [=value=]).
+	a boolean (representing whether the counter is [=reversed=]),
+	and optionally an integer (representing the counter’s [=value=]).
 	The latest [=counter=] of a given name in that set
 	represents the <dfn>innermost</dfn> counter of that name.
 
@@ -1106,8 +1121,9 @@ Instantiating Counters</h4>
 		see [[#nested-counters]].)
 		To <dfn lt="instantiate counter" local-lt="instantiate">instantiate a counter</dfn>
 		of a given |name|
-		on an |element|
-		with a starting |value|:
+		on an |element|,
+		optionally |reversed|,
+		with an optional starting |value|:
 
 		1. Let |counters| be |element|’s [=CSS counters set=].
 
@@ -1120,8 +1136,37 @@ Instantiating Counters</h4>
 		3. [=set/Append=] a new [=counter=] to |counters|
 			with name |name|,
 			originating element |element|,
-			and initial value |value|
+			reversed being |reversed|,
+			and initial value |value| (if given)
 	</div>
+
+	When a [=counter=] is [=instantiated=] without an initial value,
+	the user agent must dynamically calculate the initial value at layout-time
+	to be the value returned by the following algorithm:
+
+	1. Let |num| be 0.
+
+	2. Let |first| be true.
+
+	3. For each element or pseudo-element |el| that increments or
+		sets the same counter in the same [=scope=]:
+
+		1. Let |incrementNegated| be |el|'s 'counter-increment' integer value for this counter,
+			multiplied by -1.
+
+		2. If |first| is true,
+			then add |incrementNegated| to |num| and
+			set |first| to false.
+
+		3. If |el| sets this counter with 'counter-set',
+			then add that integer value to |num| and
+			break this loop.
+
+		4. Add |incrementNegated| to |num|.
+
+	4. Return |num|.
+
+	Note: Only [=reversed=] counters can be instantiated without an initial value.
 
 <h3 id='counters-without-boxes'>
 Counters in elements that do not generate boxes</h3>
@@ -1171,8 +1216,10 @@ The Implicit ''list-item'' Counter</h3>
 	unless the 'counter-increment' property explicitly specifies
 	a different increment for the ''list-item'' counter,
 	it must be incremented by 1 on every [=list item=],
+	or if the counter is <a>reversed</a>,
+	it must be incremented by -1 on every [=list item=] instead,
 	at the same time that <a>counters</a> are normally incremented
-	(exactly as if the [=list item=] had ''list-item 1'' appended to their 'counter-increment' value,
+	(exactly as if the [=list item=] had ''list-item 1'' or ''list-item -1'' appended to their 'counter-increment' value,
 	including side-effects such as possibly [=instantiating=] a new [=counter=], etc).
 	This does not affect the [=specified value|specified=] or [=computed values=]
 	of 'counter-increment'.
@@ -1304,7 +1351,7 @@ Outputting Counters: the ''counter()'' and ''counters()'' functions</h3>
 	whose [=used values=] represent counter values as strings or images.
 	They are defined as follows:
 
-	<pre>
+	<pre class="prod">
 		<dfn><<counter>></dfn> = <<counter()>> | <<counters()>>
 		<dfn>counter()</dfn>  =  counter( <<counter-name>>, <<counter-style>>? )
 		<dfn>counters()</dfn> = counters( <<counter-name>>, <<string>>, <<counter-style>>? )
@@ -1335,6 +1382,11 @@ Outputting Counters: the ''counter()'' and ''counters()'' functions</h3>
 
 	In both cases,
 	if the <<counter-style>> argument is omitted it defaults to ''decimal''.
+
+	Note: If the <<counter-style>> is one of the predefined symbolic styles,
+	like ''disc'',
+	it might look different than when used in 'list-style-type'.
+	See [[css-counter-styles-3#simple-symbolic]].
 
 	If no [=counter=] named <<counter-name>> exists
 	on an element where ''counter()'' or ''counters()'' is used,
@@ -1487,9 +1539,6 @@ Appendix A: Sample Style Sheet For HTML</h2>
 	this sample style sheet is provided to illustrate the CSS features
 	using familiar markup conventions.</em>
 
-	ISSUE: Discussion of how to support <code>ol[reversed]</code> list numbering in CSS is ongoing.
-	See, e.g. <a href="https://github.com/w3c/csswg-drafts/issues/4181">Issue 4181</a>.
-
 	<pre>
 		/* Set up list items */
 		li {
@@ -1525,16 +1574,13 @@ Appendix A: Sample Style Sheet For HTML</h2>
 			counter-set: list-item attr(value integer, 1);
 		}
 
-<!--
 		/* Handling reversed lists */
 		ol[reversed] {
-			counter-reset: list-item calc(attr(start integer, **magic**) + 1);
-			/* Where **magic** is the number of child &lt;li> elements. */
+			counter-reset: reversed(list-item);
 		}
-		ol[reversed] > li {
-			/* HTML implies 'counter-increment: list-item -1' */
+		ol[reversed][start] {
+			counter-reset: reversed(list-item) calc(attr(start integer) + 1);
 		}
--->
 
 		/* Box Model Rules */
 		ol, ul {

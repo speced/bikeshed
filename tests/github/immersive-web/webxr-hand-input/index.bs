@@ -5,24 +5,19 @@ Group: immersivewebwg
 Status: ED
 TR: https://www.w3.org/TR/webxr-hand-input-1/
 ED: https://immersive-web.github.io/webxr-hand-input/
-Previous Version: https://www.w3.org/TR/2020/WD-webxr-hand-input-1-20201022/
+Previous Version: https://www.w3.org/TR/2020/WD-webxr-hand-input-1-20210824/
 Repository: immersive-web/webxr-hand-input
 Level: 1
-Mailing List Archives: https://lists.w3.org/Archives/Public/public-immersive-web/
+Mailing List Archives: https://lists.w3.org/Archives/Public/public-immersive-web-wg/
 
 !Participate: <a href="https://github.com/immersive-web/webxr-hand-input/issues/new">File an issue</a> (<a href="https://github.com/immersive-web/webxr-hand-input/issues">open issues</a>)
-!Participate: <a href="https://lists.w3.org/Archives/Public/public-immersive-web/">Mailing list archive</a>
+!Participate: <a href="https://lists.w3.org/Archives/Public/public-immersive-web-wg/">Mailing list archive</a>
 !Participate: <a href="irc://irc.w3.org:6665/">W3C's #immersive-web IRC</a>
 
-Editor: Manish Goregaokar 109489, Invited Expert [Mozilla until 2020], manishsmail@gmail.com
+Editor: Manish Goregaokar 109489, Google [Mozilla until 2020], manishsmail@gmail.com
 
 Abstract: The WebXR Hand Input module expands the <a href="https://www.w3.org/TR/webxr/">WebXR Device API</a> with the functionality to track articulated hand poses.
 
-Warning: custom
-Custom Warning Title: Unstable API
-Custom Warning Text:
-  <b>The API represented in this document is under development and may change at any time.</b>
-  <p>For additional context on the use of this API please reference the <a href="https://github.com/immersive-web/webxr-hand-input/blob/master/explainer.md">Hand Input Module Explainer</a>.</p>
 Status Text: This WebXR Augmented Reality Module is designed as a module to be implemented in addition to <a href="https://www.w3.org/TR/webxr/">WebXR Device API</a>, and is originally included in WebXR Device API which was divided into core and modules.
 </pre>
 
@@ -68,7 +63,6 @@ Status Text: This WebXR Augmented Reality Module is designed as a module to be i
     border-style: solid;
     border-width: 1px;
     background: var(--def-bg);
-    color: #fff;
     font-family: sans-serif;
     font-weight: bold;
     border-color: var(--def-border);
@@ -99,6 +93,8 @@ spec: webxr-1;
     type: dfn; text: time; for: XRFrame
     type: dfn; text: session; for: XRSpace
     type: dfn; text: input profile name; for: XRInputSource
+    type: dfn; text: primary action; for: /
+    type: dfn; text: primary squeeze action; for: /
 spec:infra; type:dfn; text:list
 spec:webxr-ar-module-1; type:enum-value; text:"immersive-ar"
 spec:webidl;
@@ -115,9 +111,9 @@ Introduction {#intro}
 ============
 
 <section class="non-normative">
-On some [=/XR devices=] it is possible to get fully articulated information about the user's hands when they are use as input sources.
+On some [=/XR devices=] it is possible to get fully articulated information about the user's hands when they are used as input sources.
 
-This API exposes the poses of each of the users' hand [=skeleton joint=]s. This can be used to do gesture detection or to render a hand model in VR scenarios.
+This API exposes the poses of each of the users' hand [=skeleton joints=]. This can be used to do gesture detection or to render a hand model in VR scenarios.
 
 </section>
 
@@ -129,7 +125,7 @@ If an application wants to view articulated hand pose information during a sessi
 the session MUST be requested with an appropriate [=feature descriptor=]. The string "<dfn for="feature descriptor">hand-tracking</dfn>" is introduced
 by this module as a new valid [=feature descriptor=] for articulated hand tracking.
 
-The "[=hand-tracking=]" [=feature descriptor=] should only be granted for an {{XRSession}} its [=XRSession/XR device=] has [=physical hand input sources=] that [=supports hand tracking=].
+The "[=hand-tracking=]" [=feature descriptor=] should only be granted for an {{XRSession}} when its [=XRSession/XR device=] has [=physical hand input sources=] that [=support hand tracking=].
 
 The user agent MAY gate support for hand based {{XRInputSource|XRInputSources}} based upon this [=feature descriptor=].
 
@@ -138,7 +134,7 @@ NOTE: This means that if an {{XRSession}} does not request the "[=hand-tracking=
 Physical Hand Input Sources {#physical-hand}
 ===========================
 
-An {{XRInputSource}} is a <dfn>physical hand input source</dfn> if it tracks a physical hand. A [=physical hand input source=] <dfn>supports hand tracking</dfn> if it supports reporting the poses of one or more [=skeleton joint=]s defined in this specification.
+An {{XRInputSource}} is a <dfn>physical hand input source</dfn> if it tracks a physical hand. A [=physical hand input source=] <dfn>supports hand tracking</dfn> if it supports reporting the poses of one or more [=skeleton joints=] defined in this specification.
 
 [=Physical hand input sources=] MUST include the [=XRInputSource/input profile name=] of "generic-hand-select" in their {{XRInputSource/profiles}}.
 
@@ -149,7 +145,7 @@ XRInputSource {#xrinputsource-interface}
 
 <pre class="idl">
 partial interface XRInputSource {
-   readonly attribute XRHand? hand;
+   [SameObject] readonly attribute XRHand? hand;
 };
 </pre>
 
@@ -166,7 +162,7 @@ A [=skeleton joint=] for a given hand can be uniquely identified by a <dfn>skele
 
 A [=skeleton joint=] may have an <dfn>associated bone</dfn> that it is named after and used to orient its <code>-Z</code> axis. The [=associated bone=] of a [=skeleton joint=] is the bone that comes after the joint when moving towards the fingertips. The tip and wrist joints have no [=associated bones=].
 
-A [=skeleton joint=] has a <dfn for="skeleton joint">radius</dfn> which is the radius of a sphere placed at its center so that it roughly touches the skin on both sides of the hand.
+A [=skeleton joint=] has a <dfn for="skeleton joint">radius</dfn> which is the radius of a sphere placed at its center so that it roughly touches the skin on both sides of the hand. The "tip" [=skeleton joints=] SHOULD have an appropriate nonzero radius so that collisions with the fingertip may work. Implementations MAY offset the origin of the tip joint so that it can have a spherical shape with nonzero radius.
 
 This <dfn>list of joints</dfn> defines the following [=skeleton joints=] and their order:
 
@@ -208,7 +204,7 @@ This <dfn>list of joints</dfn> defines the following [=skeleton joints=] and the
 </tbody>
 </table>
 
-<img src="images/hand-layout.svg" style="background-color: transparent" alt="Visual aid demonstrating joint layout">
+<img src="images/hand-layout.svg" width="104" height="143" style="background-color: transparent; width: 390px; height: auto;" alt="Visual aid demonstrating joint layout">
 
 XRHand {#xrhand-interface}
 ------
@@ -299,7 +295,7 @@ interface XRJointSpace: XRSpace {
 
 The [=native origin=] of an {{XRJointSpace}} is the position and orientation of the underlying [=XRJointSpace/joint=].
 
-The [=native origin=] of the {{XRJointSpace}} may only be reported when [=native origins=] of all other {{XRJointSpace}}s on the same [=XRJointSpace/hand=] are being reported. When a hand is partially obscured the user agent MAY emulate the obscured joints, or it MAY report <code>null</code> poses for all of the joints.
+The [=native origin=] of the {{XRJointSpace}} may only be reported when [=native origins=] of all other {{XRJointSpace}}s on the same [=XRJointSpace/hand=] are being reported. When a hand is partially obscured the user agent MUST either emulate the obscured joints, or report null poses for all of the joints.
 
 Note: This means that when fetching poses you will either get an entire hand or none of it.
 
@@ -364,13 +360,20 @@ When this method is invoked on an {{XRFrame}} |frame|, the user agent MUST run t
   1. let |offset| be a new number with the initial value of <code>0</code>.
   1. Let |allValid| be <code>true</code>.
   1. For each |joint| in the |jointSpaces|:
-    1. Set the float value of |radii| at |offset| to <code>NaN</code>.
-    1. If the user agent can determine the pose of |joint|, set the float value of |radii| at |offset| to that [=skeleton joint/radius=].
-    1. If the user agent cannot determine the pose of |joint|, set |allValid| to <code>false</code>.
+    1. Set the float value of |radii| at |offset| as follows:
+        <dl class="switch">
+          <dt> If the user agent can determine the poses of all the joints belonging to the |joint|'s [=XRJointSpace/hand=]:
+            <dd> Set the float value of |radii| at |offset| to that [=skeleton joint/radius=].
+          <dt> Otherwise
+            <dd> Set the float value of |radii| at |offset| to <code>NaN</code>.
+            <dd> Set |allValid| to <code>false</code>.
+        </dl>
     1. Increase |offset| by <code>1</code>.
   1. Return |allValid|.
 
 </div>
+
+NOTE: if the user agent can't determine the pose of any of the spaces belonging to the same {{XRHand}}, all the spaces of that {{XRHand}} must also not have a pose.
 
 <div class="algorithm" data-algorithm="fill-poses">
 
@@ -404,6 +407,8 @@ When this method is invoked on an {{XRFrame}} |frame|, the user agent MUST run t
   1. Return |allValid|.
 
 </div>
+
+NOTE: if any of the spaces belonging to the same {{XRHand}} return <code>null</code> when [=Populate the pose|populating the pose=], all the spaces of that {{XRHand}} must also return <code>null</code> when [=Populate the pose|populating the pose=]
 
 XRJointPose {#xrjointpose-interface}
 -----------
@@ -445,3 +450,16 @@ When anonymizing the hands data, the UA can follow these guidelines:
  * Anonymization must be done in a trusted environment.
 
 </div>
+
+
+<h2 id="changes" class="no-num">
+Changes</h2>
+
+<h3 id="changes-from-20201022" class="no-num">
+Changes from the <a href="https://www.w3.org/TR/2020/WD-webxr-hand-input-1-20201022/">First Public Working Draft 22 October 2020</a></h3>
+
+- Mention grasp profile (<a href="https://github.com/immersive-web/webxr-hand-input/pull/68">GitHub #68</a>)
+- Change from constants to enums + change XRHand into a map (<a href="https://github.com/immersive-web/webxr-hand-input/pull/71">GitHub #71</a>)
+- Added additional clarification in security section (<a href="https://github.com/immersive-web/webxr-hand-input/pull/87">GitHub #87</a>)
+- Marked hand as sameobject + added a clarifying note (<a href="https://github.com/immersive-web/webxr-hand-input/pull/93">GitHub #93</a>)
+- Nonzero radius for tip (<a href="https://github.com/immersive-web/webxr-hand-input/pull/111">GitHub #111</a>)

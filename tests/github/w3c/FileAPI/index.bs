@@ -11,7 +11,6 @@ Status: ED
 ED: https://w3c.github.io/FileAPI/
 TR: https://www.w3.org/TR/FileAPI/
 Repository: w3c/FileAPI
-Previous Version: https://www.w3.org/TR/2019/WD-FileAPI-20190531/
 !Tests: <a href=https://github.com/web-platform-tests/wpt/tree/master/FileAPI>web-platform-tests FileAPI/</a> (<a href=https://github.com/web-platform-tests/wpt/labels/FileAPI>ongoing work</a>)
 Abstract: This specification provides an API for representing file objects in web applications,
   as well as programmatically selecting them and accessing their data. This includes:
@@ -51,14 +50,14 @@ spec: html
   type: element
     text: a
     text: iframe
+  type: element-attr
+    text: download; for: a
 spec: infra
   type: dfn
     text: list
     text: string
     text: code point
 spec: streams
-  type:interface
-    text:ReadableStream
   type: dfn
     text: chunk
 spec: url
@@ -66,9 +65,6 @@ spec: url
     text: url; for:/
   type: interface
     text: URL
-spec: fetch
-  type:interface
-    text:ReadableStream
 </pre>
 
 <pre class="anchors">
@@ -197,6 +193,73 @@ The term <dfn id="UnixEpoch">Unix Epoch</dfn> is used in this specification to r
 (or 1970-01-01T00:00:00Z ISO 8601);
 this is the same time that is conceptually "<code>0</code>" in ECMA-262 [[ECMA-262]].
 
+<div algorithm>
+The <dfn export>slice blob</dfn> algorithm given a {{Blob}} <var>blob</var>, <var>start</var>,
+<var>end</var>, and <var>contentType</var> is used to refer to the following
+steps and returns a new {{Blob}} containing the bytes ranging from the <var>start</var> parameter
+up to but not including the <var>end</var> parameter. It must act as follows:
+
+1. Let <var>originalSize</var> be <var>blob</var>'s {{Blob/size}}.
+
+1. The <var>start</var> parameter, if non-null, is a value for the start point of a <a>slice blob</a>
+   call, and must be treated as a byte-order position, with the zeroth position representing the
+   first byte. User agents must normalize <var>start</var> according to the following:
+
+  <ol type="a">
+   <li>If <var>start</var> is null, let <var>relativeStart</var> be 0.
+
+   <li>If <var>start</var> is negative, let <var>relativeStart</var> be
+   <code>max((<var>originalSize</var> + <var>start</var>), 0)</code>.
+
+   <li>Otherwise, let <var>relativeStart</var> be
+   <code>min(<var>start</var>, <var>originalSize</var>)</code>.
+  </ol>
+
+1. The <var>end</var> parameter, if non-null. is a value for the end point of a <a>slice blob</a>
+   call. User agents must normalize <var>end</var> according to the following:
+
+  <ol type="a">
+    <li>If <var>end</var> is null, let <var>relativeEnd</var> be <var>originalSize</var>.
+
+    <li>If <var>end</var> is negative, let <var>relativeEnd</var> be
+    <code>max((<var>originalSize</var> + <var>end</var>), 0)</code>.
+
+    <li>Otherwise, let <var>relativeEnd</var> be
+    <code>min(<var>end</var>, <var>originalSize</var>)</code>.
+  </ol>
+
+1. The <var>contentType</var> parameter, if non-null, is used to set the ASCII-encoded string in
+   lower case representing the media type of the {{Blob}}. User agents must normalize
+   <var>contentType</var> according to the following:
+
+  <ol type="a">
+    <li>If <var>contentType</var> is null, let <var>relativeContentType</var> be set to the empty
+    string.
+
+    <li>Otherwise, let <var>relativeContentType</var> be set to <var>contentType</var> and run the
+    substeps below:
+      1. If <var>relativeContentType</var> contains any characters outside the range of U+0020 to
+        U+007E, then set <var>relativeContentType</var> to the empty string and return from these
+        substeps.
+      2. Convert every character in <var>relativeContentType</var> to [=ASCII lowercase=].
+  </ol>
+
+1. Let <var>span</var> be <code>max((<var>relativeEnd</var> - <var>relativeStart</var>), 0)</code>.
+
+1. Return a new {{Blob}} object <var>S</var> with the following characteristics:
+
+  <ol type="a">
+    <li><var>S</var> refers to <var>span</var> consecutive <a>byte</a>s from <var>blob</var>'s
+    associated <a>byte</a> sequence, beginning with the <a>byte</a> at byte-order position
+    <var>relativeStart</var>.
+
+    <li><var>S</var>.{{Blob/size}} = <var>span</var>.
+
+    <li><var>S</var>.{{Blob/type}} = <var>relativeContentType</var>.
+  </ol>
+
+</div>
+
 <!--
 ████████  ██        ███████  ████████
 ██     ██ ██       ██     ██ ██     ██
@@ -263,20 +326,23 @@ Their [=deserialization step=], given |serialized| and |value|, are:
 2. Set |value|'s underlying byte sequence to |serialized|.\[[ByteSequence]].
 
 <div algorithm="get stream">
-A {{Blob}} |blob| has an associated <dfn for=Blob>get stream</dfn> algorithm,
+A {{Blob}} |blob| has an associated <dfn export for=Blob>get stream</dfn> algorithm,
 which runs these steps:
 
-1. Let |stream| be the result of [=construct a ReadableStream object|constructing=] a
-   {{ReadableStream}} object.
+1. Let |stream| be a [=new=] {{ReadableStream}} created in |blob|'s [=relevant Realm=].
+1. [=ReadableStream/Set up=] |stream|.
 1. Run the following steps [=in parallel=]:
   1. While not all bytes of |blob| have been read:
-    1. Let |bytes| be the [=byte sequence=] that results from reading a [=chunk=] from |blob|.
-    1. If a [=file read error=] occured while reading |bytes|, [$ReadableStream/error$]
-       |stream| with a [=failure reason=] and abort these steps.
-    1. [=ReadableStream/Enqueue=] a `Uint8Array` object wrapping an `ArrayBuffer`
-       containing |bytes| into |stream|.
-       If that threw an exception, [$ReadableStream/error$] |stream| with that exception
-       and abort these steps.
+    1. Let |bytes| be the [=byte sequence=] that results from reading a [=chunk=] from |blob|, or
+       failure if a chunk cannot be read.
+    1. [=Queue a global task=] on the [=file reading task source=] given |blob|'s
+       [=relevant global object=] to perform the following steps:
+      1. If |bytes| is failure, then [=ReadableStream/error=] |stream| with a [=failure reason=] and
+         abort these steps.
+      1. Let |chunk| be a new {{Uint8Array}} wrapping an {{ArrayBuffer}} containing |bytes|. If
+         creating the {{ArrayBuffer}} throws an exception, then [=ReadableStream/error=] |stream|
+         with that exception and abort these steps.
+      1. [=ReadableStream/Enqueue=] |chunk| in |stream|.
 
     Issue: We need to specify more concretely what reading from a Blob actually does,
     what possible errors can happen, perhaps something about chunk sizes, etc.
@@ -484,58 +550,22 @@ run the following steps:
 
 ### The {{Blob/slice()}} method ### {#slice-method-algo}
 
+<div algorithm>
 The <dfn id="dfn-slice" method for=Blob lt="slice(start, end, contentType), slice(start, end), slice(start), slice()">slice()</dfn> method
-returns a new {{Blob}} object with bytes ranging from
-the optional {{start}} parameter
-up to but not including the optional {{end}} parameter,
-and with a {{Blob/type}} attribute that is the value of the optional {{contentType!!argument}} parameter.
-It must act as follows:
+returns a new {{Blob}} object with bytes ranging from the optional <var>start</var> parameter
+up to but not including the optional <var>end</var> parameter, and with a {{Blob/type}} attribute
+that is the value of the optional <var>contentType</var> parameter. It must act as follows:
 
-1. Let |O| be the {{Blob}} <a>context object</a> on which the {{slice()}} method is being called.
-2. The optional <dfn argument for="Blob/slice(start, end, contentType)" id="dfn-start">start</dfn> parameter
-  is a value for the start point of a {{slice()}} call,
-  and must be treated as a byte-order position,
-  with the zeroth position representing the first byte.
-  User agents must process {{Blob/slice()}} with {{start}} normalized according to the following:
+1. Let <var>sliceStart</var>, <var>sliceEnd</var>, and <var>sliceContentType</var> be null.
 
-  <ol type="a">
-    <li>If the optional {{start}} parameter is not used as a parameter when making this call, let |relativeStart| be 0.
-    <li>If {{start}} is negative, let |relativeStart| be <code>max(({{Blob/size}} + {{start}}), 0)</code>.
-    <li>Else, let |relativeStart| be <code>min(start, size)</code>.
-  </ol>
+1. If <var>start</var> is given, set <var>sliceStart</var> to <var>start</var>.
 
-3. The optional <dfn argument for="Blob/slice(start, end, contentType)" id="dfn-end">end</dfn> parameter
-  is a value for the end point of a {{slice()}} call.
-  User agents must process {{Blob/slice()}} with {{end}} normalized according to the following:
+1. If <var>end</var> is given, set <var>sliceEnd</var> to <var>end</var>.
 
-  <ol type="a">
-    <li>If the optional {{end}} parameter is not used as a parameter when making this call, let |relativeEnd| be {{Blob/size}}.
-    <li>If {{end}} is negative, let |relativeEnd| be <code>max((size + end), 0)</code>.
-    <li>Else, let |relativeEnd| be <code>min(end, size)</code>.
-  </ol>
+1. If <var>contentType</var> is given, set <var>sliceContentType</var> to <var>contentType</var>.
 
-4. The optional <dfn argument for="Blob/slice(start, end, contentType)" id="dfn-contentTypeBlob">contentType</dfn> parameter
-  is used to set the ASCII-encoded string in lower case representing the media type of the Blob.
-  User agents must process the {{Blob/slice()}} with {{contentType}} normalized according to the following:
-
-  <ol type="a">
-    <li>If the {{contentType}} parameter is not provided, let |relativeContentType| be set to the empty string.
-    <li>Else let |relativeContentType| be set to {{contentType}} and run the substeps below:
-      1. If |relativeContentType| contains any characters outside the range of U+0020 to U+007E,
-        then set |relativeContentType| to the empty string and return from these substeps.
-      2. Convert every character in |relativeContentType| to [=ASCII lowercase=].
-  </ol>
-
-5. Let |span| be <code>max((relativeEnd - relativeStart), 0)</code>.
-
-6. Return a new {{Blob}} object |S| with the following characteristics:
-
-  <ol type="a">
-    <li>|S| refers to |span| consecutive <a>byte</a>s from |O|,
-      beginning with the <a>byte</a> at byte-order position |relativeStart|.
-    <li>|S|.{{Blob/size}} = |span|.
-    <li>|S|.{{Blob/type}} = |relativeContentType|.
-  </ol>
+1. Return the result of <a>slice blob</a> given <a>this</a>, <var>sliceStart</var>,
+   <var>sliceEnd</var>, and <var>sliceContentType</var>.
 
 <div class="example">
   The examples below illustrate the different types of {{slice()}} calls possible. Since the
@@ -568,17 +598,18 @@ It must act as follows:
     }
   </pre>
 </div>
+</div>
 
 ### The {{Blob/stream()}} method ### {#stream-method-algo}
 
 The <dfn method for=Blob>stream()</dfn> method, when invoked, must return
-the result of calling [=get stream=] on the [=context object=].
+the result of calling [=get stream=] on [=this=].
 
 ### The {{Blob/text()}} method ### {#text-method-algo}
 
 The <dfn method for=Blob>text()</dfn> method, when invoked, must run these steps:
 
-1. Let |stream| be the result of calling [=get stream=] on the [=context object=].
+1. Let |stream| be the result of calling [=get stream=] on [=this=].
 1. Let |reader| be the result of [=get a reader|getting a reader=] from |stream|.
    If that threw an exception, return a new promise rejected with that exception.
 1. Let |promise| be the result of [=read all bytes|reading all bytes=] from |stream| with |reader|.
@@ -594,7 +625,7 @@ the blob's type and passed in encoding name.
 
 The <dfn method for=Blob>arrayBuffer()</dfn> method, when invoked, must run these steps:
 
-1. Let |stream| be the result of calling [=get stream=] on the [=context object=].
+1. Let |stream| be the result of calling [=get stream=] on [=this=].
 1. Let |reader| be the result of [=get a reader|getting a reader=] from |stream|.
    If that threw an exception, return a new promise rejected with that exception.
 1. Let |promise| be the result of [=read all bytes|reading all bytes=] from |stream| with |reader|.
@@ -691,9 +722,7 @@ user agents must run the following steps:
   and {{File/File(fileBits, fileName, options)/options}}.
 
 
-2. Let |n| be a new string of the same size as the {{fileName}} argument to the constructor.
-  Copy every character from {{fileName}} to |n|,
-  replacing any "/" character (U+002F SOLIDUS) with a ":" (U+003A COLON).
+2. Let |n| be the {{fileName}} argument to the constructor.
 
   Note: Underlying OS filesystems use differing conventions for file name;
   with constructed files, mandating UTF-16 lessens ambiquity when file names are converted to <a>byte</a> sequences.
@@ -941,7 +970,7 @@ The <dfn constructor for=FileReader id=filereaderConstrctr>FileReader()</dfn> co
 when invoked, must return a new {{FileReader}} object.
 
 The <dfn attribute for=FileReader>readyState</dfn> attribute's getter,
-when invoked, switches on the [=context object=]'s [=FileReader/state=]
+when invoked, switches on [=this=]'s [=FileReader/state=]
 and runs the associated step:
 
 : `"empty"`
@@ -952,10 +981,10 @@ and runs the associated step:
 :: Return {{DONE}}
 
 The <dfn attribute for=FileReader>result</dfn> attribute's getter,
-when invoked, must return the [=context object=]'s [=FileReader/result=].
+when invoked, must return [=this=]'s [=FileReader/result=].
 
 The <dfn attribute for=FileReader>error</dfn> attribute's getter,
-when invoked, must return the [=context object=]'s [=FileReader/error=].
+when invoked, must return [=this=]'s [=FileReader/error=].
 
 <div algorithm="read operation">
 A {{FileReader}} |fr| has an associated <dfn id=readOperation>read operation</dfn> algorithm,
@@ -1122,20 +1151,20 @@ compatibility.
 When the <dfn method for=FileReader id="dfn-abort">abort()</dfn> method is called,
 the user agent must run the steps below:
 
-1. If [=context object=]'s [=FileReader/state=] is `"empty"`
-   or if [=context object=]'s [=FileReader/state=] is `"done"`
-   set [=context object=]'s [=FileReader/result=] to `null`
+1. If [=this=]'s [=FileReader/state=] is `"empty"`
+   or if [=this=]'s [=FileReader/state=] is `"done"`
+   set [=this=]'s [=FileReader/result=] to `null`
    and [=terminate this algorithm=].
-1. If [=context object=]'s [=FileReader/state=] is `"loading"`
-   set [=context object=]'s [=FileReader/state=] to `"done"`
-   and set [=context object=]'s [=FileReader/result=] to `null`.
-1. If there are any [=tasks=] from the [=context object=]
+1. If [=this=]'s [=FileReader/state=] is `"loading"`
+   set [=this=]'s [=FileReader/state=] to `"done"`
+   and set [=this=]'s [=FileReader/result=] to `null`.
+1. If there are any [=tasks=] from [=this=]
    on the [=file reading task source=] in an affiliated [=queue a task|task queue=],
    then remove those [=tasks=] from that task queue.
 1. [=terminate an algorithm|Terminate the algorithm=] for the [=read method=] being processed.
-1. [=Fire a progress event=] called {{abort}} at the [=context object=].
-1. If [=context object=]'s [=FileReader/state=] is not `"loading"`,
-   [=fire a progress event=] called {{loadend}} at the [=context object=].
+1. [=Fire a progress event=] called {{abort}} at [=this=].
+1. If [=this=]'s [=FileReader/state=] is not `"loading"`,
+   [=fire a progress event=] called {{loadend}} at [=this=].
 
 ## Packaging data ## {#packaging-data}
 
@@ -1187,7 +1216,7 @@ The {{FileReader}} object must be the event target for all events in this specif
 
 When this specification says to <dfn>fire a progress event</dfn> <i>called e</i>
 (for some {{ProgressEvent}} <code>e</code>
-at a given {{FileReader}} <code>reader</code> as the <a>context object</a>),
+at a given {{FileReader}} <code>reader</code>),
 the following are normative:
 
 * The progress event <code>e</code> does not bubble.  <code>e.bubbles</code> must be false [[DOM]]
@@ -1499,7 +1528,7 @@ generate a new blob URL</dfn>, run the following steps:
 
 <div class="example">
   An example of a blob URL that can be generated by this algorithm is
-  `blob:https://example.org/40a5fb5a-d56d-4a33-b4e2-0acf6a8e5f64`1.
+  `blob:https://example.org/40a5fb5a-d56d-4a33-b4e2-0acf6a8e5f64`.
 </div>
 
 <div algorithm="addBlobURL">

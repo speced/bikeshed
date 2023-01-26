@@ -5,9 +5,11 @@ Status: ED
 ED: https://w3c.github.io/mediasession/
 TR: https://www.w3.org/TR/mediasession/
 Shortname: mediasession
-Level: 1
-Editor: Mounir Lamouri, w3cid 45389, Google Inc., mlamouri@google.com
-Editor: Becca Hughes, w3cid 103353, Google Inc., beccahughes@google.com
+Level: None
+Editor: Tommy Steimel, w3cid 135774, Google Inc., steimel@google.com
+Editor: Youenn Fablet, w3cid 96458, Apple Inc., youenn@apple.com
+Former Editor: Mounir Lamouri, w3cid 45389, Google Inc., mlamouri@google.com
+Former Editor: Becca Hughes, w3cid 103353, Google Inc., beccahughes@google.com
 Former Editor: Zhiqiang Zhang, Google Inc., zqzhang@google.com
 Former Editor: Rich Tibbett, Opera, richt@opera.com
 
@@ -18,12 +20,8 @@ Abstract: metadata on platform UI, customize available platform media
 Abstract: controls, and access platform media keys such as hardware keys found
 Abstract: on keyboards, headsets, remote controls, and software keys found in
 Abstract: notification areas and on lock screens of mobile devices.
-!Participate: <a href="https://github.com/w3c/mediasession/">We are on GitHub</a>
-!Participate: <a href="https://github.com/w3c/mediasession/issues/new">File an issue</a>
-!Participate: <a href="https://github.com/w3c/mediasession/issues?state=open">Open issues</a>
 !Version History: <a href="https://github.com/w3c/mediasession/commits">https://github.com/w3c/mediasession/commits</a>
 Ignored Vars: context, media, session
-Boilerplate: omit conformance, omit feedback-header
 </pre>
 
 <style>
@@ -74,9 +72,6 @@ urlPrefix: https://fetch.spec.whatwg.org/; spec: FETCH
         text: response type
     type: dfn;
         text: force Origin header flag
-urlPrefix: https://www.w3.org/TR/appmanifest/#dom-; spec: appmanifest
-    type: dfn
-        text: ImageResource
 urlPrefix: https://tc39.es/ecma262/#sec-object.; spec: WEBIDL;
     type: dfn
         text: freeze
@@ -124,8 +119,7 @@ user agent must invoke its internal API for that attribute or method so that
 e.g. the author can't change the behavior by overriding attributes or methods
 with custom properties or functions in JavaScript.
 
-Unless otherwise stated, string comparisons are done in a <a>case-sensitive</a>
-manner.
+Unless otherwise stated, string comparisons use [=is|is identical to=].
 
 <h2 id="dependencies">Dependencies</h2>
 
@@ -385,10 +379,18 @@ conforming IDL fragments, as described in the Web IDL specification. [[!WEBIDL]]
     </p>
 
     <p>
-      A <dfn title='media session action source'>media session action
-      source</dfn> is a source that might produce a <a>media session action</a>.
+      A <dfn>media session action source</dfn> is a source that might produce a <a>media session action</a>.
       Such a source can be the platform or the UI surfaces created by the user
       agent.
+    </p>
+    <p>
+      A <a>media session action source</a> has an optional
+      <dfn for="media session action source">target</dfn> which should be the
+      recipient of any <a>media session action</a> created by the
+      <a>media session action source</a>. If a <a>media session action source</a>'s
+      <a for="media session action source">target</a> is <code>null</code>,
+      the <a>active media session</a> is the recipient of all
+      <a>media session action source</a>'s actions.
     </p>
 
     <p>
@@ -436,6 +438,26 @@ conforming IDL fragments, as described in the Web IDL specification. [[!WEBIDL]]
           <dfn enum-value for=MediaSessionAction>seekto</dfn>: the action's intent
           is to move the playback time to a specific time.
         </li>
+        <li>
+          <dfn enum-value for=MediaSessionAction>togglemicrophone</dfn>: the action's intent
+          is to mute or unmute the user's microphone.
+        </li>
+        <li>
+          <dfn enum-value for=MediaSessionAction>togglecamera</dfn>: the action's intent
+          is to turn the user's active camera on or off.
+        </li>
+        <li>
+          <dfn enum-value for=MediaSessionAction>hangup</dfn>: the action's intent
+          is to end a call.
+        </li>
+        <li>
+          <dfn enum-value for=MediaSessionAction>previousslide</dfn>: the action's intent
+          is to go back to the previous slide when presenting slides.
+        </li>
+        <li>
+          <dfn enum-value for=MediaSessionAction>nextslide</dfn>: the action's intent
+          is to go to the next slide when presenting slides.
+        </li>
       </ul>
     </p>
 
@@ -472,17 +494,24 @@ conforming IDL fragments, as described in the Web IDL specification. [[!WEBIDL]]
 
     <p>
       When the user agent is notified by a <a>media session action source</a>
-      that a
+      named <var>source</var> that a
       <a>media session action</a> named <var>action</var> has been triggered,
       the user agent MUST run the <dfn>handle media session action</dfn> steps
       as follows:
       <ol>
         <li>
-          If the <a>active media session</a> is <code>null</code>, abort these
-          steps.
+          Let <var>session</var> be <var>source</var>'s <a for="media session
+          action source">target</a>.
         </li>
         <li>
-          Let <var>actions</var> be the <a>active media session</a>'s
+          If <var>session</var> is <code>null</code>, set <var>session</var> to
+          the <a>active media session</a>.
+        </li>
+        <li>
+          If <var>session</var> is <code>null</code>, abort these steps.
+        </li>
+        <li>
+          Let <var>actions</var> be <var>session</var>'s
           <a>supported media session actions</a>.
         </li>
         <li>
@@ -499,8 +528,7 @@ conforming IDL fragments, as described in the Web IDL specification. [[!WEBIDL]]
         </li>
         <li>
           Run the <a>activation notification</a> steps in the
-          <a>browsing context</a> associated with the
-          <a>active media session</a>.
+          <a>browsing context</a> associated with <var>session</var>.
         </li>
       </ol>
     </p>
@@ -538,6 +566,14 @@ conforming IDL fragments, as described in the Web IDL specification. [[!WEBIDL]]
       It is RECOMMENDED for user agents to implement a default handler for the
       <a enum-value for=MediaSessionAction>play</a> and <a enum-value
       for=MediaSessionAction>pause</a> <a>media session actions</a> if none was
+      provided for the <a>active media session</a>.
+    </p>
+
+    <p>
+      A user agent MAY implement a default handler for the <a enum-value
+      for=MediaSessionAction>togglemicrophone</a>, <a enum-value
+      for=MediaSessionAction>togglecamera</a>, or <a enum-value
+      for=MediaSessionAction>hangup</a> <a>media session actions</a> if none was
       provided for the <a>active media session</a>.
     </p>
 
@@ -708,7 +744,12 @@ enum MediaSessionAction {
   "nexttrack",
   "skipad",
   "stop",
-  "seekto"
+  "seekto",
+  "togglemicrophone",
+  "togglecamera",
+  "hangup",
+  "previousslide",
+  "nextslide"
 };
 
 callback MediaSessionActionHandler = undefined(MediaSessionActionDetails details);
@@ -722,6 +763,10 @@ interface MediaSession {
   undefined setActionHandler(MediaSessionAction action, MediaSessionActionHandler? handler);
 
   undefined setPositionState(optional MediaPositionState state = {});
+
+  undefined setMicrophoneActive(boolean active);
+
+  undefined setCameraActive(boolean active);
 };
 </pre>
 
@@ -854,6 +899,22 @@ interface MediaSession {
       Update the <a>position state</a> and <a>last position updated time</a>.
     </li>
   </ul>
+</p>
+
+<p>
+  The <dfn method for=MediaSession>setMicrophoneActive(active)</dfn> and
+  <dfn method for=MediaSession>setCameraActive(active)</dfn> methods indicate to
+  the user agent whether the microphone and camera are currently considered by
+  the page to be active (e.g. if the microphone is considered "muted" by the
+  page since it is no longer sending audio through to a call, then the page can
+  invoke <code>setMicrophoneActive(false)</code>).
+  It is RECOMMENDED that the user agent respect the microphone and camera
+  states indicated by the page in this UI.
+</p>
+
+<p>
+  The user agent MAY display UI which invokes handlers for
+  <a>media session actions</a>.
 </p>
 
 <h2 id="the-mediametadata-interface">The {{MediaMetadata}} interface</h2>
@@ -1096,7 +1157,7 @@ dictionary MediaImage {
 </pre>
 
 <p class="informative">The {{MediaImage}} dictionary members are inspired by
-<a>ImageResource</a> in [[AppManifest]].</p>
+{{ImageResource}} in [[IMAGE-RESOURCE]].</p>
 
 The <dfn dict-member for="MediaImage">src</dfn> <a>dictionary member</a> is used
 to specify the {{MediaImage}} object's <dfn for="MediaImage">source</dfn>. It is
@@ -1166,9 +1227,9 @@ should always be positive.
 
 dictionary MediaSessionActionDetails {
   required MediaSessionAction action;
-  double? seekOffset;
-  double? seekTime;
-  boolean? fastSeek;
+  double seekOffset;
+  double seekTime;
+  boolean fastSeek;
 };
 </pre>
 
@@ -1406,6 +1467,58 @@ When the <a>media session action</a> is
   </pre>
 </div>
 
+<div class="example" id="example-microphone-camera-hangup">
+  Using video conferencing actions:
+  <pre class="lang-javascript">
+    var isMicrophoneActive = false;
+    var isCameraActive = false;
+
+    navigator.mediaSession.setMicrophoneActive(isMicrophoneActive);
+    navigator.mediaSession.setCameraActive(isCameraActive);
+
+    navigator.mediaSession.setActionHandler("togglemicrophone", function() {
+      if (isMicrophoneActive) {
+        // Mute the microphone. Implementation omitted.
+      } else {
+        // Unmute the microphone. Implementation omitted.
+      }
+      isMicrophoneActive = !isMicrophoneActive;
+      navigator.mediaSession.setMicrophoneActive(isMicrophoneActive);
+    });
+
+    navigator.mediaSession.setActionHandler("togglecamera", function() {
+      if (isCameraActive) {
+        // Disable the camera. Implementation omitted.
+      } else {
+        // Enable the camera. Implementation omitted.
+      }
+      isCameraActive = !isCameraActive;
+      navigator.mediaSession.setCameraActive(isCameraActive);
+    });
+
+    navigator.mediaSession.setActionHandler("hangup", function() {
+      // End the call. Implementation omitted.
+    });
+  </pre>
+</div>
+
+<div class="example" id="example-presenting-slide-actions">
+  Handling presenting slide actions:
+  <pre class="lang-javascript">
+    var currentSlideIndex = 0;
+
+    navigator.mediaSession.setActionHandler("previousslide", function() {
+      currentSlideIndex--;
+      // Set current slide. Implementation omitted.
+    });
+
+    navigator.mediaSession.setActionHandler("nextslide", function() {
+      currentSlideIndex++;
+      // Set current slide. Implementation omitted.
+    });
+  </pre>
+</div>
+
 <h2 id="acknowledgments" class="no-num">Acknowledgments</h2>
 
 The editors would like to thank Paul Adenot, Jake Archibald, Tab Atkins,
@@ -1420,5 +1533,3 @@ patience in working through the initial design issues; Jer Noble for his help in
 building a model that also works well within the iOS audio focus model; and
 Mounir Lamouri and Anton Vayvod for their early involvement, feedback and
 support in making this specification happen.
-
-<script id=head src=https://resources.whatwg.org/dfn.js></script>

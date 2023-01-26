@@ -1,0 +1,213 @@
+<pre class='metadata'>
+Title: User Preference Media Features Client Hints Headers
+Shortname: user-preference-media-features-headers
+Level: 1
+Status: CG-DRAFT
+Group: WICG
+Repository: WICG/user-preference-media-features-headers
+URL: https://wicg.github.io/user-preference-media-features-headers/
+Editor: Thomas Steiner, Google LLC https://google.com, tomac@google.com
+Editor: François Beaufort, Google LLC https://google.com, fbeaufort@google.com
+Abstract: HTTP Client Hints defines an <code>Accept-CH</code> response header that servers can use to advertise their use of request headers for proactive content negotiation. This specification introduces a set of user preference media features client hints headers like <code>Sec-CH-Prefers-Color-Scheme</code>, which notify the server of user preferences that will meaningfully alter the requested resource, like, for example, through the currently preferred color scheme. These client hints will commonly also be used as critical client hints via the <code>Critical-CH</code> header.
+Markup Shorthands: markdown yes
+</pre>
+
+<pre class=biblio>
+{
+  "CLIENT-HINTS": {
+    "authors": ["Ilya Grigorik", "Yoav Weiss"],
+    "href": "https://datatracker.ietf.org/doc/rfc8942/",
+    "title": "HTTP Client Hints",
+    "status": "RFC - Experimental (February 2021; No errata)",
+    "publisher": "IETF httpbis-WG"
+  },
+  "draft-ietf-httpbis-header-structure-19": {
+    "authors": ["Mark Nottingham", "Poul-Henning Kamp"],
+    "href": "https://tools.ietf.org/html/draft-ietf-httpbis-header-structure-19",
+    "title": "Structured Field Values for HTTP",
+    "status": "ID",
+    "publisher": "IETF httpbis-WG"
+  },
+  "draft-davidben-http-client-hint-reliability-02": {
+    "authors": ["David Benjamin"],
+    "href": "https://tools.ietf.org/html/draft-davidben-http-client-hint-reliability-02",
+    "title": "Client Hint Reliability",
+    "status": "ID",
+    "publisher": "IETF httpbis-WG"
+  },
+  "MEDIA-QUERIES-LEVEL-5": {
+    "authors": ["Dean Jackson", "Florian Rivoal", "Tab Atkins Jr.", "Daniel Libby"],
+    "href": "https://drafts.csswg.org/mediaqueries-5/",
+    "title": "Media Queries Level 5",
+    "status": "ED",
+    "publisher": "CSS Working Group"
+  },
+  "PERMISSIONS-POLICY": {
+    "authors": ["Ian Clelland"],
+    "href": "https://w3c.github.io/webappsec-permissions-policy/",
+    "title": "Permissions Policy",
+    "status": "ED",
+    "publisher": "W3C"
+  }
+}
+</pre>
+<pre class="anchors">
+urlPrefix: https://tools.ietf.org/html/draft-ietf-httpbis-header-structure-19; spec: draft-ietf-httpbis-header-structure-19
+    type: dfn
+        text: structured header value; url: #
+    for: structured header value
+        type: dfn
+            text: items; url: #section-3.3
+            text: string; url: #section-3.3.3
+urlPrefix: https://wicg.github.io/client-hints-infrastructure/
+    type: dfn
+        text: client hints token; url: #client-hints-token
+        text: policy-controlled client hints features; url: #policy-controlled-client-hints-features
+        text: high-entropy client hint; url: #high-entropy-client-hint
+</pre>
+
+<h2 id="introduction">Introduction</h2>
+
+CSS media queries, and specifically
+[[mediaqueries-5#mf-user-preferences]]
+like <code>prefers-color-scheme</code> or <code>prefers-reduced-motion</code>,
+have a potentially
+<a href="https://webkit.org/blog/8892/dark-mode-in-web-inspector/#:~:text=implementing%20dark%20mode%20took%20over%201%2C000%20lines%20of%20css.">significant impact</a>
+on the amount of CSS that needs to be delivered by a page, and on the experience
+the user is going to have when the page loads.
+
+High-traffic sites like search engines or news sites that
+wish to honor user preference media features like <code>prefers-color-scheme</code> and
+that inline CSS for performance reasons need to know about the preferred color
+scheme (or other user preference media features respectively) ideally at request
+time, so that the initial HTML payload already has the right CSS inlined.
+
+Additionally, and specifically for <code>prefers-color-scheme</code>, sites by all means
+want to avoid a
+<a href="https://css-tricks.com/flash-of-inaccurate-color-theme-fart/">flash of inaccurate color theme</a>.
+
+This specification introduces a set of [[!CLIENT-HINTS]] headers around user preference media features
+as defined by [[!MEDIA-QUERIES-LEVEL-5]], which servers can opt-in to receive via the Client Hints
+infrastructure defined in [[!RFC8942]].
+
+<h3 id="usage-example">Usage Example</h3>
+
+1. The client makes an initial request to the server.
+    <pre class="highlight">
+      GET / HTTP/1.1
+      Host: example.com
+    </pre>
+1. The server responds, telling the client via <code>Accept-CH</code> that it accepts the
+    <code>Sec-CH-Prefers-Color-Scheme</code> and the <code>Sec-CH-Prefers-Contrast</code> Client Hints, out of which as per
+    <code>Critical-CH</code> it considers <code>Sec-CH-Prefers-Color-Scheme</code> a Critical Client Hint that it also
+    varies the response on as conveyed by <code>Vary</code>.
+    <pre class="highlight">
+      HTTP/1.1 200 OK
+      Content-Type: text/html
+      Accept-CH: Sec-CH-Prefers-Color-Scheme, Sec-CH-Prefers-Contrast
+      Vary: Sec-CH-Prefers-Color-Scheme
+      Critical-CH: Sec-CH-Prefers-Color-Scheme
+    </pre>
+1. The client then retries the request, telling the server via <code>Sec-CH-Prefers-Color-Scheme</code> that it
+    has a user preference for dark-schemed content.
+    <pre class="highlight">
+      GET / HTTP/1.1
+      Host: example.com
+      Sec-CH-Prefers-Color-Scheme: "dark"
+    </pre>
+1. The server can then tailor the response to the client's preferences accordingly and, for example,
+    inline the CSS responsible for the dark theme into the response body.
+
+<h2 id="user-preference-media-features">User Preference Media Features</h2>
+
+User preference media features consist of a name (like <code>prefers-reduced-motion</code>) and allowed values
+(like <code>no-preference</code> or <code>reduce</code>. Each client hint header field defined in the following
+is represented as [[!draft-ietf-httpbis-header-structure-19]] object containing an [=items=] whose value
+is a [=structured header value/string=]. The ABNF (Augmented Backus-Naur Form) for each header is given below.
+It is the expectation of the author that these client hints will commonly be used as
+[[!draft-davidben-http-client-hint-reliability-02]].
+
+<h3 id="sec-ch-prefers-reduced-motion"><code>Sec-CH-Prefers-Reduced-Motion</code></h3>
+
+The <code>Sec-CH-Prefers-Reduced-Motion</code> [=high-entropy client hint=] is modeled after the <code>prefers-reduced-motion</code>
+user preference media feature as defined in [[mediaqueries-5#prefers-reduced-motion]].
+The ABNF syntax for this header header field is as follows:
+
+<pre class="highlight">
+  Sec-CH-Prefers-Reduced-Motion = "no-preference" / "reduce"
+</pre>
+
+<h3 id="sec-ch-prefers-reduced-transparency"><code>Sec-CH-Prefers-Reduced-Transparency</code></h3>
+
+The <code>Sec-CH-Prefers-Reduced-Transparency</code> [=high-entropy client hint=] is modeled after the <code>prefers-reduced-transparency</code>
+user preference media feature as defined in [[mediaqueries-5#prefers-reduced-transparency]].
+The ABNF syntax for this header header field is as follows:
+
+<pre class="highlight">
+  Sec-CH-Prefers-Reduced-Transparency = "no-preference" / "reduce"
+</pre>
+
+<h3 id="sec-ch-prefers-contrast"><code>Sec-CH-Prefers-Contrast</code></h3>
+
+The <code>Sec-CH-Prefers-Contrast</code> [=high-entropy client hint=] is modeled after the <code>prefers-contrast</code>
+user preference media feature as defined in [[mediaqueries-5#prefers-contrast]].
+The ABNF syntax for this header header field is as follows:
+
+<pre class="highlight">
+  Sec-CH-Prefers-Contrast = "no-preference" / "less" / "more" / "custom"
+</pre>
+
+<h3 id="sec-ch-forced-colors"><code>Sec-CH-Forced-Colors</code></h3>
+
+The <code>Sec-CH-Forced-Colors</code> [=high-entropy client hint=] is modeled after the <code>forced-colors</code>
+user preference media feature as defined in [[mediaqueries-5#forced-colors]].
+The ABNF syntax for this header header field is as follows:
+
+<pre class="highlight">
+  Sec-CH-Forced-Colors = "none" / "active"
+</pre>
+
+<h3 id="sec-ch-prefers-color-scheme"><code>Sec-CH-Prefers-Color-Scheme</code></h3>
+
+The <code>Sec-CH-Prefers-Color-Scheme</code> [=high-entropy client hint=] is modeled after the <code>prefers-color-scheme</code>
+user preference media feature as defined in [[mediaqueries-5#prefers-color-scheme]].
+The ABNF syntax for this header header field is as follows:
+
+<pre class="highlight">
+  Sec-CH-Prefers-Color-Scheme = "light" / "dark"
+</pre>
+
+<h2 id="feature-registry">Feature Registry</h2>
+
+<h3 id="client-hints-token-definition">Client hints token</h3>
+
+This document extends the [=client hints token=] with the following [=byte-lowercase=] representation of one of
+  <code>Sec-CH-Prefers-Reduced-Motion</code>,
+  <code>Sec-CH-Prefers-Reduced-Transparency</code>,
+  <code>Sec-CH-Prefers-Contrast</code>,
+  <code>Sec-CH-Prefers-Forced-Colors</code>,
+  <code>Sec-CH-Prefers-Color-Scheme</code>.
+
+<h3 id="policy-controlled-features">Policy-controlled features</h3>
+
+This document extends the [=policy-controlled client hints features=] with the following [=policy-controlled features=]:
+
+- <code><dfn export>ch-prefers-reduced-motion</dfn></code> which has a [=default allowlist=] of `'self'`
+- <code><dfn export>ch-prefers-reduced-transparency</dfn></code> which has a [=default allowlist=] of `'self'`
+- <code><dfn export>ch-prefers-contrast</dfn></code> which has a [=default allowlist=] of `'self'`
+- <code><dfn export>ch-prefers-forced-colors</dfn></code> which has a [=default allowlist=] of `'self'`
+- <code><dfn export>ch-prefers-color-scheme</dfn></code> which has a [=default allowlist=] of `'self'`
+
+<h2 id="security-considerations">Security Considerations</h2>
+
+The User Preference Media Features Client Hint header will only be available to
+HTTPS secure contexts. Additionally, the Security Considerations of [[!CLIENT-HINTS]]
+and the Security Considerations of [[!draft-davidben-http-client-hint-reliability-02]]
+likewise apply to this proposal.
+
+<!-- ============================================================ -->
+<h2 id="acknowledgements>Acknowledgements">Acknowledgements</h2>
+<!-- ============================================================ -->
+
+Special thanks to <a href="https://github.com/yoavweiss">Yoav Weiss</a> for his
+technical input and suggestions that led to improvements to this specification.

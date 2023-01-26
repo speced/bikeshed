@@ -153,6 +153,9 @@ The {{PerformanceEntry/name}} attribute's getter will return one of the followin
 : "<code><dfn>multiple-contexts</dfn></code>"
 :: The long task originated from an event loop <a>task</a> involving multiple <a>browsing contexts</a>.
 
+Note: There are some inconsistencies across these names, such as the "-unreachable" and the "-contexts" suffixes.
+These names are kept for backward compatibility reasons.
+
 The {{PerformanceEntry/entryType}} attribute's getter will return <code>"longtask"</code>.
 
 The {{PerformanceEntry/startTime}} attribute's getter will return a {{DOMHighResTimeStamp}} of when the task started.
@@ -272,7 +275,8 @@ Report long tasks {#report-long-tasks}
 
         1. Add |topmostBC|'s [=active document=]'s [=relevant Realm=] to |destinationRealms|.
         1. Let |descendantBCs| be |topmostBC|'s [=active document=]'s [=list of the descendant browsing contexts=].
-        1. For each |descendantBC| in |descendantBCs|, add |descendantBC|'s [=active document=]'s [=relevant Realm=] to |destinationRealms|.
+        1. Let |document| be |descendantBC|'s [=active document=].
+        1. For each |descendantBC| in |descendantBCs|, add (|document|'s [=relevant Realm=], |document|'s [=relevant settings object=]'s [=environment settings object/cross-origin isolated capability=]) to |destinationRealms|.
 
     1. A user agent may remove some [=JavaScript Realms=] from |destinationRealms|.
 
@@ -280,7 +284,7 @@ Report long tasks {#report-long-tasks}
 
     Issue(75): there is some ongoing discussion regarding the scope of which {{Document|Documents}} gain visibility over which long tasks, so this logic could change in the future.
 
-    1. For each |destinationRealm| in |destinationRealms|:
+    1. For each (|destinationRealm|, |crossOriginIsolatedCapability|) in |destinationRealms|:
 
         1. Let |name| be the empty string. This will be used to report [=minimal culprit attribution=], below.
         1. Let |culpritSettings| be <code>null</code>.
@@ -349,8 +353,8 @@ Report long tasks {#report-long-tasks}
 
             1. Set |newEntry|'s {{PerformanceEntry/name}} attribute to |name|.
             1. Set |newEntry|'s {{PerformanceEntry/entryType}} attribute to "<code>longtask</code>".
-            1. Set |newEntry|'s {{PerformanceEntry/startTime}} attribute to |start time|.
-            1. Let |dur| be |end time| minus |start time|.
+            1. Set |newEntry|'s {{PerformanceEntry/startTime}} attribute to the result of [=coarsen time|coarsening=] |start time| given |crossOriginIsolatedCapability|.
+            1. Let |dur| be the result of [=coarsen time|coarsening=] |end time| given |crossOriginIsolatedCapability|, minus |newEntry|'s {{PerformanceEntry/startTime}}.
             1. Set |newEntry|'s {{PerformanceEntry/duration}} attribute to the integer part of |dur|.
             1. If |attribution| is not <code>null</code>, set |newEntry|'s {{PerformanceLongTaskTiming/attribution}} attribute to a new frozen array containing the single value |attribution|.
 

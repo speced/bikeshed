@@ -1,0 +1,457 @@
+<pre class='metadata'>
+Title: Digital Goods API
+Shortname: digital-goods
+Level: 1
+Status: CG-DRAFT
+Group: WICG
+Repository: WICG/digital-goods
+Inline Github Issues: true
+URL: https://wicg.github.io/digital-goods/
+Editor: Glen Robertson, Google https://www.google.com/, glenrob@chromium.org
+Editor: Matt Giuca, Google https://www.google.com/, mgiuca@chromium.org
+!Participate: <a href="https://github.com/WICG/digital-goods">GitHub WICG/digital-goods</a> (<a href="https://github.com/WICG/digital-goods/issues/new">new issue</a>, <a href="https://github.com/WICG/digital-goods/issues?state=open">open issues</a>)
+!Tests: <a href=https://github.com/w3c/web-platform-tests/tree/master/digital-goods>web-platform-tests digital-goods/</a> (<a href=https://github.com/w3c/web-platform-tests/labels/digital-goods>ongoing work</a>)
+Abstract: The Digital Goods API allows web applications to get information about their digital products and their user's purchases managed by a digital store. The user agent abstracts connections to the store and the <a href="https://www.w3.org/TR/payment-request/">Payment Request API</a> is used to make purchases.
+Complain About: accidental-2119 yes, missing-example-ids yes
+Indent: 2
+Default Biblio Status: current
+Markup Shorthands: markdown yes
+Assume Explicit For: yes
+</pre>
+
+# Usage Examples # {#usage-examples}
+
+Note: This section is non-normative.
+
+## Getting a service instance ## {#getting-a-service-instance}
+
+<div class="example" id="Getting a service instance">
+  Usage of the API begins with a call to
+  {{Window/getDigitalGoodsService()|window.getDigitalGoodsService()}}, which
+  might only be available in certain contexts (eg. HTTPS, app, browser, OS). If
+  available, the method can be called with a service provider URL. The method
+  returns a promise that is rejected if the given service provider is not
+  available.
+
+  <xmp highlight="javascript">
+    if (window.getDigitalGoodsService === undefined) {
+      // Digital Goods API is not supported in this context.
+      return;
+    }
+    try {
+      const digitalGoodsService = await
+          window.getDigitalGoodsService("https://example.com/billing");
+      // Use the service here.
+      ...
+    } catch (error) {
+      // Our preferred service provider is not available.
+      // Use a normal web-based payment flow.
+      console.error("Failed to get service:", error.message);
+      return;
+    }
+  </xmp>
+</div>
+
+## Querying item details ## {#querying-item-details}
+
+<div class="example" id="Querying item details">
+  <xmp highlight="javascript">
+    const details = await digitalGoodsService
+        .getDetails(['shiny_sword', 'gem', 'monthly_subscription']);
+    for (item of details) {
+      const priceStr = new Intl.NumberFormat(
+          locale,
+          {style: 'currency', currency: item.price.currency}
+        ).format(item.price.value);
+      AddShopMenuItem(item.itemId, item.title, priceStr, item.description);
+    }
+  </xmp>
+
+  The {{DigitalGoodsService/getDetails()}} method returns server-side details
+  about a given set of items, intended to be displayed to the user in a menu, so
+  that they can see the available purchase options and prices without having to
+  go through a purchase flow.
+
+  The returned {{ItemDetails}} sequence can be in any order and might not
+  include an item if it doesn't exist on the server (i.e. there is not a 1:1
+  correspondence between the input list and output).
+
+  The item ID is a string representing the primary key of the items, configured
+  in the store server. There is no function to get a list of item IDs; those
+  have to be hard-coded in the client code or fetched from the developer’s own
+  server.
+
+  The item’s price is a {{PaymentCurrencyAmount}} containing the current price
+  of the item in the user’s current region and currency. It is designed to be
+  formatted for the user’s current locale using
+  [[ECMA-402#sec-intl.numberformat|Intl.NumberFormat]], as shown above.
+
+  For more information on the fields in the {{ItemDetails}} object, refer to the
+  [ItemDetails dictionary] section below.
+</div>
+
+## Purchase using Payment Request API ## {#purchase-using-payment-request-api}
+
+<div class="example" id="Purchase using Payment Request API">
+  <xmp highlight="javascript">
+    const details = await digitalGoodsService.getDetails(['monthly_subscription']);
+    const item = details[0];
+    new PaymentRequest(
+      [{supportedMethods: 'https://example.com/billing',
+        data: {itemId: item.itemId}}]);
+  </xmp>
+
+  The purchase flow itself uses the [[payment-request|Payment Request API]]. We
+  don’t show the
+  full payment request code here, but note that the item ID for any items the
+  user chooses to purchase can be sent in the <code>data</code> field of a
+  <code>methodData</code> entry
+  for the given payment method, in a manner specific to the store.
+</div>
+
+## Checking existing purchases ## {#checking-existing-purchases}
+
+<div class="example" id="Checking existing purchases">
+  <xmp highlight="javascript">
+    purchases = await digitalGoodsService.listPurchases();
+    for (p of purchases) {
+      VerifyOnBackendAndGrantEntitlement(p.itemId, p.purchaseToken);
+    }
+  </xmp>
+
+  The {{DigitalGoodsService/listPurchases()}} method allows a client to get a
+  list of items that are
+  currently owned or purchased by the user. This might be necessary to check for
+  entitlements (e.g. whether a subscription, promotional code, or permanent
+  upgrade is active) or to recover from network interruptions during a purchase
+  (e.g. item is purchased but not yet confirmed with a backend). The method
+  returns item IDs and purchase tokens, which would typically be verified using
+  a direct developer-to-provider API before granting entitlements.
+</div>
+
+## Checking past purchases ## {#checking-past-purchases}
+
+<div class="example" id="Checking purchases">
+  <xmp highlight="javascript">
+    const purchaseHistory = await digitalGoodsService.listPurchaseHistory();
+    for (p of purchaseHistory) {
+      DisplayPreviousPurchase(p.itemId);
+    }
+  </xmp>
+
+  The {{DigitalGoodsService/listPurchaseHistory()}} method allows a client
+  to list the latest purchases for each item type ever purchased by the
+  user. Can include expired or consumed purchases. Some stores might not keep
+  such history, in which case it would return the same data as the
+  {{DigitalGoodsService/listPurchases()}} method.
+</div>
+
+## Consuming a purchase ## {#consuming-a-purchase}
+
+<div class="example" id="Consuming a purchase">
+  <xmp highlight="javascript">
+    digitalGoodsService.consume(purchaseToken);
+  </xmp>
+
+  Purchases that are designed to be purchased multiple times usually need to be
+  marked as "consumed" before they can be purchased again by the user. An
+  example of a consumable purchase is an in-game powerup that makes the player
+  stronger for a short period of time. This can be done with the
+  {{DigitalGoodsService/consume()}} method.
+
+  It is preferable to use a direct developer-to-provider API to consume
+  purchases, if one is available, in order to more verifiably ensure that a
+  purchase was used up.
+</div>
+
+## Use with subdomain iframes ## {#use-with-subdomain-iframes}
+
+<div class="example" id="Use with subdomain iframes">
+  <xmp highlight="javascript">
+    <iframe
+      src="https://sub.origin.example"
+      allow="payment">
+    </iframe>
+  </xmp>
+
+  To indicate that a subdomain iframe is allowed to invoke the Digital Goods
+  API, the <code>allow</code> attribute along with the <code>"payment"</code>
+  keyword can be specified on the iframe element. Cross-origin iframes cannot
+  invoke the Digital Goods API. The
+  [[permissions-policy|Permissions Policy]] specification provides further
+  details and examples.
+</div>
+
+# API definition # {#api-definition}
+
+## Extensions to the Window interface ## {#extensions-to-the-window-interface}
+
+<xmp class="idl">
+  partial interface Window {
+    [SecureContext] Promise<DigitalGoodsService> getDigitalGoodsService(
+        DOMString serviceProvider);
+  };
+</xmp>
+
+The {{Window}} object MAY expose a {{Window/getDigitalGoodsService()}} method.
+User agents that do not support Digital Goods SHOULD NOT expose
+{{Window/getDigitalGoodsService()}} on the {{Window}} interface.
+
+Note: The above statement is designed to permit feature detection. If
+{{Window/getDigitalGoodsService()}} is present, there is a reasonable
+expectation that it will work with at least one service provider.
+
+### getDigitalGoodsService() method ### {#getdigitalgoodsservice-method}
+
+Note: The {{Window/getDigitalGoodsService()}} method is called to determine
+whether the given
+{{Window/getDigitalGoodsService(serviceProvider)/serviceProvider}} is supported
+in the current context. The method returns a Promise that will be resolved with
+a {{DigitalGoodsService}} object if the serviceProvider is supported, or
+rejected with an exception if the serviceProvider is unsupported or any error
+occurs. The {{Window/getDigitalGoodsService(serviceProvider)/serviceProvider}}
+is usually a [=url-based payment method identifier=].
+
+<div algorithm>
+  When the
+  <dfn method for="Window">getDigitalGoodsService(|serviceProvider|)</dfn>
+  method is called, run the following steps:
+
+  1. Let |document| be the [=current settings object=]'s [=relevant global object=]'s <a>associated <code>Document</code></a>.
+  1. If |document| is not [=Document/fully active=], then return [=a promise rejected with=] an {{"InvalidStateError"}} {{DOMException}}.
+  1. If |document|'s [=origin=] is not [=same origin=] with the [=environment/top-level origin=] return [=a promise rejected with=] a {{"NotAllowedError"}} {{DOMException}}.
+  1. If |document| is not [=allowed to use=] the "[=payment=]" permission return [=a promise rejected with=] a {{"NotAllowedError"}} {{DOMException}}.
+  1. If |serviceProvider| is undefined or null or the empty string return [=a promise rejected with=] a {{TypeError}}.
+  1. Let |result| be the result of performing the [=can make digital goods service algorithm=] given |serviceProvider| and |document|.
+  1. If |result| is false return [=a promise rejected with=] an {{OperationError}}.
+  1. Return [=a promise resolved with=] a new {{DigitalGoodsService}}.
+</div>
+
+### Can make digital goods service algorithm ### {#sec-can-make-digital-goods-service-algorithm}
+<div algorithm>
+  The <dfn>can make digital goods service algorithm</dfn> checks whether the
+  [=user agent=] supports a given |serviceProvider| and |document| context.
+
+  1. The [=user agent=] MAY return true or return false based on the |serviceProvider| or |document| or external factors.
+
+  Note: This allows for user agents to support different service providers in
+  different contexts.
+</div>
+
+
+## DigitalGoodsService interface ## {#digitalgoodsservice-interface}
+
+<xmp class="idl">
+  [Exposed=Window, SecureContext] interface DigitalGoodsService {
+
+    Promise<sequence<ItemDetails>> getDetails(sequence<DOMString> itemIds);
+
+    Promise<sequence<PurchaseDetails>> listPurchases();
+
+    Promise<sequence<PurchaseDetails>> listPurchaseHistory();
+
+    Promise<undefined> consume(DOMString purchaseToken);
+  };
+
+  dictionary ItemDetails {
+    required DOMString itemId;
+    required DOMString title;
+    required PaymentCurrencyAmount price;
+    ItemType type;
+    DOMString description;
+    sequence<DOMString> iconURLs;
+    DOMString subscriptionPeriod;
+    DOMString freeTrialPeriod;
+    PaymentCurrencyAmount introductoryPrice;
+    DOMString introductoryPricePeriod;
+    [EnforceRange] unsigned long long introductoryPriceCycles;
+  };
+
+  enum ItemType {
+    "product",
+    "subscription",
+  };
+
+  dictionary PurchaseDetails {
+    required DOMString itemId;
+    required DOMString purchaseToken;
+  };
+</xmp>
+
+### getDetails() method ### {#getDetails-method}
+
+<div algorithm>
+  When the  <dfn method for="DigitalGoodsService">getDetails(|itemIds|)</dfn>
+  method is called, run the following steps:
+
+  <!-- TODO: Would like to give these type definitions like |itemIds:sequence<DOMString>| but it's not recognized (supported?) by BikeShed. -->
+  1. If |itemIds| [=list/is empty=], then return [=a promise rejected with=] a {{TypeError}}.
+  1. Let |result| be the result of requesting information about the given |itemIds| from the digital goods service.
+
+  Note: This allows for different digital goods service providers to be
+    supported by provider-specific behavior in the user agent.
+
+  1. If |result| is an error, then return [=a promise rejected with=] an {{OperationError}}.
+  1. For each |itemDetails| in |result|:
+    1. |itemDetails|.itemId SHOULD NOT be the empty string.
+    1. |itemIds| SHOULD [=list/contain=] |itemDetails|.itemId.
+    1. |itemDetails|.title SHOULD NOT be the empty string.
+    1. |itemDetails|.price MUST be a [=canonical PaymentCurrencyAmount=].
+    1. If present, |itemDetails|.subscriptionPeriod MUST be be a [=iso-8601=] duration.
+    1. If present, |itemDetails|.freeTrialPeriod MUST be be a [=iso-8601=] duration.
+    1. If present, |itemDetails|.introductoryPrice MUST be a [=canonical PaymentCurrencyAmount=].
+    1. If present, |itemDetails|.introductoryPricePeriod MUST be be a [=iso-8601=] duration.
+  1. Return [=a promise resolved with=] |result|.
+
+  Note: There is no requirement that the ordering of items in |result| matches
+    the ordering of items in |itemIds|. This is to allow for missing or invalid
+    items to be skipped in the output list.
+</div>
+
+### listPurchases() method ### {#listPurchases-method}
+
+<div algorithm>
+  When the <dfn method for="DigitalGoodsService">listPurchases()</dfn> method is
+  called, run the following steps:
+
+  1. Let |result| be the result of requesting information about the user's purchases from the digital goods service.
+
+  Note: This allows for different digital goods service providers to be supported by provider-specific behavior in the user agent.
+
+  1. If |result| is an error, then return [=a promise rejected with=] an {{OperationError}}.
+  1. For each |itemDetails| in |result|:
+    1. |itemDetails|.itemId SHOULD NOT be the empty string.
+    1. |itemDetails|.purchaseToken SHOULD NOT be the empty string.
+  1. Return [=a promise resolved with=] |result|.
+</div>
+
+### listPurchaseHistory() method ### {#listPurchaseHistory-method}
+
+<div algorithm>
+  When the <dfn method for="DigitalGoodsService">listPurchaseHistory()</dfn> method is
+  called, run the following steps:
+
+  1. Let |result| be the result of requesting information about the latest purchases for each item type ever purchased by the user.
+  1. If |result| is an error, then return [=a promise rejected with=] an {{OperationError}}.
+  1. For each |itemDetails| in |result|:
+    1. |itemDetails|.itemId SHOULD NOT be the empty string.
+    1. |itemDetails|.purchaseToken SHOULD NOT be the empty string.
+  1. Return [=a promise resolved with=] |result|.
+</div>
+
+### consume() method ### {#consume-method}
+
+Note: Consume in this context means to use up a purchase. The user is expected
+to no longer be entitled to the purchase after it is consumed.
+
+<div algorithm>
+  When the <dfn method for="DigitalGoodsService">consume(|purchaseToken|)</dfn>
+  method is called, run the following steps:
+
+  1. If |purchaseToken| is the empty string, then return [=a promise rejected with=] a {{TypeError}}.
+  1. Let |result| be the result of requesting the digital goods service to record |purchaseToken| as consumed.
+
+  Note: This allows for different digital goods service providers to be supported by provider-specific behavior in the user agent.
+
+  1. If |result| is an error, then return [=a promise rejected with=] an {{OperationError}}.
+  1. Return [=a promise resolved with=] {{undefined}}.
+</div>
+
+## ItemDetails dictionary ## {#itemDetails-dictionary}
+
+*This section is non-normative.*
+
+<div class="note">
+  An {{ItemDetails}} dictionary represents information about a digital item from
+  a {{Window/getDigitalGoodsService(serviceProvider)/serviceProvider}}.
+
+  * {{ItemDetails/itemId}} identifies a particular digital item in the current
+    app's inventory. It is expected to be unique within the app but might not be
+    unique across all apps.
+  * {{ItemDetails/title}} is the name of the item to display to the user. It is
+    expected to have been localized for the user by the
+    {{Window/getDigitalGoodsService(serviceProvider)/serviceProvider}}.
+  * {{ItemDetails/price}} is the price of the item and is intended to be able to
+    be formatted as shown in the [[#querying-item-details]] example above for
+    display to the user. It is expected to have been localized for the user by
+    the {{Window/getDigitalGoodsService(serviceProvider)/serviceProvider}}.
+  * {{ItemDetails/type}} is one of the values of the {{ItemType}} enum.
+  * {{ItemDetails/description}} is the full description of the item to display
+    to the user. It is expected to have been localized for the user by the
+    {{Window/getDigitalGoodsService(serviceProvider)/serviceProvider}}.
+  * {{ItemDetails/iconURLs}} is a list of icons that provide a visual
+    description of the item.
+  * {{ItemDetails/subscriptionPeriod}} is the time period, specified as an
+    <a href="https://en.wikipedia.org/wiki/ISO_8601#Durations">ISO 8601 duration</a>,
+    in which the item
+    grants some entitlement to the user. After this period the entitlement is
+    expected to be renewed or lost (this is not controlled through the Digital
+    Goods API). This field is only expected to be set for subscriptions and not
+    for one-off purchases.
+  * {{ItemDetails/freeTrialPeriod}} is the time period, specified as an
+    <a href="https://en.wikipedia.org/wiki/ISO_8601#Durations">ISO 8601 duration</a>,
+    in which the item grants
+    some entitlement to the user without costing anything. After this period the
+    entitlement is expected to be paid or lost (this is not controlled through
+    the Digital Goods API). This field is only expected to be set for
+    subscriptions and not for one-off purchases.
+  * {{ItemDetails/introductoryPrice}} is the initial price of the item and is
+    intended to be able to be formatted as shown in the
+    [[#querying-item-details]] example above for display to the user. It is
+    expected to have been localized for the user by the
+    {{Window/getDigitalGoodsService(serviceProvider)/serviceProvider}}.
+  * {{ItemDetails/introductoryPricePeriod}} is the time period, specified as an
+    <a href="https://en.wikipedia.org/wiki/ISO_8601#Durations">ISO 8601 duration</a>,
+    in which the item costs the {{ItemDetails/introductoryPrice}}. After this
+    period the item is epected to cost the {{ItemDetails/price}}.
+  * {{ItemDetails/introductoryPriceCycles}} is the number of subscription cycles
+    during which the {{ItemDetails/introductoryPrice}} is effective.
+</div>
+
+## PurchaseDetails dictionary ## {#purchaseDetails-dictionary}
+
+*This section is non-normative.*
+
+<div class="note">
+  A {{PurchaseDetails}} dictionary represents information about a digital item
+  from a {{Window/getDigitalGoodsService(serviceProvider)/serviceProvider}}
+  which the user has purchased at some point.
+
+  * {{PurchaseDetails/itemId}} identifies a particular digital item in the
+    current app's inventory. It is expected to be unique within the app but
+    might not be unique across all apps. It is expected to be equivalent to an
+    {{ItemDetails/itemId}} as used in the {{DigitalGoodsService/getDetails()}}
+    method.
+  * {{PurchaseDetails/purchaseToken}} is an abitrary token representing a
+    purchase as generated by the
+    {{Window/getDigitalGoodsService(serviceProvider)/serviceProvider}}. It is
+    intended to be able to be used to verify the purchase by contacting the
+    service provider directly (not part of the Digital Goods API).
+</div>
+
+# Permissions Policy integration # {#permissions-policy-integration}
+
+This specification defines a [=policy-controlled feature=] identified
+by the string "[=payment=]". Its <a>default
+allowlist</a> is '<code>self</code>'.
+
+Note: A [=document's=] [=Document/permissions policy=] determines
+whether any content in that document is allowed to get
+{{DigitalGoodsService}} instances. If disabled in any document, no content
+in the document will be [=allowed to use=] the {{Window/getDigitalGoodsService()}}
+method (trying to call the method will throw).
+
+# Additional Definitions # {#additional-definitions}
+<!-- TODO Not sure how to reference this correctly. Needs to be exported from the other spec? -->
+The "<dfn>payment</dfn>" permission is a [[permissions-policy]] feature
+<a href="https://www.w3.org/TR/payment-request/#dfn-payment-permission">defined
+  in the payment-request spec</a>.
+
+<!-- TODO Not sure how to reference this correctly. Needs to be exported from the other spec? -->
+A <dfn>canonical {{PaymentCurrencyAmount}}</dfn> is a
+{{PaymentCurrencyAmount}} <code>amount</code> that can be run through the steps to
+<a href="https://www.w3.org/TR/payment-request/#dfn-check-and-canonicalize-amount">
+  check and canonicalize amount</a> without throwing any errors or being altered.
+
+<!-- TODO figure out how to get iso-8601 to link to a definition. -->
+<dfn>iso-8601</dfn> is a standard for date and time representations.

@@ -36,6 +36,14 @@ urlPrefix: http://www.w3.org/TR/uievents-code/#code-; type: dfn; spec: uievents-
 	text: Quote
 </pre>
 
+<pre class="link-defaults">
+spec:dom; type:attribute; for:Event; text:bubbles
+spec:dom; type:attribute; for:Event; text:cancelable
+spec:dom; type:attribute; for:Event; text:type
+spec:keyboard-lock-1; type:interface; text:Keyboard
+spec:keyboard-lock-1; type:attribute; text:keyboard
+</pre>
+
 <h2 id="introduction">Introduction</h2>
 
 	On a {{KeyboardEvent}}, the {{KeyboardEvent/code}} attribute encodes
@@ -64,28 +72,13 @@ urlPrefix: http://www.w3.org/TR/uievents-code/#code-; type: dfn; spec: uievents-
 
 <h2 id="API">Keyboard Map API</h2>
 
+	The Keyboard Map API extends the {{Keyboard}} interface to add attributes and
+	methods related to the current keyboard layout.
+
 	<h3 id="navigator-interface">Navigator Interface</h3>
 
-		<pre class="idl" data-highlight="webidl">
-		[Exposed=Window]
-		partial interface Navigator {
-			[SecureContext, SameObject] readonly attribute Keyboard keyboard;
-		};
-		</pre>
-
-		<div id="navigator-idl" dfn-for="Navigator">
-
-		<div class="algorithm" data-algorithm="navigator-keyboard">
-		<h4 id="h-navigator-keyboard"><dfn>keyboard</dfn></h4>
-		The [=keyboard=] attribute must return the {{Navigator}}'s {{Keyboard}} object.
-		</div>
-
-		</div><!-- dfn-for Navigator -->
-
-		Note: The [=keyboard=] object is also defined in the 
-		<a href="https://w3c.github.io/keyboard-lock/#navigator-interface">Keyboard Lock</a>
-		specification. These two definitions will be reconciled once we decide on a final
-		home for these specifications.
+		The {{Navigator/keyboard}} attribute on the {{Navigator}} object is specified in
+		<a href="https://wicg.github.io/keyboard-lock/#navigator-interface">Keyboard-Lock</a>.
 		
 	<h3 id="keyboardlayoutmap-interface">KeyboardLayoutMap Interface</h3>
 
@@ -106,10 +99,14 @@ urlPrefix: http://www.w3.org/TR/uievents-code/#code-; type: dfn; spec: uievents-
 	<h3 id="keyboard-interface">Keyboard Interface</h3>
 
 		<pre class="idl" data-highlight="webidl">
-		[SecureContext, Exposed=Window] interface Keyboard {
+		partial interface Keyboard {
 			Promise&lt;KeyboardLayoutMap> getLayoutMap();
+
+			attribute EventHandler onlayoutchange;
 		};
 		</pre>
+
+		Note: The base {{Keyboard}} interface is specified in [[!Keyboard-Lock]].
 
 		<div id="keyboard-idl" dfn-for="Keyboard">
 
@@ -121,9 +118,11 @@ urlPrefix: http://www.w3.org/TR/uievents-code/#code-; type: dfn; spec: uievents-
 
 			1. Let |p| be a new {{Promise}}.
 			
-			1. If not currently executing in the currently active [=top-level browsing context=], then
-		
-				1. Reject |p| with an "{{InvalidStateError}}" {{DOMException}}.
+			1. If [=this=]'s [=relevant global object=]'s [=associated Document=] is not [=allowed to use=] the [=policy-controlled feature=] named "keyboard-map"
+			
+				1. [=Reject=] |p| with a "{{SecurityError}}" {{DOMException}}.
+
+				1. Return |p|
 
 			1. Run the following steps [=in parallel=]:
 			
@@ -222,28 +221,29 @@ urlPrefix: http://www.w3.org/TR/uievents-code/#code-; type: dfn; spec: uievents-
 
 <h2 id="keyboard-events">Keyboard Events</h2>
 
-	<h3 id="layoutchange-event">The <dfn>layoutchange</dfn> Event</h2>
+	<h3 id="layoutchange-event">The <dfn export>layoutchange</dfn> Event</h2>
 	
-		The [=layoutchange=] event fires on the [=keyboard=] object whenever the
-		current keyboard layout is changed. A layout change can occur when the user
-		selects a new layout, or it may happen automatically when the user performs an
-		action (e.g., switching to an application that has a preferred layout).
+		When the user agent detects that the current keyboard layout has changed, then
+		it MUST [=fire a layoutchange event=]. The exact timing of a layout change depends
+		on the underlying platform but it is commonly triggered either directly by a user
+		action (for example, when the user selects a new layout), or indirectly
+		(such as when switching to an application that has a preferred layout).
 		
 		Note the following:
 		
-		* Modifying the set of available layouts does not trigger a [=layoutchange=]
+		* Modifying the set of available layouts should not trigger a [=layoutchange=]
 			event, unless the modification changes the current layout.
 		
-		* Adding or removing a physical keyboard does not trigger an event unless
+		* Adding or removing a physical keyboard should not trigger an event unless
 			the system has functionality to change the current layout based on adding or 
 			removing a physical keyboard. But note that it is the layout change that
 			triggers this event, not the act of adding or removing the physical keyboard.
 		
-		* The event will be fired whenever the current layout changes, even if the
+		* The event must be fired whenever the current layout changes, even if the
 			highest priority ASCII-capable layout remains the same.
 
 		If the keyboard layout changes while the user agent is not the foreground
-		application, then the [=layoutchange=] event MUST fire when the user agent
+		application, then the user agent MUST [=fire a layoutchange event=] when it
 		regains focus.
 
 		<div class="example">
@@ -255,7 +255,25 @@ urlPrefix: http://www.w3.org/TR/uievents-code/#code-; type: dfn; spec: uievents-
 			});
 		</pre>
 		</div>
+
+	<div class="algorithm" data-algorithm="fire-a-layoutchange-event">
+	<h4 id="h-fire-a-layoutchange-event"><dfn>fire a layoutchange event</dfn></h4>
+
+	To fire a "layoutchange" event, [=fire an event=] named <dfn event for=Keyboard>layoutchange</dfn> at the {{keyboard}} attribute on the user agent's {{Navigator}} object.
+
+	</div>
 	
+<h2 id="integrations">Integrations</h2>
+
+	<h3 id="permissions-policy">Permissions Policy</h3>
+	
+		This specification defines a feature that controls whether the
+		[=getLayoutMap()=] method is exposed on the {{Keyboard}} interface.
+		
+		The feature name for this feature is "keyboard-map".
+		
+		The [=default allowlist=] for this feature is "self".
+
 <h2 id="mobile">Mobile Device Considerations</h2>
 
 	Since this is a keyboard-focused API and mobile devices do not commonly
@@ -301,7 +319,7 @@ urlPrefix: http://www.w3.org/TR/uievents-code/#code-; type: dfn; spec: uievents-
 	
 	As a first line of defense for the user, this specification requires that the API
 	is only available from [=secure contexts=] and can only be called from the currently
-	active [=top-level browsing context=].
+	active [=top-level browsing context=] or granted access via [=policy-controlled feature=].
 
 	User agents that are concerned about the privacy impact of providing this
 	keyboard mapping information can also consider the following mitigations:

@@ -1,0 +1,282 @@
+<pre class="metadata">
+Title: requestStorageAccessForOrigin API
+Shortname: storage-access-for-origin
+Abstract: The requestStorageAccessForOrigin API allows top-level sites to request access to cross-site cookies on behalf of embedded origins.
+Status Text: This specification is intended to be merged into the HTML Living Standard. It is neither a WHATWG Living Standard nor is it on the standards track at W3C.
+Text Macro: LICENSE <a href=https://creativecommons.org/licenses/by/4.0/>Creative Commons Attribution 4.0 International License</a>
+Group: privacycg
+ED: https://github.com/privacycg/requestStorageAccessForOrigin
+Status: CG-DRAFT
+Editor: Matt Reichhoff, w3cid 138889, Google https://google.com, mreichhoff@google.com
+Editor: Johann Hofmann, w3cid 120436, Google https://google.com, johannhof@google.com
+Level: None
+Markup Shorthands: markdown yes, css no
+Complain About: accidental-2119 true
+</pre>
+
+<pre class=link-defaults>
+spec:html; type:dfn; for:/; text:traversable navigable
+spec:html; type:dfn; for:site; text:same site
+spec:webidl; type:dfn; text:resolve
+spec:fetch; type:dfn; for:/; text:request
+</pre>
+
+<pre class="anchors">
+urlPrefix: https://tc39.github.io/ecma262/; spec: ECMASCRIPT
+    text: agent cluster; url: #sec-agent-clusters; type: dfn
+urlPrefix: https://w3c.github.io/permissions/; spec: permissions
+    text: permissions task source; url: #permissions-task-source; type: dfn
+urlPrefix: https://privacycg.github.io/storage-access/#; spec: storage-access
+    type: dfn
+        text: determine the storage access policy; url: determine-the-storage-access-policy
+        text: determine if a site has storage access; url: determine-if-a-site-has-storage-access
+        text: requestStorageAccess; url: dom-document-requeststorageaccess
+urlPrefix: https://fetch.spec.whatwg.org/#; spec: fetch
+    type: dfn
+        text: http network or cache fetch; url: http-network-or-cache-fetch
+</pre>
+<pre class="biblio">
+{
+  "STORAGE-ACCESS": {
+    "href": "https://privacycg.github.io/storage-access/",
+    "title": "Storage Access API",
+    "status": "CG Draft",
+    "deliveredBy": [
+      "https://www.w3.org/community/privacycg/"
+    ]
+  }
+}
+</pre>
+
+<section class="non-normative">
+<h2 id="intro">Introduction</h2>
+
+<em>This section is non-normative.</em>
+
+Many User Agents prevent content from accessing non-[=same site=] data stored in cookies. 
+This can break embedded content which relies on having access to non-[=same site=] cookies.
+
+The requestStorageAccessForOrigin API enables developers to request access to non-[=same site=] cookies for embedded resources such as iframes, scripts, or images.
+It accomplishes this by specifying {{Document/requestStorageAccessForOrigin(origin)}}, which allows [=traversable navigable=]s to request access
+to unpartitioned cookies on behalf of another [=/origin=].
+
+</section>
+
+<h2 id="infra">Infrastructure</h2>
+
+This specification depends on the Infra standard. [[!INFRA]]
+
+<h2 id="the-rsa-for-api">The requestStorageAccessForOrigin API</h2>
+
+This specification defines a method that can be used to request access to [=unpartitioned data=] on behalf of another [=/origin=] ({{Document/requestStorageAccessForOrigin(origin)}}).
+
+<div class=example>
+
+Alex visits `https://social.example/`. The page sets a cookie. This cookie has been set in a [=first-party-site context=].
+
+Later on, Alex visits `https://video.example/`, which has an <{img}> in it which loads `https://social.example/profile-image`. In this case, the `social.example` {{Document}} |doc| is in a [=third party context=], and the cookie set previously might or might not be visible from |doc|`.`{{Document/cookie}}, depending on User Agent storage access policies.
+
+A script on `https://video.example/` could request access on behalf of `https://social.example` by calling |doc|`.`{{Document/requestStorageAccessForOrigin(origin)}} with {{USVString}} <var ignore>origin</var> as `https://social.example`.
+
+Note: the circumstances for use of the access have to be limited to those cases where the requested origin opts into sharing. More information is available in [[#privacy]] and [[#security]].
+
+</div>
+
+<dfn>Unpartitioned data</dfn> is client-side storage that would be available to a [=site=] were it loaded in a [=first-party-site context=].
+
+A {{Document}} is in a <dfn>first-party-site context</dfn> if it is the [=active document=] of a [=traversable navigable=]. Otherwise, it is in a [=first-party-site context=] if it is an [=active document=] and the [=environment settings object/origin=] and [=top-level origin=] of its [=relevant settings object=] are [=same site=] with one another.
+
+A {{Document}} is in a <dfn>third party context</dfn> if it is not in a [=first-party-site context=].
+
+<h3 id="the-document-object">Changes to {{Document}}</h3>
+
+<pre class="idl">
+partial interface Document {
+  Promise&lt;undefined> requestStorageAccessForOrigin(USVString origin);
+};
+</pre>
+
+<div algorithm>
+When invoked on {{Document}} |doc| with {{USVString}} |requestedOrigin|, the <dfn export method for=Document><code>requestStorageAccessForOrigin(requestedOrigin)</code></dfn> method must run these steps:
+
+1. Let |p| be [=a new promise=].
+1. If |doc| is not [=Document/fully active=], then [=reject=] |p| with an "{{InvalidStateError}}" {{DOMException}} and return |p|.
+1. If |doc|'s [=node navigable=] is not a [=traversable navigable=], [=reject=] |p| with an "{{InvalidStateError}}" {{DOMException}} and return |p|.
+1. If |doc|'s [=Document/origin=] is an [=opaque origin=], [=reject=] |p| with an "{{InvalidStateError}}" {{DOMException}} and return |p|.
+1. If |doc|'s [=relevant global object=] is not a [=secure context=], then [=reject=] |p| with a "{{NotAllowedError}}" {{DOMException}} and return |p|.
+1. Let |parsedURL| be the the result of running the [=URL parser=] on |requestedOrigin|.
+1. If |parsedURL| is failure, [=reject=] |p| with a "{{TypeError}}" {{DOMException}} and return |p|.
+1. Let |origin| be |parsedURL|'s [=/origin=].
+1. If |origin| is an [=opaque origin=], [=reject=] |p| with an "{{InvalidStateError}}" {{DOMException}} and return |p|.
+1. If |doc|'s [=Document/origin=] is [=same origin=] with |origin|, [=resolve=] and return |p|.
+1. Let |descriptor| be a newly created {{TopLevelStorageAccessPermissionDescriptor}} with {{PermissionDescriptor/name}} set to "<a permission><code>top-level-storage-access</code></a>" and with {{TopLevelStorageAccessPermissionDescriptor/requestedOrigin}} set to |origin|.
+1. Let |has activation| be true if |doc|'s {{Window}} object has [=transient activation=], and false otherwise.
+1. Run these steps [=in parallel=]:
+    1. Let |top-level site| be the result of [=obtain a site|obtaining a site=] from |doc|'s [=relevant settings object=]'s [=environment settings object/origin=].
+    1. [=Determine the top-level storage access policy=] with |descriptor|, |doc|, |top-level site|, |has activation|, and |p|.
+1. Return |p|.
+
+</div>
+
+<h3 id="ua-policies">User Agent top-level storage access policies</h3>
+
+<div algorithm>
+To <dfn>determine if a request has top-level storage access</dfn> with [=request=] |request|, run these steps:
+
+1. Let |settings| be |request|'s [=request/client=]'s [=relevant global object=]'s [=relevant settings object=].
+1. Let |embedded origin| be |request|'s [=request/url=]'s [=url/origin=].
+1. Let |descriptor| be a newly created {{TopLevelStorageAccessPermissionDescriptor}} with {{PermissionDescriptor/name}} set to "<a permission><code>top-level-storage-access</code></a>" and with {{TopLevelStorageAccessPermissionDescriptor/requestedOrigin}} set to |embedded origin|.
+1. Let |existing state| be |descriptor|'s [=permission state=] with |settings|.
+1. If |existing state| is [=permission/granted=], return true.
+1. Return false.
+
+</div>
+
+ISSUE(privacycg/requestStorageAccessForOrigin#15): The permissions task source shouldn't be used directly.
+
+<div algorithm>
+To <dfn>determine the top-level storage access policy</dfn> for {{TopLevelStorageAccessPermissionDescriptor}} |descriptor|, with {{Document}} |doc|, [=site=] |top-level site|, [=boolean=] |has activation|, and {{Promise}} |p|, run these steps:
+1. Let |settings| be |doc|'s [=relevant settings object=].
+1. Let |global| be |doc|'s [=relevant global object=].
+1. Let |existing state| be |descriptor|'s [=permission state=] with |settings|.
+1. If |existing state| is [=permission/granted=]:
+    1. [=Queue a global task=] on the [=permissions task source=] given |global| to [=resolve=] |p|.
+    1. Return.
+1. If |existing state| is [=permission/denied=]:
+    1. [=Queue a global task=] on the [=permissions task source=] given |global| to [=reject=] |p| with a "{{NotAllowedError}}" {{DOMException}}.
+    1. Return.
+1. Assert that |doc|'s [=node navigable=] is a [=traversable navigable=].
+1. If |has activation| is false:
+    1. [=Queue a global task=] on the [=permissions task source=] given |global| to [=reject=] |p| with a n "{{InvalidStateError}}" {{DOMException}}.
+    1. Return.
+1. Let |implicitly granted| and |implicitly denied| (each a [=boolean=]) be the result of running an [=implementation-defined=] set of steps to determine if |top-level site|'s request for |descriptor|'s {{TopLevelStorageAccessPermissionDescriptor/requestedOrigin}} should be granted or denied without prompting the user.
+1. If |implicitly granted| is true:
+    1. [=Queue a global task=] on the [=permissions task source=] given |global| to [=resolve=] |p|.
+    1. Return.
+1. If |implicitly denied| is true:
+    1. [=Queue a global task=] on the [=permissions task source=] given |global| to [=reject=] |p| with a "{{NotAllowedError}}" {{DOMException}}.
+    1. Return.
+1. Let |permissionState| be the result of [=requesting permission to use=] "<a permission><code>top-level-storage-access</code></a>" with |descriptor|.
+1. If |permissionState| is [=permission/granted=]:
+    1. [=Queue a global task=] on the [=permissions task source=] given |global| to [=resolve=] |p|.
+    1. Return.
+1. If |doc|'s {{Window}} object has [=transient activation=], [=consume user activation=] with it.
+1. [=Queue a global task=] on the [=permissions task source=] given |global| to [=reject=] |p| with a "{{NotAllowedError}}" {{DOMException}}.
+
+</div>
+
+<h2 id="permissions-integration">Permissions Integration</h2>
+
+The requestStorageAccessForOrigin API defines a [=powerful feature=] identified by the [=powerful feature/name=] "<dfn export permission><code>top-level-storage-access</code></dfn>". It defines the following permission-related algorithms:
+
+<dl>
+  <dt>{{PermissionDescriptor}}</dt>
+  <dd>
+    The "<a permission><code>top-level-storage-access</code></a>" [=powerful feature=] defines a {{PermissionDescriptor}} as follows:
+    <pre class="idl">
+        dictionary TopLevelStorageAccessPermissionDescriptor : PermissionDescriptor {
+            USVString requestedOrigin = "";
+        };
+    </pre>
+  </dd>
+  <dt>[=powerful feature/permission query algorithm=]</dt>
+  <dd>
+    <div algorithm='top-level-storage-access-query'>
+    To query the "<a permission><code>top-level-storage-access</code></a>" permission, given a {{PermissionDescriptor}} |permissionDesc| and a {{PermissionStatus}} |status|, run the following steps:
+
+    1. Set |status|'s {{PermissionStatus/state}} to |permissionDesc|'s [=permission state=].
+    1. If |status|'s {{PermissionStatus/state}} is [=permission/denied=], set |status|'s {{PermissionStatus/state}} to [=permission/prompt=].
+
+        Note: The [=permission/denied=] permission state is not revealed to avoid exposing the user's decision to developers. This is done to prevent retaliation against the user and repeated prompting to the detriment of the user experience.
+
+    </div>
+  </dd>
+  <dt>[=powerful feature/permission key type=]</dt>
+  <dd>
+    A [=permission key=] of the "<a permission><code>top-level-storage-access</code></a>" feature has the type [=site=].
+  </dd>
+  <dt>[=powerful feature/permission key generation algorithm=]</dt>
+  <dd>
+    <div algorithm='top-level-storage-access-key-generation'>
+    To generate a new [=permission key=] for the "<a permission><code>top-level-storage-access</code></a>" feature, given an [=environment settings object=] |settings|, run the following steps:
+    1. Return the result of [=obtain a site|obtaining a site=] from |settings|' [=top-level origin=].
+
+    </div>
+  </dd>
+</dl>
+
+<h2 id="fetch-integration">Fetch Integration</h2>
+
+The {{Document/requestStorageAccessForOrigin(origin)}} only directly affects cookie behavior on subresource requests made from top-level documents to the requested [=/origin=].
+
+<div algorithm='cookie-blocking-modification'>
+In [=http network or cache fetch=], when determining whether to block cookies, run the following algorithm. A true result means cookies can be unblocked:
+1. Let |has top-level access| be the result of running [=determine if a request has top-level storage access=] on |request|.
+1. If |has top-level access| is false, return false.
+1. Let |is subresource| be true if |request| is a [=subresource request=] and false otherwise.
+1. Let |allowed subresource mode| be true if |request|'s [=request/mode=] is "cors" and |request|'s [=request/credentials mode=] is "include", and false otherwise.
+1. If |is subresource| is true and |allowed subresource mode| is false, return false.
+1. If |request|'s [=request/client=]'s [=relevant global object=]'s [=associated document=] is not a [=traversable navigable=], return false.
+1. Return true.
+
+</div>
+
+<h2 id="storage-access-api-integration">Storage Access API Integration</h2>
+
+Note: even after a successful {{Document/requestStorageAccessForOrigin(origin)}} call, frames have to explicitly invoke [=requestStorageAccess=] for cookie access.
+This modification allows {{Document/requestStorageAccessForOrigin(origin)}} to allow resolution of [=requestStorageAccess=] calls similarly to a prior successful [=requestStorageAccess=] grant.
+
+ISSUE: This algorithm may need adjustments based on outcome of https://github.com/privacycg/storage-access/pull/141
+
+<div algorithm='storage-access-policy-modification'>
+Modify the [=determine the storage access policy=] algorithm by prepending the following steps:
+1. Let |settings| be <var ignore>doc</var>'s [=relevant settings object=].
+1. Let |origin| be |settings|' [=environment settings object/origin=].
+1. Let |descriptor| be a newly created {{TopLevelStorageAccessPermissionDescriptor}} with {{PermissionDescriptor/name}} set to "<a permission><code>top-level-storage-access</code></a>" and with {{TopLevelStorageAccessPermissionDescriptor/requestedOrigin}} set to |origin|.
+1. If |descriptor|'s [=permission state=] is [=permission/granted=], [=queue a global task=] on the [=permissions task source=] given |global| to [=resolve=] |p|, and return.
+1. If |descriptor|'s [=permission state=] is [=permission/denied=], [=queue a global task=] on the [=permissions task source=] given |global| to [=reject=] |p| with a "{{NotAllowedError}}" {{DOMException}}, and return.
+
+</div>
+
+<h2 id="privacy">Privacy considerations</h2>
+
+Like the [[STORAGE-ACCESS]], {{Document/requestStorageAccessForOrigin(origin)}} is intended to enable removal of cross-site cookies. It enables developers to re-gain cross-site cookies with additional constraints.
+
+Note: many of the same considerations as in [[STORAGE-ACCESS#privacy]] apply. This section primarily covers the differences.
+
+[=requestStorageAccess=] requires interaction with an embedded document. By requiring interaction only with the top-level document, {{Document/requestStorageAccessForOrigin(origin)}} 
+lowers the bar for a potential prompt, though embedded documents can also be quite prominent (or use other techniques to get user interaction).
+[=Implementation-defined=] acceptance and rejection steps are intended to allow user agents to reject abusive requests based on logic they see fit.
+The prompts used have to be careful to indicate the direction of the request, such that the user is able to understand who is requesting access.
+
+As with [=requestStorageAccess=], the same tension between user consent and prompt fatigue exists with {{Document/requestStorageAccessForOrigin(origin)}}; much like the Storage Access API, 
+[=implementation-defined=] acceptance and rejection steps are intended to enable implementers with differing stances on this question to make compromises as they see fit.
+
+<h2 id="security">Security considerations</h2>
+
+It is important that {{Document/requestStorageAccessForOrigin(origin)}} not degrade security properties of the web platform, even when compared to post-removal of cross-site cookies. 
+Third-party cookie removal <a href="https://docs.google.com/document/d/1AsrETl-7XvnZNbG81Zy9BcZfKbqACQYBSrjM3VsIpjY/edit">has potential benefits for security</a>, specifically in mitigating attacks that rely upon authenticated requests, e.g. CSRF.
+We do not wish {{Document/requestStorageAccessForOrigin(origin)}} to be a foothold for such attacks to leverage.
+
+Note: [[STORAGE-ACCESS#security]] properties hold for much of this proposal. Specifically, frame-level access is only granted once [=requestStorageAccess=] is successfully invoked.
+For frame access, {{Document/requestStorageAccessForOrigin(origin)}} merely simplifies the activation and prompting requirements.
+
+{{Document/requestStorageAccessForOrigin(origin)}} does expand the scope of concerns in two areas: subresource requests made by the top-level document and potential notification abuse.
+
+<h3 id="subresources">Subresource Requests</h3>
+
+The specific security controls proposed by the API are:
+* Any cookies included with the subresource request have to be explicitly marked `SameSite=None`, indicating intent for use in [=third party contexts=].
+* For any `SameSite=None` cookies to be included, the request's [=request/mode=] has to be "cors", where reading of the response is blocked unless the embeddee opts-in via sending the appropriate [:access-control-allow-credentials:] header. The sending of the [:origin:] header ensures the embeddee is aware of the embedder's identity.
+
+Additionally, only requests initiated from the top-level document will be eligible for inclusion of `SameSite=None` cookies. This ensures that other embedded frames do not receive escalated privileges.
+
+<h3 id="notification-abuse">Notification Abuse</h3>
+
+Unlike the [[STORAGE-ACCESS]], interaction is only required with the top-level document, rather than an embedded document. This does increase the likelihood of prompting.
+
+Like the Storage Access API, user activation is consumed on denial, which prevents repeated requests.
+
+The [=implementation-defined=] rejection steps also allow for imposition of numeric limits or denylists for abusive actors.
+
+As mentioned in [[#privacy]], because of the direction of the request, the language in user agents' prompts should indicate which site initiated the storage access request.

@@ -1,0 +1,324 @@
+<pre class="metadata">
+Title: No-Vary-Search
+Shortname: no-vary-search
+Group: WICG
+Status: CG-DRAFT
+Repository: WICG/nav-speculation
+URL: https://wicg.github.io/nav-speculation/no-vary-search.html
+Level: 1
+Editor: Domenic Denicola, Google https://www.google.com/, d@domenic.me
+Abstract: A proposed HTTP header field for changing how URL search parameters impact caching
+Markup Shorthands: css no, markdown yes
+Assume Explicit For: yes
+Complain About: accidental-2119 yes, missing-example-ids yes
+Indent: 2
+Boilerplate: omit conformance
+</pre>
+<pre class="anchors">
+spec: RFC8941; urlPrefix: https://www.rfc-editor.org/rfc/rfc8941.html
+  type: dfn
+    text: structured header; url: #section-1
+    for: structured header
+      text: dictionary; url: name-dictionaries
+      text: boolean; url: name-boolean
+      text: inner list; url: name-inner-lists
+</pre>
+<style>
+#example-equivalence-canonicalization table {
+  border-collapse: collapse;
+}
+
+#example-equivalence-canonicalization table :is(td, th):first-of-type {
+  border-right: 1px solid black;
+  padding-right: 20px;
+}
+
+#example-equivalence-canonicalization table :is(td, th):nth-of-type(2) {
+  padding-left: 5px;
+}
+
+#example-equivalence-canonicalization table tr.group {
+  border-top: 1px solid black;
+}
+</style>
+
+<h2 id="status-and-venue">Status and venue note</h2>
+
+This document is being written as a web-style specification in the WICG for now, because that's the tooling and venue the author is familiar with. Its purpose is to nail down some details of the processing model in order to make writing and testing prototypes easier.
+
+In the longer term, we envision this header being specified in a HTTPWG RFC, alongside whatever portion of the processing model can be shared among its various consumers. (That is, between both web platform specifications such as [[FETCH]], and HTTP specifications such as future modifications to [[RFC9111]].) It's just incubating in WICG for now.
+
+<h2 id="header-definition">HTTP header field definition</h2>
+
+The \`<dfn http-header><code>No-Vary-Search</code></dfn>\` HTTP header field is a [=structured header=] whose value must be a [=structured header/dictionary=].
+
+TODO: probably give some more introductory non-normative text. Look at what other HTTP field defintions do.
+
+It has the following authoring conformance requirements:
+
+* The dictionary must only contain entries whose keys are one of `key-order`, `params`, `except`.
+* If present, the `key-order` entry's value must be a [=structured header/boolean=].
+* If present, the `params` entry's value must be either a [=structured header/boolean=] or an [=structured header/inner list=].
+* If present, the `except` entry's value must be a [=structured header/inner list=].
+* The `except` entry must only be present if the `params` entry is also present, and the `params` entry's value is the boolean value true.
+
+<p class="note">As always, the authoring conformance requirements are not binding on implementations. Implementations instead need to implement the processing model given by the [=obtain a URL search variance=] algorithm.
+
+<h2 id="model">Data model</h2>
+
+A <dfn>URL search variance</dfn> is a [=struct=] whose [=struct/items=] are the following:
+
+* <dfn for="URL search variance">no-vary params</dfn>, either the special value <dfn for="URL search variance/no-vary params">wildcard</dfn> or a [=list=] of [=strings=]
+* <dfn for="URL search variance">vary params</dfn>, either the special value <dfn for="URL search variance/vary params">wildcard</dfn> or a [=list=] of [=strings=]
+* <dfn for="URL search variance">vary on key order</dfn>, a [=boolean=]
+
+The <dfn>default URL search variance</dfn> is a [=URL search variance=] whose [=URL search variance/no-vary params=] is an empty list, [=URL search variance/vary params=] is [=URL search variance/vary params/wildcard=], and [=URL search variance/vary on key order=] is true.
+
+The [=obtain a URL search variance=] algorithm ensures that all [=URL search variances=] obey the following constraints:
+
+* [=URL search variance/vary params=] is a [=list=] if and only if the [=URL search variance/no-vary params=] is [=URL search variance/no-vary params/wildcard=]; and
+* [=URL search variance/no-vary params=] is a [=list=] if and only if the [=URL search variance/vary params=] is [=URL search variance/vary params/wildcard=].
+
+<h2 id="parsing">Parsing</h2>
+
+<div algorithm>
+  To <dfn>obtain a URL search variance</dfn> given a [=response=] |response|:
+
+  1. Let |value| be the result of [=header list/getting a structured field value=] given [:No-Vary-Search:] and "`dictionary`" from |response|'s [=response/header list=].
+  1. If |value| is null, then return the [=default URL search variance=].
+  1. If |value|'s [=map/keys=] [=list/contains=] anything other than "`key-order`", "`params`", or "`except`", then return the [=default URL search variance=].
+  1. Let |result| be a new [=URL search variance=].
+  1. Set |result|'s [=URL search variance/vary on key order=] to true.
+  1. If |value|["`key-order`"] [=map/exists=]:
+    1. If |value|["`key-order`"] is not a [=boolean=], then return the [=default URL search variance=].
+    1. Set |result|'s [=URL search variance/vary on key order=] to the boolean negation of |value|["`key-order`"].
+  1. If |value|["`params`"] [=map/exists=]:
+    1. If |value|["`params`"] is a [=boolean=]:
+      1. If |value|["`params`"] is true, then:
+        1. Set |result|'s [=URL search variance/no-vary params=] to [=URL search variance/no-vary params/wildcard=].
+        1. Set |result|'s [=URL search variance/vary params=] to the empty list.
+      1. Otherwise:
+        1. Set |result|'s [=URL search variance/no-vary params=] to the empty list.
+        1. Set |result|'s [=URL search variance/vary params=] to [=URL search variance/no-vary params/wildcard=].
+    1. Otherwise, if |value|["`params`"] is a [=list=]:
+      1. If any [=list/item=] in |value|["`params`"] is not a [=string=], then return the [=default URL search variance=].
+      1. Set |result|'s [=URL search variance/no-vary params=] to the result of applying [=parse a key=] to each [=list/item=] in |value|["`params`"].
+      1. Set |result|'s [=URL search variance/vary params=] to [=URL search variance/no-vary params/wildcard=].
+    1. Otherwise, return the [=default URL search variance=].
+  1. If |value|["`except`"] [=map/exists=]:
+    1. If |value|["`params`"] is not true, then return the [=default URL search variance=].
+    1. If |value|["`except`"] is not a [=list=], then return the [=default URL search variance=].
+    1. If any [=list/item=] in |value|["`except`"] is not a [=string=], then return the [=default URL search variance=].
+    1. Set |result|'s [=URL search variance/vary params=] to the result of applying [=parse a key=] to each [=list/item=] in |value|["`except`"].
+  1. Return |result|.
+
+  <p class="note">In general, this algorithm is strict and tends to return the [=default URL search variance=] whenever it sees something it doesn't recognize. This is because the [=default URL search variance=] behavior will just cause fewer cache hits, which is an acceptable fallback behavior.
+</div>
+
+<div class="example" id="example-parsing-vary-vs-no-vary">
+  The following illustrates how various inputs are parsed, in terms of their impacting on the resulting [=URL search variance/no-vary params=] and [=URL search variance/vary params=]:
+
+  <table class="data">
+    <thead>
+      <tr>
+        <th>Input</th>
+        <th>Result</th>
+    <tbody>
+      <tr>
+        <td><pre highlight="http">No-Vary-Search: params</pre>
+        <td>
+          * [=URL search variance/no-vary params=]: [=URL search variance/no-vary params/wildcard=]
+          * [=URL search variance/vary params=]: (empty list)
+      <tr>
+        <td><pre highlight="http">No-Vary-Search: params=("a")</pre>
+        <td>
+          * [=URL search variance/no-vary params=]: « "`a`" »
+          * [=URL search variance/vary params=]:  [=URL search variance/vary params/wildcard=]
+      <tr>
+        <td><pre highlight="http">No-Vary-Search: params, except=("x")</pre>
+        <td>
+          * [=URL search variance/no-vary params=]: [=URL search variance/no-vary params/wildcard=]
+          * [=URL search variance/vary params=]: « "`x`" »
+  </table>
+</div>
+
+<div class="example" id="example-parsing-invalid">
+  The following inputs are all invalid and will cause the [=default URL search variance=] to be returned:
+
+  * `No-Vary-Search: unknown-key`
+  * `No-Vary-Search: key-order="not a boolean"`
+  * `No-Vary-Search: params="not a boolean or inner list"`
+  * `No-Vary-Search: params=(not-a-string)`
+  * `No-Vary-Search: params=("a"), except=("x")`
+  * `No-Vary-Search: params=(), except=()`
+  * `No-Vary-Search: params=?0, except=("x")`
+  * `No-Vary-Search: params, except=(not-a-string)`
+  * `No-Vary-Search: params, except="not an inner list"`
+  * `No-Vary-Search: params, except=?1`
+  * `No-Vary-Search: except=("x")`
+  * `No-Vary-Search: except=()`
+</div>
+
+<div class="example" id="example-parsing-unconventional">
+  The following inputs are valid, but somewhat unconventional. They are shown alongside their more conventional form.
+
+  <table>
+    <thead>
+      <tr>
+        <th>Input
+        <th>Conventional form
+    <tbody>
+      <tr>
+        <td><pre highlight="http">No-Vary-Search: params=?1</pre>
+        <td><pre highlight="http">No-Vary-Search: params</pre>
+      <tr>
+        <td><pre highlight="http">No-Vary-Search: key-order=?1</pre>
+        <td><pre highlight="http">No-Vary-Search: key-order</pre>
+      <tr>
+        <td><pre highlight="http">No-Vary-Search: params, key-order, except=("x")</pre>
+        <td><pre highlight="http">No-Vary-Search: key-order, params, except=("x")</pre>
+      <tr>
+        <td><pre highlight="http">No-Vary-Search: params=?0</pre>
+        <td>(omit the header)
+      <tr>
+        <td><pre highlight="http">No-Vary-Search: params=()</pre>
+        <td>(omit the header)
+      <tr>
+        <td><pre highlight="http">No-Vary-Search: key-order=?0</pre>
+        <td>(omit the header)
+  </table>
+</div>
+
+<div algorithm>
+  To <dfn>parse a key</dfn> given an [=ASCII string=] |keyString|:
+
+  1. Let |keyBytes| be the [=isomorphic encoding=] of |keyString|.
+
+  1. Replace any 0x2B (+) in |keyBytes| with 0x20 (SP).
+
+  1. Let |keyBytesDecoded| be the [=byte sequence/percent-decoding=] of |keyBytes|.
+
+  1. Let |keyStringDecoded| be the [=UTF-8 decode without BOM|UTF-8 decoding without BOM=] of |keyBytesDecoded|.
+
+  1. Return |keyStringDecoded|.
+</div>
+
+<div class="example" id="example-parse-a-key">
+  The [=parse a key=] algorithm allows encoding non-ASCII key strings in the ASCII structured header format, similar to how the <a><code>application/x-www-form-urlencoded</code></a> format allows encoding an entire entry list of keys and values in ASCII URL format. For example,
+
+  <pre highlight="http">No-Vary-Search: params=("%C3%A9+%E6%B0%97")</pre>
+
+  will result in a [=URL search variance=] whose [=URL search variance/vary params=] are « "`é 気`" ». As explained in <a href="#example-equivalence-canonicalization">a later example</a>, the canonicalization process during [=equivalent modulo search variance|equivalence testing=] means this will treat as equivalent URL strings such as:
+
+  * `https://example.com/?é 気=1`
+  * `https://example.com/?é+気=2`
+  * `https://example.com/?%C3%A9%20気=3`
+  * `https://example.com/?%C3%A9+%E6%B0%97=4`
+
+  and so on, since they all are [=urlencoded parser|parsed=] to having the same key "`é 気`".
+</div>
+
+<h2 id="comparing">Comparing</h2>
+
+Two [=URLs=] |urlA| and |urlB| are <dfn export>equivalent modulo search variance</dfn> given a [=URL search variance=] |searchVariance| if the following algorithm returns true:
+
+1. If the [=url/scheme=], [=url/username=], [=url/password=], [=url/host=], [=url/port=], or [=url/path=] of |urlA| and |urlB| differ, then return false.
+
+1. If |searchVariance| is equivalent to the [=default URL search variance=], then:
+
+  1. If |urlA|'s [=url/query=] equals |urlB|'s [=url/query=], then return true.
+
+  1. Return false.
+
+  <p class="note">In this case, even [=URL=] pairs that might appear the same after running the [=urlencoded parser|application/x-www-form-urlencoded parser=] on their [=url/queries=], such as `https://example.com/a` and `https://example.com/a?`, or `https://example.com/foo?a=b&&&c` and `https://example.com/foo?a=b&c=`, will be treated as inequivalent.
+
+1. Let |searchParamsA| and |searchParamsB| be empty [=lists=].
+
+1. If |urlA|'s [=url/query=] is not null, then set |searchParamsA| to the result of running the [=urlencoded parser|application/x-www-form-urlencoded parser=] given the [=isomorphic encoding=] of |urlA|'s [=url/query=].
+
+1. If |urlB|'s [=url/query=] is not null, then set |searchParamsB| to the result of running the [=urlencoded parser|application/x-www-form-urlencoded parser=] given the [=isomorphic encoding=] of |urlB|'s [=url/query=].
+
+1. If |searchVariance|'s [=URL search variance/no-vary params=] is a [=list=], then:
+
+  1. Set |searchParamsA| to a [=list=] containing those [=list/items=] |pair| in |searchParamsA| where |searchVariance|'s [=URL search variance/no-vary params=] does not [=list/contain=] |pair|[0].
+
+  1. Set |searchParamsB| to a [=list=] containing those [=list/items=] |pair| in |searchParamsB| where |searchVariance|'s [=URL search variance/no-vary params=] does not [=list/contain=] |pair|[0].
+
+1. Otherwise, if |searchVariance|'s [=URL search variance/vary params=] is a [=list=], then:
+
+  1. Set |searchParamsA| to a [=list=] containing those [=list/items=] |pair| in |searchParamsA| where |searchVariance|'s [=URL search variance/vary params=] [=list/contains=] |pair|[0].
+
+  1. Set |searchParamsB| to a [=list=] containing those [=list/items=] |pair| in |searchParamsB| where |searchVariance|'s [=URL search variance/vary params=] [=list/contains=] |pair|[0].
+
+1. If |searchVariance|'s [=URL search variance/vary on key order=] is false, then:
+
+  1. Let |keyLessThan| be an algorithm taking as inputs two pairs (|keyA|, <var ignore>valueA</var>) and (|keyB|, <var ignore>valueB</var>), which returns whether |keyA| is [=code unit less than=] |keyB|.
+
+  1. Set |searchParamsA| to the result of [=list/sorting in ascending order=] |searchParamsA|, with |keyLessThan|.
+
+  1. Set |searchParamsB| to the result of [=list/sorting in ascending order=] |searchParamsB|, with |keyLessThan|.
+
+1. If |searchParamsA|'s [=list/size=] is not equal to |searchParamsB|'s [=list/size=], then return false.
+
+1. Let |i| be 0.
+
+1. [=iteration/While=] |i| &lt; |searchParamsA|'s [=list/size=]:
+
+  1. If |searchParamsA|[|i|][0] does not equal |searchParamsB|[|i|][0], then return false.
+
+  1. If |searchParamsA|[|i|][1] does not equal |searchParamsB|[|i|][1], then return false.
+
+  1. Set |i| to |i| + 1.
+
+1. Return true.
+
+<div class="example" id="example-equivalence-canonicalization">
+  Due to how the [=urlencoded parser|application/x-www-form-urlencoded parser=] canonicalizes query strings, there are some cases where query strings which do not appear obviously equivalent, will end up being treated as equivalent after parsing.
+
+  So, for example, given any non-default value for `No-Vary-Search`, such as `No-Vary-Search: key-order`, we will have the following equivalences:
+
+  <table>
+    <thead>
+      <tr>
+        <th>Equivalent URL strings
+        <th>Explanation
+    <tbody>
+      <tr class="group">
+        <td>`https://example.com/`
+        <td rowspan=2>A null [=url/query=] is parsed the same as an empty string query
+      <tr>
+        <td>`https://example.com/?`
+      <tr class="group">
+        <td>`https://example.com/?a=x`
+        <td rowspan=2>Parsing performs percent-decoding
+      <tr>
+        <td>`https://example.com/?%61=%78`
+      <tr class="group">
+        <td>`https://example.com/?a=é`
+        <td rowspan=2>Parsing performs percent-decoding
+      <tr>
+        <td>`https://example.com/?a=%C3%A9`
+      <tr class="group">
+        <td>`https://example.com/?a=%f6`
+        <td rowspan=2>Both values are parsed as U+FFFD (�)
+      <tr>
+        <td>`https://example.com/?a=%ef%bf%bd`
+      <tr class="group">
+        <td>`https://example.com/?a=x&&&&`
+        <td rowspan=2>Parsing splits on `&` and discards empty strings
+      <tr>
+        <td>`https://example.com/?a=x`
+      <tr class="group">
+        <td>`https://example.com/?a=`
+        <td rowspan=2>Both parse as having an empty string value for `a`
+      <tr>
+        <td>`https://example.com/?a`
+      <tr class="group">
+        <td>`https://example.com/?a=%20`
+        <td rowspan=3>`+` and `%20` are both parsed as U+0020 SPACE
+      <tr>
+        <td>`https://example.com/?a=+`
+      <tr>
+        <td>`https://example.com/?a= &`
+  </table>
+</div>

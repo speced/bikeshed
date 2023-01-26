@@ -1,0 +1,367 @@
+<pre class='metadata'>
+Title:  Color API
+Status: Dream
+Work Status: exploring
+ED: https://wicg.github.io/color-api
+Shortname: color
+Level: 1
+Abstract: A color space agnostic class for color specification, manipulation, and conversion.
+Editor: Chris Lilley, W3C, https://svgees.us/, w3cid 1438
+Editor: Lea Verou, Invited Expert, http://lea.verou.me/about, w3cid 52258
+Editor: Tab Atkins Jr., Google, http://xanthir.com/contact, w3cid 42199
+Repository: wicg/color-api
+Inline Github Issues: title
+Markup Shorthands: markdown yes
+</pre>
+
+<style>
+/* Put nice boxes around each algorithm.
+   Credits: from Typed OM
+ */
+[data-algorithm]:not(.heading) {
+  padding: .5em;
+  border: thin solid #ddd; border-radius: .5em;
+  margin: .5em calc(-0.5em - 1px);
+}
+[data-algorithm]:not(.heading) > :first-child {
+  margin-top: 0;
+}
+[data-algorithm]:not(.heading) > :last-child {
+  margin-bottom: 0;
+}
+[data-algorithm] [data-algorithm] {
+	margin: 1em 0;
+}
+</style>
+
+Introduction {#intro}
+=====================
+
+Many APIs on the Web platform need to be able to accept color input
+and provide color output
+in a format more structured than CSS `<color>` strings.
+Furthermore, authors often need to perform computations on color values,
+such as manipulating components in a variety of color spaces,
+computing color differences,
+evaluating whether color pairs have sufficient contrast,
+or interpolating two colors (regardless of what color space they are specified in).
+
+The API presented in this document aims to address all of the
+<a href="https://github.com/LeaVerou/color-api#readme">common use cases</a>,
+and provide extensibility points to enable more complex use cases to be expressed.
+
+Issue(1):
+
+API objects {#objects}
+=======================
+
+{{Color}} objects {#color-objects}
+-----------------------------------
+
+{{Color}} objects represent ...TBD
+
+<xmp class='idl'>
+[Exposed=(Window, Worker, PaintWorklet, LayoutWorklet)]
+interface Color {
+	// Default constructor
+	constructor(
+		(CSSOMString or ColorSpace) colorSpace,
+		sequence<double> coords,
+		optional double alpha = 1
+	);
+
+	// Parse CSS color
+	constructor(CSSOMString cssText);
+
+	// Clone color instance or create from JSON-style object
+	constructor((Color or CSSColorValue or ColorJSON) color);
+
+	attribute CSSOMString colorSpace;
+	attribute ObservableArray<double> coords;
+	attribute double alpha;
+
+	// Get/set coordinates (in this or other color spaces)
+	double get((CSSOMString or ColorSpace) colorSpace, (CSSOMString or unsigned short) coord);
+	double get((CSSOMString or unsigned short) coord);
+
+	Color set(
+		(CSSOMString or ColorSpace) colorSpace,
+		(CSSOMString or unsigned short) coord,
+		(double or relativeCoordCallback) value
+	);
+	Color set(
+		(CSSOMString or unsigned short) coord,
+		(double or relativeCoordCallback) value
+	);
+	Color set((CSSOMString or ColorSpace) colorSpace, object values);
+	Color set(object values);
+
+	// Convert to another color space
+	Color to(CSSOMString colorspace);
+
+	// Check whether a color is in gamut of a given color space
+	boolean inGamut(optional CSSOMString colorspace);
+
+	// Bring a color into gamut of a given colorspace
+	Color toGamut(optional CSSOMString colorSpace, optional ToGamutOptions options);
+
+	stringifier;
+
+	ColorJSON toJSON();
+
+	// Color difference
+	double deltaE(Color color, optional DeltaEMethod method);
+};
+
+dictionary ToGamutOptions {
+	coordReference? method = "lch.c";
+};
+
+dictionary coordReference {
+	(CSSOMString or ColorSpace) colorSpace;
+	CSSOMString name;
+};
+
+// TODO: we want authors to be able to extend this
+// If we keep it an enum, the only way to add custom deltaE methods
+// is a separate method.
+enum DeltaEMethod {
+	"76",    // fast, but limited accuracy
+	"2000",  // slower, but accurate
+};
+
+dictionary ColorJSON {
+	CSSOMString colorSpace;
+	sequence<double> coords;
+	double alpha;
+};
+
+callback relativeCoordCallback = double (double coord);
+</xmp>
+
+<div algorithm=Color.constructor>
+	The `new Color(colorspace, coords, alpha)` constructor steps are:
+
+	1. [Look up](#colorspace-lookup) the `ColorSpace` object in the registry using the `colorspace` parameter.
+		1. If the result is `null`, throw a `TypeError`
+		2. Otherwise, set the color’s color space to it
+	2. If `coords` is not provided, create an array of zeroes with length equal to the number of coordinates in `colorspace`.
+	3. If `coords` is provided:
+		1. If it's not an array, throw a `TypeError`.
+		2. Create a clone of the array.
+		3. If its length is greater than the number of coordinates in the color space, trim the excess numbers from the end.
+		4. If its length is smaller than the number of coordinates in the color space, pad it with zeroes
+		5. Set the color's `coords` to the cloned array.
+	6. If `alpha` is not a number, coerce it to a number, then set the color's `alpha` to this number.
+
+	Issue(3):
+</div>
+
+<div algorithm="Color.get()">
+	The <dfn method for=Color>get(coord)</dfn> method
+	of {{Color}} objects must,
+	when called on |this|:
+
+	1. If there are two arguments, set refSpace to `ColorSpace.get(colorSpace)`.
+	2. If there is only one argument, set refSpace to `ColorSpace.get(this.colorSpace)`
+	3. Let `color = this.to(refSpace)`
+	4. Return `color.coords[refSpace.coord]`.
+</div>
+
+<div algorithm="Color.to()">
+	The <dfn method for=Color>to(colorSpace)</dfn> method
+	of {{Color}} objects must,
+	when called on |this|:
+
+	1. [Look up the color space object](#colorspace-lookup)
+		from the current object’s `colorSpace` specifier.
+	2.
+</div>
+
+<div algorithm="Color.inGamut()">
+	The <dfn method for=Color>inGamut(colorSpace)</dfn> method,
+	when called,
+	must perform the following steps:
+
+	1. Let `colorSpace` be the [color space object](#colorspace-lookup)
+		from the current object’s `colorSpace` specifier.
+	2. While the color space does *not* have an `inGamut` method,
+		set `colorSpace = ColorSpace.get(colorSpace.base)`
+	3. If `colorSpace` has an `inGamut` method, return `colorSpace.inGamut(this.coords)`
+	4. Otherwise, return `true`.
+</div>
+
+<div algorithm="Color.toGamut()">
+	The <dfn method for=Color>toGamut(colorSpace)</dfn> method,
+	when called,
+	must perform the following steps:
+
+	1. Let `colorSpace` be the [color space object](#colorspace-lookup)
+		from the current object’s `colorSpace` specifier.
+	2. If `this.inGamut(colorSpace) === true`, clone the current color and return it.
+	3. Lookup the coordinate reference in `options.method` and
+	3. Let `color = this.to()`
+	2. While the color space does *not* have an `inGamut` method,
+		set `colorSpace = ColorSpace.get(colorSpace.base)`
+	3. If `colorSpace` has an `inGamut` method, return `colorSpace.inGamut(this.coords)`
+	4. Otherwise, return `true`.
+
+	Issue(4):
+
+	Issue(5):
+</div>
+
+{{ColorSpace}} objects {#colorspace-objects}
+---------------------------------------------
+
+<xmp class='idl'>
+[Exposed=(Window, Worker, PaintWorklet, LayoutWorklet)]
+interface ColorSpace {
+	readonly attribute CSSOMString name;
+	readonly attribute CSSOMString? iccProfile;
+	readonly attribute ColorSpaceWhitePoint white;
+	readonly attribute ColorSpace? base;
+	readonly attribute sequence<CSSOMString> coords;
+
+	constructor(CSSOMString name, ColorSpaceOptions options);
+
+	// Register a ColorSpace object
+	static undefined register(ColorSpace colorspace);
+
+	// Creates a new ColorSpace object and registers it
+	static ColorSpace create(CSSOMString name, ColorSpaceOptions options);
+
+	// Array of names for all registered color spaces
+	static readonly attribute FrozenArray<CSSOMString> names;
+
+	// Lookup ColorSpace object by name
+	static ColorSpace get((CSSOMString or ColorSpace) name);
+
+	// Load ICC profile and create a ColorSpace object from it
+	static Promise<ColorSpace> load(CSSOMString url);
+};
+
+// White point x and y chromaticities
+interface ColorSpaceWhitePoint {
+	constructor(double x, double y);
+
+	readonly attribute double x;
+	readonly attribute double y;
+
+	static readonly attribute ColorSpaceWhitePoint D65;
+	static readonly attribute ColorSpaceWhitePoint D50;
+};
+
+dictionary ColorSpaceOptions {
+	(ColorSpaceWhitePoint or object) white;
+
+	inGamutCallback inGamut;
+
+	// Base color space, if this is a transformation
+	(CSSOMString or ColorSpace)? base;
+	toBaseCallback toBase;
+	fromBaseCallback fromBase;
+
+	sequence<CSSOMString> coords; // coord names
+};
+
+callback inGamutCallback = boolean (sequence<double> coords);
+callback toBaseCallback = sequence<double> (sequence<double> coords);
+callback fromBaseCallback = sequence<double> (sequence<double> coords);
+
+</xmp>
+
+Issue(4):
+
+Issue(6):
+
+Issue(7):
+
+Issue(20):
+
+The `ColorSpaceWhitePoint` interface represents the xy chromaticity coordinates of
+a white point. For convenience, D50 and D65 are predefined as follows:
+
+- `ColorSpaceWhitePoint.D50` is set to `new ColorSpaceWhitePoint(0.3457, 0.3585)`
+- `ColorSpaceWhitePoint.D65` is set to `new ColorSpaceWhitePoint(0.3127, 0.3290)`
+
+
+<div algorithm="ColorSpace.get()">
+	The <dfn method for=Color>get(name)</dfn> function:
+
+	1. If the argument is a `ColorSpace` object, return it
+	2. If the argument is a string, look up that string in the internal registry of ColorSpace objects.
+		1. If a ColorSpace object is found, return it.
+		2. Otherwise, throw a `ReferenceError` (Color space does not exist)
+</div>
+
+Algorithms {#algorithms}
+=========================
+
+Getting and setting coordinates {#get-set}
+-------------------------------------------
+
+The `color.get()` and `color.set()` methods allow authors to read/write coordinates
+in the current color space or even other color spaces.
+Color spaces can be provided either as a string (color space id) or a CoorSpace object.
+Coordinates can be specified either as a name, or as a numerical index.
+
+`color.set(coord, value)` also accepts a value.
+If the value is a function, it is invoked immediately,
+with the result of `color.get(coord)` being passed as the first argument.
+If the result is a number, the corresponding coordinate is set to it.
+
+Issue(8):
+
+Color space lookup {#colorspace-lookup}
+----------------------------------------
+
+Color spaces can be looked up either by `ColorSpace` object, or by `name`.
+Implementations are expected to maintain an internal `Map` registry of color space names to objects, for fast lookups.
+
+To look up a color space, follow the following steps:
+
+1. If `needle` is a `ColorSpace` object, let `needle = needle.name`
+2. If `needle` is a `USVString`, look up if there is an entry with that key in the internal Map of color names to `ColorSpace` objects.
+4. Return the `ColorSpace` object, or `null`, if none is found
+
+Converting between color spaces {#converting-colorspaces}
+---------------------------------------------------------
+
+To convert a color from color space A to color space B, perform the following steps:
+
+1. If `A.name === B.name`, clone the color and return it
+2. Let coords = `A.toBase(color.coords)`.
+    If `A.base === B.name`, return `new Color(B, coords, color.alpha)`
+3. While `A.base !== "xyz"`:
+    1. Let coords = `A.toBase(color.coords)`.
+    2. If `A.base === B.name`, return `new Color(B, coords, color.alpha)`
+    3. Otherwise, let `A = ColorSpace.get(A.base)`
+4. Follow B's base chain until `"xyz"` as well, and store the result in an array.
+5. Starting from the end, let `coords = B.fromBase(coords)` on each of these colorspaces
+6. Return `new Color(B, coords, color.alpha)`
+
+Issue(11):
+
+
+Note: While this seems complicated in the general case, in virtually every real case
+the base chain has a length of max 3, so the algorithm would end very quickly.
+
+Registering a color space {#colorspace-registering}
+----------------------------------------------------
+
+TBD.
+Should throw if `base` chain doesn't resolve to `"xyz"` eventually.
+Should throw if `name` exists.
+
+
+
+Security Considerations {#security-considerations}
+==================================================
+
+There are no known security issues introduced by these features.
+
+Privacy Considerations {#privacy-considerations}
+==================================================
+
+There are no known privacy issues introduced by these features.

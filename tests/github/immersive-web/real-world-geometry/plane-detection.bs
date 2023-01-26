@@ -14,7 +14,7 @@ Mailing List Archives: https://lists.w3.org/Archives/Public/public-immersive-web
 
 Editor: Piotr Bialecki 114482, Google http://google.com/, bialpio@google.com
 
-Abstract: 
+Abstract:
 </pre>
 
 <pre class="link-defaults">
@@ -39,6 +39,8 @@ spec: WebXR Device API - Level 1; urlPrefix: https://immersive-web.github.io/web
     type: dfn; text: feature descriptor; url: feature-descriptor
     type: dfn; text: identity transform; url: identity-transform
     type: dfn; text: inline XR device; url: inline-xr-device
+    type: dfn; text: quantization; url: quantization
+    type: dfn; text: rounding; url: rounding
     type: dfn; text: XR device; url: xr-device
 spec: WebXR Anchors Module; urlPrefix: https://immersive-web.github.io/anchors/#
     type: dfn; text: create new anchor object; url: create-new-anchor-object
@@ -99,9 +101,15 @@ spec: WebXR Anchors Module; urlPrefix: https://immersive-web.github.io/anchors/#
     border-radius: .5em;
     padding: .5em;
     margin: .5em calc(-0.5em - 1px);
-    background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='290'><text transform='rotate(-45)' text-anchor='middle' font-family='sans-serif' font-weight='bold' font-size='70' y='210' opacity='.1'>Unstable</text></svg>");
+    background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='290'><text transform='rotate(-45)' text-anchor='middle' font-family='sans-serif' font-weight='bold' font-size='70' y='210' opacity='.1' fill='white'>Unstable</text></svg>");
     background-repeat: repeat;
-    background-color: #FFF4F4;
+    background-color: #282828;
+  }
+  @media (prefers-color-scheme: light) {
+    .unstable {
+      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='290'><text transform='rotate(-45)' text-anchor='middle' font-family='sans-serif' font-weight='bold' font-size='70' y='210' opacity='.1'>Unstable</text></svg>");
+      background-color: #FFF4F4;
+    }
   }
   .unstable h3:first-of-type {
     margin-top: 0.5rem;
@@ -195,7 +203,7 @@ XRPlaneSet {#plane-set}
 
 <script type="idl">
 interface XRPlaneSet {
-  readonly setlike<XRPlaneSet>;
+  readonly setlike<XRPlane>;
 };
 </script>
 
@@ -207,9 +215,22 @@ partial interface XRFrame {
 };
 </script>
 
-An {{XRFrame}} is extended to contain {{XRFrame/detectedPlanes}} attribute which contains all planes that are still tracked in the frame. The set is initially empty and will be populated by the [=update planes=] algorithm. If this attribute is accessed when the frame is not [=XRFrame/active=], the user agent MUST throw {{InvalidStateError}}.
+{{XRFrame}} is extended to contain {{XRFrame/detectedPlanes}} attribute which contains all planes that are still tracked in the frame. The set is initially empty and will be populated by the [=update planes=] algorithm. If this attribute is accessed when the frame is not [=XRFrame/active=], the user agent MUST throw {{InvalidStateError}}.
 
-An {{XRSession}} is extended to contain associated <dfn for=XRSession>set of tracked planes</dfn>, which is initially empty. The elements of the set will be of {{XRPlane}} type.
+<div class="unstable">
+
+<script type="idl">
+partial interface XRSession {
+  Promise<undefined> initiateRoomCapture();
+};
+</script>
+
+{{XRSession}} is extended to contain the {{XRSession/initiateRoomCapture}} method which, if supported, will ask the {{XRCompositor}} to capture the current room layout. It is up to the {{XRCompositor}} if this will replace or augment the [=XRSession/set of tracked planes=]. The user agent MAY also ignore this call, for instance if it doesn't support a manual room capture more or if it determines that the room is already set up.
+The {{XRSession/initiateRoomCapture}} method MUST only be able to be called once per {{XRSession}}.
+
+</div>
+
+{{XRSession}} is also extended to contain associated <dfn for=XRSession>set of tracked planes</dfn>, which is initially empty. The elements of the set will be of {{XRPlane}} type.
 
 <div class="algorithm" data-algorithm="update-planes">
 In order to <dfn>update planes</dfn> for |frame|, the user agent MUST run the following steps:
@@ -217,10 +238,11 @@ In order to <dfn>update planes</dfn> for |frame|, the user agent MUST run the fo
     1. Let |device| be a |session|'s [=XRSession/XR device=].
     1. Let |trackedPlanes| be a result of calling into |device|'s [=native plane detection=] capability to obtain tracked planes at |frame|'s [=XRFrame/time=].
     1. For each |native plane| in |trackedPlanes|, run:
+        1. If desired, treat the |native plane| as if it were not present in |trackedPlanes| and continue to the next entry. See [[#privacy-security]] for criteria that could be used to determine whether an entry should be ignored in this way.
         1. If |session|'s [=XRSession/set of tracked planes=] contains an object |plane| that [=corresponds to=] |native plane|, invoke [=update plane object=] algorithm with |plane|, |native plane|, and |frame|, and continue to the next entry.
         1. Let |plane| be the result of invoking the [=create plane object=] algorithm with |native plane| and |frame|.
         1. Add |plane| to |session|'s [=XRSession/set of tracked planes=].
-    1. Remove each object in |session|'s [=XRSession/set of tracked planes=] that was not created or updated during the invocation of this algorithm.
+    1. Remove each object in |session|'s [=XRSession/set of tracked planes=] that was neither created nor updated during the invocation of this algorithm.
     1. Set |frame|'s {{XRFrame/detectedPlanes}} to [=XRSession/set of tracked planes=].
 </div>
 
@@ -240,6 +262,7 @@ In order to <dfn>update plane object</dfn> |plane| from a [=native plane object=
     1. Set |plane|'s [=XRPlane/frame=] to |frame|.
     1. If |native plane| is classified by the underlying system as vertical, set |plane|'s {{XRPlane/orientation}} to {{XRPlaneOrientation/"vertical"}}. Otherwise, if |native plane| is classified by the underlying system as horizontal, set |plane|'s {{XRPlane/orientation}} to {{XRPlaneOrientation/"horizontal"}}. Otherwise, set |plane|'s {{XRPlane/orientation}} to <code>null</code>.
     1. Set |plane|'s {{XRPlane/polygon}} to the new array of vertices representing |native plane|'s polygon, performing all necessary conversions to account for differences in native plane polygon representation.
+    1. If desired, reduce the level of detail of the |plane|'s {{XRPlane/polygon}} as described in [[#privacy-security]].
     1. Set |plane|'s {{XRPlane/lastChangedTime}} to [=XRFrame/time=].
 </div>
 
@@ -325,9 +348,11 @@ Privacy & Security Considerations {#privacy-security}
 
 <section class="non-normative">
 
-The plane detection API exposes information about users' physical environment. The exposed plane information (such as plane's polygon) may be limited if the user agent so chooses. Some of the ways in which the user agent can reduce the amount of exposed information are for example: decreasing the level of detail of the plane's polygon in [=update plane object=] algorithm, or removing the plane altogether by behaving as if the plane object was not present in <code>trackedPlanes</code> collection in [=update planes=] algorithm.
+The plane detection API exposes information about users' physical environment. The exposed plane information (such as plane's polygon) may be limited if the user agent so chooses. Some of the ways in which the user agent can reduce the exposed information are: decreasing the level of detail of the plane's polygon in [=update plane object=] algorithm (for example by decreasing the number of vertices, or by [=rounding=] / [=quantization|quantizing=] the coordinates of the vertices), or removing the plane altogether by behaving as if the plane object was not present in <code>trackedPlanes</code> collection in [=update planes=] algorithm (this could be done for example if the detected plane is deemed to small / too detailed to be surfaced and the mechanisms to reduce details exposed on planes are not implemented by the user agent). The poses of the planes (obtainable from {{XRPlane/planeSpace}}) could also be [=quantization|quantized=].
 
 Since concepts from plane detection API can be used in methods exposed by [[webxr-anchors-module]] specification, some of the privacy & security considerations that are relevant to WebXR Anchors Module also apply here. For details, see [[webxr-anchors-module#privacy-security]] section.
+
+Due to how plane detection API extends WebXR Device API, the section [[webxr#security]] is also applicable to the features exposed by the WebXR Plane Detection Module.
 
 </section>
 

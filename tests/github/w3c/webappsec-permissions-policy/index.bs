@@ -4,18 +4,18 @@ Shortname: permissions-policy
 Level: 1
 Indent: 2
 Status: ED
+TR: https://www.w3.org/TR/permissions-policy/
 Group: WebAppSec
 URL: https://w3c.github.io/webappsec-permissions-policy/
-Editor: Ian Clelland, Google, iclelland@google.com
+Editor: Ian Clelland 76841, Google, iclelland@google.com
 Abstract: This specification defines a mechanism that allows developers to selectively enable and disable use of various browser features and APIs.
 Repository: https://github.com/w3c/webappsec-permissions-policy/
 Markup Shorthands: css no, markdown yes
 </pre>
 <pre class="link-defaults">
 spec:dom; type:interface; for:/; text:Document
-spec:html; type:dfn; for:/; text:origin
+spec:url; type:dfn; for:url; text:origin
 spec:fetch; type:dfn; for:Response; text:response
-spec:html; type:dfn; for:/; text:browsing context
 spec:html; type:element; text:script
 spec:html; type:element; text:link
 spec:fetch; type:dfn; text:name
@@ -114,11 +114,11 @@ spec: HEADER-STRUCTURE; urlPrefix: https://httpwg.org/http-extensions/draft-ietf
   </div>
   <div class="example">
     <p>SecureCorp Inc. wants to completely disable use of the Geolocation API
-    within all browsing contexts except for its own origin and those whose
-    origin is "<code>https://example.com</code>", even in the presence of an
-    attacker who can embed their own iframes on SecureCorp's pages. It can do
-    this by delivering the following HTTP response header to define a restricted
-    permissions policy for Geolocation:</p>
+    within all [=Document/descendant navigables=] except for its own origin and
+    those whose origin is "<code>https://example.com</code>", even in the
+    presence of an attacker who can embed their own iframes on SecureCorp's
+    pages. It can do this by delivering the following HTTP response header to
+    define a restricted permissions policy for Geolocation:</p>
     <pre>
       <a http-header>Permissions-Policy</a>: geolocation=(self "https://example.com")</pre>
     <p>The <a>allowlist</a> is a list of one or more origins, which can include
@@ -179,8 +179,8 @@ spec: HEADER-STRUCTURE; urlPrefix: https://httpwg.org/http-extensions/draft-ietf
     character strings used in <a>policy directives</a>.
     <p>Each <a>policy-controlled feature</a> has a <a>default allowlist</a>,
     which defines whether that feature is available in documents in top-level
-    browsing contexts, and how access to that feature is inherited in child
-    browsing contexts.</p>
+    traversables, and how access to that feature is inherited in child
+    navigables.</p>
     <p>A user agent has a set of <dfn>supported features</dfn>, which is the set
     of <a data-lt="policy-controlled feature">features</a> which it allows to be
     controlled through policies. User agents are not required to support every
@@ -225,11 +225,11 @@ spec: HEADER-STRUCTURE; urlPrefix: https://httpwg.org/http-extensions/draft-ietf
     each feature, and whether it can be controlled by a <a>declared policy</a>
     in the document.
     </p>
-    <p>In a {{Document}} in a [=top-level browsing context=], the inherited
+    <p>In a {{Document}} in a [=/top-level traversable=], the inherited
     policy is based on defined defaults for each feature.</p>
-    <p>In a {{Document}} in a [=child browsing context=], the inherited policy
-    is based on the parent document's permissions policy, as well as the [=child
-    browsing context=]'s <a>container policy</a>.
+    <p>In a {{Document}} in a [=child navigable=], the inherited policy is based
+    on the parent document's permissions policy, as well as the [=child
+    navigable=]'s <a>container policy</a>.
     </div>
   </section>
   <section>
@@ -247,18 +247,18 @@ spec: HEADER-STRUCTURE; urlPrefix: https://httpwg.org/http-extensions/draft-ietf
   </section>
   <section>
     <h3 id="container-policies">Container policies</h3>
-    <p>In addition to the <a>header policy</a>, each [=nested browsing context=]
-    has a <dfn export>container policy</dfn>, which is a <a>policy directive</a>,
+    <p>In addition to the <a>header policy</a>, each [=child navigable=] has a
+    <dfn export>container policy</dfn>, which is a <a>policy directive</a>,
     which may be empty. The <a>container policy</a> can set by attributes on the
-    [=browsing context container=].</p>
-    <p>The <a>container policy</a> for a [=nested browsing context=] influences
-    the <a>inherited policy</a> of any document loaded into that context.
-    (See <a href="#algo-define-inherited-policy"></a>)</p>
+    [=navigable container=].</p>
+    <p>The <a>container policy</a> for a [=child navigable=] influences the
+    <a>inherited policy</a> of any document loaded into that navigable.
+    (See <a href="#algo-define-inherited-policy-in-container"></a>)</p>
     <div class="note">
       Currently, the <a>container policy</a> cannot be set directly, but is
       indirectly set by <code>iframe</code> "<a href=
       "#iframe-allowfullscreen-attribute"><code>allowfullscreen</code></a>",
-      "and <a href="#iframe-allow-attribute"><code>allow</code></a>" attributes.
+      and "<a href="#iframe-allow-attribute"><code>allow</code></a>" attributes.
       Future revisions to this spec may introduce a mechanism to explicitly
       declare the full <a>container policy</a>.
     </div>
@@ -306,24 +306,25 @@ spec: HEADER-STRUCTURE; urlPrefix: https://httpwg.org/http-extensions/draft-ietf
   </section>
   <section>
     <h3 id="default-allowlists">Default Allowlists</h3>
-    <p>Every <a>policy-controlled feature</a> has a <dfn export lt=
-    "default allowlist|default allowlists">default allowlist</dfn>. The
-    <a>default allowlist</a> determines whether the feature is allowed in a
-    document with no declared policy in a top-level browsing context, and also
-    whether access to the feature is automatically delegated to documents in
-    child browsing contexts.</p>
+    <p>Every <a>policy-controlled feature</a> has a <dfn export
+    lt="default allowlist|default allowlists"
+    for="policy-controlled feature">default allowlist</dfn>. The <a>default
+    allowlist</a> determines whether the feature is allowed in a document with
+    no declared policy in a [=/top-level traversable=], and also whether access
+    to the feature is automatically delegated to documents in [=child
+    navigables=].</p>
     <p>The <a>default allowlist</a> for a <a
     data-lt="policy-controlled feature">feature</a> is one of these values:</p>
     <dl>
-      <dt><code>*</code></dt>
-      <dd>The feature is allowed in documents in top-level browsing contexts by
+      <dt><dfn for="default allowlist" export><code>*</code></dfn></dt>
+      <dd>The feature is allowed in documents in top-level traversables by
       default, and when allowed, is allowed by default to documents in child
-      browsing contexts.</dd>
-      <dt><code>'self'</code></dt>
-      <dd>The feature is allowed in documents in top-level browsing contexts by
+      navigables.</dd>
+      <dt><dfn for="default allowlist" export><code>'self'</code></dfn></dt>
+      <dd>The feature is allowed in documents in top-level traversables by
       default, and when allowed, is allowed by default to same-origin domain
-      documents in child browsing contexts, but is disallowed by default in
-      cross-origin documents in child browsing contexts.</dd>
+      documents in child navigables, but is disallowed by default in
+      cross-origin documents in child navigables.</dd>
     </dl>
   </section>
 </section>
@@ -334,7 +335,7 @@ spec: HEADER-STRUCTURE; urlPrefix: https://httpwg.org/http-extensions/draft-ietf
     <p><a>Policy Directives</a> in HTML attributes are represented as their
     ASCII serialization, with the following ABNF:
     <pre class="abnf">
-      <dfn>serialized-permissions-policy</dfn> = <a>serialized-policy-directive</a> *(";" <a>serialized-policy-directive</a>)
+      <dfn noexport>serialized-permissions-policy</dfn> = <a>serialized-policy-directive</a> *(";" <a>serialized-policy-directive</a>)
       <dfn>serialized-policy-directive</dfn> = <a>feature-identifier</a> RWS <a>allow-list</a>
       <dfn>feature-identifier</dfn> = 1*( ALPHA / DIGIT / "-")
       <dfn>allow-list</dfn> = <a>allow-list-value</a> *(RWS <a>allow-list-value</a>)
@@ -385,7 +386,7 @@ spec: HEADER-STRUCTURE; urlPrefix: https://httpwg.org/http-extensions/draft-ietf
     HTTP header field can be used in the [=response=] (server to client) to
     communicate the <a>permissions policy</a> that should be enforced by the
     client.</p>
-    <p><a>Permissions-Policy</a> is a structured header. Its value must be a
+    <p><a http-header>Permissions-Policy</a> is a structured header. Its value must be a
     dictionary. It's ABNF is:
     <pre class="abnf">
       PermissionsPolicy = <a>sh-dictionary</a>
@@ -408,8 +409,8 @@ spec: HEADER-STRUCTURE; urlPrefix: https://httpwg.org/http-extensions/draft-ietf
     <p>When not empty, the "<code>allow</code>" attribute will result in adding
     an <a>allowlist</a> for each recognized
     <a data-lt="policy-controlled feature">feature</a> to the <{iframe}>
-    element's [=nested browsing context=]'s <a>container policy</a>, when it is
-    constructed.</p>
+    element's [=navigable container/content navigable=]'s <a>container
+    policy</a>, when it is constructed.</p>
   </section>
   <section>
     <h3 id="legacy-attributes">Additional attributes to support legacy
@@ -428,8 +429,8 @@ spec: HEADER-STRUCTURE; urlPrefix: https://httpwg.org/http-extensions/draft-ietf
       <p>Otherwise, the presence of an "<code>allowfullscreen</code>" attribute
       on an iframe will result in adding an <a>allowlist</a> of <code>*</code>
       for the "<code>fullscreen</code>" feature to the <{iframe}> element's
-      [=nested browsing context=]'s <a>container policy</a>, when it is
-      constructed.</p>
+      [=navigable container/content navigable=]'s <a>container policy</a>, when
+      it is constructed.</p>
       <div class="note">
         This is different from the behaviour of <code>&lt;iframe
         allow="fullscreen"&gt;</code>, and is for compatibility with existing
@@ -504,8 +505,8 @@ spec: HEADER-STRUCTURE; urlPrefix: https://httpwg.org/http-extensions/draft-ietf
   a feature is actually currently allowed in the frame, as the document in the
   frame may have applied its own policy via an HTTP header, or may have
   navigated away from its initial location to a new origin. Revealing the
-  effective policy in the iframe element's nested browsing context in that case
-  could leak information about the behaviour of a cross-origin document.</p>
+  effective policy in the iframe element's nested navigable in that case could
+  leak information about the behaviour of a cross-origin document.</p>
 
   <div class="example">
   <pre>
@@ -577,10 +578,10 @@ partial interface HTMLIFrameElement {
     {{PermissionsPolicy}} object's <a>associated node</a>:
     * If the {{PermissionsPolicy}} object's <a>associated node</a> is a
         {{Document}}, then its <a>default origin</a> is the {{Document}}'s
-	<a>origin</a>.
+        <a>origin</a>.
     * If the {{PermissionsPolicy}} object's <a>associated node</a> is an
         {{Element}}, then its <a>default origin</a> is the {{Element}}'s
-	<a>declared origin</a>.
+        <a>declared origin</a>.
 
     <p>Each {{Document}} has a <dfn for="Document">policy object</dfn>, which is
     a {{PermissionsPolicy}} instance whose <a>associated node</a> is that
@@ -636,9 +637,8 @@ partial interface HTMLIFrameElement {
     8. Return |result|.
 
     <p>The <dfn>observable policy</dfn> for any Node is a <a>permissions
-    policy</a>, which contains the information about the policy in the browsing
-    context represented by that Node which is visible from the current browsing
-    context.</p>
+    policy</a>, which contains the information about the policy in the navigable
+    represented by that Node which is visible from the current document.</p>
 
     <p>To get the <a>observable policy</a> for a Document |document|, return
     |document|'s permissions policy.</p>
@@ -647,9 +647,9 @@ partial interface HTMLIFrameElement {
         1. Let |inherited policy| be a new ordered map.
         2. Let |declared policy| be a new ordered map.
         3. For each <a>supported feature</a> |feature|:
-            1. Let |isInherited| be the result of running <a>Define an inherited
-                policy for feature in container at origin</a> on |feature|,
-                |node| and |node|'s <a>declared origin</a>.
+            1. Let |isInherited| be the result of running <a abstract-op>Define
+                an inherited policy for feature in container at origin</a> on
+                |feature|, |node| and |node|'s <a>declared origin</a>.
             2. Set |inherited policy|[|feature|] to |isInherited|.
         4. Return a new <a>permissions policy</a> with inherited policy
             |inherited policy| and declared policy |declared policy|.
@@ -741,7 +741,7 @@ partial interface HTMLIFrameElement {
 <section>
   <h2 id="algorithms">Algorithms</h2>
   <section>
-    ## <dfn export>Process response policy</dfn> ## {#algo-process-response-policy}
+    ## <dfn export abstract-op id="process-response-policy">Process response policy</dfn> ## {#algo-process-response-policy}
 
     <div class="algorithm" data-algorithm="process-response-policy">
     Given a [=response=] (|response|) and an [=origin=] (|origin|), this
@@ -751,14 +751,14 @@ partial interface HTMLIFrameElement {
       field value</a> given "<code>Permissions-Policy</code>" and "dictionary" from
       |response|’s header list.
     1. If |parsed header| is null, abort these steps.
-    1. Let |policy| be the result of executing <a>Construct policy from
+    1. Let |policy| be the result of executing <a abstract-op>Construct policy from
       dictionary and origin</a> on |parsed header| and |origin|.
     1. Return |policy|.
 
     </div>
   </section>
   <section>
-    ## <dfn>Construct policy from dictionary and origin</dfn> ## {#algo-construct-policy}
+    ## <dfn export abstract-op id="construct-policy">Construct policy from dictionary and origin</dfn> ## {#algo-construct-policy}
 
     <div class="algorithm" data-algorithm="construct-policy">
     Given an <a>ordered map</a> (|dictionary|) and an [=origin=] (|origin|), this
@@ -791,7 +791,7 @@ partial interface HTMLIFrameElement {
     </div>
   </section>
   <section>
-    ## <dfn>Parse policy directive</dfn> ## {#algo-parse-policy-directive}
+    ## <dfn export abstract-op id="parse-policy-directive">Parse policy directive</dfn> ## {#algo-parse-policy-directive}
 
     <div class="algorithm" data-algorithm="parse-policy-directive">
     Given a string (|value|), an [=origin=] (|container origin|), and an
@@ -836,12 +836,12 @@ partial interface HTMLIFrameElement {
     </div>
   </section>
   <section>
-    ## <dfn>Process permissions policy attributes</dfn> ## {#algo-process-policy-attributes}
+    ## <dfn export abstract-op id="process-policy-attributes">Process permissions policy attributes</dfn> ## {#algo-process-policy-attributes}
 
     <div class="algorithm" data-algorithm="process-policy-attributes">
     Given an element (|element|), this algorithm returns a <a>container
     policy</a>, which may be empty.
-    1. Let |container policy| be the result of running <a>Parse policy
+    1. Let |container policy| be the result of running <a abstract-op>Parse policy
       directive</a> on the value of |element|'s <code>allow</code> attribute,
       with <var ignore>container origin</var> set to the origin of |element|'s
       node document, and <var ignore>target origin</var> set to |element|'s
@@ -850,7 +850,7 @@ partial interface HTMLIFrameElement {
         1. If |element|'s <code>allowfullscreen</code> attribute is specified,
           and |container policy| does not contain an allowlist for
           <code>fullscreen</code>:
-            1. Construct a new declaration for <code>fullscreen</code>, whose
+            1. Let |declaration| be a new declaration for <code>fullscreen</code>, whose
               allowlist is <a>the special value <code>*</code></a>.
             1. Add |declaration| to |container policy|.
     1. Return |container policy|.
@@ -858,17 +858,18 @@ partial interface HTMLIFrameElement {
     </div>
   </section>
   <section>
-    ## <dfn export id="create-for-browsingcontext">Create a Permissions Policy for a browsing context</dfn> ## {#algo-create-for-browsingcontext}
+    ## <dfn export abstract-op id="create-for-navigable">Create a Permissions Policy for a navigable</dfn> ## {#algo-create-for-navigable}
 
-    <div class="algorithm" data-algorithm="create-for-browsingcontext">
-    Given a <a>browsing context</a> (|browsingContext|), and an <a>origin</a>
+    <div class="algorithm" data-algorithm="create-for-navigable">
+    Given null or an <a for="/">element</a> (|container|) and an <a>origin</a>
     (|origin|) this algorithm returns a new <a>Permissions Policy</a>.
+    1. Assert: If not null, |container| is a <a>navigable container</a>.
     1. Let |inherited policy| be a new ordered map.
     1. Let |declared policy| be a new ordered map.
     1. For each |feature| supported,
-        1. Let |isInherited| be the result of running <a
-          href="#define-inherited-policy">Define an inherited policy for feature
-          in browsing context</a> on |feature|, |origin| and |browsingContext|.
+        1. Let |isInherited| be the result of running <a abstract-op>Define an
+          inherited policy for feature in container at origin</a> on |feature|,
+          |container| and |origin|.
         1. Set |inherited policy|[|feature|] to |isInherited|.
     1. Let |policy| be a new <a>permissions policy</a>, with inherited policy
       |inherited policy| and declared policy |declared policy|.
@@ -877,17 +878,16 @@ partial interface HTMLIFrameElement {
     </div>
   </section>
   <section>
-    ## <dfn export id="create-from-response">Create a Permissions Policy for a browsing context from response</dfn> ## {#algo-create-from-response}
+    ## <dfn export abstract-op id="create-from-response">Create a Permissions Policy for a navigable from response</dfn> ## {#algo-create-from-response}
 
     <div class="algorithm" data-algorithm="create-from-response">
-    Given a <a>browsing context</a> (|browsingContext|), <a>origin</a>
+    Given null or a <a>navigable container</a> (|container|), an <a>origin</a>
     (|origin|), and a [=response=] (|response|), this algorithm returns a new
     <a>Permissions Policy</a>.
-    1. Let |policy| be the result of running <a>Create a Permissions Policy for
-      a browsing context</a> given |browsingContext|, and |origin|.
-    1. Let |d| be the result of running <a
-      href="#process-response-policy">Process response policy</a> on |response|
-      and |origin|.
+    1. Let |policy| be the result of running <a abstract-op>Create a Permissions
+      Policy for a navigable</a> given |container| and |origin|.
+    1. Let |d| be the result of running <a abstract-op>Process response
+      policy</a> on |response| and |origin|.
     1. For each |feature| → |allowlist| of |d|:
         1. If |policy|'s <a>inherited policy</a>[|feature|] is true, then set
           |policy|'s <a>declared policy</a>[|feature|] to |allowlist|.
@@ -896,38 +896,25 @@ partial interface HTMLIFrameElement {
     </div>
   </section>
   <section>
-    ## <dfn id="define-inherited-policy">Define an inherited policy for feature in browsing context</dfn> ## {#algo-define-inherited-policy}
-
-    <div class="algorithm" data-algorithm="define-inherited-policy">
-    Given a feature (|feature|), an <a>origin</a> (|origin|), and a <a>browsing
-    context</a> (|browsingContext|), this algorithm returns the <a>inherited
-    policy</a> for that feature.
-    1. If |browsingContext| is the [=nested browsing context=] of a [=browsing
-      context container=], return the result of executing <a>Define an
-      inherited policy for feature in container at origin</a> for |feature| in
-      |browsingContext|'s <a>browsing context container</a> at |origin|.
-    1. Otherwise, return "<code>Enabled</code>".
-
-    </div>
-  </section>
-  <section>
-    ## <dfn id="define-inherited-policy-in-container">Define an inherited policy for feature in container at origin</dfn> ## {#algo-define-inherited-policy-in-container}
+    ## <dfn export abstract-op id="define-inherited-policy-in-container">Define an inherited policy for feature in container at origin</dfn> ## {#algo-define-inherited-policy-in-container}
 
     <div class="algorithm"
     data-algorithm="define-inherited-policy-in-container">
-    Given a feature (|feature|) a <a>browsing context container</a>
+    Given a feature (|feature|), null or a <a>navigable container</a>
     (|container|), and an <a>origin</a> for a document in that container
     (|origin|), this algorithm returns the <a>inherited policy</a> for that
     feature.
-    1. Let |policy| be |container|'s <a>node document</a>'s <a>Permissions
-      Policy</a>
-    1. If |policy|'s <a>inherited policy</a> for |feature| is
-      "<code>Disabled</code>", return "<code>Disabled</code>".
-    1. If |feature| is present in |policy|'s <a>declared policy</a>, and the
-      <a>allowlist</a> for |feature| in |policy|'s <a>declared policy</a> does
-      not <a>match</a> |origin|, then return "<code>Disabled</code>".
-    1. Let |container policy| be the result of running <a>Process permissions
-      policy attributes</a> on |container|.
+    1. If |container| is null, return "<code>Enabled</code>".
+    1. If the result of executing <a abstract-op>Is feature
+      enabled in document for origin?</a> on |feature|, |container|'s
+      <a>node document</a>, and |container|'s <a>node document</a>''s origin
+      is "<code>Disabled</code>", return "<code>Disabled</code>".
+    1. If the result of executing <a abstract-op>Is feature
+      enabled in document for origin?</a> on |feature|, |container|'s
+      <a>node document</a>, and |origin| is "<code>Disabled</code>",
+      return "<code>Disabled</code>".
+    1. Let |container policy| be the result of running <a abstract-op>Process
+      permissions policy attributes</a> on |container|.
     1. If |feature| is a key in |container policy|:
         1. If the <a>allowlist</a> for |feature| in |container policy|
           <a>matches</a> |origin|, return "<code>Enabled</code>".
@@ -942,7 +929,7 @@ partial interface HTMLIFrameElement {
     </div>
   </section>
   <section>
-    ## <dfn id="is-feature-enabled">Is feature enabled in document for origin?</dfn> ## {#algo-is-feature-enabled}
+    ## <dfn export abstract-op id="is-feature-enabled">Is feature enabled in document for origin?</dfn> ## {#algo-is-feature-enabled}
 
     <div class="algorithm" data-algorithm="is-feature-enabled">
     Given a feature (|feature|), a {{Document}} object
@@ -967,7 +954,7 @@ partial interface HTMLIFrameElement {
     </div>
   </section>
   <section>
-    ## <dfn export id="report-permissions-policy-violation">Generate report for violation of permissions policy on settings</dfn> ## {#algo-report-permissions-policy-violation}
+    ## <dfn export abstract-op id="report-permissions-policy-violation">Generate report for violation of permissions policy on settings</dfn> ## {#algo-report-permissions-policy-violation}
 
     <div class="algorithm" data-algorithm="report-permissions-policy-violation">
     Given a feature (|feature|), an <a>environment settings object</a>
@@ -996,7 +983,7 @@ partial interface HTMLIFrameElement {
 
     1. If |group| is omitted, set |group| to "default".
 
-    1. Execute <a for="reporting" lt="queue">queue a report</a> with |body|,
+    1. Execute [=generate and queue a report=] with |body|,
       "permissions-policy-violation", |group|, and |settings|.
 
     </div>
@@ -1005,7 +992,7 @@ partial interface HTMLIFrameElement {
     been <a>violated</a>.
   </section>
   <section>
-    ## <dfn export>Should request be allowed to use feature?</dfn> ## {#algo-should-request-be-allowed-to-use-feature}
+    ## <dfn export abstract-op id="should-request-be-allowed-to-use-feature">Should request be allowed to use feature?</dfn> ## {#algo-should-request-be-allowed-to-use-feature}
 
     <div class="algorithm"
     data-algorithm="should-request-be-allowed-to-use-feature">
@@ -1023,9 +1010,8 @@ partial interface HTMLIFrameElement {
        sending Client Hints to third parties) in these contexts.</div>
     1. Set |document| to |window|’s <a>associated `Document`</a>.
     1. Let |origin| be |request|’s <a for="request">origin</a>.
-    1. Let |result| be the result of executing <a href="#is-feature-enabled">Is
-        feature enabled in document for
-        origin?</a> on |feature|, |document|, and |origin|.
+    1. Let |result| be the result of executing <a abstract-op>Is feature
+      enabled in document for origin?</a> on |feature|, |document|, and |origin|.
     1. If |result| is "<code>Enabled</code>", return <code>true</code>.
     1. Otherwise, return <code>false</code>.
 
@@ -1170,7 +1156,7 @@ partial interface HTMLIFrameElement {
 <section>
   <h2 id="change-log">Change log</h2>
 
-  <h3>Changes since FPWD</h3>
+  <h3 id="changes-since-fpwd">Changes since FPWD</h3>
 
   * Expose new algorithms to create a Feature Policy before document is created. [Link](https://github.com/w3c/webappsec-permissions-policy/pull/324)
   * Remove algorithms no longer needed. [Link](https://github.com/w3c/webappsec-permissions-policy/pull/325)

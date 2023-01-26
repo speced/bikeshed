@@ -1,0 +1,280 @@
+<pre class="metadata">
+Title: Navigational-Tracking Mitigations
+Shortname: nav-tracking-mitigations
+Repository: privacycg/nav-tracking-mitigations
+URL: https://privacycg.github.io/nav-tracking-mitigations/
+Editor: Pete Snyder, w3cid 109401, Brave https://brave.com/, psnyder@brave.com
+Editor: Jeffrey Yasskin, w3cid 72192, Google https://google.com/, jyasskin@google.com
+Abstract: This specification defines navigational tracking and when and how browsers are required to prevent it from happening.
+Status Text: This specification is intended to be migrated to the W3C standards track. It is not a W3C standard.
+Text Macro: LICENSE <a href=http://www.w3.org/Consortium/Legal/2015/copyright-software-and-document>W3C Software and Document License</a>
+Group: privacycg
+Status: CG-DRAFT
+Level: None
+Complain About: accidental-2119 yes, missing-example-ids yes
+Markup Shorthands: markdown yes, css no
+Assume Explicit For: yes
+Metadata Order: !*, *, This version
+
+!Participate: <a href="https://github.com/[REPOSITORY]">Github Repository</a>
+!Participate: <a href="https://github.com/privacycg/meetings/">Privacy CG Meetings</a>
+</pre>
+<pre class="biblio">
+{
+    "FSN-2021-Q4": {
+        "title": "Firefox Security Newsletter 2021 Q4",
+        "href": "https://wiki.mozilla.org/Firefox_Security_Newsletter/FSN-2021-Q4",
+        "date": "2022-03-09"
+    },
+    "MOZILLA-TRACKING-POLICY": {
+        "title": "Mozilla Anti Tracking Policy",
+        "href": "https://wiki.mozilla.org/Security/Anti_tracking_policy"
+    },
+    "WEBKIT-TRACKING-PREVENTION": {
+        "href": "https://webkit.org/tracking-prevention/",
+        "title": "Tracking Prevention in WebKit"
+    }
+}
+</pre>
+<pre class="anchors">
+spec: HTTP; urlPrefix: https://httpwg.org/specs/rfc7231.html#
+    type: dfn; text: HTTP 3xx statuses; url: status.3xx
+spec: tracking-dnt; urlPrefix: https://www.w3.org/TR/tracking-dnt/#
+    type: dfn; text: tracking; url: dfn-tracking
+</pre>
+
+<section class="non-normative">
+<h2 id="intro">Introduction</h2>
+
+<em>This section is non-normative.</em>
+
+Browsers are working to prevent cross-site [=tracking=], which threatens user
+privacy. In addition to third-party cookies and storage, other client-side
+methods exist that enable cross-site tracking. [=Navigational tracking=]
+correlates user identities across sites during navigations between those sites.
+[=Navigational tracking=] uses [=link decoration=] to convey information, but
+not all [=link decoration=] is tracking. This project attempts to distinguish
+tracking from non-tracking navigation and to prevent the tracking without
+damaging similar but benign navigations.
+
+</section>
+
+<h2 id="infra">Infrastructure</h2>
+
+This specification depends on the Infra standard. [[!INFRA]]
+
+<h2 id="terminology">Terminology</h2>
+
+<dfn>Link decoration</dfn> is when the source of a [=hyperlink=] "decorates" its [=URL=]
+with extra information beyond what's necessary to identify the page a user wants
+to navigate to. This information can be placed almost anywhere inside the URL.
+
+<dfn>Navigational tracking</dfn> refers to the general use of one or more
+[[HTML#browsing-the-web|navigations]] to identify that a user on one site is the
+same person as a user on another site. Navigations transmit information
+cross-site in a few different ways, including in the target URL, which might be
+[=link decoration|decorated=], and in the timing of the request.
+
+<div class="example" id="example-link-decoration-tracking">
+<style>
+#example-link-decoration-tracking code em {background-color: cyan}
+</style>
+
+Examples and non-examples of [=link decoration=] and [=navigational tracking=],
+with the potential decoration or tracking element emphasized:
+
+: <code>https://publisher.example/page?userId=<em>5789rhkdsaf8urfnsd</em></code>
+
+:: [=Link decoration=], and also [=navigational tracking=].
+
+: <code>https://bookshop.org/a/<em>1122</em>/9780062252074</code>
+
+:: [=Link decoration=] but **not** [=navigational tracking=]: This number
+    identifies an affiliate to credit with a book sale. Replacing this with
+    another number gets to the same target page.
+
+: <code>https://bookshop.org/a/1122/<em>9780062252074</em></code>
+
+:: **Not** decoration: This number identifies a particular book. Changing it
+    yields a different target page.
+
+: <code>https://bugzilla.mozilla.org/show_bug.cgi?id=<em>1460058</em></code>
+
+:: **Not** decoration: changing the number changes which bug the user sees.
+
+: <code>https://www.google.com/maps/@<em>37.4220328,-122.0847584,17.12z</em></code>
+
+:: Issue(4): Changing the numbers changes what map the user sees, and embedding
+    a user ID would not successfully transfer that user ID to the target site,
+    but it's hard for an automated system inside a browser to prove
+    that, and even hard for humans reading the URL to be confident of it.
+
+: <code>https://publisher.example/unsubscribe?userId=<em>5789rhkdsaf8urfnsd</em></code>
+
+:: Issue(5): The URL identifies an action rather than a page, and the user ID
+    might be essential for that action to happen. However, this is also clearly
+    a user ID and sufficient to track a user if the source and target
+    collaborate.
+
+: <code>https://example.com/auth/callback?token=<em>1234567</em></code>
+
+:: Issue(5): This is probably the same case as the unsubscribe link.
+
+: <code>https://example.com/login?returnto=<em>item/12345</em></code>
+
+:: Assuming a request for this URL shows a login page instead of immediately
+    redirecting to `item/12345`, this is a [=link decoration=] but not
+    [=navigational tracking=].
+
+</div>
+
+<dfn>Bounce tracking</dfn> refers to the use of redirects in a top-level context
+(including [=HTTP 3xx statuses=], <{meta}> elements with
+<{meta/http-equiv}>=<{meta/http-equiv/refresh}> attributes, and script-directed
+navigation that doesn't wait for user input) along with [=link decoration=] to
+join user identities between sites. [=Bounce tracking=] is a subset of
+[=navigational tracking=] and can include automated navigation through the same
+or different sites from the source or ultimate destination of a link.
+
+<div class="example" id="example-bounce-tracking-to-self">
+
+Tracking via a bounce through an aggregation domain:
+
+1. The content publisher's page (on `publisher.example`) embeds a third-party
+    script from `tracker.example`.
+1. The third-party script tries to read an already-stored identifier, for
+    example one it has set into `publisher.example`'s storage or one read from a
+    third-party `tracker.example` <{iframe}>.
+1. If it can't, it redirects the top level page to `tracker.example` using
+    {{Window/location|window.location}}.
+1. During this load `tracker.example` is the first party and can read and write
+    its cookie jar.
+1. `tracker.example` redirects back to the original page URL, with that URL
+    [=link decoration|decorated=] with its user ID in a query parameter.
+1. The `tracker.example` user ID is now available on `publisher.example` and can
+    be saved into its first-party storage so that future visits don't need to
+    bounce.
+
+</div>
+
+<h2 id="threat-model">Threat model</h2>
+
+This section will precisely define the goals and non-goals of this
+specification's mitigations. It will define a few classes of actors with the
+ability to modify websites in particular ways. Then it will define what
+cross-site information each of these actors can or cannot learn.
+
+<h3 id="threat-actors">Threat actors</h2>
+
+TODO
+
+<section class="informative">
+
+<h2 id="alternatives">Considered Alternatives</h2>
+
+<em>This section is non-normative.</em>
+
+So far, the alternative designs consist of mitigations that various browsers
+have already deployed.
+
+<h3 id="deployed-mitigations">Deployed Mitigations</h3>
+
+Some browsers have deployed and announced protections against
+[=navigational tracking=]. This section is a work in progress to detail what
+protections have been shipped and / or are planned. This section is not
+comprehensive.
+
+<h4 id="mitigations-safari">Safari</h4>
+
+Safari uses an algorithmic approach to combat [=navigational tracking=]. Safari
+classifies a site as having cross-site tracking capabilities if the
+[[WEBKIT-TRACKING-PREVENTION#classification-as-having-cross-site-tracking-capabilities|following
+criteria]] are met within a particular client:
+
+* The site appears as a third-party resource under enough different
+    [=host/registrable domains=].
+* The site automatically redirects the user to enough other sites, immediately
+    or after a short delay.
+* The site redirects to sites that are classified as trackers, recursively.
+
+    <div class="example" id="example-safari-recursive-trackers">
+
+    For example, consider the case of a user clicking on a link on
+    `start.example`, which redirects to `second.example`, which redirects to
+    `third.example`, which redirects to `end.example`. If Safari has classified
+    `third.example` as having tracking capabilities, the above behavior can
+    result in Safari classifying `second.example` as having cross-site tracking
+    capabilities.
+
+    </div>
+
+If a user navigates or is redirected from a classified tracker with a URL that
+includes either query parameters or a URL fragment, the lifetime of client-side
+set cookies on the *destination* page is capped at
+[[WEBKIT-TRACKING-PREVENTION#detection-of-cross-site-tracking-via-link-decoration|24
+hours]].
+
+
+<h4 id="mitigations-firefox">Firefox</h4>
+
+Firefox uses a list-based approach to combat [=navigational tracking=]. Sites on the
+Disconnect list are considered tracking sites. All storage
+for tracking sites is cleared after 24 hours, unless the user has interacted
+with the site in the first-party context in the last 45 days.
+
+Firefox is also starting to remove query parameters known to be used for
+cross-site tracking. ([[FSN-2021-Q4]]) The affected query parameters are chosen
+using the criteria on the [[MOZILLA-TRACKING-POLICY inline]], which includes:
+
+* High-entropy parameters that might identify a user or encode user data,
+    except:
+    * Parameters exclusively identifying specific elements or actions on the
+        navigating page (per-click or per-element identifiers), as long as those
+        parameters assign a different value to each click or element they are
+        identifying.
+    * Identifiers necessary to complete a user-initiated task such as logging in
+        or submitting a form.
+* High-entropy parameters that are broadly included in nearly all outgoing
+    navigations from a site, even if the parameters don't uniquely identify a
+    user.
+
+As of May 2022, this query-parameter stripping is applied by default in the
+Firefox Nightly build, and planned to be enabled in strict <abbr
+title="Enhanced Tracking Protection">ETP</abbr> mode and in private browsing.
+
+<h4 id="mitigations-brave">Brave</h4>
+Brave uses four list-based approaches to combat [=navigational tracking=].
+
+First, Brave strips query parameters commonly used for [=navigational tracking=]
+from URLs on navigation. This list is maintained by Brave.
+
+Second, by default, when i) the user is about to visit a list-identified
+bounce-tracking URL, and ii) the current profile does not contain any cookies
+or {{WindowLocalStorage/localStorage}} for that site, Brave will create a new, "ephemeral", empty storage
+area for the site. This storage area persists as long as the user has
+any top-level frames open for the site. As soon as the user has no
+top-level frames for the labeled bounce-tracking site, the ephemeral storage
+area is deleted.
+
+Third, in the non-default, "aggressive blocking" configuration, Brave uses
+popular crowd-sourced filter lists (e.g., EasyList, EasyPrivacy, uBlock Origin)
+to identify URLs that are used for bounce tracking, and will preempt the
+navigation with an interstitial (similar to Google SafeBrowsing), giving
+the user the option to continue the navigation or cancel it.
+
+Fourth, Brave uses a list-based approach for identifying bounce tracking
+URLs where the destination URL is present in the URL of the intermediate
+tracking URL. In such cases, Brave will skip the intermediate navigation
+and request the destination URL instead. For example, if Brave
+Browser observes the user about to navigate to the URL
+`https://tracker.example/bounce?dest=https://destination.example/`,
+the browser might replace the navigation to `tracker.example/bounce`,
+with a navigation to `https://destination.example/`. This list
+is maintained by Brave, and is drawn from a mix of crowd-sourcing and
+existing open-source projects.
+
+</section>
+
+<h2 id="acknowledgements" class="no-num">Acknowledgements</h2>
+
+Many thanks to the Privacy Community Group for many good discussions about this proposal.

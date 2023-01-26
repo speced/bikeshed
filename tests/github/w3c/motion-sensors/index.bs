@@ -643,6 +643,48 @@ as the <a>magnetic field</a> vector is more or less stable.
 The [=LinearAccelerationSensor interface=] and [=GravitySensor interface=] are defined in
 [[ACCELEROMETER]] specification.
 
+<div class="example">
+  The following example implements a [=GravitySensor=] polyfill. It shows the complexity of extracting the [=gravity=] value from
+  the [=Accelerometer interface=] and [=LinearAccelerationSensor interface=], in case both sensors are hardware-based sensors.
+  In case there is no hardware-based [=LinearAccelerationSensor=], the user agent needs to implement some fusion logic based on
+  the [=Accelerometer=] value and provide a less accurate value. In the example, a simplification shortcut has been made
+  to only listen to [=accelerometer=] events and not to both sensors' events.
+    <pre highlight="js">
+      class GravitySensor extends EventTarget {
+        #accelerometer = new Accelerometer();
+        #linearAccelerationSensor = new LinearAcceleration();
+        x = 0;
+        y = 0;
+        z = 0;
+
+        handleEvent(ev) {
+          this.timestamp = ev.timestamp;
+          this.x = this.#accelerometer.x - this.#linearAccelerationSensor.x;
+          this.y = this.#accelerometer.y - this.#linearAccelerationSensor.y;
+          this.z = this.#accelerometer.z - this.#linearAccelerationSensor.z;
+          const event = new Event("reading");
+          this.dispatchEvent(event);
+          this.onreading?.(event);
+        }
+
+        start() {
+          this.#accelerometer.addEventListener("reading", this);
+          this.#accelerometer.start();
+        }
+
+        stop() {
+          this.#accelerometer.removeEventListener("reading", this);
+          this.#accelerometer.stop();
+        }
+    }
+
+    g = new GravitySensor();
+    g.onreading = () => console.log(g.x, g.y, g.z);
+    g.start();
+    </pre>
+</div>
+
+
 Note, as the [=gravity=] changes with the frequency of the movements, i.e., 0 in falling direction
 in free fall, you can imagine that <a>linear acceleration</a> will be quite imprecise if you are
 trying to detect a shake, so keep that in mind.
@@ -659,6 +701,11 @@ Motion sensors can be used for variety of advanced use-cases, such as:
 - Sensor assisted indoor mapping and navigation [[INDOORNAV]], [[IPIN]]
 - Photo and video capture stabilization [[ROLLSTABILIZER]], [[VIDEOSTABILIZER]]
 - Games that require high-frequency sampling rates with high accuracy readings.
+- Many casual games which do not use touch input but instead use sensor value, such as gravity:
+    - Steering a rolling ball through a maze (either tilting the maze, or changing the ball's direction)
+    - Turn a vehicle by tilting the device left and right through traffic.
+    - Creating a "spirit-level" balance game where you have to balance objects by adjusting the device to change the gravity reading.
+    - Observing changes in the gravity sensor reading can indicate a swing motion of the device for a golf game
 - 3D scanning [[3DSCANNING]]
 - Advanced gesture recognition [[MEMSGESTURES]]
 - Step counting and monitoring of other physical activities [[PHYSMON]]

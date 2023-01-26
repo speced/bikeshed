@@ -1,0 +1,717 @@
+<pre class="metadata">
+Title: Speculation Rules
+Shortname: speculation-rules
+Group: WICG
+Status: CG-DRAFT
+Repository: WICG/nav-speculation
+URL: https://wicg.github.io/nav-speculation/speculation-rules.html
+Level: 1
+Editor: Jeremy Roman, Google https://www.google.com/, jbroman@chromium.org
+Abstract: A flexible syntax for defining what outgoing links can be prepared speculatively before navigation.
+Markup Shorthands: css yes, markdown yes
+Assume Explicit For: yes
+Complain About: accidental-2119 yes, missing-example-ids yes
+Indent: 2
+Boilerplate: omit conformance
+</pre>
+<pre class="link-defaults">
+spec:html; type:element; text:a
+spec:html; type:element-attr; for:a; text:href
+spec:html; type:element-attr; for:a; text:referrerpolicy
+spec:html; type:element-attr; for:a; text:rel
+spec:html; type:element; text:link
+spec:html; type:element; text:script
+spec:selectors-4; type:selector; text::link
+spec:selectors-4; type:selector; text::visited
+</pre>
+<pre class="anchors">
+spec: html; urlPrefix: https://html.spec.whatwg.org/multipage/
+  type: dfn
+    urlPrefix: infrastructure.html
+      text: HTML element removing steps; url: html-element-removing-steps
+    urlPrefix: scripting.html
+      text: already started; url: already-started
+      text: mark as ready; url: mark-as-ready
+      text: prepare the script element; url: prepare-the-script-element
+      for: HTMLScriptElement
+        text: type; url: concept-script-type
+        text: result; url: concept-script-result
+    urlPrefix: webappapis.html
+      text: await a stable state; url: await-a-stable-state
+      text: script; url: concept-script
+      text: synchronous section; url: synchronous-section
+    urlPrefix: document-sequences.html
+      text: valid navigable target name or keyword; url: valid-navigable-target-name-or-keyword
+      text: rules for choosing a navigable; url: the-rules-for-choosing-a-navigable
+    urlPrefix: semantics.html
+      text: get an element's target; url: get-an-element's-target
+    urlPrefix: links.html
+      text: following a hyperlink; url: following-hyperlinks-2
+  type: attr-value
+    urlPrefix: links.html
+      for: a/rel
+        text: noreferrer; url: link-type-noreferrer
+spec: RFC8941; urlPrefix: https://httpwg.org/specs/rfc8941.html
+  type: dfn
+    text: structured header; url: top
+    for: structured header
+      text: list; url: list
+      text: string; url: string
+spec: nav-speculation; urlPrefix: prefetch.html
+  type: dfn
+    text: prefetch; url: prefetch
+    text: prefetch record; url: prefetch-record
+    text: prefetch records; for: Document; url: document-prefetch-records
+    for: prefetch record
+      text: URL; url: prefetch-record-url
+      text: anonymization policy; url: prefetch-record-anonymization-policy
+      text: referrer policy; url: prefetch-record-referrer-policy
+      text: label; url: prefetch-record-label
+      text: state; url: prefetch-record-state
+      text: cancel and discard; url: prefetch-record-cancel-and-discard
+    text: prefetch IP anonymization policy; url: prefetch-ip-anonymization-policy
+    text: cross-origin prefetch IP anonymization policy; url: cross-origin-prefetch-ip-anonymization-policy
+    text: origin; for: cross-origin prefetch IP anonymization policy; url: cross-origin-prefetch-ip-anonymization-policy-origin
+spec: nav-speculation; urlPrefix: prerendering.html
+  type: dfn
+    text: start referrer-initiated prerendering; url: start-referrer-initiated-prerendering
+    text: prerendering traversable; url: prerendering-traversable
+    text: activate; for: prerendering traversable; url: prerendering-traversable-activate
+</pre>
+<style>
+/* domintro from https://resources.whatwg.org/standard.css */
+.domintro {
+  position: relative;
+  color: green;
+  background: #DDFFDD;
+  margin: 2.5em 0 2em 0;
+  padding: 1.5em 1em 0.5em 2em;
+}
+
+.domintro dt, .domintro dt * {
+  color: black;
+  font-size: inherit;
+}
+.domintro dd {
+  margin: 0.5em 0 1em 2em; padding: 0;
+}
+.domintro dd p {
+  margin: 0.5em 0;
+}
+.domintro::before {
+  content: 'For web developers (non-normative)';
+  background: green;
+  color: white;
+  padding: 0.15em 0.25em;
+  font-style: normal;
+  position: absolute;
+  top: -0.8em;
+  left: -0.8em;
+}
+</style>
+
+<h2 id="speculation-rules">Speculation rules</h2>
+
+<h3 id="speculation-rules-dfns">Definitions</h3>
+
+A <dfn>speculation rule</dfn> is a [=struct=] with the following [=struct/items=]:
+* <dfn for="speculation rule">URLs</dfn>, an [=ordered set=] of [=URLs=]
+* <dfn for="speculation rule">predicate</dfn>, a [=document rule predicate=] or null
+* <dfn for="speculation rule">requirements</dfn>, an [=ordered set=] of [=strings=]
+* <dfn for="speculation rule">target navigable name hint</dfn>, a [=string=] or null
+* <dfn for="speculation rule">referrer policy</dfn>, a [=referrer policy=]
+* <dfn for="speculation rule">eagerness</dfn>, one of the [=valid eagerness strings=]
+
+The only valid string for [=speculation rule/requirements=] to contain is "`anonymous-client-ip-when-cross-origin`".
+
+A <dfn>speculation rule set</dfn> is a [=struct=] with the following [=struct/items=]:
+* <dfn for="speculation rule set">prefetch rules</dfn>, a [=list=] of [=speculation rules=]
+* <dfn for="speculation rule set">prerender rules</dfn>, a [=list=] of [=speculation rules=]
+
+A <dfn>pending external speculation rule resource</dfn> is a [=struct=] with the following [=struct/items=]:
+* <dfn for="pending external speculation rule resource">URL</dfn>, a [=URL=]
+* <dfn for="pending external speculation rule resource">controller</dfn>, a [=fetch controller=] or null
+
+A <dfn>document rule predicate</dfn> is one of the following:
+* [=document rule conjunction=]
+* [=document rule disjunction=]
+* [=document rule negation=]
+* [=document rule URL pattern predicate=]
+* [=document rule CSS selector predicate=]
+
+A <dfn>document rule conjunction</dfn> is a struct with the following [=struct/items=]:
+* <dfn for="document rule conjunction">clauses</dfn>, a [=list=] of [=document rule predicates=]
+
+A <dfn>document rule disjunction</dfn> is a struct with the following [=struct/items=]:
+* <dfn for="document rule disjunction">clauses</dfn>, a [=list=] of [=document rule predicates=]
+
+A <dfn>document rule negation</dfn> is a struct with the following [=struct/items=]:
+* <dfn for="document rule negation">clause</dfn>, a [=document rule predicate=]
+
+A <dfn>document rule URL pattern predicate</dfn> is a struct with the following [=struct/items=]:
+* <dfn for="document rule URL pattern predicate">patterns</dfn>, a [=list=] of {{URLPattern}}s
+
+A <dfn>document rule CSS selector predicate</dfn> is a struct with the following [=struct/items=]:
+* <dfn for="document rule CSS selector predicate">selectors</dfn>, a [=list=] of [=selectors=]
+
+The following [=strings=] are <dfn>valid eagerness strings</dfn>: "`eager`", "`moderate`", "`conservative`".
+
+<h3 id="speculation-rules-script">The <{script}> element</h3>
+
+<em>Note</em>: This section contains modifications to the corresponding section of [[HTML]].
+
+To process speculation rules consistently with the existing script types, we make the following changes:
+
+* Add "`speculationrules`" to the list of valid values for a <{script}> element's [=HTMLScriptElement/type=].
+
+* Add a [=speculation rule set=] to the list of valid values for a <{script}> element's [=HTMLScriptElement/result=].
+
+The following algorithms are updated accordingly:
+
+* [=Prepare the script element=]: see [[#speculation-rules-prepare-the-script-element-patch]].
+* <a spec=html>Execute the script element</a>: Add the following case to the switch on [=HTMLScriptElement/type=]:
+  <dl>
+    <dt>"`speculationrules`"</dt>
+    <dd>
+      1. [=Assert=]: Never reached.
+    </dd>
+  </dl>
+
+<p class="issue">We should consider whether we also want to make this execute even if scripting is disabled.</p>
+
+<p class="issue">We should also incorporate the case where a {{HTMLScriptElement/src}} attribute is set.</p>
+
+<p class="issue">We could fire {{HTMLElement/error}} and {{HTMLElement/load}} events if we wanted to.</p>
+
+* In {{HTMLScriptElement/supports(type)}} method steps, before
+
+  > 3. Return false.
+
+  add the following step:
+
+  > 3. If type is "`speculationrules`", then return true.
+
+<div algorithm="script element removing steps">
+  The following steps are added as the <{script}> element's [=HTML element removing steps=], given |removedNode| and <var ignore>oldParent</var>:
+
+  1. If |removedNode|'s [=HTMLScriptElement/result=] is a [=speculation rule set=], then:
+      1. Let |document| be |removedNode|'s [=Node/node document=].
+      1. [=list/Remove=] it from |document|'s [=document/list of speculation rule sets=].
+      1. Set |removedNode|'s [=already started=] flag to false.
+      1. Set |removedNode|'s [=HTMLScriptElement/result=] to null.
+      1. [=Consider speculation=] for |document|.
+
+      <div class="note">This means that the rule set can be reparsed if the script is reinserted.</div>
+</div>
+
+<div algorithm="script element children changed steps">
+  The following steps are added as the <{script}> element's [=children changed steps=] for an element |scriptElement|.
+
+  1. If |scriptElement|'s [=HTMLScriptElement/result=] is a [=speculation rule set=], then:
+      1. Let |document| be |scriptElement|'s [=Node/node document=].
+      1. Let |ruleSet| be |scriptElement|'s [=HTMLScriptElement/result=].
+      1. Let |newResult| be the result of [=parsing speculation rules=] given |scriptElement|'s [=child text content=], |document|, and |document|'s [=document base URL=].
+      1. Set |scriptElement|'s [=HTMLScriptElement/result=] to |newResult|.
+      1. [=list/Replace=] |ruleSet| with |newResult| in |document|'s [=document/list of speculation rule sets=].
+      1. [=Consider speculation=] for |document|.
+
+      <div class="note">This means that the rule set is reparsed immediately if inline changes are made.</div>
+</div>
+
+<h3 id="speculation-rules-prepare-the-script-element-patch">Prepare the script element</h3>
+
+Inside the [=prepare the script element=] algorithm we make the following changes:
+
+* Insert the following step after the step that checks for an [=ASCII case-insensitive=] match for the string "`module`":
+  * If the script block's type string is an [=ASCII case-insensitive=] match for the string "`speculationrules`", then set <var ignore>el</var>'s [=HTMLScriptElement/type=] to "`speculationrules`".
+
+* Insert the following case in the switch on [=HTMLScriptElement/type=] within the step which begins "If <var ignore>el</var> does not have a {{HTMLScriptElement/src}} content attribute..."
+  <dl>
+    <dt>"`speculationrules`"</dt>
+    <dd>
+      1. Let |document| be <var ignore>el</var>'s [=Node/node document=]
+      1. Let |result| be the result of [=parsing speculation rules=] given source text, |document| and base URL.
+      1. If |result| is not null, [=list/append=] it to |document|'s [=document/list of speculation rule sets=].
+      1. [=Mark as ready=] <var ignore>el</var> given |result|.
+      1. [=Consider speculation=] for |document|.
+    </dd>
+  </dl>
+
+<h3 id="speculation-rules-header">The [:Speculation-Rules:] header</h3>
+Note: This section contains modifications to [[HTML]].
+
+The <dfn http-header><code>Speculation-Rules</code></dfn> HTTP response header is a [=structured header=] whose value must be a [=structured header/list=] whose members must be [=structured header/strings=] which are [=valid URL strings=].
+
+<div algorithm>
+
+  To <dfn>process the Speculation-Rules header</dfn> given a [=document=] |document| and a [=response=] |response|:
+
+  1. Optionally, return.
+    <p class="note">The user agent could ignore this header, for example, if it does not intend to [=consider speculation=] for |document|.</p>
+  1. Let |parsedList| be the result of [=header list/getting a structured field value=] given [:Speculation-Rules:] and "`list`" from |response|'s [=response/header list=].
+  1. If |parsedList| is null, then return.
+  1. Let |baseUrl| be |document|'s [=document base URL=].
+  1. [=list/For each=] |item| of |parsedList|:
+    1. If |item| is not a [=string=], then [=iteration/continue=].
+    1. Let |parsedURL| be the result of [=basic URL parser|parsing=] |item| with |baseUrl|.
+    1. If |parsedURL| is failure, then [=iteration/continue=].
+    1. Let |pendingResource| be a [=pending external speculation rule resource=] with [=pending external speculation rule resource/URL=] |parsedURL| and [=pending external speculation rule resource/controller=] null.
+    1. [=list/Append=] |pendingResource| to |document|'s [=document/list of pending external speculation rule resources=].
+  1. [=Process pending external speculation rule resources=] given |document|.
+</div>
+
+In <a spec="HTML">create and initialize a `Document` object</a>, before the step
+
+  > 19. Return <var ignore>document</var>.
+
+add the following step
+
+  > 19. [=Process the Speculation-Rules header=] given <var ignore>document</var> and <var ignore>navigationParams</var>'s [=response=].
+
+<h3 id="external-speculation-rule-sets">External speculation rule sets</h3>
+
+<div algorithm>
+
+  To <dfn>process pending external speculation rule resources</dfn> given a [=document=] |document|:
+
+  1. Let |pendingResources| be |document|'s [=document/list of pending external speculation rule resources=].
+  1. [=list/For each=] |pendingResource| of |pendingResources|:
+    1. Optionally, [=pending external speculation rule resource/cancel and discard=] |pendingResource| given |document|, then [=iteration/continue=].
+    1. If |pendingResource|'s [=pending external speculation rule resource/controller=] is not null, then [=iteration/continue=].
+    1. Optionally, [=pending external speculation rule resource/fetch=] |pendingResource| given |document|.
+      <p class="note">The user agent schedules the fetch of external speculation rules at its discretion. That is, if it skips the fetch during this call of [=process pending external speculation rule resources=], it might do the fetch during a later call.</p>
+
+</div>
+
+<div algorithm>
+
+  To <dfn for="pending external speculation rule resource">fetch</dfn> a [=pending external speculation rule resource=] |pendingResource| given a [=document=] |document|:
+  1. Let |pendingResources| be |document|'s [=document/list of pending external speculation rule resources=].
+  1. [=Assert=]: |pendingResources| [=list/contains=] |pendingResource|.
+  1. [=Assert=]: |pendingResource|'s [=pending external speculation rule resource/controller=] is null.
+  1. Let |settingsObject| be |document|'s [=relevant settings object=].
+  1. Let |requestURL| be |pendingResource|'s [=pending external speculation rule resource/URL=].
+  1. Let |request| be a new [=request=] whose [=request/URL=] is |requestURL|, [=request/client=] is |settingsObject|, and [=request/mode=] is "`cors`".
+  1. Let |controller| be the result of [=fetching=] given |request| with <i>[=fetch/processResponseConsumeBody=]</i> set to the following steps given [=response=] |response| and null, failure, or a [=byte sequence=] |body|:
+    1. [=list/Remove=] |pendingResource| from |pendingResources|.
+    1. If any of the following conditions are true, abort these steps:
+      * |body| is null.
+      * |body| is failure.
+      * |response|'s [=response/status=] is not an [=ok status=].
+      * The result of [=header list/extracting a MIME type=] from |response|'s [=response/header list=] does not have an [=MIME type/essence=] of "`application/speculationrules+json`".
+    1. Otherwise, let |text| be the result of [=UTF-8 decoding=] |body|.
+    1. Let |ruleSet| be the result of [=parsing speculation rules=] given |text|, |document| and |response|'s [=response/URL=].
+    1. If |ruleSet| is null, abort these steps.
+      <p class="note">User agents are encouraged to report failures of the previous steps.</p>
+    1. [=list/Append=] |ruleSet| to |document|'s [=document/list of speculation rule sets=].
+  1. Set |pendingResource|'s [=pending external speculation rule resource/controller=] to |controller|.
+
+</div>
+
+<div algorithm>
+
+  To <dfn for="pending external speculation rule resource">cancel and discard</dfn> a [=pending external speculation rule resource=] |pendingResource| given a [=document=] |document|:
+
+  1. Let |pendingResources| be |document|'s [=document/list of pending external speculation rule resources=].
+  1. [=Assert=]: |pendingResources| [=list/contains=] |pendingResource|.
+  1. Let |controller| be |pendingResource|'s [=pending external speculation rule resource/controller=].
+  1. If |controller| is not null, [=fetch controller/abort=] |controller|.
+  1. [=list/Remove=] |pendingResource| from |pendingResources|.
+</div>
+
+<h3 id="speculation-rules-parsing">Parsing</h3>
+
+<p class="note">
+  The general principle here is to allow the existence of directives which are not understood, but not to accept into the rule set a rule which the user agent does not fully understand.
+  This reduces the risk of unintended activity by user agents which are unaware of most recently added directives which might limit the scope of a rule.
+
+<div algorithm="parse speculation rules">
+  To <dfn>parse speculation rules</dfn> given a [=string=] |input|, [=document=] |document|, and a [=URL=] |baseURL|, perform the following steps. They return a [=speculation rule set=] or null.
+
+  1. Let |parsed| be the result of [=parsing a JSON string to an Infra value=] given |input|.
+  1. If |parsed| is not a [=map=], then return null.
+  1. Let |result| be an empty [=speculation rule set=].
+  1. If |parsed|["`prefetch`"] [=map/exists=] and is a [=list=], then [=list/for each=] |prefetchRule| of |parsed|["`prefetch`"]:
+    1. If |prefetchRule| is not a [=map=], then [=iteration/continue=].
+    1. Let |rule| be the result of [=parsing a speculation rule=] given |prefetchRule|, |document| and |baseURL|.
+    1. If |rule| is null, then [=iteration/continue=].
+    1. If |rule|'s [=speculation rule/target navigable name hint=] is not null, then [=iteration/continue=].
+    1. [=list/Append=] |rule| to |result|'s [=speculation rule set/prefetch rules=].
+  1. If |parsed|["`prerender`"] [=map/exists=] and is a [=list=], then [=list/for each=] |prerenderRule| of |parsed|["`prerender`"]:
+    1. If |prerenderRule| is not a [=map=], then [=iteration/continue=].
+    1. Let |rule| be the result of [=parsing a speculation rule=] given |prerenderRule|, |document|, and |baseURL|.
+    1. If |rule| is null, then [=iteration/continue=].
+    1. [=list/Append=] |rule| to |result|'s [=speculation rule set/prerender rules=].
+  1. Return |result|.
+</div>
+
+<div algorithm="parse a speculation rule">
+  To <dfn>parse a speculation rule</dfn> given a [=map=] |input|, a [=document=] |document|, and a [=URL=] |baseURL|, perform the following steps. They return a [=speculation rule=] or null.
+
+  1. If |input| has any [=map/key=] other than "`source`", "`urls`", "`where`", "`requires`", "`target_hint`","`referrer_policy`", "`relative_to`", and "`eagerness`" then return null.
+  1. If |input|["`source`"] does not [=map/exist=] or is neither the [=string=] "`list`" nor the [=string=] "`document`", then return null.
+  1. Let |source| be |input|["`source`"].
+  1. Let |urls| be an empty [=list=].
+  1. Let |predicate| be null.
+  1. If |source| is "`list`":
+    1. If |input|["`where`"] [=map/exists=], then return null.
+    1. If |input|["`urls`"] does not [=map/exist=], is not a [=list=], or has any element which is not a [=string=], then return null.
+    1. If |input|["`relative_to`"] [=map/exists=]:
+      1. Let |relativeTo| be |input|["`relative_to`"].
+      1. If |relativeTo| is neither the string "`ruleset`" nor the string "`document`", then return null.
+      1. If |relativeTo| is "`document`", then set |baseURL| to the |document|'s [=document base URL=].
+    1. [=list/For each=] |urlString| of |input|["`urls`"]:
+      1. Let |parsedURL| be the result of [=basic URL parser|parsing=] |urlString| with |baseURL|.
+      1. If |parsedURL| is failure, then [=iteration/continue=].
+      1. If |parsedURL|'s [=url/scheme=] is not an [=HTTP(S) scheme=], then [=iteration/continue=].
+      1. [=list/Append=] |parsedURL| to |urls|.
+  1. If |source| is "`document`":
+    1. If |input|["`urls`"]  [=map/exists=], then return null.
+    1. If |input|["`relative_to`"] [=map/exists=], then return null.
+    1. If |input|["`where`"] does not [=map/exist=], then set |predicate| to a [=document rule conjunction=] whose [=document rule conjunction/clauses=] is an empty [=list=].
+
+      <p class="note">Such a predicate will match all links.</p>
+    1. Otherwise, set |predicate| to the result of [=parsing a document rule predicate=] given |input|["`where`"], |document| and |baseURL|.
+    1. If |predicate| is null, then return null.
+  1. Let |requirements| be an empty [=ordered set=].
+  1. If |input|["`requires`"] [=map/exists=], but is not a [=list=], then return null.
+  1. [=list/For each=] |requirement| of |input|["`requires`"]:
+    1. If |requirement| is not the [=string=] "`anonymous-client-ip-when-cross-origin`", then return null.
+    1. [=set/Append=] |requirement| to |requirements|.
+  1. Let |targetHint| be null.
+  1. If |input|["`target_hint`"] [=map/exists=]:
+    1. If |input|["`target_hint`"] is not a [=valid navigable target name or keyword=], then return null.
+    1. Set |targetHint| to |input|["`target_hint`"].
+  1. Let |referrerPolicy| be the empty string.
+  1. If |input|["`referrer_policy`"] [=map/exists=]:
+    1. If |input|["`referrer_policy`"] is not a [=referrer policy=], then return null.
+    1. Set |referrerPolicy| to |input|["`referrer_policy`"].
+  1. Let |eagerness| be "`eager`" if |source| is "`list`", and "`conservative`" otherwise.
+  1. If |input|["`eagerness`"] [=map/exists=]:
+    1. If |input|["`eagerness`"] is not one of the [=valid eagerness strings=], then return null.
+    1. Set |eagerness| to |input|["`eagerness`"].
+  1. Return a [=speculation rule=] with
+    :  [=speculation rule/URLs=]
+    :: |urls|
+    :  [=speculation rule/predicate=]
+    :: |predicate|
+    :  [=speculation rule/requirements=]
+    :: |requirements|
+    :  [=speculation rule/target navigable name hint=]
+    :: |targetHint|
+    :  [=speculation rule/referrer policy=]
+    :: |referrerPolicy|
+    :  [=speculation rule/eagerness=]
+    :: |eagerness|
+</div>
+
+<div algorithm="parse a document rule predicate">
+  To <dfn>parse a document rule predicate</dfn> given a value |input|, a [=document=] |document| and [=URL=] |baseURL|:
+
+  1. If |input| is not a [=map=], then return null.
+  1. If |input| does not [=map/contain=] exactly one of "`and`", "`or`", "`not`", "`href_matches`" and "`selector_matches`", then return null. Otherwise, let |predicateType| be that key.
+
+      <p class="note">This makes sure it is unambiguous what type of predicate is being used.</p>
+  1. If |predicateType| is "`and`" or "`or`", then:
+    1. If |input| has any [=map/key=] other than |predicateType|, then return null.
+
+      <p class="note">This, and other similar checks below, make sure that unexpected extra options cause the predicate to be invalid.</p>
+    1. Let |rawClauses| be the |input|[|predicateType|].
+    1. If |rawClauses| is not a [=list=], then return null.
+    1. Let |clauses| be an empty [=list=].
+    1. [=list/For each=] |rawClause| of |rawClauses|:
+      1. Let |clause| be the result of [=parsing a document rule predicate=] given |rawClause|, |document| and |baseURL|.
+      1. If |clause| is null, then return null.
+      1. [=list/Append=] |clause| to |clauses|.
+    1. If |predicateType| is "`and`", then return a [=document rule conjunction=] whose [=document rule conjunction/clauses=] is |clauses|.
+    1. If |predicateType| is "`or`", then return a [=document rule disjunction=] whose [=document rule disjunction/clauses=] is |clauses|.
+  1. If |predicateType| is "`not`", then:
+    1. If |input| has any [=map/key=] other than "`not`", then return null.
+    1. Let |rawClause| be the |input|[|predicateType|].
+    1. Let |clause| be the result of [=parsing a document rule predicate=] given |rawClause|, |document| and |baseURL|.
+    1. If |clause| is null, then return null.
+    1. Return a [=document rule negation=] whose [=document rule negation/clause=] is |clause|.
+  1. If |predicateType| is "`href_matches`":
+    1. If |input| has any [=map/key=] other than "`href_matches`" and "`relative_to`", then return null.
+    1. If |input|["`relative_to`"] [=map/exists=], then:
+      1. Let |relativeTo| be |input|["`relative_to`"].
+      1. If |relativeTo| is neither the string "`ruleset`" nor the string "`document`", then return null.
+      1. If |relativeTo| is "`document`", set |baseURL| to the |document|'s [=document base URL=].
+    1. Let |rawPatterns| be |input|["`href_matches`"].
+    1. If |rawPatterns| is not a [=list=], then set |rawPatterns| to « |rawPatterns| ».
+    1. Let |patterns| be an empty [=list=].
+    1. [=list/For each=] |rawPattern| of |rawPatterns|:
+      1. Let |serializedBaseURL| be the [=URL serializer|serialization=] of |baseURL|.
+      1. Let |pattern| be null.
+      1. If |rawPattern| is a [=string=], then:
+        1. Set |pattern| to the result of constructing a {{URLPattern}} using the {{URLPattern/URLPattern(input, baseURL)}} constructor steps given |rawPattern| and |serializedBaseURL|. If those steps throw, catch the exception and return null.
+      1. Otherwise, if |rawPattern| is a [=map=], then:
+        1. Let |init| be «[ "`baseURL`" → |serializedBaseURL| ]», representing a dictionary of type {{URLPatternInit}}.
+        1. [=map/For each=] |key| → |value| of |rawPattern|:
+          1. If |key| is not the [=identifier=] of a [=dictionary member=] of {{URLPatternInit}} or one of its [=inherited dictionaries=], |value| is not a [=string=], or the member's type is not declared to be {{USVString}}, then return null.
+
+            <div class="note">This will need to be updated if {{URLPattern}} gains members of other types.</div>
+          1. Set |init|[|key|] to |value|.
+        1. Set |pattern| to the result of constructing a {{URLPattern}} using the {{URLPattern/URLPattern(input, baseURL)}} constructor steps given |init|. If those steps throw, catch the exception and return null.
+      1. Otherwise, return null.
+      1. [=Assert=]: |pattern| is a {{URLPattern}}.
+      1. [=list/Append=] |pattern| to |patterns|.
+    1. Return a [=document rule URL pattern predicate=] whose [=document rule URL pattern predicate/patterns=] is |patterns|.
+  1. If |predicateType| is "`selector_matches`":
+    1. If |input| has any [=map/key=] other than "`selector_matches`", then return null.
+    1. Let |rawSelectors| be |input|["`selector_matches`"].
+    1. If |rawSelectors| is not a [=list=], then set |rawSelectors| to « |rawSelectors| ».
+    1. Let |selectors| be an empty [=list=].
+    1. [=list/For each=] |rawSelector| of |selectors|:
+      1. If |rawSelector| is not a [=string=], then return null.
+      1. [=Parse a selector=] from |rawSelector|. If the result is failure, then return null. Otherwise, let |selector| be the result.
+      1. [=list/Append=] |selector| to |selectors|.
+    1. Return a [=document rule CSS selector predicate=] whose [=document rule CSS selector predicate/selectors=] is |selectors|.
+</div>
+
+<h3 id="speculation-rules-processing">Processing model</h3>
+
+A [=document=] has a <dfn for=document export>list of speculation rule sets</dfn>, which is an initially empty [=list=].
+
+A [=document=] has a <dfn for=document export>list of pending external speculation rule resources</dfn>, which is an initially empty [=list=] of [=pending external speculation rule resources=].
+
+Periodically, for any [=document=] |document|, the user agent may [=queue a global task=] on the [=DOM manipulation task source=] with |document|'s [=relevant global object=] to [=consider speculation=] for |document|.
+
+<p class="note">
+  The user agent will likely do when resources are idle and available, or otherwise the circumstances of its previous decision whether to start a speculation could have changed.
+</p>
+<p class="note">
+  The user agent might still [=consider speculation=] when there are [=document/list of pending external speculation rule resources|rule sets that have not been loaded yet=].
+</p>
+
+The user agent may also [=queue a global task=] on the [=networking task source=] with |document|'s [=relevant global object=] to [=process pending external speculation rule resources=] given |document|.
+
+A <dfn>prefetch candidate</dfn> is a [=struct=] with the following [=struct/items=]:
+* <dfn for="prefetch candidate">URL</dfn>, a [=URL=]
+* <dfn for="prefetch candidate">anonymization policy</dfn>, a [=prefetch IP anonymization policy=]
+* <dfn for="prefetch candidate">referrer policy</dfn>, a [=referrer policy=]
+* <dfn for="prefetch candidate">eagerness</dfn>, one of the [=valid eagerness strings=]
+
+A <dfn>prerender candidate</dfn> is a [=struct=] with the following [=struct/items=]:
+* <dfn for="prerender candidate">URL</dfn>, a [=URL=]
+* <dfn for="prerender candidate">target navigable name hint</dfn>, a [=valid navigable target name or keyword=] or null
+* <dfn for="prerender candidate">referrer policy</dfn>, a [=referrer policy=]
+* <dfn for="prerender candidate">eagerness</dfn>, one of the [=valid eagerness strings=]
+
+<div algorithm>
+  A [=prefetch candidate=] |prefetchCandidate| <dfn for="prefetch candidate">continues</dfn> a [=prefetch record=] |prefetchRecord| if the following are all true:
+  * |prefetchRecord|'s [=prefetch record/label=] is "`speculation-rules`"
+  * |prefetchRecord|'s [=prefetch record/state=] is not "`canceled`"
+  * |prefetchRecord|'s [=prefetch record/URL=] equals |prefetchCandidate|'s [=prefetch candidate/URL=]
+  * |prefetchRecord|'s [=prefetch record/anonymization policy=] equals |prefetchCandidate|'s [=prefetch candidate/anonymization policy=]
+</div>
+
+<div algorithm>
+  To <dfn>find matching links</dfn> given a {{Document}} |document| and [=document rule predicate=] |predicate|:
+
+  1. Let |links| be an empty [=list=].
+  1. For each [=shadow-including descendant=] |descendant| of |document|, in [=shadow-including tree order=]:
+    1. If |descendant| is not an <{a}> with an <{a/href}> attribute or <{area}> element with an <{area/href}> attribute, [=iteration/continue=].
+
+        <div class="note">This corresponds to the elements which match '':any-link'' [=pseudo-class=], or which appear in the {{Document/links}} collection.</div>
+
+    1. If |predicate| [=document rule predicate/matches=] |descendant|, then [=list/append=] |descendant| to |links|.
+  1. Return |links|.
+</div>
+
+<div algorithm>
+  To <dfn>compute a speculative action referrer policy</dfn> given a [=speculation rule=] |rule| and an <{a}> element, an <{area}> element, or null |link|:
+
+  1. If |rule|'s [=speculation rule/referrer policy=] is not the empty string, then return |rule|'s [=speculation rule/referrer policy=].
+  1. If |link| is null, then return the empty string.
+  1. If |link|'s <{a/rel}> attribute includes the <{a/rel/noreferrer}> keyword, then return "`no-referrer`".
+  1. Otherwise, return the current state of |link|'s <{a/referrerpolicy}> content attribute.
+    <p class="note">The [=referrer policy=] computed based on |link| is intended to be equivalent to the referrer policy computation in [=following a hyperlink=].</p>
+</div>
+
+<div algorithm="consider speculation">
+  To <dfn>consider speculation</dfn> for a [=document=] |document|:
+
+  1. [=Await a stable state=]. Steps in the [=synchronous section=] are marked with &#x231B;.
+  1. &#x231B; If |document| is not [=Document/fully active=], then return.
+     <p class="issue">It's likely that we should also handle prerendered and back-forward cached documents.
+  1. &#x231B; Let |prefetchCandidates| be an empty [=list=].
+  1. &#x231B; Let |prerenderCandidates| be an empty [=list=].
+  1. &#x231B; For each |ruleSet| of |document|'s [=document/list of speculation rule sets=]:
+    1. &#x231B; [=list/For each=] |rule| of |ruleSet|'s [=speculation rule set/prefetch rules=]:
+      1. &#x231B; Let |anonymizationPolicy| be null.
+      1. &#x231B; If |rule|'s [=speculation rule/requirements=] [=set/contains=] "`anonymous-client-ip-when-cross-origin`", set |anonymizationPolicy| to a [=cross-origin prefetch IP anonymization policy=] whose [=cross-origin prefetch IP anonymization policy/origin=] is |document|'s [=Document/origin=].
+      1. &#x231B; [=list/For each=] |url| of |rule|'s [=speculation rule/URLs=]:
+        1. &#x231B; Let |referrerPolicy| be the result of [=computing a speculative action referrer policy=] given |rule| and null.
+        1. &#x231B; [=list/Append=] a [=prefetch candidate=] with [=prefetch candidate/URL=] |url|, [=prefetch candidate/anonymization policy=] |anonymizationPolicy|, [=prefetch candidate/referrer policy=] |referrerPolicy|, and [=prefetch candidate/eagerness=] |rule|'s [=speculation rule/eagerness=] to |prefetchCandidates|.
+      1. &#x231B; If |rule|'s [=speculation rule/predicate=] is not null, then:
+        1. &#x231B; Let |links| be the result of [=finding matching links=] given |document| and |rule|'s [=speculation rule/predicate=].
+        1. &#x231B; [=list/For each=] |link| of |links|:
+          1. &#x231B; Let |href| be the result of running |link|'s {{HTMLHyperlinkElementUtils/href}} getter steps.
+          1. &#x231B; Let |referrerPolicy| be the result of [=computing a speculative action referrer policy=] given |rule| and |link|.
+          1. &#x231B; [=list/Append=] a [=prefetch candidate=] with [=prefetch candidate/URL=] |href|, [=prefetch candidate/anonymization policy=] |anonymizationPolicy|, and [=prefetch candidate/referrer policy=] |referrerPolicy| to |prefetchCandidates|.
+    1. &#x231B; [=list/For each=] |rule| of |ruleSet|'s [=speculation rule set/prerender rules=]:
+      1. &#x231B; [=list/For each=] |url| of |rule|'s [=speculation rule/URLs=]:
+        1. &#x231B; Let |referrerPolicy| be the result of [=computing a speculative action referrer policy=] given |rule| and null.
+        1. &#x231B; Let |prerenderCandidate| be a new [=prerender candidate=] whose [=prerender candidate/URL=] is |url|, [=prerender candidate/target navigable name hint=] is |rule|'s [=speculation rule/target navigable name hint=], [=prerender candidate/referrer policy=] is |referrerPolicy|, and [=prerender candidate/eagerness=] is |rule|'s [=speculation rule/eagerness=].
+        1. &#x231B; [=list/Append=] |prerenderCandidate| to |prerenderCandidates|.
+      1. &#x231B; If |rule|'s [=speculation rule/predicate=] is not null, then:
+        1. &#x231B; Let |links| be the result of [=finding matching links=] given |document| and |rule|'s [=speculation rule/predicate=].
+        1. &#x231B; [=list/For each=] |link| of |links|:
+          1. &#x231B; Let |href| be the result of running |link|'s {{HTMLHyperlinkElementUtils/href}} getter steps.
+          1. &#x231B; Let |target| be |rule|'s [=speculation rule/target navigable name hint=].
+          1. &#x231B; If |target| is null, set it to the result of [=getting an element's target=] given |link|.
+          1. &#x231B; Let |referrerPolicy| be the result of [=computing a speculative action referrer policy=] given |rule| and |link|.
+          1. &#x231B; Let |prerenderCandidate| be a new [=prerender candidate=] whose [=prerender candidate/URL=] is |href|, [=prerender candidate/target navigable name hint=] is |target|, and [=prerender candidate/referrer policy=] is |referrerPolicy|.
+          1. &#x231B; [=list/Append=] |prerenderCandidate| to |prerenderCandidates|.
+  1. &#x231B; [=list/For each=] |prefetchRecord| of |document|'s [=Document/prefetch records=]:
+    1. &#x231B; If |prefetchRecord|'s [=prefetch record/label=] is not "`speculation-rules`", then [=iteration/continue=].
+    1. &#x231B; [=Assert=]: |prefetchRecord|'s [=prefetch record/state=] is not "`canceled`".
+    1. &#x231B; If no element of |prefetchCandidates| [=prefetch candidate/continues=] |prefetchRecord|, then [=prefetch record/cancel and discard=] |prefetchRecord| given |document|.
+  1. End the [=synchronous section=], continuing the remaining steps [=in parallel=].
+  1. [=list/For each=] |prefetchCandidate| of |prefetchCandidates|:
+    1. The user agent may run the following steps:
+      1. Let |prefetchRecord| be a new [=prefetch record=] whose [=prefetch record/URL=] is |prefetchCandidate|'s [=prefetch candidate/URL=], [=prefetch record/anonymization policy=] is |prefetchCandidate|'s [=prefetch candidate/anonymization policy=], [=prefetch record/referrer policy=] is |prefetchCandidate|'s [=prefetch candidate/referrer policy=], and [=prefetch record/label=] is "`speculation-rules`".
+      1. [=Prefetch=] given |document| and |prefetchRecord|.
+  1. [=list/For each=] |prerenderCandidate| of |prerenderCandidates|:
+      1. The user agent may [=start referrer-initiated prerendering=] given |prerenderCandidate|'s [=prerender candidate/URL=], |document|, and |prerenderCandidate|'s [=prerender candidate/referrer policy=].
+
+         The user agent can use |prerenderCandidate|'s [=prerender candidate/target navigable name hint=] as a hint to their implementation of the [=start referrer-initiated prerendering=] algorithm. This hint indicates that the web developer expects the eventual [=prerendering traversable/activate|activation=] of the created [=prerendering traversable=] to be in place of a particular predecessor traversable: the one that would be chosen by the invoking the [=rules for choosing a navigable=] given |prerenderCandidate|'s [=prerender candidate/target navigable name hint=] and |document|'s [=node navigable=].
+
+         <p class="note">This is just a hint. The [=speculation rule/target navigable name hint=] actually has no normative implications, after being parsed. It is still perfectly fine to [=prerendering traversable/activate=] in place of a different predecessor traversable that was not hinted at.
+
+  When selecting among |prefetchCandidates| and |prerenderCandidates|, user agents should consider their [=prefetch candidate/eagerness=], in accordance with the following:
+  :  "`eager`"
+  :: The author believes this is very likely to be worthwhile. User agents should usually enact the candidate, subject only to considerations such as user preferences, device conditions, and resource limits.
+  :  "`moderate`"
+  :: User agents should enact the candidate if user behavior suggests the user may navigate to this URL in the near future. For instance, the user might have scrolled a link into the viewport and moved the cursor over or near it.
+  :  "`conservative`"
+  :: User agents should enact the candidate only when the user is very likely to navigate to this URL at any moment. For instance, the user might have begun to interact with a link.
+</div>
+
+<p class="issue">
+  We should also cancel speculated prerenders.
+</p>
+
+<h3 id="document-rule-predicate-matching">Document rule predicate matching</h3>
+
+<div algorithm>
+  A [=document rule predicate=] |predicate| <dfn for="document rule predicate">matches</dfn> an {{Element}} |el| implementing the {{HTMLHyperlinkElementUtils}} mixin if the following steps return true:
+
+  1. If |predicate| is a [=document rule conjunction=], then:
+    1. [=list/For each=] |clause| of |predicate|'s [=document rule conjunction/clauses=]:
+      1. If |clause| does not [=document rule predicate/match=] |el|, return false.
+    1. Return true.
+  1. If |predicate| is a [=document rule disjunction=], then:
+    1. [=list/For each=] |clause| of |predicate|'s [=document rule disjunction/clauses=]:
+      1. If |clause| [=document rule predicate/matches=] |el|, return true.
+    1. Return false.
+  1. If |predicate| is a [=document rule negation=], then:
+    1. If |predicate|'s [=document rule negation/clause=] [=document rule predicate/matches=] |el|, return false.
+    1. Return true.
+  1. If |predicate| is a [=document rule URL pattern predicate=], then:
+    1. Let |href| be the result of running |el|'s {{HTMLHyperlinkElementUtils/href}} getter steps.
+    1. [=list/For each=] |pattern| of |predicate|'s [=document rule URL pattern predicate/patterns=]:
+      1. <a spec="urlpattern">Match</a> given |pattern| and |href|. If the result is not null, return true.
+    1. Return false.
+  1. If |predicate| is a [=document rule CSS selector predicate=], then:
+    1. [=list/For each=] |selector| of |predicate|'s [=document rule CSS selector predicate/selectors=]:
+      1. [=match a selector against an element|Match=] |selector| against |el| with the [=scoping root=] set to |el|'s [=Node/node document=]. If the result is true, return true.
+
+        During this step, user agents must apply the same privacy restrictions to the '':visited'' pseudo-class as they would to other selector matching logic that could be observed by authors (e.g., {{ParentNode/querySelector(selectors)}}).
+
+        <div class="advisement">
+          This is important to prevent this from opening an avenue for attackers to gather information about a user's browsing history, e.g., by using a selector such as <code>:root:has(.sensitive-site:visited) .report-sensitive-site</code>. See the [[#privacy-visited-links|Privacy Considerations]] section.
+        </div>
+    1. Return false.
+  1. [=Assert=]: This step is not reached.
+</div>
+
+<h2 id="security-considerations">Security considerations</h2>
+
+<h3 id="security-csrf">Cross-site request forgery</h3>
+
+This specification allows documents to cause HTTP requests to be issued.
+
+When any supported action acts on a URL which is [=same origin=] to the document, then this does not constitute a risk of cross-site request forgery, since the request uses only the credentials available to the document.
+
+Otherwise, requests are always issued without using any previously existing [=credentials=]. This limits the ambient authority available to any potentially forged request, and such requests can already be made through [[FETCH]], a subresource or frame, or various other means. Site operators are therefore already well-advised to use CSRF tokens or other mitigations for this threat.
+
+Because links in a document could be selected using a document rule, if the document may contain user-generated markup then authors should construct their speculation rules to exclude such links that may have harmful side effects, e.g., by using a [=document rule CSS selector predicate=] to exclude links in regions with user-generated links or by using a [=document rule URL pattern predicate=] to allow only URL patterns known to be safe to fetch without side effects.
+
+<h3 id="security-xss">Cross-site scripting</h3>
+
+This specification causes activity in response to content found in the document, so it is worth considering the options open to an attacker able to inject unescaped HTML.
+
+Such an attacker is otherwise able to inject JavaScript, frames or other elements. The activity possible with this specification (requesting fetches etc) is generally less dangerous than arbitrary script execution, and comparable to other elements. It would, however, make it possible to cause prefetches of links in the document, and the existence of those prefetches could provide a vector for exfiltrating information about those links.
+
+The same mitigations available to other features also apply here. In particular, the [[CSP]] `script-src` directive applies to the parsing of the speculation rules and the `default-src` directive applies to prefetch requests arising from the rules.
+
+The possibility of leaking link URLs via this mechanism is additionally mitigated by the fact that prefetch and prerender to plaintext HTTP (other than to localhost) is not permitted, and so such an on-path attacker could not directly observe preloading request URLs, but would only have access to metadata and traffic analysis. This does not, however, replace standard XSS protections.
+
+<h3 id="type-confusion">Type confusion</h3>
+
+In the case of speculation rules in an inline `<script>`, an application which erroneously parsed speculation rules as a JavaScript script (though user agents are instructed not to execute scripts who "`type`" is unrecognized) would either interpret it as the empty block `{}` or produce a syntax error, since the U+003A COLON (`:`) after the first key is invalid JavaScript. In neither case would such an application execute harmful behavior.
+
+Since the parsing behavior of the `<script>` element has long been part of HTML, any modern HTML parser would not construct any non-text children of the element. There is thus a low risk of other text hidden inside a `<script>` element with `type="speculationrules"` which is parsed as part of the script content by compliant HTML implementations but as HTML tags by others.
+
+Authors should, however, still escape any potentially attacker-controlled content inserted into speculation rules. In particular, it may be necessary to escape JSON syntax as well as, if the speculation rules are in an inline `<script>` tag, the closing `</script>` tag. [[CSP]] is a useful additional mitigation for vulnerabilities of this type.
+
+<div class="issue">Expand this section once externally loaded (via "`src`") speculation rules are specified.</div>
+
+<h3 id="security-ip-anonymization">IP anonymization</h3>
+
+This specification allows authors to request prefetch traffic using IP anonymization technology provided by the user agent. The details of this technology are not a part of this specification; nonetheless some general principles apply.
+
+To the extent IP anonymization is implemented using a proxy service, it is advisable to minimize the information available to the service operator and other entities on the network path. This likely involves, at a minimum, the use of [[TLS]] for the connection.
+
+Site operators should be aware that, similar to virtual private network (VPN) technology, the client IP address seen by the HTTP server may not exactly correspond to the user's actual network provider or location, and a traffic for multiple distinct subscribers may originate from a single client IP address. This may affect site operators' security and abuse prevention measures. IP anonymization measures may make an effort to use an egress IP address which has a similar geolocation or is located in the same jurisdiction as the user, but any such behavior is particular to the user agent and not guaranteed by this specification.
+
+<h2 id="privacy-considerations">Privacy considerations</h2>
+
+<h3 id="privacy-heuristics">Heuristics</h3>
+
+Because the candidate prefetches and other actions are not required, the user agent can use heuristics to determine which actions would be best to execute. Because it may be observable to the document whether actions were executed, user agents must take care to protect privacy when making such decisions — for instance by only using information which is already available to the origin. If these heuristics depend on any persistent state, that state must be erased whenever the user erases other site data. If the user agent automatically clears other site data from time to time, it must erase such persistent state at the same time.
+
+<div class="note">
+  The use of <em>origin</em> here instead of <em>site</em> here is intentional. Origins generally form the basis for the web's security boundary. Though same-site origins are generally allowed to coordinate if they wish, origins are generally not allowed access to data from other origins, even same-site ones.
+</div>
+
+Examples of inputs which would be already known to the document:
+* author-supplied scores (if future version of this specification allows specifying them)
+* order of appearance in the document
+* whether the link is in the viewport
+* whether the cursor is near the link
+* rendered size of the link
+
+Examples of persistent data related to the origin (which the origin could have gathered itself) but which must be erased according to user intent:
+* whether the user has clicked this or similar links on this document or other documents on the same origin
+
+Examples of device information which may be valuable in deciding whether prefetching is appropriate, but which must be considered as part of the user agent's overall privacy posture because it may make the user more identifiable across origins:
+* coarse device class (CPU, memory)
+* coarse battery level
+* whether the network connection is known to be metered
+
+<h3 id="privacy-intent">Intent</h3>
+
+While efforts have been made to minimize the privacy impact of prefetching, some users may nonetheless prefer that prefetching not occur, even though this may make loading slower. User agents are encouraged to provide a setting to disable prefetching features to accommodate such users.
+
+<h3 id="privacy-partitioning">Partitioning</h3>
+
+Some user agents <a href="https://privacycg.github.io/storage-partitioning/">partition storage</a> according to the site or origin of the top-level document. In order for prefetching and prerendering to be useful, it is therefore essential that prefetching or prerendering of a document either occur in the partition in which the navigation would occur (e.g., for a same-site URL) or in an isolated partition, so as to ensure that prefetching does not become a mechanism for bypassing the partitioning scheme.
+
+<div class="issue">Expand this section once more detail on prefetch and prerender partitioning mechanism is specified.</div>
+
+<h3 id="privacy-identity-joining">Identity joining</h3>
+
+This specification describes a mechanism through which HTTP requests for later top-level navigation (in the case of prefetching) can be made without a user gesture. It is natural to ask whether it is possible for two coordinating sites to connect user identities.
+
+Since existing [=credentials=] for the destination origin are not sent (assuming it is not [=same origin=] with the referrer), that site is limited in its ability to identify the user before navigation in a similar way to if the referrer site had simply used [[FETCH]] to make an uncredentialed request. Upon navigation, this becomes similar to ordinary navigation (e.g., by clicking a link that was not prefetched).
+
+To the extent that user agents attempt to mitigate identity joining for ordinary fetches and navigations, they can apply similar mitigations to prefetched navigations.
+
+<h3 id="privacy-visited-links">Visited links</h3>
+
+It is imperative that the features in this specification do not allow sites to determine which other web sites a user has visited in the past.
+
+Because a [=document rule CSS selector predicate=] can use arbitrary CSS selectors, it is critical that browsers apply the same privacy mitigations (which may not be covered by a specification) to the '':visited'' pseudo-class as in other cases where it could be used by an attacker to extract information about the user's browsing history. The [=document rule predicate/match|matching algorithm=] requires this behavior. For more information, see <a href="https://developer.mozilla.org/en-US/docs/Web/CSS/Privacy_and_the_:visited_selector">Privacy and the :visited selector</a>.

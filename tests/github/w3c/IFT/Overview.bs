@@ -1,0 +1,1930 @@
+<pre class='metadata'>
+Title: Incremental Font Transfer
+Shortname: IFT
+Status: WD
+Prepare for TR: yes
+Date: 2022-06-28
+Group: webfontswg
+Level: none
+TR: https://www.w3.org/TR/IFT/
+ED: https://w3c.github.io/IFT/Overview.html
+Editor: Chris Lilley, W3C, https://svgees.us/, w3cid 1438
+Editor: Myles C. Maxfield, Apple Inc., mmaxfield@apple.com, w3cid 77180
+Editor: Garret Rieger, Google Inc., grieger@google.com, w3cid 73905
+Abstract: This specification defines two methods to incrementally transfer fonts from server to client.
+          Incremental transfer allows clients to load only the portions of the font they actually need
+          which speeds up font loads and reduces data transfer needed to load the fonts. A font can
+          be loaded over multiple requests where each request incrementally adds additional data.
+</pre>
+
+<!--
+    for things that are not in specref
+    https://www.specref.org/
+-->
+
+<pre class=link-defaults>
+spec:fetch; type:dfn; for:/; text:status
+spec:fetch; type:dfn; for:/; text:response
+</pre>
+
+<pre class=biblio>
+{
+  "PFE-report": {
+    "href": "https://www.w3.org/TR/PFE-evaluation/",
+    "authors": ["Chris Lilley"],
+    "status": "Note",
+    "publisher": "W3C",
+    "title": "Progressive Font Enrichment: Evaluation Report",
+    "date": "15 October 2020"
+  },
+
+  "Shared-Brotli": {
+    "href": "https://datatracker.ietf.org/doc/html/draft-vandevenne-shared-brotli-format-09#section-3.2",
+    "authors": [
+      "J. Alakuijala",
+      "T. Duong",
+      "R. Obryk",
+      "Z. Szabadka",
+      "L. Vandevenne"
+    ],
+    "status": "Internet Draft",
+    "title": "Shared Brotli Compressed Data Format",
+    "date": "27 Jul 2021"
+  },
+
+
+  "OpenType-Variations": {
+    "href": "https://docs.microsoft.com/en-us/typography/opentype/spec/otvaroverview",
+    "authors": [],
+    "status": "Note",
+    "publisher": "Microsoft",
+    "title": "OpenType Font Variations Overview",
+    "date": "23 October 2020"
+  },
+
+  "fast-hash": {
+    "href": "https://github.com/ztanml/fast-hash",
+    "authors": ["ztanml"],
+    "status": "Note",
+    "publisher": "ztanml",
+    "title": "fast-hash",
+    "date": "22 October 2018"
+  },
+
+  "fetch": {
+    "href": "https://fetch.spec.whatwg.org/",
+    "authors": [],
+    "status": "Living Standard",
+    "publisher": "What WG",
+    "title": "Fetch Standard",
+    "date": "13 December 2021"
+  }
+}
+</pre>
+
+<style>
+.conform:hover {background: #31668f}
+.conform:target {padding: 2px; border: 2px solid #AAA; background: #31668f }
+</style>
+
+Introduction {#intro}
+=====================
+
+<em>This section is not normative.</em>
+
+Incremental Font Transfer (IFT) is a collection of technologies to improve the latency of remote fonts (or "web fonts") on the web. Without this technology, a browser needs to download every last byte of a font before it can render any characters using that font. IFT allows the browser to download only some of the bytes in the file, thereby decreasing the perceived latency between the time when a browser realizes it needs a font and when the necessary text can be rendered with that font.
+
+The success of WebFonts is unevenly distributed. This specification allows WebFonts to be used where
+slow networks, very large fonts, or complex subsetting requirements currently preclude their use. For
+example, even using WOFF 2 [[WOFF2]], fonts for CJK languages are too large to be practical.
+
+There are two different methods which can be used to incrementally transfer fonts.
+
+Patch Subset {#patch-subset}
+----------------------------
+
+In the the first method, <a href="#patch-subset">Patch Subset</a> a server generates binary patches which a
+client applies to a subset of the font in order to extend the coverage of that subset. The server
+is stateless, it does not maintain any session data for clients between requests. Thus when a client
+requests the generation of a patch from the server it has to fully describe the current subset of the
+font that it has in a way which allows the server to recreate it.
+
+Generic binary patch algorithms are used which do not need to be aware of the specifics of the font
+format. Typically a server will produce a patch by generating two [=font subset|font subsets=]: one which matches what
+the client currently has and one which matches the extended subset the client desires. A binary patch
+is then produced between the two subsets.
+
+Range Request {#range-request}
+------------------------------
+
+The second
+method, <a href="#range-request-incxfer">Range Request</a>, has no server-side requirements other than the server should be able to respond to byte-based range requests. The browser makes range requests to the server for the specific bytes in the font file that it needs. In order to know which bytes are necessary, the browser makes one initial special request for the beginning of the file to obtain all required font tables, and then calculates glyph coverage and required byte ranges using font character-to-glyph mapping and glyph substitution / layout tables.
+
+In order for the range request method to be as effective as possible, the font file itself should be internally arranged in a particular way, in order to decrease the number of requests the browser needs to make. Therefore, it is expected that web developers wishing to use the range request method will use font files that have had their contents already arranged optimally.
+
+This method was modelled after video playback on the web, where seeking in a video causes the browser to send a range request to the server.
+
+Technical Motivation: Evaluation Report {#evaluation-report}
+------------------------------------------------------------
+
+See the Progressive Font Enrichment: Evaluation Report [[PFE-report]] for the investigation which led
+to this specification.
+
+The evaluation report found that patch subset was generally more efficient in terms of overall
+performance and transferred bytes than range request. However, Range Request is simpler to deploy
+for many uses cases while still providing material improvments to loading performance for large fonts.
+
+Performance Considerations and the use of Incremental Font Transfer {#performance-considerations}
+--------------------------------------------------------
+
+Using incremental transfer may not always be beneficial, depending on the characteristics of the font
+and the content being rendered. This section provides non-normative guidance to help decide:
+
+1. When incremental transfer should be utilized.
+2. When used, which of the two methods should be utilized.
+
+Incrementally loading a font has a fundemental performance tradeoff versus loading the whole font.
+Simplistically, under incremental transfer less bytes may be transferred at the potential cost of
+increasing the total number of network requests being made, and/or increased request processing
+latency. In general incremental font transfer will be beneficial where the reduction in latency from
+sending less bytes outweighs additional latency introduced by the incremental transfer method.
+
+The first factor to consider is the language of the content being rendered. The evaluation report
+contains the results of simulating incremental font transfer across three categories of languages
+([[PFE-report#langtype]]). See it's conclusions [[PFE-report#conclusions]] for a discussion of the
+anticipated performance of incremental font transfer across the language categories.
+
+Next, how much of the font is expected to be needed? If it's expected that most of the font will be
+needed to render the content then incremental font transfer is unlikely to be beneficial. In many cases
+however only part of a font is expected to be needed. For example:
+
+* If the font contains support for several languages but a user is expected to only render content
+    in a subset of those languages.
+       
+* If the content being rendered uses a small subset of the total characters in a font. This is
+    often the case for Chinese, Japanese, Korean, Emoji, and Icon fonts.
+
+* Only a small amount of text is being rendered. For example a font that is only used for a
+    headline.
+
+An alternative to incremental transfer is to break a font into distinct subsets (typically by script)
+and use the unicode range feature of @font-face to load only the subsets needed. However, this can
+break rendering [[PFE-report#fail-subset]] if there are layout rules between characters in
+different subsets. Incremental font transfer does not suffer from this issue as it maintains the
+original font and all it's layout rules.
+
+### Reducing the Number of Network Requests ### {#reduce-requests}
+
+As discussed in the previous section the most basic implementation of incremental font transfer will
+tend to increase the total number of requests made vs traditional font loading. Since each request
+will require at least one round trip time, performance can be negatively impacted if too many requests
+are made. Both range request and patch subset allow for more codepoints then needed to be requested.
+Intelligent use of this feature by an implementation can help reduce the total number of requests
+being made. The evaluation report explored this by testing the performance of a basic character
+frequency based [[PFE-report#codepredict|codepoint prediction]] scheme and found it improved overall
+performance.
+
+Performant implementations should incorporate a similar mechanism which can select codepoints which are
+likely to be needed in the future and preemptively load them. This will improve performance by reducing
+the need to make additional requests for missing codepoints. The set of codepoints the client has and
+the set they are requesting can be used in conjuction with codepoint occurence frequency and codepoint
+usage in languages/scripts  to make predictions on which additional codepoints are likely to be needed.
+
+Under range request the prediction mechanism will need to be part of the client implementation. In
+patch subset either the client and/or server implementation can include a prediction mechanism. A side
+benefit to a client side prediction mechanism is providing some obfuscation of the specific codepoints
+required by the client. This is further discussed in [[#content-inference-from-character-set]].
+
+### Deciding between Patch Subset and Range Request ### {#patchsubset-vs-rangerequest}
+
+From a purely performance perspective patch subset is more performant than range request. There are
+three main factors for this:
+
+1. Range request requires an extra round trip on the very first load of a font to fetch the non-outline
+    font data.
+
+2. Patch subset is able to incrementally transfer all tables in the font, while range request is
+    limited to only incrementally transferring glyph outline tables. In many fonts the majority of
+    data is in the glyph outlines, however there are fonts that have significant amounts of data in
+    the non outline tables.
+
+3. Patch subset is able to compress incremental font data against previously loaded data from that
+    font. This leads to better compression overall compared to range request.
+
+See the evaluation report for a quantative assessment of the difference in performance of patch
+subset versus range request [[PFE-report#analysis]].
+
+The downside of using patch subset is that it requires server side processing to produce the patches,
+while range request can work on any standard HTTP server that supports range requests:
+
+*  This means that range request can be deployed easier, and in places such as CDN's where the content
+    owner may not have control over the serving stack.
+    
+*  The server side processing required by patch subset will lead to increased processing costs (eg.
+    CPU, RAM usage) per request vs range request.
+
+Opt-In Mechanism {#opt-in}
+==========================
+
+<em>This section is general to both IFT methods.</em>
+
+Webpage's can choose to opt-in to either patch subset or range request incremental transfer for a font
+via the use of a CSS font tech keyword ([[css-fonts-4#font-tech-definitions]]) inside the
+''@font-face'' block.
+
+There are three tech keywords available:
+
+*  <code>incremental-patch</code>: Load the font incrementally using the patch subset method.
+*  <code>incremental-range</code>: Load the font incrementally using the range request method.
+*  <code>incremental-auto</code>:  Load the font incrementally. The particular method to use is
+    determined by <a href="#method-negotiation">Method Negotiation</a>.
+
+<div class=example>
+The use of the <code>incremental-patch</code> keyword in this CSS rule indicates to the browser they
+should use the patch subset IFT method to load the font.
+<pre>
+@font-face {
+    font-family: "MyCoolWebFont";
+    src: url("MyCoolWebFont.otf") tech(incremental-patch);
+}
+</pre>
+</div>
+
+Note: Each individual <code>@font-face</code> block may or may not opt-in to IFT. This is due to the
+variety of ways fonts are used on web pages. Authors have control over which fonts they want to use
+this technology with, and which they do not.
+
+Note: the use of <code>incremental-auto</code> may incur a CORS preflight request for the initial
+request of method negotiation, as the initial request sets a custom header.
+
+Note: the IFT tech keywords can be used in conjuction with other font tech specifiers to perform
+font feature selection. For example a <code>@font-face</code> could include two urls one with
+<code>tech(incremental-patch, color-COLRv1)</code> and the other with
+<code>tech(incremental-patch, color-COLRv0)</code>. The client would initiate an incremental patch
+subset transfer to one of the URLs depending on which version of COLR is supported.
+
+
+IFT Method Selection {#method-selection}
+========================================
+
+<em>This section is general to both IFT methods.</em>
+
+The client should have support for both patch subset and range request IFT. The client selects the
+IFT method to utilize for a font load using the following procedure:
+
+*  If the content has specified which method to use, such as via the <code>incremental-patch</code> or
+    <code>incremental-range</code> font tech keyword (see: <a href="#opt-in">opt-in mechanism</a>),
+    then that method should be used if the client supports it. If the specified method is not supported
+    then the client should fallback to to loading the font non-incrementally.
+
+*  Otherwise if the client does not know which particular IFT method(s) that the server hosting the
+    font supports, such as when the <code>incremental-auto</code> font tech keyword is used, then
+    <a href="#method-negotiation">method negotiation</a> should be used to determine the method.
+
+The most recently specified method by the content takes precedence. For example if on a site the
+first page specifies to use the patch subset method for a font URL, but the second page specifies
+range request for the same font URL then the second page should load the font using range request.
+Such cases will require the client to reset any previously stored state for that URL and start fresh
+with the new method. In the case that <code>incremental-auto</code> is encountered where previously a
+specific method was specified then the client can choose to continue using the previously selected
+method.
+
+
+IFT Method Negotiation {#method-negotiation}
+--------------------------------------------
+
+When the particular IFT method(s) that are supported by a server are not known, the client must
+determine which method to use. Different clients may support different IFT methods, and different
+servers may support different IFT methods, so a negotation occurs as such:
+
+1.  The browser makes the first request to the server using the GET HTTP method ([[rfc9110#name-get]]).
+     If the client prefers the <a href="#patch-incxfer">patch-subset method</a>, it sends the relevant
+     [=patch request header=]. If the client prefers the range-request method, it does not send the
+     header.
+
+2.  If the server receives the patch request header and wishes to honor it, the server must reply with
+     a valid <a href="#PatchResponse">patch subset response</a> which includes the
+     <a href="#handling-patch-response">patch-subset magic number</a>. Otherwise, the server must
+     reply with the [[RFC9110#range.requests]]
+     <a href="https://www.rfc-editor.org/rfc/rfc9110.html#name-accept-ranges"><code>Accept-Ranges</code></a>
+     header, if it supports HTTP Range Requests.
+     
+3.  If the client receives the patch-subset magic number, it commences using the patch-subset method.
+     Otherwise, if the client receives the <code>Accept-Ranges: bytes</code> header, it commences
+     using the range-request method. Otherwise, the whole font file is downloaded, and the current
+     non-incremental loading behavior is used.
+
+IFT Method Fallback {#fallback}
+-------------------------------
+
+<em>This section is not normative.</em>
+
+This summarizes behaviors that result from the above method selection and negotiation sections.
+
+If the content specifies the range request method:
+
+<table class="data">
+    <thead>
+        <tr>
+            <th>&nbsp;
+            <th>Client supports range-request method
+            <th>Client does not support range-request method
+    <tbody>
+        <tr>
+            <th>Server supports range-request method
+            <td>Range-request method is used.
+            <td>Client falls back to non-incremental load of the full font file.
+        <tr>
+            <th>Server does not support range-request method.
+            <td>Response is missing accept-ranges header. Client falls back to
+                non-incremental load of the full font file.
+            <td>Client falls back to non-incremental load of the full font file.
+</table>
+
+If the content specifies the patch subset method:
+
+<table class="data">
+    <thead>
+        <tr>
+            <th>&nbsp;
+            <th>Client supports patch-subset method
+            <th>Client does not support patch-subset method
+    <tbody>
+        <tr>
+            <th>Server supports patch-subset method
+            <td>Patch-subset method is used.
+            <td>Client falls back to non-incremental load of the full font file.
+        <tr>
+            <th>Server does not support patch-subset method
+            <td>Response is missing magic number. Client falls back to non-incremental load of the
+            full font file.
+            <td>Client falls back to non-incremental load of the
+            full font file.
+</table>
+
+If the content does not specify a specific method:
+
+<table class="data">
+    <thead>
+        <tr>
+            <th>&nbsp;
+            <th>Client prefers range-request method
+            <th>Client prefers patch-subset method
+    <tbody>
+        <tr><th>Server supports both range-request method and patch-subset method
+            <td>Client makes initial request without the patch request header, and possibly with the <code>Range</code> header. Because all patch-subset servers must support the range-request method, the server replies with <code>Accept-Ranges</code> and initial font data. Client/server commence using range-request method.
+
+            <td>Client makes initial request with the patch request header. Server replies with the patch-subset magic number, and client/server commence using patch-subset method.
+        <tr><th>Server supports only range-request method
+            <td>Same as above.
+            <td>Client makes initial request with the patch request header. Server replies with <code>Accept-Ranges</code> and initial font data. Client/server commence using range-request method.
+        <tr><th>Server supports neither
+            <td>Client makes initial request without the patch request header, and possibly with the <code>Range</code> header. Server replies without <code>Accept-Ranges</code> header, and sends the full font file to the client from beginning to end.
+            <td>Client makes initial request to server with the patch request header. Server does not reply with the patch-subset magic number, and sends the full font file to the client from beginning to end.
+</table>
+
+
+Offline Usage
+-------------
+
+Special consideration must be taken when saving a page for offline usage that uses an incrementally
+transferred font since the saved page won't be able to increment the font if content changes (eg.
+due to javascript execution). In these cases the page saving mechanism should download the full font
+by making a normal GET request without the [=patch request header=] to the font url. Additionally
+when URL's are rewritten to point to the saved full font any of the incremental tech specifiers should
+be removed.
+
+Patch Based Incremental Transfer {#patch-incxfer}
+=================================================
+
+Font Subset {#font-subset-info}
+--------------------------
+
+A <dfn dfn>font subset</dfn> is a modified version of a font file that contains only the data needed to
+render a subset of:
+
+*  the codepoints,
+*  <a href="https://docs.microsoft.com/en-us/typography/opentype/spec/featuretags">opentype layout
+    features</a>,
+*  and <a href="https://docs.microsoft.com/en-us/typography/opentype/spec/otvaroverview#terminology">design-variation space</a>.
+
+supported by the original font.
+<span class="conform client server" id="conform-font-subset">
+When a subsetted font is used to render text using any combination of the subset codepoints,
+<a href="https://docs.microsoft.com/en-us/typography/opentype/spec/featuretags">layout features</a>,
+or <a href="https://docs.microsoft.com/en-us/typography/opentype/spec/otvaroverview#terminology">design-variation space</a> it must render identically to the original font. This includes rendering with
+the use of any optional typographic features that a renderer may choose to use from the original font,
+such as hinting instructions.
+</span>
+
+A <dfn dfn>font subset definition</dfn> describes the minimum data (codepoints, layout features,
+variation axis space) that a [=font subset=] must possess.
+
+Data Types {#data-types}
+------------------------
+
+This section lists all of the data types that are used to form the request and response messages
+sent between the client and server.
+
+### Encoding ### {#encoding}
+
+All data types defined here are encoded into a byte representation for transport using CBOR
+(Concise Binary Object Representation) [[!RFC8949]]. More information on how each data types
+should be encoded by CBOR are given in the definition of those data types.
+
+### Primitives ### {#primitives}
+
+<table>
+  <tr>
+    <th>Data Type</th><th>Description</th><th>CBOR Major Type</th>
+  </tr>
+  <tr>
+    <td><dfn>Integer</dfn></td><td>An integer value range [-2<sup>63</sup>, 2<sup>63</sup> - 1] inclusive.</td>
+    <td>0 or 1</td>
+  </tr>
+  <tr>
+    <td><dfn>Float</dfn></td><td>IEEE 754 Single-Precision Float.</td><td>7</td>
+  </tr>
+  <tr>
+    <td><dfn>ByteString</dfn></td><td>Variable number of bytes.</td><td>2</td>
+  </tr>
+  <tr>
+    <td><dfn>String</dfn></td><td>UTF-8 [[rfc3629]] text string.</td><td>3</td>
+  </tr>
+  <tr>
+    <td><dfn>ArrayOf</dfn>&lt;Type&gt;</td><td>Array of a variable number of items of Type.</td><td>4</td>
+  </tr>
+</table>
+
+### <dfn>ProtocolVersion</dfn> ### {#protocol-version}
+
+An [=Integer=] describing the version of this communication protocol being used by a
+[=PatchRequest=] or [=PatchResponse=]. This value guides the semantics and interpretation
+of the fields sent.
+
+This field is for future expansion. There currently is only one valid value, 0.
+
+### <dfn>SparseBitSet</dfn> ### {#sparsebitset-object}
+
+A data structure which compactly stores a set of distinct unsigned integers. The set is represented as
+a tree where each node has a fixed number of children that recursively sub-divides an interval into
+equal partitions. A tree of height <i>H</i> with branching factor <i>B</i> can store set membership
+for integers in the interval [0 to <i>B</i><sup><i>H</i></sup>-1] inclusive. The tree is encoded into
+a [=ByteString=] for transport.
+
+To construct the tree <i>T</i> which encodes set <i>S</i> first select the branching factor <i>B</i>
+(how many children each node has). <i>B</i> can be 4, 8, 16, or 32.
+
+Note: the encoder can use any of the possible branching factors, but it is recommended to
+use 4 as that has
+<a href="https://github.com/w3c/PFE-analysis/blob/main/results/set_encoding_branch_factor.md">been shown</a>
+to give the smallest encodings for most sets typically encountered.
+
+Next, determine the height, <i>H</i>, of the tree:
+
+<i>H</i> = ceil(log<sub><i>B</i></sub>(max(<i>S</i>) + 1))
+
+If <i>S</i> is an empty set then <i>H</i> = 1.
+
+Next create a tree of height H where all non-leaf nodes have <i>B</i> children. Each node in the tree
+has a single value composed of <i>B</i> bits. Given a node <i>p</i> which has <i>B</i> children:
+<i>c<sub>0</sub></i> ... <i>c<sub><i>B</i> - 1</sub></i> and is in a tree, <i>T</i>, of height
+<i>H</i>, then:
+
+*  D(<i>n</i>) is depth of node <i>n</i>: the number of edges between
+    the root node and <i>n</i>.
+
+*  Start(<i>c<sub>i</sub></i>) is the start (inclusive) of the interval  covered by
+     <i>c<sub>i</sub></i> :<br/>
+     Start(<i>c<sub>i</sub></i>) =
+     Start(<i>p</i>) + <i>i</i> * <i>B</i><sup><i>H</i> - D(<i>c<sub>i</sub></i>)</sup>
+
+*  End(<i>c<sub>i</sub></i>) is the end (exclusive) of the interval  covered by
+     <i>c<sub>i</sub></i> :<br/>
+     End(<i>c<sub>i</sub></i>) =
+     Start(<i>p</i>) + (<i>i</i> + 1) * <i>B</i><sup><i>H</i> - D(<i>c<sub>i</sub></i>)</sup>
+
+*  Start(root node) = 0
+
+*  The value of node <i>p</i> is a string of <i>B</i> bits. If its bits are numbered from 0 (least
+    significant) to <i>B</i> - 1 (most significant) then bit <i>i</i> will be 1 if the set <i>S</i>
+    contains at least one member in the interval [Start(<i>c<sub>i</sub></i>),
+    End(<i>c<sub>i</sub></i>)), otherwise bit <i>i</i> will be 0.
+
+*  If for node <i>p</i>, End(<i>p</i>) - Start(<i>p</i>) = <i>B</i>, then <i>p</i> will have no
+    children.
+
+*  An empty set is considered to have no nodes.
+
+The tree is encoded into a bit string. When appending multiple-bit values to the bit string, bits
+are added in order from least significant bit to most significant bit.
+
+First append 2 bits which encode the branching factor:
+
+<table>
+  <tr>
+    <th>Bits&nbsp;</th><th>Branching Factor</th>
+  </tr>
+  <tr><td>00</td><td>2</td></tr>
+  <tr><td>01</td><td>4</td></tr>
+  <tr><td>10</td><td>8</td></tr>
+  <tr><td>11</td><td>32</td></tr>
+</table>
+
+Then append the value <i>H</i> - 1 as a 5 bit unsigned integer. Next append a single 0 bit, which
+is reserved for future use.
+
+Next the nodes are encoded into the bit string by traversing the nodes of the <i>T</i> in level
+order and appending the value for each non-zero node to the bit string. If all of the set values
+covered by a node's interval are present within set <i>S</i>, then that node can instead be encoded
+in the bit string as <i>B</i> bits all set to zero. All children of that node must not be encoded.
+
+Lastly the bit string is converted into a ByteString by converting each consecutive group of 8 bits
+into the next byte of the string.
+If the number of bits in the bit string is not a multiple of 8, zero bits are appended to the
+next multiple of 8.
+The bit with the smallest index in the bit string is the least
+significant bit in the byte and the bit with the largest index is the most significant bit.
+
+<div class=example>
+  The set {2, 33, 323} in a tree with a branching factor of 8 is encoded as the bit string:
+
+  ```
+  BitString:
+  |- header |- lvl 0 |---- level 1 ----|------- level 2 -----------|
+  |         |   n0   |   n1       n2   |   n3       n4       n5    |
+  [ 01010000 10000100 10001000 10000000 00100000 01000000 00010000 ]
+
+  Which then becomes the ByteString:
+  [
+    0b00001010,
+    0b00100001,
+    0b00010001,
+    0b00000001,
+    0b00000100,
+    0b00000010,
+    0b00001000
+  ]
+  ```
+
+  First determine the height of the tree:
+
+  <i>H</i> = ceil(log<sub>8</sub>(323 + 1)) = 3
+
+  Then append
+
+  *  branching factor = 8 = 10
+  *  <i>H</i> - 1 = 2 = 00010
+  *  reserved bit = 0
+
+  Level 0:
+
+  * root node, n<sub>0</sub> append 00100001. Bit 0 is set because there are set members in the interval
+     [0, 64), and bit 5 is set due to members in the interval [320, 384).
+
+  Level 1:
+
+  * There will be two non-zero children corresponding to bit 0 and bit 5 in n<sub>0</sub>:
+  * n<sub>1</sub> append 00010001. It is child 0 of n<sub>0</sub> and subdivides the interval
+     [0, 64). Bit 0 is set since there are set members in [0, 8) and bit 4 for [32, 40).
+
+  * n<sub>2</sub> append 00000001. It is child 5 of n<sub>0</sub> it subdivides the interval
+     [320, 384). Bit 0 is set since there are set members in [320 - 328).
+
+  Level 2:
+
+  * n<sub>3</sub> append 00000100. Child 0 of n<sub>1</sub>, bit 2 is set for the interval [2, 3) or 2.
+  * n<sub>4</sub> append 00000010. Child 4 of n<sub>1</sub>, bit 1 is set for the interval [33, 34) or 33.
+  * n<sub>5</sub> append 00001000. Child 0 of n<sub>2</sub>, bit 3 is set for the interval [323, 324)
+     or 323.
+
+</div>
+
+<div class=example>
+  The set {} in a tree with a branching factor of 4 is encoded as the bit string:
+
+  ```
+  BitString:
+  |- header- |
+  |          |
+  [ 00000000 ]
+
+  Which then becomes the ByteString:
+  [
+    0b00000000,
+  ]
+  ```
+
+  First determine the height of the tree. Because we are encoding an empty
+  set height is:
+
+  <i>H</i> = 1
+
+  Then append
+
+  *  branching factor = 2 = 00
+  *  <i>H</i> - 1 = 0 = 00000
+  *  reserved bit = 0
+
+  Empty sets have no nodes, so no bytes beyond the header need to be appended.
+
+</div>
+
+<div class=example>
+  The set {0, 1, 2, ..., 17} can be encoded with a branching factor of 4 as:
+
+  ```
+  BitString:
+  |- header | l0 |- lvl 1 -| l2  |
+  |         | n0 | n1 | n2 | n3  |
+  [ 10010000 1100 0000 1000 1100 ]
+
+  ByteString:
+  [
+    0b00001001,
+    0b00000011,
+    0b00110001
+  ]
+  ```
+
+  First determine the height of the tree:
+
+  <i>H</i> = ceil(log<sub>4</sub>(17 + 1)) = 3
+
+  Then append
+
+  *  branching factor = 4 = 01
+  *  <i>H</i> - 1 = 2 = 00010
+  *  reserved bit = 0
+
+  Level 0:
+  *  n<sub>0</sub> append 0011. Bit 0 set for [0, 16), bit 1 set for [16, 32)
+
+  Level 1:
+  *  n<sub>1</sub> append 0000. All bits zero to indicate interval [0, 16) is fully filled.
+  *  n<sub>2</sub> append 0001. Bit 0 set for [16, 20)
+
+  Level 2:
+  *  n<sub>3</sub> append 0011. Bit 0 set for value 16, bit 1 set for value 17.
+
+</div>
+
+### <dfn>IntegerList</dfn> ### {#integerlist-object}
+
+A data structure which compactly represents a list of non-negative integers
+from 0 to 2<sup>31</sup>-1. The list is encoded into a [=ByteString=] for transport.
+
+There are three steps of encoding/compression: first delta, second zig-zag, and finally UIntBase128.
+The final [=ByteString=] result is simply the concatenation of the individual UIntBase128
+encoded bytes.
+
+[=IntegerList=] encoding must reject an input list which contains values not in the range
+0 to 2<sup>31</sup>-1. Likewise if decoding an IntegerList results in values which are not
+in the range 0 to 2<sup>31</sup>-1 the list is invalid and must be rejected.
+
+#### Delta Encoding #### {#integerlist-deltas}
+
+Delta encoding converts a list of integers to a list of deltas between them.
+
+A list L of n integers L<sub>i<sub>0..n-1</sub></sub> is converted into a list
+of N integers D<sub>i<sub>0..n-1</sub></sub> as follows:
+
+* D<sub>0</sub> = L<sub>0</sub>
+* D<sub>i = 1..n-1</sub> = L<sub>i</sub> - L<sub>i-1<sub>
+
+This has the effect of reducing the magnitude of the values, which reduces the number
+of bytes required in the UIntBase128 encoding, below.
+
+<div class="example">
+```
+// Note: unsorted
+int_list = [23, 43, 12, 3, 67, 68, 69, 0]
+delta_list = [23, 20, -31, -9, 64, 1, 1, -69]
+```
+</div>
+
+#### Zig-Zag Encoding #### {#integerlist-zigzag}
+
+Zig-Zag encoding reversibly converts signed integers to unsigned integers,
+using the same number of bits. The entire range of values is supported.
+This step is required, as the [[#integerlist-uintbase128]] step works on
+unsigned integers only. The encoding maps positive integer values to even positive integers and
+negative integer values to odd positive integers. Psuedo code:
+
+```
+encode(n):
+  if n >= 0:
+    return n * 2
+  else:
+    return (n * -2) - 1
+
+decode(n) {
+  if n & 1:
+    return -((n + 1) / 2)
+  else:
+    return n / 2
+```
+
+<div class="example">
+<table>
+<tr><th>Value</th><th>Zig-Zag Encoding</th></tr>
+<tr><td>0</td><td>0</td></tr>
+<tr><td>1</td><td>2</td></tr>
+<tr><td>2</td><td>4</td></tr>
+<tr><td>3</td><td>6</td></tr>
+<tr><td>4</td><td>8</td></tr>
+<tr><td>-1</td><td>1</td></tr>
+<tr><td>-2</td><td>3</td></tr>
+<tr><td>-3</td><td>5</td></tr>
+<tr><td>-4</td><td>7</td></tr>
+</table>
+</div>
+
+<div class="example">
+```
+delta_list = [23, 20, -31, -9, 64, 1, 1, -69]
+zig_zag_encoded_list = [46, 40, 61, 17, 128, 2, 2, 137]
+```
+</div>
+
+#### UIntBase128 Encoding #### {#integerlist-uintbase128}
+
+UIntBase128 is a variable length encoding of unsigned integers,
+suitable for values up to 2<sup>32</sup>-1. A UIntBase128 encoded number
+is a sequence of bytes for which the most significant bit is set for all but
+the last byte, and clear for the last byte. The number itself is base 128
+encoded in the lower 7 bits of each byte. Thus, a decoding procedure for
+a UIntBase128 is: start with value = 0. Consume a byte, setting value =
+old value times 128 + (byte bitwise-and 127). Repeat last step until
+the most significant bit of byte is false.
+
+UIntBase128 encoding format allows a possibility of sub-optimal encoding, where e.g.
+the same numerical value can be represented with variable number of bytes (utilizing
+leading zeros). For example, the value 63 could be encoded as either one byte 0x3F
+or two (or more) bytes: [0x80, 0x3f].
+<span class="conform server client" id="conform-uintbase128-illegal">An encoder must not allow this
+to happen and must produce shortest possible encoding. A decoder must reject the response/request
+if it encounters a UIntBase128-encoded value with leading zeros (a value that starts with the byte
+0x80), if UIntBase128-encoded sequence is longer than 5 bytes, or if a UIntBase128-encoded value
+exceeds 2<sup>32</sup>-1.</span> Pseudo-code:
+
+```
+bool ReadUIntBase128( data, *result ) {
+  UInt32 accum = 0;
+
+  for (i = 0; i < 5; i++) {
+    UInt8 data_byte = data.getNextUInt8();
+
+    // No leading 0's
+    if (i == 0 && data_byte == 0x80) return false;
+
+    // If any of top 7 bits are set then << 7 would overflow
+    if (accum & 0xFE000000) return false;
+
+    accum = (accum << 7) | (data_byte & 0x7F);
+
+    // Spin until most significant bit of data byte is false
+    if ((data_byte & 0x80) == 0) {
+      *result = accum;
+      return true;
+    }
+  }
+  // UIntBase128 sequence exceeds 5 bytes
+  return false;
+}
+```
+
+<div class="example">
+```
+Value       Output Bytes
+0           00000000
+1           00000001
+2           00000010
+3           00000011
+127         01111111
+128         10000001 00000000
+255         10000001 01111111
+16256       11111111 00000000
+2080768     11111111 10000000 00000000
+266338304   11111111 10000000 10000000 00000000
+4294967295  10001111 11111111 11111111 11111111 01111111
+```
+</div>
+
+<div class="example">
+```
+zig_zag_encoded_list = [46, 40, 61, 17, 128, 2, 2, 137]
+bytes = [2E 28 3D 11 81 00 02 02 81 09]
+         └┘ └┘ └┘ └┘ └───┘ └┘ └┘ └───┘
+```
+</div>
+
+
+### <dfn>SortedIntegerList</dfn> ### {#sortedintegerlist-object}
+
+A data structure which compactly represents a sorted list of ascending non-negative integers
+(0 to 2<sup>32</sup>-1). The list is encoded into a [=ByteString=] for transport.
+
+This is a variation on [=IntegerList=] with better compression. Sorted lists only use two steps of
+encoding/compression: first deltas and then UIntBase128. The [[#integerlist-zigzag]] step is skipped.
+This allows twice the range in UIntBase128, so that single bytes may be used more often.
+
+[=SortedIntegerList=] encoding must reject an input list which contains values not in the range
+0 to 2<sup>32</sup>-1.
+<span class="conform server client" id="conform-sorted-integer-list-rejects-illegal">
+Likewise if decoding an [=IntegerList=] results in values which are not
+in the range 0 to 2<sup>32</sup>-1 the list is invalid and must be rejected.
+</span>
+
+### <dfn>RangeList</dfn> ### {#rangelist-object}
+
+A RangeList encodes a set of non-negative integers (0 to 2<sup>32</sup>-1). The set is encoded as a
+list of disjoint intervals. Each interval is represented by two integers, a
+start (inclusive) and end (inclusive).
+
+A RangeList is a list of n pairs
+[min<sub>i<sub>0..n-1</sub></sub>, max<sub>i<sub>0..n-1</sub></sub>].
+The list must be non-decreasing, i.e. min<sub>i=1..n-1</sub> >= max<sub>i-1<sub>.
+
+To encode this list, we convert it to a list L of 2n integers, where
+L<sub>2i</sub> = min<sub>i</sub> and L<sub>2i+1</sub> = max<sub>i</sub> for
+i = 0..n-1.
+
+L is a sorted list of integers, so a [=SortedIntegerList=] is used to encode it as a
+[=ByteString=].
+
+<div class="example">
+```
+range_list = [3, 10], [13, 268]
+int_list = [3, 10, 13, 268]
+delta_list = [3, 7, 3, 255]
+bytes = [03 07 03 81 7F]
+```
+</div>
+
+### <dfn>FeatureTagSet</dfn> ### {#featuretagset-object}
+
+A FeatureTagSet encodes a set of zero or more
+<a href="https://docs.microsoft.com/en-us/typography/opentype/spec/featuretags">opentype layout feature tags</a>.
+Each feature tag is mapped to an integer value and then the set of mapped integers are encoded in a
+[=SortedIntegerList=]. Feature tags are mapped to integers as follows:
+
+*  If the tag is found in [[#feature-tag-list]]:
+
+    *  If the "Encoded As" column corresponding to the tag is "default" then the tag is skipped and
+        not encoded.
+
+    *  Else, the tag is mapped to the integer value in the "Encoded As" column.
+
+*  Otherwise: the tag is converted to an integer by treating the tag's 4 byte string as a 4 byte
+    little endian integer.
+
+The final encoding is produced by sorting the mapped integers (exlcuding tags which are skipped)
+into ascending order and then encoding the sorted list as a [=SortedIntegerList=].
+
+When decoding a FeatureTagSet the integer values are mapped back to the original tags by reversing
+the above mapping rules.
+<span class="conform server client" id="conform-feature-tag-set-defaults">Additionally all
+default features in [[#feature-tag-list]] must be added to the decoded set.</span>
+
+### <dfn>AxisSpace</dfn> ### {#AxisSpace}
+
+Stores a set of intervals on one or more open type variation axes [[opentype-variations]]</a>.
+Encoded as a CBOR map (major type 5). The key in each pair is an
+<a href="https://docs.microsoft.com/en-us/typography/opentype/spec/fvar#variationaxisrecord">
+axis tag</a>. It is encoded as a [=ByteString=] containing exactly 4 ASCII characters. The value in each
+pair is an [=ArrayOf=]&lt;[=AxisInterval=]&gt;.
+<span class="conform client server" id="conform-axis-space-disjoint">The list of intervals for a
+each axis tag must be disjoint.</span>
+
+### Objects ### {#objects}
+
+Objects are data structures comprised of key and value pairs.
+<span class="conform server client" id="conform-object">Objects are encoded via CBOR as maps (major
+type 5)</span>. Each key and value pair is encoded as a single map entry. Keys are always unsigned
+integers and are encoded using major type 0. Values are encoded using the encoding specified by the
+type of the value.
+
+All fields in an object are optional and do not need to have an associated value. Conversely when
+decoding and object fields may be present which are not specified in the schema.
+<span class="conform server client" id="conform-object-unrecognized-field">
+The decoder must ignore without error any key and value pairs where the key is not recognized.
+</span>
+
+There are several types of object used, each type is defined by a schema in [[#schemas]]. The schema
+for a type specifies for each field:
+
+*  A human readable name for the field. For reference only, not used in the encoding.
+*  A unsigned integer id for the field. This is used as the key in the encoding.
+*  The type of the value stored in this field. Can be any of the types defined in [[#data-types]]
+    including object types.
+
+## Object Schemas ## {#schemas}
+
+### <dfn>CompressedSet</dfn> ### {#CompressedSet}
+
+Encodes a set of unsigned integers. The set is not ordered and does not
+allow duplicates. Members of the set are encoded into either a [=SparseBitSet=] or a
+[=RangeList=]. To obtain the final set the members of [=CompressedSet/sparse_bit_set=]
+and the list of ranges in [=CompressedSet/range_deltas=] are unioned together.
+
+<table>
+  <tr><th>ID&nbsp;</th><th>Field Name</th><th>Type</th></tr>
+  <tr>
+    <td>0</td>
+    <td><dfn for="CompressedSet">sparse_bit_set</dfn></td>
+    <td>[=SparseBitSet=] ([=ByteString=])</td>
+  </tr>
+  <tr>
+    <td>1</td>
+    <td><dfn for="CompressedSet">range_deltas</dfn></td>
+    <td>[=RangeList=] ([=ByteString=])</td>
+  </tr>
+</table>
+
+### <dfn>AxisInterval</dfn> ### {#AxisInterval}
+
+<table>
+  <tr><th>ID</th><th>Field Name</th><th>Value Type</th></tr>
+  <tr>
+    <td>0</td>
+    <td><dfn for="AxisInterval">start</dfn></td>
+    <td>[=Float=]</td>
+  </tr>
+  <tr>
+    <td>1</td>
+    <td><dfn for="AxisInterval">end</dfn></td>
+    <td>[=Float=]</td>
+  </tr>
+</table>
+
+[=AxisInterval=] defines an interval (from [=AxisInterval/start=] to [=AxisInterval/end=] inclusive)
+on some variable axis in a font.
+
+For an [=AxisInterval=] object to be well formed:
+
+*  <span class="conform client server" id="conform-axis-interval-start">
+    [=AxisInterval/start=] must be set.
+    </span>
+
+*  <span class="conform client server" id="conform-axis-interval-end">
+    [=AxisInterval/end=] is optional, if set it must be greater than [=AxisInterval/start=].</span>
+    If [=AxisInterval/end=] is not set then this interval is a single point, [=AxisInterval/start=].
+
+### <dfn>PatchRequest</dfn> ### {#PatchRequest}
+
+<table>
+  <tr><th>ID</th><th>Field Name</th><th>Value Type</th></tr>
+  <tr>
+    <td>0</td>
+    <td><dfn for="PatchRequest">protocol_version</dfn></td>
+    <td>[=ProtocolVersion=] ([=Integer=])</td></tr>
+  <tr>
+    <td>1</td>
+    <td><dfn for="PatchRequest">accept_patch_format</dfn></td>
+    <td>[=ArrayOf=]&lt[=Integer=]&gt;</td></tr>
+  <tr>
+    <td>2</td>
+    <td><dfn for="PatchRequest">codepoints_have</dfn></td>
+    <td>[=CompressedSet=]</td></tr>
+  <tr>
+    <td>3</td>
+    <td><dfn for="PatchRequest">codepoints_needed</dfn></td>
+    <td>[=CompressedSet=]</td></tr>
+  <tr>
+    <td>4</td>
+    <td><dfn for="PatchRequest">indices_have</dfn></td>
+    <td>[=CompressedSet=]</td></tr>
+  <tr>
+    <td>5</td>
+    <td><dfn for="PatchRequest">indices_needed</dfn></td>
+    <td>[=CompressedSet=]</td></tr>
+  <tr>
+    <td>6</td>
+    <td><dfn for="PatchRequest">features_have</dfn></td>
+    <td>[=FeatureTagSet=]</td></tr>
+  <tr>
+    <td>7</td>
+    <td><dfn for="PatchRequest">features_needed</dfn></td>
+    <td>[=FeatureTagSet=]</td></tr>
+  <tr>
+    <td>8</td>
+    <td><dfn for="PatchRequest">axis_space_have</dfn></td>
+    <td>[=AxisSpace=]</td></tr>
+  <tr>
+    <td>9</td>
+    <td><dfn for="PatchRequest">axis_space_needed</dfn></td>
+    <td>[=AxisSpace=]</td></tr>
+  <tr>
+    <td>10</td>
+    <td><dfn for="PatchRequest">ordering_checksum</dfn></td>
+    <td>[=Integer=]</td></tr>
+  <tr>
+    <td>11</td>
+    <td><dfn for="PatchRequest">original_font_checksum</dfn></td>
+    <td>[=Integer=]</td></tr>
+  <tr>
+    <td>12</td>
+    <td><dfn for="PatchRequest">base_checksum</dfn></td>
+    <td>[=Integer=]</td></tr>
+  <tr>
+    <td>13</td>
+    <td><dfn for="PatchRequest">fragment_id</dfn>
+    </td><td>[=String=]</td></tr>
+</table>
+
+For a [=PatchRequest=] object to be well formed:
+
+*  <span class="conform client server" id="conform-request-protocol-version">
+    [=PatchRequest/protocol_version=] must be set to 0.</span>
+*  [=PatchRequest/accept_patch_format=] can include any of the values listed in [[#patch-formats]].
+*  <span class="conform client server" id="conform-request-ordering-checksum">
+    If either of [=PatchRequest/indices_have=] or [=PatchRequest/indices_needed=] is set to a non-empty
+    set then [=PatchRequest/ordering_checksum=] must be set.</span>
+*  <span class="conform client server" id="conform-request-base-checksum">
+    If [=PatchRequest/codepoints_have=] or [=PatchRequest/indices_have=] is set to a non-empty set then
+    [=PatchRequest/original_font_checksum=] and [=PatchRequest/base_checksum=] must be set.</span>
+
+### <dfn>PatchResponse</dfn> ### {#PatchResponse}
+
+<table>
+  <tr><th>ID</th><th>Field Name</th><th>Value Type</th></tr>
+  <tr>
+    <td>0</td>
+    <td><dfn for="PatchResponse">protocol_version</dfn></td><td>[=ProtocolVersion=] ([=Integer=])</td>
+  <tr>
+    <td>1</td>
+    <td><dfn for="PatchResponse">patch_format</dfn></td><td>[=Integer=]</td></tr>
+  <tr>
+    <td>2</td>
+    <td><dfn for="PatchResponse">patch</dfn></td><td>[=ByteString=]</td></tr>
+  <tr>
+    <td>3</td>
+    <td><dfn for="PatchResponse">replacement</dfn></td><td>[=ByteString=]</td></tr>
+  <tr>
+    <td>4</td>
+    <td><dfn for="PatchResponse">original_font_checksum</dfn></td><td>[=Integer=]</td></tr>
+  <tr>
+    <td>5</td>
+    <td><dfn for="PatchResponse">codepoint_ordering</dfn></td><td>[=IntegerList=]</td></tr>
+  <tr>
+    <td>6</td>
+    <td><dfn for="PatchResponse">subset_axis_space</dfn></td><td>[=AxisSpace=]</td></tr>
+  <tr>
+    <td>7</td>
+    <td><dfn for="PatchResponse">original_axis_space</dfn></td><td>[=AxisSpace=]</td></tr>
+  <tr>
+    <td>8</td>
+    <td><dfn for="PatchResponse">original_features</dfn></td><td>[=FeatureTagSet=]</td></tr>
+</table>
+
+For a PatchResponse object to be well formed:
+*  <span class="conform server" id="conform-response-protocol-version">
+     [=PatchResponse/protocol_version=] must be set to 0.</span>
+*  <span class="conform server" id="conform-response-patch-or-replacement">
+     Only one of [=PatchResponse/patch=] or [=PatchResponse/replacement=] must be set.</span>
+*  <span class="conform server" id="conform-response-valid-format">
+     If [=PatchResponse/patch_format=] is set then it must be one of the values listed in
+     [[#patch-formats]].</span>
+
+Client {#client}
+----------------
+
+### <dfn>Client State</dfn> ### {#client-state-section}
+
+The client will need to maintain at minimum the following state for each font file being incrementally
+transferred:
+
+*  <dfn for="Client State">Client font subset</dfn>: a byte array containing the binary data for the
+    most recent version of the [=font subset|subset=] of the font being incrementally transferred. For
+    a new font this is initialized to empty byte array.
+    
+*  <dfn for="Client State">Original font checksum</dfn>: the most recent value of
+    [=PatchResponse/original_font_checksum=] received from the server for this font.
+
+*  <dfn for="Client State">Codepoint Reordering Map</dfn>: The most recent [[#codepoint-reordering]]
+    received from the server for this font. Supplied by [=PatchResponse/codepoint_ordering=].
+
+*  <dfn for="Client State">Original Font Axis Space</dfn>: the variations axis space that the original
+    font covers. Supplied by [=PatchResponse/original_axis_space=]</a>.
+
+*  <dfn for="Client State">Subset Axis Space</dfn>: the most recent variations axis space that the
+    subsetted font covers. Supplied by [=PatchResponse/subset_axis_space=].
+
+Additionally, the client can optionally store:
+
+*  <dfn for="Client State">Original font feature list</dfn>: a list of the
+    <a href="https://docs.microsoft.com/en-us/typography/opentype/spec/featuretags">opentype layout feature tags</a>
+    that the original font has data for. This information can be used by the client to avoid sending
+    unnecessary requests for features which the original font does not contain. Supplied by
+    [=PatchResponse/original_features=].
+
+<h4 algorithm id="extend-subset">Extending the Font Subset</h4>
+
+This algorithm is used by the client to extends its [=font subset=] to cover additional codepoints,
+features, and/or design-variation space.
+
+<dfn abstract-op>Extend the font subset</dfn>
+
+The inputs to this algorithm are:
+
+* <var>font URL</var>: a URL where the font to be extended is located.
+
+* <var>fragment identifier</var> (optional): if the font at the font url is a collection of fonts,
+    the fragment identifier ([[rfc8081#section-4.2]]) identifies a single font within the collection.
+
+* <var>client state</var> (optional): previously saved [=client state=] for the given
+    font url, or null.
+
+* <var>desired subset definition</var>: a [=font subset definition|description=] of the desired
+    minimum [=font subset=]. The subset definition must be a superset of the [=font subset=] in
+    <var>client state</var>.
+
+* <var>fetch algorithm</var>: algorithm for fetching HTTP resources, such as [[fetch]]. The remainder
+    of this section is desribed in terms of [[fetch#fetching]], but it is allowed to substitute
+    whatever HTTP fetching algorithm the user agent supports.
+
+The algorithm outputs:
+
+* Client State: [=client state=] that has been updated to contain a [=font subset=] which covers at
+    least the requested subset definition.
+
+* Cache fields: HTTP cache fields [[rfc9111#name-field-definitions]] describing how client state
+    can be cached, or null.
+
+The algorithm:
+
+1. Compare the <var>desired subset definition</var> to the <var>client state</var>. If the
+     [=Client State/client font subset|font subset=] in the <var>client state</var>
+     already satisifies the [=font subset definition=]. Then return <var>client state</var>, and null
+     for the cache fields.
+
+2. Otherwise make an HTTP request using the <var>fetch algorithm</var>:
+
+     * The request [=request/method=] must be either "GET" or "POST".
+
+     * The request [=request/destination=] must be "font".
+
+     * The request CORS [=request/mode=] must be "cors".
+
+     * The request [=request/cache mode=] should be "no-store".
+
+     * The request URL [=url/scheme=] must be "https".
+
+     * The request URL [=url/path=] is set to the input <var>font URL</var>.
+
+     * If [=request/method=] is "POST" then, request [=request/body=] must be a single
+         [=PatchRequest=] object encoded via CBOR.
+
+     * Otherwise if [=request/method=] is "GET" then, a [=header=] with name
+         <code>Font-Patch-Request</code> (the <dfn export>patch request header</dfn>)
+         and whose value is a single
+          [=PatchRequest=] object encoded via CBOR and then
+          base64url encoding [[rfc4648]] must be added to the request's header list.
+
+     Any request and/or url parameters which are not specified here should be set based on
+     the user agent's normal handling for font requests. For example if this font load is
+     from a CSS font face, then [[css-fonts-4#font-fetching-requirements]] should be followed.
+
+     The fields of the [=PatchRequest=] object should be set
+     as follows:
+
+     *  [=PatchRequest/protocol_version=]: set to 0.
+
+     *  [=PatchRequest/accept_patch_format=]: set to the list of [[#patch-formats]] that this client is
+         capable of decoding. Must contain at least one format.
+
+     *  [=PatchRequest/codepoints_have=]: set to exactly the set of codepoints that the current
+         [=Client State/client font subset=] contains data for. If the current
+         [=Client State/client font subset=] is an empty byte array this
+         field is left unset. If the client has a codepoint ordering for this font then this field
+         should not be set.
+
+     *  [=PatchRequest/codepoints_needed=]: set to the set of codepoints that the client wants to
+         add to its [=font subset=]. That is the codepoint set from <var>desired subset
+         definition</var> minus the codepoints already in [=Client State/Client font subset=]. If the
+         <var>client state</var> has a [=Client State/codepoint reordering map=] for this font then
+         this field should not be set.
+
+     *  [=PatchRequest/indices_have=]: encodes the set of additional codepoints that the current
+         [=Client State/client font subset=] contains data for. The codepoint values are transformed
+         to indices by applying [=Client State/codepoint reordering map=] to each codepoint value. If
+         the <var>client state</var> does not have a [=Client State/codepoint reordering map=] for this
+         font then this field should not be set.
+
+     *  [=PatchRequest/indices_needed=]: encodes the set of codepoints that the client wants to add to
+         its [=font subset=]. That is the codepoint set from <var>desired subset
+         definition</var> minus the codepoints already in [=Client State/Client font subset=]. The
+         codepoint values are transformed to indices by applying the [=Client State/codepoint
+         reordering map=] to each codepoint value. If the client does not have a codepoint ordering
+         for this font then this field should not be set.
+
+     *  [=PatchRequest/features_have=]: set to the list of
+         <a href="https://docs.microsoft.com/en-us/typography/opentype/spec/featuretags">
+         opentype layout feature tags</a> that the current [=Client State/client font subset=] has data
+         for. If the current [=Client State/client font subset=] is an empty byte array this
+         field is left unset. Additionally, if the current [=Client State/client font subset=] has all
+         data for features present in the [=original font=] then this field can be unset.
+
+     *  [=PatchRequest/features_needed=]: set to the list of feature tags that the client wants to add
+         to the current [=font subset=]. That is the feature set from <var>desired subset
+         definition</var> minus the set of features already in [=Client State/Client font subset=].
+         If the client wishes to add all remaining layout features from the [=original font=] to it's
+         subset then this field should be unset.
+
+     *  [=PatchRequest/axis_space_have=]: set to the current value of
+         [=Client State/subset axis space=] saved in the <var>client state</var> for this font.
+
+     *  [=PatchRequest/axis_space_needed=]: set to the intervals of each variable axis in the
+         [=original font=] that the client wants to add to its [=font subset=] as defined in the
+         <var>desired subset definition</var>. If the client wants an
+         entire axis from the [=original font=] then that axis should not be listed.
+
+     *  [=PatchRequest/ordering_checksum=]: If either of [=PatchRequest/indices_have=] or
+         [=PatchRequest/indices_needed=] is set then this must be set to the checksum of the
+         [=Client State/codepoint reordering map=] saved in the state for this font. The checksum
+         is computed via [[#reordering-checksum]].
+
+     *  [=PatchRequest/original_font_checksum=]:
+         Set to saved value for [=Client State/original font checksum=] in the state for this font. If
+         there is no saved value leave this field unset.
+
+     *  [=PatchRequest/base_checksum=]:
+         Set to the checksum of the [=Client State/client font subset=] byte array saved in
+         the <var>client state</var> for this font. See: [[#computing-checksums]].
+
+     *  [=PatchRequest/fragment_id=]:
+         If a <var>fragment identifier</var> was provided as an input then this field must be set to
+         the provided <var>fragment identifier</var>, otherwise it must be left unset.
+
+
+     Note: It is allowed for the client to request more codepoints then it strictly needs. For
+     example, on slower connections it may be more performant to request extra codepoints if
+     that is likely to prevent a future request from needing to be sent.
+
+3. Invoke [$Handle server response$] with the response from the server and return the result.
+
+Note: POST is preferred for the HTTP method since it will not cause a CORS preflight request
+and the request object is more compactly encoded. GET should only be used during
+<a href="#method-negotiation">method negotiation</a>.
+
+<h4 algorithm id="handling-patch-response">Handling Server Response</h4>
+
+If a server is able to succsessfully process a [=PatchRequest=]
+it will respond with HTTP [=response/status=] code 200 and the [=response/body=] of the response will
+be a 4 byte magic number (0x49, 0x46, 0x54, 0x20) followed by a single [=PatchResponse=] object encoded
+via CBOR. The client uses the following algorithm to interpret and process the fields of the
+object.
+
+<dfn abstract-op>Handle server response</dfn>
+
+Inputs:
+
+* <var>server response</var>: HTTP [=response=] to a patch request.
+
+* <var>client state</var> (optional): previously saved [=client state=].
+
+The algorithm outputs:
+
+* Client State: [=client state=] that has been updated to contain a [=font subset=] which covers at
+    least the requested subset definition.
+
+* Cache fields: HTTP cache fields [[rfc9111#name-field-definitions]] describing how client state
+    can be cached, or null.
+
+The algorithm:
+
+1.  If the <var>server response</var> has [=response/status=] other than 200:
+
+     *  If it is a redirect [=status=]: follow normal redirect handling, such as
+         [[fetch#http-redirect-fetch]] and then go back to step 1.
+
+     *  All other statuses, the [=font subset=] extension has failed. Invoke
+         [$Handle failed font load$] and return the result.
+
+2.  Check the first four bytes of the <var>server response</var> [=response/body=]. If they are
+     not equal to [0x49, 0x46, 0x54, 0x20] then this response is malformed.
+     Invoke [$Handle failed font load$] and return the result.
+
+3.  Interpret the remaining bytes of the <var>server response</var> [=response/body=] as a CBOR
+     encoded [=PatchResponse=]. If the bytes are not decodable with CBOR, or the
+     [=PatchResponse=] is not well formed, then this is an error. Invoke [$Handle failed font load$]
+     and return the result.
+
+4.  If field [=PatchResponse/replacement=] is set then: the byte array in this field is a binary patch
+     in the format specified by [=PatchResponse/patch_format=]. Apply the binary patch to a base which
+     is an empty byte array. Replace the [=Client State/client font subset|font subset=] in the input
+     <var>client state</var> with the result of the patch application.
+
+5. If field [=PatchResponse/patch=] is set then:  the byte array in this field is a binary patch
+    in the format specifiedy [=PatchResponse/patch_format=]. Apply the binary patch to the
+    [=Client State/client font subset|font subset=] from the input client state. Replace the
+    [=Client State/client font subset|font subset=] in the input <var>client state</var> with the
+    result of the patch application.
+
+
+6. If [=PatchResponse/original_font_checksum=] is set then update the
+    [=Client State/original font checksum=] in the input <var>client state</var> with the value in
+    [=PatchResponse/original_font_checksum=].
+
+7. If the field [=PatchResponse/codepoint_ordering=] is set then update the
+    [=Client State/codepoint reordering map=] in the input <var>client state</var> with
+    the new values specified the field. If neither [=PatchResponse/replacement=] nor
+    [=PatchResponse/patch=] are set, then the client should resend the request that triggered this
+    response but use the new codepoint ordering provided in this response. Go back to step 1 to process
+    the response.
+
+8. If [=PatchResponse/original_features=] is set and the client has opted to save them then replace the
+    [=Client State/original font feature list=] in the input <var>client state</var> with the value
+    from the response.
+
+9. If [=PatchResponse/original_axis_space=] is set then update the
+    [=Client State/original font axis space=] in the input <var>client state</var> with the value
+    specified in this field.
+
+10. If [=PatchResponse/subset_axis_space=] is set then update the
+     [=Client State/subset axis space=] in the input <var>client state</var> with the value specified
+     in this field.
+
+After processing the response, return the updated input <var>client state</var> and any cache headers
+that were set on the <var>server response</var>.
+
+<dfn abstract-op>Handle failed font load</dfn>
+
+If the font load or extension has failed the client should choose one of the following options:
+
+1.  If the client has a saved [=font subset=], it may choose to use that and then use the user
+      agent's existing font fallback mechanism for codepoints not covered by the subset.
+
+2.  The client may re-issue the request as a regular non incremental font fetch to the same
+      [=url/path=]. It must not include the patch subset request parameter or header. This will load
+      the entire [=original font=].
+
+3.  Discard the saved [=font subset=], and use the user agent's existing font fallback mechanism.
+
+Regardless of which of the above options are used, the saved client state for this font must be
+discarded.
+
+<h4 algorithm id="load-a-font">Load a Font in a User Agent with a HTTP Cache</h4>
+
+The previous section [[#extend-subset]] provides no guidance on how a user agent should handle
+saving client state between invocations of the subset extension algorithm. This section provides an
+algorithm that user agents which implement [[fetch]] should use to save client state to the user
+agent's HTTP cache ([[RFC9111]]).
+
+<dfn abstract-op>Load a font with a HTTP Cache</h4>
+
+The inputs to this algorithm:
+
+* <var>font URL</var>: a URL where the font to be extended is located.
+
+* <var>fragment identifier</var> (optional): if the font at the font url is a collection of fonts,
+    the fragment identifier ([[rfc8081#section-4.2]]) identifies a single font within the collection.
+
+* <var>desired subset definition</var>: a [=font subset definition|description=] of the desired
+    minimum [=font subset=].
+
+* <var>fetch algorithm</var>: algorithm for fetching HTTP resources, such as [[fetch]]. The remainder
+    of this section is desribed in terms of [[fetch#fetching]], but it is allowed to substitute
+    whatever HTTP fetching algorithm the user agent supports.
+
+The algorithm outputs:
+
+*  A [=font subset=] which covers at minimum the input subset definition.
+
+The algorithm:
+
+1.  Make a HTTP fetch:
+
+     * The request [=request/method=] is "GET".
+
+     * The request [=request/destination=] must be "font".
+
+     * The request CORS [=request/mode=] must be "cors".
+
+     * The request URL [=url/scheme=] must be "https".
+
+     * The request URL [=url/path=] is set to the input font URL.
+
+     * The request [=request/cache mode=] is "only-if-cached".
+
+2.  If the request is successful and the response is "fresh" ([[RFC9111#name-freshness]])
+     then invoke [$Extend the font subset$] with:
+
+     *  Font url set to the input <var>font URL</var>.
+
+     *  Fragment identifier set to the input <var>fragment identifier</var>
+
+     *  Client state set to the response.
+
+     *  Desired subset definition set to the input <var>desired subset definition</var>.
+
+     *  Fetch algorithm set to the input <var>fetch algorithm</var>.
+
+     Once that returns go to step 4.
+
+3.  Otherwise, invoke [$Extend the font subset$] with:
+
+     *  Font url set to the input <var>font URL</var>.
+
+     *  Fragment identifier set to the input <var>fragment identifier</var>
+
+     *  Client state set to null.
+
+     *  Desired subset definition set to the input <var>desired subset definition</var>.
+
+     *  Fetch algorithm set to the input <var>fetch algorithm</var>.
+
+     Once that returns go to step 4.
+
+4.  If the returned cache fields are non-null update the cache entry for the input
+     font url with the returned client state and returned cache fields.
+
+5.  Return the [=font subset=] contained in the returned client state.
+
+
+Server: Responding to a PatchRequest {#handling-patch-request}
+--------------------------------------------------------------
+
+<span class="conform server" id="conform-successful-response">If the server receives a well formed
+[=PatchRequest=] over HTTPS for a font the server has and that was
+populated according to the requirements in [[#extend-subset]] then it must respond with HTTP
+[=response/status=] code 200.</span>
+<span class="conform server" id="conform-magic-number">The first 4 bytes of the response
+[=response/body=] must be set to 0x49, 0x46, 0x54, 0x20 ("IFT " encoded as ASCII) followed by a
+single [=PatchResponse=] object encoded via CBOR.</span>
+
+The [=url/path=] in the request [=request/url=] identifies the specific font that a patch is desired
+for. If the request has the [=PatchRequest/fragment_id=] field set and the file identified by
+[=url/path=] is a collection of fonts, then [=PatchRequest/fragment_id=] identifies the font within
+that collection that a patch is desired for. The identified font is referred to as the
+<dfn>original font</dfn> in the rest of this section.
+
+From the request object the server can produce two codepoint sets:
+
+1.  Codepoints the client has: formed by the union of the codepoint sets specified by
+     [=PatchRequest/codepoints_have=] and [=PatchRequest/indices_have=].
+     <span class="conform server" id="conform-remap-codepoints-have">The indices in
+     [=PatchRequest/indices_have=] must be mapped to codepoints by the application of the
+     codepoint reordering with a checksum matching [=PatchRequest/ordering_checksum=].</span>
+
+2.  Codepoints the client needs: formed by the union of the codepoint sets specified by
+     [=PatchRequest/codepoints_needed=] and [=PatchRequest/indices_needed=].
+     <span class="conform server" id="conform-remap-codepoints-needed">The indices in
+     [=PatchRequest/indices_needed=] must be mapped to codepoints by the application of the
+     codepoint reordering with a checksum matching [=PatchRequest/ordering_checksum=].</span>
+
+Likewise, the server can produce two sets of <a href="https://docs.microsoft.com/en-us/typography/opentype/spec/featuretags">opentype layout feature tags</a>:
+
+1.  Feature tags the client's subset has: specified by [=PatchRequest/features_have=]. If the field is
+     unset this indicates the client's subset contains all features in the [=original font=].
+
+2.  Feature tags the client needs: specified by [=PatchRequest/features_needed=]. If the field is unset
+     this indicates the client wants all features in the [=original font=].
+
+Lastly, the server can produce two variable axis spaces:
+
+1.  Axis space the client has: specified by [=PatchRequest/axis_space_have=]. If any axes in the font
+     are not specified in [=PatchRequest/axis_space_have=] then for those axes add their entire
+     interval from the [=original font=].
+
+2. Axis space the client needs: specified by [=PatchRequest/axis_space_needed=]. If any axes in the
+     font are not specified in [=PatchRequest/axis_space_needed=] then for those axes add their entire
+     interval from the [=original font=].
+
+<span class="conform server" id="conform-bad-reordering">
+If the server does not recognize the codepoint ordering used by the client, it must respond
+with a response that will cause the client to update it's codepoint ordering to one the server
+will recognize via the process described in [[#handling-patch-response]] and not include any patch.
+That is the [=PatchResponse/patch=] and [=PatchResponse/replacement=] fields must not be set.
+</span>
+
+<span class="conform server" id="conform-response-valid-patch">
+Otherwise when the response is applied by the client following the process in
+[[#handling-patch-response]] to a [=font subset=] with checksum [=PatchRequest/base_checksum=] it must
+result in an extended [=font subset=]:
+</span>
+
+*  <span class="conform server" id="conform-response-subset">That contains data for at least the union
+    of the set of codepoints needed and the sets of codepoints the client already has.</span>
+
+*  <span class="conform server" id="conform-response-subset-features">That contains data for at least
+    the union of the set of features needed and the sets of features the client already has.</span>
+
+*  <span class="conform server" id="conform-response-subset-axis-space">That contains a variation axis
+    space that covers at least the union of the axis space the client has and the axis space the
+    client needs.</span>
+
+If the checksum of the [=original font=] computed by the procedure in [[#computing-checksums]] does not
+match the checksum in [=PatchRequest/original_font_checksum=] or
+[=PatchRequest/original_font_checksum=] is unset, then:
+
+*  <span class="conform server" id="conform-response-original-checksum">The value of
+    [=PatchResponse/original_font_checksum=] must be set to the checksum of the [=original font=]
+    computed by the procedure in [[#computing-checksums]].</span>
+
+*  <span class="conform server" id="conform-response-codepoint-ordering">
+    The response must set the [=PatchResponse/codepoint_ordering=] field following
+    [[#codepoint-reordering]].</span>
+
+*  <span class="conform server" id="conform-response-original-features">
+    The response must set the [=PatchResponse/original_features=] field to the list of
+    <a href="https://docs.microsoft.com/en-us/typography/opentype/spec/featuretags">opentype layout
+    feature tags</a> that the [=original font=] has data for.</span>
+
+*  <span class="conform server" id="conform-response-original-axis-space">
+    If the [=original font=] has variation axes, the
+    response must set the [=PatchResponse/original_axis_space=] field to the axis space covered by
+    the [=original font=].</span>
+
+Additionally:
+
+*  <span class="conform server" id="conform-response-patch-format">The format of the patch in the
+    either the [=PatchResponse/patch=] or [=PatchResponse/replacement=] fields must be one of those
+    listed in [=PatchRequest/accept_patch_format=]</span>.
+
+*  <span class="conform server" id="conform-response-subset-axis-space-field">
+    If [=PatchResponse/patch=] or [=PatchResponse/replacement=] fields are set and the
+    [=original font=] has variation axes, the response must set the [=PatchResponse/subset_axis_space=]
+    field to the axis space covered by the [=font subset=].</span>
+
+*  <span class="conform server" id="conform-response-ignore-unrecognized-formats">
+    If [=PatchRequest/accept_patch_format=] contains any unrecognized patch formats the server must
+    ignore the unrecognized ones.</span>
+
+Note: the server can respond with either a patch or a replacement but should try to produce a patch
+where possible. Replacement's should only be used in situations where the server is unable to recreate
+the client's state in order to generate a patch against it.
+
+Note: if a patch subset service is composed of more than one server task and some subset of those
+tasks are using a subsetter version which produces different binary results than the rest, there is
+a risk that consecutive extend requests may result in unnecessary replacement responses. For example if
+consecutive requests alternate between server backends with different subsetters, then each response
+will be a replacement as the server tasks will be unable to recreate the previously generated
+subset. This scenario might occur during software updates to the server tasks. To combat this
+it's recommended that sticky load balancing is used which aims to send consecutive requests from the
+same client to the same server task.
+
+Possible error responses:
+
+
+*  <span class="conform server" id="conform-reject-malformed-request">
+     If the request is malformed the server must instead respond with http [=response/status=] code 400
+     to indicate an error.</span>
+
+*  If the requested font is not recognized by the server it should respond with http
+    [=response/status=] code 404 to indicate a not found error.
+
+### Range Request Support ### {#range-request-support}
+
+A patch subset support server must also support incremental transfer via [[#range-request-incxfer]].
+To support range request incremental tranfser the patch subset server must support HTTP range requests
+([[RFC9110#range.requests]]) against the font files it provides via patch subset.
+
+
+Computing Checksums {#computing-checksums}
+------------------------------------------
+
+64 bit checksums of byte strings are computed using the
+[[!fast-hash]] algorithm. A python like pseudo
+code version of the algorithm is presented below:
+
+```
+# Constant values come fast hash: https://github.com/ztanml/fast-hash
+SEED = 0x11743e80f437ffe6
+M = 0x880355f21e6d1965
+
+mix(value):
+  value = value ^ (value >> 23)
+  value = value * 0x2127599bf4325c37
+  value = value ^ (value >> 47)
+  return value
+
+fast_hash(byte[] data):
+  # When casting byte arrays into unsigned 64 bit integers the bytes are in little
+  # endian order. That is the smallest index is the least significant byte.
+  uint64 hash = SEED ^ (length(data) * M)
+  for (i = 0; i <= length(data) - 8; i += 8)
+    hash = (hash ^ mix((uint64) data[i:i+8])) * M
+
+  remaining = length(data) % 8
+  if not remaining:
+    return mix(hash)
+
+  uint64 last_value = (uint64) concat(data[length(data) - remaining:],
+                                      [0] * (8 - remaining))
+  return mix((hash ^ mix(last_value)) * M)
+```
+
+To ensure checksums are consistent across all platforms, all integers during the computation are
+in little endian order.
+
+Note: a C implementation of fast hash can be found here: [[!fast-hash]]
+
+<div class=example>
+
+<table>
+  <tr><th>Bytes</th><th>Checksum value</th></tr>
+  <tr>
+    <td>0f 7b 5a e5</td>
+    <td>0xe5e0d1dc89eaa189</td>
+  </tr>
+  <tr>
+  <td>1d f4 02 5e d3 b8 43 21 3b ae de</td>
+  <td>0xb31e9c70768205fb</td>
+  </tr>
+</table>
+
+</div>
+
+Codepoint Reordering {#codepoint-reordering}
+--------------------------------------------
+
+A codepoint reordering for a font defines a function which maps unicode codepoint values from the
+font to a continuous space of [0, number of codepoints in the font). This transformation is intended
+to reduce the cost of representing codepoint sets.
+
+<span class="conform server " id="conform-remap-all">A codepoint ordering is encoded into a
+[=IntegerList=]. The list must contain all unicode codepoints that are supported by the
+font.</span> The index of a particular unicode codepoint in the list is the new value for that
+codepoint.
+
+A server is free to choose any codepoint ordering, but should try to pick one that will minimize the
+size of encoded codepoint sets for that font.
+
+### Codepoint Reordering Checksum ### {#reordering-checksum}
+
+A checksum of a codepoint reordering can be computed as follows:
+
+```
+SEED = 0x11743e80f437ffe6
+M = 0x880355f21e6d1965
+
+mix(value):
+  value = value ^ (value >> 23)
+  value = value * 0x2127599bf4325c37
+  value = value ^ (value >> 47)
+  return value
+
+fast_hash_ordering(uint64[] ordering):
+  uint64 hash = SEED ^ (length(ordering) * 8 * M)
+  for i in ordering:
+    hash = (hash ^ mix(ordering[i])) * M
+
+  return mix(hash)
+```
+
+To ensure checksums are consistent across all platforms, all integers during the computation are
+in little endian order.
+
+<div class=example>
+
+<table>
+  <tr><th>Codepoint Ordering</th><th>Checksum value</th></tr>
+  <tr>
+    <td>[106, 97, 105, 120, 100]</td>
+    <td>0x6986dc19f4e621e</td>
+  </tr>
+</table>
+
+</div>
+
+Patch Formats {#patch-formats}
+------------------------------
+
+The following patch formats may be used by the server to create binary diffs between a source file
+and a target file:
+
+<table>
+  <tr>
+    <th>Format</th><th>Value</th><th>Notes</th>
+  </tr>
+  <tr>
+    <td>VCDIFF</td><td>0</td>
+    <td>
+      Uses VCDIFF format [[!RFC3284]] to produce the patch.
+      <span class="conform server client" id="conform-vcdiff">
+      All client and server implementations must support this format.
+    </span>
+    </td>
+  </tr>
+  <tr>
+    <td>Brotli Shared Dictionary</td><td>1</td>
+    <td>
+      The target file is encoded with [[!RFC7932|brotli compression]] using the
+      source file as a [[!Shared-Brotli|shared LZ77 dictionary]]. If the source file is empty then
+      the target file is just compressed using [[!RFC7932|brotli compression]] with no shared
+      dictionary.
+   </td>
+  </tr>
+</table>
+
+
+Range Request Incremental Transfer {#range-request-incxfer}
+===========================================================
+
+Introduction to Range Request {#range-request-intro}
+-----------------------------
+
+<em>This section is not normative.</em>
+
+The Range Request method is a very simple method of incremental transfer, and has no server-side requirements (other than the server should be able to respond to byte-based range requests). The browser simply makes range requests to the server for the specific bytes in the font file that it needs. In order to know which bytes are necessary, the browser makes one initial special request for the beginning of the file.
+
+In order for the range request method to be as effective as possible, the font file itself should be internally arranged in a particular way, in order to decrease the number of requests the browser needs to make. Therefore, it is expected that web developers wishing to use the range request method will use font files that have had their contents already arranged optimally.
+
+This method was modelled after video playback on the web, where seeking in a video causes the browser to send a range request to the server.
+
+Font organization {#font-organization}
+--------------------------------------
+
+### Background ### {#font-organization-background}
+
+<em>This section is not normative.</em>
+
+A particular organization of font files is beneficial for improving the performance of the range-request IFT method. The range-request IFT method only works with [[!TRUETYPE]], [[!OPENTYPE]], [[!WOFF]], or [[!WOFF2]] files. All of these file formats use an <a href="https://docs.microsoft.com/en-us/typography/opentype/spec/otff#organization-of-an-opentype-font"><code>sfnt</code> wrapper</a> which provides a directory of tables inside the font file. A <code>sfnt</code>-based font file is mainly composed of a collection of independent tables.
+
+Issue: <a href="https://github.com/w3c/IFT/issues/59">Using WOFF2 files with range-request mechanism doesn't seem to be a viable option</a>
+
+### Introduction ### {#font-organization-introduction}
+
+The term <dfn>range-request optimized font</dfn> is used to describe a font file organized for use with the range-request IFT method. Optimizing a font for the range-request IFT method does not change the file format of the font.
+
+Note: Because optimizing a font does not change its file format, no new additional tooling is necessary to interact with these optimized fonts. They are still valid fonts, but with a particular internal organization.
+
+<div class=example>
+The result of optimizing an OpenType font for the range-request IFT method is still a valid OpenType font. The resulting file may be larger (by byte count) than it was before optimizing it, but fewer of those bytes should be necessary for a client to download in order to render a target text.
+</div>
+
+Note: There are no <code>MUST</code>-level requirements on the organization of a [=range-request optimized font=]. Any arbitrary font file may be considered to be a [=range-request optimized font=]. However, additional optimizations should increase the performance of loading in a browser via the range-request IFT method. Font creators are encouraged to enact as many of the optimizations listed in this section as are reasonable for the fonts they create.
+
+### Compression ### {#font-organization-compression}
+
+Servers supporting the range-request IFT method should support compression via the <code>Content-Encoding</code> header ([[RFC9110#name-content-encoding]]), rather than having the font file itself be statically compressed.
+
+A [=range-request optimized font=] file (the file itself) should not use any kind of compression other than [[!RFC7932]] (commonly referred to as "Brotli") compression.
+
+If Brotli compression is used in a [=range-request optimized font=], it should use only one <a href="https://datatracker.ietf.org/doc/html/rfc7932#section-9.2">meta-block</a>.
+
+If Brotli compression is used in a [=range-request optimized font=], its one meta-block should have the <a href="https://datatracker.ietf.org/doc/html/rfc7932#section-9.2"><code>ISUNCOMPRESSED</code></a> bit set to 1.
+
+Issue: <a href="https://github.com/w3c/IFT/issues/60">Static file compression compatibility with range-request method</a>
+
+### Table Ordering ### {#font-organization-table-ordering}
+
+The term <dfn>outline table</dfn> is used to describe these three tables,
+which carry different types of glyph outlines:
+
+- The <a href="https://docs.microsoft.com/en-us/typography/opentype/spec/cff"><code>CFF</code></a> table
+- The <a href="https://docs.microsoft.com/en-us/typography/opentype/spec/cff2"><code>CFF2</code></a> table
+- The <a href="https://docs.microsoft.com/en-us/typography/opentype/spec/glyf"><code>glyf</code></a> table
+
+A [=range-request optimized font=] should have only one outline table.
+
+No two tables in a [=range-request optimized font=] should share a tag name.
+
+
+The [=outline table=] data in a [=range-request optimized font=] should lie at the end of the file.
+
+If a <code>CFF</code> table exists, the <a href="https://adobe-type-tools.github.io/font-tech-notes/pdfs/5176.CFF.pdf">CharString</a> data should lie at the end of the <code>CFF</code> table.
+
+If a <code>CFF2</code> table exists, the <a href="https://docs.microsoft.com/en-us/typography/opentype/spec/cff2#charStrings">CharString</a> data should lie at the end of the <code>CFF2</code> table.
+
+Issue: <a href="https://github.com/w3c/IFT/issues/28">Font Collections support</a>
+
+### Glyph Independence ### {#font-organization-glyph-independence}
+
+Note: The goal of this section is to make every glyph independent from each other.
+
+A [=range-request optimized font=] should not use <a href="https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6glyf.html">Compound glyphs</a>.
+
+Issue: <a href="https://github.com/w3c/IFT/issues/58">Supporting fonts with composite glyphs via range-request</a>
+
+Note: Compound glyphs can be flattened by inlining their component glyphs to become additional contours.
+
+A [=range-request optimized font=] should not use <a href="https://adobe-type-tools.github.io/font-tech-notes/pdfs/5176.CFF.pdf">Subroutines</a>.
+
+Note: CFF glyph CharStrings can be flattened by inlining subroutines to become additional CharString bytes.
+
+### Glyph Order ### {#font-organization-glyph-order}
+
+Glyphs inside a [=range-request optimized font=] should be sorted in the file to keep glyphs often used in the same documents close together in the file.
+
+Note: Putting the most frequently used glyphs together in the font increases the likelihood that the browser can download a contiguous sequence of necessary glyphs in a single range-request, thereby minimizing overhead.
+
+Note: Reordering glyphs in a font is the same conceptual operation as renaming glyphs to have different glyph IDs. Therefore, this operation cannot be completed if glyph IDs must be preserved. Because glyph IDs are internal to text processing procedures and are not persisted, this requirement is not expected to be particularly burdensome.
+
+One suggested method of sorting the glyphs in the file is by [=usage document frequency=] inside a relevant [=corpus=].
+
+A <dfn>corpus</dfn> is defined to be a collection of documents, where a documents includes a collection of glyphs necessary to render some textual content.
+
+Note: For a particular website, a corpus might be defined to be individual page loads of pages on that website.
+
+The <dfn>usage document frequency</dfn> of a particular glyph inside a [=corpus=] is defined by the number of documents in the [=corpus=] which use that glyph, divided by the number of documents in the [=corpus=].
+
+Note: This is distinct, but similar, to the number of times the glyph is used throughout the entire corpus.
+
+The [=usage document frequency=] of the glyphs in a [=range-request optimized font=] should be decreasing throughout the font; that is, the most frequently used glyphs should have the lowest glyph IDs.
+
+Note: Glyph ID 0 cannot be renamed in OpenType, TrueType, WOFF, and WOFF 2 fonts. All other glyphs can be renamed.
+
+Note: Because the goal is simply to minimize overhead by placing similarly-used glyphs together, it may actually be possible to do better than ordering by simple frequency for a particular corpus. For example, some corpuses may have cliques of glyphs which have different frequencies but which nevertheless always seem to be used together.
+
+A suggested ordering is included in <a href="#suggested-glyph-character-ordering">Appendix A</a> below.
+
+Browser Behaviors {#browser-behaviors}
+--------------------------------------
+
+### First Request ### {#browser-behaviors-first-request}
+
+When a browser encounters the CSS opt-in mechanism, it is instructed to use IFT to load the fonts. First, it follows the steps in the <a href="#method-selection">IFT method selection</a> section above. If those steps result in using the range-request method, the rest of this section applies.
+
+The IFT method selection involves a single round-trip to the server, and if the range-request method is being used, the server's response starts sending the font file to the browser. The browser should start parsing the partial font data as it is being loaded from the server. The browser should not wait until the entire file has been received before parsing its contents.
+
+There is a certain amount of data from the beginning of the font file which the browser should unconditionally download. The boundary at the end of this data is called the <dfn>range-request threshold</dfn>.
+
+Note: The first request does not have to be a range request. If the browser expects the [=range-request threshold=] to lie within the first <code>n</code> bytes of the font, the first request may be a range request for the first <code>n</code> bytes of the font. However, a browser may instead make a non-range request, parse the data as it is being streamed from the server, and discover that it has reached the [=range-request threshold=] while data is still being streamed.
+
+Once all the data before the [=range-request threshold=] has been loaded by the browser, the browser may either close this connection to the server, or it may choose to leave the connection open and let the font data continue loading in the background.
+
+A browser may choose to add a <code>Range</code> header ([[RFC9110#name-range]]) to the initial request during the IFT method selection if it has reason to believe the range it requests will be large enough and it prefers to not close this connection to the server.
+
+Note: Different browsers may choose different [=range-request thresholds=]. Some browsers may treat this threshold as occuring at the end of the <a href="https://docs.microsoft.com/en-us/typography/opentype/spec/otff#table-directory">sfnt tableDirectory</a>. Other browsers may treat this threshold as occurring just before any outline data, provided the outline data appears at the end of the font. Other browsers may place this threshold at the very beginning of the file, thereby treating the whole file as able to be downloaded with range-requests.
+
+### Subsequent Requests ### {#browser-behaviors-subsequent-requests}
+
+After all the data before the [=range-request threshold=] has been loaded by the browser, the browser will determine which additional byte ranges in the file are necessary to load. It will then issue HTTP Range Requests ([[RFC9110#range.requests]]) for at least those ranges.
+
+Note: Browsers are encouraged to coalesce range requests for nearby areas of the file, to minimize the amount of range-request overhead required. Browsers are encouraged to inform these coalescing decisions from network configuration parameters and bandwidth / latency observations.
+
+Note: If the font file has followed all of the organization guidelines above, all information required for laying out content and performing shaping will lie before any of the outline data in the file, and every glyph's outline will be independent from every other glyph. Therefore, the browser can treat the [=range-request threshold=] as being just before outline data begins, and once it has loaded up to that threshold, it can lay out page content. After laying out the page, downloading all the necessary outlines can be done with a collection of independent and parallel range requests. This works particularly well for Chinese, Japanese, and Korean fonts, where 90% or more of the font data is outline data.
+
+Note: Another valid alternative is to treat the entire font as residing on an asynchronous virtual filesystem, and have the browser track which ranges of the font it ended up reading during its normal operation. The browser could then request those regions in range requests.
+
+Server Behaviors {#server-behaviors}
+------------------------------------
+
+Servers supporting the range-request IFT method must support range requests ([[RFC9110#range.requests]]).
+
+Servers supporting the range-request IFT method should support compression via the
+<code>Content-Encoding</code> ([[RFC9110#name-content-encoding]]) header or the
+<code>Transfer-Encoding</code> header ([[RFC9112#section-6.1]]), rather than having the font file
+itself be statically compressed.
+
+<h2 class=no-num id=priv>Privacy Considerations</h2>
+
+
+<h3  id="content-inference-from-character-set">Content inference from character set</h3>
+
+IFT exposes, to the server hosting a Web font, the set of characters that the browser can already render in a given Web font, and also the set of characters that it cannot render, but wants to (for example, to render a new Web page). For details, see [[#extend-subset]].
+
+The purpose of doing so is to allow the server to compute a binary patch to the existing font, adding more characters. Thus, fonts are transferred incrementally, as needed, which <a href="https://www.w3.org/TR/PFE-evaluation/#analysis-cjk">greatly reduces</a>> the bytes transferred and the overall network cost..
+
+For some languages, which use a very large character set (Chinese and Japanese are examples) the vast reduction in total bytes transferred means that Web fonts become usable, including on mobile networks, for the first time.
+
+However, for those languages, it is <em>possible</em> that individual requests might be analyzed by a rogue font server to obtain intelligence about the type of content which is being read. It is unclear how feasible this attack is, or the computational complexity required to exploit it, unless the characters being requested are very unusual.
+
+One mitigation, which was originally introduced for reasons of networking efficiency so is likely to be implemented in practice, is to request additional, un-needed characters to dilute the ability to infer what content the user is viewing. Requesting characters which are <a href="https://www.w3.org/TR/PFE-evaluation/#codepredict">statistically likely to occur</a> may <a href="https://docs.google.com/document/d/1u-05ztF9MqftHbMKB_KiqeUhZKiXNFE4TRSUWFAPXsk/edit">avoid a subsequent request</a>.
+
+(IFT mandates HTTPS, so no in-the-middle attack is possible; the trust is between the client, and the server hosting the fonts).
+
+
+<h3 id="checksum-and-possible-fingerprinting">Checksums and possible fingerprinting</h3>
+
+In the patch subset method 64 bit checksums are generated and transferred between client and server. These are used for error detection, are not persistent across browsing sessions, change frequently in the course of a single browsing session, and thus should not pose a tracking risk.
+
+Also, browsers typically cache resources keyed by the origin domain; thus the checksums and the set of characters the client requires would only be available to that domain and the patch subset server.
+
+<h3 id="per-origin">Per-origin restriction avoids fingerprinting</h3>
+
+  As required by [[!css-fonts-4]],
+  Web Fonts <a href="https://drafts.csswg.org/css-fonts-4/#web-fonts">must not be accessible
+  in any other Document from the one which either is associated with the @font-face rule
+  or owns the FontFaceSet.
+  Other applications on the device must not be able to access Web Fonts.</a>
+  This avoids information leaking across origins.
+
+  Similarly, font palette values
+  <a href="https://drafts.csswg.org/css-fonts-4/#font-palette-values">must only be available to the documents that reference it</a>.
+  Using an author-defined color palette outside of the documents that reference it
+  would constitute a security leak since the contents of one page
+  would be able to affect other pages,
+  something an attacker could use as an attack vector.
+
+<h2 class=no-num id=sec>Security Considerations</h2>
+
+No Security issues have been raised against this document
+
+<h2 id="suggested-glyph-character-ordering">
+Appendix A: Suggested glyph/character ordering</h2>
+
+Note: This section describes ordering of characters, not glyph IDs, because the meaning of glyph IDs are not consistent across different fonts. To optimize a particular font according to the ordering listed here, the characters will have to be mapped to glyph IDs inside the font. This approach of mapping characters to glyphs for ordering purposes works particularly well for ideographic languages with large character sets.
+
+Issue: <a href="https://github.com/w3c/IFT/issues/61">Populate suggested character ordering for range-request method</a>
+
+<h2 id="feature-tag-list">
+Appendix B: Default Feature Tags and Encoding IDs</h2>
+
+<pre class=include>
+<!-- Edit feature-registry.csv to update this table. -->
+path: feature-registry.html
+</pre>

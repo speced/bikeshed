@@ -4,11 +4,12 @@ Shortname: webrtc-encoded-transform
 Level: None
 Status: ED
 Group: webrtc
+TR: https://www.w3.org/TR/webrtc-encoded-transform/
 Repository: w3c/webrtc-encoded-transform
 URL: https://w3c.github.io/webrtc-encoded-transform/
-Editor: Harald Alvestrand, Google https://google.com, hta@google.com
-Editor: Guido Urdaneta, Google https://google.com, guidou@google.com
-Editor: Youenn Fablet, Apple https://www.apple.com, youenn@apple.com
+Editor: Harald Alvestrand, w3cid 24610 , Google https://google.com, hta@google.com
+Editor: Guido Urdaneta, w3cid 84810, Google https://google.com, guidou@google.com
+Editor: Youenn Fablet, w3cid 96458, Apple https://www.apple.com, youenn@apple.com
 Abstract: This API defines an API surface for manipulating the bits on
 Abstract: {{MediaStreamTrack}}s being sent via an {{RTCPeerConnection}}.
 Markup Shorthands: css no, markdown yes
@@ -22,6 +23,11 @@ spec:webidl; type:dfn; text:resolve
      "href":
      "https://github.com/WICG/web-codecs/blob/master/explainer.md",
      "title": "Web Codecs explainer"
+   },
+  "SFRAME": {
+     "href":
+     "https://www.ietf.org/archive/id/draft-ietf-sframe-enc-00.html",
+     "title": "Secure Frame (SFrame)"
    }
 }
 </pre>
@@ -31,27 +37,19 @@ spec:streams; type:interface; text:ReadableStream
 
 # Introduction # {#introduction}
 
-The [[WEBRTC-NV-USE-CASES]] document describes several functions that
-can only be achieved by access to media (requirements N20-N22),
-including, but not limited to:
-* Funny Hats
-* Machine Learning
-* Virtual Reality Gaming
+The [[WEBRTC-NV-USE-CASES]] document describes the use-case of
+    * Untrusted JavaScript Cloud Conferencing
+which requires that the conferencing server does not have access
+to the cleartext media (requirement N27).
 
-These use cases further require that processing can be done in worker
-threads (requirement N23-N24).
-
-Furthermore, the "trusted JavaScript cloud conferencing" use case
-requires such processing to be done on encoded media, not just the raw
-media.
-
-This specification gives an interface inspired by [[WEB-CODECS]] to
-provide access to such functionality while retaining the setup flow of
-RTCPeerConnection.
-
-This iteration of the specification provides access to encoded media,
+This specification provides access to encoded media,
 which is the output of the encoder part of a codec and the input to the
-decoder part of a codec.
+decoder part of a codec which allows the user agent to apply encryption
+locally.
+
+The interface is inspired by [[WEB-CODECS]] to
+provide access to such functionality while retaining the setup flow of
+RTCPeerConnection
 
 # Terminology # {#terminology}
 
@@ -60,33 +58,18 @@ decoder part of a codec.
 The Streams definition doesn't use WebIDL much, but the WebRTC spec does.
 This specification shows the IDL extensions for WebRTC.
 
-It uses an extension to RTCConfiguration in order to notify the
-{{RTCPeerConnection}} that insertable streams will be used, and uses
-an additional API on {{RTCRtpSender}} and {{RTCRtpReceiver}} to
+It uses an additional API on {{RTCRtpSender}} and {{RTCRtpReceiver}} to
 insert the processing into the pipeline.
 
 <pre class="idl">
-// New dictionary
-dictionary RTCInsertableStreams {
-    ReadableStream readable;
-    WritableStream writable;
-};
-
-// New fields in RTCConfiguration
-partial dictionary RTCConfiguration {
-    boolean encodedInsertableStreams = false;
-};
-
 typedef (SFrameTransform or RTCRtpScriptTransform) RTCRtpTransform;
 
 // New methods for RTCRtpSender and RTCRtpReceiver
 partial interface RTCRtpSender {
-    RTCInsertableStreams createEncodedStreams();
     attribute RTCRtpTransform? transform;
 };
 
 partial interface RTCRtpReceiver {
-    RTCInsertableStreams createEncodedStreams();
     attribute RTCRtpTransform? transform;
 };
 </pre>
@@ -101,54 +84,57 @@ argument, ensure that the codec is disabled and produces no output.
 ### Stream creation ### {#stream-creation}
 
 At construction of each {{RTCRtpSender}} or {{RTCRtpReceiver}}, run the following steps:
-1. Initialize [=this=].`[[Streams]]` to null.
 2. Initialize [=this=].`[[transform]]` to null.
 3. Initialize [=this=].`[[readable]]` to a new {{ReadableStream}}.
 4. <a dfn for="ReadableStream">Set up</a> [=this=].`[[readable]]`. [=this=].`[[readable]]` is provided frames using the [=readEncodedData=] algorithm given |this| as parameter.
 5. Set [=this=].`[[readable]]`.`[[owner]]` to |this|.
 6. Initialize [=this=].`[[writable]]` to a new {{WritableStream}}.
-7. <a dfn for="WritableStream">Set up</a> [=this=].`[[writable]]` with its [=WritableStream/set up/writeAlgorithm=] set to [=writeEncodedData=] given |this| as parameter.
+7. <a dfn for="WritableStream">Set up</a> [=this=].`[[writable]]` with its [=WritableStream/set up/writeAlgorithm=] set to [=writeEncodedData=] given |this| as parameter and its [=WritableStream/set up/sizeAlgorithm=] to an algorithm that returns <code>0</code>.
+    <p class="note">Chunk size is set to 0 to explictly disable streams backpressure on the write side.</p>
 8. Set [=this=].`[[writable]]`.`[[owner]]` to |this|.
 9. Initialize [=this=].`[[pipeToController]]` to null.
-10. Initialize [=this=].`[[lastReceivedFrameTimestamp]]` to zero.
-11. If the {{RTCPeerConnection}}'s configuration does not have {{RTCConfiguration/encodedInsertableStreams}} set to "true", [=queue a task=] to run the following steps:
+1. Initialize [=this=].`[[lastReceivedFrameCounter]]` to <code>0</code>.
+1. Initialize [=this=].`[[lastEnqueuedFrameCounter]]` to <code>0</code>.
+1. [=Queue a task=] to run the following steps:
     1. If [=this=].`[[pipeToController]]` is not null, abort these steps.
     2. Set [=this=].`[[pipeToController]]` to a new {{AbortController}}.
     <!-- FIXME: Use pipeTo algorithm when available. -->
     3. Call <a href="https://streams.spec.whatwg.org/#readable-stream-pipe-to">pipeTo</a> with [=this=].`[[readable]]`, [=this=].`[[writable]]`, preventClose equal to true, preventAbort equal to true, preventCancel equal to true and [=this=].`[[pipeToController]]`.signal.
 
-The <dfn method for="RTCRtpSender">createEncodedStreams()</dfn> method steps are:
-
-1. If the {{RTCPeerConnection}}'s configuration does not have {{RTCConfiguration/encodedInsertableStreams}} set to "true", throw an "{{InvalidAccessError}}" {{DOMException}} and abort these steps.
-2. If the data source does not permit access, throw an "{{InvalidAccessError}}" {{DOMException}} and abort these steps.
-3. If [=this=].`[[Streams]]` is not null, throw an "{{InvalidAccessError}}" {{DOMException}}.
-4. If [=this=].`[[pipeToController]]` is not null, throw an "{{InvalidAccessError}}" {{DOMException}}.
-5. Set [=this=].`[[Streams]]` to an {{RTCInsertableStreams}} object.
-6. Set [=this=].`[[Streams]]`.{{RTCInsertableStreams/readable}} to [=this=].`[[readable]]`.
-7. Set [=this=].`[[Streams]]`.{{RTCInsertableStreams/writable}} to [=this=].`[[writable]]`.
-8. Enable the encoded data source.
-10. Return [=this=].`[[Streams]]`.
-
 ### Stream processing ### {#stream-processing}
 
 The <dfn>readEncodedData</dfn> algorithm is given a |rtcObject| as parameter. It is defined by running the following steps:
 1. Wait for a frame to be produced by |rtcObject|'s encoder if it is a {{RTCRtpSender}} or |rtcObject|'s packetizer if it is a {{RTCRtpReceiver}}.
-2. Let |frame| be the newly produced frame.
-3. Set |frame|.`[[owner]]` to |rtcObject|.
-4. [=ReadableStream/Enqueue=] |frame| in |rtcObject|.`[[readable]]`.
+1. Increment |rtcObject|.`[[lastEnqueuedFrameCounter]]` by <code>1</code>.
+1. Let |frame| be the newly produced frame.
+1. Set |frame|.`[[owner]]` to |rtcObject|.
+1. Set |frame|.`[[counter]]` to |rtcObject|.`[[lastEnqueuedFrameCounter]]`.
+1. [=ReadableStream/Enqueue=] |frame| in |rtcObject|.`[[readable]]`.
 
 The <dfn>writeEncodedData</dfn> algorithm is given a |rtcObject| as parameter and a |frame| as input. It is defined by running the following steps:
 1. If |frame|.`[[owner]]` is not equal to |rtcObject|, abort these steps and return [=a promise resolved with=] undefined. A processor cannot create frames, or move frames between streams.
-2. If the |frame|'s {{RTCEncodedVideoFrame/timestamp}} is equal to or larger than |rtcObject|.`[[lastReceivedFrameTimestamp]]`, abort these steps and return [=a promise resolved with=] undefined. A processor cannot reorder frames, although it may delay them or drop them.
-3. Set |rtcObject|.`[[lastReceivedFrameTimestamp]]` to the |frame|'s {{RTCEncodedVideoFrame/timestamp}}.
-4. Enqueue the frame for processing as if it came directly from the encoded data source, by running one of the following steps:
-    * If |rtcObject| is a {{RTCRtpSender}}, enqueue it to |rtcObject|'s packetizer, to be processed [=in parallel=].
-    * If |rtcObject| is a {{RTCRtpReceiver}}, enqueue it to |rtcObject|'s decoder, to be processed [=in parallel=].
-5. Return [=a promise resolved with=] undefined.
+1. If |frame|.`[[counter]]` is equal or smaller than |rtcObject|.`[[lastReceivedFrameCounter]]`, abort these steps and return [=a promise resolved with=] undefined. A processor cannot reorder frames, although it may delay them or drop them.
+1. Set |rtcObject|.`[[lastReceivedFrameCounter]]` to |frame|`[[counter]]`.
+1. Let |data| be |frame|.`[[data]]`.
+1. Let |serializedFrame| be [$StructuredSerializeWithTransfer$](|frame|, « |data| »).
+1. Let |frameCopy| be [$StructuredDeserialize$](|serializedFrame|,  |frame|'s [=relevant realm=]).
+1. Enqueue |frameCopy| for processing as if it came directly from the encoded data source, by running one of the following steps:
+    * If |rtcObject| is a {{RTCRtpSender}}, enqueue |frameCopy| to |rtcObject|'s packetizer, to be processed [=in parallel=].
+    * If |rtcObject| is a {{RTCRtpReceiver}}, enqueue |frameCopy| it to |rtcObject|'s decoder, to be processed [=in parallel=].
+1. Return [=a promise resolved with=] undefined.
+
+On sender side, as part of [=readEncodedData=], frames produced by |rtcObject|'s encoder MUST be enqueued in |rtcObject|.`[[readable]]` in the encoder's output order.
+As [=writeEncodedData=] ensures that the transform cannot reorder frames, the encoder's output order is also the order followed by packetizers to generate RTP packets and assign RTP packet sequence numbers.
+
+On receiver side, as part of [=readEncodedData=], frames produced by |rtcObject|'s packetizer MUST be enqueued in |rtcObject|.`[[readable]]` in the same encoder's output order.
+To ensure the order is respected, the depacketizer will typically use RTP packet sequence numbers to reorder RTP packets as needed before enqueuing frames in |rtcObject|.`[[readable]]`.
+As [=writeEncodedData=] ensures that the transform cannot reorder frames, this will be the order expected by |rtcObject|'s decoder.
 
 ## Extension attribute ## {#attribute}
 
 A RTCRtpTransform has two private slots called `[[readable]]` and `[[writable]]`.
+
+Each RTCRtpTransform has an <dfn>association steps</dfn> set, which is empty by default.
 
 The <dfn attribute for="RTCRtpSender,RTCRtpReceiver">transform</dfn> getter steps are:
 1. Return [=this=].`[[transform]]`.
@@ -165,9 +151,10 @@ The `transform` setter steps are:
 7. Else, run the [=chain transform algorithm=] steps.
 8. Set [=this=].`[[pipeToController]]` to |newPipeToController|.
 9. Set [=this=].`[[transform]]` to |transform|.
+10. Run the steps in the set of [=association steps=] of |transform| with [=this=].
 
 The <dfn>chain transform algorithm</dfn> steps are defined as:
-1. If |newPipeToController|'s [=AbortSignal/aborted flag=] is true, abort these steps.
+1. If |newPipeToController| is [=AbortSignal/aborted=], abort these steps.
 2. [=ReadableStreamDefaultReader/Release=] |reader|.
 3. [=WritableStreamDefaultWriter/Release=] |writer|.
 4. Assert that |newPipeToController| is the same object as |rtcObject|.`[[pipeToController]]`.
@@ -182,6 +169,10 @@ If a web application sets the transform synchronously at creation of the {{RTCRt
 Similarly, if a web application sets the transform synchronously at creation of the {{RTCRtpReceiver}} (for instance when calling addTrack, or at track event handler), the transform will receive the first full frame generated by the {{RTCRtpReceiver}}'s packetizer.
 
 # SFrameTransform # {#sframe}
+
+<p>
+The API presented in this section allows applications to process SFrame data as defined in [[SFrame]].
+</p>
 
 <xmp class="idl">
 enum SFrameTransformRole {
@@ -200,8 +191,30 @@ typedef (SmallCryptoKeyID or bigint) CryptoKeyID;
 interface SFrameTransform {
     constructor(optional SFrameTransformOptions options = {});
     Promise<undefined> setEncryptionKey(CryptoKey key, optional CryptoKeyID keyID);
+    attribute EventHandler onerror;
 };
 SFrameTransform includes GenericTransformStream;
+
+enum SFrameTransformErrorEventType {
+    "authentication",
+    "keyID",
+    "syntax"
+};
+
+[Exposed=(Window,DedicatedWorker)]
+interface SFrameTransformErrorEvent : Event {
+    constructor(DOMString type, SFrameTransformErrorEventInit eventInitDict);
+
+    readonly attribute SFrameTransformErrorEventType errorType;
+    readonly attribute CryptoKeyID? keyID;
+    readonly attribute any frame;
+};
+
+dictionary SFrameTransformErrorEventInit : EventInit {
+    required SFrameTransformErrorEventType errorType;
+    required any frame;
+    CryptoKeyID? keyID;
+};
 </xmp>
 
 The <dfn constructor for="SFrameTransform" lt="SFrameTransform(options)"><code>new SFrameTransform(<var>options</var>)</code></dfn> constructor steps are:
@@ -217,18 +230,29 @@ The <dfn constructor for="SFrameTransform" lt="SFrameTransform(options)"><code>n
 
 The SFrame transform algorithm, given |sframe| as a SFrameTransform object and |frame|, runs these steps:
 1. Let |role| be |sframe|.`[[role]]`.
-2. If |frame|.`[[owner]]` is a {{RTCRtpSender}}, set |role| to 'encrypt'.
-3. If |frame|.`[[owner]]` is a {{RTCRtpReceiver}}, set |role| to 'decrypt'.
-4. Let |data| be undefined.
-5. If |frame| is a {{BufferSource}}, set |data| to |frame|.
-6. If |frame| is a {{RTCEncodedAudioFrame}}, set |data| to |frame|.{{RTCEncodedAudioFrame/data}}
-7. If |frame| is a {{RTCEncodedVideoFrame}}, set |data| to |frame|.{{RTCEncodedVideoFrame/data}}
-8. If |data| is undefined, abort these steps.
-9. Let |buffer| be the result of running the SFrame algorithm with |data| and |role| as parameters. This algorithm is defined by the <a href="https://datatracker.ietf.org/doc/draft-omara-sframe/">SFrame specification</a> and returns an {{ArrayBuffer}}.
-10. If |frame| is a {{BufferSource}}, set |frame| to |buffer|.
-11. If |frame| is a {{RTCEncodedAudioFrame}}, set |frame|.{{RTCEncodedAudioFrame/data}} to |buffer|.
-12. If |frame| is a {{RTCEncodedVideoFrame}}, set |frame|.{{RTCEncodedVideoFrame/data}} to |buffer|.
-13. [=ReadableStream/Enqueue=] |frame| in |sframe|.`[[transform]]`.
+1. If |frame|.`[[owner]]` is a {{RTCRtpSender}}, set |role| to 'encrypt'.
+1. If |frame|.`[[owner]]` is a {{RTCRtpReceiver}}, set |role| to 'decrypt'.
+1. Let |data| be undefined.
+1. If |frame| is a {{BufferSource}}, set |data| to |frame|.
+1. If |frame| is a {{RTCEncodedAudioFrame}}, set |data| to |frame|.{{RTCEncodedAudioFrame/data}}
+1. If |frame| is a {{RTCEncodedVideoFrame}}, set |data| to |frame|.{{RTCEncodedVideoFrame/data}}
+1. If |data| is undefined, abort these steps.
+1. Let |buffer| be the result of running the SFrame algorithm with |data| and |role| as parameters. This algorithm is defined by the <a href="https://datatracker.ietf.org/doc/draft-omara-sframe/">SFrame specification</a> and returns an {{ArrayBuffer}}.
+1. If the SFrame algorithm exits abruptly with an error, [=queue a task=] to run the following sub steps:
+     1. If the processing fails on decryption side due to |data| not following the SFrame format, [=fire an event=] named {{SFrameTransform/onerror|error}} at |sframe|,
+        using the {{SFrameTransformErrorEvent}} interface with its {{SFrameTransformErrorEvent/errorType}} attribute set to {{SFrameTransformErrorEventType/syntax}}
+        and its {{SFrameTransformErrorEvent/frame}} attribute set to |frame|.
+     1. If the processing fails on decryption side due to the key identifier parsed in |data| being unknown, [=fire an event=] named {{SFrameTransform/onerror|error}} at |sframe|,
+        using the {{SFrameTransformErrorEvent}} interface with its {{SFrameTransformErrorEvent/errorType}} attribute set to {{SFrameTransformErrorEventType/keyID}},
+        its {{SFrameTransformErrorEvent/frame}} attribute set to |frame| and its {{SFrameTransformErrorEvent/keyID}} attribute set to the keyID value parsed in the SFrame header.
+     1. If the processing fails on decryption side due to validation of the authentication tag, [=fire an event=] named {{SFrameTransform/onerror|error}} at |sframe|,
+        using the {{SFrameTransformErrorEvent}} interface with its {{SFrameTransformErrorEvent/errorType}} attribute set to {{SFrameTransformErrorEventType/authentication}}
+        and its {{SFrameTransformErrorEvent/frame}} attribute set to |frame|.
+     1. Abort these steps.
+1. If |frame| is a {{BufferSource}}, set |frame| to |buffer|.
+1. If |frame| is a {{RTCEncodedAudioFrame}}, set |frame|.{{RTCEncodedAudioFrame/data}} to |buffer|.
+1. If |frame| is a {{RTCEncodedVideoFrame}}, set |frame|.{{RTCEncodedVideoFrame/data}} to |buffer|.
+1. [=ReadableStream/Enqueue=] |frame| in |sframe|.`[[transform]]`.
 
 ## Methods ## {#sframe-transform-methods}
 The <dfn method for="SFrameTransform">setEncryptionKey(|key|, |keyID|)</dfn> method steps are:
@@ -243,6 +267,7 @@ The <dfn method for="SFrameTransform">setEncryptionKey(|key|, |keyID|)</dfn> met
 
 # RTCRtpScriptTransform # {#scriptTransform}
 
+## <dfn>RTCEncodedVideoFrameType</dfn> dictionary ## {#RTCEncodedVideoFrameType}
 <pre class="idl">
 // New enum for video frame types. Will eventually re-use the equivalent defined
 // by WebCodecs.
@@ -251,43 +276,250 @@ enum RTCEncodedVideoFrameType {
     "key",
     "delta",
 };
+</pre>
+<table data-link-for="RTCEncodedVideoFrameType" data-dfn-for=
+    "RTCEncodedVideoFrameType" class="simple">
+	<caption>Enumeration description</caption>
+    <thead>
+        <tr>
+            <th>Enum value</th><th>Description</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+                <dfn data-idl="">empty</dfn>
+            </td>
+            <td>
+                <p>
+                    This frame contains no data.
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <dfn data-idl="">key</dfn>
+            </td>
+            <td>
+                <p>
+                    This frame can be decoded without reference to any other frames.
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <dfn data-idl="">delta</dfn>
+            </td>
+            <td>
+                <p>
+                    This frame references another frame and can not be decoded without that frame.
+                </p>
+            </td>
+        </tr>
+    </tbody>
+</table>
 
+## <dfn>RTCEncodedVideoFrameMetadata</dfn> dictionary ## {#RTCEncodedVideoFrameMetadata}
+<pre class="idl">
 dictionary RTCEncodedVideoFrameMetadata {
-    long long frameId;
-    sequence&lt;long long&gt; dependencies;
+    unsigned long long frameId;
+    sequence&lt;unsigned long long&gt; dependencies;
     unsigned short width;
     unsigned short height;
-    long spatialIndex;
-    long temporalIndex;
-    long synchronizationSource;
-    sequence&lt;long&gt; contributingSources;
+    unsigned long spatialIndex;
+    unsigned long temporalIndex;
+    unsigned long synchronizationSource;
+    octet payloadType;
+  sequence&lt;unsigned long&gt; contributingSources;
 };
+</pre>
 
+### Members ### {#RTCEncodedVideoFrameMetadata-members}
+<dl data-link-for="RTCEncodedVideoFrameMetadata"
+        data-dfn-for="RTCEncodedVideoFrameMetadata"
+        class="dictionary-members">
+    <dt>
+        <dfn>synchronizationSource</dfn> of type <span class="idlMemberType">unsigned long</span>
+    </dt>
+    <dd>
+        <p>
+            The synchronization source (ssrc) identifier is an unsigned integer value per [[RFC3550]]
+            used to identify the stream of RTP packets that the encoded frame object is describing.
+        </p>
+    </dd>
+    <dt>
+        <dfn>payloadType</dfn> of type <span class="idlMemberType">octet</span>
+    </dt>
+    <dd>
+        <p>
+            The payload type is an unsigned integer value in the range from 0 to 127 per [[RFC3550]]
+            that is used to describe the format of the RTP payload.
+        </p>
+    </dd>
+    <dt>
+        <dfn>contributingSources</dfn> of type <span class=
+            "idlMemberType">sequence&lt;unsigned long&gt;</span>
+    </dt>
+    <dd>
+        <p>
+            The list of contribution sources (csrc list) as defined in [[RFC3550]].
+        </p>
+    </dd>
+</dl>
+
+
+## <dfn>RTCEncodedVideoFrame</dfn> interface ## {#RTCEncodedVideoFrame-interface}
+<pre class="idl">
 // New interfaces to define encoded video and audio frames. Will eventually
 // re-use or extend the equivalent defined in WebCodecs.
 [Exposed=(Window,DedicatedWorker)]
 interface RTCEncodedVideoFrame {
     readonly attribute RTCEncodedVideoFrameType type;
-    readonly attribute unsigned long long timestamp;
+    readonly attribute unsigned long timestamp;
     attribute ArrayBuffer data;
     RTCEncodedVideoFrameMetadata getMetadata();
 };
+</pre>
 
+### Members ### {#RTCEncodedVideoFrame-members}
+<dl data-link-for="RTCEncodedVideoFrame"
+        data-dfn-for="RTCEncodedVideoFrame"
+        class="dictionary-members">
+    <dt>
+        <dfn>type</dfn> of type <span class="idlMemberType">RTCEncodedVideoFrameType</span>
+    </dt>
+    <dd>
+        <p>
+            The type attribute allows the application to determine when a key frame is being
+            sent or received.
+        </p>
+    </dd>
+
+    <dt>
+        <dfn>timestamp</dfn> of type <span class="idlMemberType">unsigned long</span>
+    </dt>
+    <dd>
+        <p>
+            The RTP timestamp identifier is an unsigned integer value per [[RFC3550]]
+            that reflects the sampling instant of the first octet in the RTP data packet.
+        </p>
+    </dd>
+    <dt>
+        <dfn>data</dfn> of type <span class="idlMemberType">ArrayBuffer</span>
+    </dt>
+    <dd>
+        <p>
+            The encoded frame data.
+        </p>
+    </dd>
+</dl>
+
+### Methods ### {#RTCEncodedVideoFrame-methods}
+<dl data-link-for="RTCEncodedVideoFrame"
+        data-dfn-for="RTCEncodedVideoFrame"
+        class="dictionary-members">
+    <dt>
+        <dfn data-dfn-for="RTCEncodedVideoFrame" data-dfn-type="method">getMetadata()</dfn>
+    </dt>
+    <dd>
+        <p>
+            Returns the metadata associated with the frame.
+        </p>
+    </dd>
+</dl>
+
+## <dfn>RTCEncodedAudioFrameMetadata</dfn> dictionary ## {#RTCEncodedAudioFrameMetadata}
+<pre class="idl">
 dictionary RTCEncodedAudioFrameMetadata {
-    long synchronizationSource;
-    sequence&lt;long&gt; contributingSources;
+    unsigned long synchronizationSource;
+    octet payloadType;
+    sequence&lt;unsigned long&gt; contributingSources;
 };
+</pre>
+### Members ### {#RTCEncodedAudioFrameMetadata-members}
+<dl data-link-for="RTCEncodedAudioFrameMetadata"
+        data-dfn-for="RTCEncodedAudioFrameMetadata"
+        class="dictionary-members">
+    <dt>
+        <dfn>synchronizationSource</dfn> of type <span class="idlMemberType">unsigned long</span>
+    </dt>
+    <dd>
+        <p>
+            The synchronization source (ssrc) identifier is an unsigned integer value per [[RFC3550]]
+            used to identify the stream of RTP packets that the encoded frame object is describing.
+        </p>
+    </dd>
+    <dt>
+        <dfn>payloadType</dfn> of type <span class="idlMemberType">octet</span>
+    </dt>
+    <dd>
+        <p>
+            The payload type is an unsigned integer value in the range from 0 to 127 per [[RFC3550]]
+            that is used to describe the format of the RTP payload.
+        </p>
+    </dd>
+    <dt>
+        <dfn>contributingSources</dfn> of type <span class=
+            "idlMemberType">sequence&lt;unsigned long&gt;</span>
+    </dt>
+    <dd>
+        <p>
+            The list of contribution sources (csrc list) as defined in [[RFC3550]].
+        </p>
+    </dd>
+</dl>
 
+## <dfn>RTCEncodedAudioFrame</dfn> interface ## {#RTCEncodedAudioFrame-interface}
+<pre class="idl">
 [Exposed=(Window,DedicatedWorker)]
 interface RTCEncodedAudioFrame {
-    readonly attribute unsigned long long timestamp;
+    readonly attribute unsigned long timestamp;
     attribute ArrayBuffer data;
     RTCEncodedAudioFrameMetadata getMetadata();
 };
+</pre>
+
+### Members ### {#RTCEncodedAudioFrame-members}
+<dl data-link-for="RTCEncodedAudioFrame"
+        data-dfn-for="RTCEncodedAudioFrame"
+        class="dictionary-members">
+    <dt>
+        <dfn>timestamp</dfn> of type <span class="idlMemberType">unsigned long</span>
+    </dt>
+    <dd>
+        <p>
+            The RTP timestamp identifier is an unsigned integer value per [[RFC3550]]
+            that reflects the sampling instant of the first octet in the RTP data packet.
+        </p>
+    </dd>
+    <dt>
+        <dfn>data</dfn> of type <span class="idlMemberType">ArrayBuffer</span>
+    </dt>
+    <dd>
+        <p>
+            The encoded frame data.
+        </p>
+    </dd>
+</dl>
+
+### Methods ### {#RTCEncodedAudioFrame-methods}
+<dl data-link-for="RTCEncodedAudioFrame"
+        data-dfn-for="RTCEncodedAudioFrame"
+        class="dictionary-members">
+    <dt>
+        <dfn data-dfn-for="RTCEncodedAudioFrame" data-dfn-type="method">getMetadata()</dfn>
+    </dt>
+    <dd>
+        <p>
+            Returns the metadata associated with the frame.
+        </p>
+    </dd>
+</dl>
 
 
 // New interfaces to expose JavaScript-based transforms.
-
+##Interfaces
+<pre class="idl">
 [Exposed=DedicatedWorker]
 interface RTCTransformEvent : Event {
     readonly attribute RTCRtpScriptTransformer transformer;
@@ -302,6 +534,8 @@ interface RTCRtpScriptTransformer {
     readonly attribute ReadableStream readable;
     readonly attribute WritableStream writable;
     readonly attribute any options;
+    Promise&lt;unsigned long long&gt; generateKeyFrame(optional DOMString rid);
+    Promise&lt;undefined&gt; sendKeyFrameRequest();
 };
 
 [Exposed=Window]
@@ -328,16 +562,34 @@ The <dfn constructor for="RTCRtpScriptTransform" lt="RTCRtpScriptTransform(worke
     5. Set |transformer|.`[[options]]` to |transformerOptions|.
     6. Set |transformer|.`[[readable]]` to |readable|.
     7. Set |transformer|.`[[writable]]` to |writable|.
-    8. Let |event| be the result of [=creating an event=] with {{RTCTransformEvent}}.
-    9. Set |event|.type attribute to "rtctransform".
-    10. Set |event|.transformer to |transformer|.
-    11. Dispatch |event| on |worker|’s global scope.
+    8. [=Fire an event=] named <dfn event for="DedicatedWorkerGlobalScope">rtctransform</dfn> using {{RTCTransformEvent}} with {{RTCTransformEvent/transformer}} set to |transformer| on |worker|’s global scope.
 
 // FIXME: Describe error handling (worker closing flag true at RTCRtpScriptTransform creation time. And worker being terminated while transform is processing data).
 
+Each RTCRtpScriptTransform has the following set of [=association steps=], given |rtcObject|:
+1. Let |transform| be the {{RTCRtpScriptTransform}} object that owns the [=association steps=].
+1. Let |encoder| be |rtcObject|'s encoder if |rtcObject| is a {{RTCRtpSender}} or undefined otherwise.
+1. Let |depacketizer| be |rtcObject|'s depacketizer if |rtcObject| is a {{RTCRtpReceiver}} or undefined otherwise.
+1. [=Queue a task=] on the DOM manipulation [=task source=] |worker|'s global scope to run the following steps:
+    1. Let |transformer| be the {{RTCRtpScriptTransformer}} object associated to |transform|.
+    1. Set |transformer|.`[[encoder]]` to |encoder|.
+    1. Set |transformer|.`[[depacketizer]]` to |depacketizer|.
+
+The <dfn method for="RTCRtpScriptTransformer">generateKeyFrame(|rid|)</dfn> method steps are:
+1. Let |promise| be a new promise.
+1. Run the [=generate key frame algorithm=] with |promise|, |this|.`[[encoder]]` and |rid|.
+1. Return |promise|.
+
+The <dfn method for="RTCRtpScriptTransformer">sendKeyFrameRequest()</dfn> method steps are:
+1. Let |promise| be a new promise.
+1. Run the [=send request key frame algorithm=] with |promise| and |this|.`[[depacketizer]]`.
+1. Return |promise|.
+
 ## Attributes ## {#RTCRtpScriptTransformer-attributes}
 
-A RTCRtpScriptTransformer has three private slots called `[[options]]`, `[[readable]]` and `[[writable]]`.
+A {{RTCRtpScriptTransformer}} has the following private slots called `[[depacketizer]]`, `[[encoder]]`, `[[options]]`, `[[readable]]` and `[[writable]]`.
+In addition, a {{RTCRtpScriptTransformer}} is always associated with its parent {{RTCRtpScriptTransform}} transform.
+This allows algorithms to go from an {{RTCRtpScriptTransformer}} object to its {{RTCRtpScriptTransform}} parent and vice versa.
 
 The <dfn attribute for="RTCRtpScriptTransformer">options</dfn> getter steps are:
 1. Return [=this=].`[[options]]`.
@@ -348,6 +600,66 @@ The <dfn attribute for="RTCRtpScriptTransformer">readable</dfn> getter steps are
 The <dfn attribute for="RTCRtpScriptTransformer">writable</dfn> getter steps are:
 1. Return [=this=].`[[writable]]`.
 
+## KeyFrame Algorithms ## {#KeyFrame-algorithms}
+
+The <dfn>generate key frame algorithm</dfn>, given |promise|, |encoder| and |rid|, is defined by running these steps:
+1. If |encoder| is undefined, reject |promise| with {{InvalidStateError}}, abort these steps.
+1. If |encoder| is not processing video frames, reject |promise| with {{InvalidStateError}}, abort these steps.
+1. If |rid| is defined, validate its value. If invalid, reject |promise| with {{NotAllowedError}} and abort these steps.
+1. [=In parallel=], run the following steps:
+    1. Gather a list of video encoders, named |videoEncoders| from |encoder|, ordered according negotiated RIDs if any.
+    1. If |rid| is defined, remove from |videoEncoders| any video encoder that does not match |rid|.
+    1. If |rid| is undefined, remove from |videoEncoders| all video encoders except the first one.
+    1. If |videoEncoders| is empty, reject |promise| with {{NotFoundError}} and abort these steps.
+        |videoEncoders| is expected to be empty if the corresponding {{RTCRtpSender}} is not active, or the corresponding {{RTCRtpSender}} track is ended.
+    1. Let |videoEncoder| be the first encoder in |videoEncoders|.
+    1. If |rid| is undefined, set |rid| to the RID value corresponding to |videoEncoder|.
+    1. Create a pending key frame task called |task| with |task|.`[[rid]]` set to rid and |task|.`[[promise]]`| set to |promise|.
+    1. If |encoder|.`[[pendingKeyFrameTasks]]` is undefined, initialize |encoder|.`[[pendingKeyFrameTasks]]` to an empty set.
+    1. Let |shouldTriggerKeyFrame| be <code>true</code> if |encoder|.`[[pendingKeyFrameTasks]]` contains a task whose `[[rid]]`
+        value is equal to |rid|, and <code>false</code> otherwise.
+    1. Add |task| to |encoder|.`[[pendingKeyFrameTasks]]`.
+    1. If |shouldTriggerKeyFrame| is <code>true</code>, instruct |videoEncoder| to generate a key frame for the next provided video frame.
+
+For any {{RTCRtpScriptTransformer}} named |transformer|, the following steps are run just before any |frame| is enqueued in |transformer|.`[[readable]]`:
+1. Let |encoder| be |transformer|.`[[encoder]]`.
+1. If |encoder| or |encoder|.`[[pendingKeyFrameTasks]]` is undefined, abort these steps.
+1. If |frame| is not a video {{RTCEncodedVideoFrameType/"key"}} frame, abort these steps.
+1. For each |task| in |encoder|.`[[pendingKeyFrameTasks]]`, run the following steps:
+    1. If |frame| was generated by a video encoder identified by |task|.`[[rid]]`, run the following steps:
+        1. Remove |task| from |encoder|.`[[pendingKeyFrameTasks]]`.
+        1. Resolve |task|.`[[promise]]` with |frame|'s timestamp.
+
+By resolving the promises just before enqueuing the corresponding key frame in a {{RTCRtpScriptTransformer}}'s readable,
+the resolution callbacks of the promises are always executed just before the corresponding key frame is exposed.
+If the promise is associated to several rid values, it will be resolved when the first key frame corresponding to one the rid value is enqueued.
+
+The <dfn>send request key frame algorithm</dfn>, given |promise| and |depacketizer|, is defined by running these steps:
+1. If |depacketizer| is undefined, reject |promise| with {{InvalidStateError}}, abort these steps.
+1. If |depacketizer| is not processing video packets, reject |promise| with {{InvalidStateError}}, abort these steps.
+1. [=In parallel=], run the following steps:
+    1. If sending a Full Intra Request (FIR) by |depacketizer|'s receiver is not deemed appropriate, [=resolve=] |promise| with undefined and abort these steps.
+        Section 4.3.1 of [[RFC5104]] provides guidelines of how and when it is appropriate to sending a Full Intra Request.
+    1. Generate a Full Intra Request (FIR) packet as defined in section 4.3.1 of [[RFC5104]] and send it through |depacketizer|'s receiver.
+    1. [=Resolve=] |promise| with undefined.
+
+# RTCRtpSender extension # {#rtcrtpsender-extension}
+
+An additional API on {{RTCRtpSender}} is added to complement the generation of key frame added to {{RTCRtpScriptTransformer}}.
+
+<pre class="idl">
+partial interface RTCRtpSender {
+    Promise&lt;undefined&gt; generateKeyFrame(optional sequence &lt;DOMString&gt; rids);
+};
+</pre>
+
+## Extension operation ## {#sender-operation}
+
+The <dfn method for="RTCRtpSender">generateKeyFrame(|rids|)</dfn> method steps are:
+
+1. Let |promise| be a new promise.
+1. [=In parallel=], run the [=generate key frame algorithm=] with |promise|, |this|'s encoder and |rids|.
+1. Return |promise|.
 
 # Privacy and security considerations # {#privacy}
 
@@ -361,6 +673,13 @@ accessed using this API, since that would break the isolation rule.
 The API will allow access to some aspects of timing information that are
 otherwise unavailable, which allows some fingerprinting surface.
 
+The API will give access to encoded media, which means that the JS application
+will have full control over what's delivered to internal components like
+the packetizer or the decoder. This may require additional care with
+auditing how data is handled inside these components.
+
+For instance, packetizers may expect to see data only from trusted encoders,
+and may not be audited for reception of data from untrusted sources.
 
 # Examples # {#examples}
 

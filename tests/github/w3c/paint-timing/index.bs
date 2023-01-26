@@ -1,0 +1,256 @@
+<pre class='metadata'>
+Title: Paint Timing
+Group: webperf
+Shortname: paint-timing
+Level: 1
+ED: https://w3c.github.io/paint-timing/
+TR: https://www.w3.org/TR/paint-timing/
+Status: WD
+Editor: Nicolás Peña Moreno, Google https://google.com, npm@chromium.org, w3cid 103755
+        Noam Rosenthal, Invited Expert, noam@webkit.org, w3cid 121539
+Former Editor: Shubhie Panicker, Google https://google.com, panicker@google.com, w3cid 92587
+Repository: w3c/paint-timing
+Abstract: This document defines an API that can be used to capture a series of key moments (first paint, first contentful paint) during pageload which developers care about.
+Default Highlight: js
+</pre>
+
+<pre class=anchors>
+urlPrefix: https://www.w3.org/TR/performance-timeline-2/; spec: PERFORMANCE-TIMELINE-2;
+    type: interface; url: #the-performanceentry-interface; text: PerformanceEntry;
+    type: attribute; for: PerformanceEntry;
+        text: name; url: #dom-performanceentry-name
+        text: entryType; url: #dom-performanceentry-entrytype
+        text: startTime; url: #dom-performanceentry-starttime
+        text: duration; url: #dom-performanceentry-duration
+    type: dfn; url: #dfn-register-a-performance-entry-type; text: register a performance entry type
+    type: attribute; for: PerformanceObserver;
+        text: supportedEntryTypes; url: #supportedentrytypes-attribute
+urlPrefix: https://www.w3.org/TR/hr-time-2/#idl-def-domhighrestimestamp; spec: HR-TIME-2;
+    type: typedef; text: DOMHighResTimeStamp
+urlPrefix: https://www.w3.org/TR/CSS22/visufx.html; spec: CSS-2;
+    type: dfn; url: #propdef-visibility; text: visibility;
+urlPrefix: https://www.w3.org/TR/css-color-3; spec: CSS-COLOR-3;
+    type: dfn; url: #opacity; text: opacity;
+urlPrefix: https://html.spec.whatwg.org/multipage/images.html
+    type: dfn; text: available; url: #img-available;
+    type: dfn; text: image; url: #images;
+urlPrefix: https://www.w3.org/TR/SVG2/render.html; spec: CR-SVG2
+    type: dfn; url: #Rendered-vs-NonRendered; text: svg element with rendered descendants;
+urlPrefix: https://www.w3.org/TR/css-backgrounds-3/; spec: CSS-BACKGROUNDS-3;
+    type: dfn; text: background-image; url: #propdef-background-image;
+    type: dfn; text: background-size; url: #background-size;
+urlPrefix: https://html.spec.whatwg.org/multipage/canvas.html
+    type: dfn; text: canvas;
+    type: dfn; text: context mode; url: #concept-canvas-context-mode;
+urlPrefix: https://html.spec.whatwg.org/multipage/rendering.html
+    type: dfn; text: replaced element; url: #replaced-elements;
+    type: dfn; text: being rendered; url: #being-rendered;
+urlPrefix: https://w3c.github.io/IntersectionObserver/
+    type: dfn; text: Intersection rect algorithm; url: #calculate-intersection-rect-algo
+urlPrefix: https://drafts.csswg.org/css-cascade-4/
+    type: dfn; text: used; url: #used;
+urlPrefix: https://html.spec.whatwg.org/multipage/dom.html
+    type: dfn; text: element; url: #element;
+    type: dfn; text: represents; url: #represents;
+urlPrefix: https://drafts.csswg.org/css-pseudo-4
+    type: dfn; text: generated content pseudo-element; url: #generated-content;
+    type: dfn; text: typographical pseudo-element; url: #typographic-pseudos;
+urlPrefix: https://www.w3.org/TR/cssom-view
+    type: dfn; text: getBoundingClientRect; url: #dom-element-getboundingclientrect;
+    type: dfn; text: scrolling area; url: #scrolling-area;
+urlPrefix: https://www.w3.org/TR/css3-values/
+    type: dfn; text: url valued; url: #url-value;
+urlPrefix: https://drafts.fxtf.org/css-masking-1/
+    type: dfn; text: clip-path; url: #the-clip-path;
+urlPrefix: https://www.w3.org/TR/css-images-3/
+    type: dfn; text: CSS image; url: #typedef-image;
+urlPrefix: https://html.spec.whatwg.org/multipage/media.html
+    type: dfn; text: poster frame; url: #poster-frame;
+    type: dfn; text: video element; url: #the-video-element;
+urlPrefix: https://html.spec.whatwg.org/multipage/input.html
+    type: dfn; text: input; url: #the-input-element;
+    type: dfn; text: value attribute; url: #attr-input-value;
+urlPrefix: https://html.spec.whatwg.org/multipage/browsers.html
+    type: dfn; text: browsing context; url: #browsing-context;
+    type: dfn; text: nested browsing context; url: #nested-browsing-context;
+urlPrefix: https://html.spec.whatwg.org/multipage/webappapis.html
+    type: dfn; text: global object; url: #concept-realm-global;
+urlPrefix: https://infra.spec.whatwg.org/
+    type: dfn; text: set; url: #sets;
+    type: dfn; text: contains; url: #list-contain;
+    type: dfn; text: append; url: #list-append;
+</pre>
+
+Introduction {#intro}
+=====================
+
+<div class=non-normative>
+
+<em>This section is non-normative.</em>
+
+Load is not a single moment in time — it's an experience that no one metric can fully capture. There are multiple moments during the load experience that can affect whether a user perceives it as "fast" or "slow".
+
+First paint (FP) is the first of these key moments, followed by first contentful paint (FCP). These metrics mark the points in time when the browser renders a given document. This is important to the user because it answers the question: is it happening?
+
+The primary difference between the two metrics is FP marks the first time the browser renders anything for a given document. By contrast, FCP marks the time when the browser renders the first bit of image or text content from the DOM.
+
+Usage example {#example}
+------------------------
+
+<pre class="example highlight">
+    const observer = new PerformanceObserver(function(list) {
+        const perfEntries = list.getEntries();
+        for (const perfEntry of perfEntries) {
+            // Process entries
+            // report back for analytics and monitoring
+            // ...
+        }
+    });
+
+    // register observer for paint timing notifications
+    observer.observe({entryTypes: ["paint"]});
+</pre>
+
+</div>
+
+Terminology {#sec-terminology}
+==============================
+
+<dfn export>Paint</dfn>: the user agent has performed a "paint" (or "render") when it has converted the render tree to pixels on the screen.
+Formally, we consider the user agent to have "rendered" a document when it has performed the [=update the rendering=] steps of the event loop.
+
+    NOTE: The rendering pipeline is very complex, and the timestamp should be the latest timestamp the user agent is able to note in this pipeline (best effort). Typically the time at which the frame is submitted to the OS for display is recommended for this API.
+
+A [=generated content pseudo-element=] is a <dfn>paintable pseudo-element</dfn> when all of the following apply:
+* The pseudo-element's [=used=] [=visibility=] is <code>visible</code>.
+* The pseudo-element's [=used=] [=opacity=] is greater than zero.
+* The pseudo-element generates a non-empty [=box=].
+
+A [=CSS image=] |img| is a <dfn>contentful image</dfn> when all of the following apply:
+* |img| is [=url valued=].
+* |img| is [=available=].
+
+A {{DOMString}} is <dfn>non-empty</dfn> if it contains at least one character excluding [=document white space characters=].
+
+An [=element=] |target| is <dfn export>contentful</dfn> when one or more of the following apply:
+* |target| has a [=text node=] child, representing [=non-empty=] text, and the node's [=used=] [=opacity=] is greater than zero.
+
+    NOTE: this covers the case where a [=typographical pseudo-element=] would override the opacity of the text node.
+
+* |target| is a [=replaced element=] representing an [=available=] [=image=].
+* |target| has a [=background-image=] which is a [=contentful image=], and its [=used=] [=background-size=] has non-zero width and height values.
+* |target| is a [=canvas=] with its [=context mode=] set to any value other than <code>none</code>.
+* |target| is a [=video element=] that [=represents=] its [=poster frame=] or the first video frame and the frame is available.
+* |target| is an [=svg element with rendered descendants=].
+* |target| is an [=input=] element with a [=non-empty=] [=value attribute=].
+* |target| is an [=originating element=] for a [=paintable pseudo-element=] that represents a [=contentful image=] or [=non-empty=] text.
+
+To compute the <dfn>paintable bounding rect</dfn> of [=element=] |target|, run the following steps:
+    1. Let |boundingRect| be the result of running the [=getBoundingClientRect=] on |target|.
+    1. Clip |boundingRect| with the [=document=]'s [=scrolling area=].
+    1. Return |boundingRect|.
+
+    NOTE: elements contained by boxes with <code>overflow: scroll</code> or <code>overflow: hidden</code> don't have their [=paintable bounding rect=] clipped, as in both cases the [=element=] can become visible by scrolling.
+
+An [=element=] |el| is <dfn>paintable</dfn> when all of the following apply:
+* |el| is [=being rendered=].
+* |el|'s [=used=] [=visibility=] is <code>visible</code>.
+* |el| and all of its ancestors' [=used=] [=opacity=] is greater than zero.
+
+    NOTE: there could be cases where a <code>paintable</code> [=element=] would not be visible to the user, for example in the case of text that has the same color as its background.
+    Those elements would still considered as paintable for the purpose of computing [=first contentful paint=].
+
+* |el|'s [=paintable bounding rect=] intersects with the [=scrolling area=] of the [=document=].
+
+    NOTE: This covers the cases where the element is scaled to zero size, has <code>display: none</code>, or <code>display: contents</code> where the contents resolve to an empty rect.
+
+    NOTE: As a general rule, an [=element=] is paintable if it is within the viewport, or can potentially be in the viewport as a result of scrolling or zooming.
+
+<dfn export>First paint</dfn> entry contains a {{DOMHighResTimeStamp}} reporting the time when the user agent first rendered after navigation. This excludes the default background paint, but includes non-default background paint and the enclosing box of an iframe. This is the first key moment developers care about in page load – when the user agent has started to render the page.
+
+A [=browsing context=] |ctx| is <dfn>paint-timing eligible</dfn> when one of the following apply:
+* |ctx| is a [=top-level browsing context=].
+* |ctx| is a [=nested browsing context=], and the user agent has configured |ctx| to report paint timing.
+
+    NOTE: this allows user agents to enable paint-timing only for some of the frames, in addition to the main frame, if they so choose.
+    For example, a user agent may decide to disable paint-timing for cross-origin iframes, as in some scenarios their paint-timing might reveal information about the main frame.
+
+The {{PerformancePaintTiming}} interface {#sec-PerformancePaintTiming}
+=======================================
+
+<pre class="idl">
+    [Exposed=Window]
+    interface PerformancePaintTiming : PerformanceEntry {};
+</pre>
+
+{{PerformancePaintTiming}} extends the following attributes of {{PerformanceEntry}} interface:
+
+* The {{PerformanceEntry/name}} attribute's getter must return a {{DOMString}} for minimal frame attribution. Possible values of name are:
+    * <code>"first-paint"</code>: for [=first paint=]
+    * <code>"first-contentful-paint"</code>: for [=first contentful paint=]
+* The {{PerformanceEntry/entryType}} attribute's getter must return <code>"paint"</code>.
+* The {{PerformanceEntry/startTime}} attribute's getter must return a {{DOMHighResTimeStamp}} of when the paint occured.
+* The {{PerformanceEntry/duration}} attribute's getter must return 0.
+
+NOTE: A user agent implementing {{PerformancePaintTiming}} would need to include <code>"paint"</code> in {{PerformanceObserver/supportedEntryTypes}} of a [=global object=] whose [=Window/browsing context=] is [=paint-timing eligible=].
+This allows developers to detect support for paint timing for a particular [=browsing context=].
+
+Processing model {#sec-processing-model}
+========================================
+
+Reporting paint timing {#sec-reporting-paint-timing}
+--------------------------------------------------------
+
+Every [=Document=] has an associated [=set=] of <dfn>previously reported paints</dfn>, initiallized to an empty [=set=].
+
+<h4 dfn export>First Contentful Paint</h4>
+<div algorithm="Should report first contentful paint">
+    To know whether [=Document=] |document| <dfn>should report first contentful paint</dfn>, perform the following steps:
+    1. If |document|'s [=previously reported paints=] contains <code>"first-contentful-paint"</code>, then return false.
+    1. If |document| contains at least one [=element=] that is both [=paintable=] and [=contentful=], then return true.
+    1. Otherwise, return false.
+</div>
+
+<h4 dfn export>Mark paint timing</h4>
+
+<div algorithm="Mark paint timing">
+    When asked to [=mark paint timing=] given a [=Document=] |document| as input, perform the following steps:
+    1. If the [=document=]'s [=Document/browsing context=] is not [=paint-timing eligible=], return.
+    1. Let |paintTimestamp| be the [=current high resolution time=].
+    1. Let |reportedPaints| be the [=previously reported paints=] associated with |document|.
+    1. If |reportedPaints| does not contain <code>"first-paint"</code>, and the user agent is configured to mark [=first paint=], then invoke the [[#report-paint-timing]] algorithm with |document|, <code>"first-paint"</code>, and |paintTimestamp|.
+
+        NOTE: [=First paint=] excludes the default background paint, but includes non-default background paint.
+
+            ISSUE: This should be turned into a normative note.
+
+    1. If |document| [=should report first contentful paint=], then:
+        1. Invoke the [[#report-paint-timing]] algorithm with |document|, <code>"first-contentful-paint"</code>, and |paintTimestamp| as arguments.
+
+        NOTE: A parent frame should not be aware of the paint events from its child iframes, and vice versa. This means that a frame that contains just iframes will have [=first paint=] (due to the enclosing boxes of the iframes) but no [=first contentful paint=].
+
+        NOTE: A [=document=] is not guaranteed to mark <code>"first-paint"</code> or <code>"first-contentful-paint"</code>. A completely blank [=document=] may never mark [=first paint=], and a [=document=] containing only elements that are not [=contentful=], may never mark [=first contentful paint=].
+
+    NOTE: The marking of [=first paint=] is optional. User-agents implementing paint timing should at the very least mark [=first contentful paint=] .
+</div>
+
+<h4 dfn>Report paint timing</h4>
+
+<div algorithm="Report paint timing">
+    When asked to [=report paint timing=] given |document|, |paintType|, and |paintTimestamp| as arguments, perform the following steps:
+    1. Create a <a spec=webidl>new</a> {{PerformancePaintTiming}} object |newEntry| with |document|'s [=relevant realm=] and set its attributes as follows:
+        1. Set |newEntry|'s {{PerformanceEntry/name}} attribute to |paintType|.
+        1. Set |newEntry|'s {{PerformanceEntry/entryType}} attribute to <code>"paint"</code>.
+        1. Set |newEntry|'s {{PerformanceEntry/startTime}} attribute to |paintTimestamp|.
+        1. Set |newEntry|'s {{PerformanceEntry/duration}} attribute to 0.
+    1. <a href="https://w3c.github.io/performance-timeline/#dfn-queue-a-performanceentry">Add the PerformanceEntry</a> |newEntry| object.
+    1. [=Append=] |paintType| to |document|'s associated [=previously reported paints=].
+</div>
+
+
+<!-- ============================================================ -->
+<h2 id=acknowledgements>Acknowledgements</h2>
+<!-- ============================================================ -->
+
+Special thanks to <a href="https://github.com/w3c/paint-timing/graphs/contributors">all the contributors</a> for their technical input and suggestions that led to improvements to this
+specification.

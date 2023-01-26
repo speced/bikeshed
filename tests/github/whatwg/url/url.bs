@@ -3,13 +3,17 @@ Group: WHATWG
 H1: URL
 Shortname: url
 Text Macro: TWITTER urlstandard
-Text Macro: LATESTRD 2021-02
+Text Macro: LATESTRD 2022-08
 Abstract: The URL Standard defines URLs, domains, IP addresses, the <code>application/x-www-form-urlencoded</code> format, and their API.
 Translation: ja https://triple-underscore.github.io/URL-ja.html
+Required IDs: application/x-www-form-urlencoded,urlencoded-parsing
 </pre>
 
 <pre class=anchors>
-url: https://tc39.es/ecma262/#sec-encodeuricomponent-uricomponent; text: "encodeURIComponent() [sic]"; type: method; spec: ECMA-262
+spec: ECMA-262; url: https://tc39.es/ecma262/#sec-encodeuricomponent-uricomponent; text: "encodeURIComponent() [sic]"; type: method
+spec: UTS46; urlPrefix: https://www.unicode.org/reports/tr46/
+    type: abstract-op; text: ToASCII; url: #ToASCII
+    type: abstract-op; text: ToUnicode; url: #ToUnicode
 </pre>
 
 
@@ -20,7 +24,7 @@ url: https://tc39.es/ecma262/#sec-encodeuricomponent-uricomponent; text: "encode
 
 <ul>
  <li><p>Align RFC 3986 and RFC 3987 with contemporary implementations and
- obsolete them in the process. (E.g., spaces, other "illegal" code points,
+ obsolete the RFCs in the process. (E.g., spaces, other "illegal" code points,
  query encoding, equality, canonicalization, are all concepts not entirely
  shared, or defined.) URL parsing needs to become as solid as HTML parsing.
  [[RFC3986]]
@@ -52,18 +56,16 @@ might increase in scope somewhat.
 
 <h2 id=infrastructure>Infrastructure</h2>
 
-<p>This specification depends on the Infra Standard. [[!INFRA]]
+<p>This specification depends on <cite>Infra</cite>. [[!INFRA]]
 
 <p>Some terms used in this specification are defined in the following standards and specifications:
 
 <ul class=brief>
- <li>DOM Standard [[!DOM]]
- <li>Encoding Standard [[!ENCODING]]
- <li>File API [[!FILEAPI]]
- <li>HTML Standard [[!HTML]]
- <li>Media Source Extensions [[!MEDIA-SOURCE]]
- <li>Unicode IDNA Compatibility Processing [[!UTS46]]
- <li>Web IDL [[!WEBIDL]]
+ <li><cite>Encoding</cite> [[!ENCODING]]
+ <li><cite>File API</cite> [[!FILEAPI]]
+ <li><cite>HTML</cite> [[!HTML]]
+ <li><cite>Unicode IDNA Compatibility Processing</cite> [[!UTS46]]
+ <li><cite>Web IDL</cite> [[!WEBIDL]]
 </ul>
 
 <hr>
@@ -77,7 +79,7 @@ number.
 <p>A <dfn oldids=syntax-violation>validation error</dfn> indicates a mismatch between input and
 valid input. User agents, especially conformance checkers, are encouraged to report them somewhere.
 
-<div class="note no-backref">
+<div class=note>
  <p>A <a>validation error</a> does not mean that the parser terminates. Termination of a parser is
  always stated explicitly, e.g., through a return statement.
 
@@ -101,9 +103,10 @@ code point stream.
 <a>pointer</a> points to as long as it does not point nowhere. When the <a>pointer</a> points to
 nowhere <a>c</a> cannot be used.
 
-<p>When a <a>pointer</a> is used, <dfn>remaining</dfn> references the substring after <a>c</a> as
-long as <a>c</a> is not the <a>EOF code point</a>. When <a>c</a> is the <a>EOF code point</a>
-<a>remaining</a> cannot be used.
+<p>When a <a>pointer</a> is used, <dfn>remaining</dfn> references the
+<a lt="code point substring to the end of the string">code point substring</a> from the
+<a>pointer</a> + 1 to the end of the string, as long as <a>c</a> is not the <a>EOF code point</a>.
+When <a>c</a> is the <a>EOF code point</a> <a>remaining</a> cannot be used.
 
 <p class=example id=example-12672b6a>If "<code>mailto:username@example</code>" is a <a>string</a>
 being processed and a <a>pointer</a> points to @, <a>c</a> is U+0040 (@) and <a>remaining</a> is
@@ -117,14 +120,21 @@ error.
 <h3 id=percent-encoded-bytes>Percent-encoded bytes</h3>
 
 <p>A <dfn>percent-encoded byte</dfn> is U+0025 (%), followed by two <a>ASCII hex digits</a>.
-Sequences of <a lt="percent-encoded byte">percent-encoded bytes</a>,
-<a for=string>percent-decoded</a>, should not cause <a>UTF-8 decode without BOM or fail</a> to
-return failure.
 
+<p class=note>It is generally a good idea for sequences of <a>percent-encoded bytes</a> to be such
+that, when <a for=string>percent-decoded</a> and then passed to
+<a>UTF-8 decode without BOM or fail</a>, they do not end up as failure. How important this is
+depends on where the <a>percent-encoded bytes</a> are used. E.g., for the <a>host parser</a> not
+following this advice is fatal, whereas for <a href="#url-rendering-i18n">URL rendering</a> the
+<a>percent-encoded bytes</a> would not be rendered <a for=string>percent-decoded</a>.
+
+<div algorithm>
 <p>To <dfn for=byte id=percent-encode>percent-encode</dfn> a <a for=/>byte</a> <var>byte</var>,
 return a <a for=/>string</a> consisting of U+0025 (%), followed by two <a>ASCII upper hex digits</a>
 representing <var>byte</var>.
+</div>
 
+<div algorithm>
 <p>To <dfn export for="byte sequence" id=percent-decode>percent-decode</dfn> a
 <a for=/>byte sequence</a> <var>input</var>, run these steps:
 
@@ -162,9 +172,11 @@ bytes that are not <a>ASCII bytes</a> might be insecure and is not recommended.
 
  <li><p>Return <var>output</var>.
 </ol>
+</div>
 
-<p>To <dfn export for=string>percent-decode</dfn> a <a for=/>string</a> <var>input</var>, run these
-steps:
+<div algorithm>
+<p>To <dfn export for=string>percent-decode</dfn> a <a for=/>scalar value string</a>
+<var>input</var>:
 
 <ol>
  <li><p>Let <var>bytes</var> be the <a>UTF-8 encoding</a> of <var>input</var>.
@@ -174,6 +186,7 @@ steps:
 
 <p class=note>In general, percent-encoding results in a string with more U+0025 (%) code points than
 the input, and percent-decoding results in a byte sequence with less 0x25 (%) bytes than the input.
+</div>
 
 <hr>
 
@@ -217,9 +230,10 @@ inclusive, and U+007E (~).
 all code points, except the <a>ASCII alphanumeric</a>, U+002A (*), U+002D (-), U+002E (.), and
 U+005F (_).
 
+<div algorithm>
 <p>To <dfn for=string>percent-encode after encoding</dfn>, given an <a for=/>encoding</a>
-<var>encoding</var>, <a for=/>string</a> <var>input</var>, a <var>percentEncodeSet</var>, and an
-optional boolean <var>spaceAsPlus</var> (default false), run these steps:
+<var>encoding</var>, <a for=/>scalar value string</a> <var>input</var>, a
+<var>percentEncodeSet</var>, and an optional boolean <var>spaceAsPlus</var> (default false):
 
 <ol>
  <li><p>Let <var>encoder</var> be the result of <a>getting an encoder</a> from <var>encoding</var>.
@@ -266,21 +280,35 @@ optional boolean <var>spaceAsPlus</var> (default false), run these steps:
     shortest sequence of <a for=/>ASCII digits</a> representing <var>potentialError</var> in base
     ten, followed by "<code>%3B</code>", to <var>output</var>.
 
-    <p class="note no-backref">This can happen when <var>encoding</var> is not <a>UTF-8</a>.
+    <p class=note>This can happen when <var>encoding</var> is not <a>UTF-8</a>.
   </ol>
 
  <li><p>Return <var>output</var>.
 </ol>
 
-<p>To <dfn for="code point" id=utf-8-percent-encode>UTF-8 percent-encode</dfn> a
-<a for=/>code point</a> <var>codePoint</var> using a <var>percentEncodeSet</var>, return the result
-of running <a for=string>percent-encode after encoding</a> with <a for=/>UTF-8</a>,
-<var>codePoint</var> as a <a for=/>string</a>, and <var>percentEncodeSet</var>.
+<p class=note>Of the possible values for the <var>percentEncodeSet</var> argument only two end up
+encoding U+0025 (%) and thus give “roundtripable data”: <a>component percent-encode set</a> and
+<a><code>application/x-www-form-urlencoded</code> percent-encode set</a>. The other values for the
+<var>percentEncodeSet</var> argument — which happen to be used by the <a>URL parser</a> — leave
+U+0025 (%) untouched and as such it needs to be
+<a for="code point" lt="UTF-8 percent-encode">percent-encoded</a> first in order to be properly
+represented.
 
-<p>To <dfn export for=string>UTF-8 percent-encode</dfn> a <a for=/>string</a> <var>input</var> using
-a <var>percentEncodeSet</var>, return the result of running
+</div>
+
+<div algorithm>
+<p>To <dfn for="code point" id=utf-8-percent-encode>UTF-8 percent-encode</dfn> a
+<a for=/>scalar value</a> <var>scalarValue</var> using a <var>percentEncodeSet</var>, return the
+result of running <a for=string>percent-encode after encoding</a> with <a for=/>UTF-8</a>,
+<var>scalarValue</var> as a <a for=/>string</a>, and <var>percentEncodeSet</var>.
+</div>
+
+<div algorithm>
+<p>To <dfn export for=string>UTF-8 percent-encode</dfn> a <a for=/>scalar value string</a>
+<var>input</var> using a <var>percentEncodeSet</var>, return the result of running
 <a for=string>percent-encode after encoding</a> with <a for=/>UTF-8</a>, <var>input</var>, and
 <var>percentEncodeSet</var>.
+</div>
 
 <hr>
 
@@ -370,8 +398,8 @@ point <a for=/>URLs</a> from <var>A</var> can come from untrusted sources.
 <a>host serializer</a> relate as follows:
 
 <ul>
- <li><p>The <a>host parser</a> takes an arbitrary string and returns either failure or a
- <a for=/>host</a>.
+ <li><p>The <a>host parser</a> takes an arbitrary <a>scalar value string</a> and returns either
+ failure or a <a for=/>host</a>.
 
  <li><p>A <a for=/>host</a> can be seen as the in-memory representation.
 
@@ -379,18 +407,77 @@ point <a for=/>URLs</a> from <var>A</var> can come from untrusted sources.
  or failure when given to the <a>host parser</a>. I.e., input that would be considered conforming or
  valid.
 
- <li><p>The <a>host serializer</a> takes a <a for=/>host</a> and returns a string. (If that string
- is then <a lt="host parser">parsed</a>, the result will <a for=host>equal</a> the <a for=/>host</a>
- that was <a lt="host serializer">serialized</a>.)
+ <li><p>The <a>host serializer</a> takes a <a for=/>host</a> and returns an <a>ASCII string</a>. (If
+ that string is then <a lt="host parser">parsed</a>, the result will <a for=host>equal</a> the
+ <a for=/>host</a> that was <a lt="host serializer">serialized</a>.)
 </ul>
+
+<div class=example id=example-host-parsing>
+ <p>A <a lt="host parser">parse</a>-<a lt="host serializer">serialize</a> roundtrip gives the
+ following results, depending on the <var ignore>isNotSpecial</var> argument to the
+ <a>host parser</a>:
+
+ <table>
+  <tr>
+   <th>Input
+   <th>Output (<var ignore>isNotSpecial</var> = false)
+   <th>Output (<var ignore>isNotSpecial</var> = true)
+  <tr>
+   <td><code>EXAMPLE.COM</code>
+   <td rowspan=2><code>example.com</code> (<a for=/>domain</a>)
+   <td><code>EXAMPLE.COM</code> (<a>opaque host</a>)
+  <tr>
+   <td><code>example%2Ecom</code>
+   <td><code>example%2Ecom</code> (<a>opaque host</a>)
+  <tr>
+   <td><code>faß.example</code>
+   <td><code>xn--fa-hia.example</code> (<a for=/>domain</a>)
+   <td><code>fa%C3%9F.example</code> (<a>opaque host</a>)
+  <tr>
+   <td><code>0</code>
+   <td rowspan=3><code>0.0.0.0</code> (<a for=/ lt="IPv4 address">IPv4</a>)
+   <td><code>0</code> (<a>opaque host</a>)
+  <tr>
+   <td><code>%30</code>
+   <td><code>%30</code> (<a>opaque host</a>)
+  <tr>
+   <td><code>0x</code>
+   <td><code>0x</code> (<a>opaque host</a>)
+  <tr>
+   <td><code>0xffffffff</code>
+   <td><code>255.255.255.255</code> (<a for=/ lt="IPv4 address">IPv4</a>)
+   <td><code>0xffffffff</code> (<a>opaque host</a>)
+  <tr>
+   <td><code>[0:0::1]</code>
+   <td colspan=2><code>[::1]</code> (<a for=/ lt="IPv6 address">IPv6</a>)
+  <tr>
+   <td><code>[0:0::1%5D</code>
+   <td colspan=2 rowspan=2>Failure
+  <tr>
+   <td><code>[0:0::%31]</code>
+  <tr>
+   <td><code>09</code>
+   <td rowspan=3>Failure
+   <td><code>09</code> (<a>opaque host</a>)
+  <tr>
+   <td><code>example.255</code>
+   <td><code>example.255</code> (<a>opaque host</a>)
+  <tr>
+   <td><code>example^example</code>
+   <td>Failure
+ </table>
+</div>
 
 
 <h3 id=host-representation>Host representation</h3>
 
-<p>A <dfn export id=concept-host>host</dfn> is a <a>domain</a>, an
-<a>IPv4 address</a>, an <a>IPv6 address</a>, an <a>opaque host</a>, or an <a>empty host</a>.
-Typically a <a for=/>host</a> serves as a network address, but it is sometimes used as opaque
-identifier in <a for=/>URLs</a> where a network address is not necessary.
+<p>A <dfn export id=concept-host>host</dfn> is a <a>domain</a>, an <a>IP address</a>, an
+<a>opaque host</a>, or an <a>empty host</a>. Typically a <a for=/>host</a> serves as a network
+address, but it is sometimes used as opaque identifier in <a for=/>URLs</a> where a network address
+is not necessary.
+
+<p class=example id=example-opaque-host-url>A typical <a for=/>URL</a> whose <a for=url>host</a> is
+an <a>opaque host</a> is <code>git://github.com/whatwg/url.git</code>.
 
 <p class=note>The RFCs referenced in the paragraphs below are for informative purposes only. They
 have no influence on <a for=/>host</a> writing, parsing, and serialization. Unless stated otherwise
@@ -400,8 +487,13 @@ in the sections that follow.
 realm within a network.
 [[RFC1034]]
 
+<p>The <dfn export lt="domain label">domain labels</dfn> of a <a>domain</a> <var>domain</var> are
+the result of <a>strictly splitting</a> <var>domain</var> on U+002E (.).
+
 <p class=note>The <code>example.com</code> and <code>example.com.</code> <a for=/>domains</a> are
 not equivalent and typically treated as distinct.
+
+<p>An <dfn export>IP address</dfn> is an <a>IPv4 address</a> or an <a>IPv6 address</a>.
 
 <p>An <dfn export id=concept-ipv4>IPv4 address</dfn> is a 32-bit unsigned integer that identifies a
 network address.
@@ -425,41 +517,57 @@ processing.
 <h3 id=host-miscellaneous>Host miscellaneous</h3>
 
 <p>A <dfn export>forbidden host code point</dfn> is U+0000 NULL, U+0009 TAB, U+000A LF, U+000D CR,
-U+0020 SPACE, U+0023 (#), U+0025 (%), U+002F (/), U+003A (:), U+003C (&lt;), U+003E (>), U+003F (?),
-U+0040 (@), U+005B ([), U+005C (\), U+005D (]), U+005E (^), or U+007C (|).
+U+0020 SPACE, U+0023 (#), U+002F (/), U+003A (:), U+003C (&lt;), U+003E (>), U+003F (?), U+0040 (@),
+U+005B ([), U+005C (\), U+005D (]), U+005E (^), or U+007C (|).
 
-<p>A <a for=/>host</a>'s <dfn for=host export>public suffix</dfn> is the portion of a
-<a for=/>host</a> which is included on the <cite>Public Suffix List</cite>. To obtain
-<var>host</var>'s <a for=host>public suffix</a>, run these steps: [[!PSL]]
+<p>A <dfn export>forbidden domain code point</dfn> is a <a>forbidden host code point</a>,
+a <a>C0 control</a>, U+0025 (%), or U+007F DELETE.
+
+<div algorithm>
+<p>To obtain the <dfn export for=host>public suffix</dfn> of a <a for=/>host</a> <var>host</var>,
+run these steps. They return null or a <a for=/>domain</a> representing a portion of <var>host</var>
+that is included on the <cite>Public Suffix List</cite>. [[!PSL]]
 
 <ol>
  <li><p>If <var>host</var> is not a <a>domain</a>, then return null.
 
+ <li><p>Let <var>trailingDot</var> be "<code>.</code>" if <var>host</var>
+ <a for=string>ends with</a> "<code>.</code>"; otherwise the empty string.
+
  <li><p>Let <var>publicSuffix</var> be the public suffix determined by running the
- <a href="https://publicsuffix.org/list/">Public Suffix List algorithm</a> with <var>host</var> as
- domain. [[!PSL]]
+ <a href="https://github.com/publicsuffix/list/wiki/Format#formal-algorithm">Public Suffix List algorithm</a>
+ with <var>host</var> as domain. [[!PSL]]
 
- <li><p>Assert: <var>publicSuffix</var> is an <a>ASCII string</a>.
+ <li><p>Assert: <var>publicSuffix</var> is an <a>ASCII string</a> that does not
+ <a for=string>end with</a> "<code>.</code>".
 
- <li><p>Return <var>publicSuffix</var>.
+ <li><p>Return <var>publicSuffix</var> and <var>trailingDot</var> concatenated.
 </ol>
+</div>
 
-<p>A <a for=/>host</a>'s <dfn for=host export>registrable domain</dfn> is a <a>domain</a> formed by
-the most specific public suffix, along with the domain label immediately preceding it, if any. To
-obtain <var>host</var>'s <a for=host>registrable domain</a>, run these steps:
+<div algorithm>
+<p>To obtain the <dfn export for=host>registrable domain</dfn> of a <a for=/>host</a>
+<var>host</var>, run these steps. They return null or a <a for=/>domain</a> formed by
+<var>host</var>'s <a for=host>public suffix</a> and the <a for=/>domain label</a> preceding it, if
+any.
 
 <ol>
  <li><p>If <var>host</var>'s <a for=host>public suffix</a> is null or <var>host</var>'s
  <a for=host>public suffix</a> <a for=host>equals</a> <var>host</var>, then return null.
 
+ <li><p>Let <var>trailingDot</var> be "<code>.</code>" if <var>host</var>
+ <a for=string>ends with</a> "<code>.</code>"; otherwise the empty string.
+
  <li><p>Let <var>registrableDomain</var> be the registrable domain determined by running the
- <a href="https://publicsuffix.org/list/">Public Suffix List algorithm</a> with <var>host</var> as
- domain. [[!PSL]]
+ <a href="https://github.com/publicsuffix/list/wiki/Format#formal-algorithm">Public Suffix List algorithm</a>
+ with <var>host</var> as domain. [[!PSL]]
 
- <li><p>Assert: <var>registrableDomain</var> is an <a>ASCII string</a>.
+ <li><p>Assert: <var>registrableDomain</var> is an <a>ASCII string</a> that does not
+ <a for=string>end with</a> "<code>.</code>".
 
- <li><p>Return <var>registrableDomain</var>.
+ <li><p>Return <var>registrableDomain</var> and <var>trailingDot</var> concatenated.
 </ol>
+</div>
 
 <div class=example id=example-host-psl>
  <table>
@@ -487,6 +595,10 @@ obtain <var>host</var>'s <a for=host>registrable domain</a>, run these steps:
    <td><code>EXAMPLE.COM</code>
    <td><code>com</code>
    <td><code>example.com</code>
+  <tr>
+   <td><code>example.com.</code>
+   <td><code>com.</code>
+   <td><code>example.com.</code>
   <tr>
    <td><code>github.io</code>
    <td><code>github.io</code>
@@ -519,20 +631,27 @@ for security decisions. The notion of "<a for=host>public suffix</a>" and
 "<a for=host>registrable domain</a>" cannot be relied-upon to provide a hard security boundary, as
 the public suffix list will diverge from client to client. Specifications which ignore this advice
 are encouraged to carefully consider whether URLs' schemes ought to be incorporated into any
-decisions made, i.e. whether to use the <a>same site</a> or <a>schemelessly same site</a> concepts.
+decisions made, i.e. whether to use the <a for=/>same site</a> or <a>schemelessly same site</a>
+concepts.
 
 
 <h3 id=idna>IDNA</h3>
 
 <p>The <dfn id=concept-domain-to-ascii>domain to ASCII</dfn> algorithm, given a <a>string</a>
-<var>domain</var> and an optional boolean <var>beStrict</var> (default false), runs these steps:
+<var>domain</var> and a boolean <var>beStrict</var>, runs these steps:
 
 <ol>
- <li><p>Let <var>result</var> be the result of running <a abstract-op lt=ToASCII>Unicode ToASCII</a>
- with <i>domain_name</i> set to <var>domain</var>, <i>UseSTD3ASCIIRules</i> set to
- <var>beStrict</var>, <i>CheckHyphens</i> set to false, <i>CheckBidi</i> set to true,
- <i>CheckJoiners</i> set to true, <i>Transitional_Processing</i> set to false,
- and <i>VerifyDnsLength</i> set to <var>beStrict</var>.
+ <li>
+  <p>Let <var>result</var> be the result of running <a abstract-op lt=ToASCII>Unicode ToASCII</a>
+  with <i>domain_name</i> set to <var>domain</var>, <i>UseSTD3ASCIIRules</i> set to
+  <var>beStrict</var>, <i>CheckHyphens</i> set to false, <i>CheckBidi</i> set to true,
+  <i>CheckJoiners</i> set to true, <i>Transitional_Processing</i> set to false,
+  and <i>VerifyDnsLength</i> set to <var>beStrict</var>. [[!UTS46]]
+
+  <p class=note>If <var>beStrict</var> is false, <var>domain</var> is an <a>ASCII string</a>, and
+  <a>strictly splitting</a> <var>domain</var> on U+002E (.) does not produce any
+  <a for=list>item</a> that <a for=string>starts with</a> an <a>ASCII case-insensitive</a> match for
+  "<code>xn--</code>", this step is equivalent to <a>ASCII lowercasing</a> <var>domain</var>.
 
  <li><p>If <var>result</var> is a failure value, <a>validation error</a>, return failure.
 
@@ -541,14 +660,19 @@ decisions made, i.e. whether to use the <a>same site</a> or <a>schemelessly same
  <li><p>Return <var>result</var>.
 </ol>
 
+<p class=note>This document and the web platform at large use
+<cite>Unicode IDNA Compatibility Processing</cite> and not IDNA2008. For instance,
+<code>☕.example</code> becomes <code>xn--53h.example</code> and not failure. [[UTS46]] [[RFC5890]]
+
 <p>The <dfn id=concept-domain-to-unicode>domain to Unicode</dfn> algorithm, given a <a>domain</a>
-<var>domain</var>, runs these steps:
+<var>domain</var> and a boolean <var>beStrict</var>, runs these steps:
 
 <ol>
  <li><p>Let <var>result</var> be the result of running
  <a abstract-op lt=ToUnicode>Unicode ToUnicode</a> with <i>domain_name</i> set to <var>domain</var>,
  <i>CheckHyphens</i> set to false, <i>CheckBidi</i> set to true, <i>CheckJoiners</i> set to true,
- <i>UseSTD3ASCIIRules</i> set to false, and <i>Transitional_Processing</i> set to false.
+ <i>UseSTD3ASCIIRules</i> set to <var>beStrict</var>, and <i>Transitional_Processing</i> set to
+ false. [[!UTS46]]
 
  <li><p>Signify <a>validation errors</a> for any returned errors, and then, return
  <var>result</var>.
@@ -569,10 +693,8 @@ decisions made, i.e. whether to use the <a>same site</a> or <a>schemelessly same
 
  <li><p>If <var>result</var> is failure, then return failure.
 
- <li><p>Set <var>result</var> to the result of running
- <a abstract-op lt=ToUnicode>Unicode ToUnicode</a> with <i>domain_name</i> set to <var>result</var>,
- <i>CheckHyphens</i> set to false, <i>CheckBidi</i> set to true, <i>CheckJoiners</i> set to true,
- <i>UseSTD3ASCIIRules</i> set to true, and <i>Transitional_Processing</i> set to false.
+ <li><p>Set <var>result</var> to the result of running <a>domain to Unicode</a> with
+ <var>result</var> and true.
 
  <li><p>If <var>result</var> contains any errors, return failure.
 
@@ -586,9 +708,9 @@ decisions made, i.e. whether to use the <a>same site</a> or <a>schemelessly same
 <p>A <dfn export oldids=syntax-host-domain>valid domain string</dfn> must be a string that is a
 <a>valid domain</a>.
 
-<p>A <dfn export oldids=syntax-host-ipv4>valid IPv4-address string</dfn> must be four sequences of
-up to three <a>ASCII digits</a> per sequence, each representing a decimal number no greater than
-255, and separated from each other by U+002E (.).
+<p>A <dfn export oldids=syntax-host-ipv4>valid IPv4-address string</dfn> must be four shortest
+possible strings of <a>ASCII digits</a>, representing a decimal number in the range 0 to 255,
+inclusive, separated from each other by U+002E (.).
 
 <p>A <dfn export oldids=syntax-host-ipv6>valid IPv6-address string</dfn> is defined in the
 <a href="https://tools.ietf.org/html/rfc4291#section-2.2">"Text Representation of Addresses" chapter of IP Version 6 Addressing Architecture</a>.
@@ -605,15 +727,16 @@ up to three <a>ASCII digits</a> per sequence, each representing a decimal number
  <li><p>U+005B ([), followed by a <a>valid IPv6-address string</a>, followed by U+005D (]).
 </ul>
 
-<p class="note no-backref">This is not part of the definition of <a>valid host string</a> as it
-requires context to be distinguished.
+<p class=note>This is not part of the definition of <a>valid host string</a> as it requires context
+to be distinguished.
 
 
 <h3 id=host-parsing>Host parsing</h3>
 
+<div algorithm>
 <p>The <dfn export id=concept-host-parser lt="host parser|host parsing">host parser</dfn> takes a
-string <var>input</var> with an optional boolean <var>isNotSpecial</var> (default false), and then
-runs these steps:
+<a>scalar value string</a> <var>input</var> with an optional boolean <var>isNotSpecial</var>
+(default false), and then runs these steps. They return failure or a <a for=/>host</a>.
 
 <ol>
  <li>
@@ -635,40 +758,31 @@ runs these steps:
   <p>Let <var>domain</var> be the result of running <a>UTF-8 decode without BOM</a> on the
   <a for=string>percent-decoding</a> of <var>input</var>.
 
-  <p class="note no-backref">Alternatively <a>UTF-8 decode without BOM or fail</a> can be used,
-  coupled with an early return for failure, as <a>domain to ASCII</a> fails on
-  U+FFFD REPLACEMENT CHARACTER.
+  <p class=note>Alternatively <a>UTF-8 decode without BOM or fail</a> can be used, coupled with an
+  early return for failure, as <a>domain to ASCII</a> fails on U+FFFD (�).
 
- <li><p>Let <var>asciiDomain</var> be the result of running
- <a>domain to ASCII</a> on <var>domain</var>.
+ <li><p>Let <var>asciiDomain</var> be the result of running <a>domain to ASCII</a> with
+ <var>domain</var> and false.
 
  <li><p>If <var>asciiDomain</var> is failure, <a>validation error</a>, return failure.
 
- <li><p>If <var>asciiDomain</var> contains a <a>forbidden host code point</a>,
+ <li><p>If <var>asciiDomain</var> contains a <a>forbidden domain code point</a>,
  <a>validation error</a>, return failure.
 
- <li><p>Let <var>ipv4Host</var> be the result of <a lt="IPv4 parser">IPv4 parsing</a>
- <var>asciiDomain</var>.
-
- <li><p>If <var>ipv4Host</var> is an <a>IPv4 address</a> or failure, return
- <var>ipv4Host</var>.
+ <li><p>If <var>asciiDomain</var> <a lt="ends in a number checker">ends in a number</a>, then return
+ the result of <a lt="IPv4 parser">IPv4 parsing</a> <var>asciiDomain</var>.
 
  <li><p>Return <var>asciiDomain</var>.
 </ol>
+</div>
 
 <hr>
 
-<p>The <dfn id=concept-ipv4-parser>IPv4 parser</dfn> takes a string <var>input</var> and then runs
-these steps:
+<div algorithm>
+<p>The <dfn>ends in a number checker</dfn> takes an <a>ASCII string</a> <var>input</var> and then
+runs these steps. They return a boolean.
 
 <ol>
- <li>
-  <p>Let <var>validationError</var> be false.
-
-  <p class="note no-backref">This uses <var>validationError</var> to track <a>validation errors</a>
-  to avoid reporting them before we are confident we want to parse <var>input</var> as an IPv4
-  address as the <a>host parser</a> almost always invokes the <a>IPv4 parser</a>.
-
  <li><p>Let <var>parts</var> be the result of <a>strictly splitting</a> <var>input</var> on
  U+002E (.).
 
@@ -676,7 +790,46 @@ these steps:
   <p>If the last <a for=list>item</a> in <var>parts</var> is the empty string, then:
 
   <ol>
-   <li><p>Set <var>validationError</var> to true.
+   <li><p>If <var>parts</var>'s <a for=list>size</a> is 1, then return false.
+
+   <li><p><a for=list>Remove</a> the last <a for=list>item</a> from <var>parts</var>.
+  </ol>
+
+ <li><p>Let <var>last</var> be the last <a for=list>item</a> in <var>parts</var>.
+
+ <li>
+  <p>If <var>last</var> is non-empty and contains only <a>ASCII digits</a>, then return true.
+
+  <p class=note>The erroneous input "<code>09</code>" will be caught by the <a>IPv4 parser</a> at a
+  later stage.
+
+ <li>
+  <p>If parsing <var>last</var> as an <a lt="IPv4 number parser">IPv4 number</a> does not return
+  failure, then return true.
+
+  <p class=note>This is equivalent to checking that <var>last</var> is "<code>0X</code>" or
+  "<code>0x</code>", followed by zero or more <a>ASCII hex digits</a>.
+
+ <li><p>Return false.
+</ol>
+</div>
+
+<div algorithm>
+<p>The <dfn id=concept-ipv4-parser>IPv4 parser</dfn> takes an <a>ASCII string</a> <var>input</var>
+and then runs these steps. They return failure or an <a for=/>IPv4 address</a>.
+
+<p class=note>The <a for=/>IPv4 parser</a> is not to be invoked directly. Instead check that the
+return value of the <a for=/>host parser</a> is an <a for=/>IPv4 address</a>.
+
+<ol>
+ <li><p>Let <var>parts</var> be the result of <a>strictly splitting</a> <var>input</var> on
+ U+002E (.).
+
+ <li>
+  <p>If the last <a for=list>item</a> in <var>parts</var> is the empty string, then:
+
+  <ol>
+   <li><p><a>Validation error</a>.
 
    <li><p>If <var>parts</var>'s <a for=list>size</a> is greater than 1, then <a for=list>remove</a>
    the last <a for=list>item</a> from <var>parts</var>.
@@ -684,7 +837,8 @@ these steps:
         but if it somehow is this conditional makes sure we can keep going. -->
   </ol>
 
- <li><p>If <var>parts</var>'s <a for=list>size</a> is greater than 4, then return <var>input</var>.
+ <li><p>If <var>parts</var>'s <a for=list>size</a> is greater than 4, <a>validation error</a>,
+ return failure.
 
  <li><p>Let <var>numbers</var> be an empty <a for=/>list</a>.
 
@@ -692,28 +846,15 @@ these steps:
   <p><a for=list>For each</a> <var>part</var> of <var>parts</var>:
 
   <ol>
-   <li>
-    <p>If <var>part</var> is the empty string, then return <var>input</var>.
-
-    <p class="example no-backref" id=example-c2afe535><code>0..0x300</code> is a
-    <a>domain</a>, not an <a>IPv4 address</a>.
-
    <li><p>Let <var>result</var> be the result of <a lt="IPv4 number parser">parsing</a>
    <var>part</var>.
 
-   <li><p>If <var>result</var> is failure, then return <var>input</var>.
+   <li><p>If <var>result</var> is failure, <a>validation error</a>, return failure.
 
-   <li><p>If <var>result</var>[1] is true, then set <var>validationError</var> to true.
+   <li><p>If <var>result</var>[1] is true, <a>validation error</a>.
 
    <li><p><a for=list>Append</a> <var>result</var>[0] to <var>numbers</var>.
   </ol>
-
- <li>
-  <p>If <var>validationError</var> is true, <a>validation error</a>.
-
-  <p class="note">At this point each part was parsed into a number and <var>input</var> will be
-  treated as an IPv4 address (or failure). And therefore error reporting resumes.
- </li>
 
  <li><p>If any item in <var>numbers</var> is greater than 255, <a>validation error</a>.
 
@@ -742,17 +883,22 @@ these steps:
 
  <li><p>Return <var>ipv4</var>.
 </ol>
+</div>
 
-<p>The <dfn>IPv4 number parser</dfn> takes a string <var>input</var> and then runs these steps:
+<div algorithm>
+<p>The <dfn>IPv4 number parser</dfn> takes an <a>ASCII string</a> <var>input</var> and then runs
+these steps:
 
 <ol>
+ <li><p>If <var>input</var> is the empty string, then return failure.
+
  <li><p>Let <var>validationError</var> be false.
 
  <li><p>Let <var>R</var> be 10.
 
  <li>
   <p>If <var>input</var> contains at least two code points and the first two code points are either
-  "<code>0x</code>" or "<code>0X</code>", then:
+  "<code>0X</code>" or "<code>0x</code>", then:
 
   <ol>
    <li><p>Set <var>validationError</var> to true.
@@ -775,7 +921,7 @@ these steps:
    <li><p>Set <var>R</var> to 8.
   </ol>
 
- <li><p>If <var>input</var> is the empty string, then return 0.
+ <li><p>If <var>input</var> is the empty string, then return (0, true).
  <!-- 0x/0X is an IPv4 number apparently -->
 
  <li><p>If <var>input</var> contains a code point that is not a radix-<var>R</var> digit, then
@@ -790,11 +936,16 @@ these steps:
 
  <li><p>Return (<var>output</var>, <var>validationError</var>).
 </ol>
+</div>
 
 <hr>
 
-<p>The <dfn id=concept-ipv6-parser>IPv6 parser</dfn> takes a string <var>input</var> and
-then runs these steps:
+<div algorithm>
+<p>The <dfn id=concept-ipv6-parser>IPv6 parser</dfn> takes a <a>scalar value string</a>
+<var>input</var> and then runs these steps. They return failure or an <a for=/>IPv6 address</a>.
+
+<p class=note>The <a for=/>IPv6 parser</a> could in theory be invoked directly, but please discuss
+actually doing that with the editors of this document first.
 
 <ol>
  <li><p>Let <var>address</var> be a new <a>IPv6 address</a> whose <a>IPv6 pieces</a> are all 0.
@@ -940,14 +1091,17 @@ then runs these steps:
 
  <li><p>Return <var>address</var>.
 </ol>
+</div>
 
 <hr>
 
-<p>The <dfn export id=concept-opaque-host-parser>opaque-host parser</dfn> takes a string
-<var>input</var>, and then runs these steps:
+<div algorithm>
+<p>The <dfn export id=concept-opaque-host-parser>opaque-host parser</dfn> takes a
+<a>scalar value string</a> <var>input</var>, and then runs these steps. They return failure or an
+<a for=/>opaque host</a>.
 
 <ol>
- <li><p>If <var>input</var> contains a <a>forbidden host code point</a> excluding U+0025 (%),
+ <li><p>If <var>input</var> contains a <a>forbidden host code point</a>,
  <a>validation error</a>, return failure.
 
  <li><p>If <var>input</var> contains a <a>code point</a> that is not a <a>URL code point</a> and not
@@ -959,12 +1113,13 @@ then runs these steps:
  <li><p>Return the result of running <a for=string>UTF-8 percent-encode</a> on <var>input</var>
  using the <a>C0 control percent-encode set</a>.
 </ol>
+</div>
 
 
 <h3 id=host-serializing>Host serializing</h3>
 
 <p>The <dfn id=concept-host-serializer lt="host serializer">host serializer</dfn> takes a
-<a for=/>host</a> <var>host</var> and then runs these steps:
+<a for=/>host</a> <var>host</var> and then runs these steps. They return an <a>ASCII string</a>.
 
 <ol>
  <li><p>If <var>host</var> is an <a>IPv4 address</a>, return the result of
@@ -977,8 +1132,8 @@ then runs these steps:
  return <var>host</var>.
 </ol>
 
-The <dfn id=concept-ipv4-serializer>IPv4 serializer</dfn> takes an
-<a>IPv4 address</a> <var>address</var> and then runs these steps:
+The <dfn id=concept-ipv4-serializer>IPv4 serializer</dfn> takes an <a>IPv4 address</a>
+<var>address</var> and then runs these steps. They return an <a>ASCII string</a>.
 
 <ol>
  <li><p>Let <var>output</var> be the empty string.
@@ -1000,8 +1155,8 @@ The <dfn id=concept-ipv4-serializer>IPv4 serializer</dfn> takes an
  <li><p>Return <var>output</var>.
 </ol>
 
-<p>The <dfn id=concept-ipv6-serializer>IPv6 serializer</dfn> takes an
-<a>IPv6 address</a> <var>address</var> and then runs these steps:
+<p>The <dfn id=concept-ipv6-serializer>IPv6 serializer</dfn> takes an <a>IPv6 address</a>
+<var>address</var> and then runs these steps. They return an <a>ASCII string</a>.
 
 <ol>
  <li><p>Let <var>output</var> be the empty string.
@@ -1058,9 +1213,9 @@ A Recommendation for IPv6 Address Text Representation.
 
 <h3 id=host-equivalence>Host equivalence</h3>
 
-To determine whether a <a for=/>host</a> <var>A</var>
-<dfn export for=host id=concept-host-equals lt=equal>equals</dfn> <var>B</var>, return true if
-<var>A</var> is <var>B</var>, and false otherwise.
+<p>To determine whether a <a for=/>host</a> <var>A</var>
+<dfn export for=host id=concept-host-equals lt=equal>equals</dfn> <a for=/>host</a> <var>B</var>,
+return true if <var>A</var> is <var>B</var>, and false otherwise.
 
 <p class=XXX>Certificate comparison requires a host equivalence check that ignores the
 trailing dot of a domain (if any). However, those hosts have also various other facets
@@ -1079,8 +1234,8 @@ unified model would be, please file an issue.
 <a>URL serializer</a> relate as follows:
 
 <ul>
- <li><p>The <a>URL parser</a> takes an arbitrary string and returns either failure or a
- <a for=/>URL</a>.
+ <li><p>The <a>URL parser</a> takes an arbitrary <a>scalar value string</a> and returns either
+ failure or a <a for=/>URL</a>. It might also record zero or more <a>validation errors</a>.
 
  <li><p>A <a for=/>URL</a> can be seen as the in-memory representation.
 
@@ -1090,7 +1245,8 @@ unified model would be, please file an issue.
 
  <li><p>The <a>URL serializer</a> takes a <a for=/>URL</a> and returns an <a>ASCII string</a>. (If
  that string is then <a lt="URL parser">parsed</a>, the result will <a for=url>equal</a> the <a
- for=/>URL</a> that was <a lt="URL serializer">serialized</a>.)
+ for=/>URL</a> that was <a lt="URL serializer">serialized</a>.) The output of the
+ <a>URL serializer</a> is not always a <a>valid URL string</a>.
 </ul>
 
 <div class=example id=example-url-parsing>
@@ -1190,6 +1346,21 @@ unified model would be, please file an issue.
    <td>
    <td>✅
    <td><code>https://example.org//</code>
+  <tr>
+   <td><code>https://example.com/[]?[]#[]</code>
+   <td>
+   <td>❌
+   <td><code>https://example.com/[]?[]#[]</code>
+  <tr>
+   <td><code>https://example/%?%#%</code>
+   <td>
+   <td>❌
+   <td><code>https://example/%?%#%</code>
+  <tr>
+   <td><code>https://example/%25?%25#%25</code>
+   <td>
+   <td>✅
+   <td><code>https://example/%25?%25#%25</code>
  </table>
 
  <p>The base and output <a lt="URL record">URL</a> are represented in
@@ -1199,8 +1370,9 @@ unified model would be, please file an issue.
 
 <h3 id=url-representation>URL representation</h3>
 
-<p>A <dfn export id=concept-url lt="URL|URL record">URL</dfn> is a universal identifier. To
-disambiguate from a <a>valid URL string</a> it can also be referred to as a <a for=/>URL record</a>.
+<p>A <dfn export id=concept-url lt="URL|URL record">URL</dfn> is a <a for=/>struct</a> that
+represents a universal identifier. To disambiguate from a <a>valid URL string</a> it can also be
+referred to as a <a for=/>URL record</a>.
 
 <p>A <a for=/>URL</a>'s <dfn export for=url id=concept-url-scheme>scheme</dfn> is an
 <a>ASCII string</a> that identifies the type of <a for=/>URL</a> and can be used to
@@ -1261,12 +1433,13 @@ It is initially the empty string.
 <p>A  <a for=/>URL</a>'s <dfn export for=url id=concept-url-port>port</dfn> is either
 null or a 16-bit unsigned integer that identifies a networking port. It is initially null.
 
-<p>A <a for=/>URL</a>'s <dfn export for=url id=concept-url-path>path</dfn> is a <a for=/>list</a> of
-zero or more <a>ASCII strings</a>, usually identifying a location in hierarchical form. It is
-initially empty.
+<p>A <a for=/>URL</a>'s
+<dfn export for=url id=concept-url-path oldids=non-relative-flag,url-cannot-be-a-base-url-flag>path</dfn>
+is either a <a>URL path segment</a> or a <a for=/>list</a> of zero or more <a>URL path segments</a>,
+usually identifying a location. It is initially « ».
 
-<p class="note no-backref">A <a lt="is special">special</a> <a for=/>URL</a> always has a
-<a for=list lt="is empty">non-empty</a> <a for=url>path</a>.
+<p class=note>A <a lt="is special">special</a> <a for=/>URL</a>'s <a for=url>path</a> is always a
+<a for=/>list</a>, i.e., it is never <a for=url lt="opaque path">opaque</a>.
 
 <p>A  <a for=/>URL</a>'s <dfn export for=url id=concept-url-query>query</dfn> is either
 null or an <a>ASCII string</a>. It is initially null.
@@ -1275,18 +1448,13 @@ null or an <a>ASCII string</a>. It is initially null.
 an <a>ASCII string</a> that can be used for further processing on the resource the
 <a for=/>URL</a>'s other components identify. It is initially null.
 
-<p id=non-relative-flag>A <a for=/>URL</a> also has an associated boolean
-<dfn export for=url id=url-cannot-be-a-base-url-flag>cannot-be-a-base-URL</dfn>. It is initially
-false.
-
 <p>A <a for=/>URL</a> also has an associated
 <dfn export for=url id=concept-url-blob-entry>blob URL entry</dfn> that is either null or a
 <a for=/>blob URL entry</a>. It is initially null.
 
-<p class="note no-backref">This is used to support caching the object a "<code>blob</code>" URL
-refers to as well as its origin. It is important that these are cached as the <a for=/>URL</a> might
-be removed from the <a>blob URL store</a> between parsing and fetching, while fetching will still
-need to succeed.
+<p class=note>This is used to support caching the object a "<code>blob</code>" URL refers to as well
+as its origin. It is important that these are cached as the <a for=/>URL</a> might be removed from
+the <a>blob URL store</a> between parsing and fetching, while fetching will still need to succeed.
 
 <div class=example id=example-url-components>
  <p>The following table lists how <a>valid URL strings</a>, when <a lt="URL parser">parsed</a>, map
@@ -1303,7 +1471,6 @@ need to succeed.
    <th><a for=url>Path</a>
    <th><a for=url>Query</a>
    <th><a for=url>Fragment</a>
-   <th><a for=url>Cannot-be-a-base-URL</a>
   <tr>
    <td><code>https://example.com/</code>
    <td>"<code>https</code>"
@@ -1312,7 +1479,6 @@ need to succeed.
    <td>« the empty string »
    <td>null
    <td>null
-   <td>false
   <tr>
    <td><code>https://localhost:8000/search?q=text#hello</code>
    <td>"<code>https</code>"
@@ -1321,16 +1487,14 @@ need to succeed.
    <td>« "<code>search</code>" »
    <td>"<code>q=text</code>"
    <td>"<code>hello</code>"
-   <td>false
   <tr>
    <td><code>urn:isbn:9780307476463</code>
    <td>"<code>urn</code>"
    <td>null
    <td>null
-   <td>« "<code>isbn:9780307476463</code>" »
+   <td>"<code>isbn:9780307476463</code>"
    <td>null
    <td>null
-   <td>true
   <tr>
    <td><code>file:///ada/Analytical%20Engine/README.md
    <td>"<code>file</code>"
@@ -1339,20 +1503,37 @@ need to succeed.
    <td>« "<code>ada</code>", "<code>Analytical%20Engine</code>", "<code>README.md</code>" »
    <td>null
    <td>null
-   <td>false
  </table>
 </div>
+
+<hr>
+
+<p>A <dfn export>URL path segment</dfn> is an <a for=/>ASCII string</a>. It commonly refers to a
+directory or a file, but has no predefined meaning.
+
+<p>A
+<dfn export id=single-dot-path-segment oldids=syntax-url-path-segment-dot>single-dot URL path segment</dfn>
+is a <a for=/>URL path segment</a> that is "<code>.</code>" or an <a>ASCII case-insensitive</a>
+match for "<code>%2e</code>".
+<!-- "." is not a code point here -->
+
+<p>A
+<dfn export id=double-dot-path-segment oldids=syntax-url-path-segment-dotdot>double-dot URL path segment</dfn>
+is a <a for=/>URL path segment</a> that is "<code>..</code>" or an <a>ASCII case-insensitive</a>
+match for "<code>.%2e</code>", "<code>%2e.</code>", or "<code>%2e%2e</code>".
+<!-- Referenced by EPUB. -->
 
 
 <h3 id=url-miscellaneous>URL miscellaneous</h3>
 
-<p>A <dfn export>special scheme</dfn> is a <a for=url>scheme</a> listed in the first column of
-the following table. A <dfn>default port</dfn> is a <a>special scheme</a>'s corresponding
-<a for=url>port</a> and is listed in the second column on the same row.
+<p>A <dfn export>special scheme</dfn> is an <a>ASCII string</a> that is listed in the first column
+of the following table. The <dfn export>default port</dfn> for a <a>special scheme</a> is listed in
+the second column on the same row. The <a>default port</a> for any other <a>ASCII string</a> is
+null.
 
 <table>
- <tr><th><a for=url>scheme</a>
-     <th><a for=url>port</a>
+ <tr><th><a>Special scheme</a>
+     <th><a>Default port</a>
  <tr><td>"<code>ftp</code>"<td>21
  <tr><td>"<code>file</code>"<td>null
  <tr><td>"<code>http</code>"<td>80
@@ -1370,14 +1551,17 @@ not a <a>special scheme</a>.
 <a for=url>username</a> or <a for=url>password</a> is not the empty string.
 <!-- also used by Fetch -->
 
+<p>A <a for=/>URL</a> has an <dfn export for=url>opaque path</dfn> if its <a for=url>path</a> is a
+<a for=/>URL path segment</a>.
+
 <p>A <a for=/>URL</a> <dfn export>cannot have a username/password/port</dfn> if its
-<a for=url>host</a> is null or the empty string, its <a for=url>cannot-be-a-base-URL</a> is true, or
-its <a for=url>scheme</a> is "<code>file</code>".
+<a for=url>host</a> is null or the empty string, or its <a for=url>scheme</a> is
+"<code>file</code>".
 
 <p>A <a for=/>URL</a> can be designated as <dfn id=concept-base-url>base URL</dfn>.
 
-<p class="note no-backref">A <a>base URL</a> is useful for the <a>URL parser</a> when the
-input might be a <a>relative-URL string</a>.
+<p class=note>A <a>base URL</a> is useful for the <a>URL parser</a> when the input might be a
+<a>relative-URL string</a>.
 
 <hr>
 
@@ -1421,15 +1605,15 @@ if all of the following are true:
 <p id=pop-a-urls-path>To <dfn local-lt=shorten>shorten a <var>url</var>'s path</dfn>:
 
 <ol>
- <li><p>Let <var>path</var> be <var>url</var>'s <a for=url>path</a>.
+ <li><p><a for=/>Assert</a>: <var>url</var> does not have an <a for=url>opaque path</a>.
 
- <li><p>If <var>path</var> <a for=list>is empty</a>, then return.
+ <li><p>Let <var>path</var> be <var>url</var>'s <a for=url>path</a>.
 
  <li><p>If <var>url</var>'s <a for=url>scheme</a> is "<code>file</code>", <var>path</var>'s
  <a for=list>size</a> is 1, and <var>path</var>[0] is a <a>normalized Windows drive letter</a>, then
  return.
 
- <li><p><a for=list>Remove</a> <var>path</var>'s last item.
+ <li><p><a for=list>Remove</a> <var>path</var>'s last item, if any.
 </ol>
 
 
@@ -1492,8 +1676,8 @@ switching on <a>base URL</a>'s <a for=url>scheme</a>:
 
 <p>any optionally followed by U+003F (?) and a <a>URL-query string</a>.
 
-<p class="note no-backref">A non-null <a>base URL</a> is necessary when
-<a lt="URL parser">parsing</a> a <a>relative-URL string</a>.
+<p class=note>A non-null <a>base URL</a> is necessary when <a lt="URL parser">parsing</a> a
+<a>relative-URL string</a>.
 
 <p>A <dfn export>scheme-relative-special-URL string</dfn> must be "<code>//</code>", followed by a
 <a>valid host string</a>, optionally followed by U+003A (:) and a <a>URL-port string</a>, optionally
@@ -1544,18 +1728,10 @@ following:
 
 <ul class=brief>
  <li><p>zero or more <a>URL units</a> excluding U+002F (/) and U+003F (?), that together are not a
- <a>single-dot path segment</a> or a <a>double-dot path segment</a>.
- <li><p>a <a>single-dot path segment</a>
- <li><p>a <a>double-dot path segment</a>.
+ <a>single-dot URL path segment</a> or a <a>double-dot URL path segment</a>.
+ <li><p>a <a>single-dot URL path segment</a>
+ <li><p>a <a>double-dot URL path segment</a>.
 </ul>
-
-<p>A <dfn export oldids=syntax-url-path-segment-dot>single-dot path segment</dfn> must be
-"<code>.</code>" or an <a>ASCII case-insensitive</a> match for "<code>%2e</code>".
-<!-- "." is not a code point here -->
-
-<p>A <dfn export oldids=syntax-url-path-segment-dotdot>double-dot path segment</dfn> must be
-"<code>..</code>" or an <a>ASCII case-insensitive</a> match for "<code>.%2e</code>",
-"<code>%2e.</code>", or "<code>%2e%2e</code>".
 
 <p>A <dfn export oldids=syntax-url-query>URL-query string</dfn> must be zero or more <a>URL units</a>.
 
@@ -1617,21 +1793,20 @@ different document encoding. Using the <a>UTF-8</a> encoding everywhere solves t
 
 <hr>
 
-<p class="note no-backref">There is no way to express a <a for=url>username</a> or
-<a for=url>password</a> of a <a for=/>URL record</a> within a <a>valid URL string</a>.
+<p class=note>There is no way to express a <a for=url>username</a> or <a for=url>password</a> of a
+<a for=/>URL record</a> within a <a>valid URL string</a>.
 
 
 <h3 id=url-parsing>URL parsing</h3>
 
-<p>The <dfn export id=concept-url-parser lt="URL parser">URL parser</dfn> takes a string
-<var>input</var>, with an optional null or <a>base URL</a> <var>base</var> (default null) and an
-optional <a for=/>encoding</a> <var>encoding</var> (default <a>UTF-8</a>), and then runs these
-steps:
+<p>The <dfn export id=concept-url-parser lt="URL parser">URL parser</dfn> takes a
+<a>scalar value string</a> <var>input</var>, with an optional null or <a>base URL</a>
+<var>base</var> (default null) and an optional <a for=/>encoding</a> <var>encoding</var> (default
+<a>UTF-8</a>), and then runs these steps:
 
-<p class="note no-backref">Non-web-browser implementations only need to implement the
-<a>basic URL parser</a>.
+<p class=note>Non-web-browser implementations only need to implement the <a>basic URL parser</a>.
 
-<p class="note no-backref">How user input in the web browser's address bar is converted to a
+<p class=note>How user input in the web browser's address bar is converted to a
 <a for=/>URL record</a> is out-of-scope of this standard. This standard does include
 <a href="#url-rendering">URL rendering requirements</a> as they pertain trust decisions.
 
@@ -1654,15 +1829,15 @@ steps:
 <hr>
 
 <p>The <dfn export id=concept-basic-url-parser lt="basic URL parser">basic URL parser</dfn> takes a
-string <var>input</var>, with an optional null or <a>base URL</a> <var>base</var> (default null), an
-optional <a for=/>encoding</a> <var>encoding</var> (default <a>UTF-8</a>), an optional
-<a for=/>URL</a> <dfn export for="basic URL parser"><var>url</var></dfn>, and an optional
-state override <dfn export for="basic URL parser"><var>state override</var></dfn>, and then runs
-these steps:
+<a>scalar value string</a> <var>input</var>, with an optional null or <a>base URL</a>
+<var>base</var> (default null), an optional <a for=/>encoding</a> <var>encoding</var> (default
+<a>UTF-8</a>), an optional <a for=/>URL</a> <dfn export for="basic URL parser"><var>url</var></dfn>,
+and an optional state override <dfn export for="basic URL parser"><var>state override</var></dfn>,
+and then runs these steps:
 
-<div class="note no-backref">
+<div class=note>
  <p>The <var>encoding</var> argument is a legacy concept only relevant for <cite>HTML</cite>. The
- <var>url</var> and <var>state override</var> arguments are only for use by various APIs. [[!HTML]]
+ <var>url</var> and <var>state override</var> arguments are only for use by various APIs. [[HTML]]
  <!-- HTMLHyperlinkElementUtils, Location, and URL -->
 
  <p>When the <var>url</var> and <var>state override</var> arguments are not passed, the
@@ -1706,7 +1881,7 @@ these steps:
   <var>pointer</var> by 1 and continue with the state machine.
 
   <dl class=switch>
-   <dt><dfn>scheme start state</dfn>
+   <dt><dfn export for="basic URL parser" id=scheme-start-state>scheme start state</dfn>
    <dd>
     <ol>
      <li><p>If <a>c</a> is an <a>ASCII alpha</a>,
@@ -1723,7 +1898,7 @@ these steps:
       {{Location/protocol}} setter.
     </ol>
 
-   <dt><dfn>scheme state</dfn>
+   <dt><dfn export for="basic URL parser" id=scheme-state>scheme state</dfn>
    <dd>
     <ol>
      <li><p>If <a>c</a> is an <a>ASCII alphanumeric</a>, U+002B (+), U+002D (-), or U+002E (.),
@@ -1776,11 +1951,14 @@ these steps:
 
        <li>
         <p>Otherwise, if <var>url</var> <a>is special</a>, <var>base</var> is non-null, and
-        <var>base</var>'s <a for=url>scheme</a> is equal to <var>url</var>'s <a for=url>scheme</a>,
-        set <var>state</var> to <a>special relative or authority state</a>.
+        <var>base</var>'s <a for=url>scheme</a> is <var>url</var>'s <a for=url>scheme</a>:
 
-        <p class=note>This means that <var>base</var>'s <a for=url>cannot-be-a-base-URL</a> is
-        false.
+        <ol>
+         <li><p><a for=/>Assert</a>: <var>base</var> is <a>is special</a> (and therefore does not
+         have an <a for=url>opaque path</a>).
+
+         <li><p>Set <var>state</var> to <a>special relative or authority state</a>.
+        </ol>
 
        <li><p>Otherwise, if <var>url</var> <a>is special</a>, set <var>state</var> to
        <a>special authority slashes state</a>.
@@ -1788,9 +1966,8 @@ these steps:
        <li><p>Otherwise, if <a>remaining</a> starts with an U+002F (/), set <var>state</var> to
        <a>path or authority state</a> and increase <var>pointer</var> by 1.
 
-       <li><p>Otherwise, set <var>url</var>'s <a for=url>cannot-be-a-base-URL</a> to true,
-       <a for=list>append</a> an empty string to <var>url</var>'s <a for=url>path</a>, and set
-       <var>state</var> to <a>cannot-be-a-base-URL path state</a>.
+       <li><p>Otherwise, set <var>url</var>'s <a for=url>path</a> to the empty string and set
+       <var>state</var> to <a>opaque path state</a>.
       </ol>
 
      <li><p>Otherwise, if <var>state override</var> is not given, set
@@ -1806,21 +1983,20 @@ these steps:
       is an intentional difference for defining that setter.
     </ol>
 
-   <dt><dfn>no scheme state</dfn>
+   <dt><dfn export for="basic URL parser" id=no-scheme-state>no scheme state</dfn>
    <dd>
     <ol>
-     <li><p>If <var>base</var> is null, or <var>base</var>'s <a for=url>cannot-be-a-base-URL</a> is
-     true and <a>c</a> is not U+0023 (#), <a>validation error</a>, return failure.
+     <li><p>If <var>base</var> is null, or <var>base</var> has an <a for=url>opaque path</a> and
+     <a>c</a> is not U+0023 (#), <a>validation error</a>, return failure.
 
-     <li><p>Otherwise, if <var>base</var>'s <a for=url>cannot-be-a-base-URL</a> is true and <a>c</a>
-     is U+0023 (#), set <var>url</var>'s <a for=url>scheme</a> to
+     <li><p>Otherwise, if <var>base</var> has an <a for=url>opaque path</a> and <a>c</a> is
+     U+0023 (#), set <var>url</var>'s <a for=url>scheme</a> to
      <var>base</var>'s <a for=url>scheme</a>,
-     <var>url</var>'s <a for=url>path</a> to a <a for=list>clone</a> of
+     <var>url</var>'s <a for=url>path</a> to
      <var>base</var>'s <a for=url>path</a>,
      <var>url</var>'s <a for=url>query</a> to
      <var>base</var>'s <a for=url>query</a>,
-     <var>url</var>'s <a for=url>fragment</a> to the empty string, set
-     <var>url</var>'s <a for=url>cannot-be-a-base-URL</a> to true, and set <var>state</var> to
+     <var>url</var>'s <a for=url>fragment</a> to the empty string, and set <var>state</var> to
      <a>fragment state</a>.
 
      <li><p>Otherwise, if <var>base</var>'s <a for=url>scheme</a> is not "<code>file</code>", set
@@ -1830,7 +2006,7 @@ these steps:
      by 1.
     </ol>
 
-   <dt><dfn>special relative or authority state</dfn>
+   <dt><dfn export for="basic URL parser" id=special-relative-or-authority-state>special relative or authority state</dfn>
    <dd>
     <ol>
      <li><p>If <a>c</a> is U+002F (/) and <a>remaining</a> starts with U+002F (/), then set
@@ -1841,7 +2017,7 @@ these steps:
      decrease <var>pointer</var> by 1.
     </ol>
 
-   <dt><dfn>path or authority state</dfn>
+   <dt><dfn export for="basic URL parser" id=path-or-authority-state>path or authority state</dfn>
    <dd>
     <ol>
      <li><p>If <a>c</a> is U+002F (/), then set <var>state</var> to <a>authority state</a>.
@@ -1850,9 +2026,11 @@ these steps:
      by 1.
     </ol>
 
-   <dt><dfn>relative state</dfn>
+   <dt><dfn export for="basic URL parser" id=relative-state>relative state</dfn>
    <dd>
     <ol>
+     <li><p>Assert: <var>base</var>'s <a for=url>scheme</a> is not "<code>file</code>".
+
      <li><p>Set <var>url</var>'s <a for=url>scheme</a> to <var>base</var>'s <a for=url>scheme</a>.
 
      <li><p>If <a>c</a> is U+002F (/), then set <var>state</var> to <a>relative slash state</a>.
@@ -1889,14 +2067,14 @@ these steps:
         <ol>
          <li><p>Set <var>url</var>'s <a for=url>query</a> to null.
 
-         <li><p><a for=list>Remove</a> <var>url</var>'s <a for=url>path</a>'s last item, if any.
+         <li><p><a>Shorten</a> <var>url</var>'s <a for=url>path</a>.
 
          <li><p>Set <var>state</var> to <a>path state</a> and decrease <var>pointer</var> by 1.
         </ol>
       </ol>
     </ol>
 
-   <dt><dfn>relative slash state</dfn>
+   <dt><dfn export for="basic URL parser" id=relative-slash-state>relative slash state</dfn>
    <dd>
     <ol>
      <li>
@@ -1923,7 +2101,7 @@ these steps:
      <var>state</var> to <a>path state</a>, and then, decrease <var>pointer</var> by 1.
     </ol>
 
-   <dt><dfn>special authority slashes state</dfn>
+   <dt><dfn export for="basic URL parser" id=special-authority-slashes-state>special authority slashes state</dfn>
    <dd>
     <ol>
      <li><p>If <a>c</a> is U+002F (/) and <a>remaining</a> starts with U+002F (/), then set
@@ -1934,7 +2112,7 @@ these steps:
      <a>special authority ignore slashes state</a> and decrease <var>pointer</var> by 1.
     </ol>
 
-   <dt><dfn>special authority ignore slashes state</dfn>
+   <dt><dfn export for="basic URL parser" id=special-authority-ignore-slashes-state>special authority ignore slashes state</dfn>
    <dd>
     <ol>
      <li><p>If <a>c</a> is neither U+002F (/) nor U+005C (\), then set <var>state</var> to
@@ -1943,7 +2121,7 @@ these steps:
      <li><p>Otherwise, <a>validation error</a>.
     </ol>
 
-   <dt><dfn>authority state</dfn>
+   <dt><dfn export for="basic URL parser" id=authority-state>authority state</dfn>
    <dd>
     <ol>
      <li>
@@ -1995,16 +2173,16 @@ these steps:
             idempotent:
             https://@/example.org/ -> https:///example.org/ -> https://example.org/ -->
 
-       <li><p>Decrease <var>pointer</var> by the number of code points in <var>buffer</var> plus
-       one, set <var>buffer</var> to the empty string, and set <var>state</var> to
-       <a>host state</a>.
+       <li><p>Decrease <var>pointer</var> by <var>buffer</var>'s
+       <a for=string>code point length</a> + 1, set <var>buffer</var> to the empty string, and set
+       <var>state</var> to <a>host state</a>.
       </ol>
 
      <li><p>Otherwise, append <a>c</a> to <var>buffer</var>.
     </ol>
 
-   <dt><dfn>host state</dfn>
-   <dt><dfn>hostname state</dfn>
+   <dt><dfn export for="basic URL parser" id=host-state>host state</dfn>
+   <dt><dfn export for="basic URL parser" id=hostname-state>hostname state</dfn>
    <dd>
     <ol>
      <li><p>If <var>state override</var> is given and <var>url</var>'s <a for=url>scheme</a> is
@@ -2018,6 +2196,9 @@ these steps:
        <li><p>If <var>buffer</var> is the empty string, <a>validation error</a>, return failure.
        <!-- No URLs with port, but without host. -->
 
+       <li><p>If <var>state override</var> is given and <var>state override</var> is
+       <a>hostname state</a>, then return.
+
        <li><p>Let <var>host</var> be the result of <a>host parsing</a> <var>buffer</var> with
        <var>url</var> <a>is not special</a>.
 
@@ -2026,9 +2207,6 @@ these steps:
        <li><p>Set <var>url</var>'s <a for=url>host</a> to
        <var>host</var>, <var>buffer</var> to the empty string,
        and <var>state</var> to <a>port state</a>.
-
-       <li><p>If <var>state override</var> is given and <var>state override</var> is
-       <a>hostname state</a>, then return.
       </ol>
 
      <li>
@@ -2049,7 +2227,7 @@ these steps:
 
        <li><p>Otherwise, if <var>state override</var> is given, <var>buffer</var> is the empty
        string, and either <var>url</var> <a>includes credentials</a> or <var>url</var>'s
-       <a for=url>port</a> is non-null, <a>validation error</a>, return.
+       <a for=url>port</a> is non-null, return.
 
        <li><p>Let <var>host</var> be the result of <a>host parsing</a> <var>buffer</var> with
        <var>url</var> <a>is not special</a>.
@@ -2075,7 +2253,7 @@ these steps:
       </ol>
     </ol>
 
-   <dt><dfn>port state</dfn>
+   <dt><dfn export for="basic URL parser" id=port-state>port state</dfn>
    <dd>
     <ol>
      <li><p>If <a>c</a> is an <a>ASCII digit</a>, append <a>c</a> to <var>buffer</var>.
@@ -2104,8 +2282,7 @@ these steps:
          <a>validation error</a>, return failure.
 
          <li><p>Set <var>url</var>'s <a for=url>port</a> to null, if <var>port</var> is
-         <var>url</var>'s <a for=url>scheme</a>'s <a>default port</a>, and to
-         <var>port</var> otherwise.
+         <var>url</var>'s <a for=url>scheme</a>'s <a>default port</a>; otherwise to <var>port</var>.
 
          <li><p>Set <var>buffer</var> to the empty string.
         </ol>
@@ -2118,7 +2295,7 @@ these steps:
      <li><p>Otherwise, <a>validation error</a>, return failure.
     </ol>
 
-   <dt><dfn>file state</dfn>
+   <dt><dfn export for="basic URL parser" id=file-state>file state</dfn>
    <dd>
     <ol>
      <li><p>Set <var>url</var>'s <a for=url>scheme</a> to "<code>file</code>".
@@ -2156,7 +2333,9 @@ these steps:
         <ol>
          <li><p>Set <var>url</var>'s <a for=url>query</a> to null.
 
-         <li><p>If the substring from <var>pointer</var> in <var>input</var> does not
+         <li><p>If the
+         <a lt="code point substring to the end of the string">code point substring</a> from
+         <var>pointer</var> to the end of <var>input</var> does not
          <a>start with a Windows drive letter</a>, then <a>shorten</a> <var>url</var>'s
          <a for=url>path</a>.
 
@@ -2166,7 +2345,7 @@ these steps:
           <ol>
            <li><p><a>Validation error</a>.
 
-           <li><p>Set <var>url</var>'s <a for=url>path</a> to an empty list.
+           <li><p>Set <var>url</var>'s <a for=url>path</a> to « ».
           </ol>
 
           <p class=note>This is a (platform-independent) Windows drive letter quirk.
@@ -2179,7 +2358,7 @@ these steps:
      by 1.
     </ol>
 
-   <dt><dfn>file slash state</dfn>
+   <dt><dfn export for="basic URL parser" id=file-slash-state>file slash state</dfn>
    <dd>
     <ol>
      <li>
@@ -2203,7 +2382,8 @@ these steps:
          <li><p>Set <var>url</var>'s <a for=url>host</a> to <var>base</var>'s <a for=url>host</a>.
 
          <li>
-          <p>If the substring from <var>pointer</var> in <var>input</var> does not
+          <p>If the <a lt="code point substring to the end of the string">code point substring</a>
+          from <var>pointer</var> to the end of <var>input</var> does not
           <a>start with a Windows drive letter</a> and <var>base</var>'s <a for=url>path</a>[0] is a
           <a>normalized Windows drive letter</a>, then <a for=list>append</a> <var>base</var>'s
           <a for=url>path</a>[0] to <var>url</var>'s <a for=url>path</a>.
@@ -2216,7 +2396,7 @@ these steps:
       </ol>
     </ol>
 
-   <dt><dfn>file host state</dfn>
+   <dt><dfn export for="basic URL parser" id=file-host-state>file host state</dfn>
    <dd>
     <ol>
      <li>
@@ -2267,7 +2447,7 @@ these steps:
      <li><p>Otherwise, append <a>c</a> to <var>buffer</var>.
     </ol>
 
-   <dt><dfn>path start state</dfn>
+   <dt><dfn export for="basic URL parser" id=path-start-state>path start state</dfn>
    <dd>
     <ol>
      <li>
@@ -2298,9 +2478,13 @@ these steps:
 
        <li><p>If <a>c</a> is not U+002F (/), then decrease <var>pointer</var> by 1.
       </ol>
+
+     <li><p>Otherwise, if <var>state override</var> is given and <var>url</var>'s
+     <a for=url>host</a> is null, <a for=list>append</a> the empty string to <var>url</var>'s
+     <a for=url>path</a>.
     </ol>
 
-   <dt><dfn>path state</dfn>
+   <dt><dfn export for="basic URL parser" id=path-state>path state</dfn>
    <dd>
     <ol>
      <li>
@@ -2319,7 +2503,7 @@ these steps:
        <a>validation error</a>.
 
        <li>
-        <p>If <var>buffer</var> is a <a>double-dot path segment</a>, then:
+        <p>If <var>buffer</var> is a <a>double-dot URL path segment</a>, then:
 
         <ol>
          <li><p><a>Shorten</a> <var>url</var>'s <a for=url>path</a>.
@@ -2329,16 +2513,16 @@ these steps:
           U+005C (\), <a for=list>append</a> the empty string to <var>url</var>'s
           <a for=url>path</a>.
 
-          <p class="note no-backref">This means that for input <code>/usr/..</code> the result is
-          <code>/</code> and not a lack of a path.
+          <p class=note>This means that for input <code>/usr/..</code> the result is <code>/</code>
+          and not a lack of a path.
         </ol>
 
-       <li><p>Otherwise, if <var>buffer</var> is a <a>single-dot path segment</a> and if neither
+       <li><p>Otherwise, if <var>buffer</var> is a <a>single-dot URL path segment</a> and if neither
        <a>c</a> is U+002F (/), nor <var>url</var> <a>is special</a> and <a>c</a> is U+005C (\),
        <a for=list>append</a> the empty string to <var>url</var>'s <a for=url>path</a>.
 
        <li>
-        <p>Otherwise, if <var>buffer</var> is not a <a>single-dot path segment</a>, then:
+        <p>Otherwise, if <var>buffer</var> is not a <a>single-dot URL path segment</a>, then:
 
         <ol>
          <li>
@@ -2376,7 +2560,7 @@ these steps:
       </ol>
     </ol>
 
-   <dt><dfn>cannot-be-a-base-URL path state</dfn>
+   <dt><dfn export for="basic URL parser" id=cannot-be-a-base-url-path-state>opaque path state</dfn>
    <dd>
     <ol>
      <li><p>If <a>c</a> is U+003F (?), then set <var>url</var>'s <a for=url>query</a> to the empty
@@ -2398,11 +2582,11 @@ these steps:
        <li><p>If <a>c</a> is not the <a>EOF code point</a>,
        <a for="code point">UTF-8 percent-encode</a> <a>c</a> using the
        <a>C0 control percent-encode set</a> and append the result to <var>url</var>'s
-       <a for=url>path</a>[0].
+       <a for=url>path</a>.
       </ol>
     </ol>
 
-   <dt><dfn>query state</dfn>
+   <dt><dfn export for="basic URL parser" id=query-state>query state</dfn>
    <dd>
     <ol>
      <li>
@@ -2458,7 +2642,7 @@ these steps:
       </ol>
     </ol>
 
-   <dt><dfn>fragment state</dfn>
+   <dt><dfn export for="basic URL parser" id=fragment-state>fragment state</dfn>
    <dd>
     <ol>
      <li>
@@ -2531,25 +2715,18 @@ these steps. They return an <a>ASCII string</a>.
    <var>output</var>.
   </ol>
 
- <li><p>If <var>url</var>'s <a for=url>cannot-be-a-base-URL</a> is true, then append
- <var>url</var>'s <a for=url>path</a>[0] to <var>output</var>.
-
  <li>
-  <p>Otherwise:
-
-  <ol>
-   <li><p>If <var>url</var>'s <a for=url>host</a> is null, <var>url</var>'s <a for=url>path</a>'s
-   <a for=list>size</a> is greater than 1, and <var>url</var>'s <a for=url>path</a>[0] is the empty
-   string, then append U+002F (/) followed by U+002E (.) to <var>output</var>.
-
-   <li><p><a for=list>For each</a> <var>segment</var> of <var>url</var>'s <a for=url>path</a>:
-   append U+002F (/) followed by <var>segment</var> to <var>output</var>.
-  </ol>
+  <p>If <var>url</var>'s <a for=url>host</a> is null, <var>url</var> does not have an
+  <a for=url>opaque path</a>, <var>url</var>'s <a for=url>path</a>'s <a for=list>size</a> is greater
+  than 1, and <var>url</var>'s <a for=url>path</a>[0] is the empty string, then append U+002F (/)
+  followed by U+002E (.) to <var>output</var>.
 
   <p class=note>This prevents <code>web+demo:/.//not-a-host/</code> or
   <code>web+demo:/path/..//not-a-host/</code>, when <a lt="URL parser">parsed</a> and then
   <a lt="URL serializer">serialized</a>, from ending up as <code>web+demo://not-a-host/</code> (they
   end up as <code>web+demo:/.//not-a-host/</code>).
+
+ <li><p>Append the result of <a>URL path serializing</a> <var>url</var> to <var>output</var>.
 
  <li><p>If <var>url</var>'s <a for=url>query</a> is non-null, append
  U+003F (?), followed by <var>url</var>'s <a for=url>query</a>, to
@@ -2562,13 +2739,28 @@ these steps. They return an <a>ASCII string</a>.
  <li><p>Return <var>output</var>.
 </ol>
 
+<p>The <dfn export lt="URL path serializer|URL path serializing">URL path serializer</dfn> takes a
+<a for=/>URL</a> <var>url</var> and then runs these steps. They return an <a>ASCII string</a>.
+
+<ul>
+ <li><p>If <var>url</var> has an <a for=url>opaque path</a>, then return <var>url</var>'s
+ <a for=url>path</a>.
+
+ <li><p>Let <var>output</var> be the empty string.
+
+ <li><p><a for=list>For each</a> <var>segment</var> of <var>url</var>'s <a for=url>path</a>: append
+ U+002F (/) followed by <var>segment</var> to <var>output</var>.
+
+ <li><p>Return <var>output</var>.
+</ul>
+
 
 <h3 id=url-equivalence>URL equivalence</h3>
 
 <p>To determine whether a <a for=/>URL</a> <var>A</var>
-<dfn export for=url id=concept-url-equals lt=equal>equals</dfn> <var>B</var>, with an optional
-boolean with an <dfn export for="url/equals"><var>exclude fragments</var></dfn> (default false), run
-these steps:
+<dfn export for=url id=concept-url-equals lt=equal>equals</dfn> <a for=/>URL</a> <var>B</var>, with
+an optional boolean <dfn export for="url/equals"><var>exclude fragments</var></dfn> (default false),
+run these steps:
 
 <ol>
  <li><p>Let <var>serializedA</var> be the result of <a lt="URL serializer">serializing</a>
@@ -2589,37 +2781,38 @@ these steps:
 <p class=note>See <a for=/>origin</a>'s definition in <cite>HTML</cite> for the necessary background
 information. [[HTML]]
 
-<p>A <a for=/>URL</a>'s <dfn export for=url id=concept-url-origin>origin</dfn> is the
-<a for=/>origin</a> returned by running these steps, switching on
-<a for=/>URL</a>'s <a for=url>scheme</a>:
+<p>The <dfn export for=url id=concept-url-origin>origin</dfn> of a <a for=/>URL</a> <var>url</var>
+is the <a for=/>origin</a> returned by running these steps, switching on <var>url</var>'s
+<a for=url>scheme</a>:
 
 <dl class=switch>
  <dt>"<code>blob</code>"
  <dd>
   <ol>
-   <li><p>If <a for=/>URL</a>'s <a for=url>blob URL entry</a> is non-null, then return
-   <a for=/>URL</a>'s <a for=url>blob URL entry</a>'s <a for="blob URL entry">environment</a>'s
+   <li><p>If <var>url</var>'s <a for=url>blob URL entry</a> is non-null, then return
+   <var>url</var>'s <a for=url>blob URL entry</a>'s <a for="blob URL entry">environment</a>'s
    <a for="environment settings object">origin</a>.
 
-   <li><p>Let <var>url</var> be the result of <a lt="basic URL parser">parsing</a>
-   <a for=/>URL</a>'s <a for=url>path</a>[0].
+   <li><p>Let <var>pathURL</var> be the result of <a lt="basic URL parser">parsing</a> the result of
+   <a>URL path serializing</a> <var>url</var>.
 
-   <li><p>Return a new <a>opaque origin</a>, if <var>url</var> is failure, and <var>url</var>'s
-   <a for=url>origin</a> otherwise.
+   <li><p>If <var>pathURL</var> is failure, then return a new <a>opaque origin</a>.
+
+   <li><p>Return <var>pathURL</var>'s <a for=url>origin</a>.
    <!-- Did you mean: recursion -->
   </ol>
 
-  <p class="example no-backref" id=example-43b5cea5>The <a for=url>origin</a> of
-  <code>blob:https://whatwg.org/d0360e2f-caee-469f-9a2f-87d5b0456f6f</code> is the tuple
-  (<code>https</code>, <code>whatwg.org</code>, null, null).
+  <p class=example id=example-43b5cea5>The <a for=url>origin</a> of
+  <code>blob:https://whatwg.org/d0360e2f-caee-469f-9a2f-87d5b0456f6f</code> is the
+  <a for=/>tuple origin</a> ("<code>https</code>", "<code>whatwg.org</code>", null, null).
 
  <dt>"<code>ftp</code>"
  <dt>"<code>http</code>"
  <dt>"<code>https</code>"
  <dt>"<code>ws</code>"
  <dt>"<code>wss</code>"
- <dd><p>Return a tuple consisting of <a for=/>URL</a>'s <a for=url>scheme</a>,
- <a for=/>URL</a>'s <a for=url>host</a>, <a for=/>URL</a>'s <a for=url>port</a>, and null.
+ <dd><p>Return the <a for=/>tuple origin</a> (<var>url</var>'s <a for=url>scheme</a>,
+ <var>url</var>'s <a for=url>host</a>, <var>url</var>'s <a for=url>port</a>, null).
 
  <dt>"<code>file</code>"
  <dd><p>Unfortunate as it is, this is left as an exercise to the reader. When in doubt,
@@ -2629,8 +2822,8 @@ information. [[HTML]]
  <dd>
   <p>Return a new <a>opaque origin</a>.
 
-  <p class="note no-backref">This does indeed mean that these <a for=/>URLs</a> cannot be
-  <a lt="same origin">same-origin</a> with themselves.
+  <p class=note>This does indeed mean that these <a for=/>URLs</a> cannot be <a>same origin</a> with
+  themselves.
 </dl>
 
 
@@ -2648,12 +2841,13 @@ rendered in the browser address bar.
 information:
 
 <ul>
- <li><p>Browsers may render only a URL's <a for=url>host</a> in places where it is important for
- users to distinguish between the host and other parts of the URL such as the
- <a for=url>path</a>. Browsers may consider simplifying the host further to draw attention to its
+ <li><p>Browsers may render only a URL's <a for=url>host</a> in places where it is important for end
+ users to distinguish between the host and other parts of the URL such as the <a for=url>path</a>.
+ Browsers may consider simplifying the host further to draw attention to its
  <a for=host>registrable domain</a>. For example, browsers may omit a leading <code>www</code> or
- <code>m</code> domain label to simplify the host, or display its registrable domain only to remove
- spoofing opportunities posted by subdomains (e.g., <code>https://examplecorp.attacker.com/</code>).
+ <code>m</code> <a for=/>domain label</a> to simplify the host, or display its registrable domain
+ only to remove spoofing opportunities posted by subdomains (e.g.,
+ <code>https://examplecorp.attacker.com/</code>).
 
  <li><p>Browsers should not render a <a for=/>URL</a>'s <a for=url>username</a> and <a
  for=url>password</a>, as they can be mistaken for a <a for=/>URL</a>'s <a for=url>host</a> (e.g.,
@@ -2675,10 +2869,11 @@ making a security decision:
  when the URL is rendered (to avoid showing, e.g., <code>...examplecorp.com</code> when loading
  <code>https://not-really-examplecorp.com/</code>).
 
- <li><p>When the full <a for=url>host</a> cannot be rendered, browsers should elide domain labels
- starting from the lowest-level domain label. For example, <code>examplecorp.com.evil.com</code>
- should be elided as <code>...com.evil.com</code>, not <code>examplecorp.com...</code>. (Note that
- bidirectional text means that the lowest-level domain label may not appear on the left.)
+ <li><p>When the full <a for=url>host</a> cannot be rendered, browsers should elide
+ <a for=/>domain labels</a> starting from the lowest-level domain label. For example,
+ <code>examplecorp.com.evil.com</code> should be elided as <code>...com.evil.com</code>, not
+ <code>examplecorp.com...</code>. (Note that bidirectional text means that the lowest-level domain
+ label may not appear on the left.)
 </ul>
 
 <h4 id=url-rendering-i18n>Internationalization and special characters</h4>
@@ -2688,26 +2883,27 @@ handled with care to prevent spoofing:
 
 <ul>
  <li>
-  <p>Browsers should render a <a for=/>URL</a>'s <a for=url>host</a> using <a>domain to Unicode</a>.
+  <p>Browsers should render a <a for=/>URL</a>'s <a for=url>host</a> by running
+  <a>domain to Unicode</a> with the <a for=/>URL</a>'s <a for=url>host</a> and false.
 
-  <p class="note no-backref">Note that various characters can be used in homograph spoofing attacks.
-  Consider detecting confusable characters and warning when they are in use. [[IDNFAQ]] [[UTS39]]
+  <p class=note>Various characters can be used in homograph spoofing attacks. Consider detecting
+  confusable characters and warning when they are in use. [[IDNFAQ]] [[UTS39]]
 
  <li><p>URLs are particularly prone to confusion between host and path when they contain
  bidirectional text, so in this case it is particularly advisable to only render a URL's
  <a for=url>host</a>. For readability, other parts of the <a for=/>URL</a>, if rendered, should have
- their sequences of <a>percent-encoded bytes</a> replaced with code points resulting from
- <a for=string>percent-decoding</a> those sequences converted to bytes, unless that renders those
- sequences invisible. Browsers may choose to not decode certain sequences that present spoofing
- risks (e.g., U+1F512 (🔒)).
+ their sequences of <a>percent-encoded bytes</a> replaced with code points resulting from running
+ <a>UTF-8 decode without BOM</a> on the <a for=string>percent-decoding</a> of those sequences,
+ unless that renders those sequences invisible. Browsers may choose to not decode certain sequences
+ that present spoofing risks (e.g., U+1F512 (🔒)).
 
  <li>
   <p>Browsers should render bidirectional text as if it were in a left-to-right embedding. [[!BIDI]]
 
-  <p class="note no-backref">Unfortunately, as rendered <a for=/>URLs</a> are strings and can appear
-  anywhere, a specific bidirectional algorithm for rendered <a for=/>URLs</a> would not see wide
-  adoption. Bidirectional text interacts with the parts of a <a for=/>URL</a> in ways that can cause
-  the rendering to be different from the model. Users of bidirectional languages can come to expect
+  <p class=note>Unfortunately, as rendered <a for=/>URLs</a> are strings and can appear anywhere, a
+  specific bidirectional algorithm for rendered <a for=/>URLs</a> would not see wide adoption.
+  Bidirectional text interacts with the parts of a <a for=/>URL</a> in ways that can cause the
+  rendering to be different from the model. Users of bidirectional languages can come to expect
   this, particularly in plain text environments.
 </ul>
 
@@ -2716,23 +2912,22 @@ handled with care to prevent spoofing:
 <h2 id="application/x-www-form-urlencoded"><code>application/x-www-form-urlencoded</code></h2>
 
 <p>The <dfn export id=concept-urlencoded><code>application/x-www-form-urlencoded</code></dfn> format
-provides a way to encode name-value pairs.
+provides a way to encode a <a for=/>list</a> of <a for=/>tuples</a>, each consisting of a name and a
+value.
 
-<p class="note no-backref">The <code>application/x-www-form-urlencoded</code> format is in many ways
-an aberrant monstrosity, the result of many years of implementation accidents and compromises
-leading to a set of requirements necessary for interoperability, but in no way representing good
-design practices. In particular, readers are cautioned to pay close attention to the twisted details
-involving repeated (and in some cases nested) conversions between character encodings and byte
-sequences. Unfortunately the format is in widespread use due to the prevalence of HTML forms.
-[[HTML]]
+<p class=note>The <code>application/x-www-form-urlencoded</code> format is in many ways an aberrant
+monstrosity, the result of many years of implementation accidents and compromises leading to a set
+of requirements necessary for interoperability, but in no way representing good design practices. In
+particular, readers are cautioned to pay close attention to the twisted details involving repeated
+(and in some cases nested) conversions between character encodings and byte sequences. Unfortunately
+the format is in widespread use due to the prevalence of HTML forms. [[HTML]]
 
 
 <h3 id=urlencoded-parsing><code>application/x-www-form-urlencoded</code> parsing</h3>
 
-<p class="note no-backref">A legacy server-oriented implementation might have to support
-<a for=/>encodings</a> other than <a>UTF-8</a> as well as have special logic for tuples of which the
-name is `<code>_charset</code>`. Such logic is not described here as only <a>UTF-8</a> is
-conforming.
+<p class=note>A legacy server-oriented implementation might have to support <a for=/>encodings</a>
+other than <a>UTF-8</a> as well as have special logic for tuples of which the name is
+`<code>_charset</code>`. Such logic is not described here as only <a>UTF-8</a> is conforming.
 
 <p>The
 <dfn export id=concept-urlencoded-parser lt="urlencoded parser"><code>application/x-www-form-urlencoded</code> parser</dfn>
@@ -2783,7 +2978,8 @@ takes a byte sequence <var>input</var>, and then runs these steps:
 <p>The
 <dfn export id=concept-urlencoded-serializer lt="urlencoded serializer"><code>application/x-www-form-urlencoded</code> serializer</dfn>
 takes a list of name-value tuples <var>tuples</var>, with an optional <a for=/>encoding</a>
-<var>encoding</var> (default <a>UTF-8</a>), and then runs these steps:
+<var>encoding</var> (default <a>UTF-8</a>), and then runs these steps. They return an
+<a>ASCII string</a>.
 
 <ol>
  <li><p>Set <var>encoding</var> to the result of <a>getting an output encoding</a> from
@@ -2795,20 +2991,19 @@ takes a list of name-value tuples <var>tuples</var>, with an optional <a for=/>e
   <p><a for=list>For each</a> <var>tuple</var> of <var>tuples</var>:
 
   <ol>
+   <li><p><a for=/>Assert</a>: <var>tuple</var>'s name and <var>tuple</var>'s value are
+   <a for=/>scalar value strings</a>.
+
    <li><p>Let <var>name</var> be the result of running
    <a for=string>percent-encode after encoding</a> with <var>encoding</var>,
    <var>tuple</var>'s name, the
    <a><code>application/x-www-form-urlencoded</code> percent-encode set</a>, and true.
 
-   <li><p>Let <var>value</var> be <var>tuple</var>'s value.
+   <li><p>Let <var>value</var> be the result of running
+   <a for=string>percent-encode after encoding</a> with <var>encoding</var>, <var>tuple</var>'s
+   value, the <a><code>application/x-www-form-urlencoded</code> percent-encode set</a>, and true.
 
-   <li><p>If <var>value</var> is a file, then set <var>value</var> to <var>value</var>'s filename.
-
-   <li><p>Set <var>value</var> to the result of running
-   <a for=string>percent-encode after encoding</a> with <var>encoding</var>, <var>value</var>, the
-   <a><code>application/x-www-form-urlencoded</code> percent-encode set</a>, and true.
-
-   <li><p>If <var>tuple</var> is not <var>tuples</var>[0], then append U+0026 (&amp;) to
+   <li><p>If <var>output</var> is not the empty string, then append U+0026 (&amp;) to
    <var>output</var>.
 
    <li>Append <var>name</var>, followed by U+003D (=), followed by <var>value</var>, to
@@ -2818,25 +3013,27 @@ takes a list of name-value tuples <var>tuples</var>, with an optional <a for=/>e
  <li>Return <var>output</var>.
 </ol>
 
-<p class=note><cite>HTML</cite> invokes this algorithm with values that are files. [[HTML]]
-
 
 <h3 id=urlencoded-hooks>Hooks</h3>
 
 <p>The
 <dfn id=concept-urlencoded-string-parser lt="urlencoded string parser"><code>application/x-www-form-urlencoded</code> string parser</dfn>
-takes a string <var>input</var>, <a>UTF-8 encodes</a> it, and then returns the result of
-<a lt="urlencoded parser"><code>application/x-www-form-urlencoded</code> parsing</a> it.
+takes a <a>scalar value string</a> <var>input</var>, <a>UTF-8 encodes</a> it, and then returns the
+result of <a lt="urlencoded parser"><code>application/x-www-form-urlencoded</code> parsing</a> it.
 
 
 
 <h2 id=api>API</h2>
 
+<p>This section uses terminology from <cite>Web IDL</cite>. Browser user agents must support this
+API. JavaScript implementations should support this API. Other user agents or programming languages
+are encouraged to use an API suitable to their needs, which might not be this one. [[!WEBIDL]]
+
 
 <h3 id=url-class>URL class</h3>
 
 <pre class=idl>
-[Exposed=(Window,Worker),
+[Exposed=*,
  LegacyWindowAlias=webkitURL]
 interface URL {
   constructor(USVString url, optional USVString base);
@@ -2865,6 +3062,21 @@ interface URL {
  <li><dfn id=concept-url-query-object noexport for=URL>query object</dfn>: a {{URLSearchParams}}
  object.
 </ul>
+
+<p>To <dfn>potentially strip trailing spaces from an opaque path</dfn> given a {{URL}} object
+<var>url</var>:
+
+<ol>
+ <li><p>If <var>url</var>'s <a for=URL>URL</a> does not have an <a for=url>opaque path</a>, then
+ return.
+
+ <li><p>If <var>url</var>'s <a for=URL>URL</a>'s <a for=url>fragment</a> is non-null, then return.
+
+ <li><p>If <var>url</var>'s <a for=URL>URL</a>'s <a for=url>query</a> is non-null, then return.
+
+ <li><p>Remove all trailing U+0020 SPACE <a for=/>code points</a> from <var>url</var>'s
+ <a for=URL>URL</a>'s <a for=url>path</a>.
+</ol>
 
 <hr>
 
@@ -2904,7 +3116,7 @@ constructor steps are:
  <a>this</a>.
 </ol>
 
-<div class="example no-backref" id=example-5434421b>
+<div class=example id=example-5434421b>
  <p>To <a lt="basic URL parser">parse</a> a string into a <a for=/>URL</a> without using a
  <a>base URL</a>, invoke the {{URL}} constructor with a single argument:
 
@@ -2913,7 +3125,7 @@ var input = "https://example.org/💩",
     url = new URL(input)
 url.pathname // "/%F0%9F%92%A9"</code></pre>
 
- <p>This throws an exception if the input is not an <a>absolute-URL-with-fragment string</a>:
+ <p>This throws an exception if the input is a <a>relative-URL string</a>:
 
  <pre><code class="lang-javascript">
 try {
@@ -2922,14 +3134,14 @@ try {
   // that happened
 }</code></pre>
 
- <p>A <a>base URL</a> is necessary if the input is a <a>relative-URL string</a>:
+ <p>For those cases a <a>base URL</a> is necessary:
 
  <pre><code class="lang-javascript">
 var input = "/🍣🍺",
     url = new URL(input, document.baseURI)
 url.href // "https://url.spec.whatwg.org/%F0%9F%8D%A3%F0%9F%8D%BA"</code></pre>
 
- <p>A {{URL}} object can be used as <a>base URL</a> (while IDL requires a string as argument, a
+ <p>A {{URL}} object can be used as a <a>base URL</a> (as the IDL requires a string as argument, a
  {{URL}} object stringifies to its {{URL/href}} getter return value):</p>
 
  <pre><code class="lang-javascript">
@@ -3016,18 +3228,17 @@ url.pathname // "/%F0%9F%8F%B3%EF%B8%8F%E2%80%8D%F0%9F%8C%88"</code></pre>
 <p>The <code><a attribute for=URL>host</a></code> setter steps are:
 
 <ol>
- <li><p>If <a>this</a>'s <a for=URL>URL</a>'s <a for=url>cannot-be-a-base-URL</a> is true, then
- return.
+ <li><p>If <a>this</a>'s <a for=URL>URL</a> has an <a for=url>opaque path</a>, then return.
 
  <li><p><a lt="basic URL parser">Basic URL parse</a> the given value with <a>this</a>'s
  <a for=URL>URL</a> as <a for="basic URL parser"><i>url</i></a> and <a>host state</a> as
  <a for="basic URL parser"><i>state override</i></a>.
 </ol>
 
-<p class="note no-backref">If the given value for the <code><a attribute for=URL>host</a></code>
-setter lacks a <a lt="URL-port string">port</a>, <a>this</a>'s <a for=URL>URL</a>'s
-<a for=url>port</a> will not change. This can be unexpected as <code>host</code> getter
-does return a <a>URL-port string</a> so one might have assumed the setter to always "reset" both.
+<p class=note>If the given value for the <code><a attribute for=URL>host</a></code> setter lacks a
+<a lt="URL-port string">port</a>, <a>this</a>'s <a for=URL>URL</a>'s <a for=url>port</a> will not
+change. This can be unexpected as <code>host</code> getter does return a <a>URL-port string</a> so
+one might have assumed the setter to always "reset" both.
 
 <p>The <dfn attribute for=URL><code>hostname</code></dfn> getter steps are:
 
@@ -3042,8 +3253,7 @@ does return a <a>URL-port string</a> so one might have assumed the setter to alw
 <p>The <code><a attribute for=URL>hostname</a></code> setter steps are:
 
 <ol>
- <li><p>If <a>this</a>'s <a for=URL>URL</a>'s <a for=url>cannot-be-a-base-URL</a> is true, then
- return.
+ <li><p>If <a>this</a>'s <a for=URL>URL</a> has an <a for=url>opaque path</a>, then return.
 
  <li><p><a lt="basic URL parser">Basic URL parse</a> the given value with <a>this</a>'s
  <a for=URL>URL</a> as <a for="basic URL parser"><i>url</i></a> and <a>hostname state</a> as
@@ -3074,26 +3284,15 @@ does return a <a>URL-port string</a> so one might have assumed the setter to alw
  <a>port state</a> as <a for="basic URL parser"><i>state override</i></a>.
 </ol>
 
-<p>The <dfn attribute for=URL><code>pathname</code></dfn> getter steps are:
-
-<ol>
- <li><p>If <a>this</a>'s <a for=URL>URL</a>'s <a for=url>cannot-be-a-base-URL</a> is true, then
- return <a>this</a>'s <a for=URL>URL</a>'s <a for=url>path</a>[0].
-
- <li><p>If <a>this</a>'s <a for=URL>URL</a>'s <a for=url>path</a> <a for=list>is empty</a>, then
- return the empty string.
-
- <li><p>Return U+002F (/), followed by the strings in <a>this</a>'s <a for=URL>URL</a>'s
- <a for=url>path</a> (including empty strings), if any, separated from each other by U+002F (/).
-</ol>
+<p>The <dfn attribute for=URL><code>pathname</code></dfn> getter steps are to return the result of
+<a>URL path serializing</a> <a>this</a>'s <a for=URL>URL</a>.
 
 <p>The <code><a attribute for=URL>pathname</a></code> setter steps are:
 
 <ol>
- <li><p>If <a>this</a>'s <a for=URL>URL</a>'s <a for=url>cannot-be-a-base-URL</a> is true, then
- return.
+ <li><p>If <a>this</a>'s <a for=URL>URL</a> has an <a for=url>opaque path</a>, then return.
 
- <li><p>Empty <a>this</a>'s <a for=URL>URL</a>'s <a for=url>path</a>.
+ <li><p><a for=list>Empty</a> <a>this</a>'s <a for=URL>URL</a>'s <a for=url>path</a>.
 
  <li><p><a lt="basic URL parser">Basic URL parse</a> the given value with <a>this</a>'s
  <a for=URL>URL</a> as <a for="basic URL parser"><i>url</i></a> and <a>path start state</a> as
@@ -3114,8 +3313,19 @@ does return a <a>URL-port string</a> so one might have assumed the setter to alw
 <ol>
  <li><p>Let <var>url</var> be <a>this</a>'s <a for=URL>URL</a>.
 
- <li><p>If the given value is the empty string, set <var>url</var>'s <a for=url>query</a> to null,
- empty <a>this</a>'s <a for=URL>query object</a>'s <a for=URLSearchParams>list</a>, and then return.
+ <li>
+  <p>If the given value is the empty string:
+
+  <ol>
+   <li><p>Set <var>url</var>'s <a for=url>query</a> to null.
+
+   <li><p><a for=list>Empty</a> <a>this</a>'s <a for=URL>query object</a>'s
+   <a for=URLSearchParams>list</a>.
+
+   <li><p><a>Potentially strip trailing spaces from an opaque path</a> with <a>this</a>.
+
+   <li><p>Return.
+  </ol>
 
  <li><p>Let <var>input</var> be the given value with a single leading U+003F (?) removed, if any.
 
@@ -3128,6 +3338,11 @@ does return a <a>URL-port string</a> so one might have assumed the setter to alw
  <li><p>Set <a>this</a>'s <a for=URL>query object</a>'s <a for=URLSearchParams>list</a> to the
  result of <a lt="urlencoded string parser">parsing</a> <var>input</var>.
 </ol>
+
+<p class=note>The {{URL/search}} setter has the potential to remove trailing U+0020 SPACE
+<a for=/>code points</a> from <a>this</a>'s <a for=URL>URL</a>'s <a for=url>path</a>. It does this
+so that running the <a>URL parser</a> on the output of running the <a>URL serializer</a> on
+<a>this</a>'s <a for=URL>URL</a> does not yield a <a for=/>URL</a> that is not <a for=url>equal</a>.
 
 <p>The <dfn attribute for=URL><code>searchParams</code></dfn> getter steps are to return
 <a>this</a>'s <a for=URL>query object</a>.
@@ -3144,8 +3359,16 @@ does return a <a>URL-port string</a> so one might have assumed the setter to alw
 <p>The <code><a attribute for=URL>hash</a></code> setter steps are:
 
 <ol>
- <li><p>If the given value is the empty string, then set <a>this</a>'s <a for=URL>URL</a>'s
- <a for=url>fragment</a> to null and return.
+ <li>
+  <p>If the given value is the empty string:
+
+  <ol>
+   <li><p>Set <a>this</a>'s <a for=URL>URL</a>'s <a for=url>fragment</a> to null.
+
+   <li><p><a>Potentially strip trailing spaces from an opaque path</a> with <a>this</a>.
+
+   <li><p>Return.
+  </ol>
 
  <li><p>Let <var>input</var> be the given value with a single leading U+0023 (#) removed, if any.
 
@@ -3156,11 +3379,14 @@ does return a <a>URL-port string</a> so one might have assumed the setter to alw
  <a for="basic URL parser"><i>state override</i></a>.
 </ol>
 
+<p class=note>The {{URL/hash}} setter has the potential to change <a>this</a>'s <a for=URL>URL</a>'s
+<a for=url>path</a> in a manner equivalent to the {{URL/search}} setter.
+
 
 <h3 id=interface-urlsearchparams>URLSearchParams class</h3>
 
 <pre class=idl>
-[Exposed=(Window,Worker)]
+[Exposed=*]
 interface URLSearchParams {
   constructor(optional (sequence&lt;sequence&lt;USVString>> or record&lt;USVString, USVString> or USVString) init = "");
 
@@ -3217,30 +3443,34 @@ console.log(url.searchParams.get('b')); // "~"</code></pre>
 
 <ul class=brief>
  <li><dfn export for=URLSearchParams id=concept-urlsearchparams-list>list</dfn>: a <a for=/>list</a>
- of name-value pairs, initially empty.
+ of <a for=/>tuples</a> each consisting of a name and a value, initially empty.
  <li><dfn export for=URLSearchParams id=concept-urlsearchparams-url-object>URL object</dfn>: null or
  a {{URL}} object, initially null.
 </ul>
+
+<p class=note>A {{URLSearchParams}} object with a non-null <a for=URLSearchParams>URL object</a> has
+the potential to change that object's <a for=url>path</a> in a manner equivalent to the {{URL}}
+object's {{URL/search}} and {{URL/hash}} setters.
 
 <p>To <dfn for=URLSearchParams oldids=concept-urlsearchparams-new>initialize</dfn> a
 {{URLSearchParams}} object <var>query</var> with <var>init</var>, run these steps:
 
 <ol>
  <li>
-  <p>If <var>init</var> is a <a>sequence</a>, then <a for=list>for each</a> <var>pair</var> in
-  <var>init</var>:
+  <p>If <var>init</var> is a <a>sequence</a>, then <a for=list>for each</a> <var>innerSequence</var>
+  of <var>init</var>:
 
   <ol>
-   <li><p>If <var>pair</var> does not contain exactly two items, then <a>throw</a> a {{TypeError}}.
+   <li><p>If <var>innerSequence</var>'s <a for=list>size</a> is not 2, then <a>throw</a> a
+   {{TypeError}}.
 
-   <li><p>Append a new name-value pair whose name is <var>pair</var>'s first item, and value is
-   <var>pair</var>'s second item, to <var>query</var>'s <a for=URLSearchParams>list</a>.
+   <li><p><a for=list>Append</a> (<var>innerSequence</var>[0], <var>innerSequence</var>[1]) to
+   <var>query</var>'s <a for=URLSearchParams>list</a>.
   </ol>
 
  <li><p>Otherwise, if <var>init</var> is a <a for=/>record</a>, then <a for=map>for each</a>
- <var>name</var> → <var>value</var> of <var>init</var>, <a for=list>append</a> a new name-value pair
- whose name is <var>name</var> and value is <var>value</var>, to <var>query</var>'s
- <a for=URLSearchParams>list</a>.
+ <var>name</var> → <var>value</var> of <var>init</var>, <a for=list>append</a> (<var>name</var>,
+ <var>value</var>) to <var>query</var>'s <a for=URLSearchParams>list</a>.
 
  <li>
   <p>Otherwise:
@@ -3267,6 +3497,10 @@ object <var>query</var>, run these steps:
 
  <li><p>Set <var>query</var>'s <a for=URLSearchParams>URL object</a>'s <a for=URL>URL</a>'s
  <a for=url>query</a> to <var>serializedQuery</var>.
+
+ <li><p>If <var>serializedQuery</var> is null, then
+ <a>potentially strip trailing spaces from an opaque path</a> with <var>query</var>'s
+ <a for=URLSearchParams>URL object</a>.
 </ol>
 
 <p>The
@@ -3284,7 +3518,7 @@ constructor steps are:</p>
 method steps are:
 
 <ol>
- <li><p>Append a new name-value pair whose name is <var>name</var> and value is <var>value</var>, to
+ <li><p><a for=list>Append</a> (<var>name</var>, <var>value</var>) to <a>this</a>'s
  <a for=URLSearchParams>list</a>.
 
  <li><p><a for=URLSearchParams>Update</a> <a>this</a>.
@@ -3293,34 +3527,34 @@ method steps are:
 <p>The <dfn method for=URLSearchParams><code>delete(<var>name</var>)</code></dfn> method steps are:
 
 <ol>
- <li><p>Remove all name-value pairs whose name is <var>name</var> from
- <a for=URLSearchParams>list</a>.
+ <li><p><a for=list>Remove</a> all <a for=/>tuples</a> whose name is <var>name</var> from
+ <a>this</a>'s <a for=URLSearchParams>list</a>.
 
  <li><p><a for=URLSearchParams>Update</a> <a>this</a>.
 </ol>
 
 <p>The <dfn method for=URLSearchParams><code>get(<var>name</var>)</code></dfn> method steps are to
-return the value of the first name-value pair whose name is <var>name</var> in <a>this</a>'s
-<a for=URLSearchParams>list</a>, if there is such a pair, and null otherwise.
+return the value of the first <a for=/>tuple</a> whose name is <var>name</var> in <a>this</a>'s
+<a for=URLSearchParams>list</a>, if there is such a <a for=/>tuple</a>; otherwise null.
 
 <p>The <dfn method for=URLSearchParams><code>getAll(<var>name</var>)</code></dfn> method steps are
-to return the values of all name-value pairs whose name is <var>name</var>, in <a>this</a>'s
-<a for=URLSearchParams>list</a>, in list order, and the empty sequence otherwise.
+to return the values of all <a for=/>tuples</a> whose name is <var>name</var> in <a>this</a>'s
+<a for=URLSearchParams>list</a>, in list order; otherwise the empty sequence.
 
 <p>The <dfn method for=URLSearchParams><code>has(<var>name</var>)</code></dfn> method steps are to
-return true if there is a name-value pair whose name is <var>name</var> in <a>this</a>'s
-<a for=URLSearchParams>list</a>, and false otherwise.
+return true if there is a <a for=/>tuple</a> whose name is <var>name</var> in <a>this</a>'s
+<a for=URLSearchParams>list</a>; otherwise false.
 
 <p>The <dfn method for=URLSearchParams><code>set(<var>name</var>, <var>value</var>)</code></dfn>
 method steps are:
 
 <ol>
- <li><p>If <a>this</a>'s <a for=URLSearchParams>list</a> <a for=list>contains</a> any name-value
- pairs whose name is <var>name</var>, then set the value of the first such name-value pair to
- <var>value</var> and remove the others.
+ <li><p>If <a>this</a>'s <a for=URLSearchParams>list</a> <a for=list>contains</a> any
+ <a for=/>tuples</a> whose name is <var>name</var>, then set the value of the first such
+ <a for=/>tuple</a> to <var>value</var> and <a for=list>remove</a> the others.
 
- <li><p>Otherwise, append a new name-value pair whose name is <var>name</var> and value is
- <var>value</var>, to <a>this</a>'s <a for=URLSearchParams>list</a>.
+ <li><p>Otherwise, <a for=list>append</a> (<var>name</var>, <var>value</var>) to <a>this</a>'s
+ <a for=URLSearchParams>list</a>.
 
  <li><p><a for=URLSearchParams>Update</a> <a>this</a>.
 </ol>
@@ -3328,7 +3562,7 @@ method steps are:
 <hr>
 
 <div class=example id=example-searchparams-sort>
- <p>It can be useful to sort the name-value pairs in a {{URLSearchParams}} object, in particular to
+ <p>It can be useful to sort the name-value tuples in a {{URLSearchParams}} object, in particular to
  increase cache hits. This can be accomplished through invoking the
  {{URLSearchParams/sort()}} method:
 
@@ -3348,8 +3582,9 @@ sorted.sort()</code></pre>
 <p>The <dfn method for=URLSearchParams><code>sort()</code></dfn> method steps are:
 
 <ol>
- <li><p>Sort all name-value pairs, if any, by their names. Sorting must be done by comparison of
- code units. The relative order between name-value pairs with equal names must be preserved.
+ <li><p>Sort all <a for=/>tuples</a> in <a>this</a>'s <a for=URLSearchParams>list</a>, if any, by
+ their names. Sorting must be done by comparison of code units. The relative order between
+ <a for=/>tuples</a> with equal names must be preserved.
 
  <li><p><a for=URLSearchParams>Update</a> <a>this</a>.
 </ol>
@@ -3357,7 +3592,7 @@ sorted.sort()</code></pre>
 <hr>
 
 <p>The <a>value pairs to iterate over</a> are <a>this</a>'s <a for=URLSearchParams>list</a>'s
-name-value pairs with the key being the name and the value being the value.
+<a for=/>tuples</a> with the key being the name and the value being the value.
 
 <p>The <dfn for=URLSearchParams>stringification behavior</dfn> steps are to return the
 <a lt="urlencoded serializer">serialization</a> of <a>this</a>'s <a for=URLSearchParams>list</a>.
@@ -3379,22 +3614,24 @@ such a feature "url" (i.e., lowercase and with an "l" at the end). Names such as
 e.g., "newURL" and "oldURL".
 
 <p class=note>The {{EventSource}} and {{HashChangeEvent}} interfaces in <cite>HTML</cite> are
-examples of proper naming. [[!HTML]]
+examples of proper naming. [[HTML]]
 
 
 
 <h2 id=acknowledgments class=no-num>Acknowledgments</h2>
 
-<p>There have been a lot of people that have helped make <a for=/ class=no-backref>URLs</a>
-more interoperable over the years and thereby furthered the goals of this standard. Likewise many
-people have helped making this standard what it is today.
+<p>There have been a lot of people that have helped make <a for=/>URLs</a> more interoperable over
+the years and thereby furthered the goals of this standard. Likewise many people have helped making
+this standard what it is today.
 
 <p>With that, many thanks to
 100の人,<!-- https://twitter.com/esperecyan -->
 Adam Barth,
 Addison Phillips,
+Adrián Chaves,<!-- Gallaecio; GitHub -->
 Albert Wiersch,
 Alex Christensen,
+Alexis Hunt,<!-- alercah; GitHub -->
 Alexandre Morgaut,
 Alexis Hunt,
 Alwin Blok,
@@ -3497,21 +3734,5 @@ Yongsheng Zhang,
 zealousidealroll
 for being awesome!
 
-<p>This standard is written by
-<a lang=nl href=https://annevankesteren.nl/>Anne van Kesteren</a>
-(<a href=https://www.mozilla.org/>Mozilla</a>,
-<a href=mailto:annevk@annevk.nl>annevk@annevk.nl</a>).
-
-<pre class=anchors>
-spec: MEDIA-SOURCE; urlPrefix: https://w3c.github.io/media-source/#idl-def-
-    type: interface; text: MediaSource
-spec: UTS46; urlPrefix: https://www.unicode.org/reports/tr46/
-    type: abstract-op; text: ToASCII; url: #ToASCII
-    type: abstract-op; text: ToUnicode; url: #ToUnicode
-</pre>
-
-<pre class=link-defaults>
-spec:infra; type:dfn;
-    text:code point
-    text:string
-</pre>
+<p>This standard is written by <a lang=nl href=https://annevankesteren.nl/>Anne van Kesteren</a>
+(<a href=https://www.apple.com/>Apple</a>, <a href=mailto:annevk@annevk.nl>annevk@annevk.nl</a>).

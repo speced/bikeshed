@@ -1,6 +1,6 @@
 <pre class='metadata'>
 Title: Cookie Store API
-Shortname: cookiestore
+Shortname: cookie-store
 Level: 1
 Status: CG-DRAFT
 Group: WICG
@@ -14,12 +14,13 @@ Former Editor: Raymond Toy, Google Inc. https://google.com, rtoy@google.com
 Markup Shorthands: markdown yes, css no, biblio yes
 Abstract: An asynchronous Javascript cookies API for documents and service workers
 Test Suite: https://github.com/web-platform-tests/wpt/tree/master/cookie-store
+Include MDN Panels: yes
 </pre>
 
 <pre class=biblio>
 {
   "RFC6265bis": {
-    "authors": [ "A. Barth", "M. West" ],
+    "authors": [ "L. Chen", "S. Englehardt", "M. West", "J. Wilander" ],
     "href": "https://tools.ietf.org/html/draft-ietf-httpbis-rfc6265bis",
     "title": "Cookies: HTTP State Management Mechanism",
     "publisher": "IETF",
@@ -32,14 +33,15 @@ Test Suite: https://github.com/web-platform-tests/wpt/tree/master/cookie-store
 spec: ecma262; urlPrefix: https://tc39.github.io/ecma262/
     type: dfn
         text: time values; url: sec-time-values-and-time-range
-        text: promise; url: sec-promise-objects
+spec: html; urlPrefix: https://html.spec.whatwg.org/multipage/
+    urlPrefix: webappapis.html
+        type: dfn
+            text: DOM manipulation task source; url: dom-manipulation-task-source
 </pre>
 
 <pre class=link-defaults>
-spec:infra; type:dfn; text:list
-spec:html; type:dfn; for:environment settings object; text:global object
-spec:webidl; type:dfn; text:resolve
 spec:service-workers; type:dfn; for:/; text:service worker
+spec:service-workers; type:dfn; for:/; text:service worker registration
 </pre>
 
 <style>
@@ -61,8 +63,18 @@ spec:service-workers; type:dfn; for:/; text:service worker
 }
 </style>
 
-<img src="logo-cookies.svg" alt="logo"
-    style="height: 100px; width: 100px; position: absolute; right: 20px; top: 30px;">
+<img id="speclogo" src="logo-cookies.svg" alt="logo" width="100" height="100">
+<style>
+#speclogo { height: 100px; width: 100px; background-color: transparent; }
+main #speclogo { position: absolute; right: 20px; top: 30px; }
+.logo #speclogo { margin-top: 20px; }
+</style>
+<script>
+(function() {
+  const logo = document.querySelector('.logo');
+  if (logo) logo.appendChild(document.querySelector('#speclogo'));
+})();
+</script>
 
 
 <!-- ============================================================ -->
@@ -94,7 +106,6 @@ Newer parts of the web built in service workers [need access to cookies too](htt
 
 <!-- ============================================================ -->
 ## A Taste of the Proposed Change ## {#intro-proposed-change}
-
 <!-- ============================================================ -->
 
 Although it is tempting to [rethink cookies](https://discourse.wicg.io/t/rethinking-cookies/744) entirely, web sites today continue to rely heavily on them, and the script APIs for using them are largely unchanged over their first decades of usage.
@@ -171,7 +182,7 @@ Both [=documents=] and [=service workers=] access the same query API, via the
 {{Window/cookieStore}} property on the [[#globals|global object]].
 
 The {{CookieStore/get()}} and {{CookieStore/getAll()}} methods on {{CookieStore}} are used to query cookies.
-Both methods return [=promises=].
+Both methods return {{Promise}}s.
 Both methods take the same arguments, which can be either:
 
 * a name, or
@@ -410,7 +421,7 @@ Checking change subscriptions:
 A <dfn>cookie</dfn> is normatively defined for user agents by [[RFC6265bis#section-5|Cookies: HTTP State Management Mechanism §User Agent Requirements]].
 
 <div dfn-for=cookie>
-Per [[RFC6265bis#section-5.4|Cookies: HTTP State Management Mechanism §Storage Model]], a [=cookie=] has the following fields:
+Per [[RFC6265bis#section-5.5|Cookies: HTTP State Management Mechanism §Storage Model]], a [=cookie=] has the following fields:
 <dfn>name</dfn>,
 <dfn>value</dfn>,
 <dfn>expiry-time</dfn>,
@@ -426,7 +437,11 @@ Per [[RFC6265bis#section-5.4|Cookies: HTTP State Management Mechanism §Storage 
 
 </div>
 
-A cookie is <dfn>script-visible</dfn> when it is in-scope and does not have the `HttpOnly` cookie flag. This is more formally enforced in the processing model, which consults [[RFC6265bis#section-5.5|Cookies: HTTP State Management Mechanism §The Cookie Header]] at appropriate points.
+A cookie is <dfn>script-visible</dfn> when it is in-scope and does not have the `HttpOnly` cookie flag. This is more formally enforced in the processing model, which consults [[RFC6265bis#section-5.6|Cookies: HTTP State Management Mechanism §Retrieval Model]] at appropriate points.
+
+A cookie is also subject to certain size limits. Per [[RFC6265bis#section-5.5|Cookies: HTTP State Management Mechanism §Storage Model]]:
+* The combined lengths of the name and value fields must not be greater than 4096 [=byte|bytes=] (the <dfn for=cookie>maximum name/value pair size</dfn>).
+* The length of every field except the name and value fields must not be greater than 1024 [=bytes|bytes=] (the <dfn for=cookie>maximum attribute value size</dfn>).
 
 <!-- ============================================================ -->
 ## Cookie Store ## {#cookie-store--concept}
@@ -446,7 +461,7 @@ When any of the following conditions occur for a [=cookie store=], perform the s
 
 [[Service-Workers]] defines [=service worker registration=], which this specification extends.
 
-A [=service worker registration=] has an associated <dfn>cookie change subscription list</dfn> which is a [=list=];
+A [=service worker registration=] has an associated <dfn>cookie change subscription list</dfn> which is a [=/list=];
 each member is a <dfn>cookie change subscription</dfn>. A [=cookie change subscription=] is
 <span dfn-for="cookie change subscription">
 a [=tuple=] of <dfn>name</dfn> and <dfn>url</dfn>.
@@ -491,7 +506,7 @@ enum CookieSameSite {
 dictionary CookieInit {
   required USVString name;
   required USVString value;
-  DOMTimeStamp? expires = null;
+  EpochTimeStamp? expires = null;
   USVString? domain = null;
   USVString path = "/";
   CookieSameSite sameSite = "strict";
@@ -508,7 +523,7 @@ dictionary CookieListItem {
   USVString value;
   USVString? domain;
   USVString path;
-  DOMTimeStamp? expires;
+  EpochTimeStamp? expires;
   boolean secure;
   CookieSameSite sameSite;
 };
@@ -542,8 +557,8 @@ The <dfn method for=CookieStore>get(|name|)</dfn> method steps are:
     1. Let |list| be the results of running [=query cookies=] with
         |url| and |name|.
     1. If |list| is failure, then [=reject=] |p| with a {{TypeError}} and abort these steps.
-    1. If |list| [=list/is empty=], then [=resolve=] |p| with undefined.
-    1. Otherwise, [=resolve=] |p| with the first item of |list|.
+    1. If |list| [=list/is empty=], then [=/resolve=] |p| with undefined.
+    1. Otherwise, [=/resolve=] |p| with the first item of |list|.
 1. Return |p|.
 
 </div>
@@ -568,8 +583,8 @@ The <dfn method for=CookieStore>get(|options|)</dfn> method steps are:
         |url| and
         |options|["{{CookieStoreGetOptions/name}}"] (if present).
     1. If |list| is failure, then [=reject=] |p| with a {{TypeError}} and abort these steps.
-    1. If |list| [=list/is empty=], then [=resolve=] |p| with undefined.
-    1. Otherwise, [=resolve=] |p| with the first item of |list|.
+    1. If |list| [=list/is empty=], then [=/resolve=] |p| with undefined.
+    1. Otherwise, [=/resolve=] |p| with the first item of |list|.
 1. Return |p|.
 
 </div>
@@ -600,7 +615,7 @@ The <dfn method for=CookieStore>getAll(|name|)</dfn> method steps are:
     1. Let |list| be the results of running [=query cookies=] with
         |url| and |name|.
     1. If |list| is failure, then [=reject=] |p| with a {{TypeError}}.
-    1. Otherwise, [=resolve=] |p| with |list|.
+    1. Otherwise, [=/resolve=] |p| with |list|.
 1. Return |p|.
 
 </div>
@@ -624,7 +639,7 @@ The <dfn method for=CookieStore>getAll(|options|)</dfn> method steps are:
         |url| and
         |options|["{{CookieStoreGetOptions/name}}"] (if present).
     1. If |list| is failure, then [=reject=] |p| with a {{TypeError}}.
-    1. Otherwise, [=resolve=] |p| with |list|.
+    1. Otherwise, [=/resolve=] |p| with |list|.
 1. Return |p|.
 
 </div>
@@ -663,7 +678,7 @@ The <dfn method for=CookieStore>set(|name|, |value|)</dfn> method steps are:
         |name|,
         |value|.
     1. If |r| is failure, then [=reject=] |p| with a {{TypeError}} and abort these steps.
-    1. [=Resolve=] |p| with undefined.
+    1. [=/Resolve=] |p| with undefined.
 1. Return |p|.
 
 </div>
@@ -685,7 +700,7 @@ The <dfn method for=CookieStore>set(|options|)</dfn> method steps are:
         |options|["{{CookieInit/path}}"], and
         |options|["{{CookieInit/sameSite}}"].
     1. If |r| is failure, then [=reject=] |p| with a {{TypeError}} and abort these steps.
-    1. [=Resolve=] |p| with undefined.
+    1. [=/Resolve=] |p| with undefined.
 1. Return |p|.
 
 </div>
@@ -720,7 +735,7 @@ The <dfn method for=CookieStore>delete(|name|)</dfn> method steps are:
         true, and
         "{{CookieSameSite/strict}}".
     1. If |r| is failure, then [=reject=] |p| with a {{TypeError}} and abort these steps.
-    1. [=Resolve=] |p| with undefined.
+    1. [=/Resolve=] |p| with undefined.
 1. Return |p|.
 
 </div>
@@ -739,7 +754,7 @@ The <dfn method for=CookieStore>delete(|options|)</dfn> method steps are:
         |options|["{{CookieStoreDeleteOptions/domain}}"], and
         |options|["{{CookieStoreDeleteOptions/path}}"].
     1. If |r| is failure, then [=reject=] |p| with a {{TypeError}} and abort these steps.
-    1. [=Resolve=] |p| with undefined.
+    1. [=/Resolve=] |p| with undefined.
 1. Return |p|.
 
 </div>
@@ -792,7 +807,7 @@ The <dfn method for=CookieStoreManager>subscribe(|subscriptions|)</dfn> method s
             then [=reject=] |p| with a {{TypeError}} and abort these steps.
         1. Let |subscription| be the [=cookie change subscription=] (|name|, |url|).
         1. If |subscription list| does not already [=list/contain=] |subscription|, then [=list/append=] |subscription| to |subscription list|.
-    1. [=Resolve=] |p| with undefined.
+    1. [=/Resolve=] |p| with undefined.
 1. Return |p|.
 
 </div>
@@ -815,10 +830,10 @@ The <dfn method for=CookieStoreManager>getSubscriptions()</dfn> method steps are
 1. Let |p| be [=a new promise=].
 1. Run the following steps [=in parallel=]:
     1. Let |subscriptions| be |registration|'s associated [=cookie change subscription list=].
-    1. Let |result| be a new [=list=].
+    1. Let |result| be a new [=/list=].
     1. [=list/For each=] |subscription| in |subscriptions|, run these steps:
         1. [=list/Append=] «[ "name" → |subscription|'s [=cookie change subscription/name=], "url" → |subscription|'s [=cookie change subscription/url=]]» to |result|.
-    1. [=Resolve=] |p| with |result|.
+    1. [=/Resolve=] |p| with |result|.
 1. Return |p|.
 
 </div>
@@ -849,7 +864,7 @@ The <dfn method for=CookieStoreManager>unsubscribe(|subscriptions|)</dfn> method
             then [=reject=] |p| with a {{TypeError}} and abort these steps.
         1. Let |subscription| be the [=cookie change subscription=] (|name|, |url|).
         1. [=list/Remove=] any [=list/item=] from |subscription list| equal to |subscription|.
-    1. [=Resolve=] |p| with undefined.
+    1. [=/Resolve=] |p| with undefined.
 1. Return |p|.
 
 </div>
@@ -991,7 +1006,7 @@ The <dfn attribute for=ServiceWorkerGlobalScope>cookieStore</dfn> getter steps a
 
 [=Cookie=] attribute-values are stored as [=byte sequences=], not strings.
 
-To <dfn>encode</dfn> a |string|, run [=UTF-8 encode=] on |string|.
+To encode a |string|, run [=UTF-8 encode=] on |string|.
 
 To <dfn>decode</dfn> a |value|, run [=UTF-8 decode without BOM=] on |value|.
 
@@ -1006,7 +1021,7 @@ Note: This is the same representation used for [=time values=] in [[ECMAScript]]
 
 
 <div algorithm>
-To <dfn>date serialize</dfn> a {{DOMTimeStamp}} |millis|,
+To <dfn>date serialize</dfn> a {{EpochTimeStamp}} |millis|,
 let |dateTime| be the date and time |millis| milliseconds after 00:00:00 UTC, 1 January 1970
 (assuming that there are exactly 86,400,000 milliseconds per day),
 and return a [=byte sequence=] corresponding to the closest `cookie-date` representation of |dateTime| according to [[RFC6265bis#section-5.1.1|Cookies: HTTP State Management Mechanism §Dates]].
@@ -1024,13 +1039,13 @@ To <dfn>query cookies</dfn> with
 optional |name|,
 run the following steps:
 
-1. Perform the steps defined in [[RFC6265bis#section-5.5|Cookies: HTTP State Management Mechanism §The Cookie Header]] to "compute the cookie-string from a cookie store"
+1. Perform the steps defined in [[RFC6265bis#section-5.6|Cookies: HTTP State Management Mechanism §Retrieval Model]] to compute the "cookie-string from a given cookie store"
     with |url| as <var ignore>request-uri</var>.
     The |cookie-string| itself is ignored, but the intermediate |cookie-list| is used in subsequent steps.
 
     For the purposes of the steps, the |cookie-string| is being generated for a "non-HTTP" API.
 
-1. Let |list| be a new [=list=].
+1. Let |list| be a new [=/list=].
 1. [=list/For each=] |cookie| in |cookie-list|, run these steps:
     1. Assert: |cookie|'s [=cookie/http-only-flag=] is false.
     1. If |name| is given, then run these steps:
@@ -1098,18 +1113,32 @@ optional |expires|,
 |sameSite|,
 run the following steps:
 
+1. If |name| or |value| contain U+003B (`;`), any [=C0 control=] character except U+0009 (the horizontal tab character), or U+007F, then return failure.
+
+    ISSUE(httpwg/http-extensions#1593): Note that it's up for discussion whether these character restrictions should also apply to |expires|, |domain|, |path|, and |sameSite| as well.
+
 1. If |name|'s [=string/length=] is 0 and |value| contains U+003D (`=`), then return failure.
 1. If |name|'s [=string/length=] is 0 and |value|'s [=string/length=] is 0, then return failure.
+1. Let |encodedName| be the result of [=UTF-8 encode|UTF-8 encoding=] |name|.
+1. Let |encodedValue| be the result of [=UTF-8 encode|UTF-8 encoding=] |value|.
+1. If the [=byte sequence=] [=byte sequence/length=] of |encodedName| plus the [=byte sequence=] [=byte sequence/length=] of |encodedValue| is greater than the <a for=cookie>maximum name/value pair size</a>, then return failure.
 1. Let |host| be |url|'s [=url/host=]
-1. Let |attributes| be a new [=list=].
+1. Let |attributes| be a new [=/list=].
 1. If |domain| is not null, then run these steps:
     1. If |domain| starts with U+002D (`.`), then return failure.
     1. If |host| does not equal |domain| and
         |host| does not end with U+002D (`.`) followed by |domain|,
         then return failure.
-    1. [=list/Append=] \``Domain`\`/|domain| ([=encoded=]) to |attributes|.
+    1. Let |encodedDomain| be the result of [=UTF-8 encode|UTF-8 encoding=] |domain|.
+    1. If the [=byte sequence=] [=byte sequence/length=] of |encodedDomain| is greater than the [=cookie/maximum attribute value size=], then return failure.
+    1. [=list/Append=] \``Domain`\`/|encodedDomain| to |attributes|.
 1. If |expires| is given, then [=list/append=] \``Expires`\`/|expires| ([=date serialized=]) to |attributes|.
-1. [=list/Append=] \``Path`\`/|path| ([=encoded=]) to |attributes|.
+1. If |path| is not null, then run these steps:
+    1. If |path| does not start with U+002F (`/`), then return failure.
+    1. If |path| does not end with U+002F (`/`), then append U+002F (`/`) to |path|.
+    1. Let |encodedPath| be the result of [=UTF-8 encode|UTF-8 encoding=] |path|.
+    1. If the [=byte sequence=] [=byte sequence/length=] of |encodedPath| is greater than the [=cookie/maximum attribute value size=], then return failure.
+    1. [=list/Append=] \``Path`\`/|encodedPath| to |attributes|.
 1. [=list/Append=] \``Secure`\`/\`\` to |attributes|.
 1. Switch on |sameSite|:
     <dl class=switch>
@@ -1120,10 +1149,10 @@ run the following steps:
         : "{{CookieSameSite/lax}}"
         :: [=list/Append=] \``SameSite`\`/\``Lax`\` to |attributes|.
     </dl>
-1. Perform the steps defined in [[RFC6265bis#section-5.4|Cookies: HTTP State Management Mechanism §Storage Model]] for when the user agent "receives a cookie" with
+1. Perform the steps defined in [[RFC6265bis#section-5.5|Cookies: HTTP State Management Mechanism §Storage Model]] for when the user agent "receives a cookie" with
     |url| as <var ignore>request-uri</var>,
-    |name| ([=encoded=]) as <var ignore>cookie-name</var>,
-    |value| ([=encoded=]) as <var ignore>cookie-value</var>, and
+    |encodedName| as <var ignore>cookie-name</var>,
+    |encodedValue| as <var ignore>cookie-value</var>, and
     |attributes| as <var ignore>cookie-attribute-list</var>.
 
     For the purposes of the steps, the newly-created cookie was received from a "non-HTTP" API.
@@ -1147,6 +1176,10 @@ To <dfn>delete a cookie</dfn> with
 |domain| and
 |path|,
 run the following steps:
+
+1. If |path| is not null, then run these steps:
+    1. If |path| does not start with U+002F (`/`), then return failure.
+    1. If |path| does not end with U+002F (`/`), then append U+002F (`/`) to |path|.
 
 1. Let |expires| be the earliest representable date represented [=as a timestamp=].
 
@@ -1183,7 +1216,7 @@ To <dfn>process cookie changes</dfn>, run the following steps:
     1. Let |url| be |window|'s [=creation URL=].
     1. Let |changes| be the [=observable changes=] for |url|.
     1. If |changes| [=set/is empty=], then [=continue=].
-    1. [=Queue a global task=] on the [=DOM manipulation task source=] given |window| to
+    1. [=Queue a global task=] on the [=/DOM manipulation task source=] given |window| to
         [=fire a change event=] named "`change`" with |changes| at |window|'s {{CookieStore}}.
 
 1. For every [=service worker registration=] |registration|, run the following steps:
@@ -1210,7 +1243,7 @@ To <dfn>process cookie changes</dfn>, run the following steps:
 <div algorithm>
 
 The <dfn>observable changes</dfn> for |url| are the [=/set=] of [=cookie changes=] to [=cookies=] in a [=cookie store=]
-which meet the requirements in step 1 of [[RFC6265bis#section-5.5|Cookies: HTTP State Management Mechanism §The Cookie Header]]'s steps to "compute the cookie-string from a cookie store"
+which meet the requirements in step 1 of [[RFC6265bis#section-5.6.3|Cookies: HTTP State Management Mechanism §Retrieval Algorithm]]'s steps to compute the "cookie-string from a given cookie store"
 with |url| as <var ignore>request-uri</var>, for a "non-HTTP" API.
 
 </div>
@@ -1244,8 +1277,8 @@ To <dfn>fire a change event</dfn> named |type| with |changes| at |target|, run t
 
 To <dfn>prepare lists</dfn> from |changes|, run the following steps:
 
-1. Let |changedList| be a new [=list=].
-1. Let |deletedList| be a new [=list=].
+1. Let |changedList| be a new [=/list=].
+1. Let |deletedList| be a new [=/list=].
 1. [=set/For each=] |change| in |changes|, run these steps:
     1. Let |item| be the result of running [=create a CookieListItem=] from |change|'s cookie.
     1. If |change|'s type is *changed*, then [=list/append=] |item| to |changedList|.
@@ -1271,7 +1304,7 @@ Although browser cookie implementations are now evolving in the direction of bet
 
     * unsecured origins can typically overwrite cookies used on secure origins
     * superdomains can typically overwrite cookies seen by subdomains
-    * cross-site scripting attacts and other script and header injection attacks can be used to forge cookies too
+    * cross-site scripting attacks and other script and header injection attacks can be used to forge cookies too
     * cookie read operations (both from script and on web servers) don't give any indication of where the cookie came from
     * browsers sometimes truncate, transform or evict cookie data in surprising and counterintuitive ways
         * ... due to reaching storage limits
@@ -1284,7 +1317,7 @@ For these reasons it is best to use caution when interpreting any cookie's value
 ## Restrict? ## {#restrict}
 <!-- ============================================================ -->
 
-This API may have the unintended side-effect of making cookies easier to use and consequently encouraging their further use. If it causes their further use in unsecured `http` contexts this could result in a web less safe for users. For that reason this API has been restricted to secure contexts only.
+This API may have the unintended side-effect of making cookies easier to use and consequently encouraging their further use. If it causes their further use in [=non-secure contexts=] this could result in a web less safe for users. For that reason this API has been restricted to [=secure contexts=] only.
 
 <!-- ============================================================ -->
 ## Secure cookies ## {#secure-cookies}
@@ -1298,7 +1331,7 @@ This API only allows writes for `Secure` cookies to encourage better decisions a
 ## Surprises ## {#surprises}
 <!-- ============================================================ -->
 
-Some existing cookie behavior (especially domain-rather-than-origin orientation, unsecured contexts being able to set cookies readable in secure contexts, and script being able to set cookies unreadable from script contexts) may be quite surprising from a web security standpoint.
+Some existing cookie behavior (especially domain-rather-than-origin orientation, [=non-secure contexts=] being able to set cookies readable in [=secure contexts=], and script being able to set cookies unreadable from script contexts) may be quite surprising from a web security standpoint.
 
 Other surprises are documented in [[RFC6265bis#section-1|Section 1 of Cookies: HTTP State Management Mechanism (RFC 6265bis)]] - for instance, a cookie may be set for a superdomain (e.g. app.example.com may set a cookie for the whole example.com domain), and a cookie may be readable across all port numbers on a given domain name.
 
@@ -1308,7 +1341,7 @@ Further complicating this are historical differences in cookie-handling across m
 ## Prefixes ## {#prefixes}
 <!-- ============================================================ -->
 
-Where feasible the examples use the `__Host-` and `__Secure-` name prefixes which causes some current browsers to disallow overwriting from unsecured contexts, disallow overwriting with no `Secure` flag, and &mdash; in the case of `__Host-` &mdash; disallow overwriting with an explicit `Domain` or non-'/' `Path` attribute (effectively enforcing same-origin semantics.) These prefixes provide important security benefits in those browsers implementing Secure Cookies and degrade gracefully (i.e. the special semantics may not be enforced in other cookie APIs but the cookies work normally and the async cookies API enforces the secure semantics for write operations) in other browsers. A major goal of this API is interoperation with existing cookies, though, so a few examples have also been provided using cookie names lacking these prefixes.
+Where feasible the examples use the `__Host-` and `__Secure-` name prefixes which causes some current browsers to disallow overwriting from [=non-secure contexts=], disallow overwriting with no `Secure` flag, and &mdash; in the case of `__Host-` &mdash; disallow overwriting with an explicit `Domain` or non-'/' `Path` attribute (effectively enforcing same-origin semantics.) These prefixes provide important security benefits in those browsers implementing Secure Cookies and degrade gracefully (i.e. the special semantics may not be enforced in other cookie APIs but the cookies work normally and the async cookies API enforces the secure semantics for write operations) in other browsers. A major goal of this API is interoperation with existing cookies, though, so a few examples have also been provided using cookie names lacking these prefixes.
 
 Prefix rules are also enforced in write operations by this API, but may not be enforced in the same browser for other APIs. For this reason it is inadvisable to rely on their enforcement too heavily until and unless they are more broadly adopted.
 
@@ -1352,6 +1385,7 @@ Many thanks to
 Adam Barth,
 Alex Russell,
 Andrea Marchesini,
+Andrew Williams,
 Anne van Kesteren,
 Ben Kelly,
 Craig Francis,

@@ -1,34 +1,26 @@
 <pre class='metadata'>
 Title: MediaStreamTrack Insertable Media Processing using Streams
-Shortname: mediacapture-insertable-streams
+Shortname: mediacapture-transform
 Level: None
-Status: UD
+Status: ED
 Group: webrtc
-Repository: w3c/mediacapture-insertable-streams
-URL: https://w3c.github.io/mediacapture-insertable-streams/
-Editor: Harald Alvestrand, Google https://google.com, hta@google.com
-Editor: Guido Urdaneta, Google https://google.com, guidou@google.com
+Repository: w3c/mediacapture-transform
+TR: https://www.w3.org/TR/mediacapture-transform/
+URL: https://w3c.github.io/mediacapture-transform/
+Editor: Harald Alvestrand, w3cid 24610, Google https://google.com, hta@google.com
+Editor: Guido Urdaneta, w3cid 84810, Google https://google.com, guidou@google.com
 Abstract: This API defines an API surface for manipulating the bits on
 Abstract: {{MediaStreamTrack}}s carrying raw data.
-Abstract: NOT AN ADOPTED WORKING GROUP DOCUMENT.
 Markup Shorthands: css no, markdown yes
 </pre>
 <pre class=anchors>
-url: https://wicg.github.io/web-codecs/#videoframe; text: VideoFrame; type: interface; spec: WEBCODECS
-url: https://wicg.github.io/web-codecs/#audioframe; text: AudioFrame; type: interface; spec: WEBCODECS
+url: https://w3c.github.io/webcodecs/#videoframe; text: VideoFrame; type: interface; spec: WEBCODECS
+url: https://w3c.github.io/webcodecs/#videoencoder; text: VideoEncoder; type: interface; spec: WEBCODECS
+url: https://streams.spec.whatwg.org/#readablestream-controller; text: [[controller]]; for: ReadableStream; type: dfn; spec: STREAMS
 </pre>
-<pre class=biblio>
-{
-  "WEBCODECS": {
-     "href":
-     "https://wicg.github.io/web-codecs/",
-     "title": "WebCodecs"
-   },
-  "MEDIACAPTURE-SCREEN-SHARE": {
-    "href": "https://w3c.github.io/mediacapture-screen-share/",
-    "title": "Screen Capture"
-  }
-}
+<pre class=link-defaults>
+spec:infra; type:dfn; text:queue
+spec:streams; type:interface; text:WritableStream
 </pre>
 
 # Introduction # {#introduction}
@@ -43,17 +35,25 @@ including, but not limited to:
 These use cases further require that processing can be done in worker
 threads (requirement N23-N24).
 
-This specification gives an interface inspired by [[WEBCODECS]] to
+This specification gives an interface based on [[WEBCODECS]] and [[STREAMS]] to
 provide access to such functionality.
 
 This specification provides access to raw media,
 which is the output of a media source such as a camera, microphone, screen capture,
 or the decoder part of a codec and the input to the
 decoder part of a codec. The processed media can be consumed by any destination
-that can take a MediaStreamTrack, including HTML &lt;video&gt; and &lt;audio&gt; tags,
+that can take a MediaStreamTrack, including HTML &lt;video&gt; tags,
 RTCPeerConnection, canvas or MediaRecorder.
 
-# Terminology # {#terminology}
+This specification explicitly aims to support the following use cases:
+- *Video processing*: This is the "Funny Hats" use case, where the input is a single video track and the output is a transformed video track.
+  - *Custom video sink*: In this use case, the purpose is not producing a processed {{MediaStreamTrack}}, but to consume the media in a different way. For example, an application could use [[WEBCODECS]] and [[WEBTRANSPORT]] to create an {{RTCPeerConnection}}-like sink, but using different codec configuration and networking protocols.
+  - *Multi-source processing*: In this use case, two or more tracks are combined into one. For example, a presentation containing a live weather map and a camera track with the speaker can be combined to produce a weather report application.
+
+Note: There is no WG consensus on whether or not audio use cases should be supported.
+
+Note: The WG expects that the Streams spec will adopt the solutions outlined in
+[the relevant explainer](https://github.com/whatwg/streams/blob/main/streams-for-raw-video-explainer.md), to solve some issues with the current Streams specification.
 
 # Specification # {#specification}
 
@@ -62,19 +62,59 @@ It defines some new objects that inherit the {{MediaStreamTrack}} interface, and
 can be constructed from a {{MediaStreamTrack}}.
 
 The API consists of two elements. One is a track sink that is
-capable of exposing the unencoded frames from the track to a ReadableStream, and exposes a control
-channel for signals going in the oppposite direction. The other one is the inverse of that: it takes
-video frames as input, and emits control signals that result from subsequent processing.
+capable of exposing the unencoded media frames from the track to a ReadableStream.
+The other one is the inverse of that: it provides a track source that takes
+media frames as input.
 
 <!-- ## Extension operation ## {#operation} -->
 
-## MediaStreamTrackProcessor interface ## {#track-processor}
+## MediaStreamTrackProcessor ## {#track-processor}
+
+A {{MediaStreamTrackProcessor}} allows the creation of a
+{{ReadableStream}} that can expose the media flowing through
+a given {{MediaStreamTrack}}. If the {{MediaStreamTrack}} is a video track,
+the chunks exposed by the stream will be {{VideoFrame}} objects.
+
+This makes {{MediaStreamTrackProcessor}} effectively a sink in the
+<a href="https://www.w3.org/TR/mediacapture-streams/#the-model-sources-sinks-constraints-and-settings">
+MediaStream model</a>.
+
+A {{MediaStreamTrackProcessor}} internally contains a circular queue
+that allows buffering incoming media frames delivered by the track it
+is connected to. This buffering allows the {{MediaStreamTrackProcessor}}
+to temporarily hold frames waiting to be read from its associated {{ReadableStream}}.
+The application can influence the maximum size of the queue via a parameter
+provided in the {{MediaStreamTrackProcessor}} constructor. However, the
+maximum size of the queue is decided by the UA and can change dynamically,
+but it will not exceed the size requested by the application.
+If the application does not provide a maximum size parameter, the UA is free
+to decide the maximum size of the queue.
+
+When a new frame arrives to the
+{{MediaStreamTrackProcessor}}, if the queue has reached its maximum size,
+the oldest frame will be removed from the queue, and the new frame will be
+added to the queue. This means that for the particular case of a queue
+with a maximum size of 1, if there is a queued frame, it will aways be
+the most recent one.
+
+The UA is also free to remove any frames from the queue at any time. The UA
+may remove frames in order to save resources or to improve performance in
+specific situations. In all cases, frames that are not dropped
+must be made available to the {{ReadableStream}} in the order in which
+they arrive to the {{MediaStreamTrackProcessor}}.
+
+A {{MediaStreamTrackProcessor}} makes frames available to its
+associated {{ReadableStream}} only when a read request has been issued on
+the stream. The idea is to avoid the stream's internal buffering, which
+does not give the UA enough flexibility to choose the buffering policy.
+
+### Interface definition ### {#track-processor-interface}
 
 <pre class="idl">
+[Exposed=DedicatedWorker]
 interface MediaStreamTrackProcessor {
     constructor(MediaStreamTrackProcessorInit init);
-    attribute ReadableStream readable;  // VideoFrame or AudioFrame
-    attribute WritableStream writableControl;  // MediaStreamTrackSignal
+    attribute ReadableStream readable;
 };
 
 dictionary MediaStreamTrackProcessorInit {
@@ -83,214 +123,604 @@ dictionary MediaStreamTrackProcessorInit {
 };
 </pre>
 
-### Internal slots
+Note: There is WG consensus that the interface should be exposed on DedicatedWorker.
+There is no WG consensus on whether or not the interface should not be exposed on Window.
+
+
+### Internal slots ### {#internal-slots-processor}
 <dl>
-<dt><dfn for=MediaStreamTrackProcessor>`[[track]]`</dfn></dt>
+<dt><dfn attribute for=MediaStreamTrackProcessor>`[[track]]`</dfn></dt>
 <dd>Track whose raw data is to be exposed by the {{MediaStreamTrackProcessor}}.</dd>
-<dt><dfn for=MediaStreamTrackProcessor>`[[maxBufferSize]]`</dfn></dt>
-<dd>The maximum number of media frames buffered by the {{MediaStreamTrackProcessor}}.</dd>
+<dt><dfn attribute for=MediaStreamTrackProcessor>`[[maxBufferSize]]`</dfn></dt>
+<dd>The maximum number of media frames to be buffered by the {{MediaStreamTrackProcessor}}
+as specified by the application. It may have no value if the application does
+not provide it. Its minimum valid value is 1.</dd>
+<dt><dfn attribute for=MediaStreamTrackProcessor>`[[queue]]`</dfn></dt>
+<dd>A [=queue=] used to buffer media frames not yet read by the application</dd>
+<dt><dfn attribute for=MediaStreamTrackProcessor>`[[numPendingReads]]`</dfn></dt>
+<dd>An integer whose value represents the number of read requests issued by the
+application that have not yet been handled.
+</dd>
+<dt><dfn attribute for=MediaStreamTrackProcessor>`[[isClosed]]`</dfn></dt>
+<dd>An boolean whose value indicates if the {{MediaStreamTrackProcessor}} is closed.
+</dd>
 </dl>
 
-### Constructor
+### Constructor ### {#constructor-processor}
 <dfn constructor for=MediaStreamTrackProcessor title="MediaStreamTrackProcessor(init)">
   MediaStreamTrackProcessor(|init|)
 </dfn>
 1. If |init|.{{MediaStreamTrackProcessorInit/track}} is not a valid {{MediaStreamTrack}},
     throw a {{TypeError}}.
 2. Let |processor| be a new {{MediaStreamTrackProcessor}} object.
-3. Assign |init|.{{MediaStreamTrackProcessorInit/track}} to the `[[track]]`
-    internal slot of |processor|.
-3. Assign |init|.{{MediaStreamTrackProcessorInit/maxBufferSize}} to the `[[maxBufferSize]]`
-    internal slot of |processor|.
-4. Return |processor|.
+3. Assign |init|.{{MediaStreamTrackProcessorInit/track}} to |processor|.`[[track]]`.
+4. If |init|.{{MediaStreamTrackProcessorInit/maxBufferSize}} has a integer value greater than or equal to 1, assign it to |processor|.`[[maxBufferSize]]`.
+6. Set the `[[queue]]` internal slot of |processor| to an empty [=queue=].
+7. Set |processor|.`[[numPendingReads]]` to 0.
+8. Set |processor|.`[[isClosed]]` to false.
+9. Return |processor|.
 
-### Attributes
+### Attributes ### {#attributes-processor}
 <dl>
-<dt><dfn for=MediaStreamTrackProcessor>readable</dfn></dt>
-<dd>Allows reading the frames flowing through the {{MediaStreamTrack}} stored
-in the `[[track]]` internal slot. If `[[track]]`
-is a video track, chunks read from {{MediaStreamTrackProcessor/readable}} will be {{VideoFrame}}
-objects. If `[[track]]` is an audio track, chunks read from
-{{MediaStreamTrackProcessor/readable}} will produce {{AudioFrame}} objects.
-If media frames are not read from {{MediaStreamTrackProcessor/readable}} quickly enough,
-the {{MediaStreamTrackProcessor}} will internally buffer up to `[[maxBufferSize]]`
-of the frames produced by `[[track]]`. If the internal buffer
-is full, each time `[[track]]` produces a new frame, the oldest frame
-in the buffer MUST be dropped and the new frame MUST be added to the buffer.
-</dd>
-<p class="note">
-The application may detect that frames have been dropped by noticing that there is a gap in the
-timestamps of the frames.
-</p>
-<dt><dfn for=MediaStreamTrackProcessor>writableControl</dfn></dt>
-<dd>Allows sending control signals to `[[track]]`.
-Control signals are objects of type {{MediaStreamTrackSignal}}.
+<dt><dfn attribute for=MediaStreamTrackProcessor>readable</dfn></dt>
+<dd>Allows reading the frames delivered by the {{MediaStreamTrack}} stored
+in the `[[track]]` internal slot. This attribute is created the first time it is invoked
+according to the following steps:
+1. Initialize [=this=].{{MediaStreamTrackProcessor/readable}} to be a new {{ReadableStream}}.
+2. <a dfn for="ReadableStream">Set up</a> [=this=].{{MediaStreamTrackProcessor/readable}} with its [=ReadableStream/set up/pullAlgorithm=] set to [=processorPull=] with [=this=] as parameter, [=ReadableStream/set up/cancelAlgorithm=] set to [=processorCancel=] with [=this=] as parameter, and [=ReadableStream/set up/highWatermark=] set to 0.
+
+The <dfn>processorPull</dfn> algorithm is given a |processor| as input. It is defined by the following steps:
+1. Increment the value of the |processor|.`[[numPendingReads]]` by 1.
+2. [=Queue a task=] to run the [=maybeReadFrame=] algorithm with |processor| as parameter.
+3. Return  [=a promise resolved with=] undefined.
+
+The <dfn>maybeReadFrame</dfn> algorithm is given a |processor| as input. It is defined by the following steps:
+1. If |processor|.`[[queue]]` is [=queue/empty=], abort these steps.
+2. If |processor|.`[[numPendingReads]]` equals zero, abort these steps.
+3. [=queue/Dequeue=] a frame from |processor|.`[[queue]]` and [=ReadableStream/Enqueue=] it in |processor|.{{MediaStreamTrackProcessor/readable}}.
+4. Decrement |processor|.`[[numPendingReads]]` by 1.
+5. Go to step 1.
+
+The <dfn>processorCancel</dfn> algorithm is given a |processor| as input.
+It is defined by running the following steps:
+1. Run the [=processorClose=] algorithm with |processor| as parameter.
+3. Return  [=a promise resolved with=] undefined.
+
+The <dfn>processorClose</dfn> algorithm is given a |processor| as input.
+It is defined by running the following steps:
+1. If |processor|.`[[isClosed]]` is true, abort these steps.
+2. Disconnect |processor| from |processor|.`[[track]]`. The mechanism to do this is UA specific and the result is that |processor| is no longer a sink of |processor|.`[[track]]`.
+3. [$ReadableStreamDefaultControllerClose|Close$] |processor|.{{MediaStreamTrackProcessor/readable}}.[=ReadableStream/[[controller]]=].
+4. [=list/Empty=] |processor|.`[[queue]]`.
+5. Set |processor|.`[[isClosed]]` to true.
+
 </dd>
 </dl>
 
+### Handling interaction with the track ### {#processor-handling-interaction-with-track}
+When the `[[track]]` of a {{MediaStreamTrackProcessor}} |processor| delivers a
+frame to |processor|, the UA MUST execute the [=handleNewFrame=] algorithm
+with |processor| as parameter.
 
-## MediaStreamTrackGenerator interface ## {#track-generator}
+The <dfn>handleNewFrame</dfn> algorithm is given a |processor| as input.
+It is defined by running the following steps:
+1. If |processor|.`[[maxBufferSize]]` has a value and |processor|.`[[queue]]` has |processor|.`[[maxBufferSize]]` elements, [=queue/dequeue=] an item from |processor|.`[[queue]]`.
+2. [=queue/Enqueue=] the new frame in |processor|.`[[queue]]`.
+3. [=Queue a task=] to run the [=maybeReadFrame=] algorithm with |processor| as parameter.
+
+At any time, the UA MAY [=list/remove=] any frame from |processor|.`[[queue]]`.
+The UA may decide to remove frames from |processor|.`[[queue]]`, for example,
+to prevent resource exhaustion or to improve performance in certain situations.
+</dd>
+
+<p class="note">
+The application may detect that frames have been dropped by noticing that there
+is a gap in the timestamps of the frames.
+</p>
+</dl>
+
+When the `[[track]]` of a {{MediaStreamTrackProcessor}} |processor|
+[=track|ends=], the [=processorClose=] algorithm must be
+executed with |processor| as parameter.
+
+
+## VideoTrackGenerator ## {#video-track-generator}
+A {{VideoTrackGenerator}} allows the creation of a video source for a
+{{MediaStreamTrack}} in the
+<a href="https://www.w3.org/TR/mediacapture-streams/#the-model-sources-sinks-constraints-and-settings">
+MediaStream model</a> that generates its frames from a Stream of {{VideoFrame}} objects. It has two readonly
+attributes: a {{VideoTrackGenerator/writable}} {{WritableStream}} and a
+{{VideoTrackGenerator/track}} {{MediaStreamTrack}}.
+
+The {{VideoTrackGenerator}} is the underlying sink] of its
+{{VideoTrackGenerator/writable}} attribute. The {{VideoTrackGenerator/track}} attribute
+is the output. Further tracks connected to the same {{VideoTrackGenerator}} can be
+created using the {{MediaStreamTrack/clone}} method on the
+{{VideoTrackGenerator/track}} attribute.
+
+The {{WritableStream}} accepts {{VideoFrame}} objects.
+When a {{VideoFrame}} is written to {{VideoTrackGenerator/writable}},
+the frame's `close()` method is automatically invoked, so that its internal
+resources are no longer accessible from JavaScript.
+
+Note: There is consensus in the WG that a source capable of generating a MediaStreamTrack of kind "video" should exist.
+There is no WG consensus on whether or not a source capable of generating a MediaStreamTrack of kind "audio" should exist.
+
+
+### Interface definition ### {#video-generator-interface}
 <pre class="idl">
+[Exposed=DedicatedWorker]
+interface VideoTrackGenerator {
+  constructor();
+  readonly attribute WritableStream writable;
+  attribute boolean muted;
+  readonly attribute MediaStreamTrack track;
+};
+</pre>
+
+Note: There is WG consensus that this interface should be exposed on DedicatedWorker.
+There is no WG consensus on whether or not it should be exposed on Window.
+
+### Internal slots ### {#internal-slots}
+<dl>
+<dt><dfn attribute for=VideoTrackGenerator>`[[track]]`</dfn></dt>
+<dd>The {{MediaStreamTrack}} output of this source</dd>
+<dt><dfn attribute for=VideoTrackGenerator>`[[isMuted]]`</dfn></dt>
+<dd>A boolean whose value indicates whether this source and all the
+{{MediaStreamTrack}}s it sources, are currently {{MediaStreamTrack/muted}} or not.
+</dd>
+</dl>
+
+### Constructor ### {#video-generator-constructor}
+<dfn constructor for=VideoTrackGenerator title="VideoTrackGenerator(init)">
+  VideoTrackGenerator()
+</dfn>
+1. Let |generator| be a new {{VideoTrackGenerator}} object.
+1. Let |track| be a newly [=Create a MediaStreamTrack|created=] {{MediaStreamTrack}} with <var>source</var> set to |generator| and <var>tieSourceToContext</var> set to <code>false</code>.
+1. Initialize |generator|.{{VideoTrackGenerator/track}} to |track|.
+4. Return |generator|.
+
+### Attributes ### {#video-generator-attributes}
+<dl>
+<dt><dfn attribute for=VideoTrackGenerator>writable</dfn></dt>
+<dd>Allows writing video frames to the {{VideoTrackGenerator}}. When this attribute
+is accessed for the first time, it MUST be initialized with the following steps:
+1. Initialize [=this=].{{VideoTrackGenerator/writable}} to be a new {{WritableStream}}.
+2. <a dfn for="WritableStream">Set up</a> [=this=].{{VideoTrackGenerator/writable}}, with its [=WritableStream/set up/writeAlgorithm=] set to [=writeFrame=] with |this| as parameter, with [=WritableStream/set up/closeAlgorithm=] set to [=closeWritable=] with |this| as parameter and [=WritableStream/set up/abortAlgorithm=] set to [=closeWritable=] with |this| as parameter.
+
+The <dfn>writeFrame</dfn> algorithm is given a |generator| and a |frame| as input. It is defined by running the following steps:
+1. If |frame| is not a {{VideoFrame}} object, return [=a promise rejected with= a {{TypeError}}.
+1. If |generator|.`[[isMuted]]` is false, send the media data backing |frame| to all live tracks sourced from |generator|.
+1. Invoke the `close` method of |frame|.
+1. Return [=a promise resolved with=] undefined.
+
+<p class="note">
+When the media data is sent to a track, the UA may apply processing
+(e.g., cropping and downscaling) to ensure that the media data sent
+to the track satisfies the track's constraints. Each track may receive a
+different version of the media data depending on its constraints.
+</p>
+
+The <dfn>closeWritable</dfn> algorithm is given a |generator| as input.
+It is defined by running the following steps.
+1. For each track `t` sourced from |generator|, [=track|end=] `t`.
+2. Return [=a promise resolved with=] undefined.
+
+</dd>
+<dt><dfn attribute for=VideoTrackGenerator>muted</dfn></dt>
+<dd>Mutes the {{VideoTrackGenerator}}. The getter steps are to return
+[=this=].`[[isMuted]]`. The setter steps, given a value |newValue|, are as follows:
+1. If |newValue| is equal to [=this=].`[[isMuted]]`, abort these steps.
+1. Set [=this=].`[[isMuted]]` to |newValue|.
+1. Unless one has been queued already this run of the event loop, [=queue a task=] to run the following steps:
+    1. Let |settledValue| be [=this=].`[[isMuted]]`.
+    1. For each live track sourced by [=this=], [=queue a task=] to [=set a track's muted state=] to |settledValue|.
+
+</dd>
+<dt><dfn attribute for=VideoTrackGenerator>track</dfn></dt>
+<dd>The {{MediaStreamTrack}} output. The getter steps are to return
+[=this=].`[[track]]`.
+</dd>
+</dl>
+
+### Specialization of MediaStreamTrack behavior ### {#video-generator-as-track}
+A {{VideoTrackGenerator}} acts as the source for one or more {{MediaStreamTrack}}s.
+This section adds clarifications on how a {{MediaStreamTrack}} sourced from a
+{{VideoTrackGenerator}} behaves.
+
+#### stop #### {#video-generator-stop}
+The {{MediaStreamTrack/stop}} method stops the track. When the last track
+sourced from a {{VideoTrackGenerator}} ends, that {{VideoTrackGenerator}}'s
+{{VideoTrackGenerator/writable}} is [=WritableStream/closing|closed=].
+
+
+#### Constrainable properties #### {#generator-constrainable-properties}
+
+The following constrainable properties are defined for any {{MediaStreamTrack}}s sourced from
+a {{VideoTrackGenerator}}:
+<table>
+  <thead>
+    <tr>
+      <th>
+        Property Name
+      </th>
+      <th>
+        Values
+      </th>
+      <th>
+        Notes
+      </th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr id="def-constraint-width">
+      <td>
+        width
+      </td>
+      <td>
+        {{ConstrainULong}}
+      </td>
+      <td>
+        As a setting, this is the width, in pixels, of the latest
+        frame received by the track.
+        As a capability, `max` MUST reflect the
+        largest width a {{VideoFrame}} may have, and `min`
+        MUST reflect the smallest width a {{VideoFrame}} may have.
+      </td>
+    </tr>
+    <tr id="def-constraint-height">
+      <td>
+        height
+      </td>
+      <td>
+        {{ConstrainULong}}
+      </td>
+      <td>
+        As a setting, this is the height, in pixels, of the latest
+        frame received by the track.
+        As a capability, `max` MUST reflect the largest height
+        a {{VideoFrame}} may have, and `min` MUST reflect
+        the smallest height a {{VideoFrame}} may have.
+      </td>
+    </tr>
+    <tr id="def-constraint-frameRate">
+      <td>
+        frameRate
+      </td>
+      <td>
+        {{ConstrainDouble}}
+      </td>
+      <td>
+        As a setting, this is an estimate of the frame rate based on frames
+        recently received by the track.
+        As a capability `min` MUST be zero and
+        `max` MUST be the maximum frame rate supported by the system.
+      </td>
+    </tr>
+    <tr id="def-constraint-aspect">
+      <td>
+        aspectRatio
+      </td>
+      <td>
+        {{ConstrainDouble}}
+      </td>
+      <td>
+        As a setting, this is the aspect ratio of the latest frame
+        delivered by the track;
+        this is the width in pixels divided by height in pixels as a
+        double rounded to the tenth decimal place. As a capability,
+        `min` MUST be the
+        smallest aspect ratio supported by a {{VideoFrame}}, and `max` MUST be
+        the largest aspect ratio supported by a {{VideoFrame}}.
+      </td>
+    </tr>
+    <tr id="def-constraint-resizeMode">
+      <td>
+        resizeMode
+      </td>
+      <td>
+        {{ConstrainDOMString}}
+      </td>
+      <td>
+        As a setting, this string should be one of the members of
+        {{VideoResizeModeEnum}}. The value "{{VideoResizeModeEnum/none}}"
+        means that the frames output by the MediaStreamTrack are unmodified
+        versions of the frames written to the
+        {{VideoTrackGenerator/writable}} backing
+        the track, regardless of any constraints.
+        The value "{{VideoResizeModeEnum/crop-and-scale}}" means
+        that the frames output by the MediaStreamTrack may be cropped and/or
+        downscaled versions
+        of the source frames, based on the values of the width, height and
+        aspectRatio constraints of the track.
+        As a capability, the values "{{VideoResizeModeEnum/none}}" and
+        "{{VideoResizeModeEnum/crop-and-scale}}" both MUST be present.
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+The {{MediaStreamTrack/applyConstraints}} method applied to a video {{MediaStreamTrack}}
+sourced from a {{VideoTrackGenerator}} supports the properties defined above.
+It can be used, for example, to resize frames or adjust the frame rate of the track.
+Note that these constraints have no effect on the {{VideoFrame}} objects
+written to the {{VideoTrackGenerator/writable}} of a {{VideoTrackGenerator}},
+just on the output of the track on which the constraints have been applied.
+Note also that, since a {{VideoTrackGenerator}} can in principle produce
+media data with any setting for the supported constrainable properties,
+an {{MediaStreamTrack/applyConstraints}} call on a track
+backed by a {{VideoTrackGenerator}} will generally not fail with
+{{OverconstrainedError}} unless the given constraints
+are outside the system-supported range, as reported by
+{{MediaStreamTrack/getCapabilities}}.
+
+#### Events and attributes #### {#generator-events-attributes}
+Events and attributes work the same as for any {{MediaStreamTrack}}.
+It is relevant to note that if the {{VideoTrackGenerator/writable}}
+stream of a {{VideoTrackGenerator}} is closed, all the live
+tracks connected to it are ended and the `ended` event is fired on them.
+
+# Examples # {#examples}
+## Video Processing ## {#video-processing}
+Consider a face recognition function `detectFace(videoFrame)` that returns a face position
+(in some format), and a manipulation function `blurBackground(videoFrame, facePosition)` that
+returns a new VideoFrame similar to the given `videoFrame`, but with the
+non-face parts blurred. The example also shows the video before and after
+effects on video elements.
+
+<pre class="example" highlight="js">
+// main.js
+
+const stream = await navigator.mediaDevices.getUserMedia({video:true});
+const videoBefore = document.getElementById('video-before');
+const videoAfter = document.getElementById('video-after');
+videoBefore.srcObject = stream.clone();
+
+const [track] = stream.getVideoTracks();
+const worker = new Worker('worker.js');
+worker.postMessage({track}, [track]);
+
+const {data} = await new Promise(r => worker.onmessage);
+videoAfter.srcObject = new MediaStream([data.track]);
+
+// worker.js
+
+self.onmessage = async ({data: {track}}) => {
+  const source = new VideoTrackGenerator();
+  parent.postMessage({track: source.track}, [source.track]);
+
+  const {readable} = new MediaStreamTrackProcessor({track});
+  const transformer = new TransformStream({
+    async transform(frame, controller) {
+      const facePosition = await detectFace(frame);
+      const newFrame = blurBackground(frame, facePosition);
+      frame.close();
+      controller.enqueue(newFrame);
+    }
+  });
+  await readable.pipeThrough(transformer).pipeTo(source.writable);
+};
+</pre>
+
+## Multi-consumer post-processing with constraints ## {#multi-consumer-constraints}
+A common use case is to remove the background from live camera video fed into a
+video conference, with a live self-view showing the result. It's desirable for
+the self-view to have a high frame rate even if the frame rate used for actual
+sending may dip lower due to back pressure from bandwidth constraints. This can
+be achieved by applying constraints to a track clone, avoiding having to process
+twice.
+
+<pre class="example" highlight="js">
+// main.js
+
+const stream = await navigator.mediaDevices.getUserMedia({video:true});
+const [track] = stream.getVideoTracks();
+const worker = new Worker('worker.js');
+worker.postMessage({track}, [track]);
+
+const {data} = await new Promise(r => worker.onmessage);
+const selfView = document.getElementById('video-self');
+selfView.srcObject = new MediaStream([data.track.clone()]); // 60 fps
+
+await data.track.applyConstraints({width: 320, height: 200, frameRate: 30});
+const pc = new RTCPeerConnection(config);
+pc.addTrack(data.track); // 30 fps
+
+// worker.js
+
+self.onmessage = async ({data: {track}}) => {
+  const source = new VideoTrackGenerator();
+  parent.postMessage({track: source.track}, [source.track]);
+
+  const {readable} = new MediaStreamTrackProcessor({track});
+  const transformer = new TransformStream({transform: myRemoveBackgroundFromVideo});
+  await readable.pipeThrough(transformer).pipeTo(source.writable);
+};
+</pre>
+
+## Multi-consumer post-processing with constraints in a worker ## {#multi-consumer-worker}
+Being able to show a higher frame-rate self-view is also relevant when sending
+video frames over WebTransport in a worker. The same technique above may be used
+here, except constraints are applied to a track clone in the worker.
+
+<pre class="example" highlight="js">
+// main.js
+
+const stream = await navigator.mediaDevices.getUserMedia({video:true});
+const [track] = stream.getVideoTracks();
+const worker = new Worker('worker.js');
+worker.postMessage({track}, [track]);
+
+const {data} = await new Promise(r => worker.onmessage);
+const selfView = document.getElementById('video-self');
+selfView.srcObject = new MediaStream([data.track]); // 60 fps
+
+// worker.js
+
+self.onmessage = async ({data: {track}}) => {
+  const source = new VideoTrackGenerator();
+  const sendTrack = source.track.clone();
+  parent.postMessage({track: source.track}, [source.track]);
+
+  await sendTrack.applyConstraints({width: 320, height: 200, frameRate: 30});
+
+  const wt = new WebTransport("https://webtransport.org:8080/up");
+
+  const {readable} = new MediaStreamTrackProcessor({track});
+  const transformer = new TransformStream({transform: myRemoveBackgroundFromVideo});
+  await readable.pipeThrough(transformer)
+    .pipeThrough({writable: source.writable, readable: sendTrack.readable}),
+    .pipeThrough(createMyEncodeVideoStream({
+      codec: "vp8",
+      width: 640,
+      height: 480,
+      bitrate: 1000000,
+    }))
+    .pipeThrough(new TransformStream({transform: mySerializer}));
+    .pipeTo(wt.createUnidirectionalStream()); // 30 fps
+};
+</pre>
+<div class="note">
+<p>The above example avoids using the `tee()` function to serve multiple
+consumers, due to its issues with real-time streams.</p>
+<p>For brevity, the example also over-simplifies using a WebCodecs wrapper to
+encode and send video frames over a single WebTransport stream (incurring
+head-of-line blocking).</p>
+</div>
+
+# Implementation advice # {#implementation-advice}
+
+This section is informative.
+
+## Use with multiple consumers ## {#multi-consumers}
+
+There are use cases where the programmer may desire that a single stream of frames
+is consumed by multiple consumers.
+
+Examples include the case where the result of a background blurring function should
+be both displayed in a self-view and encoded using a {{VideoEncoder}}.
+
+For cases where both consumers are consuming unprocessed frames, and synchronization
+is not desired, instantianting multiple {{MediaStreamTrackProcessor}} objects is a robust solution.
+
+For cases where both consumers intend to convert the result of a processing step into a
+{{MediaStreamTrack}}
+using a {{VideoTrackGenerator}}, for example when feeding a processed stream
+to both a &lt;video&gt& tag and an {{RTCPeerConnection}}, attaching the resulting {{MediaStreamTrack}}
+to multiple sinks may be the most appropriate mechanism.
+
+For cases where the downstream processing takes frames, not streams, the frames can
+be cloned as needed and sent off to the downstream processing; "clone" is a cheap operation.
+
+When the stream is the output of some processing, and both branches need a Stream object
+to do further processing, one needs a function that produces two streams from one stream.
+
+However, the standard tee() operation is problematic
+in this context:
+
+*   It defeats the backpressure mechanism that guards against excessive queueing
+*   It creates multiple links to the same buffers, meaning that the question of which
+    consumer gets to destroy() the buffer is a difficult one to address
+
+Therefore, the use of tee() with Streams containing media should only be done when
+fully understanding the implications. Instead, custom elements for splitting streams
+more appropriate to the use case should be used.
+
+*   If both branches require the ability to dispose of the frames, clone() the frame
+    and enqueue distinct copies in both queues. This corresponds to the function
+    ReadableStreamTee(stream, cloneForBranch2=true). Then choose one of the
+    alternatives below.
+
+*   If one branch requires all frames, and the other branch tolerates dropped frames,
+    enqueue buffers in the all-frames-required stream and use the backpressure signal
+    from that stream to stop reading from the source. If backpressure signal from the
+    other stream indicates room, enqueue the same frame in that queue too.
+
+*   If neither stream tolerates dropped frames, use the combined backpressure signal
+    to stop reading from the source. In this case, frames will be processed in
+    lockstep if the buffer sizes are both 1.
+
+*   If it is OK for the incoming stream to be stalled only when the underlying
+    buffer pool allocated to the process is exhausted, standard tee() may be used.
+
+Note: There are issues filed on the Streams spec where the resolution might affect this section: https://github.com/whatwg/streams/issues/1157, https://github.com/whatwg/streams/issues/1156, https://github.com/whatwg/streams/issues/401, https://github.com/whatwg/streams/issues/1186
+
+# Security and Privacy considerations # {#security-considerations}
+
+This API defines a {{MediaStreamTrack}} source and a {{MediaStreamTrack}} sink.
+The security and privacy of the source ({{VideoTrackGenerator}}) relies
+on the same-origin policy. That is, the data {{VideoTrackGenerator}} can
+make available in the form of a {{MediaStreamTrack}} must be visible to
+the document before a {{VideoFrame}} object can be constructed
+and pushed into the {{VideoTrackGenerator}}. Any attempt to create
+{{VideoFrame}} objects using cross-origin data will fail.
+Therefore, {{VideoTrackGenerator}} does not introduce any new
+fingerprinting surface.
+
+The {{MediaStreamTrack}} sink introduced by this API ({{MediaStreamTrackProcessor}})
+exposes {{MediaStreamTrack}} the same data that is exposed by other
+{{MediaStreamTrack}} sinks such as WebRTC peer connections, and media elements. The security and privacy
+of {{MediaStreamTrackProcessor}} relies on the security and privacy of the
+{{MediaStreamTrack}} sources of the tracks to which {{MediaStreamTrackProcessor}}
+is connected. For example, camera, microphone and screen-capture tracks
+rely on explicit use authorization via permission dialogs (see
+[[MEDIACAPTURE-STREAMS]] and [[SCREEN-CAPTURE]]),
+while element capture and {{VideoTrackGenerator}}
+rely on the same-origin policy.
+
+A potential issue with {{MediaStreamTrackProcessor}} is resource exhaustion.
+For example, a site might hold on to too many open {{VideoFrame}} objects
+and deplete a system-wide pool of GPU-memory-backed frames. UAs can
+mitigate this risk by limiting the number of pool-backed frames a site can
+hold. This can be achieved by reducing the maximum number of buffered frames
+and by refusing to deliver more frames to {{MediaStreamTrackProcessor/readable}}
+once the budget limit is reached. Accidental exhaustion is also mitigated by
+automatic closing of {{VideoFrame}} objects once they
+are written to a {{VideoTrackGenerator}}.
+
+# Backwards compatibility with earlier proposals # {#backwards-compatibility}
+
+This section is informative.
+
+Previous proposals for this interface had an API like this:
+
+<div class="example">
+<pre class="idl">
+[Exposed=Window,DedicatedWorker]
 interface MediaStreamTrackGenerator : MediaStreamTrack {
     constructor(MediaStreamTrackGeneratorInit init);
-    attribute WritableStream writable;  // VideoFrame or AudioFrame
-    attribute ReadableStream readableControl;  // MediaStreamTrackSignal
+    attribute WritableStream writable;  // VideoFrame or AudioData
 };
 
 dictionary MediaStreamTrackGeneratorInit {
   required DOMString kind;
-  // If signalTarget is provided and signalTarget.kind and kind do not match,
-  // the MediaStreamTrackGenerator's constructor will raise an exception.
-  MediaStreamTrack signalTarget;
 };
 </pre>
+</div>
+This interface had the generator for the MediaStreamTrack being an instance of
+a MediaStreamTrack rather than containing one.
 
-### Internal slots
-<dl>
-<dt><dfn for=MediaStreamTrackGenerator>`[[signalTarget]]`</dfn></dt>
-<dd>(Optional) track to which the {{MediaStreamTrackGenerator}} will automatically forward control signals.</dd>
-</dl>
-
-### Constructor
-<dfn constructor for=MediaStreamTrackGenerator title="MediaStreamTrackGenerator(init)">
-  MediaStreamTrackGenerator(init)
-</dfn>
-1. If |init|.{{MediaStreamTrackGeneratorInit/signalTarget}} is not empty and is not a valid {{MediaStreamTrack}},
-    or |init|.{{MediaStreamTrackGeneratorInit/kind}} is not `"audio"` or `"video"`,
-    throw a {{TypeError}}.
-2. If |init|.{{MediaStreamTrackGeneratorInit/signalTarget}} is not empty, and
-    |init|.{{MediaStreamTrackGeneratorInit/signalTarget}}.{{MediaStreamTrack/kind}}
-    does not match |init|.{{MediaStreamTrackGeneratorInit/kind}}, throw a {{TypeError}}.
-3. Let |g| be a new {{MediaStreamTrackGenerator}} object.
-4. Initialize the {{MediaStreamTrack/kind}} field of |g| (inherited from {{MediaStreamTrack}})
-    with |init|.{{MediaStreamTrackGeneratorInit/kind}}.
-5. If |init|.{{MediaStreamTrackGeneratorInit/signalTarget}} is not empty,
-    assign |init|.{{MediaStreamTrackGeneratorInit/signalTarget}}
-    to the `[[signalTarget]]` internal slot of |g|.
-6. Return |g|.
-
-### Attributes
-<dl>
-<dt><dfn attribute for=MediaStreamTrackGenerator>writable</dfn></dt>
-<dd>Allows writing media frames the {{MediaStreamTrackGenerator}}, which is
-itself a {{MediaStreamTrack}}. If the {{MediaStreamTrack/kind}} attribute is `"audio"`,
-the stream will accept {{AudioFrame}} objects and fail with any other type. If
-{{MediaStreamTrack/kind}} is `"video"`, the stream will accept {{VideoFrame}} objects
-and fail with any other type. When a frame is written to {{MediaStreamTrackGenerator/writable}},
-the frame's `close()` method is automatically invoked, so that its internal resources are no longer
-accessible from JavaScript.
-</dd>
-<dt><dfn attribute for=MediaStreamTrackGenerator>readableControl</dfn></dt>
-<dd>Allows reading control signals sent from any sinks connected to the
-{{MediaStreamTrackGenerator}}. Control signals are objects of type {{MediaStreamTrackSignal}}.
-</dd>
-</dl>
-
-## Stream control ## {#stream-control}
-<pre class="idl">
-dictionary MediaStreamTrackSignal {
-  required MediaStreamTrackSignalType signalType;
-};
-
-enum MediaStreamTrackSignalType {
-  "request-frame",
-};
-</pre>
-In the MediaStream model, apart from media, which flows from sources to sinks, there are also
-control signals that flow in the opposite direction (i.e., from sinks to sources via the track).
-A {{MediaStreamTrackProcessor}} is a sink and it allows sending control
-signals to its track and source via its {{MediaStreamTrackProcessor/writableControl}} field.
-A {{MediaStreamTrackGenerator}} is a track for which a custom source can be implemented
-by writing media frames to its {{MediaStreamTrackGenerator/writable}} field. Such a source can
-receive control signals sent by sinks via its {{MediaStreamTrackGenerator/readableControl}} field.
-Note that control signals are just hints that a sink can send to its track (or the source
-backing it). There is no obligation for a source or track to react to them.
-
-Control signals are represented as {{MediaStreamTrackSignal}} objects.
-The {{MediaStreamTrackSignal}} dictionary has the following fields:
-* {{MediaStreamTrackSignal/signalType}}, which specifies the action to be requested to
-    the track or source. The possible values are defined by the {{MediaStreamTrackSignalType}}
-    enum and are the following:
-    * `"request-frame"`, tells the source to produce a new frame.
-
-This set of control signals is intended to be extensible, so it is possible that new signal types
-and parameters may be added in the future. Note also that this set of control signals is
-not intended to cover all possible signaling that may occur between platform sinks and
-tracks/sources. A user agent implementation is free to implement any internal signaling between
-specific types of sinks and specific types of sources, and it would not make sense to expose all
-such specific signaling to generic Web platform objects like track generators and processors,
-as they can be considered implementation details that may differ significantly across browsers.
-It is, however, a requirement of this specification that it is possible to operate a
-MediaStreamTrackGenerator connected to a MediaStreamTrackProcessor using only the
-Web Platform-exposed signals and without connecting any implicit signalling.
-
-### Implicit signaling
-A common use case for processors and generators is to connect the media flow from
-a pre-existing platform track (e.g., camera, screen capture) to pre-existing platform sinks
-(e.g., peer connection, media element) with a transformation in between, in a chain like this:
-
-Platform Track -> Processor -> Transform -> Generator -> Platform Sinks
-
-Absent the Breakout Box elements, the platform sinks would normally send the signals directly
-to the platform track (and its source). Arguably, in many cases the source of the platform track
-can still be considered the source for the platform sinks and it would be desirable to keep
-the original platform signaling even with the Processor -> Transform -> Generator chain between
-them. This can be achieved by assigning the platform track to the
-{{MediaStreamTrackGeneratorInit/signalTarget}} field in
-{{MediaStreamTrackGeneratorInit}}. Note that such a connection between the platform track and the
-generator includes all possible internal signaling coming from the platform sinks and not just
-the generic signals exposed as {{MediaStreamTrackSignal}} objects via the
-{{MediaStreamTrackGenerator/readableControl}} and
-{{MediaStreamTrackProcessor/writableControl}} fields. Just connecting explicit signals from
-a generator to a processor (e.g., with a call like
-`generator.readableControl.pipeTo(processor.writableControl`) forwards only
-the Web Platform-exposed signals, but ignores any internal custom signals as there is no
-way for the platform sinks to know what the upstream source is.
-
-
-# Examples # {#examples}
-Consider a face recognition function `detectFace(videoFrame)` that returns a face position
-(in some format), and a manipulation function `blurBackground(videoFrame, facePosition)` that
-returns a new VideoFrame similar to the given `videoFrame`, but with the non-face parts blurred.
+The VideoTrackGenerator can be shimmed on top of MediaStreamTrackGenerator like this:
 
 <pre class="example">
-let stream = await getUserMedia({video:true});
-let videoTrack = stream.getVideoTracks()[0];
-let trackProcessor = new TrackProcessor(videoTrack);
-let trackGenerator = new TrackGenerator();
-let transformer = new TransformStream({
-   async transform(videoFrame, controller) {
-      let facePosition = detectFace(videoFrame);
-      let newFrame = blurBackground(videoFrame.data, facePosition);
-      videoFrame.close();
-      controller.enqueue(newFrame);
+
+// Not tested, unlikely to work as written!
+class VideoTrackGenerator {
+  constructor() {
+     this.innerGenerator = new MediaStreamTrackGenerator({kind: 'video'});
+     this.writable = this.innerGenerator.writable;
+     this.track = this.innerGenerator.clone();
   }
-});
+  // Missing: shim for setting of the "muted" attribute.
+};
 
-// After this, trackGenerator can be assigned to any sink such as a
-// peer connection, or media element.
-trackProcessor.readable
-    .pipeThrough(transformer)
-    .pipeTo(trackGenerator.writable);
-
-// Forward Web-exposed signals to the original videoTrack.
-trackGenerator.readableControl.pipeTo(trackProcessor.writableControl);
 </pre>
 
-# Security and Privacy considerations # {#security-considerations}
+Further description of the previous proposals, including considerations involving
+processing of audio, can be found in earlier versions of this document.
 
-The security of this API relies on existing mechanisms in the Web platform.
-As data is exposed using the {{VideoFrame}} and {{AudioFrame}} interfaces,
-the rules of those interfaces to deal with origin-tained data apply.
-For example, data from cross-origin resources cannot be accessed due to existing
-restrictions to access such resources (e.g., it is not possible to access the pixels of
-a cross-origin image or video element).
-In addition to this, access to media data from cameras, microphones or the screen is subject
-to user authorization as specified in [[MEDIACAPTURE-STREAMS]] and [[MEDIACAPTURE-SCREEN-SHARE]].
+Note: A link will be placed here pointing to the chrome-96 branch when
+we have finished moving repos about.
 
-The media data this API exposes is already available through other APIs (e.g., media elements +
-canvas + canvas capture). In addition to the media data, this API exposes some control signals
-such as requests for new frames. These signals are intended as hints and do not pose a
-significant security risk.
 
 

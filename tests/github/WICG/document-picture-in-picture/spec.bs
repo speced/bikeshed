@@ -1,0 +1,372 @@
+<pre class='metadata'>
+Title: Document Picture-in-Picture Specification
+Repository: w3c/document-pip
+Shortname: document-pip-spec
+Level: 1
+Status: w3c/UD
+Group: mediawg
+URL: http://example.com/url-this-spec-will-live-at
+Editor: Tommy Steimel,  Google Inc.,  steimel@google.com
+Abstract: This specification enables web developers to populate an HTMLDocument
+Abstract: in an always-on-top window.
+</pre>
+
+<pre class="link-defaults">
+spec:dom; type:attribute; text:bubbles
+spec:url; type:dfn; for:/; text:url
+</pre>
+
+# Introduction # {#intro}
+
+<em>This section is non-normative.</em>
+
+There currently exists a Web API for putting an {{HTMLVideoElement}} into a
+Picture-in-Picture window (<code>requestPictureInPicture()</code>). This limits
+a website's ability to provide a custom picture-in-picture experience (PiP). We
+want to expand upon that functionality by providing the website with a full
+{{Document}} on an always-on-top window.
+
+This new window will be much like a blank same-origin window opened via the
+existing <a method for="Window">open()</a> method on {{Window}}, with some minor
+differences:
+
+- The PiP window will float on top of other windows.
+- The PiP window will never outlive the opening window.
+- The website cannot set the position of the PiP window.
+- The PiP window cannot be navigated (any `window.history` or `window.location`
+	calls that change to a new document will close the PiP window).
+- The PiP window cannot open more windows.
+
+# Dependencies # {#dependencies}
+
+The IDL fragments in this specification must be interpreted as required for
+conforming IDL fragments, as described in the Web IDL specification. [[!WEBIDL]]
+
+# Security Considerations # {#security-considerations}
+
+## Secure Context ## {#secure-context}
+
+The API is limited to [[SECURE-CONTEXTS]].
+
+## Spoofing ## {#spoofing}
+
+It is recommended that the user agent provides enough UI on the
+{{DocumentPictureInPicture}} window to prevent malicious websites from abusing
+the ability to float on top of other windows to spoof other websites or system
+UI. The website's inability to directly set the location or size of the PiP
+window helps alleviate some avenues of abuse.
+
+It is recommended that the user agent makes it clear to the user which origin is
+controlling the {{DocumentPictureInPicture}} window at all times.
+
+# Privacy Considerations # {#privacy-considerations}
+
+## Fingerprinting ## {#fingerprinting}
+
+When a PiP window is closed and then later re-opened, it can be useful for the
+user agent to re-use size and location of the previous PiP window (modulo
+aspect-ratio constraints) to provide a smoother user experience. However, it is
+recommended that the user agent does not re-use size/location across different
+origins as this may provide malicious websites an avenue for fingerprinting
+a user.
+
+# API # {#api}
+
+<pre class="idl">
+[Exposed=Window]
+partial interface Window {
+  [SameObject, SecureContext] readonly attribute DocumentPictureInPicture
+    documentPictureInPicture;
+};
+
+[Exposed=Window, SecureContext]
+interface DocumentPictureInPicture : EventTarget {
+  [NewObject] Promise&lt;Window&gt; requestWindow(
+    optional DocumentPictureInPictureOptions options = {});
+  readonly attribute Window window;
+  attribute EventHandler onenter;
+};
+
+dictionary DocumentPictureInPictureOptions {
+  [EnforceRange] unsigned long long width = 0;
+  [EnforceRange] unsigned long long height = 0;
+  double initialAspectRatio = 0.0;
+  boolean lockAspectRatio = false;
+  boolean copyStyleSheets = false;
+};
+
+[Exposed=Window]
+interface DocumentPictureInPictureEvent : Event {
+  constructor(DOMString type, DocumentPictureInPictureEventInit eventInitDict);
+  [SameObject] readonly attribute Window window;
+};
+
+dictionary DocumentPictureInPictureEventInit : EventInit {
+  required Window window;
+};
+</pre>
+
+<p>
+A {{DocumentPictureInPicture}} object allows websites to create and open a new
+always-on-top {{Window}} as well as listen for events related to opening and
+closing that {{Window}}.
+
+Each {{Window}} object has an associated <dfn for="Window">documentPictureInPicture API</dfn>,
+which is a new {{DocumentPictureInPicture}} instance created alongside the {{Window}}.
+
+<div algorithm>
+The <dfn attribute for="Window">documentPictureInPicture</dfn> getter steps are:
+
+1. Return <a>this</a>'s <a>documentPictureInPicture API</a>.
+
+</div>
+
+<div algorithm>
+The <dfn attribute for="DocumentPictureInPicture">window</dfn> getter steps are:
+
+1. Return the last {{Window}} opened by <a>this</a> if it exists and is still
+    open. Otherwise, return <code>null</code>.
+
+</div>
+
+<div algorithm>
+The <dfn method for="DocumentPictureInPicture">requestWindow(options)</dfn> method steps are:
+
+1. If <a>Document Picture-in-Picture support</a> is <code>false</code>, throw a
+    "{{NotSupportedError}}" {{DOMException}} and abort these steps.
+2. If the <a>relevant global object</a> of <a>this</a> does not have
+    <a>transient activation</a>, throw a "{{NotAllowedError}}" {{DOMException}}
+    and abort these steps.
+3. The user agent may choose to close any existing
+    DocumentPictureInPicture {{Window}}s or
+        <a data-link-type="idl" href="https://w3c.github.io/picture-in-picture/#pictureinpicturewindow">PictureInPictureWindow</a>s.
+4. Let |target browsing context| be a new
+    <a data-link-type="idl" href="https://html.spec.whatwg.org/multipage/browsers.html#browsing-context">browsing context</a> navigated to
+    the <code>about:blank</code> <a>URL</a>.
+5. If |options|["{{DocumentPictureInPictureOptions/width}}"] exists and is
+    greater than zero:
+    1. Optionally, clamp or ignore |options|["{{DocumentPictureInPictureOptions/width}}"] if it is too large or too
+        small in order to fit a user-friendly window size.
+    2. Set the window width for the |target browsing context| to |options|["{{DocumentPictureInPictureOptions/width}}"].
+6. If |options|["{{DocumentPictureInPictureOptions/height}}"] exists and is
+    greater than zero:
+    1. Optionally, clamp or ignore |options|["{{DocumentPictureInPictureOptions/height}}"] if it is too large or too
+        small in order to fit a user-friendly window size.
+    2. Set the window height for the |target browsing context| to |options|["{{DocumentPictureInPictureOptions/height}}"].
+7. If |options|["{{DocumentPictureInPictureOptions/initialAspectRatio}}"] exists
+    and is greater than zero:
+    1. If |options|["{{DocumentPictureInPictureOptions/width}}"] and
+        |options|["{{DocumentPictureInPictureOptions/height}}"] have been specified and don't
+        match |options|["{{DocumentPictureInPictureOptions/initialAspectRatio}}"],
+        the user agent may ignore |options|["{{DocumentPictureInPictureOptions/initialAspectRatio}}"].
+    2. Optionally, clamp or ignore |options|["{{DocumentPictureInPictureOptions/initialAspectRatio}}"] if it is too large
+        or too small in order to fit a user-friendly window size.
+    3. Set the window size for the |target browsing context| to a |width| and
+        |height| such that |width| divided by |height| is approximately
+        |options|["{{DocumentPictureInPictureOptions/initialAspectRatio}}"].
+8. If |options|["{{DocumentPictureInPictureOptions/lockAspectRatio}}"] exists
+    and is <code>true</code>, then the window should be configured such that
+    when a user resizes it, the aspect ratio of the window should remain
+    constant.
+9. Configure the window containing |target browsing context| to float on top of
+    other windows.
+10. If |options|["{{DocumentPictureInPictureOptions/copyStyleSheets}}"] exists and
+    is <code>true</code>, then the <a>CSS style sheet</a>s applied the current
+    <a>associated Document</a> should be copied and applied to the
+    |target browsing context|'s <a>associated Document</a>. This is a one-time
+    copy, and any further changes to the current <a>associated Document</a>'s
+    <a>CSS style sheet</a>s will not be copied.
+11. <a>Queue a global task</a> on the
+    <a data-link-type="idl" href="https://html.spec.whatwg.org/multipage/webappapis.html#dom-manipulation-task-source">DOM manipulation task source</a>
+    given <a>this</a>'s <a>relevant global object</a> to <a>fire an event</a>
+    named {{enter}} using {{DocumentPictureInPictureEvent}} on
+    <a>this</a> with its {{bubbles}} attribute initialized to <code>true</code>
+    and its {{DocumentPictureInPictureEvent/window}}
+    attribute initialized to |target browsing context|.
+12. Return |target browsing context|.
+
+</div>
+
+<p class="note">
+While the aspect ratio or size of the window can be configured by the website,
+the initial position is left to the discretion of the user agent.
+</p>
+
+</p>
+
+
+: <dfn event for="DocumentPictureInPicture">enter</dfn>
+:: Fired on {{DocumentPictureInPicture}} when a PiP window is opened.
+
+# Concepts # {#concepts}
+
+## Document Picture-in-Picture Support ## {#pip-support}
+
+<dfn>Document Picture-in-Picture Support</dfn> is <code>false</code> if there's
+a user preference that disables it or a platform limitation. It is
+<code>true</code> otherwise.
+
+## One PiP Window ## {#one-pip-window}
+
+Whether only one window is allowed in Picture-in-Picture mode is left to the
+implementation and the platform. As such, what happens when there is a
+Picture-in-Picture request while a {{DocumentPictureInPicture}} {{Window}} or
+<a data-link-type="idl" href="https://w3c.github.io/picture-in-picture/#pictureinpicturewindow">PictureInPictureWindow</a>
+is already open will be left as an implementation detail: the current window
+could be closed, the Picture-in-Picture request could be rejected, or multiple
+Picture-in-Picture windows could be created. Regardless, the user agent must
+fire the appropriate events in order to notify the websites of the
+Picture-in-Picture status changes.
+
+## Relative URLs ## {#relative-urls}
+
+A primary use case of DocumentPictureInPicture is to put existing elements (e.g.
+an {{HTMLVideoElement}}) into an always-on-top window so the user can continue
+to see them while multitasking. However, sometimes these elements have
+attributes that use a <a>relative-URL string</a> (e.g.
+<a attribute for="HTMLMediaElement">src</a>). Since the {{Document}} in a
+{{DocumentPictureInPicture}} {{Window}} is always navigated to the
+<code>about:blank</code> <a>URL</a>, these <a>relative-URL string</a>s would
+break. To prevent this, the user agent must parse <a>relative-URL string</a>s as
+if they were being parsed on the {{Document}} that opened the
+{{DocumentPictureInPicture}} {{Window}}.
+
+# Examples # {#examples}
+
+<em>This section is non-normative</em>
+
+## Extracting a video player into PiP ## {#example-video-player}
+
+### HTML ### {#example-video-player-html}
+
+<pre class="lang-html">
+&lt;body&gt;
+  &lt;div id="player-container"&gt;
+    &lt;div id="player"&gt;
+      &lt;video id="video" src="foo.webm"&gt;&lt;/video&gt;
+      &lt;!-- More player elements here. --&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+  &lt;input type="button" onclick="enterPiP();" value="Enter PiP" /&gt;
+&lt;/body&gt;
+</pre>
+
+### JavaScript ### {#example-video-player-js}
+
+<pre class="lang-javascript">
+// Handle to the picture-in-picture window.
+let pipWindow = null;
+
+function enterPiP() {
+  const player = document.querySelector('#player');
+
+  // Lock the aspect ratio so the window is always properly sized to the video.
+  const pipOptions = {
+    initialAspectRatio: player.clientWidth / player.clientHeight,
+    lockAspectRatio: true,
+    copyStyleSheets: true
+  };
+
+  documentPictureInPicture.requestWindow(pipOptions).then((pipWin) => {
+    pipWindow = pipWin;
+
+    // Style remaining container to imply the player is in PiP.
+    playerContainer.classList.add('pip-mode');
+
+    // Add player to the PiP window.
+    pipWindow.document.body.append(player);
+
+    // Listen for the PiP closing event to put the video back.
+    pipWindow.addEventListener('unload', onLeavePiP.bind(pipWindow), { once: true });
+  });
+}
+
+// Called when the PiP window has closed.
+function onLeavePiP() {
+  if (this !== pipWindow) {
+    return;
+  }
+
+  // Remove PiP styling from the container.
+  const playerContainer = document.querySelector('#player-container');
+  playerContainer.classList.remove('pip-mode');
+
+  // Add the player back to the main window.
+  const player = pipWindow.document.querySelector('#player');
+  playerContainer.append(player);
+
+  pipWindow = null;
+}
+</pre>
+
+## Accessing elements on the PiP Window ## {#example-access-elements}
+
+<pre class="lang-javascript">
+const video = pipWindow.document.querySelector('#video');
+video.loop = true;
+</pre>
+
+## Listening to events on the PiP Window ## {#example-listen-events}
+
+As part of creating an improved picture-in-picture experience, websites will often want
+customize buttons and controls that need to respond to user input events such as clicks.
+
+<pre class="lang-javascript">
+const pipDocument = pipWindow.document;
+const video = pipDocument.querySelector('#video');
+const muteButton = pipDocument.document.createElement('button');
+muteButton.textContent = 'Toggle mute';
+muteButton.addEventListener('click', () => {
+  video.muted = !video.muted;
+});
+pipDocument.body.append(muteButton);
+</pre>
+
+## Exiting PiP ## {#example-exiting-pip}
+
+The website may want to close the {{DocumentPictureInPicture}} {{Window}}
+without the user explicitly clicking on the window's close button. They can do
+this by using the <a method for="Window">close()</a> method on the {{Window}}
+object:
+
+<pre class="lang-javascript">
+// This will close the PiP window and trigger our existing onLeavePiP()
+// listener.
+pipWindow.close();
+</pre>
+
+## Getting elements out of the PiP window when it closes ## {#example-elements-out-on-close}
+
+When the PiP window is closed for any reason (either because the website
+initiated it or the user closed it), the website will often want to get the
+elements back out of the PiP window. The website can perform this in an event
+handler for the {{Window/unload}} event on the
+{{Window}} object. This is shown in the
+<code>onLeavePiP()</code> handler in
+<a href="#example-video-player">video player example</a> above and is copied
+below:
+
+<pre class="lang-javascript">
+// Called when the PiP window has closed.
+function onLeavePiP() {
+  if (this !== pipWindow) {
+    return;
+  }
+
+  // Remove PiP styling from the container.
+  const playerContainer = document.querySelector('#player-container');
+  playerContainer.classList.remove('pip-mode');
+
+  // Add the player back to the main window.
+  const player = pipWindow.document.querySelector('#player');
+  playerContainer.append(player);
+
+  pipWindow = null;
+}
+</pre>
+
+# Acknowledgments # {#acknowledgments}
+
+Many thanks to Frank Liberato, Mark Foltz, Klaus Weidner, François Beaufort,
+Charlie Reis, Joe DeBlasio, Domenic Denicola, and Yiren Wang for their comments
+and contributions to this document and to the discussions that have informed it.

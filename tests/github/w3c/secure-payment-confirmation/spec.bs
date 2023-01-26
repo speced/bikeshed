@@ -1,0 +1,1551 @@
+<pre class="metadata">
+Title: Secure Payment Confirmation
+Shortname: secure-payment-confirmation
+Repository: w3c/secure-payment-confirmation
+TR: https://www.w3.org/TR/secure-payment-confirmation/
+ED: https://w3c.github.io/secure-payment-confirmation/
+Prepare for TR: true
+Inline Github Issues: true
+Group: web-payments
+Status: w3c/ED
+Level:
+URL: https://w3c.github.io/secure-payment-confirmation/
+Editor: Rouslan Solomakhin, w3cid 83784, Google https://www.google.com/, rouslan@chromium.org
+Editor: Stephen McGruer, w3cid 96463, Google https://www.google.com/, smcgruer@chromium.org
+Abstract: Secure Payment Confirmation (SPC) is a Web API to support streamlined
+  authentication during a payment transaction. It is designed to scale authentication
+  across merchants, to be used within a wide range of authentication protocols, and
+  to produce cryptographic evidence that the user has confirmed transaction details.
+Complain About: missing-example-ids true
+Local Boilerplate: status yes
+Markup Shorthands: markdown yes
+WPT Display: closed
+WPT Path Prefix: /secure-payment-confirmation/
+</pre>
+
+<pre class="anchors">
+spec: credential-management-1; urlPrefix: https://w3c.github.io/webappsec-credential-management/
+    type: dfn
+        text: same-origin with its ancestors; url: same-origin-with-its-ancestors
+        text: request a credential; url: abstract-opdef-request-a-credential
+
+spec: ECMAScript; urlPrefix: https://tc39.github.io/ecma262/#
+    type: dfn
+        url: sec-object-internal-methods-and-internal-slots
+            text: internal slot
+            text: internal method
+
+spec: i18n-glossary; urlPrefix: https://w3c.github.io/i18n-glossary/
+    type: dfn
+        text: locale; url: locale
+        text: language priority list; url: language-priority-list
+        text: language negotiation; url: language-negotiation
+
+spec: payment-request; urlPrefix: https://w3c.github.io/payment-request/
+    type: dfn
+        text: payment method; url: dfn-payment-method
+        text: payment method additional data type; url: dfn-additional-data-type
+        text: payment request details; url: dfn-details
+        text: steps to validate payment method data; url: dfn-steps-to-validate-payment-method-data
+        text: steps to check if a payment can be made; url: dfn-steps-to-check-if-a-payment-can-be-made
+        text: steps to respond to a payment request; url: dfn-steps-to-respond-to-a-payment-request
+        text: payment permission string; url: dfn-payment-permission
+        text: payment request accessibility considerations; url: accessibility-considerations
+
+spec: payment-method-id; urlPrefix: https://w3c.github.io/payment-method-id/
+    type: dfn
+        text: registry of standardized payment methods; url: registry
+
+spec: web-authn; urlPrefix: https://w3c.github.io/webauthn/
+    type: dfn
+        text: authentication ceremony; url: authentication-ceremony
+        text: credential ID; url: credential-id
+        text: discoverable credential; url: discoverable-credential
+        text: relying party; url: relying-party
+        text: public key credential; url: public-key-credential
+        text: WebAuthn Extension; url: webauthn-extensions
+        text: client extension; url: client-extension
+        text: registration extension; url: registration-extension
+        text: authentication extension; url: authentication-extension
+
+spec: webdriver; urlPrefix: https://w3c.github.io/webdriver/
+    type: dfn
+        text: extension command; url: dfn-extension-commands
+        text: getting a property; url: dfn-getting-properties
+        text: invalid argument; url: dfn-invalid-argument
+        text: remote end steps; url: dfn-remote-end-steps
+        text: success; url: dfn-success
+        text: undefined; url: dfn-undefined
+        text: WebDriver error; url: dfn-error
+        text: WebDriver error code; url: dfn-error-code
+</pre>
+
+<pre class="link-defaults">
+spec:url; type:dfn; text:valid domain;
+</pre>
+
+<pre class="biblio">
+{
+    "webauthn-conditional-ui": {
+        "title": "WebAuthn Conditional UI Proposal",
+        "href": "https://github.com/w3c/webauthn/issues/1545"
+    }
+}
+</pre>
+
+<div class="non-normative">
+
+# Introduction # {#sctn-intro}
+
+*This section and its sub-sections are non-normative.*
+
+This specification defines an API that enables the use of strong authentication
+methods in payment flows on the web. It aims to provide the same authentication
+benefits and user privacy focus as [[webauthn-3]] with enhancements to meet the
+needs of payment processing.
+
+Similarly to [[webauthn-3]], this specification defines two related processes
+involving a user. The first is [[#sctn-registration]] (formerly "enrollment"),
+where a relationship is created between the user and the [=Relying Party=]. The
+second is [[#sctn-authentication]], where the user responds to a challenge from
+the [=Relying Party=] (possibly via an intermediary payment service provider)
+to consent to a specific payment.
+
+It is a goal of this specification to reduce authentication friction during
+checkout, and one aspect of that is to maximize the number of authentications
+that the user can perform for a given registration. That is, with consent
+from the [=Relying Party=], ideally the user could "register once" and
+authenticate on any merchant origin (and via payment service provider),
+not just the merchant origin where the user first registered.
+
+To that end, an important feature of Secure Payment Confirmation is
+that the merchant (or another entity) may initiate the authentication
+ceremony on the [=Relying Party's=] behalf. The [=Relying Party=] must
+opt-in to allowing this behavior during credential creation.
+
+Functionally, this specification defines a new [=payment method=] for the
+{{PaymentRequest}} API, and adds a [=WebAuthn Extension=] to extend
+[[webauthn-3]] with payment-specific datastructures and to relax assumptions to
+allow the API to be called in payment contexts.
+
+## Use Cases ## {#sctn-use-cases}
+
+Although [[webauthn-3]] provides general authentication capabilities for the
+Web, the following use cases illustrate the value of the payment-specific
+extension defined in this specification.
+
+We presume that the general use case of cryptographic-based authentication for
+online transactions is well established.
+
+Note: These sections are still a WIP.
+
+### Cryptographic evidence of transaction confirmation ### {#sctn-use-case-verifying-payment}
+
+In many online payment systems, it is common for the entity (e.g., bank) that
+issues a payment instrument to seek to reduce fraud through authentication.
+[[webauthn-3]] and this specification make it possible to use authenticators to
+cryptographically sign important payment-specific information such as the
+origin of the merchant and the transaction amount and currency. The bank, as
+the [=Relying Party=], can then verify the signed payment-specific information
+as part of the decision to authorize the payment.
+
+If the bank uses plain [[webauthn-3]], the payment-specific information to be
+verified must be stored in the WebAuthn
+{{PublicKeyCredentialRequestOptions/challenge}}. This raises several issues:
+
+1. It is a misuse of the `challenge` field (which is intended to defeat replay
+    attacks).
+1. There is no specification for this, so each bank is likely to have
+    to devise its own format for how payment-specific information should be
+    formatted and encoded in the challenge, complicating deployment and
+    increasing fragmentation.
+1. Regulations may require evidence that the user was shown and agreed to the
+    payment-specific information. Plain [[webauthn-3]] does not provide for
+    this display: there is no specified UX associated with information stored
+    in the `challenge` field.
+
+These limitations motivate the following Secure Payment Confirmation behaviors:
+
+1. The `challenge` field is only used to defeat replay attacks, as with plain
+    [[webauthn-3]].
+1. SPC specifies a format for payment-specific information. This will enable
+    development of generic verification code and test suites.
+1. SPC guarantees that the user agent has presented the payment-specific
+    information to the user in a way that a malicious website (or maliciously
+    introduced JavaScript code on a trusted website) cannot bypass.
+
+    * The payment-specific information is included in the
+        {{CollectedClientData}} dictionary, which cannot be tampered with via
+        JavaScript.
+
+    NOTE: Banks and other stakeholders in the payments ecosystem trust payments
+    via browsers sufficiently today using TLS, iframes, and other Web features.
+    The current specification is designed to increase the security and usability
+    of Web payments.
+
+### Registration in a third-party iframe ### {#sctn-use-case-iframe-registration}
+
+If a bank wishes to use [[webauthn-3]] as the [=Relying Party=], that
+specification requires the bank to register the user in a first party context.
+Registration can happen outside of a transaction while the user is visiting the
+bank's site. It is also useful to be able to register the user during a
+transaction, but any registration that interrupts the payment journey creates a
+risk of transaction abandonment.
+
+This limitation motivates the following Secure Payment Confirmation behavior:
+
+1. SPC supports cross-origin registration from an iframe in a third-party
+    context. For instance, this registration might take place following some
+    other identity and verification (<abbr>ID&V</abbr>) flow (e.g., SMS OTP).
+
+* See <a href="https://github.com/w3c/webauthn/issues/1336#issuecomment-554170183">discussion
+    on WebAuthn issue 1336</a>.
+
+### Merchant control of authentication ### {#sctn-use-case-merchant-authentication}
+
+Merchants seek to avoid user drop-off during checkout, in particular by
+reducing authentication friction. A [=Relying Party=] (e.g., a bank) that
+wishes to use [[webauthn-3]] to authenticate the user typically does so from an
+iframe. However, merchants would prefer to manage the user experience of
+authenticating the user while still enabling the [=Relying Party=] to verify
+the results of authentication.
+
+This limitation motivates the following Secure Payment Confirmation behavior:
+
+* With SPC, other parties than the [=Relying Party=] can use authentication
+    credentials *on behalf of* the Relying Party. The Relying Party can then
+    verify the authentication results.
+
+An additional benefit of this feature to Relying Parties is that they no longer
+need to build their own front-end experiences for authentication. Instead,
+payment service providers are likely to build them on behalf of merchants.
+
+NOTE: Relying Parties that wish to provide the authentication user experience
+may still do so using SPC from an iframe.
+
+## Sample API Usage Scenarios ## {#sctn-sample-scenarios}
+
+In this section, we walk through some scenarios for Secure Payment Confirmation
+and the corresponding sample code for using this API. Note that these are
+example flows and do not limit the scope of how the API can be used.
+
+### Registration during a checkout ### {#sctn-sample-registration}
+
+This is a first-time flow, in which a new credential is created and stored by
+an issuing bank during a checkout by the user on some merchant.
+
+1. The user visits `merchant.com`, selects an item to purchase, and proceeds to
+    the checkout flow. They enter their payment instrument details, and indicate
+    that they wish to pay (e.g., by pressing a "Pay" button).
+
+1. The merchant communicates out-of-band (e.g., using another protocol) with the
+    bank that issued the payment instrument. The issuing bank requests
+    verification of the user, and provides a bank-controlled URL for the
+    merchant to open in an iframe.
+
+1. The merchant opens an iframe to `bank.com`, with the `allow` attribute set to
+    "[=payment permission string|payment=]".
+
+1. In the iframe, the issuing bank confirms the user's identity via a
+    traditional means (e.g., SMS OTP). After confirmation, the bank invites the
+    user to register in SPC authentication for future payments.
+
+1. The user consents (e.g., by clicking an "Register" button in the bank UX),
+    and the bank runs code in the iframe (see example below).
+
+1. The user goes through a WebAuthn registration flow. A new credential is
+    created and returned to the issuing bank who stores it in their server-side
+    database associated with the user and payment instrument(s).
+
+1. The verification completes; the bank iframe closes and the merchant finishes
+    the checkout process for the user.
+
+Sample code for registering the user in this way follows:
+
+<pre class="example" id="registration-example" highlight="js">
+if (!window.PublicKeyCredential) { /* Client not capable. Handle error. */ }
+
+const publicKey = {
+  // The challenge should be created by the bank server and sent to the iframe.
+  challenge: new Uint8Array([21,31,105 /* 29 more random bytes generated by the server */]),
+
+  // Relying Party:
+  rp: {
+    name: "Fancy Bank",
+  },
+
+  // User:
+  user: {
+    // Part of WebAuthn. This information is not required by SPC
+    // but may be used by the bank server to identify this user in
+    // future transactions. Inconsistent values for the same user
+    // can result in the creation of multiple credentials for the user
+    // and thus potential UX friction due to credential selection.
+    id: Uint8Array.from(window.atob("MIIBkzCCATigAwIBAjCCAZMwggE4oAMCAQIwggGTMII="), c=>c.charCodeAt(0)),
+    name: "jane.doe@example.com",
+    displayName: "Jane Doe",
+  },
+
+  // In this example the Relying Party accepts either an ES256 or RS256
+  // credential, but prefers an ES256 credential.
+  pubKeyCredParams: [
+    {
+      type: "public-key",
+      alg: -7 // "ES256"
+    },
+    {
+      type: "public-key",
+      alg: -257 // "RS256"
+    }
+  ],
+
+  authenticatorSelection: {
+    userVerification: "required",
+    residentKey: "required",
+    authenticatorAttachment: "platform",
+  },
+
+  timeout: 360000,  // 6 minutes
+
+  // Indicate that this is an SPC credential. This is currently required so
+  // that the browser knows this credential relates to SPC. It also enables
+  // credential creation in a cross-origin iframe, which is required for this
+  // example.
+  //
+  // A future version of the spec may remove the need for this extension.
+  extensions: {
+    "payment": {
+      isPayment: true,
+    }
+  }
+};
+
+// Note: The following call will cause the authenticator to display UI.
+navigator.credentials.create({ publicKey })
+  .then(function (newCredentialInfo) {
+    // Send new credential info to server for verification and registration.
+  }).catch(function (err) {
+    // No acceptable authenticator or user refused consent. Handle appropriately.
+  });
+</pre>
+
+</div> <!-- non-normative -->
+
+### Authentication on merchant site ### {#sctn-sample-authentication}
+
+This is the flow when a user with an already registered credential is
+performing a transaction and the issuing bank and merchant wish to use Secure
+Payment Confirmation.
+
+1. The user visits `merchant.com`, selects an item to purchase, and proceeds
+    to the checkout flow. They enter their payment instrument details, and
+    indicate that they wish to pay (e.g., by pressing a "Pay" button).
+
+1. The merchant communicates out-of-band with the issuing bank of the payment
+    instrument (e.g., using another protocol). The issuing bank requests
+    verification of the user, and at the same time informs the merchant that it
+    accepts SPC by providing the information necessary to use the API. This
+    information includes a challenge and any credential IDs associated with this
+    user and payment instrument(s).
+
+1. The merchant runs the example code shown below.
+
+1. The user agrees to the payment-specific information displayed in the SPC UX,
+    and performs a subsequent WebAuthn authentication ceremony. The signed
+    cryptogram is returned to the merchant.
+
+1. The merchant communicates the signed cryptogram to the issuing bank
+    out-of-band. The issuing bank verifies the cryptogram, and knows that the
+    user is valid, what payment-specific information has been displayed, and
+    that the user has consented to the transaction. The issuing bank authorizes
+    the transaction and the merchant finishes the checkout process for the user.
+
+The sample code for authenticating the user follows. Note that the example code
+presumes access to await/async, for easier to read promise handling.
+
+<pre class="example" id="authentication-example" highlight="js">
+if (!window.PaymentRequest) { /* PaymentRequest not available; merchant should fallback to traditional flows */ }
+
+const request = new PaymentRequest([{
+  supportedMethods: "secure-payment-confirmation",
+  data: {
+    // List of credential IDs obtained from the bank.
+    credentialIds,
+
+    rpId: "fancybank.com",
+
+    // The challenge is also obtained from the bank.
+    challenge: new Uint8Array([21,31,105 /* 29 more random bytes generated by the bank */]),
+
+    instrument: {
+      displayName: "Fancy Card ****1234",
+      icon: "https://fancybank.com/card-art.png",
+    },
+
+    payeeName: "Merchant Shop",
+    payeeOrigin: "https://merchant.com",
+
+    timeout: 360000,  // 6 minutes
+  }], {
+    total: {
+      label: "Total",
+      amount: {
+        currency: "USD",
+        value: "5.00",
+      },
+    },
+  });
+
+  /* canMakePayment indicates whether the browser supports SPC. */
+  /* canMakePayment does not indicate whether the user has a credential */
+  /* ready to go on this device. */
+
+try {
+  const canMakePayment = await request.canMakePayment();
+  if (!canMakePayment) { /* Browser does not support SPC. Handle error. */ }
+
+  const response = await request.show();
+  await response.complete('success');
+
+  // response.data is a PublicKeyCredential, with a clientDataJSON that
+  // contains the transaction data for verification by the issuing bank.
+
+  /* send response.data to the issuing bank for verification */
+} catch (err) {
+  /* SPC cannot be used; merchant should fallback to traditional flows */
+}
+</pre>
+
+# Terminology # {#sctn-terminology}
+
+: <dfn export>SPC Credential</dfn>
+:: A [=public key credential|WebAuthn credential=] that can be used for the
+    behaviors defined in this specification. When an SPC Credential is to be
+    used by a party other than the [=Relying Party=], the [=Relying Party=] must
+    explicitly opt in by declaring the credential for SPC at creation time.
+
+    This specification does not intend to limit how SPC credentials may (or may
+    not) be used by a [=Relying Party=] for other authentication flows (e.g.,
+    login).
+
+    Note: The current version of this specification requires the [=Relying
+          Party=] to explicitly opt in for a credential to be used in
+          either a first-party or third-party context. Longer-term, our
+          intention is that all [=public key credential|WebAuthn credentials=]
+          will be usable for SPC in a first-party context (e.g., on the
+          [=Relying Party's=] domain) and opt-in will only be required to allow
+          a credential to be used by a third-party.
+
+: <dfn>Steps to silently determine if a credential is SPC-enabled</dfn>
+:: An as-yet undefined process by which a user agent can, given a
+    [[webauthn-3#relying-party-identifier|Relying Party Identifier]] and a
+    [=credential ID=], silently (i.e., without user interaction) determine if
+    the credential represented by that ID is an [=SPC Credential=].
+
+    NOTE: See <a href="https://github.com/w3c/webauthn/issues/1667">WebAuthn
+    issue 1667</a>.
+
+: <dfn>Steps to silently determine if a credential is available for the current device</dfn>
+:: An as-yet undefined process by which a user agent can, given a
+    [[webauthn-3#relying-party-identifier|Relying Party Identifier]] and a
+    [=credential ID=], silently (i.e., without user interaction) determine if
+    the credential represented by that credential ID is available for the
+    current device (i.e., could be successfully used as part of a WebAuthn
+    [[webauthn-3#sctn-getAssertion|Get]] call).
+
+    This allows the user agent to only conditionally display
+    [[#sctn-transaction-confirmation-ux|the transaction UX]] to the user if
+    there is some chance that they can successfully complete the transaction.
+
+    NOTE: This property will likely require that [=SPC Credentials=] be
+    [=discoverable credential|discoverable=]; as such this specification
+    currently encodes that as a requirement.
+
+    NOTE: This property is very similar to that which is required for the
+    [[webauthn-conditional-ui inline]]. It is likely that both it and SPC could
+    be supported by the same underlying API.
+
+# Registration # {#sctn-registration}
+
+To register a user for Secure Payment Confirmation, relying parties should call
+{{CredentialsContainer/create()|navigator.credentials.create()}}, with the
+{{AuthenticationExtensionsClientInputs/payment}} [=WebAuthn Extension=]
+specified.
+
+<wpt>
+  enrollment.https.html
+  enrollment-in-iframe.sub.https.html
+</wpt>
+
+Note: In this specification we define an extension in order to allow (1)
+      credential creation in a cross-origin iframe (which WebAuthn does not yet
+      allow) and (2) the browser to cache SPC credentials in the absence of
+      [[webauthn-conditional-ui|Conditional UI]]. If these capabilities are
+      available in future versions of WebAuthn, we may remove the requirement
+      for the extension from SPC. Note that SPC credentials (with the extension)
+      are otherwise full-fledged WebAuthn credentials.
+
+# Authentication # {#sctn-authentication}
+
+To authenticate a payment via Secure Payment Confirmation, this specification
+defines a new [=payment method=], "[=secure-payment-confirmation=]". This
+payment method confirms the transaction with the user and then performs an
+[=authentication ceremony=] to authenticate the user and create a signed blob
+representing the authentication ceremony.
+
+At a high level, authentication for Secure Payment Confirmation is similar to
+[[webauthn-3]], with one major conceptual shift. Secure Payment Confirmation
+allows a third-party (e.g., the merchant) to trigger an authentication ceremony
+on behalf of the [=Relying Party=], passing in credentials that it has obtained
+from the Relying Party on some other unspecified channel. See
+[[#sctn-use-case-merchant-authentication]].
+
+<wpt title="This test file tests inherited behavior from the PaymentRequest
+            specification; that a user activation is required to call show()
+            (and thus to trigger SPC authentication). We test it explicitly for
+            SPC to make it clear that this behavior is desirable even if the
+            API shape for SPC changes in the future.">
+  authentication-requires-user-activation.https.html
+</wpt>
+
+## Payment Method: Secure Payment Confirmation ## {#sctn-payment-method-spc}
+
+This specification defines a new [=payment handler=], the <dfn>Secure Payment
+Confirmation payment handler</dfn>, which handles requests to authenticate a
+given payment.
+
+NOTE: To quickly support an initial SPC experiment, this API was designed atop
+existing implementations of the Payment Request and Payment Handler APIs. There
+is now general agreement to explore a design of SPC independent of Payment
+Request. We therefore expect (without a concrete timeline) that SPC will move
+away from its Payment Request origins. For developers, this should improve
+feature detection, invocation, and other aspects of the API.
+
+<div class="note">
+**TODO**: This specification also needs to constrain
+{{PaymentRequest/constructor|PaymentRequest's constructor}} somehow, to enforce
+that when "[=secure-payment-confirmation=]" is used exactly one method is
+given.
+</div>
+
+### Payment Method Identifier ### {#sctn-payment-method-identifier}
+
+The [=standardized payment method identifier=] for the [=Secure Payment
+Confirmation payment handler=] is "<dfn>secure-payment-confirmation</dfn>".
+
+### Registration in [[payment-method-id]] ### {#sctn-registration-in-payment-method-id}
+
+Add the following to the [=registry of standardized payment methods=] in
+[[payment-method-id]]:
+
+    : "[=secure-payment-confirmation=]"
+    :: The <a href="https://w3c.github.io/secure-payment-confirmation/">Secure Payment Confirmation</a> specification.
+
+### <dfn dictionary>SecurePaymentConfirmationRequest</dfn> Dictionary ### {#sctn-securepaymentconfirmationrequest-dictionary}
+
+<xmp class="idl">
+    dictionary SecurePaymentConfirmationRequest {
+        required BufferSource challenge;
+        required USVString rpId;
+        required sequence<BufferSource> credentialIds;
+        required PaymentCredentialInstrument instrument;
+        unsigned long timeout;
+        USVString payeeName;
+        USVString payeeOrigin;
+        AuthenticationExtensionsClientInputs extensions;
+        sequence<USVString> locale;
+        boolean showOptOut;
+    };
+</xmp>
+
+The {{SecurePaymentConfirmationRequest}} dictionary contains the following
+members:
+
+<dl dfn-type="dict-member" dfn-for="SecurePaymentConfirmationRequest">
+    :  <dfn>challenge</dfn> member
+    :: A random challenge that the relying party generates on the server side
+        to prevent replay attacks.
+
+    :  <dfn>rpId</dfn> member
+    :: The [[webauthn-3#relying-party-identifier|Relying Party Identifier]] of
+        the credentials.
+
+    :  <dfn>credentialIds</dfn> member
+    :: The list of credential identifiers for the given instrument.
+
+    :  <dfn>instrument</dfn> member
+    :: The description of the instrument name and icon to display during
+        registration and to be signed along with the transaction details.
+
+    :  <dfn>timeout</dfn> member
+    :: The number of milliseconds before the request to sign the transaction
+        details times out. At most 1 hour.
+
+    :  <dfn>payeeName</dfn> member
+    :: The display name of the payee that this SPC call is for (e.g., the
+        merchant). Optional, may be provided alongside or instead of
+        {{SecurePaymentConfirmationRequest/payeeOrigin}}.
+
+    :  <dfn>payeeOrigin</dfn> member
+    :: The [=/origin=] of the payee that this SPC call is for (e.g., the
+        merchant). Optional, may be provided alongside or instead of
+        {{SecurePaymentConfirmationRequest/payeeName}}.
+
+    :  <dfn>extensions</dfn> member
+    :: Any [=WebAuthn extensions=] that should be used for the passed
+        credential(s). The caller does not need to specify the
+        [[#sctn-payment-extension-registration| payment extension]]; it is added
+        automatically.
+
+    :  <dfn>locale</dfn> member
+    :: An optional list of well-formed [[BCP47]] language tags, in descending
+        order of priority, that identify the [=locale=] preferences of the
+        website, i.e. a [=language priority list=] [[RFC4647]], which the user
+        agent can use to perform [=language negotiation=] and locale-affected
+        formatting with the caller.
+
+        NOTE: The {{SecurePaymentConfirmationRequest/locale}} is distinct from
+              language or direction metadata associated with specific input
+              members, in that it represents the caller's requested localized
+              experience rather than assertion about a specific string value.
+
+    :  <dfn>showOptOut</dfn> member
+    :: Whether the user should be given a chance to opt-out during the
+        [[#sctn-transaction-confirmation-ux|transaction confirmation UX]].
+        Optional, default false.
+</dl>
+
+### Payment Method additional data type ### {#sctn-payment-method-additional-data-type}
+
+The [=payment method additional data type=] for this payment method is
+{{SecurePaymentConfirmationRequest}}.
+
+### Steps to validate payment method data ### {#sctn-steps-to-validate-payment-method-data}
+
+The [=steps to validate payment method data=] for this payment method, for an
+input {{SecurePaymentConfirmationRequest}} |data|, are:
+
+<wpt>
+  constructor.https.html
+  constructor-validate-payment-method-data.https.html
+</wpt>
+
+1. If |data|["{{SecurePaymentConfirmationRequest/credentialIds}}"] is empty,
+    throw a {{RangeError}}.
+
+1. For each |id| in |data|["{{SecurePaymentConfirmationRequest/credentialIds}}"]:
+
+    1. If |id| is empty, throw a {{RangeError}}.
+
+1. If |data|["{{SecurePaymentConfirmationRequest/challenge}}"] is null or
+    empty, throw a {{TypeError}}.
+
+1. If |data|["{{SecurePaymentConfirmationRequest/instrument}}"]["{{PaymentCredentialInstrument/displayName}}"]
+    is empty, throw a {{TypeError}}.
+
+1. If |data|["{{SecurePaymentConfirmationRequest/instrument}}"]["{{PaymentCredentialInstrument/icon}}"]
+    is empty, throw a {{TypeError}}.
+
+1. Run the URL parser on data["{{SecurePaymentConfirmationRequest/instrument}}"]
+    ["{{PaymentCredentialInstrument/icon}}"]. If this returns failure, throw a
+    {{TypeError}}.
+
+1. If |data|["{{SecurePaymentConfirmationRequest/rpId}}"] is not a
+    [=valid domain=], throw a {{TypeError}}.
+
+1. If both |data|["{{SecurePaymentConfirmationRequest/payeeName}}"] and
+    |data|["{{SecurePaymentConfirmationRequest/payeeOrigin}}"] are omitted,
+    throw a {{TypeError}}.
+
+1. If either of |data|["{{SecurePaymentConfirmationRequest/payeeName}}"] or
+    |data|["{{SecurePaymentConfirmationRequest/payeeOrigin}}"] is present and
+    empty, throw a {{TypeError}}.
+
+1. If |data|["{{SecurePaymentConfirmationRequest/payeeOrigin}}"] is present:
+
+    1. Let |parsedURL| be the result of running the [=URL parser=] on
+        |data|["{{SecurePaymentConfirmationRequest/payeeOrigin}}"].
+
+    1. If |parsedURL| is failure, then throw a {{TypeError}}.
+
+    1. If |parsedURL|'s [=url/scheme=] is not "`https`", then throw a {{TypeError}}.
+
+### Steps to check if a payment can be made ### {#sctn-steps-to-check-if-a-payment-can-be-made}
+
+The [=steps to check if a payment can be made=] for this payment method, for an
+input {{SecurePaymentConfirmationRequest}} |data|, are:
+
+<wpt>
+  constructor.https.html
+  authentication-invalid-icon.https.html
+  authentication-icon-data-url.https.html
+  authentication-rejected.https.html
+</wpt>
+
+1. If |data|["{{SecurePaymentConfirmationRequest/payeeOrigin}}"] is present:
+
+    1. Let |parsedURL| be the result of running the [=URL parser=] on
+        |data|["{{SecurePaymentConfirmationRequest/payeeOrigin}}"].
+
+    1. Assert that |parsedURL| is not failure.
+
+    1. Assert that |parsedURL|'s [=url/scheme=] is "`https`".
+
+       NOTE: These pre-conditions were previously checked in the
+       [[#sctn-steps-to-validate-payment-method-data|steps to validate payment
+       method data]].
+
+    1. Set |data|["{{SecurePaymentConfirmationRequest/payeeOrigin}}"] to the
+        [=serialization of an origin|serialization of=] |parsedURL|'s [=url/origin=].
+
+1. [=fetch an image resource|Fetch the image resource=] for the icon, passing «["{{ImageResource/src}}" →
+    |data|["{{SecurePaymentConfirmationRequest/instrument}}"]["{{PaymentCredentialInstrument/icon}}"]]»
+    for *image*. If this fails:
+
+    1. If |data|["{{SecurePaymentConfirmationRequest/instrument}}"]["{{PaymentCredentialInstrument/iconMustBeShown}}"]
+        is `true`, then return `false`.
+
+    1. Otherwise, set |data|["{{SecurePaymentConfirmationRequest/instrument}}"]["{{PaymentCredentialInstrument/icon}}"]
+        to an empty string.
+
+        Note: This lets the RP know that the specified icon was not shown, as the output
+        {{CollectedClientAdditionalPaymentData/instrument}} will have an empty icon
+        string.
+
+    Note: The image resource must be fetched whether or not any credential
+    matches, to defeat attempts to [[#sctn-privacy-probing-credential-ids|probe
+    for credential existence]].
+
+1. For each |id| in |data|["{{SecurePaymentConfirmationRequest/credentialIds}}"]:
+
+    1. Run the [=steps to silently determine if a credential is available for
+        the current device=] and the [=steps to silently determine if a
+        credential is SPC-enabled=], passing in
+        |data|["{{SecurePaymentConfirmationRequest/rpId}}"] and |id|. If the
+        result of either of these is `false`, remove |id| from
+        |data|["{{SecurePaymentConfirmationRequest/credentialIds}}"].
+
+1. If |data|["{{SecurePaymentConfirmationRequest/credentialIds}}"] is now empty,
+    return `false`. The user agent must maintain
+    [[#sctn-privacy-probing-credential-ids|authentication ceremony privacy]]
+    and not leak this lack of matching credentials to the caller, by:
+
+    1. Not allowing the caller to perform a timing attack on this outcome versus
+        the user declining to authenticate on the
+        [[#sctn-transaction-confirmation-ux|transaction confirmation UX]], e.g.,
+        by presenting an alternative interstitial that the user must interact
+        with.
+    1. Rejecting the {{PaymentRequest/show|show()}} promise with a
+        "{{NotAllowedError}}" {{DOMException}}.
+
+1. Return `true`.
+
+### Displaying a transaction confirmation UX ### {#sctn-transaction-confirmation-ux}
+
+To avoid restricting User Agent implementation choice, this specification does
+not require a User Agent to display a particular user interface when
+{{PaymentRequest/show|PaymentRequest.show()}} is called and the [=Secure
+Payment Confirmation payment handler=] is selected. However, so that a
+[=Relying Party=] can trust the information included in
+{{CollectedClientPaymentData}}, the User Agent MUST ensure that the following
+is communicated to the user and that the user's consent is collected for the
+authentication:
+
+* The {{CollectedClientAdditionalPaymentData/payeeName}} if it is present.
+* The {{CollectedClientAdditionalPaymentData/payeeOrigin}} if it is present.
+* The {{CollectedClientAdditionalPaymentData/total}}, that is the
+    {{PaymentCurrencyAmount/currency}} and {{PaymentCurrencyAmount/value}} of the
+    transaction.
+* The {{CollectedClientAdditionalPaymentData/instrument}} details, that is the
+    payment instrument {{PaymentCredentialInstrument/displayName}} and
+    {{PaymentCredentialInstrument/icon}}. If an image resource could not be
+    fetched or decoded from the input {{PaymentCredentialInstrument/icon}},
+    then the User Agent may show no icon or a generic payment instrument
+    icon in its place.
+
+    NOTE: If the specified icon could not be fetched or decoded, then
+    {{PaymentCredentialInstrument/iconMustBeShown}} must be `false` here as
+    otherwise the [[#sctn-steps-to-check-if-a-payment-can-be-made|the steps
+    to check if a payment can be made]] would have failed previously.
+
+The user agent MAY utilize the information in
+{{SecurePaymentConfirmationRequest/locale}}, if any, to display a UX localized
+into a language and using locale-based formatting consistent with that of the
+website.
+
+If {{SecurePaymentConfirmationRequest/showOptOut}} is `true`, the user agent
+MUST give the user the opportunity to indicate that they want to opt out of the
+process for the {{SecurePaymentConfirmationRequest/rpId|given relying party}}.
+If the user indicates that they wish to opt-out, then the user agent must reject
+the {{PaymentRequest/show|show()}} promise with an
+"{{OptOutError}}" {{DOMException}}. See [[#sctn-user-opt-out]].
+
+<wpt>
+  authentication-optout.https.html
+</wpt>
+
+If the [=current transaction automation mode=] is not
+"{{TransactionAutomationMode/none}}", the user agent should first verify that
+it is in an automation context (see [[WebDriver2#security|WebDriver's Security
+considerations]]). The user agent should then bypass the above communication of
+information and gathering of user consent, and instead do the following based
+on the value of the [=current transaction automation mode=]:
+
+    : "{{TransactionAutomationMode/autoAccept}}"
+    :: Act as if the user has seen the transaction details and accepted
+        the authentication.
+
+    : "{{TransactionAutomationMode/autoReject}}"
+    :: Act as if the user has seen the transaction details and rejected
+        the authentication.
+
+    : "{{TransactionAutomationMode/autoOptOut}}"
+    :: Act as if the user has seen the transaction details and indicated
+        they want to opt out.
+
+### Steps to respond to a payment request ### {#sctn-steps-to-respond-to-a-payment-request}
+
+The [=steps to respond to a payment request=] for this payment method, for a given
+{{PaymentRequest}} |request| and {{SecurePaymentConfirmationRequest}} |data|, are:
+
+1. Let |topOrigin| be the [=top-level origin=] of the [=relevant settings object=] of |request|.
+
+1. Let |payment| be a new a {{AuthenticationExtensionsPaymentInputs}} dictionary,
+    whose fields are:
+
+    : {{AuthenticationExtensionsPaymentInputs/isPayment}}
+    :: The boolean value `true`.
+    : {{AuthenticationExtensionsPaymentInputs/rpId}}
+    :: |data|["{{SecurePaymentConfirmationRequest/rpId}}"]
+    : {{AuthenticationExtensionsPaymentInputs/topOrigin}}
+    :: |topOrigin|
+    : {{AuthenticationExtensionsPaymentInputs/payeeName}}
+    :: |data|["{{SecurePaymentConfirmationRequest/payeeName}}"] if it is
+        present, otherwise omitted.
+    : {{AuthenticationExtensionsPaymentInputs/payeeOrigin}}
+    :: |data|["{{SecurePaymentConfirmationRequest/payeeOrigin}}"] if it is
+        present, otherwise omitted.
+    : {{AuthenticationExtensionsPaymentInputs/total}}
+    :: |request|.[=payment request details|[[details]]=]["{{PaymentDetailsInit/total}}"]
+    : {{AuthenticationExtensionsPaymentInputs/instrument}}
+    :: |data|["{{SecurePaymentConfirmationRequest/instrument}}"]
+
+1. Let |extensions| be a new {{AuthenticationExtensionsClientInputs}} dictionary
+    whose {{AuthenticationExtensionsClientInputs/payment}} member is set to
+    |payment|, and whose other members are set from
+    |data|["{{SecurePaymentConfirmationRequest/extensions}}"].
+
+1. Let |publicKeyOpts| be a new {{PublicKeyCredentialRequestOptions}}
+    dictionary, whose fields are:
+
+    : {{PublicKeyCredentialRequestOptions/challenge}}
+    :: |data|["{{SecurePaymentConfirmationRequest/challenge}}"]
+    : {{PublicKeyCredentialRequestOptions/timeout}}
+    :: |data|["{{SecurePaymentConfirmationRequest/timeout}}"]
+    : {{PublicKeyCredentialRequestOptions/rpId}}
+    :: |data|["{{SecurePaymentConfirmationRequest/rpId}}"]
+    : {{PublicKeyCredentialRequestOptions/userVerification}}
+    :: {{UserVerificationRequirement/required}}
+    : {{PublicKeyCredentialRequestOptions/extensions}}
+    :: |extensions|
+
+    Note: This algorithm hard-codes "required" as the value for {{PublicKeyCredentialRequestOptions/userVerification}}, because that is what Chrome's initial implementation supports. The current limitations may change. The Working Group invites implementers to share use cases that would benefit from support for other values (e.g., "preferred" or "discouraged").
+
+1. For each |id| in |data|["{{SecurePaymentConfirmationRequest/credentialIds}}"]:
+
+    1. Let |descriptor| be a new {{PublicKeyCredentialDescriptor}} dictionary,
+        whose fields are:
+
+        : {{PublicKeyCredentialDescriptor/type}}
+        :: {{PublicKeyCredentialType/public-key}}
+        : {{PublicKeyCredentialDescriptor/id}}
+        :: |id|
+        : {{PublicKeyCredentialDescriptor/transports}}
+        :: A sequence of length 1 whose only member is
+            {{AuthenticatorTransport/internal}}.
+
+    1. [=list/Append=] |descriptor| to |publicKeyOpts|["{{PublicKeyCredentialRequestOptions/allowCredentials}}"].
+
+1. Let |outputCredential| be the result of running the algorithm to
+    [=Request a Credential=], passing «["{{CredentialRequestOptions/publicKey}}"
+    → |publicKeyOpts|]».
+
+    Note: Chrome's initial implementation does not pass the full `data.credentialIds` list to [=Request a Credential=]. Instead, it chooses one credential in the list that matches the current device and passes only that in.
+
+    Note: This triggers [[webauthn-3]]'s [[webauthn-3#sctn-getAssertion|Get]] behavior
+
+1. Return |outputCredential|.
+
+# WebAuthn Extension - "`payment`" # {#sctn-payment-extension-registration}
+
+This [=client extension|client=] [=registration extension=] and
+[=authentication extension=] indicates that a credential is either being
+created for or used for Secure Payment Confirmation, respectively.
+
+For registration, this extension relaxes the WebAuthn requirements to allow
+credential creation in a cross-origin iframe, and also allows the browser to
+identify and cache Secure Payment Confirmation credentials. For authentication,
+this extension allows a third-party to perform an authentication ceremony on
+behalf of the [=Relying Party=], and also adds transaction information to the
+signed cryptogram.
+
+Notably, a website should not call
+{{CredentialsContainer/get()|navigator.credentials.get()}} with this extension
+directly; for authentication the extension can only be accessed via
+{{PaymentRequest}} with a "[=secure-payment-confirmation=]" payment method.
+
+<wpt title="This test does not directly correspond to a spec line, but instead
+            tests that authentication can be triggered from inside a
+            cross-origin iframe. That behavior is specified by the lack of any
+            line forbidding it.">
+  authentication-in-iframe.sub.https.html
+</wpt>
+
+:  Extension identifier
+:: `payment`
+
+:  Operation applicability
+:: [=registration extension|Registration=] and [=authentication extension|authentication=]
+
+:  Client extension input
+:: <xmp class="idl">
+    partial dictionary AuthenticationExtensionsClientInputs {
+      AuthenticationExtensionsPaymentInputs payment;
+    };
+
+    dictionary AuthenticationExtensionsPaymentInputs {
+      boolean isPayment;
+
+      // Only used for authentication.
+      USVString rpId;
+      USVString topOrigin;
+      USVString payeeName;
+      USVString payeeOrigin;
+      PaymentCurrencyAmount total;
+      PaymentCredentialInstrument instrument;
+    };
+    </xmp>
+
+    <dl dfn-type="dict-member" dfn-for="AuthenticationExtensionsPaymentInputs">
+      :  <dfn>isPayment</dfn> member
+      :: Indicates that the extension is active.
+
+        <div class="note">**TODO**: Find a better way to do this. Needed currently because other members are auth-time only.</div>
+
+      :  <dfn>rpId</dfn> member
+      :: The [=Relying Party=] id of the credential(s) being used. Only used at authentication time; not registration.
+
+      :  <dfn>topOrigin</dfn> member
+      :: The origin of the top-level frame. Only used at authentication time; not registration.
+
+      :  <dfn>payeeName</dfn> member
+      :: The payee name, if present, that was displayed to the user. Only used at authentication time; not registration.
+
+      :  <dfn>payeeOrigin</dfn> member
+      :: The payee origin, if present, that was displayed to the user. Only used at authentication time; not registration.
+
+      :  <dfn>total</dfn> member
+      :: The transaction amount that was displayed to the user. Only used at authentication time; not registration.
+
+      :  <dfn>instrument</dfn> member
+      :: The instrument details that were displayed to the user. Only used at authentication time; not registration.
+
+    </dl>
+
+:  <dfn export>Client extension processing ([=registration extension|registration=])</dfn>
+:: Note: Reading [[webauthn-3]] literally, these steps don't work; extensions
+    are injected at step 12 of `[[Create]]` and cannot really modify anything.
+    However other extensions ignore that entirely and assume they can modify any
+    part of any WebAuthn algorithm!
+
+    When [[webauthn-3#sctn-createCredential|creating a new credential]]:
+
+    1. Modify step 2 (the check for *sameOriginWithAncestors*) as follows:
+
+        * If *sameOriginWithAncestors* is `false`:
+
+            * If the [=relevant global object=], as determined by the calling
+                {{CredentialsContainer/create()}} implementation, does not have
+                [=transient activation=]:
+
+                 * Return a {{DOMException}} whose name is "{{SecurityError}}", and
+                    terminate this algorithm.
+
+            * [=Consume user activation=] of the [=relevant global object=].
+
+            <wpt>
+              enrollment-in-iframe.sub.https.html
+            </wpt>
+
+         Note: This allows for creating SPC credentials in a cross-origin
+         iframe, as long as the correct permission policy is set
+         (see [[#sctn-permissions-policy]]). A [=transient activation=] is
+         also required in this case to mitigate privacy risks; see
+         [[#sctn-security-cross-origin-registration]].
+
+    1. After step 3, insert the following step:
+
+        * If any of the following are true:
+
+            * *options*["{{PublicKeyCredentialCreationOptions/authenticatorSelection}}"]["{{AuthenticatorSelectionCriteria/authenticatorAttachment}}"] is not "{{AuthenticatorAttachment/platform}}".
+            * *options*["{{PublicKeyCredentialCreationOptions/authenticatorSelection}}"]["{{AuthenticatorSelectionCriteria/residentKey}}"] is not "{{ResidentKeyRequirement/required}}" or "{{ResidentKeyRequirement/preferred}}".
+            * *options*["{{PublicKeyCredentialCreationOptions/authenticatorSelection}}"]["{{AuthenticatorSelectionCriteria/userVerification}}"] is not "{{UserVerificationRequirement/required}}".
+
+            then return a {{TypeError}}.
+
+            Note: These values are hard-coded as that is what Chrome's initial implementation
+            supports. The current limitations may change. The Working Group invites implementers
+            to share use cases that would benefit from support for other values.
+
+            <wpt>
+              enrollment.https.html
+            </wpt>
+
+:  <dfn export>Client extension processing ([=authentication extension|authentication=])</dfn>
+:: When [[webauthn-3#sctn-getAssertion|making an assertion]] with a
+    {{AuthenticationExtensionsPaymentInputs}} |extension_inputs|:
+
+    1. If not in a "[=secure-payment-confirmation=]" payment handler, return a
+        "{{NotAllowedError}}" {{DOMException}}.
+
+        <wpt>
+          authentication-cannot-bypass-spc.https.html
+        </wpt>
+
+        Note: This guards against websites trying to access the extended powers of
+        SPC without going through [[#sctn-transaction-confirmation-ux|the
+        transaction UX]].
+
+    1. During {{PublicKeyCredential/[[DiscoverFromExternalSource]](origin, options, sameOriginWithAncestors)}}:
+
+        1. Skip step 6.1, which compares *options.rpId* to *effectiveDomain*
+
+           <wpt>
+             authentication-cross-origin.sub.https.html
+           </wpt>
+
+            Note: This enables cross-domain authentication ceremonies; see
+                  [[#sctn-use-case-merchant-authentication]].
+
+        1. In step 9, instead of creating a {{CollectedClientData}}, instead
+            create a {{CollectedClientPaymentData}} with:
+
+            1. {{CollectedClientData/type}} set to "`payment.get`"
+            1. {{CollectedClientPaymentData/payment}} set to a new
+                {{CollectedClientAdditionalPaymentData}} whose fields are:
+
+                : {{CollectedClientAdditionalPaymentData/rpId}}
+                :: |extension_inputs|["{{AuthenticationExtensionsPaymentInputs/rpId}}"]
+                : {{CollectedClientAdditionalPaymentData/topOrigin}}
+                :: |extension_inputs|["{{AuthenticationExtensionsPaymentInputs/topOrigin}}"]
+                : {{CollectedClientAdditionalPaymentData/payeeName}}
+                :: |extension_inputs|["{{AuthenticationExtensionsPaymentInputs/payeeName}}"]
+                    if it is present, otherwise omitted.
+                : {{CollectedClientAdditionalPaymentData/payeeOrigin}}
+                :: |extension_inputs|["{{AuthenticationExtensionsPaymentInputs/payeeOrigin}}"]
+                    if it is present, otherwise omitted.
+                : {{CollectedClientAdditionalPaymentData/total}}
+                :: |extension_inputs|["{{AuthenticationExtensionsPaymentInputs/total}}"]
+                : {{CollectedClientAdditionalPaymentData/instrument}}
+                :: |extension_inputs|["{{AuthenticationExtensionsPaymentInputs/instrument}}"]
+
+            1. All other fields set as per the original step 9.
+
+            <wpt>
+              authentication-accepted.https.html
+            </wpt>
+
+:  Client extension output
+:: None
+
+:  Authenticator extension processing
+:: None
+
+## <dfn dictionary>CollectedClientPaymentData</dfn> Dictionary ## {#sctn-collectedclientpaymentdata-dictionary}
+
+<xmp class="idl">
+    dictionary CollectedClientPaymentData : CollectedClientData {
+        required CollectedClientAdditionalPaymentData payment;
+    };
+</xmp>
+
+The {{CollectedClientPaymentData}} dictionary inherits from
+{{CollectedClientData}}. It contains the following additional field:
+
+<dl dfn-type="dict-member" dfn-for="CollectedClientPaymentData">
+    :  <dfn>payment</dfn> member
+    :: The additional payment information to sign.
+</dl>
+
+## <dfn dictionary>CollectedClientAdditionalPaymentData</dfn> Dictionary ## {#sctn-collectedclientadditionalpaymentdata-dictionary}
+
+<xmp class="idl">
+    dictionary CollectedClientAdditionalPaymentData {
+        required USVString rpId;
+        required USVString topOrigin;
+        USVString payeeName;
+        USVString payeeOrigin;
+        required PaymentCurrencyAmount total;
+        required PaymentCredentialInstrument instrument;
+    };
+</xmp>
+
+The {{CollectedClientAdditionalPaymentData}} dictionary contains the following
+fields:
+
+<dl dfn-type="dict-member" dfn-for="CollectedClientAdditionalPaymentData">
+    :  <dfn>rpId</dfn> member
+    :: The id of the [=Relying Party=] that created the credential.
+
+           NOTE: For historical reasons, some implementations may additionally
+                 include this parameter with the name `rp`. The values of `rp` and
+                 `rpId` must be the same if both are present.
+
+    :  <dfn>topOrigin</dfn> member
+    :: The origin of the top level context that requested to sign the transaction details.
+
+    :  <dfn>payeeName</dfn> member
+    :: The name of the payee, if present, that was displayed to the user.
+
+    :  <dfn>payeeOrigin</dfn> member
+    :: The origin of the payee, if present, that was displayed to the user.
+
+    :  <dfn>total</dfn> member
+    :: The {{PaymentCurrencyAmount}} of the [[payment-request]] `total` field.
+
+    :  <dfn>instrument</dfn> member
+    :: The instrument information that was displayed to the user.
+</dl>
+
+Note that there is no `paymentRequestOrigin` field in
+{{CollectedClientAdditionalPaymentData}}, because the origin of the calling
+frame is already included in {{CollectedClientData}} of [[webauthn-3]].
+
+# Common Data Structures # {#sctn-common-data-structures}
+
+The following data structures are shared between registration and authentication.
+
+## <dfn dictionary>PaymentCredentialInstrument</dfn> Dictionary ## {#sctn-paymentcredentialinstrument-dictionary}
+
+<xmp class="idl">
+    dictionary PaymentCredentialInstrument {
+        required USVString displayName;
+        required USVString icon;
+        boolean iconMustBeShown = true;
+    };
+</xmp>
+
+The {{PaymentCredentialInstrument}} dictionary contains the information to be
+displayed to the user and signed together with the transaction details. It
+contains the following members:
+
+<dl dfn-type="dict-member" dfn-for="PaymentCredentialInstrument">
+    :  <dfn>displayName</dfn> member
+    :: The name of the payment instrument to be displayed to the user.
+
+         NOTE: For discussion about internationalization of the 
+         {{PaymentCredentialInstrument/displayName}}, see
+         <a href="https://github.com/w3c/secure-payment-confirmation/issues/93">issue 93</a>.
+
+    :  <dfn>icon</dfn> member
+    :: The URL of the icon of the payment instrument.
+
+         NOTE: The {{PaymentCredentialInstrument/icon}} URL may either identify
+         an image on an internet-accessible server (e.g., `https://bank.com/card.png`),
+         or directly encode the icon data via a Data URL [[RFC2397]]. Between
+         the two types of URLs, Data URLs offer several benefits to the
+         [=Relying Party=]. They can improve reliability (e.g., in the case that
+         the icon hosting server may be unavailable). They can also enhance
+         validation because the [=Relying Party=]  has cryptographic evidence of
+         what the browser displayed to the user: the icon URL is signed as part
+         of the {{CollectedClientAdditionalPaymentData}} structure.
+
+         NOTE: See related [[#sctn-accessibility-considerations|accessibility considerations]].
+
+    :  <dfn>iconMustBeShown</dfn> member
+    :: Indicates whether the specified icon must be successfully fetched and shown for the
+        request to succeed.
+</dl>
+
+# Permissions Policy integration # {#sctn-permissions-policy}
+
+This specification uses the "[=payment permission string|payment=]"
+policy-identifier string from [[payment-request]] to control access to **both**
+registration and authentication. This extends the
+[[webauthn-3#sctn-permissions-policy|WebAuthn Permission Policy]].
+
+<wpt>
+enrollment-in-iframe.sub.https.html
+</wpt>
+
+Note: Algorithms specified in [[!CREDENTIAL-MANAGEMENT-1]] perform the actual
+permissions policy evaluation. This is because such policy evaluation needs to
+occur when there is access to the [=current settings object=]. The
+{{PublicKeyCredential/[[Create]](origin, options, sameOriginWithAncestors)}}
+and {{PublicKeyCredential/[[DiscoverFromExternalSource]](origin, options,
+sameOriginWithAncestors)}} [=internal methods=] do not have such access since
+they are invoked [=in parallel=] (by algorithms specified in
+[[!CREDENTIAL-MANAGEMENT-1]]).
+
+# SPC Relying Party Operations # {#sctn-relying-party-operations}
+
+## Verifying an Authentication Assertion ## {#sctn-verifying-assertion}
+
+In order to perform an [=authentication ceremony=] for Secure Payment
+Confirmation, the [=Relying Party=] MUST proceed as follows:
+
+1. Let |credential| be a {{PublicKeyCredential}} returned from a successful
+    invocation of the [=Secure Payment Confirmation payment handler=] by the
+    |SPC caller|.
+
+    Note: As SPC is designed to enable [[#sctn-use-case-merchant-authentication|merchant
+    control of authentication]], the entity that invokes SPC may not be the
+    [=Relying Party=]. This first step presumes that the SPC caller has returned
+    a credential obtained via SPC to the [=Relying Party=].
+
+1. Perform steps 3-21 [[webauthn-3#sctn-verifying-assertion| as specified in
+    WebAuthn]], with the following changes:
+
+    1. In step 5, verify that |credential|.{{Credential/id}} identifies one of
+        the public key credentials provided to the |SPC caller| by the [=Relying Party=].
+
+    1. In step 11, verify that the value of |C|["{{CollectedClientData/type}}"]
+        is the string `payment.get`.
+
+    1. In step 12, verify that the value of |C|["{{CollectedClientData/challenge}}"]
+        equals the base64url encoding of the challenge provided to the
+        |SPC caller| by the [=Relying Party=].
+
+    1. In step 13, verify that the value of |C|["{{CollectedClientData/origin}}"]
+        matches the origin that the [=Relying Party=] expects SPC to have been
+        called from.
+
+    1. After step 13, insert the following steps:
+
+        * Verify that the value of |C|["{{CollectedClientPaymentData/payment}}"]["{{CollectedClientAdditionalPaymentData/rpId}}"]
+            matches the [=Relying Party=]'s origin.
+
+        * Verify that the value of |C|["{{CollectedClientPaymentData/payment}}"]["{{CollectedClientAdditionalPaymentData/topOrigin}}"]
+            matches the top-level origin that the [=Relying Party=] expects.
+
+        * Verify that the value of |C|["{{CollectedClientPaymentData/payment}}"]["{{CollectedClientAdditionalPaymentData/payeeName}}"]
+            matches the name of the payee that should have been displayed to the user, if any.
+
+        * Verify that the value of |C|["{{CollectedClientPaymentData/payment}}"]["{{CollectedClientAdditionalPaymentData/payeeOrigin}}"]
+            matches the origin of the payee that should have been displayed to the user, if any.
+
+        * Verify that the value of |C|["{{CollectedClientPaymentData/payment}}"]["{{CollectedClientAdditionalPaymentData/total}}"]
+            matches the transaction amount that should have been displayed to the user.
+
+        * Verify that the value of |C|["{{CollectedClientPaymentData/payment}}"]["{{CollectedClientAdditionalPaymentData/instrument}}"]
+            matches the payment instrument details that should have been displayed to the user.
+
+# User Agent Automation # {#sctn-automation}
+
+For the purposes of user agent automation and website testing, this document
+defines the below [[WebDriver2]] [=extension commands=]. Interested parties
+should also consult the [[webauthn-3#sctn-automation|equivalent automation
+section]] in [[webauthn-3]].
+
+## <dfn>Set SPC Transaction Mode</dfn> ## {#sctn-automation-set-spc-transaction-mode}
+
+The [=Set SPC Transaction Mode=] WebDriver [=extension command=] instructs the
+user agent to place Secure Payment Confirmation into a mode where it will
+automatically simulate a user either accepting or rejecting the
+[[#sctn-transaction-confirmation-ux|transaction confirmation UX]].
+
+The <dfn>current transaction automation mode</dfn> tracks what
+{{TransactionAutomationMode}} is currently active for SPC. It defaults to
+"{{TransactionAutomationMode/none}}".
+
+<xmp class="idl">
+    enum TransactionAutomationMode {
+      "none",
+      "autoAccept",
+      "autoReject",
+      "autoOptOut"
+    };
+</xmp>
+
+<figure id="table-setSPCTransactionMode" class="table">
+    <table class="data">
+        <thead>
+            <tr>
+                <th>HTTP Method</th>
+                <th>URI Template</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>POST</td>
+                <td>`/session/{session id}/secure-payment-confirmation/set-mode`</td>
+            </tr>
+        </tbody>
+    </table>
+</figure>
+
+The [=remote end steps=] are:
+
+1. If |parameters| is not a JSON [[ECMASCRIPT#sec-json-object|Object]], return a
+     [=WebDriver error=] with [=WebDriver error code=] [=invalid argument=].
+
+1. Let |mode| be the result of [=getting a property=] named `"mode"` from
+    |parameters|.
+
+1. If |mode| is [=undefined=] or is not a member of {{TransactionAutomationMode}},
+    return a [=WebDriver error=] with [=WebDriver error code=] [=invalid
+    argument=].
+
+1. Set the [=current transaction automation mode=] to |mode|.
+
+1. Return [=success=] with data `null`.
+
+# Security Considerations # {#sctn-security-considerations}
+
+As this specification builds on top of WebAuthn, the
+[[webauthn-3#sctn-security-considerations|WebAuthn Security Considerations]]
+are applicable. The below subsections comprise the current Secure Payment
+Confirmation-specific security considerations, where this specification
+diverges from WebAuthn.
+
+## Cross-origin authentication ceremony ## {#sctn-security-cross-origin-auth}
+
+A significant departure that Secure Payment Confirmation makes from WebAuthn is
+in allowing a third-party to initiate an authentication ceremony using
+credentials for a different [=Relying Party=], and returning the assertion to
+the third party. This feature can expose [=Relying Parties=] to both login and
+payment attacks, which are discussed here.
+
+### Login Attack ### {#sctn-security-login-attack}
+
+As credentials created for Secure Payment Confirmation are valid WebAuthn
+credentials, it is possible that a [=Relying Party=] may wish to use the same
+credential for a given user for both login and payment. This allows a potential
+attack on the [=Relying Party's=] login system, if they do not carefully verify
+the assertion they receive.
+
+The attack is as follows:
+
+1. The user visits `attacker.com`, which is or pretends to be a merchant site.
+1. `attacker.com` obtains credentials for the user from `relyingparty.com`,
+     either legitimately or by stealing them from `relyingparty.com` or another
+     party with whom `relyingparty.com` had shared the credentials.
+1. `attacker.com` initiates SPC authentication, and the user agrees to the
+     transaction (which may or may not be legitimate).
+1. `attacker.com` takes the payment assertion that they received from the API
+     call, and sends it to the login endpoint for `relyingparty.com`, e.g. by
+     sending a POST to `https://relyingparty.com/login`.
+1. `relyingparty.com` is employing faulty assertion validation code, which
+     checks the signature but fails to validate the necessary fields (see
+     below), and believes the login attempt to be legitimate.
+1. `relyingparty.com` returns e.g. a login cookie to `attacker.com`. The user's
+     account at `relyingparty.com` has now been compromised.
+
+[=Relying Parties=] can guard against this attack in two ways.
+
+Firstly, a [=Relying Party=] must always follow the correct assertion
+validation steps either for [[webauthn-3#sctn-verifying-assertion|WebAuthn
+login]] or [[#sctn-verifying-assertion|SPC payment]] as appropriate. In
+particular, the following fields can all be used to detect an inappropriate use
+of a credential:
+
+* {{CollectedClientData}}["{{CollectedClientData/type}}"]- "webauthn.get" for
+    login, "payment.get" for SPC.
+* {{CollectedClientData}}["{{CollectedClientData/challenge}}"] - this value should
+    be provided by the [=Relying Party=] server to the site ahead of any call
+    to either WebAuthn or SPC, and should be verified as matching an expected,
+    appropriate, previously-provided value.
+* {{CollectedClientData}}["{{CollectedClientData/origin}}"] - if SPC is being
+    performed cross-origin, this value will contain the origin of the caller
+    (e.g. `attacker.com` in the above example).
+
+Secondly, a [=Relying Party=] can consider keeping their payment and login
+credentials separate. If doing this, the [=Relying Party=] should only register
+credentials for Secure Payment Confirmation on a subdomain (e.g.
+`https//payment.relyingparty.com`), and should keep payment credentials and
+login credentials separate in their database.
+
+<div class="note">
+NOTE: As currently written, the Secure Payment Confirmation specification
+      allows any WebAuthn credential to be used in an SPC authentication.
+      However this is not true in implementations today, which only allow
+      credentials created with the {{AuthenticationExtensionsClientInputs/payment}}
+      extension specified to participate in SPC authentication, and the
+      specification may be updated to reflect that in the future.
+
+      In both implementation and specification today, a credential created
+      with the {{AuthenticationExtensionsClientInputs/payment}} can be used
+      for login, if the Relying Party wishes. This is not expected to change.
+</div>
+
+### Payment Attack ### {#sctn-security-payment-attack}
+
+A Secure Payment Confirmation assertion is essentially useless unless
+it is part of an ongoing online transaction.
+
+A variety of mechanisms protect against an attack where a malicious
+third-party, instead of attempting to hijack a user account, initiates
+an unauthorized payment using Secure Payment Confirmation credentials
+(obtained either legitimately or otherwise):
+
+* When the attacker initiates SPC, the user will be shown UI by the
+    User Agent that clearly states the transaction details (including the payee
+    and amount). The user is very likely to "cancel" in this scenario.
+* If the user does agree to the transaction, and completes the subsequent
+    WebAuthn authentication ceremony, the attacker now has a signed SPC
+    assertion for the [=Relying Party=].
+* If the [=Relying Party=] is not expecting a transaction, it will reject the
+    assertion.
+* If the [=Relying Party=] is expecting a transaction, it will detect at least
+    one of the following and reject the assertion:
+    * An incorrect {{CollectedClientData}}["{{CollectedClientData/challenge}}"],
+        if an attacker attempts to race against a valid ongoing payment.
+    * An incorrect {{CollectedClientData}}["{{CollectedClientData/origin}}"],
+        if an attacker attempts to sit between the user and a valid merchant
+        site and forward the assertion.
+
+## Merchant-supplied authentication data ## {#sctn-security-merchant-data}
+
+The bank can and should protect against spoofing by
+[[#sctn-verifying-assertion|verifying the authentication assertion]] they receive to
+ensure it aligns with the transaction details provided by the
+merchant.
+
+That is because a consequence of this specification's third-party
+authentication ceremony is that even in a valid transaction (i.e. one
+that the [=Relying Party=] is expecting), a third-party provides the
+transaction details that are shown to the user:
+
+* Transaction amount and currency
+* Payment instrument name and icon
+* Payee name and origin
+
+This could lead to a spoofing attack, in which a merchant presents incorrect
+data to the user. For example, the merchant could tell the bank (in the
+backend) that it is initiating a purchase of $100, but then pass $1 to the SPC
+API (and thus show the user a $1 transaction to verify). Or the merchant
+could provide the correct transaction details but pass Secure Payment
+Confirmation credentials that don't match what the [=Relying Party=]
+expects.
+
+Secure Payment Confirmation actually makes defeating this kind of attack easier
+than it currently is on the web. In online payments today, the bank has to
+trust that the merchant showed the user the correct amount in their checkout
+flow (and any fraud discoveries are post-payment, when the user checks their
+account statement).
+
+# Privacy Considerations # {#sctn-privacy-considerations}
+
+As this specification builds on top of WebAuthn, the
+[[webauthn-3#sctn-privacy-considerations|WebAuthn Privacy Considerations]] are
+applicable. The below subsections comprise the current Secure Payment
+Confirmation-specific privacy considerations, where this specification diverges
+from WebAuthn.
+
+## Registration in a Cross-Origin iframe ## {#sctn-security-cross-origin-registration}
+
+Unlike WebAuthn, this specification allows the creation of credentials in a
+cross-origin iframe (as long as the appropriate
+[[#sctn-permissions-policy|Permission Policy]] is set on the iframe). That is,
+if site A embeds an iframe from site B, with the "[=payment permission
+string|payment=]" policy set, then site B may initiate a credential creation
+for site B within that iframe.
+
+NOTE: Allowing credential creation in cross-origin iframes is currently [under
+      discussion](https://github.com/w3c/webauthn/issues/1656) in the WebAuthn
+      Working Group, and thus may move from this specification to WebAuthn in
+      the future.
+
+Allowing credential creation in a cross-origin iframe presents a risk that an
+iframe may attempt to trick a user into registering a credential. That
+credential could then be used for tracking (see [WebAuthn issue
+1336](https://github.com/w3c/webauthn/issues/1336#issue-513568855)). To
+mitigate such an attack, this specification requires that a call to
+{{CredentialsContainer/create()|navigator.credentials.create()}} inside a
+cross-origin iframe may only be invoked when the iframe has [=transient
+activation=] (e.g., via a click or press from the user).
+
+NOTE: Requiring user activation for WebAuthn APIs in general is under discussion
+      in the WebAuthn WG too; see [issue #1293](https://github.com/w3c/webauthn/issues/1293).
+
+## Probing for credential ids ## {#sctn-privacy-probing-credential-ids}
+
+As per WebAuthn's section on [[webauthn-3#sctn-assertion-privacy|Authentication
+Ceremony Privacy]], implementors of Secure Payment Confirmation must make sure
+not to enable malicious callers (who now may not even be the [=Relying Party=])
+to distinguish between these cases:
+
+* A credential is not available.
+* A credential is available, but the user does not consent to use it.
+
+If the above cases are distinguishable, information is leaked by which a
+malicious [=Relying Party=] could identify the user by probing for which
+[=public key credential|credentials=] are available.
+
+Section [[#sctn-steps-to-check-if-a-payment-can-be-made]] gives normative steps
+to mitigate this risk.
+
+## Joining different payment instruments ## {#sctn-privacy-joining-payment-instruments}
+
+If a [=Relying Party=] uses the same credentials for a given user across
+multiple payment instruments, this might allow a merchant to join information
+about payment instruments that might otherwise not be linked. That is, across
+two different transactions that a user U performs with payment instruments P1
+and P2 (either on the same merchant M, or two colluding merchants M1 and M2),
+the merchant(s) may now be able to learn that P1 and P2 are for the same user.
+
+For many current online payment flows this may not be a significant
+risk, as the user often provides sufficient information to do
+this joining anyway (e.g., name, email address, shipping address).
+
+However, if payment methods that involve less identifying information
+(e.g., tokenization) become commonplace, it is important that
+ecosystem stakeholders take steps to preserve user privacy. For example:
+
+* Payment systems might establish rules that place limits on storage of credential ID(s) by third parties.
+* When a [=Relying Party=] assigns multiple instruments to a single SPC credential, it might choose not to share that credential ID with other parties. In this case, the [=Relying Party=] could still use the SPC credential itself (in either a first-party or third-party context) to authenticate the user.
+* A [=Relying Party=] (e.g., a bank) might enable the user to register a distinct SPC credential per payment instrument. This would not prevent the [=Relying Party=] from joining those accounts internally.
+
+NOTE: See [issue #77](https://github.com/w3c/secure-payment-confirmation/issues/77)
+      for discussion on possible spec changes related to this section.
+
+## Credential ID(s) as a tracking vector ## {#sctn-privacy-credential-id-tracking-vector}
+
+Even for a single payment instrument, the credential ID(s) returned by the
+[=Relying Party=] could be used by a malicious entity as a tracking vector, as
+they are strong, cross-site identifiers. However in order to obtain them from
+the [=Relying Party=], the merchant already needs an as-strong identifier to
+give to the [=Relying Party=] (e.g., the credit card number).
+
+NOTE: See [issue #77](https://github.com/w3c/secure-payment-confirmation/issues/77)
+      for discussion on possible spec changes related to this section.
+
+## User opt out ## {#sctn-user-opt-out}
+
+The API option {{SecurePaymentConfirmationRequest/showOptOut}} tells the
+user agent to provide a way for the user to indicate they wish to opt out of the
+relying party's storage of information. When the user invokes this opt out, an
+{{OptOutError}} is returned to the caller to indicate the user's intent to opt
+out. It is then up to the caller to act on the opt out, e.g. by clearing payment
+information stored for the user.
+
+Implementors must make sure that the return of an {{OptOutError}} does not
+reveal that the user has credentials but did not complete an authentication.
+This can be mitigated by similar means as
+[[#sctn-privacy-probing-credential-ids]], e.g. by also providing the user an
+opportunity to opt out on the interstitial UX in the case where a credential
+match is not found.
+
+This is not intended to be a mechanism to delete browser data or credentials -
+it is for the developer to prompt for opt out via the user agent. The user agent
+should make this clear to the user, for example with some clarifying text:
+"This provider may have stored information about your payment method, which you
+can request to be deleted."
+
+# Accessibility Considerations # {#sctn-accessibility-considerations}
+
+User agents render the {{PaymentCredentialInstrument/icon}} and {{PaymentCredentialInstrument/displayName}} together. Relying parties ensure the accessibility of the icon presentation by providing sufficient information via the {{PaymentCredentialInstrument/displayName}} (e.g., if the icon represents a bank, by including the bank name in the {{PaymentCredentialInstrument/displayName}}).
+
+User Agents implementing this specification should follow both
+[[webauthn-3#sctn-accessiblility-considerations|WebAuthn's Accessibility Considerations]]
+and [=payment request accessibility considerations|PaymentRequest's Accessibility Considerations=].
