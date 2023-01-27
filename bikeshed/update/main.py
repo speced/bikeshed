@@ -12,7 +12,6 @@ from . import (
     updateLanguages,
     updateLinkDefaults,
     updateMdn,
-    updateTestSuites,
     updateWpt,
 )
 
@@ -25,7 +24,6 @@ def update(
     caniuse: bool = False,
     linkDefaults: bool = False,
     mdn: bool = False,
-    testSuites: bool = False,
     languages: bool = False,
     wpt: bool = False,
     path: str | None = None,
@@ -46,8 +44,8 @@ def update(
 
     # fmt: off
     # If all are False, update everything
-    if anchors == backrefs == biblio == boilerplate == caniuse == linkDefaults == mdn == testSuites == languages == wpt == False:  # noqa: E712
-        anchors = backrefs =  biblio =  boilerplate =  caniuse =  linkDefaults =  mdn =  testSuites =  languages =  wpt =  True  # noqa: E222
+    if anchors == backrefs == biblio == boilerplate == caniuse == linkDefaults == mdn == languages == wpt == False:  # noqa: E712
+        anchors = backrefs =  biblio =  boilerplate =  caniuse =  linkDefaults =  mdn =  languages =  wpt =  True  # noqa: E222
 
     touchedPaths: dict[str, set[str]|None] = {
         "anchors": updateCrossRefs.update(path=path, dryRun=dryRun) if anchors else None,
@@ -57,7 +55,6 @@ def update(
         "caniuse": updateCanIUse.update(path=path, dryRun=dryRun) if caniuse else None,
         "mdn": updateMdn.update(path=path, dryRun=dryRun) if mdn else None,
         "linkDefaults": updateLinkDefaults.update(path=path, dryRun=dryRun) if linkDefaults else None,
-        "testSuites": updateTestSuites.update(path=path, dryRun=dryRun) if testSuites else None,
         "languages": updateLanguages.update(path=path, dryRun=dryRun) if languages else None,
         "wpt": updateWpt.update(path=path, dryRun=dryRun) if wpt else None,
     }

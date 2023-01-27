@@ -279,7 +279,6 @@ class Spec:
         boilerplate.addTOCSection(self)
         u.addSelfLinks(self)
         u.processAutolinks(self)
-        boilerplate.addAnnotations(self)
         boilerplate.removeUnwantedBoilerplate(self)
         # Add MDN panels after all IDs/anchors have been added
         mdn.addMdnPanels(self)

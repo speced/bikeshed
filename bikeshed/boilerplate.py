@@ -243,13 +243,6 @@ def removeUnwantedBoilerplate(doc: t.SpecT) -> None:
                 h.removeNode(el)
 
 
-def addAnnotations(doc: t.SpecT) -> None:
-    if doc.md.vshortname in doc.testSuites:
-        html = retrieve.retrieveBoilerplateFile(doc, "annotations")
-        el = boilerplateFromHtml(doc, html)
-        h.appendContents(doc.head, el)
-
-
 def w3cStylesheetInUse(doc: t.SpecT) -> bool:
     return doc.md.prepTR or doc.md.status in config.snapshotStatuses
 

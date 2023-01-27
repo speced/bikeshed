@@ -260,12 +260,6 @@ def main() -> None:
         help="Download link default data.",
     )
     updateParser.add_argument(
-        "--test-suites",
-        dest="testSuites",
-        action="store_true",
-        help="Download test suite data.",
-    )
-    updateParser.add_argument(
         "--languages",
         dest="languages",
         action="store_true",
@@ -467,7 +461,6 @@ def handleUpdate(options: argparse.Namespace) -> None:
         caniuse=options.caniuse,
         mdn=options.mdn,
         linkDefaults=options.linkDefaults,
-        testSuites=options.testSuites,
         languages=options.languages,
         wpt=options.wpt,
         dryRun=constants.dryRun,
