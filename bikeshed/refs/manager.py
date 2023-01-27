@@ -924,6 +924,6 @@ def reportAmbiguousForlessLink(
     localRefText = "\n".join([refToText(ref) for ref in simplifyPossibleRefs(localRefs, alwaysShowFor=True)])
     forlessRefText = "\n".join([refToText(ref) for ref in simplifyPossibleRefs(forlessRefs, alwaysShowFor=True)])
     m.linkerror(
-        f"Ambiguous for-less link for '{text}', please see <https://tabatkins.github.io/bikeshed/#ambi-for> for instructions:\nLocal references:\n{localRefText}\nfor-less references:\n{forlessRefText}",
+        f"Ambiguous for-less link for '{text}', please see <https://speced.github.io/bikeshed/#ambi-for> for instructions:\nLocal references:\n{localRefText}\nfor-less references:\n{forlessRefText}",
         el=el,
     )

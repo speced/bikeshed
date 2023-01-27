@@ -49,7 +49,7 @@ knownFolders = [
     "mdn",
 ]
 
-ghPrefix = "https://raw.githubusercontent.com/tabatkins/bikeshed-data/master/data/"
+ghPrefix = "https://raw.githubusercontent.com/speced/bikeshed-data/master/data/"
 
 # To avoid 'Event loop is closed' RuntimeError due to compatibility issue with aiohttp
 if sys.platform.startswith("win") and sys.version_info >= (3, 8):

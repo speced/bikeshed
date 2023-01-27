@@ -11,7 +11,7 @@ def verify_python_version() -> None:
         print(
             """Bikeshed has updated to Python 3, but you are trying to run it with
     Python {}. For instructions on upgrading, please check:
-    https://tabatkins.github.io/bikeshed/#installing""".format(
+    https://speced.github.io/bikeshed/#installing""".format(
                 platform.python_version()
             )
         )
@@ -21,7 +21,7 @@ def verify_python_version() -> None:
         print(
             """Bikeshed now requires Python 3.7; you are on {}.
     For instructions on how to set up a pyenv with 3.7, see:
-    https://tabatkins.github.io/bikeshed/#installing""".format(
+    https://speced.github.io/bikeshed/#installing""".format(
                 platform.python_version()
             )
         )

@@ -21,7 +21,7 @@ def isErr(x: t.Any) -> t.TypeGuard[Err]:
     return isinstance(x, Err)
 
 
-ghPrefix = "https://raw.githubusercontent.com/tabatkins/bikeshed-boilerplate/main/"
+ghPrefix = "https://raw.githubusercontent.com/speced/bikeshed-boilerplate/main/"
 
 
 def update(path: str, dryRun: bool = False) -> set[str] | None:
