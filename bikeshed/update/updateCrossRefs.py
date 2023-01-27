@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from alive_progress import alive_it
 from collections import defaultdict
 
 import certifi
@@ -183,21 +184,15 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
 
 def gatherWebrefData(specs: SpecsT, anchors: AnchorsT, headings: AllHeadingsT) -> None:
     m.say("Downloading anchor data from Webref...")
-    currentWebrefData = specsFromWebref("current")
+    currentWebrefData = [x for x in specsFromWebref("current") if "dfns" in x or "headings" in x]
     snapshotWebrefData = specsFromWebref("snapshot")
 
-    lastMsgTime: float = 0
-    for i, rawWSpec in enumerate(currentWebrefData, 1):
-        lastMsgTime = config.doEvery(
-            s=5,
-            lastTime=lastMsgTime,
-            action=progressMessager(i, len(currentWebrefData)),
-        )
-        if "dfns" not in rawWSpec and "headings" not in rawWSpec:
-            continue
+    progress = alive_it(currentWebrefData, dual_line=True)
+    for rawWSpec in t.cast("t.Generator[WebrefSpecT, None, None]", progress):
         spec = genWebrefSpec(rawWSpec)
         currentUrl = spec["current_url"]
         assert currentUrl is not None
+        progress.text(spec["vshortname"].lower())
 
         specs[spec["vshortname"].lower()] = spec
         specHeadings: HeadingsT = {}
