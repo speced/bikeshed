@@ -776,6 +776,105 @@ def addIDLSection(doc: t.SpecT) -> None:
     h.addClass(doc, container, "highlight")
 
 
+bookmarkCss = """
+    .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24
+    }
+    .heading {
+        position: relative;
+    }
+    .bookmark-tooltip {
+        opacity: 0;
+        display: block;
+        position: absolute;
+        bottom: 100%;
+        left: 0;
+        pointer-events: auto;
+        border: shadow 2px gray;
+        padding: 0;
+        margin: 0;
+        background: rgb(200 200 200 / 50%);
+        color: black;
+        border-radius: 5px;
+    }
+    a.has-bookmark-tooltip {
+        display: block;
+    }
+    .bookmark-tooltip button {
+        padding: 0;
+        background: rgb(100 100 100 / 50%);
+    }
+    .has-bookmark-tooltip:hover .bookmark-tooltip {
+        opacity: 0.8;
+    }
+    .bookmarksSection {
+        margin-left: 2em;
+    }
+    """
+
+bookmarkScript = """
+    "use strict";
+    // Add tooltip behavior to all headers.
+    const headers = document.querySelectorAll('.heading');
+    // We need to get the createElement method now, or else it is not available!?
+    const createElement = document.createElement;
+    const makeTag = (tag) => {
+        return createElement.call(document, tag);
+    }
+
+    for (let h of headers) {
+        const textElement = h.querySelector('span.content');
+        insertTooltipAction(h, 'bookmark_add', 'Add bookmark', (event) => {
+            addBookmark(h, textElement.textContent); })
+    }
+
+    function insertTooltipAction(element, className, title, action) {
+        const tooltipSpan = makeTag('span');
+        tooltipSpan.className = 'bookmark-tooltip';
+        const button = makeTag('button');
+        button.setHTML(
+            `<span class="material-symbols-outlined"
+                title="${title}">${className}</span>`);
+        button.addEventListener('click', action);
+        tooltipSpan.insertAdjacentElement('beforeend', button);
+        element.insertAdjacentElement('beforeend', tooltipSpan);
+        element.classList.add('has-bookmark-tooltip');
+    }
+
+    function addBookmark(header, text) {
+        // console.info('add bookmark for', header);
+        let bookmarksSection = document.querySelector('.bookmarksSection');
+        if (bookmarksSection == null) {
+            const tocContents = document.querySelector('#toc #contents');
+            bookmarksSection = makeTag('div');
+            bookmarksSection.className = 'bookmarksSection';
+            bookmarksSection.setHTML('Bookmarks <ul class="bookmarks"></ul>');
+            tocContents.insertAdjacentElement('afterend', bookmarksSection);
+        }
+        const bookmarksList = document.querySelector('.bookmarks');
+        const bookmarkItem = makeTag('li');
+        bookmarksList.insertAdjacentElement('beforeend', bookmarkItem);
+
+        const bookmarkLink = makeTag('a');
+        bookmarkLink.href = `#${header.id}`;
+        bookmarkLink.textContent = text;
+        bookmarkItem.insertAdjacentElement('beforeend', bookmarkLink);
+
+        insertTooltipAction(bookmarkLink, 'bookmark_remove', 'Remove bookmark',
+            (event) => {
+                removeBookmark(bookmarkItem);
+                event.stopPropagation();
+                event.preventDefault();
+            });
+    }
+
+    function removeBookmark(bookmarkItem) {
+        const parentElement = bookmarkItem.parentElement;
+        parentElement.removeChild(bookmarkItem);
+    }
+    """
+
+
 def addTOCSection(doc: t.SpecT) -> None:
     toc = getFillContainer("table-of-contents", doc=doc, default=False)
     if toc is None:
@@ -787,6 +886,20 @@ def addTOCSection(doc: t.SpecT) -> None:
             _("Table of Contents"),
         ),
     )
+    if "bookmark" in doc.md.boilerplate:
+        # Load icon for "add bookmark"
+        h.appendChild(
+            toc,
+            h.E.link(
+                {
+                    "rel": "stylesheet",
+                    "href": "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@48,400,0,0",
+                }
+            ),
+        )
+
+        doc.extraScripts["script-bookmark"] = bookmarkScript
+        doc.extraStyles["css-bookmark"] = bookmarkCss
 
     # containers[n] holds the current <ol> for inserting each heading's <li> into.
     # containers[1] is initialized with something arbitrary
