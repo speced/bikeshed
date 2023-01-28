@@ -4,6 +4,7 @@ import difflib
 import glob
 import os
 import re
+from alive_progress import alive_it
 
 from . import config, messages as m, metadata, retrieve, t
 from .Spec import Spec
@@ -60,9 +61,10 @@ def runAllTests(
     numPassed = 0
     total = 0
     fails = []
-    for i, path in enumerate(paths, 1):
+    pathProgress = alive_it(paths, dual_line=True, length=20)
+    for path in pathProgress:
         testName = testNameForPath(path)
-        m.p(f"{ratio(i,len(paths))}: {testName}")
+        pathProgress.text(testName)
         total += 1
         doc = processTest(path, md)
         outputText = doc.serialize()
@@ -118,18 +120,14 @@ def rebase(patterns: list[str] | None = None, md: t.MetadataManager | None = Non
     if len(paths) == 0:
         m.p("No tests were found.")
         return True
-    for i, path in enumerate(paths, 1):
+    pathProgress = alive_it(paths, dual_line=True, length=20)
+    for path in pathProgress:
         name = testNameForPath(path)
+        pathProgress.text(name)
         m.resetSeenMessages()
-        m.p(f"{ratio(i,len(paths))}: Rebasing {name}")
         doc = processTest(path, md)
         doc.finish(newline="\n")
     return True
-
-
-def ratio(i: int, total: int) -> str:
-    justifiedI = str(i).rjust(len(str(total)))
-    return f"{justifiedI}/{total}"
 
 
 def testPaths(patterns: list[str] | None = None) -> list[str]:

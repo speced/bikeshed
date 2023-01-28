@@ -3,12 +3,12 @@ from __future__ import annotations
 import json
 import os
 import re
-from alive_progress import alive_it
 from collections import defaultdict
 
 import certifi
 import tenacity
 import requests
+from alive_progress import alive_it
 from json_home_client import Client as APIClient
 
 from .. import config, messages as m, t
