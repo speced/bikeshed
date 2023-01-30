@@ -392,8 +392,8 @@ def checkForMixedIndents(line: l.Line, indentChar: str) -> None:
             m.lint(f"Your document appears to use spaces to indent, but line {line.i} starts with tabs.")
         else:
             m.lint(f"Your document appears to use tabs to indent, but line {line.i} starts with spaces.")
-    if re.match(r"(\t+ )|( +\t)", line.text):
-        m.lint(f"Line {line.i} is indented with both tabs and spaces.")
+    if re.match(r"(\t+ +\t)|( +\t)", line.text):
+        m.lint(f"Line {line.i}'s indent contains tabs after spaces.")
 
 
 def prefixCount(text: str, numSpacesForIndentation: int) -> int:
