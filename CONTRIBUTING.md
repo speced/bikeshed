@@ -16,6 +16,10 @@ I find it simple to use,
 and it's what I use to develop Bikeshed,
 so it has a high chance of working correctly.)
 
+If you use Visual Studio Code,
+you can [open a Bikeshed development environment
+in a local container](https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/speced/bikeshed).
+
 See [my blog post on cleanly handling a fork](https://www.xanthir.com/b4hf0)
 for guidance on how to fork responsibly
 when you're making small changes to an active project;
