@@ -62,8 +62,8 @@ def runAllTests(
     total = 0
     fails = []
     pathProgress = alive_it(paths, dual_line=True, length=20)
-    for path in pathProgress:
-        try:
+    try:
+        for path in pathProgress:
             testName = testNameForPath(path)
             pathProgress.text(testName)
             total += 1
@@ -79,8 +79,8 @@ def runAllTests(
                 numPassed += 1
             else:
                 fails.append(testName)
-        except:  # pylint: disable=bare-except
-            print(testName)
+    except:  # pylint: disable=bare-except
+        print(testName)
     if numPassed == total:
         m.p(m.printColor("✔ All tests passed.", color="green"))
         return True
