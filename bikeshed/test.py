@@ -63,21 +63,24 @@ def runAllTests(
     fails = []
     pathProgress = alive_it(paths, dual_line=True, length=20)
     for path in pathProgress:
-        testName = testNameForPath(path)
-        pathProgress.text(testName)
-        total += 1
-        doc = processTest(path, md)
-        outputText = doc.serialize()
-        if outputText is None:
-            m.p(m.printColor("Serialization failed.", color="red"))
-            fails.append(testName)
-            continue
-        with open(os.path.splitext(path)[0] + ".html", encoding="utf-8") as golden:
-            goldenText = golden.read()
-        if compare(outputText, goldenText):
-            numPassed += 1
-        else:
-            fails.append(testName)
+        try:
+            testName = testNameForPath(path)
+            pathProgress.text(testName)
+            total += 1
+            doc = processTest(path, md)
+            outputText = doc.serialize()
+            if outputText is None:
+                m.p(m.printColor("Serialization failed.", color="red"))
+                fails.append(testName)
+                continue
+            with open(os.path.splitext(path)[0] + ".html", encoding="utf-8") as golden:
+                goldenText = golden.read()
+            if compare(outputText, goldenText):
+                numPassed += 1
+            else:
+                fails.append(testName)
+        except:
+            print(testName)
     if numPassed == total:
         m.p(m.printColor("✔ All tests passed.", color="green"))
         return True
