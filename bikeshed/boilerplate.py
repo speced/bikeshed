@@ -1346,6 +1346,22 @@ linkHintsCss = """
 
 linkHintsScript = """
     "use strict";
+
+    // Map from string as regexp (which will be applied to href) to hrefType string.
+    // Or property value is a function from href to hrefType string.
+    const hrefPatterns = Object.entries({
+        'infra.spec':  '<span class="infra-chip chip">Infra</span> ',
+        'webidl.spec': '<span class="webidl-chip chip">Web IDL</span> ',
+        'url.spec': '<span class="chip">URL </span> ',
+        'html.spec': '<span class="chip">HTML </span> ',
+        'dom.spec': '<span class="chip">DOM </span> ',
+        'w3.org': (href) => {
+            const tr = href.match(/TR\/([^\/]+)/);
+            return `<span class="w3c-chip chip">W3C ${tr ? tr[1] : ''}</span> `;
+        },
+        'github.com': '<span class="github-chip chip">GitHub </span> ',
+    });
+
     // Add tooltip behavior to all links.
     const links = document.querySelectorAll('a[href]');
     // We need to get the createElement method now, or else it is not available!?
@@ -1361,37 +1377,22 @@ linkHintsScript = """
 
     function insertLinkHintsTooltipAction(element, className, title, action) {
         const linkType = element.getAttribute('data-link-type');
-        let linkTypeText = '';
-        if (linkType) linkTypeText = `${linkType} `;
+        let linkTypeText = linkType ? `${linkType} ` : '';
         const dataType = element.getAttribute('data-type');
-        const dataTypeText = (dataType) ? `${dataType}` : '';
-        let hrefType = '';
+        const dataTypeText = dataType ? `${dataType}` : '';
 
         const href = element.href;
-        if (href.match('infra.spec')) hrefType = '<span class="infra-chip chip">Infra</span> ';
-        if (href.match('webidl.spec')) hrefType = '<span class="webidl-chip chip">Web IDL</span> ';
-        if (href.match('url.spec')) {
-            hrefType = `<span class="chip">URL </span> `;
-        }
-        if (href.match('html.spec')) {
-            hrefType = `<span class="chip">HTML </span> `;
-        }
-        if (href.match('dom.spec')) {
-            hrefType = `<span class="chip">DOM </span> `;
-        }
-        if (href.match('w3.org')) {
-            const tr = href.match(/TR\/([^\/]+)/);
-            hrefType = `<span class="w3c-chip chip">W3C ${tr ? tr[1] : ''}</span> `;
-        }
-
-        if (href.match('github.com')) {
-            hrefType = `<span class="github-chip chip">GitHub </span> `;
-        }
+        const hrefType = hrefPatterns.find(
+            ([re, hrefType]) => href.match(re))?.at(1);
+        let hrefTypeText = hrefType ? (
+            typeof hrefType === 'function' ? hrefType(href) : hrefType
+            ) : '';
 
         const id = element.getAttribute('id');
-        const refFor = id && id.match(/(?:^ref-for-)(.*)$/);
+        const refFor = id && id.match(/(?:^ref-for-)([a-z\-]*).*$/);
         const refForText = refFor ? ` for ${refFor[1]}` : '';
-        const tooltipText = `${hrefType}${linkTypeText}${dataTypeText}${refForText}`;
+
+        const tooltipText = `${hrefTypeText}${linkTypeText}${dataTypeText}${refForText}`;
         if (!tooltipText) return;
 
         const tooltipSpan = makeTag('span');
