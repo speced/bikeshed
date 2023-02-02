@@ -968,6 +968,11 @@ def decorateAutolink(doc: t.SpecT, el: t.ElementT, linkType: str, linkText: str,
     # Add additional effects to autolinks.
     if doc.md.slimBuildArtifact:
         return
+    print(ref)
+    el.set("data-ref-type", ref._ref['type'])
+    el.set("data-status", ref._ref['status'])
+    el.set("data-spec", ref._ref['spec'])
+    el.set("data-shortname", ref._ref['shortname'])
 
     # Put an ID on every reference, so I can link to references to a term.
     if el.get("id") is None:

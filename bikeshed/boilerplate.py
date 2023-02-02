@@ -1362,6 +1362,13 @@ linkHintsScript = """
         'github.com': '<span class="github-chip chip">GitHub </span> ',
     });
 
+    const dataAttrs = Object.entries({
+        'data-link-type': 'link type',
+        'data-type': 'type',
+        'data-ref-type': 'ref type',
+        'status': 'status',
+    });
+
     // Add tooltip behavior to all links.
     const links = document.querySelectorAll('a[href]');
     // We need to get the createElement method now, or else it is not available!?
@@ -1372,27 +1379,46 @@ linkHintsScript = """
 
     for (let link of links) {
         insertLinkHintsTooltipAction(link, 'show-link-hint', '', (event) => {
-            console.info(link); })
+            // console.info(link);
+        })
     }
 
     function insertLinkHintsTooltipAction(element, className, title, action) {
+       /*
         const linkType = element.getAttribute('data-link-type');
-        let linkTypeText = linkType ? `${linkType} ` : '';
+        const linkTypeText = linkType ? `link type ${linkType} ` : '';
+
         const dataType = element.getAttribute('data-type');
-        const dataTypeText = dataType ? `${dataType}` : '';
+        const dataTypeText = dataType ? `type ${dataType} ` : '';
+
+        const dataRefType = element.getAttribute('data-ref-type');
+        const dataRefTypeText = dataRefType ? `ref type ${dataRefType} ` : '';
+
+        const status = element.getAttribute('data-status');
+        const statusText = status ? `status ${status} ` : '';
+        */
+
+        const getAttrText = (element) => {
+          const attrText = '';
+          dataAttrs.forEach(([attr, text]) => {
+            const value = element.getAttribute(attr);
+            value != null ?
+            attrText += value ? `${text} ${value} ` : '';
+            });
+        }
 
         const href = element.href;
         const hrefType = hrefPatterns.find(
             ([re, hrefType]) => href.match(re))?.at(1);
-        let hrefTypeText = hrefType ? (
+        const hrefTypeText = hrefType ? (
             typeof hrefType === 'function' ? hrefType(href) : hrefType
             ) : '';
 
         const id = element.getAttribute('id');
         const refFor = id && id.match(/(?:^ref-for-)([a-z\-]*).*$/);
-        const refForText = refFor ? ` for ${refFor[1]}` : '';
+        const refForText = refFor ? `for ${refFor[1]} ` : '';
 
-        const tooltipText = `${hrefTypeText}${linkTypeText}${dataTypeText}${refForText}`;
+        const tooltipText = `${hrefTypeText}${linkTypeText}${dataRefTypeText}${statusText}${dataTypeText}${refForText}`;
         if (!tooltipText) return;
 
         const tooltipSpan = makeTag('span');
