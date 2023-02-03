@@ -14,17 +14,42 @@ from . import dom
 
 
 def test() -> None:
+    nodes = []
     with io.open(os.path.abspath("tests/abstract001.html"), "r") as fh:
         i = 0
         s = Stream(fh.read())
+        _, i = parseDoctype(s, i)
         while not s.eof(i):
-            tag, end = parseStartTag(s, i)
-            if tag is Failure:
-                i += 1
-                continue
-            else:
-                print(f"Start tag found at {s.loc(i)}:\n{tag}")
-                i = end
+            print(s.loc(i))
+            text, i = s.skip(i, "<")
+            if text:
+                nodes.append(text)
+
+            comment, i = parseComment(s, i)
+            if comment is not Failure:
+                nodes.append(comment)
+
+            startTag, i = parseStartTag(s, i)
+            if startTag is not Failure:
+                nodes.append(startTag)
+                if startTag.tag == "script":
+                    text, i = parseScriptToEnd(s, i)
+                    nodes.append(text)
+                    nodes.append(EndTag(-1, "script"))
+                elif startTag.tag == "style":
+                    text, i = parseStyleToEnd(s, i)
+                    nodes.append(text)
+                    nodes.append(EndTag(-1, "style"))
+                elif startTag.tag == "xmp":
+                    text, i = parseXmpToEnd(s, i)
+                    nodes.append(text)
+                    nodes.append(EndTag(-1, "xmp"))
+
+            endTag, i = parseEndTag(s, i)
+            if endTag is not Failure:
+                nodes.append(endTag)
+        for node in nodes:
+            print(node, end="")
 
 
 @dataclass
@@ -113,14 +138,22 @@ class Stream:
     def loc(self, index: int) -> str:
         return f"{self.line(index)}:{self.col(index)}"
 
+    def skip(self, start: int, ch: str) -> Result:
+        i = start
+        chLen = len(ch)
+        while self[i : i + chLen] != ch and not self.eof(i):
+            i += 1
+        return Result(self[start:i], i)
+
 
 @dataclass
 class StartTag:
+    line: int
     tag: str
     attrs: dict[str, str] = field(default_factory=dict)
 
     def __str__(self) -> str:
-        start = f"<{self.tag}"
+        start = f"<{self.tag}:{self.line}"
         if self.attrs:
             attrs = " " + " ".join(f'{name}="{val}"' for name, val in self.attrs.items())
         else:
@@ -130,18 +163,20 @@ class StartTag:
 
 @dataclass
 class EndTag:
+    line: int
     tag: str
 
     def __str__(self) -> str:
-        return f"</{self.tag}>"
+        return f"</{self.tag}:{self.line}>"
 
 
-def parseerror(s: Stream, i: int, state: str) -> None:
-    return
-    m.warn(
-        f'Parse error trying to get a start tag from "{s[i-3:i+10]}...".\nSpecifically failed at {s.line(i)}:{s.col(i)}, in state {state}.',
-        lineNum=s.line(i),
-    )
+@dataclass
+class Comment:
+    line: int
+    data: str
+
+    def __str__(self) -> str:
+        return f"<!--{self.data}-->"
 
 
 def parseStartTag(s: Stream, start: int) -> Result:
@@ -157,7 +192,7 @@ def parseStartTag(s: Stream, start: int) -> Result:
     # After this point we're committed to a start tag,
     # so failure will really be a parse error.
 
-    tag = StartTag(tagname)
+    tag = StartTag(s.line(start), tagname)
 
     while True:
         ws, i = parseWhitespace(s, i)
@@ -368,10 +403,10 @@ def parseWhitespace(s: Stream, start: int) -> Result:
         return Result.fail(start)
 
 
-def parseCloseTag(s: Stream, start: int) -> Result:
-    if s[start:start+2] != "</":
+def parseEndTag(s: Stream, start: int) -> Result:
+    if s[start : start + 2] != "</":
         return Result.fail(start)
-    i = start+2
+    i = start + 2
 
     # committed now
 
@@ -381,19 +416,107 @@ def parseCloseTag(s: Stream, start: int) -> Result:
     if s.eof(i):
         m.die("Hit EOF in the middle of an end tag.", lineNum=s.loc(start))
         return Result.fail(start)
-    tagname, i = parseTagname(s, i)
+    tagname, i = parseTagName(s, i)
     if tagname is Failure:
         m.die("Garbage in an end tag.", lineNum=s.loc(start))
         return Result.fail(start)
     if s.eof(i):
-        m.die(f"Hit EOF in the middle of an end tag </{tagname}>.", lineNum=s.loc)
+        m.die(f"Hit EOF in the middle of an end tag </{tagname}>.", lineNum=s.loc(start))
         return Result.fail(start)
     if s[i] != ">":
         m.die(f"Garbage after the tagname in </{tagname}>.", lineNum=s.loc(start))
         return Result.fail(start)
     i += 1
-    return Result(EndTag(tagname), i)
+    return Result(EndTag(s.line(start), tagname), i)
 
+
+def parseComment(s: Stream, start: int) -> Result:
+    if s[start : start + 2] != "<!":
+        return Result.fail(start)
+    i = start + 2
+
+    # committed
+    if s[i : i + 2] != "--":
+        m.die(f"Malformed HTML comment '{s[start:start+10]}'.", lineNum=s.loc(start))
+        return Result.fail(start)
+    i += 2
+
+    dataStart = i
+
+    while True:
+        while s[i] != "-" and not s.eof(i):
+            i += 1
+        if s[i : i + 3] == "-->":
+            return Result(Comment(s.line(start), s[dataStart:i]), i + 3)
+        if s[i : i + 4] == "--!>":
+            m.die("Malformed comment - don't use a ! at the end.", lineNum=s.loc(start))
+            return Result.fail(start)
+        if s.eof(i):
+            m.die("Hit EOF in the middle of a comment.", lineNum=s.loc(start))
+            return Result.fail(start)
+        i += 1
+    assert False
+
+
+def parseDoctype(s: Stream, start: int) -> Result:
+    if s[start : start + 2] != "<!":
+        return Result.fail(start)
+    if s[start + 2 : start + 9].lower() != "doctype":
+        return Result.fail(start)
+    if s[start + 9 : start + 15].lower() != " html>":
+        m.die("Unnecessarily complex doctype - use <!doctype html>.", lineNum=s.loc(start))
+        return Result.fail(start)
+    return Result(True, start + 15)
+
+
+def parseScriptToEnd(s: Stream, start: int) -> Result:
+    # Call with s[i] after the opening <script> tag.
+    # Returns with s[i] after the </script> tag,
+    # with text contents in the Result.
+
+    i = start
+    while True:
+        while s[i] != "<" and not s.eof(i):
+            i += 1
+        if s.eof(i):
+            m.die("Hit EOF in the middle of a <script>.", lineNum=s.loc(start))
+            return Result.fail(start)
+        if s[i : i + 9] == "</script>":
+            return Result(s[start:i], i + 9)
+        i += 1
+    assert False
+
+
+def parseStyleToEnd(s: Stream, start: int) -> Result:
+    # Identical to parseScriptToEnd
+
+    i = start
+    while True:
+        while s[i] != "<" and not s.eof(i):
+            i += 1
+        if s.eof(i):
+            m.die("Hit EOF in the middle of a <style>.", lineNum=s.loc(start))
+            return Result.fail(start)
+        if s[i : i + 8] == "</style>":
+            return Result(s[start:i], i + 8)
+        i += 1
+    assert False
+
+
+def parseXmpToEnd(s: Stream, start: int) -> Result:
+    # Identical to parseScriptToEnd
+
+    i = start
+    while True:
+        while s[i] != "<" and not s.eof(i):
+            i += 1
+        if s.eof(i):
+            m.die("Hit EOF in the middle of an <xmp>.", lineNum=s.loc(start))
+            return Result.fail(start)
+        if s[i : i + 6] == "</xmp>":
+            return Result(s[start:i], i + 6)
+        i += 1
+    assert False
 
 
 def isTagnameChar(ch: str) -> bool:
