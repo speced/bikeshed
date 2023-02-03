@@ -72,3 +72,4 @@ from .dom import (
     wrapContents,
 )
 from .serializer import Serializer
+from .parser import test

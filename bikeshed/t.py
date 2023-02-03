@@ -23,6 +23,7 @@ if TYPE_CHECKING:
         Mapping,
         MutableMapping,
         MutableSequence,
+        NamedTuple,
         NewType,
         Protocol,
         Sequence,
