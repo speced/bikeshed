@@ -219,7 +219,7 @@ def transformPre(lines: list[str], tagName: str, firstLine: str, lineNum: int | 
         return [firstLine, lastLine]
 
     indent = float("inf")
-    for (i, line) in enumerate(lines):
+    for i, line in enumerate(lines):
         if line.strip() == "":
             continue
 
@@ -235,7 +235,7 @@ def transformPre(lines: list[str], tagName: str, firstLine: str, lineNum: int | 
         indent = 0
 
     # Strip off the whitespace prefix from each line
-    for (i, line) in enumerate(lines):
+    for i, line in enumerate(lines):
         if line.strip() == "":
             continue
         lines[i] = lines[i][t.cast(int, indent) :]

@@ -764,7 +764,6 @@ def classifyLink(el: t.ElementT) -> t.ElementT:
 def processBiblioLinks(doc: t.SpecT) -> None:
     biblioLinks = h.findAll("a[data-link-type='biblio']", doc)
     for el in biblioLinks:
-
         linkText = determineLinkText(el)
         if linkText[0] == "[" and linkText[-1] == "]":
             linkText = linkText[1:-1]

@@ -356,7 +356,6 @@ def addExplicitIndexes(doc: t.SpecT) -> None:
     # Explicit indexes can be requested for specs with <index spec="example-spec-1"></index>
 
     for el in h.findAll("index", doc):
-
         status = el.get("status")
         if status and status not in config.specStatuses:
             m.die(
@@ -532,7 +531,6 @@ def addIndexOfExternallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> Non
 
     atLeastOnePanel = False
     for specName, specData in doc.externalRefsUsed.sorted():
-
         # Skip entries that are *solely* a biblio entry.
         if not specData.refs:
             continue

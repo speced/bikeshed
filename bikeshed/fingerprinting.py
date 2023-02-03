@@ -62,7 +62,6 @@ def trackingVectorImage(
     imageURL: str | None, imageWidth: str, imageHeight: str, altText: str, title: str
 ) -> t.ElementT:
     if imageURL is None:
-
         return h.E.svg(
             {"width": "46", "height": "64", "role": "img", "aria-label": altText},
             h.E.title({}, title),

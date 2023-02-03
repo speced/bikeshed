@@ -16,7 +16,6 @@ if t.TYPE_CHECKING:
 
 
 class ReferenceManager:
-
     __slots__ = [
         "dataFile",
         "specs",

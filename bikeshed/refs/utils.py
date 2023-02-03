@@ -71,7 +71,6 @@ def linkTextVariations(str: str, linkType: str | None) -> t.Generator[str, None,
     if linkType is None:
         return
     elif linkType == "dfn":
-
         last1 = str[-1]
         last2 = str[-2:]
         last3 = str[-3:]

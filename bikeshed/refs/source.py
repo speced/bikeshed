@@ -10,7 +10,6 @@ from . import utils, wrapper
 
 
 class RefSource:
-
     __slots__ = [
         "dataFile",
         "source",

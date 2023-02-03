@@ -159,7 +159,6 @@ def tokenizeLines(
     indentChar: str | None = None
 
     for i, line in enumerate(lines):
-
         # Three kinds of "raw" elements, which prevent markdown processing inside of them.
         # 1. <pre> and manual opaque elements, which can contain markup and so can nest.
         # 2. <xmp>, <script>, and <style>, which contain raw text, can't nest.

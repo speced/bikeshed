@@ -207,7 +207,6 @@ def processReferBiblioFile(lines: t.Sequence[str], storage: t.BiblioStorageT, or
     for group in groupsFromReferFile(lines):
         biblio: dict[str, t.Any] = {"order": order}
         for line in group:
-
             match = re.match(r"%(\w)\s+(.*)", line)
             if match:
                 letter, value = match.groups()
