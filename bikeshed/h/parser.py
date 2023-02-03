@@ -52,6 +52,41 @@ def test() -> None:
             print(node, end="")
 
 
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#####################################
+# Scaffolding
+#####################################
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+
+
 @dataclass
 class Failure:
     pass
@@ -177,6 +212,46 @@ class Comment:
 
     def __str__(self) -> str:
         return f"<!--{self.data}-->"
+
+
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+##################################
+# Parsing Funcs
+##################################
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
 
 
 def parseStartTag(s: Stream, start: int) -> Result:
@@ -335,7 +410,6 @@ def parseCharRef(s: Stream, start: int) -> Result:
     i = start + 1
 
     if isASCIIAlphanum(s[i]):
-        startName = i
         i += 1
         while isASCIIAlphanum(s[i]):
             i += 1
@@ -517,6 +591,50 @@ def parseXmpToEnd(s: Stream, start: int) -> Result:
             return Result(s[start:i], i + 6)
         i += 1
     assert False
+
+
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+######################################
+# Predicates
+######################################
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
 
 
 def isTagnameChar(ch: str) -> bool:
