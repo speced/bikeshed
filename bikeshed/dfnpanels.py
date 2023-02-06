@@ -156,7 +156,7 @@ def addExternalDfnPanelStyles(doc: t.SpecT) -> None:
 
 
 dfnPanelScript = """
-document.body.addEventListener("click", function(e) {
+document.body.addEventListener("xclick", function(e) {
     var queryAll = function(sel) { return [].slice.call(document.querySelectorAll(sel)); }
     // Find the dfn element or panel, if any, that was clicked on.
     var el = e.target;
@@ -209,6 +209,37 @@ document.body.addEventListener("click", function(e) {
     }
 
 });
+
+
+// Add tooltip behavior to all dfns to show the corresponding dfn-panel.
+const dfns = document.querySelectorAll(dfn');
+
+// We need to get the createElement method now, or else it is not available!?
+const createElement = document.createElement;
+const makeTag = (tag) => {
+    return createElement.call(document, tag);
+}
+
+for (let dfn of dfns) {
+    insertDfnTooltipAction(dfn, 'show-dfn-panel', '', (event) => {
+        // console.info(link);
+    })
+}
+
+
+function insertDfnTooltipAction(dfn, className, title, action) {
+    const el = dfn;
+
+    // Find dfn panel
+    const dfnPanel = document.querySelector(".dfn-panel[data-for='" + el.id + "']");
+    if(dfnPanel) {
+        // Move to be tooltip inside dfn.
+        el.insertAdjacentElement('beforeend', dfnPanel);
+        el.classList.add('has-dfn-panel');
+    } else {
+        console.log("Couldn't find .dfn-panel[data-for='" + el.id + "']");
+    }
+}
 """
 
 dfnPanelStyle = """
@@ -250,6 +281,59 @@ dfnPanelStyle = """
 }
 
 .dfn-paneled { cursor: pointer; }
+
+dfn.has-dfn-panel {
+    position: relative;
+    cursor: pointer;
+    display: inline-block;
+}
+
+a.has-dfn-panel > .dfn-panel {
+    text-align: center;
+    font: italic normal 90% Georgia, serif;
+    color: black;
+    background: #DDD;
+    background-clip: padding-box;
+    box-shadow: 0 0px 2px rgba(0, 0, 0, 0.5);
+    border: 5px solid #111;
+    border: 5px solid rgba(0, 0, 0, 0.5);
+    border-radius: 3px;
+    position: absolute;
+    padding: 0.5em 1em;
+    bottom: 100%;
+    left: -0.5em;
+    visibility:hidden;
+    opacity:0;
+    transition: opacity 0.25s linear;
+}
+
+a.has-dfn-panel > .dfn-panel:before, a > .dfn-panel:after {
+    content: "";
+    position: absolute;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    top: 100%;
+    left: 1em;
+    margin-left: -10px;
+}
+
+a.has-dfn-panel > .dfn-panel:before {
+    border-top: 10px solid #111;
+    border-top: 10px solid rgba(0, 0, 0, 0.5);
+    margin-top: 5px;
+}
+
+a.has-dfn-panel > .dfn-panel:after{
+    border-top: 10px solid #DDD;
+    margin-top: -2px;
+    z-index: 1;
+}
+
+a.has-dfn-panel:hover > .dfn-panel {
+    visibility: visible;
+    opacity: 1;
+}
+
 """
 
 dfnPanelDarkmodeStyle = """

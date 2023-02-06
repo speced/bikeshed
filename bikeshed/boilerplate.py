@@ -1235,3 +1235,204 @@ def formatBiblioTerm(linkText: str) -> str:
     if linkText.islower():
         return linkText.upper()
     return linkText
+
+
+    doc.extraStyles[
+        "style-link-hints"
+    ] = """
+    a[data-link-type='dfn']:hover {
+    }
+    """
+
+linkHintsCss = """
+    pre, .issue {
+        overflow: visible !important; /* cheating here */
+    }
+
+    a.has-link-hints-tooltip {
+        position: relative;
+        cursor: pointer;
+        display: inline-block;
+    }
+
+    a.has-link-hints-tooltip > .link-hints-tooltip {
+        text-align: center;
+        font: italic normal 90% Georgia, serif;
+        color: black;
+        background: #DDD;
+        background-clip: padding-box;
+        box-shadow: 0 0px 2px rgba(0, 0, 0, 0.5);
+        border: 5px solid #111;
+        border: 5px solid rgba(0, 0, 0, 0.5);
+        border-radius: 3px;
+        position: absolute;
+        padding: 0.5em 1em;
+        bottom: 100%;
+        left: -0.5em;
+        visibility:hidden;
+        opacity:0;
+        transition: opacity 0.25s linear;
+    }
+
+    a.has-link-hints-tooltip > .link-hints-tooltip:before, a > .link-hints-tooltip:after {
+        content: "";
+        position: absolute;
+        border-left: 10px solid transparent;
+        border-right: 10px solid transparent;
+        top: 100%;
+        left: 1em;
+        margin-left: -10px;
+    }
+
+    a.has-link-hints-tooltip > .link-hints-tooltip:before {
+        border-top: 10px solid #111;
+        border-top: 10px solid rgba(0, 0, 0, 0.5);
+        margin-top: 5px;
+    }
+
+    a.has-link-hints-tooltip > .link-hints-tooltip:after{
+        border-top: 10px solid #DDD;
+        margin-top: -2px;
+        z-index: 1;
+    }
+
+    a.has-link-hints-tooltip:hover > .link-hints-tooltip {
+        visibility: visible;
+        opacity: 1;
+    }
+
+    .chip {
+        font-size: smaller;
+        border: 2px solid black;
+        border-radius: 6px;
+        padding: 0.2em;
+        margin-top: 2px;
+        text-shadow: none;
+        display:inline-block;
+    }
+
+    .infra-chip {
+        color: #3B790A;
+        background-color: #DCFEDE;
+        border-color: #3B790A;
+    }
+
+    .webidl-chip {
+        color: #3B790A;
+        border-color: #3B790A;
+    }
+
+    .w3c-chip {
+        color: #245B9C;
+        border-color: #245B9C;
+    }
+
+    .whatgw-chip {
+        color: #3B790A;
+    }
+
+    .github-chip {
+        color: black;
+        border-color: black;
+    }
+    """
+
+linkHintsScript = """
+    "use strict";
+    // Map from string as regexp (which will be applied to href) to hrefType string.
+    // Or property value is a function from href to hrefType string.
+    const hrefPatterns = Object.entries({
+        'infra.spec':  '<span class="infra-chip chip">Infra</span> ',
+        'webidl.spec': '<span class="webidl-chip chip">Web IDL</span> ',
+        'url.spec': '<span class="chip">URL </span> ',
+        'html.spec': '<span class="chip">HTML </span> ',
+        'dom.spec': '<span class="chip">DOM </span> ',
+        'w3.org': (href) => {
+            const tr = href.match(/TR\/([^\/]+)/);
+            return `<span class="w3c-chip chip">W3C ${tr ? tr[1] : ''}</span> `;
+        },
+        'github.com': '<span class="github-chip chip">GitHub </span> ',
+    });
+
+    const dataAttrs = Object.entries({
+        'data-link-type': 'link type',
+        'data-type': 'type',
+        'data-ref-type': 'ref type',
+        'status': 'status',
+    });
+
+    // Add tooltip behavior to all links.
+    const links = document.querySelectorAll('a[href]');
+
+    // We need to get the createElement method now, or else it is not available!?
+    const createElement = document.createElement;
+    const makeTag = (tag) => {
+        return createElement.call(document, tag);
+    }
+
+    for (let link of links) {
+        insertLinkHintsTooltipAction(link, 'show-link-hint', '', (event) => {
+            // console.info(link);
+        })
+    }
+
+    function insertLinkHintsTooltipAction(element, className, title, action) {
+       /*
+        const linkType = element.getAttribute('data-link-type');
+        const linkTypeText = linkType ? `link type ${linkType} ` : '';
+        const dataType = element.getAttribute('data-type');
+        const dataTypeText = dataType ? `type ${dataType} ` : '';
+        const dataRefType = element.getAttribute('data-ref-type');
+        const dataRefTypeText = dataRefType ? `ref type ${dataRefType} ` : '';
+        const status = element.getAttribute('data-status');
+        const statusText = status ? `status ${status} ` : '';
+        */
+
+        const getAttrText = (element) => {
+          const attrText = '';
+          dataAttrs.forEach(([attr, text]) => {
+            const value = element.getAttribute(attr);
+            value != null ?
+            attrText += value ? `${text} ${value} ` : '';
+            });
+        }
+
+        const href = element.href;
+        const hrefType = hrefPatterns.find(
+            ([re, hrefType]) => href.match(re))?.at(1);
+        const hrefTypeText = hrefType ? (
+            typeof hrefType === 'function' ? hrefType(href) : hrefType
+            ) : '';
+
+        const id = element.getAttribute('id');
+        const refFor = id && id.match(/(?:^ref-for-)([a-z\-]*).*$/);
+        const refForText = refFor ? `for ${refFor[1]} ` : '';
+
+        const tooltipText = `${hrefTypeText}${linkTypeText}${dataRefTypeText}${statusText}${dataTypeText}${refForText}`;
+        if (!tooltipText) return;
+
+        const tooltipSpan = makeTag('span');
+        tooltipSpan.className = 'link-hints-tooltip';
+        tooltipSpan.setHTML(`<nobr>${tooltipText}</nobr>`);
+        element.insertAdjacentElement('beforeend', tooltipSpan);
+        element.classList.add('has-link-hints-tooltip');
+    }
+    """
+
+def addLinkHints(doc: t.SpecT) -> None:
+    if "link-hints" in doc.md.boilerplate:
+
+        doc.extraScripts["script-link-hints"] = linkHintsScript
+        doc.extraStyles["css-link-hints"] = linkHintsCss
+
+    # dfnLinks = h.findAll("a[data-link-type='dfn']", doc)
+    # for el in dfnLinks:
+    #     print('link', el)
+    #     href = el.get("href")
+    #     print ('href', href)
+    #     if href is not None:
+    #         if re.match(r"^https?://infra.spec.whatwg.org", href):
+    #             el.set("title", "infra")
+    #         else:
+    #             if re.match(r"^https?://webidl.spec.whatwg.org", href):
+    #                 el.set("title", "webidl")
