@@ -162,19 +162,12 @@ function queryAll(sel) {
 
 // Add popup behavior to all dfns to show the corresponding dfn-panel.
 var dfns = document.querySelectorAll('.dfn-paneled');
+for (let dfn of dfns) { insertDfnPopupAction(dfn); }
 
 document.body.addEventListener("click", (e) => {
     // If not handled already, just hide all dfn panels.
     hideAllDfnPanels();
 });
-
-// We need to get the createElement method now, or else it is not available!?
-var createElement = document.createElement;
-var makeTag = (tag) => {
-    return createElement.call(document, tag);
-}
-
-for (let dfn of dfns) { insertDfnPopupAction(dfn); }
 
 function hideAllDfnPanels() {
     // Turn off any currently "on" or "activated" panels.
@@ -210,9 +203,7 @@ function insertDfnPopupAction(dfn) {
     // Find dfn panel
     const dfnPanel = document.querySelector(`.dfn-panel[data-for='${dfn.id}']`);
     if (dfnPanel) {
-        const panelId = `dfn-panel-${dfnPanel.getAttribute('data-for')}`;
-        dfnPanel.id = panelId;
-        const dfnId = dfn.id;
+        dfnPanel.id = `dfn-panel-${dfnPanel.getAttribute('data-for')}`;
 
         if (dfnPanel.id)
             dfn.setAttribute('aria-describedby', dfnPanel.id);
@@ -227,8 +218,8 @@ function insertDfnPopupAction(dfn) {
             showDfnPanel(dfnPanel, dfn);
         });
 
-        if (dfnId)
-            dfnPanel.setAttribute('aria-labelledby', dfnId);
+        if (dfn.id)
+            dfnPanel.setAttribute('aria-labelledby', dfn.id);
 
         dfnPanel.setAttribute('aria-hidden', true);
         dfnPanel.addEventListener('click', (event) => {
