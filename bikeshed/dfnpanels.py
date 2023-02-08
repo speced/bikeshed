@@ -156,59 +156,90 @@ def addExternalDfnPanelStyles(doc: t.SpecT) -> None:
 
 
 dfnPanelScript = """
-document.body.addEventListener("click", function(e) {
-    var queryAll = function(sel) { return [].slice.call(document.querySelectorAll(sel)); }
-    // Find the dfn element or panel, if any, that was clicked on.
-    var el = e.target;
-    var target;
-    var hitALink = false;
-    while(el.parentElement) {
-        if(el.tagName == "A") {
-            // Clicking on a link in a <dfn> shouldn't summon the panel
-            hitALink = true;
-        }
-        if(el.classList.contains("dfn-paneled")) {
-            target = "dfn";
-            break;
-        }
-        if(el.classList.contains("dfn-panel")) {
-            target = "dfn-panel";
-            break;
-        }
-        el = el.parentElement;
-    }
-    if(target != "dfn-panel") {
-        // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(function(el){
-            el.classList.remove("on");
-            el.classList.remove("activated");
-        });
-    }
-    if(target == "dfn" && !hitALink) {
-        // open the panel
-        var dfnPanel = document.querySelector(".dfn-panel[data-for='" + el.id + "']");
-        if(dfnPanel) {
-            dfnPanel.classList.add("on");
-            var rect = el.getBoundingClientRect();
-            dfnPanel.style.left = window.scrollX + rect.right + 5 + "px";
-            dfnPanel.style.top = window.scrollY + rect.top + "px";
-            var panelRect = dfnPanel.getBoundingClientRect();
-            var panelWidth = panelRect.right - panelRect.left;
-            if(panelRect.right > document.body.scrollWidth && (rect.left - (panelWidth + 5)) > 0) {
-                // Reposition, because the panel is overflowing
-                dfnPanel.style.left = window.scrollX + rect.left - (panelWidth + 5) + "px";
-            }
-        } else {
-            console.log("Couldn't find .dfn-panel[data-for='" + el.id + "']");
-        }
-    } else if(target == "dfn-panel") {
-        // Switch it to "activated" state, which pins it.
-        el.classList.add("activated");
-        el.style.left = null;
-        el.style.top = null;
-    }
+function queryAll(sel) {
+    return [].slice.call(document.querySelectorAll(sel));
+}
 
+// Add popup behavior to all dfns to show the corresponding dfn-panel.
+var dfns = document.querySelectorAll('.dfn-paneled');
+
+document.body.addEventListener("click", (e) => {
+    // If not handled already, just hide all dfn panels.
+    hideAllDfnPanels();
 });
+
+// We need to get the createElement method now, or else it is not available!?
+var createElement = document.createElement;
+var makeTag = (tag) => {
+    return createElement.call(document, tag);
+}
+
+for (let dfn of dfns) { insertDfnPopupAction(dfn); }
+
+function hideAllDfnPanels() {
+    // Turn off any currently "on" or "activated" panels.
+    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(function(el){
+        el.classList.remove("on");
+        el.classList.remove("activated");
+    });
+}
+
+function showDfnPanel(dfnPanel, dfn) {
+    hideAllDfnPanels(); // Only display one at this time.
+    dfnPanel.classList.add("on");
+    const rect = dfn.getBoundingClientRect();
+    dfnPanel.style.left = `${window.scrollX + rect.right + 5}px`;
+    dfnPanel.style.top = `${window.scrollY + rect.top}px`;
+    const panelRect = dfnPanel.getBoundingClientRect();
+    const panelWidth = panelRect.right - panelRect.left;
+    if (panelRect.right > document.body.scrollWidth &&
+        (rect.left - (panelWidth + 5)) > 0) {
+        // Reposition, because the panel is overflowing
+        dfnPanel.style.left = `${window.scrollX + rect.left - (panelWidth + 5)}px`;
+    }
+}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+    dfnPanel.style.left = null;
+    dfnPanel.style.top = null;
+}
+
+function insertDfnPopupAction(dfn) {
+    // Find dfn panel
+    const dfnPanel = document.querySelector(`.dfn-panel[data-for='${dfn.id}']`);
+    if (dfnPanel) {
+        const panelId = `dfn-panel-${dfnPanel.getAttribute('data-for')}`;
+        dfnPanel.id = panelId;
+        const dfnId = dfn.id;
+
+        if (dfnPanel.id)
+            dfn.setAttribute('aria-describedby', dfnPanel.id);
+        dfn.setAttribute('role', 'button');
+        dfn.tabIndex = 0;
+        dfn.classList.add('has-dfn-panel');
+        dfn.addEventListener('click', (event) => {
+            showDfnPanel(dfnPanel, dfn);
+            event.stopPropagation();
+        });
+        dfn.addEventListener('keypress', (event) => {
+            showDfnPanel(dfnPanel, dfn);
+        });
+
+        if (dfnId)
+            dfnPanel.setAttribute('aria-labelledby', dfnId);
+
+        dfnPanel.setAttribute('aria-hidden', true);
+        dfnPanel.addEventListener('click', (event) => {
+            pinDfnPanel(dfnPanel);
+            event.stopPropagation();
+        });
+
+    } else {
+        console.log("Couldn't find .dfn-panel[data-for='" + dfn.id + "']");
+    }
+}
 """
 
 dfnPanelStyle = """
@@ -250,6 +281,14 @@ dfnPanelStyle = """
 }
 
 .dfn-paneled { cursor: pointer; }
+
+dfn.has-dfn-panel:hover, .dfn-paneled:hover,
+dfn.has-dfn-panel:focus, .dfn-paneled:focus {
+    outline: 2px outset;
+    outline-color: rgba(152, 200, 254, .9);
+    outline-offset: 1px;
+    border-radius: 2px;
+}
 """
 
 dfnPanelDarkmodeStyle = """
