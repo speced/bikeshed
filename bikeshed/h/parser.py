@@ -180,6 +180,14 @@ class Stream:
             i += 1
         return Result(self[start:i], i)
 
+    def skipToNextLine(self, start: int) -> Result:
+        lineIndex = bisect.bisect_left(self._lineBreaks, start)
+        if lineIndex+1 < len(self._lineBreaks):
+            i = self._lineBreaks[lineIndex+1]+1
+            return Result(self[start:i], i)
+        else:
+            return Result(self[start:], len(self._chars))
+
 
 @dataclass
 class StartTag:
