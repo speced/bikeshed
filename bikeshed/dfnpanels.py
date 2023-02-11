@@ -202,15 +202,18 @@ dfnPanelScript = """
         hideAllDfnPanels(); // Only display one at this time.
         dfn.setAttribute("aria-expanded", "true");
         dfnPanel.classList.add("on");
-        const rect = dfn.getBoundingClientRect();
-        dfnPanel.style.left = `${window.scrollX + rect.right + 5}px`;
-        dfnPanel.style.top = `${window.scrollY + rect.top}px`;
+        dfnPanel.style.left = "5px";
+        dfnPanel.style.top = "0px";
         const panelRect = dfnPanel.getBoundingClientRect();
         const panelWidth = panelRect.right - panelRect.left;
-        if (panelRect.right > document.body.scrollWidth &&
-            (rect.left - (panelWidth + 5)) > 0) {
-            // Reposition, because the panel is overflowing
-            dfnPanel.style.left = `${window.scrollX + rect.left - (panelWidth + 5)}px`;
+        if (panelRect.right > document.body.scrollWidth) {
+            // Panel's overflowing the screen.
+            // Just drop it below the dfn and flip it rightward instead.
+            // This still wont' fix things if the screen is *really* wide,
+            // but fixing that's a lot harder without 'anchor()'.
+            dfnPanel.style.top = "1.5em";
+            dfnPanel.style.left = "auto";
+            dfnPanel.style.right = "0px";
         }
     }
 
@@ -242,7 +245,11 @@ dfnPanelScript = """
         // Find dfn panel
         const dfnPanel = document.querySelector(`.dfn-panel[data-for='${dfn.id}']`);
         if (dfnPanel) {
-            dfn.insertAdjacentElement("afterend", dfnPanel);
+            const panelWrapper = document.createElement('span');
+            panelWrapper.appendChild(dfnPanel);
+            panelWrapper.style.position = "relative";
+            panelWrapper.style.height = "0px";
+            dfn.insertAdjacentElement("afterend", panelWrapper);
             dfn.setAttribute('role', 'button');
             dfn.setAttribute('aria-haspopup', 'menu');
             dfn.setAttribute('aria-expanded', 'false')
