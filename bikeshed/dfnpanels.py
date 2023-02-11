@@ -244,6 +244,7 @@ dfnPanelScript = """
         // Find dfn panel
         const dfnPanel = document.querySelector(`.dfn-panel[data-for='${dfn.id}']`);
         if (dfnPanel) {
+            dfn.insertAdjacentElement("afterend", dfnPanel);
             dfn.setAttribute('role', 'button');
             dfn.setAttribute('aria-haspopup', 'menu');
             dfn.setAttribute('aria-expanded', 'false')
