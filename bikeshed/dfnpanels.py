@@ -47,7 +47,6 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
                 "id": f"infopanel-for-{id}",
                 "role": "dialog",
                 "aria-labelledby": f"infopaneltitle-for-{id}",
-                "aria-hidden": "true",
             },
             h.E.span(
                 {"style": "display:none", "id": f"infopaneltitle-for-{id}"},
@@ -129,7 +128,6 @@ def addExternalDfnPanel(termEl: t.ElementT, ref: r.RefWrapper, doc: t.SpecT) -> 
                 "id": f"infopanel-for-{termID}",
                 "role": "menu",
                 "aria-labelledby": f"infopaneltitle-for-{termID}",
-                "aria-hidden": "true",
             },
             h.E.span(
                 {"style": "display:none", "id": f"infopaneltitle-for-{termID}"},
