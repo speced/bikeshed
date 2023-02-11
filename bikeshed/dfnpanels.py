@@ -274,6 +274,14 @@ dfnPanelScript = """
                 event.stopPropagation();
             });
 
+            dfnPanel.addEventListener('keydown', (event) => {
+                if(event.keyCode == 27) { // Escape key
+                    hideDfnPanel(dfnPanel, dfn);
+                    event.stopPropagation();
+                    event.preventDefault();
+                }
+            })
+
         } else {
             console.log("Couldn't find .dfn-panel[data-for='" + dfn.id + "']");
         }
