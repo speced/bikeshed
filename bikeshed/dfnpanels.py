@@ -315,14 +315,6 @@ dfnPanelStyle = """
 }
 
 .dfn-paneled { cursor: pointer; }
-
-dfn.has-dfn-panel:hover, .dfn-paneled:hover,
-dfn.has-dfn-panel:focus, .dfn-paneled:focus {
-    outline: 2px outset;
-    outline-color: rgba(152, 200, 254, .9);
-    outline-offset: 1px;
-    border-radius: 2px;
-}
 """
 
 dfnPanelDarkmodeStyle = """
