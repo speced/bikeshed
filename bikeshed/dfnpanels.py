@@ -23,6 +23,7 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
         allRefs.setdefault(href[1:], []).append(a)
     for dfn in dfns:
         id = dfn.get("id")
+        dfnText = h.textContent(dfn)
         if not id:
             # Something went wrong, bail.
             continue
@@ -40,7 +41,18 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
         h.addClass(doc, dfn, "dfn-paneled")
         atLeastOnePanel = True
         panel = h.E.aside(
-            {"class": "dfn-panel", "data-for": id},
+            {
+                "class": "dfn-panel",
+                "data-for": id,
+                "id": f"infopanel-for-{id}",
+                "role": "dialog",
+                "aria-labelledby": f"infopaneltitle-for-{id}",
+                "aria-hidden": "true",
+            },
+            h.E.span(
+                {"style": "display:none", "id": f"infopaneltitle-for-{id}"},
+                _(f"Info about the '{dfnText}' definition."),
+            ),
             h.E.b(h.E.a({"href": "#" + h.escapeUrlFrag(id)}, "#" + id)),
             h.E.b(_("Referenced in:")),
         )
@@ -108,9 +120,21 @@ def addExternalDfnPanel(termEl: t.ElementT, ref: r.RefWrapper, doc: t.SpecT) -> 
         unused1, unused2, refID = ref.url.partition("#")  # pylint: disable=unused-variable
         termID = f"term-for-{refID}"
         termEl.set("id", termID)
+        termText = h.textContent(termEl)
         termEl.set("data-silently-dedup", "")
         panel = h.E.aside(
-            {"class": "dfn-panel", "data-for": termID},
+            {
+                "class": "dfn-panel",
+                "data-for": termID,
+                "id": f"infopanel-for-{termID}",
+                "role": "menu",
+                "aria-labelledby": f"infopaneltitle-for-{termID}",
+                "aria-hidden": "true",
+            },
+            h.E.span(
+                {"style": "display:none", "id": f"infopaneltitle-for-{termID}"},
+                _(f"Info about the '{termText}' external reference."),
+            ),
             h.E.a({"href": ref.url}, ref.url),
             h.E.b(_("Referenced in:")),
         )
@@ -173,14 +197,12 @@ dfnPanelScript = """
 
     function hideAllDfnPanels() {
         // Turn off any currently "on" or "activated" panels.
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(function(el){
-            el.classList.remove("on");
-            el.classList.remove("activated");
-        });
+        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
     }
 
     function showDfnPanel(dfnPanel, dfn) {
         hideAllDfnPanels(); // Only display one at this time.
+        dfn.setAttribute("aria-expanded", "true");
         dfnPanel.classList.add("on");
         const rect = dfn.getBoundingClientRect();
         dfnPanel.style.left = `${window.scrollX + rect.right + 5}px`;
@@ -201,10 +223,18 @@ dfnPanelScript = """
         dfnPanel.style.top = null;
     }
 
+    function hideDfnPanel(dfnPanel, dfn) {
+        if(!dfn) {
+            dfn = document.getElementById(dfnPanel.getAttribute("data-for"));
+        }
+        dfn.setAttribute("aria-expanded", "false")
+        dfnPanel.classList.remove("on");
+        dfnPanel.classList.remove("activated");
+    }
+
     function toggleDfnPanel(dfnPanel, dfn) {
         if(dfnPanel.classList.contains("on")) {
-            dfnPanel.classList.remove("on");
-            dfnPanel.classList.remove("activated");
+            hideDfnPanel(dfnPanel, dfn);
         } else {
             showDfnPanel(dfnPanel, dfn);
         }
@@ -214,11 +244,9 @@ dfnPanelScript = """
         // Find dfn panel
         const dfnPanel = document.querySelector(`.dfn-panel[data-for='${dfn.id}']`);
         if (dfnPanel) {
-            dfnPanel.id = `dfn-panel-${dfnPanel.getAttribute('data-for')}`;
-
-            if (dfnPanel.id)
-                dfn.setAttribute('aria-describedby', dfnPanel.id);
             dfn.setAttribute('role', 'button');
+            dfn.setAttribute('aria-haspopup', 'menu');
+            dfn.setAttribute('aria-expanded', 'false')
             dfn.tabIndex = 0;
             dfn.classList.add('has-dfn-panel');
             dfn.addEventListener('click', (event) => {
@@ -235,10 +263,6 @@ dfnPanelScript = """
                 }
             });
 
-            if (dfn.id)
-                dfnPanel.setAttribute('aria-labelledby', dfn.id);
-
-            dfnPanel.setAttribute('aria-hidden', true);
             dfnPanel.addEventListener('click', (event) => {
                 pinDfnPanel(dfnPanel);
                 event.stopPropagation();
