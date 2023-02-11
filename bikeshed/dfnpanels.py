@@ -156,79 +156,97 @@ def addExternalDfnPanelStyles(doc: t.SpecT) -> None:
 
 
 dfnPanelScript = """
-function queryAll(sel) {
-    return [].slice.call(document.querySelectorAll(sel));
-}
-
-// Add popup behavior to all dfns to show the corresponding dfn-panel.
-var dfns = document.querySelectorAll('.dfn-paneled');
-for (let dfn of dfns) { insertDfnPopupAction(dfn); }
-
-document.body.addEventListener("click", (e) => {
-    // If not handled already, just hide all dfn panels.
-    hideAllDfnPanels();
-});
-
-function hideAllDfnPanels() {
-    // Turn off any currently "on" or "activated" panels.
-    queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(function(el){
-        el.classList.remove("on");
-        el.classList.remove("activated");
-    });
-}
-
-function showDfnPanel(dfnPanel, dfn) {
-    hideAllDfnPanels(); // Only display one at this time.
-    dfnPanel.classList.add("on");
-    const rect = dfn.getBoundingClientRect();
-    dfnPanel.style.left = `${window.scrollX + rect.right + 5}px`;
-    dfnPanel.style.top = `${window.scrollY + rect.top}px`;
-    const panelRect = dfnPanel.getBoundingClientRect();
-    const panelWidth = panelRect.right - panelRect.left;
-    if (panelRect.right > document.body.scrollWidth &&
-        (rect.left - (panelWidth + 5)) > 0) {
-        // Reposition, because the panel is overflowing
-        dfnPanel.style.left = `${window.scrollX + rect.left - (panelWidth + 5)}px`;
+"use strict";
+{
+    function queryAll(sel) {
+        return [].slice.call(document.querySelectorAll(sel));
     }
-}
 
-function pinDfnPanel(dfnPanel) {
-    // Switch it to "activated" state, which pins it.
-    dfnPanel.classList.add("activated");
-    dfnPanel.style.left = null;
-    dfnPanel.style.top = null;
-}
+    // Add popup behavior to all dfns to show the corresponding dfn-panel.
+    var dfns = document.querySelectorAll('.dfn-paneled');
+    for (let dfn of dfns) { insertDfnPopupAction(dfn); }
 
-function insertDfnPopupAction(dfn) {
-    // Find dfn panel
-    const dfnPanel = document.querySelector(`.dfn-panel[data-for='${dfn.id}']`);
-    if (dfnPanel) {
-        dfnPanel.id = `dfn-panel-${dfnPanel.getAttribute('data-for')}`;
+    document.body.addEventListener("click", (e) => {
+        // If not handled already, just hide all dfn panels.
+        hideAllDfnPanels();
+    });
 
-        if (dfnPanel.id)
-            dfn.setAttribute('aria-describedby', dfnPanel.id);
-        dfn.setAttribute('role', 'button');
-        dfn.tabIndex = 0;
-        dfn.classList.add('has-dfn-panel');
-        dfn.addEventListener('click', (event) => {
+    function hideAllDfnPanels() {
+        // Turn off any currently "on" or "activated" panels.
+        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(function(el){
+            el.classList.remove("on");
+            el.classList.remove("activated");
+        });
+    }
+
+    function showDfnPanel(dfnPanel, dfn) {
+        hideAllDfnPanels(); // Only display one at this time.
+        dfnPanel.classList.add("on");
+        const rect = dfn.getBoundingClientRect();
+        dfnPanel.style.left = `${window.scrollX + rect.right + 5}px`;
+        dfnPanel.style.top = `${window.scrollY + rect.top}px`;
+        const panelRect = dfnPanel.getBoundingClientRect();
+        const panelWidth = panelRect.right - panelRect.left;
+        if (panelRect.right > document.body.scrollWidth &&
+            (rect.left - (panelWidth + 5)) > 0) {
+            // Reposition, because the panel is overflowing
+            dfnPanel.style.left = `${window.scrollX + rect.left - (panelWidth + 5)}px`;
+        }
+    }
+
+    function pinDfnPanel(dfnPanel) {
+        // Switch it to "activated" state, which pins it.
+        dfnPanel.classList.add("activated");
+        dfnPanel.style.left = null;
+        dfnPanel.style.top = null;
+    }
+
+    function toggleDfnPanel(dfnPanel, dfn) {
+        if(dfnPanel.classList.contains("on")) {
+            dfnPanel.classList.remove("on");
+            dfnPanel.classList.remove("activated");
+        } else {
             showDfnPanel(dfnPanel, dfn);
-            event.stopPropagation();
-        });
-        dfn.addEventListener('keypress', (event) => {
-            showDfnPanel(dfnPanel, dfn);
-        });
+        }
+    }
 
-        if (dfn.id)
-            dfnPanel.setAttribute('aria-labelledby', dfn.id);
+    function insertDfnPopupAction(dfn) {
+        // Find dfn panel
+        const dfnPanel = document.querySelector(`.dfn-panel[data-for='${dfn.id}']`);
+        if (dfnPanel) {
+            dfnPanel.id = `dfn-panel-${dfnPanel.getAttribute('data-for')}`;
 
-        dfnPanel.setAttribute('aria-hidden', true);
-        dfnPanel.addEventListener('click', (event) => {
-            pinDfnPanel(dfnPanel);
-            event.stopPropagation();
-        });
+            if (dfnPanel.id)
+                dfn.setAttribute('aria-describedby', dfnPanel.id);
+            dfn.setAttribute('role', 'button');
+            dfn.tabIndex = 0;
+            dfn.classList.add('has-dfn-panel');
+            dfn.addEventListener('click', (event) => {
+                showDfnPanel(dfnPanel, dfn);
+                event.stopPropagation();
+            });
+            dfn.addEventListener('keypress', (event) => {
+                const kc = event.keyCode;
+                // 32->Space, 13->Enter
+                if(kc == 32 || kc == 13) {
+                    toggleDfnPanel(dfnPanel, dfn);
+                    event.stopPropagation();
+                    event.preventDefault();
+                }
+            });
 
-    } else {
-        console.log("Couldn't find .dfn-panel[data-for='" + dfn.id + "']");
+            if (dfn.id)
+                dfnPanel.setAttribute('aria-labelledby', dfn.id);
+
+            dfnPanel.setAttribute('aria-hidden', true);
+            dfnPanel.addEventListener('click', (event) => {
+                pinDfnPanel(dfnPanel);
+                event.stopPropagation();
+            });
+
+        } else {
+            console.log("Couldn't find .dfn-panel[data-for='" + dfn.id + "']");
+        }
     }
 }
 """
