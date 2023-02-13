@@ -4,6 +4,7 @@ window.addEventListener("load", function(){
         var panel = panels[i];
         var dfn = document.querySelector("#" + panel.getAttribute("data-dfn-id"));
         var rect = dfn.getBoundingClientRect();
+        console.info('rect', rect);
         panel.style.top = (window.scrollY + rect.top) + "px";
     }
 });
