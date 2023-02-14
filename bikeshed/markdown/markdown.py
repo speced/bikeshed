@@ -88,10 +88,9 @@ def tokenizeLines(
     # Every token *must* have 'type', 'raw', and 'prefix' keys.
 
     if features is None:
-        features = {"headings", "lint-indentation"}
+        features = {"headings"}
 
     featureHeadings = "headings" in features
-    featureLintIndentation = "lint-indentation" in features
 
     if opaqueElements is None:
         opaqueElements = []
@@ -155,8 +154,6 @@ def tokenizeLines(
     tokens: list[TokenT] = []
     rawStack: list[RawTokenT] = []
     rawElements = "|".join(re.escape(x) for x in opaqueElements)
-
-    indentChar: str | None = None
 
     for i, line in enumerate(lines):
         # Three kinds of "raw" elements, which prevent markdown processing inside of them.
@@ -232,12 +229,6 @@ def tokenizeLines(
         if rawStack:
             tokens.append({"type": "raw", "prefixlen": float("inf"), "line": line})
             continue
-
-        if featureLintIndentation:
-            if indentChar is None:
-                indentChar = getIndentChar(line)
-            if indentChar is not None:
-                checkForMixedIndents(line, indentChar)
 
         lineText = line.text.strip()
 
@@ -372,27 +363,6 @@ def stripCommentsFromLine(line: str, inComment: bool = False) -> tuple[str, bool
             # Keep the non-comment part, see if there's any more to do
             res, inComment = stripCommentsFromLine(post, inComment=True)
             return pre + res, inComment
-
-
-def getIndentChar(line: l.Line) -> str | None:
-    if not line.text:
-        return None
-    if line.text[0] in ("\t", " "):
-        return line.text[0]
-    return None
-
-
-def checkForMixedIndents(line: l.Line, indentChar: str) -> None:
-    if not line.text:
-        return
-    badIndentChar = " " if indentChar == "\t" else "\t"
-    if line.text.startswith(badIndentChar):
-        if indentChar == " ":
-            m.lint(f"Your document appears to use spaces to indent, but line {line.i} starts with tabs.")
-        else:
-            m.lint(f"Your document appears to use tabs to indent, but line {line.i} starts with spaces.")
-    if re.match(r"(\t+ +\t)|( +\t)", line.text):
-        m.lint(f"Line {line.i}'s indent contains tabs after spaces.")
 
 
 def prefixCount(text: str, numSpacesForIndentation: int) -> int:
