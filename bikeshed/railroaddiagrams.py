@@ -372,9 +372,7 @@ class Diagram(DiagramMultiContainer):
                 Path(x, y).h(10).addTo(g)
                 x += 10
         self.attrs["width"] = str(self.width + paddingLeft + paddingRight)
-        self.attrs["height"] = str(
-            self.up + self.height + self.down + paddingTop + paddingBottom
-        )
+        self.attrs["height"] = str(self.up + self.height + self.down + paddingTop + paddingBottom)
         self.attrs["viewBox"] = f"0 0 {self.attrs['width']} {self.attrs['height']}"
         g.addTo(self)
         self.formatted = True
@@ -385,19 +383,18 @@ class Diagram(DiagramMultiContainer):
             self.format()
         return DiagramItem.writeSvg(self, write)
 
-    def writeStandalone(self, write: WriterF, css: str|None = None) -> None:
+    def writeStandalone(self, write: WriterF, css: str | None = None) -> None:
         if not self.formatted:
             self.format()
         if css is None:
             css = DEFAULT_STYLE
         Style(css).addTo(self)
         self.attrs["xmlns"] = "http://www.w3.org/2000/svg"
-        self.attrs['xmlns:xlink'] = "http://www.w3.org/1999/xlink"
-        result = DiagramItem.writeSVG(self, write)
+        self.attrs["xmlns:xlink"] = "http://www.w3.org/1999/xlink"
+        DiagramItem.writeSvg(self, write)
         self.children.pop()
         del self.attrs["xmlns"]
         del self.attrs["xmlns:xlink"]
-        return result
 
 
 class Sequence(DiagramMultiContainer):
