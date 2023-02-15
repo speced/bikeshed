@@ -4,10 +4,11 @@ from collections import OrderedDict
 
 from . import h, t
 from .translate import _
+from . import config
+
 
 if t.TYPE_CHECKING:
     from . import refs as r  # pylint: disable=unused-import
-from . import config
 
 
 def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
