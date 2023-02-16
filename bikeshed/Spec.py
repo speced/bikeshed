@@ -557,5 +557,5 @@ def addDomintroStyles(doc: Spec) -> None:
 
 
 def getModuleFile(filename: str) -> str:
-    with open(config.scriptPath(".", filename), "r", encoding="utf-8") as fh:
+    with open(config.scriptPath(filename), "r", encoding="utf-8") as fh:
         return fh.read()
