@@ -13,7 +13,7 @@ def addCanIUsePanels(doc: t.SpecT) -> None:
     # for a term's feature.
     if not doc.md.includeCanIUsePanels:
         return
-    main = h.findAll("main", doc.body)[0]
+    main = h.find("main", doc.body)
     if not main:
         return
 
