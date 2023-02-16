@@ -7,7 +7,7 @@ import json
 import os
 import re
 import subprocess
-from collections import OrderedDict, defaultdict
+from collections import OrderedDict, defaultdict, Counter
 from datetime import date, datetime, timedelta
 from functools import partial
 
@@ -1022,7 +1022,78 @@ def parse(lines: t.Sequence[Line]) -> tuple[list[Line], MetadataManager]:
             newlines.append(line)
         else:
             newlines.append(line)
+    indentInfo = inferIndent(newlines)
+    if "Indent" not in md.manuallySetKeys and indentInfo.size:
+        md.indent = indentInfo.size
+    if "mixed-indents" in md.complainAbout and indentInfo.char:
+        checkForMixedIndents(newlines, indentInfo)
     return newlines, md
+
+
+@dataclasses.dataclass
+class IndentInfo:
+    size: int | None = None
+    char: str | None = None
+    spaceLines: int = 0
+    tabLines: int = 0
+    totalLines: int = 0
+
+
+def inferIndent(lines: t.Sequence[Line]) -> IndentInfo:
+    # If the document uses space indentation,
+    # infer what the indent size is by seeing what % of indents
+    # are divisible by various values.
+    # (If it uses tabs, or no indents at all, returns None.)
+    indentSizes: Counter[int] = Counter()
+    info = IndentInfo()
+    for line in lines:
+        match = re.match("( +)", line.text)
+        if match:
+            indentSizes[len(match.group(1))] += 1
+            info.spaceLines += 1
+        elif line.text[0:1] == "\t":
+            info.tabLines += 1
+        info.totalLines += 1
+    # If very few lines are indented at all, just bail
+    if (info.spaceLines + info.tabLines) < info.totalLines / 20:
+        return info
+    # If tab indents predominate, assume tab-indent.
+    if info.spaceLines < info.tabLines:
+        info.char = "\t"
+    else:
+        info.char = " "
+    # If we have more than a handful of indented lines,
+    # do a pretend Fourier analysis
+    # (see how many lines' indents are evenly divided).
+    # This allows *some* lines to be indented incorrectly
+    # (or space indent + space alignment on code samples).
+    # Add some extra weight for being *exactly* the desired indent,
+    # to counterbalance the fact that every 4-indent line
+    # looks like a 2-indent line as well, etc.
+    if info.spaceLines >= 50:
+        evenDivisions: Counter[int] = Counter()
+        for candidateIndent in range(8, 1, -1):
+            for spaceCount, lineCount in indentSizes.items():
+                if spaceCount % candidateIndent == 0:
+                    evenDivisions[candidateIndent] += lineCount
+                if spaceCount == candidateIndent:
+                    evenDivisions[candidateIndent] += lineCount
+        info.size = evenDivisions.most_common(1)[0][0]
+    return info
+
+
+def checkForMixedIndents(lines: t.Sequence[Line], info: IndentInfo) -> None:
+    badIndentChar = " " if info.char == "\t" else "\t"
+    for line in lines:
+        if not line.text:
+            continue
+        if line.text.startswith(badIndentChar):
+            if info.char == " ":
+                m.lint(f"Your document appears to use spaces to indent, but line {line.i} starts with tabs.")
+            else:
+                m.lint(f"Your document appears to use tabs to indent, but line {line.i} starts with spaces.")
+        if re.match(r"(\t+ +\t)|( +\t)", line.text):
+            m.lint(f"Line {line.i}'s indent contains tabs after spaces.")
 
 
 def fromCommandLine(overrides: list[str]) -> MetadataManager:

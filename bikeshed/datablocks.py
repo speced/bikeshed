@@ -637,7 +637,6 @@ def transformRailroad(lines: list[str], tagName: str, firstLine: str, lineNum: i
     code = "".join(lines)
     diagram = railroadparser.parse(code)
     if diagram:
-        diagram.css = None
         temp = io.StringIO()
         diagram.writeSvg(temp.write)
         ret.append(temp.getvalue())

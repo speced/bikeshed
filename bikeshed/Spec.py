@@ -192,8 +192,6 @@ class Spec:
         self.lines = datablocks.transformDataBlocks(self, self.lines)
 
         markdownFeatures: set[str] = {"headings"}
-        if "mixed-indents" in self.md.complainAbout:
-            markdownFeatures.add("lint-indentation")
         self.lines = markdown.parse(
             self.lines,
             self.md.indent,

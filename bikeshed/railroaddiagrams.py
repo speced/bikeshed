@@ -309,8 +309,6 @@ class Diagram(DiagramMultiContainer):
             list(items),
             {
                 "class": DIAGRAM_CLASS,
-                "xmlns": "http://www.w3.org/2000/svg",
-                "xmlns:xlink": "http://www.w3.org/1999/xlink",
             },
         )
         self.type = kwargs.get("type", "simple")
@@ -318,7 +316,6 @@ class Diagram(DiagramMultiContainer):
             self.items.insert(0, Start(self.type))
         if items and not isinstance(items[-1], End):
             self.items.append(End(self.type))
-        self.css: Opt[str] = kwargs.get("css", DEFAULT_STYLE)
         self.up = 0
         self.down = 0
         self.height = 0
@@ -339,8 +336,6 @@ class Diagram(DiagramMultiContainer):
     def __repr__(self) -> str:
         items = ", ".join(map(repr, self.items[1:-1]))
         pieces = [] if not items else [items]
-        if self.css != DEFAULT_STYLE:
-            pieces.append(f"css={repr(self.css)}")
         if self.type != "simple":
             pieces.append(f"type={repr(self.type)}")
         return f'Diagram({", ".join(pieces)})'
@@ -352,8 +347,6 @@ class Diagram(DiagramMultiContainer):
         paddingBottom: Opt[float] = None,
         paddingLeft: Opt[float] = None,
     ) -> Diagram:
-        if self.css:
-            Style(self.css).addTo(self)
         if paddingRight is None:
             paddingRight = paddingTop
         if paddingBottom is None:
@@ -389,6 +382,19 @@ class Diagram(DiagramMultiContainer):
         if not self.formatted:
             self.format()
         return DiagramItem.writeSvg(self, write)
+
+    def writeStandalone(self, write: WriterF, css: str | None = None) -> None:
+        if not self.formatted:
+            self.format()
+        if css is None:
+            css = DEFAULT_STYLE
+        Style(css).addTo(self)
+        self.attrs["xmlns"] = "http://www.w3.org/2000/svg"
+        self.attrs["xmlns:xlink"] = "http://www.w3.org/1999/xlink"
+        DiagramItem.writeSvg(self, write)
+        self.children.pop()
+        del self.attrs["xmlns"]
+        del self.attrs["xmlns:xlink"]
 
 
 class Sequence(DiagramMultiContainer):

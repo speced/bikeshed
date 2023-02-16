@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from collections import OrderedDict
 
 from . import h, t
@@ -116,11 +117,9 @@ def addExternalDfnPanel(termEl: t.ElementT, ref: r.RefWrapper, doc: t.SpecT) -> 
         linksBySection.setdefault(section, []).append(link)
     if linksBySection:
         h.addClass(doc, termEl, "dfn-paneled")
-        unused1, unused2, refID = ref.url.partition("#")  # pylint: disable=unused-variable
-        termID = f"term-for-{refID}"
+        termID = uniqueId(ref.url + ref.text)
         termEl.set("id", termID)
         termText = h.textContent(termEl)
-        termEl.set("data-silently-dedup", "")
         panel = h.E.aside(
             {
                 "class": "dfn-panel",
@@ -142,16 +141,14 @@ def addExternalDfnPanel(termEl: t.ElementT, ref: r.RefWrapper, doc: t.SpecT) -> 
             for i, el in enumerate(els):
                 linkID = el.get("id")
                 if linkID is None:
-                    linkID = f"termref-for-{refID}"
+                    linkID = f"ref-for-{termID}"
                     el.set("id", h.safeID(doc, linkID))
-                    el.set("data-silently-dedup", "")
                 if i == 0:
                     h.appendChild(
                         li,
                         h.E.a(
                             {
                                 "href": "#" + h.escapeUrlFrag(linkID),
-                                "data-silently-dedup": "",
                             },
                             text,
                         ),
@@ -163,7 +160,6 @@ def addExternalDfnPanel(termEl: t.ElementT, ref: r.RefWrapper, doc: t.SpecT) -> 
                         h.E.a(
                             {
                                 "href": "#" + h.escapeUrlFrag(linkID),
-                                "data-silently-dedup": "",
                             },
                             "(" + str(i + 1) + ")",
                         ),
@@ -175,6 +171,12 @@ def addExternalDfnPanelStyles(doc: t.SpecT) -> None:
     doc.extraScripts["script-dfn-panel"] = dfnPanelScript
     doc.extraStyles["style-dfn-panel"] = dfnPanelStyle
     doc.extraStyles["style-darkmode"] += dfnPanelDarkmodeStyle
+
+
+def uniqueId(s: str) -> str:
+    # Turns a unique string into a more compact (and ID-safe)
+    # hashed string
+    return hashlib.md5(s.encode("utf-8")).hexdigest()
 
 
 dfnPanelScript = """
