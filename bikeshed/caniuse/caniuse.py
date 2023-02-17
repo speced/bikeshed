@@ -13,6 +13,9 @@ def addCanIUsePanels(doc: t.SpecT) -> None:
     # for a term's feature.
     if not doc.md.includeCanIUsePanels:
         return
+    main = h.find("main", doc.body)
+    if not main:
+        return
 
     canIUseData = CanIUseManager(dataFile=doc.dataFile)
 
@@ -50,7 +53,8 @@ def addCanIUsePanels(doc: t.SpecT) -> None:
             m.die(f"Elements with `caniuse` attribute need to have an ID as well. Got:\n{h.serializeTag(dfn)}", el=dfn)
             continue
         panel.set("data-dfn-id", dfnId)
-        h.appendChild(doc.body, panel)
+        # Append to 'main' element, same as for mdn panels.
+        h.appendChild(main, panel)
         atLeastOnePanel = True
 
     if atLeastOnePanel:
