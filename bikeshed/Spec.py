@@ -279,7 +279,7 @@ class Spec:
         boilerplate.removeUnwantedBoilerplate(self)
         # Add MDN panels after all IDs/anchors have been added
         mdnPanels = mdn.addMdnPanels(self)
-        ciuPanel = caniuse.addCanIUsePanels(self)
+        ciuPanels = caniuse.addCanIUsePanels(self)
         if mdnPanels or ciuPanels:
             self.extraScripts["position-annos"] = getModuleFile("Spec-position-annos.js")
         highlight.addSyntaxHighlighting(self)
