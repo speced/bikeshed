@@ -21,9 +21,9 @@ if t.TYPE_CHECKING:
     MdnDataT: t.TypeAlias = dict[str, list[MdnFeatureT]]
 
 
-def addMdnPanels(doc: t.SpecT) -> None:
+def addMdnPanels(doc: t.SpecT) -> list[t.ElementT]:
     if not doc.md.includeMdnPanels:
-        return
+        return []
 
     try:
         filename = f"{doc.md.vshortname}.json"
@@ -38,12 +38,12 @@ def addMdnPanels(doc: t.SpecT) -> None:
                 pass
             else:
                 m.die(f"Couldn't find the MDN data for '{doc.md.vshortname}' nor '{doc.md.shortname}'.")
-            return
+            return []
     try:
         data = t.cast("MdnDataT", json.loads(datafile, object_pairs_hook=OrderedDict))
     except Exception as e:
         m.die(f"Couldn't load MDN Spec Links data for this spec.\n{e}")
-        return
+        return []
 
     panels = panelsFromData(doc, data)
     if panels:
@@ -57,7 +57,7 @@ def createAnno(className: str, mdnButton: t.ElementT, featureDivs: list[t.Elemen
     return h.E.div({"class": className}, mdnButton, featureDivs)
 
 
-def panelsFromData(doc: t.SpecT, data: MdnDataT) -> bool:
+def panelsFromData(doc: t.SpecT, data: MdnDataT) -> list[t.ElementT]:
     mdnBaseUrl = "https://developer.mozilla.org/en-US/docs/Web/"
 
     browsersProvidingCurrentEngines = ["firefox", "safari", "chrome"]
@@ -90,10 +90,8 @@ def panelsFromData(doc: t.SpecT, data: MdnDataT) -> bool:
         "webview_android": "Android WebView",
     }
 
-    panels = False
+    panels = []
     for elementId, features in data.items():
-        isAnnoForHeadingContent = False
-        isAnnoForListItemOrTableContent = False
         lessThanTwoEngines = 0
         onlyTwoEngines = 0
         allEngines = 0
@@ -103,7 +101,6 @@ def panelsFromData(doc: t.SpecT, data: MdnDataT) -> bool:
             m.warn(f"No '{elementId}' ID found, skipping MDN features that would target it.")
             continue
 
-        panels = True
         for feature in features:
             if "engines" in feature:
                 engines = len(feature["engines"])
@@ -149,9 +146,8 @@ def panelsFromData(doc: t.SpecT, data: MdnDataT) -> bool:
                 ),
             )
         h.appendChild(summary, h.E.span("MDN"))
-        anno = h.E.details({"class":"mdn-anno unpositioned", "data-anno-for":elementId},
-            summary,
-            featureDivs)
+        anno = h.E.details({"class": "mdn-anno unpositioned", "data-anno-for": elementId}, summary, featureDivs)
+        panels.append(anno)
         h.appendChild(doc.body, anno)
 
     return panels

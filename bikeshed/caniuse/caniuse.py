@@ -8,11 +8,11 @@ from .. import config, h, messages as m, t
 from ..translate import _
 
 
-def addCanIUsePanels(doc: t.SpecT) -> None:
+def addCanIUsePanels(doc: t.SpecT) -> list[t.ElementT]:
     # Constructs "Can I Use panels" which show a compatibility data summary
     # for a term's feature.
     if not doc.md.includeCanIUsePanels:
-        return
+        return []
 
     canIUseData = CanIUseManager(dataFile=doc.dataFile)
 
@@ -24,7 +24,7 @@ def addCanIUsePanels(doc: t.SpecT) -> None:
     panels = []
     elements = h.findAll("[caniuse]", doc)
     if not elements:
-        return
+        return []
     validateCanIUseURLs(doc, canIUseData, elements)
     for dfn in elements:
         dfnId = dfn.get("id")
