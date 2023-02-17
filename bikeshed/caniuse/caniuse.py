@@ -13,9 +13,6 @@ def addCanIUsePanels(doc: t.SpecT) -> None:
     # for a term's feature.
     if not doc.md.includeCanIUsePanels:
         return
-    main = h.find("main", doc.body)
-    if main is None:
-        return
 
     canIUseData = CanIUseManager(dataFile=doc.dataFile)
 
@@ -24,21 +21,25 @@ def addCanIUsePanels(doc: t.SpecT) -> None:
     # e.g. 'iOS Safari' -> 'ios_saf'
     classFromBrowser = canIUseData.agents
 
-    atLeastOnePanel = False
+    panels = []
     elements = h.findAll("[caniuse]", doc)
     if not elements:
         return
     validateCanIUseURLs(doc, canIUseData, elements)
     for dfn in elements:
+        dfnId = dfn.get("id")
+        if not dfnId:
+            m.die(f"Elements with `caniuse` attribute need to have an ID as well. Got:\n{h.serializeTag(dfn)}", el=dfn)
+            continue
+
         featId = dfn.get("caniuse")
         if not featId:
             continue
-        del dfn.attrib["caniuse"]
-
-        featId = featId.lower()
         if not canIUseData.hasFeature(featId):
             m.die(f"Unrecognized Can I Use feature ID: {featId}", el=dfn)
             continue
+        del dfn.attrib["caniuse"]
+        featId = featId.lower()
         feature = canIUseData.getFeature(featId)
 
         h.addClass(doc, dfn, "caniuse-paneled")
@@ -48,25 +49,21 @@ def addCanIUsePanels(doc: t.SpecT) -> None:
             update=lastUpdated,
             classFromBrowser=classFromBrowser,
         )
-        dfnId = dfn.get("id")
-        if not dfnId:
-            m.die(f"Elements with `caniuse` attribute need to have an ID as well. Got:\n{h.serializeTag(dfn)}", el=dfn)
-            continue
-        panel.set("data-dfn-id", dfnId)
-        # Append to 'main' element, same as for mdn panels.
-        h.appendChild(main, panel)
-        atLeastOnePanel = True
+        panel.set("data-anno-for", dfnId)
+        h.appendChild(doc.body, panel)
+        panels.append(panel)
 
-    if atLeastOnePanel:
-        doc.extraScripts["script-caniuse-panel"] = getModuleFile("caniuse.js")
+    if panels:
         doc.extraStyles["style-caniuse-panel"] = getModuleFile("caniuse.css")
         doc.extraStyles["style-darkmode"] += getModuleFile("caniuse-dark.css")
 
+    return panels
+
 
 def canIUsePanelFor(id: str, data: t.JSONT, update: str, classFromBrowser: dict[str, str]) -> t.ElementT:
-    panel = h.E.aside(
-        {"class": "caniuse-status wrapped", "data-deco": ""},
-        h.E.input({"value": "CanIUse", "type": "button", "class": "caniuse-panel-btn"}),
+    panel = h.E.details(
+        {"class": "caniuse-status unpositioned", "data-deco": ""},
+        h.E.summary({}, "CanIUse"),
     )
     mainPara = h.E.p({"class": "support"}, h.E.b({}, _("Support:")))
     h.appendChild(panel, mainPara)

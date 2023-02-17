@@ -263,7 +263,6 @@ class Spec:
         u.processAutolinks(self)
         u.fixInterDocumentReferences(self)
         biblio.dedupBiblioReferences(self)
-        caniuse.addCanIUsePanels(self)
         boilerplate.addIndexSection(self)
         boilerplate.addExplicitIndexes(self)
         boilerplate.addStyles(self)
@@ -279,7 +278,10 @@ class Spec:
         u.processAutolinks(self)
         boilerplate.removeUnwantedBoilerplate(self)
         # Add MDN panels after all IDs/anchors have been added
-        mdn.addMdnPanels(self)
+        mdnPanels = mdn.addMdnPanels(self)
+        ciuPanel = caniuse.addCanIUsePanels(self)
+        if mdnPanels or ciuPanels:
+            self.extraScripts["position-annos"] = getModuleFile("Spec-position-annos.js")
         highlight.addSyntaxHighlighting(self)
         boilerplate.addBikeshedBoilerplate(self)
         fingerprinting.addTrackingVector(self)

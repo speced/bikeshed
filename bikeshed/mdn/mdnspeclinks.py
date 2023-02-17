@@ -47,9 +47,10 @@ def addMdnPanels(doc: t.SpecT) -> None:
 
     panels = panelsFromData(doc, data)
     if panels:
-        doc.extraScripts["script-mdn-anno"] = getModuleFile("mdn.js")
         doc.extraStyles["style-mdn-anno"] = getModuleFile("mdn.css")
         doc.extraStyles["style-darkmode"] += getModuleFile("mdn-dark.css")
+
+    return panels
 
 
 def createAnno(className: str, mdnButton: t.ElementT, featureDivs: list[t.ElementT]) -> t.ElementT:
@@ -103,30 +104,6 @@ def panelsFromData(doc: t.SpecT, data: MdnDataT) -> bool:
             continue
 
         panels = True
-        if targetElement.tag in ["h1", "h2", "h3", "h4", "h5", "h6"]:
-            isAnnoForHeadingContent = True
-        else:
-            for ancestor in targetElement.iterancestors():
-                if ancestor.tag in [
-                    "body",
-                    "main",
-                    "article",
-                    "aside",
-                    "nav",
-                    "section",
-                    "header",
-                    "footer",
-                ]:
-                    break
-                targetElement = ancestor
-                if ancestor.tag in ["h1", "h2", "h3", "h4", "h5", "h6"]:
-                    isAnnoForHeadingContent = True
-                    break
-                if ancestor.tag in ["td", "dt", "dd", "li"]:
-                    isAnnoForListItemOrTableContent = True
-                    break
-                if ancestor.tag in ["pre", "xmp", "p"]:
-                    break
         for feature in features:
             if "engines" in feature:
                 engines = len(feature["engines"])
@@ -148,10 +125,10 @@ def panelsFromData(doc: t.SpecT, data: MdnDataT) -> bool:
                 )
             )
 
-        mdnButton = h.E.button({"class": "mdn-anno-btn"})
+        summary = h.E.summary()
         if lessThanTwoEngines > 0:
             h.appendChild(
-                mdnButton,
+                summary,
                 h.E.b(
                     {
                         "class": "less-than-two-engines-flag",
@@ -162,7 +139,7 @@ def panelsFromData(doc: t.SpecT, data: MdnDataT) -> bool:
             )
         elif allEngines > 0 and lessThanTwoEngines == 0 and onlyTwoEngines == 0:
             h.appendChild(
-                mdnButton,
+                summary,
                 h.E.b(
                     {
                         "class": "all-engines-flag",
@@ -171,50 +148,12 @@ def panelsFromData(doc: t.SpecT, data: MdnDataT) -> bool:
                     "\u2714",
                 ),
             )
-        h.appendChild(mdnButton, h.E.span("MDN"))
+        h.appendChild(summary, h.E.span("MDN"))
+        anno = h.E.details({"class":"mdn-anno unpositioned", "data-anno-for":elementId},
+            summary,
+            featureDivs)
+        h.appendChild(doc.body, anno)
 
-        if isAnnoForListItemOrTableContent:
-            firstChild = None
-            if h.hasChildElements(targetElement):
-                firstChild = list(h.childElements(targetElement))[0]
-            if (
-                firstChild is not None
-                and h.hasClass(doc, firstChild, "mdn-anno")
-                and not h.hasClass(doc, firstChild, "after")
-            ):
-                # If there's already an annotation at the point where we want
-                # this, just re-use it (instead of creating another one).
-                h.appendChild(firstChild, featureDivs)
-            else:
-                # For elements we're annotating inside a dt, dd, li, or td, we
-                # prepend the annotation to the dt, dd, li, or td — because in
-                # cases where we have a long table or list, all the annotations
-                # for everything in it otherwise ends up being merged into a
-                # single annotation way up at the top of the table or list.
-                h.prependChild(targetElement, createAnno("mdn-anno wrapped", mdnButton, featureDivs))
-        elif isAnnoForHeadingContent:
-            nextEl = targetElement.getnext()
-            if nextEl is not None and h.hasClass(doc, nextEl, "mdn-anno") and h.hasClass(doc, nextEl, "after"):
-                # If there's already an "after" annotation
-                # at the point where we want this,
-                # just re-use it (instead of creating another one).
-                h.appendChild(nextEl, featureDivs)
-            else:
-                # For elements we're annotating inside an h1-h6 heading, we
-                # insert the annotation as the next sibling of the heading.
-                h.insertAfter(targetElement, createAnno("mdn-anno wrapped after", mdnButton, featureDivs))
-        else:
-            prevEl = targetElement.getprevious()
-            if prevEl is not None and h.hasClass(doc, prevEl, "mdn-anno") and not h.hasClass(doc, prevEl, "after"):
-                # If there's already an annotation at the point where we want
-                # this, just re-use it (instead of creating another one) —
-                # unless it's a class=after annotation (following a heading).
-                h.appendChild(prevEl, featureDivs)
-            else:
-                # For elements we're annotating that aren't inside a table or
-                # list or heading, we insert the annotation as the previous
-                # sibling of whatever block-level element holds the element.
-                h.insertBefore(targetElement, createAnno("mdn-anno wrapped", mdnButton, featureDivs))
     return panels
 
 
