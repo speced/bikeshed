@@ -14,7 +14,7 @@ def addCanIUsePanels(doc: t.SpecT) -> None:
     if not doc.md.includeCanIUsePanels:
         return
     main = h.find("main", doc.body)
-    if not main:
+    if main is None:
         return
 
     canIUseData = CanIUseManager(dataFile=doc.dataFile)
