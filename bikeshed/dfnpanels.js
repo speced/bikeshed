@@ -71,7 +71,6 @@
             panelWrapper.style.height = "0px";
             dfn.insertAdjacentElement("afterend", panelWrapper);
             dfn.setAttribute('role', 'button');
-            dfn.setAttribute('aria-haspopup', 'menu');
             dfn.setAttribute('aria-expanded', 'false')
             dfn.tabIndex = 0;
             dfn.classList.add('has-dfn-panel');
