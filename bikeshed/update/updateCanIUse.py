@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import os
 from collections import OrderedDict
@@ -7,19 +9,19 @@ import requests
 from .. import messages as m
 
 
-def update(path, dryRun=False):
+def update(path: str, dryRun: bool = False) -> set[str] | None:
     m.say("Downloading Can I Use data...")
     try:
         response = requests.get("https://raw.githubusercontent.com/Fyrd/caniuse/master/fulldata-json/data-2.0.json")
     except Exception as e:
         m.die(f"Couldn't download the Can I Use data.\n{e}")
-        return
+        return None
 
     try:
-        data = response.json(encoding="utf-8", object_pairs_hook=OrderedDict)
+        data = response.json(object_pairs_hook=OrderedDict)
     except Exception as e:
         m.die(f"The Can I Use data wasn't valid JSON for some reason. Try downloading again?\n{e}")
-        return
+        return None
 
     basicData = {"agents": [], "features": {}, "updated": data["updated"]}
 
@@ -32,7 +34,7 @@ def update(path, dryRun=False):
     basicData["agents"] = agentData
 
     # Trim feature data to minimum - notes and minimum supported version
-    def simplifyStatus(s, *rest):
+    def simplifyStatus(s: str, *rest: str) -> str:
         if "x" in s or "d" in s or "n" in s or "p" in s:
             return "n"
         elif "a" in s:
@@ -43,9 +45,10 @@ def update(path, dryRun=False):
             return "u"
         else:
             m.die(f"Unknown CanIUse Status '{s}' for {'/'.join(rest)}. Please report this as a Bikeshed issue.")
+            assert False
             return None
 
-    def simplifyVersion(v):
+    def simplifyVersion(v: str) -> str:
         if "-" in v:
             # Use the earliest version in a range.
             v, _, _ = v.partition("-")
@@ -98,6 +101,6 @@ def update(path, dryRun=False):
                     fh.write(json.dumps(feature, indent=1, ensure_ascii=False, sort_keys=True))
         except Exception as e:
             m.die(f"Couldn't save Can I Use database to disk.\n{e}")
-            return
+            return None
     m.say("Success!")
     return writtenPaths

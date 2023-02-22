@@ -1,11 +1,11 @@
 from setuptools import find_packages, setup
 
-with open("README.md") as fh:
+with open("README.md", encoding="utf-8") as fh:
     long_description = fh.read()
-with open("semver.txt") as fh:
+with open("semver.txt", encoding="utf-8") as fh:
     semver = fh.read().strip()
-with open("requirements.txt") as fh:
-    install_requires = [x.strip() for x in fh.read().strip().split("\n")]
+with open("requirements.txt", encoding="utf-8") as fh:
+    install_requires = [x.strip() for x in fh.read().strip().split("\n") if len(x) and x[0].isalpha()]
 
 setup(
     name="bikeshed",
@@ -14,7 +14,7 @@ setup(
     description="A document-authoring tool mainly intended for web specifications.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/tabatkins/bikeshed/",
+    url="https://github.com/speced/bikeshed/",
     packages=find_packages(),
     include_package_data=True,
     install_requires=install_requires,

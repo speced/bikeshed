@@ -1,7 +1,9 @@
 # pylint: disable=wrong-import-position
 
+from __future__ import annotations
 
-def verify_python_version():
+
+def verify_python_version() -> None:
     import platform
     import sys
 
@@ -9,7 +11,7 @@ def verify_python_version():
         print(
             """Bikeshed has updated to Python 3, but you are trying to run it with
     Python {}. For instructions on upgrading, please check:
-    https://tabatkins.github.io/bikeshed/#installing""".format(
+    https://speced.github.io/bikeshed/#installing""".format(
                 platform.python_version()
             )
         )
@@ -19,7 +21,7 @@ def verify_python_version():
         print(
             """Bikeshed now requires Python 3.7; you are on {}.
     For instructions on how to set up a pyenv with 3.7, see:
-    https://tabatkins.github.io/bikeshed/#installing""".format(
+    https://speced.github.io/bikeshed/#installing""".format(
                 platform.python_version()
             )
         )
@@ -29,7 +31,7 @@ def verify_python_version():
 verify_python_version()
 
 
-def verify_requirements():
+def verify_requirements() -> None:
     import os
     import sys
 

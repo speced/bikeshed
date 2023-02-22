@@ -1,31 +1,37 @@
+from __future__ import annotations
+
 import copy
+import dataclasses
 import os
 import re
 import subprocess
 from collections import OrderedDict, defaultdict
 from datetime import datetime
 
-from . import conditional, config, dfnpanels, h, messages as m
-from .DefaultOrderedDict import DefaultOrderedDict
-from .refs import utils as refUtils
+from . import conditional, config, dfnpanels, h, messages as m, refs as r, retrieve, t
+from .translate import _
+
+if t.TYPE_CHECKING:
+    MetadataT: t.TypeAlias = t.Mapping[str, t.Sequence[MetadataValueT]]
+    MetadataValueT: t.TypeAlias = str | t.NodesT | None
 
 
-def boilerplateFromHtml(doc, htmlString):
+def boilerplateFromHtml(doc: t.SpecT, htmlString: str) -> t.NodesT:
     htmlString = doc.fixText(htmlString)
     bp = h.E.div({}, h.parseHTML(htmlString))
-    conditional.processConditionals(bp, doc)
+    conditional.processConditionals(doc, bp)
     return h.childNodes(bp, clear=True)
 
 
-def loadBoilerplate(doc, filename, bpname=None):
+def loadBoilerplate(doc: t.SpecT, filename: str, bpname: str | None = None) -> None:
     if bpname is None:
         bpname = filename
-    html = config.retrieveBoilerplateFile(doc, filename)
+    html = retrieve.retrieveBoilerplateFile(doc, filename)
     el = boilerplateFromHtml(doc, html)
     fillWith(bpname, el, doc=doc)
 
 
-def addBikeshedVersion(doc):
+def addBikeshedVersion(doc: t.SpecT) -> None:
     # Adds a <meta> containing the current Bikeshed semver.
     if "generator" not in doc.md.boilerplate:
         return
@@ -55,23 +61,23 @@ def addBikeshedVersion(doc):
         )
     except Exception:
         # Not in Bikeshed's repo, so instead grab from the datafile.
-        bikeshedVersion = doc.dataFile.fetch("bikeshed-version.txt", type="readonly", str=True).strip()
+        bikeshedVersion = doc.dataFile.fetch("bikeshed-version.txt", fileType="readonly", str=True).strip()
     h.appendChild(doc.head, h.E.meta({"name": "generator", "content": bikeshedVersion}))
 
 
-def addCanonicalURL(doc):
+def addCanonicalURL(doc: t.SpecT) -> None:
     # Adds a <link rel=canonical> to the configured canonical url
     if doc.md.canonicalURL:
         h.appendChild(doc.head, h.E.link({"rel": "canonical", "href": doc.md.canonicalURL}))
 
 
-def addFavicon(doc):
+def addFavicon(doc: t.SpecT) -> None:
     # Adds a <link rel=icon> to the configured favicon url
     if doc.md.favicon:
         h.appendChild(doc.head, h.E.link({"rel": "icon", "href": doc.md.favicon}))
 
 
-def addSpecVersion(doc):
+def addSpecVersion(doc: t.SpecT) -> None:
     # Adds a <meta> with the current spec revision, if one was detected
     if "document-revision" not in doc.md.boilerplate:
         return
@@ -109,19 +115,19 @@ def addSpecVersion(doc):
         h.appendChild(doc.head, h.E.meta({"name": "document-revision", "content": revision}))
 
 
-def addHeaderFooter(doc):
-    header = config.retrieveBoilerplateFile(doc, "header") if "header" in doc.md.boilerplate else ""
-    footer = config.retrieveBoilerplateFile(doc, "footer") if "footer" in doc.md.boilerplate else ""
+def addHeaderFooter(doc: t.SpecT) -> None:
+    header = retrieve.retrieveBoilerplateFile(doc, "header") if "header" in doc.md.boilerplate else ""
+    footer = retrieve.retrieveBoilerplateFile(doc, "footer") if "footer" in doc.md.boilerplate else ""
 
     doc.html = "\n".join([header, doc.html, footer])
 
 
-def fillWith(tag, newElements, doc):
+def fillWith(tag: str, newElements: t.NodesT, doc: t.SpecT) -> None:
     for el in doc.fillContainers[tag]:
         h.replaceContents(el, newElements)
 
 
-def getFillContainer(tag, doc, default=False):
+def getFillContainer(tag: str, doc: t.SpecT, default: bool = False) -> t.ElementT | None:
     """
     Gets the element that should be filled with the stuff corresponding to tag.
     If it returns None, don't generate the section.
@@ -147,17 +153,18 @@ def getFillContainer(tag, doc, default=False):
         return None
     if default:
         return doc.body
+    return None
 
 
-def addLogo(doc):
+def addLogo(doc: t.SpecT) -> None:
     loadBoilerplate(doc, "logo")
 
 
-def addCopyright(doc):
+def addCopyright(doc: t.SpecT) -> None:
     loadBoilerplate(doc, "copyright")
 
 
-def addAbstract(doc):
+def addAbstract(doc: t.SpecT) -> None:
     if not doc.md.noAbstract:
         loadBoilerplate(doc, "abstract")
     else:
@@ -166,11 +173,11 @@ def addAbstract(doc):
             h.removeNode(container)
 
 
-def addStatusSection(doc):
+def addStatusSection(doc: t.SpecT) -> None:
     loadBoilerplate(doc, "status")
 
 
-def addExpiryNotice(doc):
+def addExpiryNotice(doc: t.SpecT) -> None:
     if doc.md.expires is None:
         return
     if doc.md.date >= doc.md.expires or datetime.utcnow().date() >= doc.md.expires:
@@ -179,7 +186,7 @@ def addExpiryNotice(doc):
         boilerplate = "warning-expires"
         doc.extraScripts["script-expires"] = expiryScript
     loadBoilerplate(doc, boilerplate, "warning")
-    h.addClass(doc.body, boilerplate)
+    h.addClass(doc, doc.body, boilerplate)
 
 
 expiryScript = """
@@ -195,12 +202,12 @@ if(expires < today) {
 """
 
 
-def addObsoletionNotice(doc):
+def addObsoletionNotice(doc: t.SpecT) -> None:
     if doc.md.warning:
         loadBoilerplate(doc, doc.md.warning[0], "warning")
 
 
-def addAtRisk(doc):
+def addAtRisk(doc: t.SpecT) -> None:
     if len(doc.md.atRisk) == 0:
         return
     html = "<p>The following features are at-risk, and may be dropped during the CR period:\n<ul>"
@@ -215,39 +222,32 @@ def addAtRisk(doc):
     fillWith("at-risk", h.parseHTML(html), doc=doc)
 
 
-def addStyles(doc):
+def addStyles(doc: t.SpecT) -> None:
     el = getFillContainer("stylesheet", doc)
     if el is not None:
-        el.text = config.retrieveBoilerplateFile(doc, "stylesheet")
+        el.text = retrieve.retrieveBoilerplateFile(doc, "stylesheet")
 
 
-def addCustomBoilerplate(doc):
+def addCustomBoilerplate(doc: t.SpecT) -> None:
     for el in h.findAll("[boilerplate]", doc):
-        tag = el.get("boilerplate")
+        tag = el.get("boilerplate", "")
         if doc.fillContainers[tag]:
             h.replaceContents(doc.fillContainers[tag][0], el)
             h.removeNode(el)
 
 
-def removeUnwantedBoilerplate(doc):
+def removeUnwantedBoilerplate(doc: t.SpecT) -> None:
     for tag, els in doc.fillContainers.items():
         if tag not in doc.md.boilerplate:
             for el in els:
                 h.removeNode(el)
 
 
-def addAnnotations(doc):
-    if doc.md.vshortname in doc.testSuites:
-        html = config.retrieveBoilerplateFile(doc, "annotations")
-        el = boilerplateFromHtml(doc, html)
-        h.appendContents(h.find("head", doc), el)
-
-
-def w3cStylesheetInUse(doc):
+def w3cStylesheetInUse(doc: t.SpecT) -> bool:
     return doc.md.prepTR or doc.md.status in config.snapshotStatuses
 
 
-def keyFromStyles(kv):
+def keyFromStyles(kv: tuple[str, str]) -> tuple[int, str]:
     k = kv[0]
     if k == "style-darkmode":
         prio = 2
@@ -257,7 +257,7 @@ def keyFromStyles(kv):
     return (prio, k)
 
 
-def addBikeshedBoilerplate(doc):
+def addBikeshedBoilerplate(doc: t.SpecT) -> None:
     w3cStylesheet = w3cStylesheetInUse(doc)
     for k, v in sorted(doc.extraStyles.items(), key=keyFromStyles):
         if k not in doc.md.boilerplate:
@@ -280,80 +280,82 @@ def addBikeshedBoilerplate(doc):
             h.appendChild(container, h.E.script(f"/* {k} */\n{v}"))
 
 
-def addIndexSection(doc):
-    if len(h.findAll(config.dfnElementsSelector, doc)) == 0 and len(list(doc.externalRefsUsed.keys())) == 0:
+def addIndexSection(doc: t.SpecT) -> None:
+    hasLocalDfns = len(h.findAll(config.dfnElementsSelector, doc)) > 0
+    hasExternalDfns = doc.externalRefsUsed.hasRefs()
+    if not hasLocalDfns and not hasExternalDfns:
         return
+
     container = getFillContainer("index", doc=doc, default=True)
     if container is None:
         return
-    h.appendChild(container, h.E.h2({"class": "no-num no-ref", "id": h.safeID(doc, "index")}, "Index"))
+    h.appendChild(container, h.E.h2({"class": "no-num no-ref", "id": h.safeID(doc, "index")}, _("Index")))
 
-    if len(h.findAll(config.dfnElementsSelector, doc)) > 0:
+    if hasLocalDfns:
         addIndexOfLocallyDefinedTerms(doc, container)
 
-    if len(list(doc.externalRefsUsed.keys())) > 0:
+    if hasExternalDfns:
         addIndexOfExternallyDefinedTerms(doc, container)
 
 
-def addIndexOfLocallyDefinedTerms(doc, container):
+def addIndexOfLocallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> None:
     h.appendChild(
         container,
         h.E.h3(
             {"class": "no-num no-ref", "id": h.safeID(doc, "index-defined-here")},
-            "Terms defined by this specification",
+            _("Terms defined by this specification"),
         ),
     )
 
     indexEntries = defaultdict(list)
     for el in h.findAll(config.dfnElementsSelector, doc):
-        if el.get("id") is None or el.get("data-dfn-type") is None:
+        dfnID = el.get("id")
+        dfnType = el.get("data-dfn-type")
+        if dfnID is None or dfnType is None:
             continue
         linkTexts = config.linkTextsFromElement(el)
-        headingLevel = h.headingLevelOfElement(el) or "Unnumbered section"
-        type = el.get("data-dfn-type")
-        if type == "argument":
+        headingLevel = h.headingLevelOfElement(el) or _("Unnumbered section")
+        if dfnType == "argument":
             # Don't generate index entries for arguments.
             continue
         if el.get("data-dfn-for") is not None:
-            disambiguator = "{} for {}".format(
-                el.get("data-dfn-type"),
-                ", ".join(config.splitForValues(el.get("data-dfn-for"))),
+            disamb = _("{type} for {forVals}").format(
+                type=dfnType,
+                forVals=", ".join(config.splitForValues(el.get("data-dfn-for", ""))),
             )
-        elif type == "dfn":
-            disambiguator = "definition of"
+        elif dfnType == "dfn":
+            disamb = _("definition of")
         else:
-            disambiguator = "({})".format(el.get("data-dfn-type"))
+            disamb = "({})".format(dfnType)
 
-        id = el.get("id")
         for linkText in linkTexts:
-            entry = {
-                "url": "#" + id,
-                "label": "§\u202f" + headingLevel,
-                "disambiguator": disambiguator,
-            }
+            entry = IndexTerm(
+                url="#" + dfnID,
+                label="§\u202f" + headingLevel,
+                disambiguator=disamb,
+            )
             indexEntries[linkText].append(entry)
 
     # Now print the indexes
     indexHTML = htmlFromIndexTerms(indexEntries)
-    h.appendChild(container, indexHTML)
+    h.appendChild(container, indexHTML, allowEmpty=True)
 
 
-def disambiguator(ref, types, specs):
+def disambiguator(ref: r.RefWrapper, types: set[str] | None, specs: set[str] | None) -> str:
     disambInfo = []
     if types is None or len(types) > 1:
         disambInfo.append(ref.type)
     if specs is None or len(specs) > 1:
-        disambInfo.append("in " + ref.spec)
+        disambInfo.append(_("in {spec}").format(spec=ref.spec))
     if ref.for_:
-        disambInfo.append("for {}".format(", ".join(x.strip() for x in ref.for_)))
+        disambInfo.append(_("for {forVals}").format(forVals=", ".join(x.strip() for x in ref.for_)))
     return ", ".join(disambInfo)
 
 
-def addExplicitIndexes(doc):
+def addExplicitIndexes(doc: t.SpecT) -> None:
     # Explicit indexes can be requested for specs with <index spec="example-spec-1"></index>
 
     for el in h.findAll("index", doc):
-
         status = el.get("status")
         if status and status not in config.specStatuses:
             m.die(
@@ -363,20 +365,20 @@ def addExplicitIndexes(doc):
             continue
 
         if el.get("type"):
-            types = {x.strip() for x in el.get("type").split(",")}
-            for t in types:
-                if t not in config.dfnTypes:
+            elTypes = {x.strip() for x in el.get("type", "").split(",")}
+            for elType in elTypes:
+                if elType not in config.dfnTypes:
                     m.die(
-                        f"Unknown type value '{t}' on {h.outerHTML(el)}",
+                        f"Unknown type value '{elType}' on {h.outerHTML(el)}",
                         el=el,
                     )
-                    types.remove(t)
+                    elTypes.remove(elType)
         else:
-            types = None
+            elTypes = None
 
         if el.get("data-link-spec"):
             # Yes, this is dumb. Accidental over-firing of a shortcut attribute. >_<
-            specs = {x.strip() for x in el.get("data-link-spec").split(",")}
+            specs = {x.strip() for x in el.get("data-link-spec", "").split(",")}
             for s in list(specs):
                 if s not in doc.refs.specs:
                     m.die(f"Unknown spec name '{s}' on {h.outerHTML(el)}", el=el)
@@ -385,12 +387,12 @@ def addExplicitIndexes(doc):
             specs = None
 
         if el.get("for"):
-            fors = {x.strip() for x in el.get("for").split(",")}
+            fors = {x.strip() for x in el.get("for", "").split(",")}
         else:
             fors = None
 
         if el.get("export"):
-            exportVal = el.get("export").lower().strip()
+            exportVal = el.get("export", "").lower().strip()
             if exportVal in ["yes", "y", "true", "on"]:
                 export = True
             elif exportVal in ["no", "n", "false", "off"]:
@@ -412,7 +414,7 @@ def addExplicitIndexes(doc):
                 continue
             if specs is not None and ref.spec not in specs:
                 continue
-            if types is not None and ref.type not in types:
+            if elTypes is not None and ref.type not in elTypes:
                 continue
             if fors is not None and not (set(ref.for_) & fors):
                 continue
@@ -420,11 +422,11 @@ def addExplicitIndexes(doc):
 
         # Group entries by linking text,
         # ensuring no duplicate disambiguators.
-        refsFromText = defaultdict(list)
+        refsFromText: t.DefaultDict[str, list[r.RefWrapper]] = defaultdict(list)
         for ref in possibleRefs:
-            refDisambiguator = disambiguator(ref, types, specs)
+            refDisambiguator = disambiguator(ref, elTypes, specs)
             for i, existingRef in enumerate(refsFromText[ref.text]):
-                if disambiguator(existingRef, types, specs) != refDisambiguator:
+                if disambiguator(existingRef, elTypes, specs) != refDisambiguator:
                     continue
                 # Whoops, found an identical entry.
                 if existingRef.status != ref.status:
@@ -434,7 +436,7 @@ def addExplicitIndexes(doc):
                             break
                         if ref.status == status:
                             # New entry matches status, update and don't re-add it.
-                            refsFromText[text][i] = ref
+                            refsFromText[ref.text][i] = ref
                             break
                     else:
                         # Default to preferring current specs
@@ -451,30 +453,37 @@ def addExplicitIndexes(doc):
 
         # Group entries by text/type/for,
         # then filter each group for obsolete/oldversions.
-        refsFromTtf = defaultdict(list)
+        refsFromTtf: t.DefaultDict[tuple[str, str, str | None], list[r.RefWrapper]] = defaultdict(list)
         for text, entries in refsFromText.items():
             for ref in entries:
                 ttf = (text, ref.type, "".join(ref.for_) if ref.for_ else None)
                 refsFromTtf[ttf].append(ref)
-        filteredRefs = defaultdict(list)
+        filteredRefs: t.DefaultDict[str, list[IndexTerm]] = defaultdict(list)
         for ttf, refs in list(refsFromTtf.items()):
             refs = doc.refs.filterObsoletes(refs)
-            refs = refUtils.filterOldVersions(refs)
+            refs = r.utils.filterOldVersions(refs)
             if refs:
                 filteredRefs[ttf[0]].extend(
-                    {"url": ref.url, "disambiguator": disambiguator(ref, types, specs)} for ref in refs
+                    IndexTerm(url=ref.url, disambiguator=disambiguator(ref, elTypes, specs)) for ref in refs
                 )
 
-        h.appendChild(el, htmlFromIndexTerms(filteredRefs))
+        h.appendChild(el, htmlFromIndexTerms(filteredRefs), allowEmpty=True)
         el.tag = "div"
         h.removeAttr(el, "export", "for", "spec", "status", "type")
 
 
-def htmlFromIndexTerms(entries):
+@dataclasses.dataclass
+class IndexTerm:
+    url: str
+    disambiguator: str
+    label: str | None = None
+
+
+def htmlFromIndexTerms(entries: t.Mapping[str, list[IndexTerm]]) -> t.ElementT:
     # entries: dict (preferably OrderedDict, if you want stability) of linkText=>{url, label, disambiguator}
     # label is used for the actual link (normally heading level), disambiguator is phrase to use when there are collisions
 
-    def entryKey(x):
+    def entryKey(x: tuple[str, t.Any]) -> tuple[str, str, str]:
         return (
             # first group by approximating a human-friendly "nearness" of terms
             re.sub(r"[^a-z0-9]", "", x[0].lower()),
@@ -493,87 +502,88 @@ def htmlFromIndexTerms(entries):
             li = h.appendChild(
                 topList,
                 h.E.li(
-                    h.E.a({"href": item["url"]}, text),
-                    h.E.span(", in ", item["label"]) if item.get("label") else "",
+                    h.E.a({"href": item.url}, text),
+                    h.E.span(_(", in "), item.label) if item.label else "",
                 ),
             )
         else:
             li = h.appendChild(topList, h.E.li(text))
             ul = h.appendChild(li, h.E.ul())
-            for item in sorted(items, key=lambda x: x["disambiguator"]):
+            for item in sorted(items, key=lambda x: x.disambiguator):
                 h.appendChild(
                     ul,
                     h.E.li(
-                        h.E.a({"href": item["url"]}, item["disambiguator"]),
-                        h.E.span(", in ", item["label"]) if item.get("label") else "",
+                        h.E.a({"href": item.url}, item.disambiguator),
+                        h.E.span(_(", in "), item.label) if item.label else "",
                     ),
                 )
     return topList
 
 
-def addIndexOfExternallyDefinedTerms(doc, container):
-    if not doc.externalRefsUsed:
+def addIndexOfExternallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> None:
+    if not doc.externalRefsUsed.hasRefs():
         return
 
-    def makeLink(*contents):
+    def makeLink(*contents: t.NodesT) -> t.ElementT:
         return h.E.span({}, *contents)
 
     ul = h.E.ul({"class": "index"})
-    # Gather all the <a href> in the document, for use in the dfn-panels
-    elsFromHref = DefaultOrderedDict(list)
-    for a in h.findAll("a", doc):
-        href = a.get("href")
-        if href is None:
-            continue
-        if href.startswith("#"):
-            continue
-        elsFromHref[href].append(a)
+
     atLeastOnePanel = False
-    for spec, refGroups in sorted(doc.externalRefsUsed.items(), key=lambda x: x[0].upper()):
+    for specName, specData in doc.externalRefsUsed.sorted():
+        # Skip entries that are *solely* a biblio entry.
+        if not specData.refs:
+            continue
+
         # ref.spec is always lowercase; if the same string shows up in biblio data,
         # use its casing instead.
-        biblioRef = doc.refs.getBiblioRef(spec, quiet=True)
+        biblioRef = specData.biblio or doc.refs.getBiblioRef(specName, quiet=True)
         if biblioRef:
             printableSpec = biblioRef.linkText
         else:
-            printableSpec = spec
+            printableSpec = specName
+
         attrs = {
-            "data-lt": spec,
+            "data-lt": specName,
             "data-link-type": "biblio",
             "data-biblio-type": "informative",
             "data-okay-to-fail": "true",
         }
         specLi = h.appendChild(
             ul,
-            h.E.li(h.E.a(attrs, "[", printableSpec, "]"), " defines the following terms:"),
+            h.E.li(h.E.a(attrs, "[", formatBiblioTerm(printableSpec), "]"), " defines the following terms:"),
         )
         termsUl = h.appendChild(specLi, h.E.ul())
-        for _, refs in sorted(refGroups.items(), key=lambda x: x[0]):
-            if len(refs) == 1:
-                ref = list(refs.values())[0]
-                link = makeLink(ref.text)
+        for refText, refGroup in specData.sorted():
+            if len(refGroup) == 1:
+                ref = refGroup.single()
+                link = makeLink(refText)
+                h.appendChild(termsUl, h.E.li(link))
+                dfnpanels.addExternalDfnPanel(link, ref, doc)
             else:
-                for key, ref in sorted(refs.items(), key=lambda x: x[0]):
-                    if key:
-                        link = makeLink(ref.text, " ", h.E.small({}, f"(for {key})"))
+                for forVal, ref in refGroup.sorted():
+                    if forVal:
+                        link = makeLink(refText, " ", h.E.small({}, f"({_('for')} {forVal})"))
                     else:
-                        link = makeLink(ref.text)
-            h.appendChild(termsUl, h.E.li(link))
+                        link = makeLink(refText)
+                    h.appendChild(termsUl, h.E.li(link))
+                    dfnpanels.addExternalDfnPanel(link, ref, doc)
             atLeastOnePanel = True
-            dfnpanels.addExternalDfnPanel(link, ref, elsFromHref, doc)
     if atLeastOnePanel:
         dfnpanels.addExternalDfnPanelStyles(doc)
     h.appendChild(
         container,
         h.E.h3(
             {"class": "no-num no-ref", "id": h.safeID(doc, "index-defined-elsewhere")},
-            "Terms defined by reference",
+            _(
+                "Terms defined by reference",
+            ),
         ),
         ul,
     )
 
 
-def addPropertyIndex(doc):
+def addPropertyIndex(doc: t.SpecT) -> None:
     # Extract all the data from the propdef and descdef tables
 
     if len(h.findAll("table.propdef, table.descdef", doc)) == 0:
@@ -586,11 +596,11 @@ def addPropertyIndex(doc):
         html,
         h.E.h2(
             {"class": "no-num no-ref", "id": h.safeID(doc, "property-index")},
-            "Property Index",
+            _("Property Index"),
         ),
     )
 
-    def extractKeyValFromRow(row, table):
+    def extractKeyValFromRow(row: t.ElementT, table: t.ElementT) -> tuple[str, str]:
         # Extract the key, minus the trailing :
         result = re.match(r"(.*):", h.textContent(row[0]).strip())
         if result is None:
@@ -638,10 +648,10 @@ def addPropertyIndex(doc):
             tempDesc = desc.copy()
             tempDesc["Name"] = name
             atRules[atRule].append(tempDesc)
-    for desc in atRules.values():
-        desc.sort(key=lambda x: x["Name"])
+    for descs in atRules.values():
+        descs.sort(key=lambda x: x["Name"])
 
-    def createRow(prop, linkType, for_=None):
+    def createRow(prop: dict[str, str], linkType: str, for_: str | None = None) -> t.ElementT:
         attrs = {"data-link-type": linkType}
         if for_:
             attrs["data-link-for"] = for_
@@ -660,7 +670,7 @@ def addPropertyIndex(doc):
         columns.extend(sorted(allKeys - set(columns)))
         # Create the table
 
-        def formatColumnName(name):
+        def formatColumnName(name: str) -> str:
             if name == "Inherited":
                 return "Inh."
             if name == "Percentages":
@@ -729,8 +739,8 @@ def addPropertyIndex(doc):
             )
 
 
-def addIDLSection(doc):
-    idlBlocks = [x for x in h.findAll("pre.idl, xmp.idl", doc) if h.isNormative(x, doc)]
+def addIDLSection(doc: t.SpecT) -> None:
+    idlBlocks = [x for x in h.findAll("pre.idl, xmp.idl", doc) if h.isNormative(doc, x)]
     if len(idlBlocks) == 0:
         return
     html = getFillContainer("idl-index", doc=doc, default=True)
@@ -739,12 +749,12 @@ def addIDLSection(doc):
 
     h.appendChild(
         html,
-        h.E.h2({"class": "no-num no-ref", "id": h.safeID(doc, "idl-index")}, "IDL Index"),
+        h.E.h2({"class": "no-num no-ref", "id": h.safeID(doc, "idl-index")}, _("IDL Index")),
     )
 
     container = h.appendChild(html, h.E.pre({"class": "idl"}))
     for block in idlBlocks:
-        if h.hasClass(block, "extract"):
+        if h.hasClass(doc, block, "extract"):
             continue
         blockCopy = copy.deepcopy(block)
         h.appendContents(container, blockCopy)
@@ -752,12 +762,12 @@ def addIDLSection(doc):
     for el in h.findAll("[id]", container):
         if el.tag == "dfn":
             el.tag = "a"
-            el.set("href", "#" + el.get("id"))
+            el.set("href", "#" + el.get("id", ""))
         del el.attrib["id"]
-    h.addClass(container, "highlight")
+    h.addClass(doc, container, "highlight")
 
 
-def addTOCSection(doc):
+def addTOCSection(doc: t.SpecT) -> None:
     toc = getFillContainer("table-of-contents", doc=doc, default=False)
     if toc is None:
         return
@@ -765,7 +775,7 @@ def addTOCSection(doc):
         toc,
         h.E.h2(
             {"class": "no-num no-toc no-ref", "id": h.safeID(doc, "contents")},
-            "Table of Contents",
+            _("Table of Contents"),
         ),
     )
 
@@ -788,9 +798,9 @@ def addTOCSection(doc):
     # it sets containers[N+1] to None
     # to indicate that no children should go there.
     previousLevel = 1
-    containers = [0, 1, 2, 3, 4, 5, 6, 7]
+    containers: list[t.ElementT | None] = [None, None, None, None, None, None, None, None]
     containers[1] = toc
-    containers[2] = h.appendChild(containers[1], h.E.ol({"class": "toc", "role": "directory"}))
+    containers[2] = h.appendChild(toc, h.E.ol({"class": "toc", "role": "directory"}))
     for header in h.findAll("h2, h3, h4, h5, h6", doc):
         level = int(header.tag[-1])
         container = containers[level]
@@ -810,20 +820,21 @@ def addTOCSection(doc):
             return
 
         addToTOC = True
-        if h.hasClass(header, "no-toc"):
+        if h.hasClass(doc, header, "no-toc"):
             # Hit a no-toc, suppress the entire section.
             addToTOC = False
         elif container is None:
             addToTOC = False
-        elif (level - 1) > doc.md.maxToCDepth:
+        elif (level - 1) > (doc.md.maxToCDepth or float("inf")):
             addToTOC = False
 
         if addToTOC:
+            assert container is not None
             li = h.appendChild(
                 container,
                 h.E.li(
                     h.E.a(
-                        {"href": "#" + header.get("id")},
+                        {"href": "#" + header.get("id", "")},
                         h.E.span({"class": "secno"}, header.get("data-level", "")),
                         " ",
                         copy.deepcopy(h.find(".content", header)),
@@ -835,7 +846,7 @@ def addTOCSection(doc):
             containers[level + 1] = None
         previousLevel = level
 
-    container = containers[1]
+    container = t.cast("t.ElementT", containers[1])
     for el in h.findAll(".content a, .content dfn", container):
         el.tag = "span"
         if "href" in el.attrib:
@@ -846,8 +857,8 @@ def addTOCSection(doc):
         h.removeNode(el)
 
 
-def addSpecMetadataSection(doc):
-    def printEditor(editor):
+def addSpecMetadataSection(doc: t.SpecT) -> None:
+    def printEditor(editor: dict[str, str | None]) -> t.ElementT | None:
         dd = h.E.dd({"class": "editor p-author h-card vcard"})
         if editor["w3cid"]:
             dd.attrib["data-editor-id"] = editor["w3cid"]
@@ -889,7 +900,7 @@ def addSpecMetadataSection(doc):
             )
         return dd
 
-    def printTranslation(tr):
+    def printTranslation(tr: dict[str, str]) -> t.ElementT | None:
         lang = tr["lang-code"]
         # canonicalize the lang-code structure
         lang = lang.lower().replace("_", "-")
@@ -899,12 +910,12 @@ def addSpecMetadataSection(doc):
         missingInfo = False
         if name is None:
             if lang in doc.languages:
-                name = doc.languages[lang]["name"]
+                name = doc.languages[lang].name
             else:
                 missingInfo = True
         if nativeName is None:
             if lang in doc.languages:
-                nativeName = doc.languages[lang]["native-name"]
+                nativeName = doc.languages[lang].nativeName
             else:
                 missingInfo = True
         if missingInfo:
@@ -923,29 +934,33 @@ def addSpecMetadataSection(doc):
             return h.E.a({"href": url, "hreflang": lang, "rel": "alternate", "title": lang}, name)
         return h.E.a({"href": url, "hreflang": lang, "rel": "alternate"}, lang)
 
-    def printPreviousVersion(v):
+    def printPreviousVersion(v: dict[str, str]) -> t.ElementT | None:
         if v["type"] == "url":
             return h.E.a({"href": v["value"], "rel": "prev"}, v["value"])
+        # Otherwise, generate an implicit line from the latest known
+        key: str
         if v["type"] == "from-biblio":
             key = v["value"]
-        else:  # "from-biblio-implicit"
+        elif v["type"] == "from-biblio-implicit":  # "from-biblio-implicit"
+            if doc.md.vshortname is None:
+                return None
             key = doc.md.vshortname
         dated = doc.refs.getLatestBiblioRef(key)
         if not dated:
             m.die(
                 f"While trying to generate a Previous Version line, couldn't find a dated biblio reference for {key}."
             )
-            return
+            return None
         return h.E.a({"href": dated.url, "rel": "prev"}, dated.url)
 
-    md = DefaultOrderedDict(list)
+    md: OrderedDict[str, list[MetadataValueT]] = OrderedDict()
     mac = doc.macros
     if "version" in mac:
-        md["This version"].append(h.E.a({"href": mac["version"], "class": "u-url"}, mac["version"]))
+        md.setdefault("This version", []).append(h.E.a({"href": mac["version"], "class": "u-url"}, mac["version"]))
     if doc.md.TR:
-        md["Latest published version"].append(h.E.a({"href": doc.md.TR}, doc.md.TR))
+        md.setdefault("Latest published version", []).append(h.E.a({"href": doc.md.TR}, doc.md.TR))
     if doc.md.ED and doc.md.status in config.snapshotStatuses:
-        md["Editor's Draft"].append(h.E.a({"href": doc.md.ED}, doc.md.ED))
+        md.setdefault("Editor's Draft", []).append(h.E.a({"href": doc.md.ED}, doc.md.ED))
     if doc.md.previousVersions:
         md["Previous Versions"] = [printPreviousVersion(ver) for ver in doc.md.previousVersions]
     if "history" in mac:
@@ -979,17 +994,19 @@ def addSpecMetadataSection(doc):
                 ),
                 ")",
             )
-        md["Feedback"].append(span)
+        md.setdefault("Feedback", []).append(span)
     if doc.md.implementationReport is not None:
-        md["Implementation Report"].append(h.E.a({"href": doc.md.implementationReport}, doc.md.implementationReport))
+        md.setdefault("Implementation Report", []).append(
+            h.E.a({"href": doc.md.implementationReport}, doc.md.implementationReport)
+        )
     if doc.md.testSuite is not None:
-        md["Test Suite"].append(h.E.a({"href": doc.md.testSuite}, doc.md.testSuite))
-    elif (doc.md.vshortname in doc.testSuites) and (doc.testSuites[doc.md.vshortname]["url"] is not None):
-        url = doc.testSuites[doc.md.vshortname]["url"]
-        md["Test Suite"].append(h.E.a({"href": url}, url))
+        md.setdefault("Test Suite", []).append(h.E.a({"href": doc.md.testSuite}, doc.md.testSuite))
+    elif (doc.md.vshortname in doc.testSuites) and (doc.testSuites[doc.md.vshortname].url is not None):
+        url = doc.testSuites[doc.md.vshortname].url
+        md.setdefault("Test Suite", []).append(h.E.a({"href": url}, url))
     if doc.md.issues:
         if doc.md.TR:
-            md["Feedback"].extend([h.E.a({"href": href}, text) for text, href in doc.md.issues])
+            md.setdefault("Feedback", []).extend([h.E.a({"href": href}, text) for text, href in doc.md.issues])
         else:
             md["Issue Tracking"] = [h.E.a({"href": href}, text) for text, href in doc.md.issues]
     if doc.md.editors:
@@ -1025,52 +1042,64 @@ def addSpecMetadataSection(doc):
             #hidedel:checked ~ #hidedel-label::before, #hidedel:checked ~ * #hidedel-label::before { content: "☑ "; }
         """
 
-    def createMdEntry(key, vals):
-        vals = list(filter(lambda x: x is not None, vals))
-        if not vals:
-            return []
-        # Convert the canonical key to a display version
-        if key == "Editor":
-            displayKey = doc.md.editorTerm["singular"]
-        elif key == "Former Editor":
-            displayKey = "Former " + doc.md.editorTerm["singular"]
-        else:
-            displayKey = key
-        # Pluralize appropriate words
-        pluralization = {
-            "Previous Version": "Previous Versions",
-            "Test Suite": "Test Suites",
-            doc.md.editorTerm["singular"]: doc.md.editorTerm["plural"],
-            "Former " + doc.md.editorTerm["singular"]: "Former " + doc.md.editorTerm["plural"],
-        }
-        if len(vals) > 1 and displayKey in pluralization:
-            displayKey = pluralization[displayKey]
-        # Handle some custom <dt> structures
-        if key in ("Editor", "Former Editor"):
-            ret = [h.E.dt({"class": "editor"}, displayKey, ":")]
-        elif key == "Translations":
-            ret = [h.E.dt(displayKey, " ", h.E.small("(non-normative)"), ":")]
-        else:
-            ret = [h.E.dt(displayKey, ":")]
-        # Add all the values, wrapping in a <dd> if necessary.
-        for val in vals:
-            if h.isElement(val) and val.tag == "dd":
-                ret.append(val)
-            else:
-                ret.append(h.E.dd({}, val))
-        return ret
-
     # Merge "custom" metadata into non-custom, when they match up
     # and upgrade html-text values into real elements
-    otherMd = OrderedDict()
+    otherMd: OrderedDict[str, list[MetadataValueT]] = OrderedDict()
     for k, vs in doc.md.otherMetadata.items():
-        for i, v in enumerate(vs):
-            if isinstance(v, str):
-                vs[i] = h.parseHTML(doc.fixText(v))
+        parsed: list[t.NodesT] = [h.parseHTML(doc.fixText(v)) if isinstance(v, str) else v for v in vs]
         if k in md:
-            md[k].extend(vs)
+            md[k].extend(parsed)
         else:
-            otherMd[k] = vs
+            otherMd[k] = t.cast("list[t.NodesT|None]", parsed)
+
+    el = h.E.div(htmlFromMd(md, otherMd, doc))
+
+    fillWith("spec-metadata", el, doc=doc)
+
+
+def createMdEntry(key: str, dirtyVals: t.Sequence[MetadataValueT], doc: t.SpecT) -> t.NodesT:
+    # Turns a metadata key/vals pair
+    # into a list of dt/dd elements.
+
+    vals: list[t.NodesT] = [x for x in dirtyVals if x is not None]
+    if not vals:
+        return []
+    # Convert the canonical key to a display version
+    if key == "Editor":
+        displayKey = doc.md.editorTerm["singular"]
+    elif key == "Former Editor":
+        displayKey = "Former " + doc.md.editorTerm["singular"]
+    else:
+        displayKey = key
+    # Pluralize appropriate words
+    pluralization = {
+        "Previous Version": "Previous Versions",
+        "Test Suite": "Test Suites",
+        doc.md.editorTerm["singular"]: doc.md.editorTerm["plural"],
+        "Former " + doc.md.editorTerm["singular"]: "Former " + doc.md.editorTerm["plural"],
+    }
+    if len(vals) > 1 and displayKey in pluralization:
+        displayKey = pluralization[displayKey]
+    displayKey = _(displayKey)
+    # Handle some custom <dt> structures
+    if key in ("Editor", "Former Editor"):
+        ret = [h.E.dt({"class": "editor"}, displayKey, ":")]
+    elif key == "Translations":
+        ret = [h.E.dt(displayKey, " ", h.E.small(_("(non-normative)")), ":")]
+    else:
+        ret = [h.E.dt(displayKey, ":")]
+    # Add all the values, wrapping in a <dd> if necessary.
+    for val in vals:
+        if h.isElement(val) and val.tag == "dd":
+            ret.append(val)
+        else:
+            ret.append(h.E.dd({}, val))
+    return ret
+
+
+def htmlFromMd(md: MetadataT, otherMd: MetadataT, doc: t.SpecT) -> t.ElementT:
+    # Turns canonical and "other" metadata
+    # into a <dl>, per Metadata Order.
 
     dl = h.E.dl()
     for key in doc.md.metadataOrder:
@@ -1083,7 +1112,7 @@ def addSpecMetadataSection(doc):
                 if k not in doc.md.metadataInclude:
                     # Explicitly excluded
                     continue
-                h.appendChild(dl, *createMdEntry(k, vs))
+                h.appendChild(dl, *createMdEntry(k, vs, doc), allowEmpty=True)
         elif key == "!*":
             # Do all the non-explicit custom keys
             for k, vs in otherMd.items():
@@ -1091,46 +1120,37 @@ def addSpecMetadataSection(doc):
                     continue
                 if k not in doc.md.metadataInclude:
                     continue
-                h.appendChild(dl, *createMdEntry(k, vs))
+                h.appendChild(dl, *createMdEntry(k, vs, doc), allowEmpty=True)
         elif key not in doc.md.metadataInclude:
             # Key explicitly excluded
             continue
         elif key in md:
-            h.appendChild(dl, *createMdEntry(key, md[key]))
+            h.appendChild(dl, *createMdEntry(key, md[key], doc), allowEmpty=True)
         elif key in otherMd:
-            h.appendChild(dl, *createMdEntry(key, otherMd[key]))
-    fillWith("spec-metadata", h.E.div(dl), doc=doc)
+            h.appendChild(dl, *createMdEntry(key, otherMd[key], doc), allowEmpty=True)
+    return dl
 
 
-def addReferencesSection(doc):
+def addReferencesSection(doc: t.SpecT) -> None:
     if not doc.normativeRefs and not doc.informativeRefs:
         return
     container = getFillContainer("references", doc=doc, default=True)
     if container is None:
         return
 
-    def formatBiblioTerm(linkText):
-        """
-        If the term is all uppercase, leave it like that.
-        If it's all lowercase, uppercase it.
-        If it's mixed case, leave it like that.
-        """
-        if linkText.islower():
-            return linkText.upper()
-        return linkText
-
     h.appendChild(
         container,
-        h.E.h2({"class": "no-num no-ref", "id": h.safeID(doc, "references")}, "References"),
+        h.E.h2({"class": "no-num no-ref", "id": h.safeID(doc, "references")}, _("References")),
     )
 
     normRefs = sorted(doc.normativeRefs.values(), key=lambda r: r.linkText.lower())
+    normRefKeys = set(r.linkText.lower() for r in doc.normativeRefs.values())
     if len(normRefs) > 0:
         dl = h.appendChild(
             container,
             h.E.h3(
                 {"class": "no-num no-ref", "id": h.safeID(doc, "normative")},
-                "Normative References",
+                _("Normative References"),
             ),
             h.E.dl(),
         )
@@ -1148,14 +1168,14 @@ def addReferencesSection(doc):
     informRefs = [
         x
         for x in sorted(doc.informativeRefs.values(), key=lambda r: r.linkText.lower())
-        if x.linkText not in doc.normativeRefs
+        if x.linkText.lower() not in normRefKeys
     ]
     if len(informRefs) > 0:
         dl = h.appendChild(
             container,
             h.E.h3(
                 {"class": "no-num no-ref", "id": h.safeID(doc, "informative")},
-                "Informative References",
+                _("Informative References"),
             ),
             h.E.dl(),
         )
@@ -1171,7 +1191,7 @@ def addReferencesSection(doc):
             h.appendChild(dl, h.E.dd(*ref.toHTML()))
 
 
-def addIssuesSection(doc):
+def addIssuesSection(doc: t.SpecT) -> None:
     issues = h.findAll(".issue", doc)
     if len(issues) == 0:
         return
@@ -1183,7 +1203,7 @@ def addIssuesSection(doc):
         container,
         h.E.h2(
             {"class": "no-num no-ref", "id": h.safeID(doc, "issues-index")},
-            "Issues Index",
+            _("Issues Index"),
         ),
     )
     container = h.appendChild(container, h.E.div({"style": "counter-reset:issue"}))
@@ -1194,9 +1214,22 @@ def addIssuesSection(doc):
             el.tag = "div"
         h.appendChild(container, el)
         h.appendChild(
-            el, " ", h.E.a({"href": "#" + issue.get("id"), "class": "issue-return", "title": "Jump to section"}, "↵")
+            el,
+            " ",
+            h.E.a({"href": "#" + issue.get("id", ""), "class": "issue-return", "title": _("Jump to section")}, "↵"),
         )
     for idel in h.findAll("[id]", container):
         del idel.attrib["id"]
     for dfnel in h.findAll(config.dfnElementsSelector, container):
         dfnel.tag = "span"
+
+
+def formatBiblioTerm(linkText: str) -> str:
+    """
+    If the term is all uppercase, leave it like that.
+    If it's all lowercase, uppercase it.
+    If it's mixed case, leave it like that.
+    """
+    if linkText.islower():
+        return linkText.upper()
+    return linkText

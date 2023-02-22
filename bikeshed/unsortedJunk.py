@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import logging
 import re
@@ -5,87 +7,52 @@ from collections import Counter, defaultdict, namedtuple
 from urllib import parse
 from PIL import Image
 
-from . import biblio, config, dfnpanels
-from .func import Functor
-from .h import (
-    E,
-    addClass,
-    appendChild,
-    childNodes,
-    clearContents,
-    closestAncestor,
-    closestAttr,
-    createElement,
-    dedupIDs,
-    emptyText,
-    escapeAttr,
-    escapeHTML,
-    escapeUrlFrag,
-    find,
-    findAll,
-    fixupIDs,
-    foldWhitespace,
-    hasAncestor,
-    hasClass,
-    hashContents,
-    hasOnlyChild,
-    insertAfter,
-    isEmpty,
-    isNormative,
-    moveContents,
-    outerHTML,
-    parentElement,
-    parseHTML,
-    prependChild,
-    relevantHeadings,
-    removeAttr,
-    replaceContents,
-    replaceNode,
-    safeID,
-    textContent,
-    treeAttr,
-    wrapContents,
-)
-from .messages import die, say, warn
+from . import biblio, config, dfnpanels, h, func, t, messages as m, idl, repository
+from .translate import _
+
+if t.TYPE_CHECKING:
+    import widlparser  # pylint: disable=unused-import
+    from . import refs
+    from .line import Line
 
 
-class MarkdownCodeSpans(Functor):
+class MarkdownCodeSpans(func.Functor):
     # Wraps a string, such that the contained text is "safe"
     # and contains no markdown code spans.
     # Thus, functions mapping over the text can freely make substitutions,
     # knowing they won't accidentally replace stuff in a code span.
-    def __init__(self, text):
+    def __init__(self, text: str):
         self.__codeSpanReplacements__ = []
         newText = ""
         mode = "text"
         indexSoFar = 0
         backtickCount = 0
-        for m in re.finditer(r"(\\`)|([\w-]*)(`+)", text):
+        for match in re.finditer(r"(\\`)|([\w-]*)(`+)", text):
             if mode == "text":
-                if m.group(1):
-                    newText += text[indexSoFar : m.start()] + m.group(1)[1]
-                    indexSoFar = m.end()
-                elif m.group(3):
+                if match.group(1):
+                    newText += text[indexSoFar : match.start()] + match.group(1)[1]
+                    indexSoFar = match.end()
+                elif match.group(3):
                     mode = "code"
-                    newText += text[indexSoFar : m.start()]
-                    indexSoFar = m.end()
-                    backtickCount = len(m.group(3))
-                    tag = m.group(2)
-                    literalStart = m.group(0)
+                    newText += text[indexSoFar : match.start()]
+                    indexSoFar = match.end()
+                    backtickCount = len(match.group(3))
+                    tag = match.group(2)
+                    literalStart = match.group(0)
             elif mode == "code":
-                if m.group(1):
+                if match.group(1):
                     pass
-                elif m.group(3):
-                    if len(m.group(3)) != backtickCount:
+                elif match.group(3):
+                    if len(match.group(3)) != backtickCount:
                         pass
                     else:
                         mode = "text"
-                        innerText = text[indexSoFar : m.start()] + m.group(2)
-                        fullText = literalStart + text[indexSoFar : m.start()] + m.group(0)
+                        innerText = text[indexSoFar : match.start()] + match.group(2)
+                        fullText = literalStart + text[indexSoFar : match.start()] + match.group(0)
                         replacement = (tag, innerText, fullText)
                         self.__codeSpanReplacements__.append(replacement)
                         newText += "\ue0ff"
-                        indexSoFar = m.end()
+                        indexSoFar = match.end()
         if mode == "text":
             newText += text[indexSoFar:]
         elif mode == "code":
@@ -93,70 +60,66 @@ class MarkdownCodeSpans(Functor):
 
         super().__init__(newText)
 
-    def map(self, fn):
+    def map(self, fn: t.Callable) -> MarkdownCodeSpans:
         x = MarkdownCodeSpans("")
         x.__val__ = fn(self.__val__)
         x.__codeSpanReplacements__ = self.__codeSpanReplacements__
         return x
 
-    def extract(self):
+    def extract(self) -> str:
         if self.__codeSpanReplacements__:
             # Reverse the list, so I can use pop() to get them starting from the first.
             repls = self.__codeSpanReplacements__[::-1]
 
-            def codeSpanReviver(_):
+            def codeSpanReviver(_: t.Any) -> str:
                 # Match object is the PUA character, which I can ignore.
                 repl = repls.pop()
                 if repl[0] == "" or repl[0].endswith("-"):
                     # Markdown code span, so massage per CommonMark rules.
                     import string
 
-                    t = escapeHTML(repl[1]).strip(string.whitespace)
-                    t = re.sub("[" + string.whitespace + "]{2,}", " ", t)
-                    return "{2}<code data-opaque bs-autolink-syntax='{1}'>{0}</code>".format(
-                        t, escapeAttr(repl[2]), repl[0]
-                    )
-                return "<code data-opaque data-span-tag={0} bs-autolink-syntax='{2}'>{1}</code>".format(
-                    repl[0], escapeHTML(repl[1]), escapeAttr(repl[2])
-                )
+                    text = h.escapeHTML(repl[1]).strip(string.whitespace)
+                    text = re.sub("[" + string.whitespace + "]{2,}", " ", text)
+                    return f"{repl[0]}<code data-opaque bs-autolink-syntax='{h.escapeAttr(repl[2])}'>{text}</code>"
+                return f"<code data-opaque data-span-tag={repl[0]} bs-autolink-syntax='{h.escapeAttr(repl[2])}'>{h.escapeHTML(repl[1])}</code>"
 
-            return re.sub("\ue0ff", codeSpanReviver, self.__val__)
-        return self.__val__
+            return re.sub(r"\ue0ff", codeSpanReviver, self.__val__)
+        return t.cast(str, self.__val__)
 
 
-def stripBOM(doc):
+def stripBOM(doc: t.SpecT) -> None:
     if len(doc.lines) >= 1 and doc.lines[0].text[0:1] == "\ufeff":
         doc.lines[0].text = doc.lines[0].text[1:]
-        warn("Your document has a BOM. There's no need for that, please re-save it without a BOM.")
+        m.warn("Your document has a BOM. There's no need for that, please re-save it without a BOM.")
 
 
 # Definitions and the like
 
 
-def fixManualDefTables(doc):
+def fixManualDefTables(doc: t.SpecT) -> None:
     # Def tables generated via datablocks are guaranteed correct,
     # but manually-written ones often don't link up the names in the first row.
-    for table in findAll("table.propdef, table.descdef, table.elementdef", doc):
-        if hasClass(table, "partial"):
+    for table in h.findAll("table.propdef, table.descdef, table.elementdef", doc):
+        if h.hasClass(doc, table, "partial"):
             tag = "a"
             attr = "data-link-type"
         else:
             tag = "dfn"
             attr = "data-dfn-type"
-        tag = "a" if hasClass(table, "partial") else "dfn"
-        if hasClass(table, "propdef"):
+        tag = "a" if h.hasClass(doc, table, "partial") else "dfn"
+        if h.hasClass(doc, table, "propdef"):
             type = "property"
-        elif hasClass(table, "descdef"):
+        elif h.hasClass(doc, table, "descdef"):
             type = "descriptor"
-        elif hasClass(table, "elementdef"):
+        elif h.hasClass(doc, table, "elementdef"):
             type = "element"
-        cell = findAll("tr:first-child > :nth-child(2)", table)[0]
-        names = [x.strip() for x in textContent(cell).split(",")]
-        newContents = config.intersperse((createElement(tag, {attr: type}, name) for name in names), ", ")
-        replaceContents(cell, newContents)
+        cell = h.findAll("tr:first-child > :nth-child(2)", table)[0]
+        names = [x.strip() for x in h.textContent(cell).split(",")]
+        newContents = config.intersperse((h.createElement(tag, {attr: type}, name) for name in names), ", ")
+        h.replaceContents(cell, newContents)
 
 
-def canonicalizeShortcuts(doc):
+def canonicalizeShortcuts(doc: t.SpecT) -> None:
     # Take all the invalid-HTML shortcuts and fix them.
 
     attrFixup = {
@@ -181,77 +144,79 @@ def canonicalizeShortcuts(doc):
         "algorithm": "data-algorithm",
         "ignore": "data-var-ignore",
     }
-    for el in findAll(",".join(f"[{attr}]" for attr in attrFixup), doc):
+    for el in h.findAll(",".join(f"[{attr}]" for attr in attrFixup), doc):
         for attr, fixedAttr in attrFixup.items():
             if el.get(attr) is not None:
-                el.set(fixedAttr, el.get(attr))
+                el.set(fixedAttr, t.cast(str, el.get(attr)))
                 del el.attrib[attr]
 
     # The next two aren't in the above dict because some of the words conflict with existing attributes on some elements.
     # Instead, limit the search/transforms to the relevant elements.
-    for el in findAll("dfn, h2, h3, h4, h5, h6", doc):
+    for el in h.findAll("dfn, h2, h3, h4, h5, h6", doc):
         for dfnType in config.dfnTypes:
             if el.get(dfnType) == "":
                 del el.attrib[dfnType]
                 el.set("data-dfn-type", dfnType)
                 break
-    for el in findAll("a", doc):
+    for el in h.findAll("a", doc):
         for linkType in config.linkTypes:
             if el.get(linkType) is not None:
                 del el.attrib[linkType]
                 el.set("data-link-type", linkType)
                 break
-    for el in findAll(config.dfnElementsSelector + ", a", doc):
+    for el in h.findAll(config.dfnElementsSelector + ", a", doc):
         if el.get("for") is None:
             continue
-        if el.tag == "a":
-            el.set("data-link-for", el.get("for"))
-        else:
-            el.set("data-dfn-for", el.get("for"))
+        _for = t.cast(str, el.get("for"))
         del el.attrib["for"]
+        if el.tag == "a":
+            el.set("data-link-for", _for)
+        else:
+            el.set("data-dfn-for", _for)
 
 
-def addImplicitAlgorithms(doc):
+def addImplicitAlgorithms(doc: t.SpecT) -> None:
     # If a container has an empty `algorithm` attribute,
     # but it contains only a single `<dfn>`,
     # assume that the dfn is a description of the algorithm.
-    for el in findAll("[data-algorithm='']:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6)", doc):
-        dfns = findAll("dfn", el)
+    for el in h.findAll("[data-algorithm='']:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6)", doc):
+        dfns = h.findAll("dfn", el)
         if len(dfns) == 1:
-            dfnName = config.firstLinkTextFromElement(dfns[0])
+            dfnName = config.firstLinkTextFromElement(dfns[0]) or ""
             el.set("data-algorithm", dfnName)
             dfnFor = dfns[0].get("data-dfn-for")
             if dfnFor:
                 el.set("data-algorithm-for", dfnFor)
         elif len(dfns) == 0:
-            die(
-                "Algorithm container has no name, and there is no <dfn> to infer one from.",
+            m.die(
+                "Algorithm container has no name, and there is no <dfn> to infer one from. Please set the algorithm='name here' attribute.",
                 el=el,
             )
         else:
-            die(
-                "Algorithm container has no name, and there are too many <dfn>s to choose which to infer a name from.",
+            m.die(
+                "Algorithm container has no name, and there are too many <dfn>s to choose which to infer a name from. Please set the algorithm='name here' attribute.",
                 el=el,
             )
 
 
-def checkVarHygiene(doc):
-    def isAlgo(el):
+def checkVarHygiene(doc: t.SpecT) -> None:
+    def isAlgo(el: t.ElementT) -> bool:
         return el.get("data-algorithm") is not None
 
-    def nearestAlgo(el):
+    def nearestAlgo(el: t.ElementT) -> t.ElementT | None:
         # Find the nearest "algorithm" container,
         # either an ancestor with [algorithm] or the nearest heading with same.
         if isAlgo(el):
             return el
-        ancestor = closestAncestor(el, isAlgo)
+        ancestor = h.closestAncestor(el, isAlgo)
         if ancestor is not None:
             return ancestor
-        for h in relevantHeadings(el):
-            if isAlgo(h):
-                return h
+        for heading in h.relevantHeadings(el):
+            if isAlgo(heading):
+                return heading
+        return None
 
-    def algoName(el):
+    def algoName(el: t.ElementT) -> str | None:
         # Finds a uniquified algorithm name from an algo container
         algo = nearestAlgo(el)
         if algo is None:
@@ -261,46 +226,39 @@ def checkVarHygiene(doc):
         return f"'{algoName}'" + (f" for {algoFor}" if algoFor else "")
 
     # Look for vars that only show up once. These are probably typos.
-    varCounts = defaultdict(lambda: 0)
-    for el in findAll("var:not([data-var-ignore])", doc):
-        key = (foldWhitespace(textContent(el)).strip(), algoName(el))
-        varCounts[key] += 1
-    foldedVarCounts = defaultdict(lambda: 0)
+    varCounts: defaultdict[tuple[str, str | None], list[t.ElementT]] = defaultdict(list)
     atLeastOneAlgo = False
-    for (var, algo), count in varCounts.items():
+    for el in h.findAll("var:not([data-var-ignore])", doc):
+        var = h.foldWhitespace(h.textContent(el)).strip()
+        algo = algoName(el)
+        varCounts[(var, algo)].append(el)
         if algo:
             atLeastOneAlgo = True
-        if count > 1:
+    for (var, algo), els in varCounts.items():
+        if len(els) > 1:
             continue
         if var.lower() in doc.md.ignoredVars:
             continue
-        key = var, algo
-        foldedVarCounts[key] += 1
-    varLines = []
-    for (var, algo), count in foldedVarCounts.items():
-        if count == 1:
-            if algo:
-                varLines.append(f"  '{var}', in algorithm {algo}")
-            else:
-                varLines.append(f"  '{var}'")
-    if varLines:
-        warn(
-            "The following <var>s were only used once in the document:\n"
-            + "\n".join(varLines)
-            + "\nIf these are not typos, please add an ignore='' attribute to the <var>."
+        if algo:
+            varName = f"'{var}' (in algorithm {algo})"
+        else:
+            varName = f"'{var}' (in global scope)"
+        m.warn(
+            f"The var {varName} is only used once.\nIf this is not a typo, please add an ignore='' attribute to the <var>.",
+            el=els[0],
         )
 
     if atLeastOneAlgo:
         addVarClickHighlighting(doc)
 
     # Look for algorithms that show up twice; these are errors.
-    for algo, count in Counter(algoName(el) for el in findAll("[data-algorithm]", doc)).items():
+    for algo, count in Counter(algoName(el) for el in h.findAll("[data-algorithm]", doc)).items():
         if count > 1:
-            die(f"Multiple declarations of the {algo} algorithm.")
+            m.die(f"Multiple declarations of the {algo} algorithm.")
             return
 
 
-def addVarClickHighlighting(doc):
+def addVarClickHighlighting(doc: t.SpecT) -> None:
     if doc.md.slimBuildArtifact:
         return
     doc.extraStyles[
@@ -333,12 +291,13 @@ def addVarClickHighlighting(doc):
     doc.extraScripts[
         "script-var-click-highlighting"
     ] = r"""
-    document.addEventListener("click", e=>{
-        if(e.target.nodeName == "VAR") {
-            highlightSameAlgoVars(e.target);
-        }
-    });
+    "use strict";
     {
+        document.addEventListener("click", e=>{
+            if(e.target.nodeName == "VAR") {
+                highlightSameAlgoVars(e.target);
+            }
+        });
         const indexCounts = new Map();
         const indexNames = new Map();
         function highlightSameAlgoVars(v) {
@@ -417,49 +376,50 @@ def addVarClickHighlighting(doc):
     """
 
 
-def fixIntraDocumentReferences(doc):
-    ids = {el.get("id"): el for el in findAll("[id]", doc)}
-    headingIDs = {el.get("id"): el for el in findAll("[id].heading", doc)}
-    for el in findAll("a[href^='#']:not([href='#']):not(.self-link):not([data-link-type])", doc):
-        targetID = parse.unquote(el.get("href")[1:])
+def fixIntraDocumentReferences(doc: t.SpecT) -> None:
+    ids = {el.get("id"): el for el in h.findAll("[id]", doc)}
+    headingIDs = {el.get("id"): el for el in h.findAll("[id].heading", doc)}
+    for el in h.findAll("a[href^='#']:not([href='#']):not(.self-link):not([data-link-type])", doc):
+        href = t.cast(str, el.get("href"))
+        targetID = parse.unquote(href[1:])
         if el.get("data-section") is not None and targetID not in headingIDs:
-            die(f"Couldn't find target document section {targetID}:\n{outerHTML(el)}", el=el)
+            m.die(f"Couldn't find target document section {targetID}:\n{h.outerHTML(el)}", el=el)
             continue
         if targetID not in ids:
-            die(f"Couldn't find target anchor {targetID}:\n{outerHTML(el)}", el=el)
+            m.die(f"Couldn't find target anchor {targetID}:\n{h.outerHTML(el)}", el=el)
             continue
-        if isEmpty(el):
+        if h.isEmpty(el):
             # TODO Allow this to respect "safe" markup (<sup>, etc) in the title
             target = ids[targetID]
-            content = find(".content", target)
+            content = h.find(".content", target)
             if content is None:
-                die(
-                    f"Tried to generate text for a section link, but the target isn't a heading:\n{outerHTML(el)}",
+                m.die(
+                    f"Tried to generate text for a section link, but the target isn't a heading:\n{h.outerHTML(el)}",
                     el=el,
                 )
                 continue
-            text = textContent(content).strip()
+            text = h.textContent(content).strip()
             if target.get("data-level") is not None:
                 text = f"§\u202f{target.get('data-level')} {text}"
-            appendChild(el, text)
+            h.appendChild(el, text)
 
 
-def fixInterDocumentReferences(doc):
-    for el in findAll("[spec-section]", doc):
-        spec = el.get("data-link-spec").lower()
+def fixInterDocumentReferences(doc: t.SpecT) -> None:
+    for el in h.findAll("[spec-section]", doc):
+        if el.get("data-link-spec") is None:
+            m.die(
+                f"Spec-section autolink doesn't have a 'spec' attribute:\n{h.outerHTML(el)}",
+                el=el,
+            )
+            continue
+        spec = el.get("data-link-spec", "").lower()
+        if el.get("spec-section") is None:
+            m.die(
+                f"Spec-section autolink doesn't have a 'spec-section' attribute:\n{h.outerHTML(el)}",
+                el=el,
+            )
+            continue
         section = el.get("spec-section", "")
-        if spec is None:
-            die(
-                f"Spec-section autolink doesn't have a 'spec' attribute:\n{outerHTML(el)}",
-                el=el,
-            )
-            continue
-        if section is None:
-            die(
-                f"Spec-section autolink doesn't have a 'spec-section' attribute:\n{outerHTML(el)}",
-                el=el,
-            )
-            continue
         if spec in doc.refs.specs:
             # Bikeshed recognizes the spec
             fillInterDocumentReferenceFromShepherd(doc, el, spec, section)
@@ -470,8 +430,8 @@ def fixInterDocumentReferences(doc):
             if len(vNames) > 0:
                 fillInterDocumentReferenceFromShepherd(doc, el, vNames[0], section)
                 if len(vNames) > 1:
-                    die(
-                        f"Section autolink {outerHTML(el)} attempts to link to unversioned spec name '{spec}', "
+                    m.die(
+                        f"Section autolink {h.outerHTML(el)} attempts to link to unversioned spec name '{spec}', "
                         + "but that spec is versioned as {}. ".format(config.englishFromList(f"'{x}'" for x in vNames))
                         + "Please choose a versioned spec name.",
                         el=el,
@@ -482,97 +442,95 @@ def fixInterDocumentReferences(doc):
             fillInterDocumentReferenceFromSpecref(doc, el, spec, section)
             continue
         # Unknown spec
-        die(
-            f"Spec-section autolink tried to link to non-existent '{spec}' spec:\n{outerHTML(el)}",
+        m.die(
+            f"Spec-section autolink tried to link to non-existent '{spec}' spec:\n{h.outerHTML(el)}",
             el=el,
         )
 
 
-def fillInterDocumentReferenceFromShepherd(doc, el, spec, section):
-    specData = doc.refs.fetchHeadings(spec)
-    if section in specData:
-        heading = specData[section]
-    else:
-        die(
-            f"Couldn't find section '{section}' in spec '{spec}':\n{outerHTML(el)}",
-            el=el,
-        )
+def fillInterDocumentReferenceFromShepherd(doc: t.SpecT, el: t.ElementT, specName: str, section: str) -> None:
+    heading = doc.refs.fetchHeading(specName, section, el=el)
+    if heading is None:
+        # Error message already handled in fetchHeading
         return
-    if isinstance(heading, list):
-        # Multipage spec
-        if len(heading) == 1:
-            # only one heading of this name, no worries
-            heading = specData[heading[0]]
-        else:
-            # multiple headings of this id, user needs to disambiguate
-            die(
-                f"Multiple headings with id '{section}' for spec '{spec}'. Please specify:\n"
-                + "\n".join("  [[{}]]".format(spec + x) for x in heading),
-                el=el,
-            )
-            return
-    if doc.md.status == "current":
-        if "current" in heading:
-            heading = heading["current"]
-        else:
-            heading = heading["snapshot"]
-    else:
-        if "snapshot" in heading:
-            heading = heading["snapshot"]
-        else:
-            heading = heading["current"]
     el.tag = "a"
     el.set("href", heading["url"])
-    if isEmpty(el):
-        appendChild(el, E.cite("{spec}".format(**heading)))
-        appendChild(el, " §\u202f{number} {text}".format(**heading))
-    removeAttr(el, "data-link-spec", "spec-section")
+    if h.isEmpty(el):
+        h.appendChild(el, h.E.cite("{spec}".format(**heading)))
+        h.appendChild(el, " §\u202f{number} {text}".format(**heading))
+    h.removeAttr(el, "data-link-spec", "spec-section")
+
+    # Mark this as a used biblio ref
+    biblioRef = doc.refs.getBiblioRef(
+        specName,
+        status=doc.md.defaultRefStatus,
+        generateFakeRef=True,
+        quiet=False,
+    )
+    if biblioRef:
+        registerBiblioUsage(doc, biblioRef, el=el)
 
 
-def fillInterDocumentReferenceFromSpecref(doc, el, spec, section):
+def fillInterDocumentReferenceFromSpecref(doc: t.SpecT, el: t.ElementT, spec: str, section: str) -> None:
     bib = doc.refs.getBiblioRef(spec)
-    if isinstance(bib, biblio.StringBiblioEntry):
-        die(f"Can't generate a cross-spec section ref for '{spec}', because the biblio entry has no url.", el=el)
+    if bib is None:
+        m.die(f"Can't find spec '{spec}' when filling in cross-spec section refs.", el=el)
+        return
+    if bib.url is None:
+        m.die(f"Can't generate a cross-spec section ref for '{spec}', because the biblio entry has no url.", el=el)
+        return
+    if bib.title is None:
+        m.die(
+            f"Can't generate a cross-spec section ref for '{spec}', because the biblio entry has no spec title.", el=el
+        )
         return
     el.tag = "a"
     el.set("href", bib.url + section)
-    if isEmpty(el):
+    if h.isEmpty(el):
         el.text = bib.title + " §\u202f" + section[1:]
-    removeAttr(el, "data-link-spec", "spec-section")
+    h.removeAttr(el, "data-link-spec", "spec-section")
+
+    # Mark this as a used biblio ref
+    registerBiblioUsage(doc, bib, el=el)
 
 
-def processDfns(doc):
-    dfns = findAll(config.dfnElementsSelector, doc)
+def processDfns(doc: t.SpecT) -> None:
+    dfns = h.findAll(config.dfnElementsSelector, doc)
     classifyDfns(doc, dfns)
-    fixupIDs(doc, dfns)
-    doc.refs.addLocalDfns(dfn for dfn in dfns if dfn.get("id") is not None)
+    h.fixupIDs(doc, dfns)
+    doc.refs.addLocalDfns(doc, (dfn for dfn in dfns if dfn.get("id") is not None))
 
 
-def determineDfnType(dfn, inferCSS=False):
+def determineDfnType(doc: t.SpecT, dfn: t.ElementT, inferCSS: bool = False) -> str:
     # 1. Look at data-dfn-type
     if dfn.get("data-dfn-type"):
-        return dfn.get("data-dfn-type")
+        return t.cast(str, dfn.get("data-dfn-type"))
     # 2. Look for a prefix on the id
     if dfn.get("id"):
-        id = dfn.get("id")
+        id = t.cast(str, dfn.get("id"))
         for prefix, type in config.dfnClassToType.items():
             if id.startswith(prefix):
                 return type
     # 3. Look for a class or data-dfn-type on the ancestors
     for ancestor in dfn.iterancestors():
         if ancestor.get("data-dfn-type"):
-            return ancestor.get("data-dfn-type")
+            return t.cast(str, ancestor.get("data-dfn-type"))
         for cls, type in config.dfnClassToType.items():
-            if hasClass(ancestor, cls):
+            if h.hasClass(doc, ancestor, cls):
                 return type
-            if hasClass(ancestor, "idl") and not hasClass(ancestor, "extract"):
+            if h.hasClass(doc, ancestor, "idl") and not h.hasClass(doc, ancestor, "extract"):
                 return "interface"
     # 4. Introspect on the text
     if inferCSS:
-        text = textContent(dfn)
+        text = h.textContent(dfn)
         if text[0:1] == "@":
             return "at-rule"
-        if len(dfn) == 1 and dfn[0].get("data-link-type") == "maybe" and emptyText(dfn.text) and emptyText(dfn[0].tail):
+        if (
+            len(dfn) == 1
+            and dfn[0].get("data-link-type") == "maybe"
+            and h.emptyText(dfn.text)
+            and h.emptyText(dfn[0].tail)
+        ):
             return "value"
         if text[0:1] == "<" and text[-1:] == ">":
             return "type"
@@ -584,28 +542,28 @@ def determineDfnType(dfn, inferCSS=False):
     return "dfn"
 
 
-def classifyDfns(doc, dfns):
+def classifyDfns(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
     dfnTypeToPrefix = {v: k for k, v in config.dfnClassToType.items()}
     for el in dfns:
-        dfnType = determineDfnType(el, inferCSS=doc.md.inferCSSDfns)
+        dfnType = determineDfnType(doc, el, inferCSS=doc.md.inferCSSDfns)
         if dfnType not in config.dfnTypes:
-            die(f"Unknown dfn type '{dfnType}':\n{outerHTML(el)}", el=el)
+            m.die(f"Unknown dfn type '{dfnType}':\n{h.outerHTML(el)}", el=el)
             continue
-        dfnFor = treeAttr(el, "data-dfn-for")
+        dfnFor = h.treeAttr(el, "data-dfn-for")
         primaryDfnText = config.firstLinkTextFromElement(el)
         if primaryDfnText is None:
-            die(f"Dfn has no linking text:\n{outerHTML(el)}", el=el)
+            m.die(f"Dfn has no linking text:\n{h.outerHTML(el)}", el=el)
             continue
         if len(primaryDfnText) > 300:
             # Almost certainly accidentally missed the end tag
-            warn(
-                f"Dfn has extremely long text - did you forget the </dfn> tag?\n{outerHTML(el)}",
+            m.warn(
+                f"Dfn has extremely long text - did you forget the </dfn> tag?\n{h.outerHTML(el)}",
                 el=el,
             )
         # Check for invalid fors, as it's usually some misnesting.
         if dfnFor and dfnType in config.typesNotUsingFor:
-            die(
-                f"'{dfnType}' definitions don't use a 'for' attribute, but this one claims it's for '{dfnFor}' (perhaps inherited from an ancestor). This is probably a markup error.\n{outerHTML(el)}",
+            m.die(
+                f"'{dfnType}' definitions don't use a 'for' attribute, but this one claims it's for '{dfnFor}' (perhaps inherited from an ancestor). This is probably a markup error.\n{h.outerHTML(el)}",
                 el=el,
             )
         # Push the dfn type down to the <dfn> itself.
@@ -615,29 +573,30 @@ def classifyDfns(doc, dfns):
         if dfnFor:
             el.set("data-dfn-for", dfnFor)
         elif dfnType in config.typesUsingFor:
-            die(
-                f"'{dfnType}' definitions need to specify what they're for.\nAdd a 'for' attribute to {outerHTML(el)}, or add 'dfn-for' to an ancestor.",
+            m.die(
+                f"'{dfnType}' definitions need to specify what they're for.\nAdd a 'for' attribute to {h.outerHTML(el)}, or add 'dfn-for' to an ancestor.",
                 el=el,
             )
             continue
         # Some error checking
         if dfnType in config.functionishTypes:
             if not re.search(r"\(.*\)$", primaryDfnText):
-                die(
-                    f"Function/methods must end with a () arglist in their linking text. Got '{primaryDfnText}'.\n{outerHTML(el)}",
+                m.die(
+                    f"Function/methods must end with a () arglist in their linking text. Got '{primaryDfnText}'.\n{h.outerHTML(el)}",
                     el=el,
                 )
                 continue
             if not re.match(r"^[\w\[\]-]+\s*\(", primaryDfnText):
-                die(
-                    f"Function/method names can only contain alphanums, underscores, dashes, or []. Got '{primaryDfnText}'.\n{outerHTML(el)}",
+                m.die(
+                    f"Function/method names can only contain alphanums, underscores, dashes, or []. Got '{primaryDfnText}'.\n{h.outerHTML(el)}",
                     el=el,
                 )
                 continue
             if el.get("data-lt") is None:
-                if dfnType == "function":
+                match = re.match(r"^([\w\[\]-]+)\(.*\)$", primaryDfnText)
+                if dfnType == "function" and match:
                     # CSS function, define it with no args in the text
-                    primaryDfnText = re.match(r"^([\w\[\]-]+)\(.*\)$", primaryDfnText).group(1) + "()"
+                    primaryDfnText = match.group(1) + "()"
                     el.set("data-lt", primaryDfnText)
                 elif dfnType in config.idlTypes:
                     # IDL methodish construct, ask the widlparser what it should have.
@@ -646,21 +605,23 @@ def classifyDfns(doc, dfns):
                     primaryDfnText = names[0]
                     el.set("data-lt", "|".join(names))
                 else:
-                    die(
+                    m.die(
                         f"BIKESHED ERROR: Unhandled functionish type '{dfnType}' in classifyDfns. Please report this to Bikeshed's maintainer.",
                         el=el,
                     )
         # If type=argument, try to infer what it's for.
         if dfnType == "argument" and el.get("data-dfn-for") is None:
-            parent = el.getparent()
+            parent = h.parentElement(el)
+            assert parent is not None
             parentFor = parent.get("data-dfn-for")
             if parent.get("data-dfn-type") in config.functionishTypes and parentFor is not None:
                 dfnFor = ", ".join(
-                    parentFor + "/" + name for name in doc.widl.normalized_method_names(textContent(parent), parentFor)
+                    parentFor + "/" + name
+                    for name in doc.widl.normalized_method_names(h.textContent(parent), parentFor)
                 )
-            elif treeAttr(el, "data-dfn-for") is None:
-                die(
-                    f"'argument' dfns need to specify what they're for, or have it be inferrable from their parent. Got:\n{outerHTML(el)}",
+            elif h.treeAttr(el, "data-dfn-for") is None:
+                m.die(
+                    f"'argument' dfns need to specify what they're for, or have it be inferrable from their parent. Got:\n{h.outerHTML(el)}",
                     el=el,
                 )
                 continue
@@ -669,10 +630,15 @@ def classifyDfns(doc, dfns):
             if dfnFor:
                 singleFor = config.splitForValues(dfnFor)[0]
             if dfnType in config.functionishTypes.intersection(config.idlTypes):
+                match = re.match(r"[^(]*", primaryDfnText)
+                if match:
+                    parenlessID = match.group(0)
+                else:
+                    parenlessID = primaryDfnText
                 id = config.simplifyText(
                     "{_for}-{id}".format(
                         _for=singleFor,
-                        id=re.match(r"[^(]*", primaryDfnText).group(0) + "()",
+                        id=parenlessID + "()",
                     )
                 )
                 el.set(
@@ -706,14 +672,14 @@ def classifyDfns(doc, dfns):
                 id = config.simplifyText(f"dom-{id}")
             else:
                 id = f"{dfnTypeToPrefix[dfnType]}-{id}"
-            el.set("id", safeID(doc, id))
+            el.set("id", h.safeID(doc, id))
         # Set lt if it's not set,
         # and doing so won't mess with anything else.
         if el.get("data-lt") is None and "|" not in primaryDfnText:
             el.set("data-lt", primaryDfnText)
         # Push export/noexport down to the definition
         if el.get("data-export") is None and el.get("data-noexport") is None:
-            attr, _ = closestAttr(el, "data-export", "data-noexport")
+            attr, _ = h.closestAttr(el, "data-export", "data-noexport")
             if attr is not None:
                 el.set(attr, "")
             else:
@@ -725,25 +691,25 @@ def classifyDfns(doc, dfns):
         # and doesn't already have a sole <code> child,
         # wrap the contents in a <code>.
         if config.linkTypeIn(dfnType, "codelike"):
-            child = hasOnlyChild(el)
+            child = h.hasOnlyChild(el)
             if child is not None and child.tag == "code":
                 continue
             if el.tag in ("h1", "h2", "h3", "h4", "h5", "h6"):
                 # Don't wrap headings, it looks bad.
                 continue
-            wrapContents(el, E.code())
+            h.wrapContents(el, h.E.code())
 
 
-def determineLinkType(el):
+def determineLinkType(el: t.ElementT) -> str:
     # 1. Look at data-link-type
-    linkType = treeAttr(el, "data-link-type")
+    linkType = h.treeAttr(el, "data-link-type")
     if linkType:
         if linkType in config.linkTypes:
             return linkType
-        die(f"Unknown link type '{linkType}':\n{outerHTML(el)}", el=el)
+        m.die(f"Unknown link type '{linkType}':\n{h.outerHTML(el)}", el=el)
         return "unknown-type"
     # 2. Introspect on the text
-    text = textContent(el)
+    text = h.textContent(el)
     if config.typeRe["at-rule"].match(text):
         return "at-rule"
     if config.typeRe["type"].match(text):
@@ -755,25 +721,25 @@ def determineLinkType(el):
     return "dfn"
 
 
-def determineLinkText(el):
-    linkType = el.get("data-link-type")
-    contents = textContent(el)
+def determineLinkText(el: t.ElementT) -> str:
+    linkType = el.get("data-link-type", "")
+    contents = h.textContent(el)
     if el.get("data-lt"):
-        linkText = el.get("data-lt")
+        linkText = el.get("data-lt", "")
     elif config.linkTypeIn(linkType, "function") and re.match(r"^[\w-]+\(.*\)$", contents):
         # Remove arguments from CSS function autolinks,
         # as they should always be defined argument-less
         # (and this allows filled-in examples to still autolink).
-        linkText = re.match(r"^([\w-]+)\(.*\)$", contents).group(1) + "()"
+        linkText = t.cast(re.Match, re.match(r"^([\w-]+)\(.*\)$", contents)).group(1) + "()"
     else:
         linkText = contents
-    linkText = foldWhitespace(linkText)
+    linkText = h.foldWhitespace(linkText)
     if len(linkText) == 0:
-        die(f"Autolink {outerHTML(el)} has no linktext.", el=el)
+        m.die(f"Autolink {h.outerHTML(el)} has no linktext.", el=el)
     return linkText
 
 
-def classifyLink(el):
+def classifyLink(el: t.ElementT) -> t.ElementT:
     linkType = determineLinkType(el)
     el.set("data-link-type", linkType)
 
@@ -786,7 +752,7 @@ def classifyLink(el):
         "data-link-spec",
         "data-link-for-hint",
     ]:
-        val = treeAttr(el, attr)
+        val = h.treeAttr(el, attr)
         if val is not None:
             el.set(attr, val)
     return el
@@ -795,26 +761,14 @@ def classifyLink(el):
 # Additional Processing
 
 
-def processBiblioLinks(doc):
-    biblioLinks = findAll("a[data-link-type='biblio']", doc)
+def processBiblioLinks(doc: t.SpecT) -> None:
+    biblioLinks = h.findAll("a[data-link-type='biblio']", doc)
     for el in biblioLinks:
-        biblioType = el.get("data-biblio-type")
-        if biblioType == "normative":
-            storage = doc.normativeRefs
-        elif biblioType == "informative":
-            storage = doc.informativeRefs
-        else:
-            die(
-                f"Unknown data-biblio-type value '{biblioType}' on {outerHTML(el)}. Only 'normative' and 'informative' allowed.",
-                el=el,
-            )
-            continue
-
         linkText = determineLinkText(el)
         if linkText[0] == "[" and linkText[-1] == "]":
             linkText = linkText[1:-1]
 
-        refStatus = treeAttr(el, "data-biblio-status") or doc.md.defaultRefStatus
+        refStatus = h.treeAttr(el, "data-biblio-status") or doc.md.defaultRefStatus
 
         okayToFail = el.get("data-okay-to-fail") is not None
 
@@ -830,8 +784,8 @@ def processBiblioLinks(doc):
         )
         if not ref:
             if not okayToFail:
-                closeBiblios = biblio.findCloseBiblios(doc.refs.biblioKeys, linkText)
-                die(
+                closeBiblios = biblio.findCloseBiblios(list(doc.refs.biblioKeys), linkText)
+                m.die(
                     f"Couldn't find '{linkText}' in bibliography data. Did you mean:\n"
                     + "\n".join("  " + b for b in closeBiblios),
                     el=el,
@@ -848,7 +802,7 @@ def processBiblioLinks(doc):
                 pass
             else:
                 # Oh no! I'm using two different names to refer to the same biblio!
-                die(
+                m.die(
                     f"The biblio refs [[{linkText}]] and [[{ref.linkText}]] are both aliases of the same base reference [[{ref.originalLinkText}]]. Please choose one name and use it consistently.",
                     el=el,
                 )
@@ -859,7 +813,7 @@ def processBiblioLinks(doc):
             doc.refs.preferredBiblioNames[ref.linkText] = linkText
             # Use it on the current ref. Future ones will use the preferred name automatically.
             ref.linkText = linkText
-        storage[ref.linkText] = ref
+        registerBiblioUsage(doc, ref, el=el, type=el.get("data-biblio-type"))
 
         id = config.simplifyText(ref.linkText)
         el.set("href", "#biblio-" + id)
@@ -869,14 +823,17 @@ def processBiblioLinks(doc):
             if (
                 el.text == f"[{linkText}]"
             ):  # False if it's already been replaced by an author supplied text using the [[FOOBAR inline|custom text]] syntax.
-                clearContents(el)
-                appendChild(el, E.cite(ref.title))
+                h.clearContents(el)
+                h.appendChild(el, h.E.cite(ref.title))
+        else:
+            if ref.title:
+                el.set("title", ref.title)
         if biblioDisplay in ("inline", "direct"):
-            if ref.url is not None:
+            if ref.url:
                 el.set("href", ref.url)
 
 
-def verifyUsageOfAllLocalBiblios(doc):
+def verifyUsageOfAllLocalBiblios(doc: t.SpecT) -> None:
     """
     Verifies that all the locally-declared biblios
     (those written inline in a <pre class=biblio> block,
@@ -884,36 +841,36 @@ def verifyUsageOfAllLocalBiblios(doc):
     were used in the spec,
     so you can remove entries when they're no longer necessary.
     """
-    usedBiblioKeys = {x.lower() for x in list(doc.normativeRefs.keys()) + list(doc.informativeRefs.keys())}
-    localBiblios = [b["linkText"].lower() for bs in doc.refs.biblios.values() for b in bs if b["order"] == 1]
+    usedBiblioKeys = {x.upper() for x in list(doc.normativeRefs.keys()) + list(doc.informativeRefs.keys())}
+    localBiblios = [b.linkText.upper() for bs in doc.refs.biblios.values() for b in bs if b.order == 1]
     unusedBiblioKeys = []
     for b in localBiblios:
         if b not in usedBiblioKeys:
             unusedBiblioKeys.append(b)
     if unusedBiblioKeys:
-        warn(
+        m.warn(
             "The following locally-defined biblio entries are unused and can be removed:\n"
             + "\n".join(f"  * {b}" for b in unusedBiblioKeys),
         )
 
 
-def processAutolinks(doc):
+def processAutolinks(doc: t.SpecT) -> None:
     # An <a> without an href is an autolink.
     # <i> is a legacy syntax for term autolinks. If it links up, we change it into an <a>.
     # We exclude bibliographical links, as those are processed in `processBiblioLinks`.
     query = "a:not([href]):not([data-link-type='biblio'])"
     if doc.md.useIAutolinks:
-        warn("Use <i> Autolinks is deprecated and will be removed. Please switch to using <a> elements.")
+        m.warn("Use <i> Autolinks is deprecated and will be removed. Please switch to using <a> elements.")
         query += ", i"
-    autolinks = findAll(query, doc)
+    autolinks = h.findAll(query, doc)
     for el in autolinks:
         # Explicitly empty linking text indicates this shouldn't be an autolink.
         if el.get("data-lt") == "":
             continue
 
         classifyLink(el)
-        linkType = el.get("data-link-type")
-        linkText = el.get("data-lt")
+        linkType = t.cast(str, el.get("data-link-type"))
+        linkText = t.cast(str, el.get("data-lt"))
 
         # Properties and descriptors are often written like 'foo-*'. Just ignore these.
         if linkType in ("property", "descriptor", "propdesc") and "*" in linkText:
@@ -935,8 +892,12 @@ def processAutolinks(doc):
         elif status in config.linkStatuses or status is None:
             pass
         else:
-            die(f"Unknown link status '{status}' on {outerHTML(el)}")
+            m.die(f"Unknown link status '{status}' on {h.outerHTML(el)}")
             continue
+
+        # Some links are okay to fail, and so should do so silently.
+        okayToFail = el.get("data-okay-to-fail") is not None
+        ignorable = linkText.lower() in doc.md.ignoredTerms
 
         ref = doc.refs.getRef(
             linkType,
@@ -947,30 +908,29 @@ def processAutolinks(doc):
             linkForHint=el.get("data-link-for-hint"),
             explicitFor=doc.md.assumeExplicitFor,
             el=el,
-            error=(linkText.lower() not in doc.md.ignoredTerms),
+            error=not okayToFail and not ignorable,
         )
         # Capture the reference (and ensure we add a biblio entry) if it
-        # points to an external specification. We check the spec name here
-        # rather than checking `status == "local"`, as "local" refs include
-        # those defined in `<pre class="anchor">` datablocks, which we do
-        # want to capture here.
-        if ref and ref.spec and doc.refs.spec and ref.spec.lower() != doc.refs.spec.lower():
-            spec = ref.spec.lower()
-            key = ref.for_[0] if ref.for_ else ""
-            if isNormative(el, doc):
-                biblioStorage = doc.normativeRefs
-            else:
-                biblioStorage = doc.informativeRefs
+        # points to an external specification.
+        if ref and ref.status != "local":
+            spec = ref.spec.upper()
+            forVal = ref.for_[0] if ref.for_ else None
+
+            # If the ref is from an anchor block, it knows what it's doing.
+            # Don't follow obsoletion chains.
+            allowObsolete = ref.status == "anchor-block"
+
             biblioRef = doc.refs.getBiblioRef(
                 ref.spec,
                 status=doc.md.defaultRefStatus,
                 generateFakeRef=True,
-                quiet=True,
+                quiet=False,
+                allowObsolete=allowObsolete,
             )
             if biblioRef:
-                biblioStorage[biblioRef.linkText] = biblioRef
-                spec = biblioRef.linkText.lower()
-            doc.externalRefsUsed[spec][ref.text][key] = ref
+                spec = biblioRef.linkText.upper()
+                registerBiblioUsage(doc, biblioRef, el=el)
+            doc.externalRefsUsed.addRef(spec, ref, forVal)
 
         if ref:
             el.set("href", ref.url)
@@ -983,17 +943,35 @@ def processAutolinks(doc):
                     del el.attrib["data-link-type"]
                 if el.get("data-lt"):
                     del el.attrib["data-lt"]
-    dedupIDs(doc)
+    h.dedupIDs(doc)
 
 
-def decorateAutolink(doc, el, linkType, linkText, ref):
+def registerBiblioUsage(doc: t.SpecT, ref: biblio.BiblioEntry, el: t.ElementT, type: str | None = None) -> None:
+    if type is None:
+        if h.isNormative(doc, el):
+            type = "normative"
+        else:
+            type = "informative"
+    if type == "normative":
+        biblioStorage = doc.normativeRefs
+    elif type == "informative":
+        biblioStorage = doc.informativeRefs
+    else:
+        m.die(f"Unknown biblio type {type}.", el=el)
+        return
+    spec = ref.linkText.upper()
+    biblioStorage[spec] = ref
+    doc.externalRefsUsed.addBiblio(spec, ref)
+
+
+def decorateAutolink(doc: t.SpecT, el: t.ElementT, linkType: str, linkText: str, ref: refs.RefWrapper) -> None:
     # Add additional effects to autolinks.
     if doc.md.slimBuildArtifact:
         return
 
     # Put an ID on every reference, so I can link to references to a term.
     if el.get("id") is None:
-        _, _, id = ref.url.partition("#")
+        unused1, unused2, id = ref.url.partition("#")  # pylint: disable=unused-variable
         if id:
             el.set("id", f"ref-for-{id}")
             el.set("data-silently-dedup", "")
@@ -1004,39 +982,45 @@ def decorateAutolink(doc, el, linkType, linkText, ref):
         if linkText in doc.typeExpansions:
             titleText = doc.typeExpansions[linkText]
         else:
-            refs = doc.refs.queryAllRefs(linkFor=linkText, ignoreObsoletes=True)
-            texts = sorted({ref.text for ref in refs})
-            if refs:
-                titleText = "Expands to: " + " | ".join(texts)
+            if linkText == "":
+                print(h.outerHTML(el, literal=True))
+                assert linkText != ""
+
+            typeRefs = doc.refs.queryAllRefs(linkFor=linkText, ignoreObsoletes=True)
+            texts = sorted({ref.text for ref in typeRefs})
+            if typeRefs:
+                titleText = _("Expands to: ") + " | ".join(texts)
+                assert titleText is not None
                 doc.typeExpansions[linkText] = titleText
         if titleText:
             el.set("title", titleText)
 
 
-def removeMultipleLinks(doc):
+def removeMultipleLinks(doc: t.SpecT) -> None:
     # If there are multiple autolinks to the same thing in a paragraph,
     # only keep the first.
     if not doc.md.removeMultipleLinks:
         return
+    paras: defaultdict[t.ElementT | None, defaultdict[str, list[t.ElementT]]]
     paras = defaultdict(lambda: defaultdict(list))
-    for el in findAll("a[data-link-type]", doc):
-        if hasAncestor(el, lambda x: x.tag in ["pre", "xmp"]):
+    for el in h.findAll("a[data-link-type]", doc):
+        if h.hasAncestor(el, lambda x: x.tag in ["pre", "xmp"]):
             # Don't strip out repeated links from opaque elements
             continue
-        paras[parentElement(el)][el.get("href")].append(el)
+        paras[h.parentElement(el)][el.get("href", "")].append(el)
     for linkGroups in paras.values():
-        for _, links in linkGroups.items():
+        for links in linkGroups.values():
             if len(links) > 1:
                 for el in links[1:]:
                     el.tag = "span"
-                    removeAttr(el, "href", "data-link-type")
+                    h.removeAttr(el, "href", "data-link-type")
 
 
-def processIssuesAndExamples(doc):
+def processIssuesAndExamples(doc: t.SpecT) -> None:
     # Add an auto-genned and stable-against-changes-elsewhere id to all issues and
     # examples, and link to remote issues if possible:
-    for el in findAll(".issue:not([id])", doc):
-        el.set("id", safeID(doc, "issue-" + hashContents(el)))
+    for el in h.findAll(".issue:not([id])", doc):
+        el.set("id", h.safeID(doc, "issue-" + h.hashContents(el)))
         remoteIssueID = el.get("data-remote-issue-id")
         if remoteIssueID:
             del el.attrib["data-remote-issue-id"]
@@ -1052,7 +1036,7 @@ def processIssuesAndExamples(doc):
                         "data-inline-github",
                         "{} {} {}".format(*githubMatch.groups()),
                     )
-            elif numberMatch and doc.md.repository.type == "github":
+            elif numberMatch and isinstance(doc.md.repository, repository.GithubRepository):
                 remoteIssueURL = doc.md.repository.formatIssueUrl(numberMatch.group(1))
                 if doc.md.inlineGithubIssues:
                     el.set(
@@ -1066,52 +1050,54 @@ def processIssuesAndExamples(doc):
             elif doc.md.issueTrackerTemplate:
                 remoteIssueURL = doc.md.issueTrackerTemplate.format(remoteIssueID)
             if remoteIssueURL:
-                appendChild(el, " ", E.a({"href": remoteIssueURL}, "[Issue #" + remoteIssueID + "]"))
-    for el in findAll(".example:not([id])", doc):
-        el.set("id", safeID(doc, "example-" + hashContents(el)))
-    fixupIDs(doc, findAll(".issue, .example", doc))
+                h.appendChild(
+                    el, " ", h.E.a({"href": remoteIssueURL}, _("[Issue #{number}]").format(number=remoteIssueID))
+                )
+    for el in h.findAll(".example:not([id])", doc):
+        el.set("id", h.safeID(doc, "example-" + h.hashContents(el)))
+    h.fixupIDs(doc, h.findAll(".issue, .example", doc))
 
 
-def addSelfLinks(doc):
+def addSelfLinks(doc: t.SpecT) -> None:
     if doc.md.slimBuildArtifact:
         return
 
-    def makeSelfLink(el):
-        return E.a({"href": "#" + escapeUrlFrag(el.get("id", "")), "class": "self-link"})
+    def makeSelfLink(el: t.ElementT) -> t.ElementT:
+        return h.E.a({"href": "#" + h.escapeUrlFrag(el.get("id", "")), "class": "self-link"})
 
-    dfnElements = findAll(config.dfnElementsSelector, doc)
+    dfnElements = h.findAll(config.dfnElementsSelector, doc)
 
     foundFirstNumberedSection = False
-    for el in findAll("h2, h3, h4, h5, h6", doc):
+    for el in h.findAll("h2, h3, h4, h5, h6", doc):
         foundFirstNumberedSection = foundFirstNumberedSection or (el.get("data-level") is not None)
         if foundFirstNumberedSection:
-            appendChild(el, makeSelfLink(el))
-    for el in findAll(".issue[id], .example[id], .note[id], li[id], dt[id]", doc):
+            h.appendChild(el, makeSelfLink(el))
+    for el in h.findAll(".issue[id], .example[id], .note[id], li[id], dt[id]", doc):
         if list(el.iterancestors("figure")):
             # Skipping - element is inside a figure and is part of an example.
             continue
         if el.get("data-no-self-link") is not None:
             continue
         if el.tag == "details":
-            summary = find("summary", el)
+            summary = h.find("summary", el)
             if summary is not None:
-                insertAfter(summary, makeSelfLink(el))
+                h.insertAfter(summary, makeSelfLink(el))
                 continue
-        prependChild(el, makeSelfLink(el))
+        h.prependChild(el, makeSelfLink(el))
     if doc.md.useDfnPanels:
         dfnpanels.addDfnPanels(doc, dfnElements)
     else:
         for el in dfnElements:
             if list(el.iterancestors("a")):
-                warn(
-                    f"Found <a> ancestor, skipping self-link. Swap <dfn>/<a> order?\n  {outerHTML(el)}",
+                m.warn(
+                    f"Found <a> ancestor, skipping self-link. Swap <dfn>/<a> order?\n  {h.outerHTML(el)}",
                     el=el,
                 )
                 continue
-            appendChild(el, makeSelfLink(el))
+            h.appendChild(el, makeSelfLink(el))
 
 
-def cleanupHTML(doc):
+def cleanupHTML(doc: t.SpecT) -> None:
     # Cleanup done immediately before serialization.
 
     head = None
@@ -1132,7 +1118,7 @@ def cleanupHTML(doc):
             strayHeadEls.append(el)
 
         if el.tag == "style" and el.get("scoped") is not None:
-            die(
+            m.die(
                 "<style scoped> is no longer part of HTML. Ensure your styles can apply document-globally and remove the scoped attribute.",
                 el=el,
             )
@@ -1149,100 +1135,129 @@ def cleanupHTML(doc):
 
         # If we accidentally recognized an autolink shortcut in SVG, kill it.
         if el.tag == "{http://www.w3.org/2000/svg}a" and el.get("data-link-type") is not None:
-            removeAttr(el, "data-link-type")
+            h.removeAttr(el, "data-link-type")
             el.tag = "{http://www.w3.org/2000/svg}tspan"
 
         # Add .algorithm to [algorithm] elements, for styling
-        if el.get("data-algorithm") is not None and not hasClass(el, "algorithm"):
-            addClass(el, "algorithm")
+        if el.get("data-algorithm") is not None and not h.hasClass(doc, el, "algorithm"):
+            h.addClass(doc, el, "algorithm")
 
         # Allow MD-generated lists to be surrounded by HTML list containers,
         # so you can add classes/etc without an extraneous wrapper.
-        if el.tag in ["ol", "ul", "dl"]:
-            onlyChild = hasOnlyChild(el)
-            if (
-                onlyChild is not None
-                and el.tag == onlyChild.tag
-                and el.get("data-md") is None
-                and onlyChild.get("data-md") is not None
-            ):
-                # The md-generated list container is featureless,
-                # so we can just throw it away and move its children into its parent.
-                nestedLists.append(onlyChild)
+        if el.tag in ["ol", "ul", "dl"] and el.get("data-md") is None:
+            if el.tag in ["ol", "ul"]:
+                onlyChild = h.hasOnlyChild(el)
+                if onlyChild is not None and el.tag == onlyChild.tag and onlyChild.get("data-md") is not None:
+                    # The md-generated list container is featureless,
+                    # so we can just throw it away and move its children into its parent.
+                    nestedLists.append(onlyChild)
             else:
-                # Remove any lingering data-md attributes on lists that weren't using this container replacement thing.
-                removeAttr(el, "data-md")
+                # dls can contain both dt/dds
+                # (which'll make an md-generated dl)
+                # and divs, so I need to account for multiple children
+                for child in h.childElements(el):
+                    if child.tag == "dl" and child.get("data-md") is not None:
+                        nestedLists.append(child)
+                    elif child.tag == "div":
+                        pass
+                    elif child.tag in ["dt", "dd"]:
+                        pass
+                    else:
+                        # misnested element; leave alone for now
+                        pass
+
+        # HTML allows dt/dd to be grouped by a div, so recognize
+        # when a markdown-generated dl has a div parent and dl grandparent
+        # and remove it.
+        if (
+            h.tagName(el) == "dl"
+            and el.get("data-md") is not None
+            and h.tagName(h.parentElement(el)) == "div"
+            and h.tagName(h.parentElement(el, 2)) == "dl"
+        ):
+            # Also featureless and can be safely thrown away
+            # with its children merged into the parent div
+            nestedLists.append(el)
+
+        # Remove any lingering data-md attributes on lists
+        if el.tag in ["ol", "ul", "dl"] and el.get("data-md") is not None:
+            h.removeAttr(el, "data-md")
 
         # Mark pre.idl blocks as .def, for styling
-        if el.tag == "pre" and hasClass(el, "idl") and not hasClass(el, "def"):
-            addClass(el, "def")
+        if el.tag == "pre" and h.hasClass(doc, el, "idl") and not h.hasClass(doc, el, "def"):
+            h.addClass(doc, el, "def")
 
         # Tag classes on wide types of dfns/links
         if el.tag in config.dfnElements:
             if el.get("data-dfn-type") in config.idlTypes:
-                addClass(el, "idl-code")
+                h.addClass(doc, el, "idl-code")
             if el.get("data-dfn-type") in config.maybeTypes.union(config.linkTypeToDfnType["propdesc"]):
-                if not hasAncestor(el, lambda x: x.tag == "pre"):
-                    addClass(el, "css")
+                if not h.hasAncestor(el, lambda x: x.tag == "pre"):
+                    h.addClass(doc, el, "css")
         if el.tag == "a":
             if el.get("data-link-type") in config.idlTypes:
-                addClass(el, "idl-code")
+                h.addClass(doc, el, "idl-code")
             if el.get("data-link-type") in config.maybeTypes.union(config.linkTypeToDfnType["propdesc"]):
-                if not hasAncestor(el, lambda x: x.tag == "pre"):
-                    addClass(el, "css")
+                if not h.hasAncestor(el, lambda x: x.tag == "pre"):
+                    h.addClass(doc, el, "css")
 
         # Remove duplicate linking texts.
         if (
             el.tag in config.anchorishElements
             and el.get("data-lt") is not None
-            and el.get("data-lt") == textContent(el, exact=True)
+            and el.get("data-lt") == h.textContent(el, exact=True)
         ):
-            removeAttr(el, "data-lt")
+            h.removeAttr(el, "data-lt")
 
         # Transform the <css> fake tag into markup.
         # (Used when the ''foo'' shorthand doesn't work.)
         if el.tag == "css":
             el.tag = "span"
-            addClass(el, "css")
+            h.addClass(doc, el, "css")
 
+        # Assert IDs are used to tag arbitrary sections with an ID so you can point tests at it.
+        # (The ID will be guaranteed stable across publications, but guaranteed to change when the text changes.)
+        #
         # Transform the <assert> fake tag into a span with a unique ID based on its contents.
-        # This is just used to tag arbitrary sections with an ID so you can point tests at it.
-        # (And the ID will be guaranteed stable across publications, but guaranteed to change when the text changes.)
         if el.tag == "assert":
             el.tag = "span"
-            el.set("id", safeID(doc, "assert-" + hashContents(el)))
+            el.set("id", h.safeID(doc, "assert-" + h.hashContents(el)))
+        # For any <div assert> elements, add a unique ID based on its contents.
+        if el.tag == "div" and el.get("assert") is not None:
+            h.removeAttr(el, "assert")
+            el.set("id", h.safeID(doc, "assert-" + h.hashContents(el)))
 
         # Add ARIA role of "note" to class="note" elements
-        if el.tag in ["div", "p"] and hasClass(el, doc.md.noteClass):
+        if el.tag in ["div", "p"] and h.hasClass(doc, el, doc.md.noteClass):
             el.set("role", "note")
 
         # Look for nested <a> elements, and warn about them.
-        if el.tag == "a" and hasAncestor(el, lambda x: x.tag == "a"):
-            warn(
-                f"The following (probably auto-generated) link is illegally nested in another link:\n{outerHTML(el)}",
+        if el.tag == "a" and h.hasAncestor(el, lambda x: x.tag == "a"):
+            m.warn(
+                f"The following (probably auto-generated) link is illegally nested in another link:\n{h.outerHTML(el)}",
                 el=el,
             )
 
         # If the <h1> contains only capital letters, add a class=allcaps for styling hook
         if el.tag == "h1":
-            for letter in textContent(el):
+            for letter in h.textContent(el):
                 if letter.isalpha() and letter.islower():
                     break
             else:
-                addClass(el, "allcaps")
+                h.addClass(doc, el, "allcaps")
 
         # If a markdown-generated <dt> contains only a single paragraph,
         # remove that paragraph so it just contains naked text.
         if el.tag == "dt" and el.get("data-md") is not None:
-            child = hasOnlyChild(el)
-            if child is not None and child.tag == "p" and emptyText(el.text) and emptyText(child.tail):
+            dtChild = h.hasOnlyChild(el)
+            if dtChild is not None and h.tagName(dtChild) == "p" and h.emptyText(el.text) and h.emptyText(dtChild.tail):
                 flattenEls.append(el)
 
         # Remove a bunch of attributes
         if el.get("data-attribute-info") is not None or el.get("data-dict-member-info") is not None:
-            removeAttr(el, "data-attribute-info", "data-dict-member-info", "for")
+            h.removeAttr(el, "data-attribute-info", "data-dict-member-info", "for")
         if el.tag in ["a", "span"]:
-            removeAttr(
+            h.removeAttr(
                 el,
                 "data-link-for",
                 "data-link-for-hint",
@@ -1255,14 +1270,14 @@ def cleanupHTML(doc):
                 "data-lt",
             )
         if el.tag != "a":
-            removeAttr(el, "data-link-for", "data-link-type")
+            h.removeAttr(el, "data-link-for", "data-link-type")
         if el.tag not in config.dfnElements:
-            removeAttr(el, "data-dfn-for", "data-dfn-type", "data-export", "data-noexport")
+            h.removeAttr(el, "data-dfn-for", "data-dfn-type", "data-export", "data-noexport")
         if el.tag == "var":
-            removeAttr(el, "data-var-ignore")
+            h.removeAttr(el, "data-var-ignore")
         # Strip the control attributes
         if el.tag == "pre":
-            removeAttr(
+            h.removeAttr(
                 el,
                 "path",
                 "highlight",
@@ -1271,7 +1286,7 @@ def cleanupHTML(doc):
                 "line-highlight",
                 "line-numbers",
             )
-        removeAttr(
+        h.removeAttr(
             el,
             "bs-autolink-syntax",
             "data-alternate-id",
@@ -1295,81 +1310,80 @@ def cleanupHTML(doc):
         if doc.md.slimBuildArtifact:
             # Remove *all* data- attributes.
             for attrName in el.attrib:
-                if attrName.startswith("data-"):
-                    removeAttr(el, attrName)
-    for el in strayHeadEls:
-        head.append(el)
+                if str(attrName).startswith("data-"):
+                    h.removeAttr(el, str(attrName))
+    if head is not None:
+        for el in strayHeadEls:
+            head.append(el)
     for el in styleScoped:
-        parent = parentElement(el)
-        prependChild(parent, el)
+        parent = h.parentElement(el)
+        if parent is not None:
+            h.prependChild(parent, el)
     for el in nestedLists:
-        children = childNodes(el, clear=True)
-        parent = parentElement(el)
-        clearContents(parent)
-        appendChild(parent, *children)
+        h.replaceWithContents(el)
     for el in flattenEls:
-        moveContents(fromEl=el[0], toEl=el)
+        h.moveContents(fromEl=el[0], toEl=el)
 
 
-def finalHackyCleanup(text):
+def finalHackyCleanup(text: str) -> str:
     # For hacky last-minute string-based cleanups of the rendered html.
 
     return text
 
 
-def hackyLineNumbers(lines):
+def hackyLineNumbers(lines: list[Line]) -> list[Line]:
     # Hackily adds line-number information to each thing that looks like an open tag.
     # This is just regex text-munging, so potentially dangerous!
     for line in lines:
         line.text = re.sub(
             r"(^|[^<])(<[\w-]+)([ >])",
-            fr"\1\2 line-number={line.i}\3",
+            rf"\1\2 line-number={line.i}\3",
             line.text,
         )
     return lines
 
 
-def correctFrontMatter(doc):
+def correctFrontMatter(doc: t.SpecT) -> None:
     # Detect and move around some bits of information,
     # if you provided them in your
     # If you provided an <h1> manually, use that element rather than whatever the boilerplate contains.
-    h1s = [h1 for h1 in findAll("h1", doc) if isNormative(h1, doc)]
+    h1s = [h1 for h1 in h.findAll("h1", doc) if h.isNormative(doc, h1)]
     if len(h1s) == 2:
-        replaceNode(h1s[0], h1s[1])
+        h.replaceNode(h1s[0], h1s[1])
 
 
-def formatElementdefTables(doc):
-    for table in findAll("table.elementdef", doc):
-        elements = findAll("tr:first-child dfn", table)
-        elementsFor = " ".join(textContent(x) for x in elements)
-        for el in findAll("a[data-element-attr-group]", table):
-            groupName = textContent(el).strip()
+def formatElementdefTables(doc: t.SpecT) -> None:
+    for table in h.findAll("table.elementdef", doc):
+        elements = h.findAll("tr:first-child dfn", table)
+        elementsFor = " ".join(h.textContent(x) for x in elements)
+        for el in h.findAll("a[data-element-attr-group]", table):
+            groupName = h.textContent(el).strip()
             groupAttrs = sorted(
                 doc.refs.queryAllRefs(linkType="element-attr", linkFor=groupName),
                 key=lambda x: x.text,
             )
             if len(groupAttrs) == 0:
-                die(
+                m.die(
                     f"The element-attr group '{groupName}' doesn't have any attributes defined for it.",
                     el=el,
                 )
                 continue
             el.tag = "details"
-            clearContents(el)
-            removeAttr(el, "data-element-attr-group", "data-dfn-type")
-            ul = appendChild(el, E.summary(E.a({"data-link-type": "dfn"}, groupName)), E.ul())
+            h.clearContents(el)
+            h.removeAttr(el, "data-element-attr-group", "data-dfn-type")
+            ul = h.appendChild(el, h.E.summary(h.E.a({"data-link-type": "dfn"}, groupName)), h.E.ul())
             for ref in groupAttrs:
-                id = "element-attrdef-" + config.simplifyText(textContent(elements[0])) + "-" + ref.text
-                appendChild(
+                id = "element-attrdef-" + config.simplifyText(h.textContent(elements[0])) + "-" + ref.text
+                h.appendChild(
                     ul,
-                    E.li(
-                        E.dfn(
+                    h.E.li(
+                        h.E.dfn(
                             {
-                                "id": safeID(doc, id),
+                                "id": h.safeID(doc, id),
                                 "for": elementsFor,
                                 "data-dfn-type": "element-attr",
                             },
-                            E.a(
+                            h.E.a(
                                 {"data-link-type": "element-attr", "for": groupName},
                                 ref.text.strip(),
                             ),
@@ -1378,48 +1392,59 @@ def formatElementdefTables(doc):
                 )
 
 
-def formatArgumentdefTables(doc):
-    for table in findAll("table.argumentdef", doc):
-        forMethod = doc.widl.normalized_method_names(table.get("data-dfn-for"))
-        method = doc.widl.find(table.get("data-dfn-for"))
+def formatArgumentdefTables(doc: t.SpecT) -> None:
+    for table in h.findAll("table.argumentdef", doc):
+        forMethod = doc.widl.normalized_method_names(table.get("data-dfn-for", ""))
+        method = doc.widl.find(table.get("data-dfn-for", ""))
         if not method:
-            die(f"Can't find method '{forMethod}'.", el=table)
+            m.die(f"Can't find method '{forMethod}'.", el=table)
             continue
-        for tr in findAll("tbody > tr", table):
-            tds = findAll("td", tr)
-            argName = textContent(tds[0]).strip()
-            arg = method.find_argument(argName)
+        for i, tr in enumerate(h.findAll("tbody > tr", table)):
+            try:
+                argCell, typeCell, nullCell, optCell, _ = h.findAll("td", tr)
+            except ValueError:
+                m.die(
+                    f"In the argumentdef table for '{method.full_name}', row {i} is misformatted, with {len(h.findAll('td', tr))} cells instead of 5.",
+                    el=table,
+                )
+                continue
+            argName = h.textContent(argCell).strip()
+            arg = t.cast("widlparser.Argument", method.find_argument(argName))
             if arg:
-                appendChild(tds[1], str(arg.type))
+                h.appendChild(typeCell, idl.nodesFromType(arg.type))
                 if str(arg.type).strip().endswith("?"):
-                    appendChild(tds[2], E.span({"class": "yes"}, "✔"))
+                    h.appendChild(nullCell, h.E.span({"class": "yes"}, "✔"))
                 else:
-                    appendChild(tds[2], E.span({"class": "no"}, "✘"))
+                    h.appendChild(nullCell, h.E.span({"class": "no"}, "✘"))
                 if arg.optional:
-                    appendChild(tds[3], E.span({"class": "yes"}, "✔"))
+                    h.appendChild(optCell, h.E.span({"class": "yes"}, "✔"))
                 else:
-                    appendChild(tds[3], E.span({"class": "no"}, "✘"))
+                    h.appendChild(optCell, h.E.span({"class": "no"}, "✘"))
             else:
-                die(
+                m.die(
                     f"Can't find the '{argName}' argument of method '{method.full_name}' in the argumentdef block.",
                     el=table,
                 )
                 continue
 
 
-def inlineRemoteIssues(doc):
+def inlineRemoteIssues(doc: t.SpecT) -> None:
     # Finds properly-marked-up "remote issues",
     # and inlines their contents into the issue.
 
     # Right now, only github inline issues are supported.
     # More can be supported when someone cares.
 
+    if not isinstance(doc.md.repository, repository.GithubRepository):
+        return
+
     # Collect all the inline issues in the document
     inlineIssues = []
     GitHubIssue = namedtuple("GitHubIssue", ["user", "repo", "num", "el"])
-    for el in findAll("[data-inline-github]", doc):
-        inlineIssues.append(GitHubIssue(*el.get("data-inline-github").split(), el=el))
-        removeAttr(el, "data-inline-github")
+    for el in h.findAll("[data-inline-github]", doc):
+        user, repo, num = el.get("data-inline-github", "").split()
+        inlineIssues.append(GitHubIssue(user, repo, num, el=el))
+        h.removeAttr(el, "data-inline-github")
     if not inlineIssues:
         return
 
@@ -1433,7 +1458,7 @@ def inlineRemoteIssues(doc):
         key = f"{issueUserRepo}/{issue.num}"
         href = "https://github.{}/{}/issues/{}".format(doc.md.repository.ns, issueUserRepo, issue.num)
         url = "{}/repos/{}/issues/{}".format(doc.md.repository.api, issueUserRepo, issue.num)
-        say("Fetching issue {:-3d}/{:d}: {:s}".format(i + 1, len(inlineIssues), key))
+        m.say("Fetching issue {:-3d}/{:d}: {:s}".format(i + 1, len(inlineIssues), key))
 
         # Fetch the issues
         headers = {"Accept": "application/vnd.github.v3.html+json"}
@@ -1451,7 +1476,7 @@ def inlineRemoteIssues(doc):
             if key in responses:
                 data = responses[key]
             else:
-                warn(f"Connection error fetching issue #{issue.num}")
+                m.warn(f"Connection error fetching issue #{issue.num}")
                 continue
         if res is None:
             # Already handled in the except block
@@ -1466,20 +1491,20 @@ def inlineRemoteIssues(doc):
         elif res.status_code == 401:
             error = res.json()
             if error["message"] == "Bad credentials":
-                die(f"'{doc.token}' is not a valid GitHub OAuth token. See https://github.com/settings/tokens")
+                m.die(f"'{doc.token}' is not a valid GitHub OAuth token. See https://github.com/settings/tokens")
             else:
-                die(
+                m.die(
                     "401 error when fetching GitHub Issues:\n" + config.printjson(error),
                 )
             continue
         elif res.status_code == 403:
             error = res.json()
             if error["message"].startswith("API rate limit exceeded"):
-                die(
+                m.die(
                     "GitHub Issues API rate limit exceeded. Get an OAuth token from https://github.com/settings/tokens to increase your limit, or just wait an hour for your limit to refresh; Bikeshed has cached all the issues so far and will resume from where it left off."
                 )
             else:
-                die(
+                m.die(
                     "403 error when fetching GitHub Issues:\n" + config.printjson(error),
                 )
             continue
@@ -1488,33 +1513,33 @@ def inlineRemoteIssues(doc):
                 error = config.printjson(res.json())
             except ValueError:
                 error = "First 100 characters of error:\n" + res.text[0:100]
-            die(f"{res.status_code} error when fetching GitHub Issues:\n" + error)
+            m.die(f"{res.status_code} error when fetching GitHub Issues:\n" + error)
             continue
         responses[key] = data
         # Put the issue data into the DOM
         el = issue.el
         data = responses[key]
-        clearContents(el)
+        h.clearContents(el)
         if doc.md.inlineGithubIssues == "title":
-            appendChild(
+            h.appendChild(
                 el,
-                E.a(
+                h.E.a(
                     {"href": href, "class": "marker", "style": "text-transform:none"},
                     key,
                 ),
-                E.a({"href": href}, data["title"]),
+                h.E.a({"href": href}, data["title"]),
             )
-            addClass(el, "no-marker")
+            h.addClass(doc, el, "no-marker")
         else:
-            appendChild(
+            h.appendChild(
                 el,
-                E.a(
+                h.E.a(
                     {"href": href, "class": "marker"},
-                    f"Issue #{data['number']} on GitHub: “{data['title']}”",
+                    _("Issue #{number} on GitHub: “{title}”").format(number=data["number"], title=data["title"]),
                 ),
-                *parseHTML(data["body_html"]),
+                *h.parseHTML(data["body_html"]),
             )
-            addClass(el, "no-marker")
+            h.addClass(doc, el, "no-marker")
         if el.tag == "p":
             el.tag = "div"
     # Save the cache for later
@@ -1522,57 +1547,57 @@ def inlineRemoteIssues(doc):
         with open(config.scriptPath("spec-data", "github-issues.json"), "w", encoding="utf-8") as f:
             f.write(json.dumps(responses, ensure_ascii=False, indent=2, sort_keys=True))
     except Exception as e:
-        warn(f"Couldn't save GitHub Issues cache to disk.\n{e}")
+        m.warn(f"Couldn't save GitHub Issues cache to disk.\n{e}")
     return
 
 
-def addNoteHeaders(doc):
+def addNoteHeaders(doc: t.SpecT) -> None:
     # Finds <foo heading="bar"> and turns it into a marker-heading
-    for el in findAll("[heading]", doc):
-        addClass(el, "no-marker")
-        if hasClass(el, "note"):
-            preText = "NOTE: "
-        elif hasClass(el, "issue"):
-            preText = "ISSUE: "
-        elif hasClass(el, "example"):
-            preText = "EXAMPLE: "
+    for el in h.findAll("[heading]", doc):
+        h.addClass(doc, el, "no-marker")
+        if h.hasClass(doc, el, "note"):
+            preText = _("NOTE: ")
+        elif h.hasClass(doc, el, "issue"):
+            preText = _("ISSUE: ")
+        elif h.hasClass(doc, el, "example"):
+            preText = _("EXAMPLE: ")
         else:
             preText = ""
-        prependChild(el, E.div({"class": "marker"}, preText, *parseHTML(el.get("heading"))))
-        removeAttr(el, "heading")
+        h.prependChild(el, h.E.div({"class": "marker"}, preText, *h.parseHTML(el.get("heading", ""))))
+        h.removeAttr(el, "heading")
 
 
-def locateFillContainers(doc):
+def locateFillContainers(doc: t.SpecT) -> t.FillContainersT:
     fillContainers = defaultdict(list)
-    for el in findAll("[data-fill-with]", doc):
-        fillContainers[el.get("data-fill-with")].append(el)
+    for el in h.findAll("[data-fill-with]", doc):
+        fillContainers[t.cast(str, el.get("data-fill-with"))].append(el)
     return fillContainers
 
 
-def forceCrossorigin(doc):
+def forceCrossorigin(doc: t.SpecT) -> None:
     if not doc.md.forceCrossorigin:
         return
-    for el in findAll("link, script[src], audio, video, img", doc):
-        if el.get("crossorigin") is not None or treeAttr(el, "nocrossorigin") is not None:
+    for el in h.findAll("link, script[src], audio, video, img", doc):
+        if el.get("crossorigin") is not None or h.treeAttr(el, "nocrossorigin") is not None:
             continue
         el.set("crossorigin", "")
 
 
-def addImageSize(doc):
+def addImageSize(doc: t.SpecT) -> None:
     if doc.md.imgAutoSize is False:
         return
-    imgElements = findAll("img", doc)
+    imgElements = h.findAll("img", doc)
     for el in imgElements:
         if el.get("width") or el.get("height"):
             continue
         if el.get("no-autosize") is not None:
-            removeAttr(el, "no-autosize")
+            h.removeAttr(el, "no-autosize")
             continue
         src = el.get("src")
         srcset = el.get("srcset")
         res = 1
         if src is None and srcset is None:
-            warn(
+            m.warn(
                 "<img> elements must have at least one of src or srcset.",
                 el=el,
             )
@@ -1580,53 +1605,72 @@ def addImageSize(doc):
         elif src is not None and srcset is not None:
             continue
         elif src is None:
-            m = re.match(r"^[ \t\n]*([^ \t\n]+)[ \t\n]+(\d+)x[ \t\n]*$", srcset)
-            if m is None:
-                die(
+            match = re.match(r"^[ \t\n]*([^ \t\n]+)[ \t\n]+(\d+)x[ \t\n]*$", srcset or "")
+            if match is None:
+                m.die(
                     f"Couldn't parse 'srcset' attribute: \"{srcset}\"\n"
                     + "Bikeshed only supports a single image followed by an integer resolution. If not targeting Bikeshed specifically, HTML requires a 'src' attribute (and probably a 'width' and 'height' attribute too). This warning can also be suppressed by adding a 'no-autosize' attribute.",
                     el=el,
                 )
                 continue
             else:
-                src = m.group(1)
+                src = match.group(1)
                 el.set("src", src)
-                res = int(m.group(2))
+                res = int(match.group(2) or "1")
+        assert src is not None
         if not doc.inputSource.cheaplyExists(""):
             # If the input source can't tell whether a file cheaply exists,
             # PIL very likely can't use it either.
-            warn(
-                f"At least one <img> doesn't have its size set ({outerHTML(el)}), but given the type of input document, Bikeshed can't figure out what the size should be.\nEither set 'width'/'height' manually, or opt out of auto-detection by setting the 'no-autosize' attribute.",
+            m.warn(
+                f"At least one <img> doesn't have its size set ({h.outerHTML(el)}), but given the type of input document, Bikeshed can't figure out what the size should be.\nEither set 'width'/'height' manually, or opt out of auto-detection by setting the 'no-autosize' attribute.",
                 el=el,
             )
             return
         if re.match(r"^(https?:/)?/", src):
-            warn(
-                f"Autodetection of image dimensions is only supported for local files, skipping this image: {outerHTML(el)}\nConsider setting 'width' and 'height' manually or opting out of autodetection by setting the 'no-autosize' attribute.",
+            m.warn(
+                f"Autodetection of image dimensions is only supported for local files, skipping this image: {h.outerHTML(el)}\nConsider setting 'width' and 'height' manually or opting out of autodetection by setting the 'no-autosize' attribute.",
                 el=el,
             )
             continue
-        imgPath = doc.inputSource.relative(src).sourceName
+        localImg = doc.inputSource.relative(src)
+        if localImg is None:
+            continue
+        imgPath = localImg.sourceName
         try:
             im = Image.open(imgPath)
-            w, h = im.size
+            width, height = im.size
         except Exception as e:
-            warn(
+            m.warn(
                 f"Couldn't determine width and height of this image: {src}\n{e}",
                 el=el,
             )
             continue
-        if w % res == 0:
-            el.set("width", str(int(w / res)))
+        if width % res == 0:
+            el.set("width", str(int(width / res)))
         else:
-            warn(
-                f"The width ({w}px) of this image is not a multiple of the declared resolution ({res}): {src}\nConsider fixing the image so its width is a multiple of the resolution, or setting its 'width' and 'height' attribute manually.",
+            m.warn(
+                f"The width ({width}px) of this image is not a multiple of the declared resolution ({res}): {src}\nConsider fixing the image so its width is a multiple of the resolution, or setting its 'width' and 'height' attribute manually.",
                 el=el,
             )
-        if h % res == 0:
-            el.set("height", str(int(h / res)))
+        if height % res == 0:
+            el.set("height", str(int(height / res)))
         else:
-            warn(
-                f"The height ({h}px) of this image is not a multiple of the declared resolution ({res}): {src}\nConsider fixing the image so its height is a multiple of the resolution, or setting its 'width' and 'height' attribute manually.",
+            m.warn(
+                f"The height ({height}px) of this image is not a multiple of the declared resolution ({res}): {src}\nConsider fixing the image so its height is a multiple of the resolution, or setting its 'width' and 'height' attribute manually.",
                 el=el,
             )
+
+
+def processIDL(doc: t.SpecT) -> None:
+    localDfns = set()
+    for pre in h.findAll("pre.idl, xmp.idl", doc):
+        if pre.get("data-no-idl") is not None:
+            continue
+        if not h.isNormative(doc, pre):
+            continue
+        localDfns.update(idl.markupIDLBlock(pre, doc))
+
+    dfns = h.findAll("pre.idl:not([data-no-idl]) dfn, xmp.idl:not([data-no-idl]) dfn", doc) + list(localDfns)
+    classifyDfns(doc, dfns)
+    h.fixupIDs(doc, dfns)
+    doc.refs.addLocalDfns(doc, (dfn for dfn in dfns if dfn.get("id") is not None))

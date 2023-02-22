@@ -1,8 +1,9 @@
-from ..h import isElement, outerHTML
-from ..messages import printColor
+from __future__ import annotations
+
+from .. import h, messages as m, t
 
 
-def printjson(x, indent=2, level=0):
+def printjson(x: t.Any, indent: str | int = 2, level: int = 0) -> str:
     if isinstance(indent, int):
         # Convert into a number of spaces.
         indent = " " * indent
@@ -22,14 +23,14 @@ def printjson(x, indent=2, level=0):
     # return json.dumps(obj, indent=2, default=lambda x:x.__json__())
 
 
-def getjson(x):
+def getjson(x: t.Any) -> t.Any:
     try:
         return x.__json__()
     except AttributeError:
         return x
 
 
-def printjsonobject(x, indent, level):
+def printjsonobject(x: t.Any, indent: str, level: int) -> str:
     x = getjson(x)
     ret = ""
     maxKeyLength = 0
@@ -39,35 +40,35 @@ def printjsonobject(x, indent, level):
         ret += (
             "\n"
             + (indent * level)
-            + printColor((k + ": ").ljust(maxKeyLength + 2), "cyan")
+            + m.printColor((k + ": ").ljust(maxKeyLength + 2), "cyan")
             + printjson(v, indent, level + 1)
         )
     return ret
 
 
-def printjsonobjectarray(x, indent, level):
+def printjsonobjectarray(x: list[dict[str, t.Any]], indent: str, level: int) -> str:
     # Prints an array of objects
     x = getjson(x)
     ret = ""
     for i, v in enumerate(x):
         if i != 0:
-            ret += "\n" + (indent * level) + printColor("=" * 10, "blue")
+            ret += "\n" + (indent * level) + m.printColor("=" * 10, "blue")
         ret += printjsonobject(v, indent, level)
     return ret
 
 
-def printjsonsimplearray(x, indent, level):  # pylint: disable=unused-argument
+def printjsonsimplearray(x: list, indent: str, level: int) -> str:  # pylint: disable=unused-argument
     x = getjson(x)
-    ret = printColor("[", "blue")
+    ret = m.printColor("[", "blue")
     for i, v in enumerate(x):
         if i != 0:
-            ret += printColor(", ", "blue")
+            ret += m.printColor(", ", "blue")
         ret += printjsonprimitive(v)
-    ret += printColor("]", "blue")
+    ret += m.printColor("]", "blue")
     return ret
 
 
-def printjsonprimitive(x):
+def printjsonprimitive(x: t.Any) -> str:
     x = getjson(x)
     if isinstance(x, int):
         return str(x)
@@ -77,6 +78,6 @@ def printjsonprimitive(x):
         return str(x)
     if x is None:
         return "null"
-    if isElement(x):
-        return repr(x) + ":" + outerHTML(x)
+    if h.isElement(x):
+        return repr(x) + ":" + h.outerHTML(x)
     raise ValueError(f"Could not print value: {x}")

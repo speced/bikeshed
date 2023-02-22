@@ -1,9 +1,17 @@
+from __future__ import annotations
+
 from collections import defaultdict
 
-from .. import config
+from .. import config, t
 
 
-def filterObsoletes(refs, replacedSpecs, ignoredSpecs, localShortname=None, localSpec=None):
+def filterObsoletes(
+    refs: list[t.RefWrapper],
+    replacedSpecs: set[tuple[str, str]],
+    ignoredSpecs: set[str],
+    localShortname: str | None = None,
+    localSpec: str | None = None,
+) -> list[t.RefWrapper]:
     # Remove any ignored or obsoleted specs
     possibleSpecs = {ref.spec for ref in refs}
     if localSpec:
@@ -24,13 +32,15 @@ def filterObsoletes(refs, replacedSpecs, ignoredSpecs, localShortname=None, loca
     return ret
 
 
-def filterOldVersions(refs, status=None):
+def filterOldVersions(refs: list[t.RefWrapper], status: str | None = None) -> list[t.RefWrapper]:
     # If multiple levels of the same shortname exist,
     # only use the latest level.
     # If generating for a snapshot, prefer the latest snapshot level,
     # unless that doesn't exist, in which case just prefer the latest level.
-    shortnameLevels = defaultdict(lambda: defaultdict(list))
-    snapshotShortnameLevels = defaultdict(lambda: defaultdict(list))
+    shortnameLevels: defaultdict[str, defaultdict[str, list[t.RefWrapper]]] = defaultdict(lambda: defaultdict(list))
+    snapshotShortnameLevels: defaultdict[str, defaultdict[str, list[t.RefWrapper]]] = defaultdict(
+        lambda: defaultdict(list)
+    )
     for ref in refs:
         shortnameLevels[ref.shortname][ref.level].append(ref)
         if status == ref.status == "snapshot":
@@ -48,7 +58,7 @@ def filterOldVersions(refs, status=None):
     return refs
 
 
-def linkTextVariations(str, linkType):
+def linkTextVariations(str: str, linkType: str | None) -> t.Generator[str, None, None]:
     # Generate intelligent variations of the provided link text,
     # so explicitly adding an lt attr isn't usually necessary.
     str = str.strip()
@@ -61,7 +71,6 @@ def linkTextVariations(str, linkType):
     if linkType is None:
         return
     elif linkType == "dfn":
-
         last1 = str[-1]
         last2 = str[-2:]
         last3 = str[-3:]
@@ -173,7 +182,11 @@ def linkTextVariations(str, linkType):
             yield '"' + str + '"'
 
 
-def stripLineBreaks(obj):
+if t.TYPE_CHECKING:
+    U = t.TypeVar("U", bound="t.MutableMapping|t.MutableSequence")
+
+
+def stripLineBreaks(obj: U) -> U:
     it = obj.items() if isinstance(obj, dict) else enumerate(obj)
     for key, val in it:
         if isinstance(val, str):

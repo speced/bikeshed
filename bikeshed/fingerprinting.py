@@ -1,9 +1,11 @@
-from . import h
+from __future__ import annotations
+
+from . import h, t
 
 trackingVectorId = "b732b3fe"  # hashlib.md5("tracking-vector").hexdigest()[0:8], to minimize chance of collision
 
 
-def addTrackingVector(doc):
+def addTrackingVector(doc: t.SpecT) -> None:
     if doc.md.trackingVectorClass is None:
         return
 
@@ -56,9 +58,10 @@ def addTrackingVector(doc):
         h.removeAttr(el, "tracking-vector")
 
 
-def trackingVectorImage(imageURL, imageWidth, imageHeight, altText, title):
+def trackingVectorImage(
+    imageURL: str | None, imageWidth: str, imageHeight: str, altText: str, title: str
+) -> t.ElementT:
     if imageURL is None:
-
         return h.E.svg(
             {"width": "46", "height": "64", "role": "img", "aria-label": altText},
             h.E.title({}, title),

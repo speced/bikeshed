@@ -11,6 +11,11 @@ to isolate it.)
 This way your local changes will be reflected when you run the `bikeshed` command,
 making it easy to test.
 
+(I recommend `pipenv`;
+I find it simple to use,
+and it's what I use to develop Bikeshed,
+so it has a high chance of working correctly.)
+
 See [my blog post on cleanly handling a fork](https://www.xanthir.com/b4hf0)
 for guidance on how to fork responsibly
 when you're making small changes to an active project;
@@ -70,3 +75,18 @@ so running these before submitting a PR is important.
     versus several minutes for the full suite.
     However, many code paths are not exercised by these,
     so a full test run/rebase is required to ensure your change is actually fine.
+
+Pipenv, Pipfile, and `requirements.txt`
+---------------------------------------
+
+I'm using `pipenv` to maintain Bikeshed's requirements in a clean way;
+users don't *need* to do it themselves
+(it installs in the standard global fashion just fine),
+but if they also want a hermetic install without dep clashes, they can.
+
+This means we have to keep `Pipfile` and `Pipfile.lock` in sync,
+and keep `requirements.txt` in sync with the lockfile.
+Whenever new packages are installed or updated,
+run `pipenv lock` (to generate a `Pipfile.lock`)
+and `pipenv lock -r` (to generate a `requirements.txt`)
+and commit those alongside the new code that requires it.

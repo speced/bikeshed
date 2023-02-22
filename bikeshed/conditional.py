@@ -1,6 +1,8 @@
+from __future__ import annotations
+import dataclasses
 import re
 
-from . import config, h, messages as m
+from . import config, h, messages as m, t
 
 # Any element can have an include-if or exclude-if attribute,
 # containing a comma-separated list of conditions (described below).
@@ -22,10 +24,8 @@ from . import config, h, messages as m
 # but its children are left in its place.
 
 
-def processConditionals(container, doc=None):
-    if doc is None:
-        doc = container
-    for el in h.findAll("[include-if], [exclude-if], if-wrapper", container):
+def processConditionals(doc: t.SpecT, container: t.ElementT | None = None) -> None:
+    for el in h.findAll("[include-if], [exclude-if], if-wrapper", container if container is not None else doc):
         if el.tag == "if-wrapper" and not h.hasAttr(el, "include-if", "exclude-if"):
             m.die(
                 "<if-wrapper> elements must have an include-if and/or exclude-if attribute.",
@@ -36,10 +36,10 @@ def processConditionals(container, doc=None):
 
         removeEl = False
         if h.hasAttr(el, "include-if"):
-            if not any(evalConditions(doc, el, el.get("include-if"))):
+            if not any(evalConditions(doc, el, el.get("include-if", ""))):
                 removeEl = True
         if not removeEl and h.hasAttr(el, "exclude-if"):
-            if any(evalConditions(doc, el, el.get("exclude-if"))):
+            if any(evalConditions(doc, el, el.get("exclude-if", ""))):
                 removeEl = True
 
         if removeEl:
@@ -56,19 +56,19 @@ def processConditionals(container, doc=None):
         h.removeAttr(el, "include-if", "exclude-if")
 
 
-def evalConditions(doc, el, conditionString):
+def evalConditions(doc: t.SpecT, el: t.ElementT, conditionString: str) -> t.Generator[bool, None, None]:
     for cond in parseConditions(conditionString, el):
-        if cond["type"] == "status":
-            yield config.looselyMatch(cond["value"], doc.md.status)
-        elif cond["type"] == "text macro":
+        if cond.type == "status":
+            yield config.looselyMatch(cond.value, doc.md.status)
+        elif cond.type == "text macro":
             for k in doc.macros.keys():
-                if k.upper() == cond["value"]:
+                if k.upper() == cond.value:
                     yield True
                     break
             else:
                 yield False
-        elif cond["type"] == "boilerplate":
-            yield (h.find(f'[boilerplate="{h.escapeCSSIdent(cond["value"])}"]', doc) is not None)
+        elif cond.type == "boilerplate":
+            yield (h.find(f'[boilerplate="{h.escapeCSSIdent(cond.value)}"]', doc) is not None)
         else:
             m.die(
                 f"Program error, some type of include/exclude-if condition wasn't handled: '{repr(cond)}'. Please report!",
@@ -77,21 +77,27 @@ def evalConditions(doc, el, conditionString):
             yield False
 
 
-def parseConditions(s, el=None):
+@dataclasses.dataclass
+class Condition:
+    type: str
+    value: str
+
+
+def parseConditions(s: str, el: t.ElementT | None = None) -> t.Generator[Condition, None, None]:
     for sub in s.split(","):
         sub = sub.strip()
         if sub == "":
             continue
         if re.match(r"([\w-]+/)?[\w-]+$", sub):
-            yield {"type": "status", "value": sub}
+            yield Condition(type="status", value=sub)
             continue
         match = re.match(r"text macro:\s*(.+)$", sub, re.I)
         if match:
-            yield {"type": "text macro", "value": match.group(1).strip()}
+            yield Condition(type="text macro", value=match.group(1).strip())
             continue
         match = re.match(r"boilerplate:\s*(.+)$", sub, re.I)
         if match:
-            yield {"type": "boilerplate", "value": match.group(1).strip()}
+            yield Condition(type="boilerplate", value=match.group(1).strip())
             continue
         m.die(f"Unknown include/exclude-if condition '{sub}'", el=el)
         continue

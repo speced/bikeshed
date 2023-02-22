@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 
 import requests
@@ -5,21 +7,24 @@ import requests
 from .. import messages as m
 
 
-def update(path, dryRun=False):
+def update(path: str, dryRun: bool = False) -> set[str] | None:
     try:
         m.say("Downloading languages...")
         data = requests.get(
-            "https://raw.githubusercontent.com/tabatkins/bikeshed/master/bikeshed/spec-data/readonly/languages.json"
+            "https://raw.githubusercontent.com/speced/bikeshed/master/bikeshed/spec-data/readonly/languages.json"
         ).text
     except Exception as e:
         m.die(f"Couldn't download languages data.\n{e}")
-        return
+        return None
+
+    filePath = os.path.join(path, "languages.json")
 
     if not dryRun:
         try:
-            with open(os.path.join(path, "languages.json"), "w", encoding="utf-8") as f:
+            with open(filePath, "w", encoding="utf-8") as f:
                 f.write(data)
         except Exception as e:
             m.die(f"Couldn't save languages database to disk.\n{e}")
-            return
+            return None
     m.say("Success!")
+    return set([filePath])

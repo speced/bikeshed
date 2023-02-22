@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sys
 from collections import Counter
 
@@ -5,14 +7,14 @@ import lxml.html
 
 from . import constants, t
 
-messages: t.Set[str]
+messages: set[str | tuple[str, str]]
 messages = set()
 
-messageCounts: t.Dict[str, int]
+messageCounts: dict[str, int]
 messageCounts = Counter()
 
 
-def p(msg, sep=None, end=None):
+def p(msg: str | tuple[str, str], sep: str | None = None, end: str | None = None) -> None:
     if constants.quiet == float("infinity"):
         return
     if isinstance(msg, tuple):
@@ -37,74 +39,94 @@ def p(msg, sep=None, end=None):
             print(msg.encode("ascii", "xmlcharrefreplace"), sep=sep, end=end)
 
 
-def die(msg, el=None, lineNum=None):
+def die(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None) -> None:
     if lineNum is None and el is not None and el.get("line-number"):
         lineNum = el.get("line-number")
-    msg = formatMessage("fatal", msg, lineNum=lineNum)
-    if msg not in messages:
+    formattedMsg = formatMessage("fatal", msg, lineNum=lineNum)
+    if formattedMsg not in messages:
         messageCounts["fatal"] += 1
-        messages.add(msg)
+        messages.add(formattedMsg)
         if constants.quiet < 3:
-            p(msg)
+            p(formattedMsg)
     if constants.errorLevelAt("fatal"):
         errorAndExit()
 
 
-def linkerror(msg, el=None, lineNum=None):
+def linkerror(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None) -> None:
     if lineNum is None and el is not None and el.get("line-number"):
         lineNum = el.get("line-number")
     suffix = ""
     if el is not None:
         if el.get("bs-autolink-syntax"):
-            suffix = "\n" + el.get("bs-autolink-syntax")
+            suffix = "\n" + t.cast(str, el.get("bs-autolink-syntax"))
         else:
             suffix = "\n" + lxml.html.tostring(el, with_tail=False, encoding="unicode")
-    msg = formatMessage("link", msg + suffix, lineNum=lineNum)
-    if msg not in messages:
+    formattedMsg = formatMessage("link", msg + suffix, lineNum=lineNum)
+    if formattedMsg not in messages:
         messageCounts["linkerror"] += 1
-        messages.add(msg)
+        messages.add(formattedMsg)
         if constants.quiet < 2:
-            p(msg)
+            p(formattedMsg)
     if constants.errorLevelAt("link-error"):
         errorAndExit()
 
 
-def warn(msg, el=None, lineNum=None):
+def lint(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None) -> None:
     if lineNum is None and el is not None and el.get("line-number"):
         lineNum = el.get("line-number")
-    msg = formatMessage("warning", msg, lineNum=lineNum)
-    if msg not in messages:
-        messageCounts["warning"] += 1
-        messages.add(msg)
+    suffix = ""
+    if el is not None:
+        if el.get("bs-autolink-syntax"):
+            suffix = "\n" + t.cast(str, el.get("bs-autolink-syntax"))
+        else:
+            suffix = "\n" + lxml.html.tostring(el, with_tail=False, encoding="unicode")
+    formattedMsg = formatMessage("lint", msg + suffix, lineNum=lineNum)
+    if formattedMsg not in messages:
+        messageCounts["lint"] += 1
+        messages.add(formattedMsg)
         if constants.quiet < 1:
-            p(msg)
+            p(formattedMsg)
+    if constants.errorLevelAt("lint"):
+        errorAndExit()
+
+
+def warn(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None) -> None:
+    if lineNum is None and el is not None and el.get("line-number"):
+        lineNum = el.get("line-number")
+    formattedMsg = formatMessage("warning", msg, lineNum=lineNum)
+    if formattedMsg not in messages:
+        messageCounts["warning"] += 1
+        messages.add(formattedMsg)
+        if constants.quiet < 1:
+            p(formattedMsg)
     if constants.errorLevelAt("warning"):
         errorAndExit()
 
 
-def say(msg):
+def say(msg: str) -> None:
     if constants.quiet < 1:
         p(formatMessage("message", msg))
 
 
-def success(msg):
+def success(msg: str) -> None:
     if constants.quiet < 4:
         p(formatMessage("success", msg))
 
 
-def failure(msg):
+def failure(msg: str) -> None:
     if constants.quiet < 4:
         p(formatMessage("failure", msg))
 
 
-def resetSeenMessages():
+def resetSeenMessages() -> None:
     global messages
     messages = set()
     global messageCounts
     messageCounts = Counter()
+    return
 
 
-def printColor(text, color="white", *styles):
+def printColor(text: str, color: str = "white", *styles: str) -> str:
     if constants.printMode == "console":
         colorsConverter = {
             "black": 30,
@@ -143,13 +165,15 @@ def printColor(text, color="white", *styles):
     return text
 
 
-def formatMessage(type, text, lineNum=None):
+def formatMessage(type: str, text: str, lineNum: str | int | None = None) -> str | tuple[str, str]:
     if constants.printMode == "markup":
         text = text.replace("<", "&lt;")
         if type == "fatal":
             return f"<fatal>{text}</fatal>"
         if type == "link":
             return f"<linkerror>{text}</linkerror>"
+        if type == "lint":
+            return f"<lint>{text}</lint>"
         if type == "warning":
             return f"<warning>{text}</warning>"
         if type == "message":
@@ -158,33 +182,35 @@ def formatMessage(type, text, lineNum=None):
             return f"<final-success>{text}</final-success>"
         if type == "failure":
             return f"<final-failure>{text}</final-failure>"
-    else:
-        if type == "message":
-            return text
-        if type == "success":
-            return (
-                printColor(" ✔ ", "green", "invert") + " " + text,
-                printColor("YAY", "green", "invert") + " " + text,
-            )
-        if type == "failure":
-            return (
-                printColor(" ✘ ", "red", "invert") + " " + text,
-                printColor("ERR", "red", "invert") + " " + text,
-            )
-        if type == "fatal":
-            headingText = "FATAL ERROR"
-            color = "red"
-        elif type == "link":
-            headingText = "LINK ERROR"
-            color = "yellow"
-        elif type == "warning":
-            headingText = "WARNING"
-            color = "light cyan"
-        if lineNum is not None:
-            headingText = f"LINE {lineNum}"
-        return printColor(headingText + ":", color, "bold") + " " + text
+    if type == "message":
+        return text
+    if type == "success":
+        return (
+            printColor(" ✔ ", "green", "invert") + " " + text,
+            printColor("YAY", "green", "invert") + " " + text,
+        )
+    if type == "failure":
+        return (
+            printColor(" ✘ ", "red", "invert") + " " + text,
+            printColor("ERR", "red", "invert") + " " + text,
+        )
+    if type == "fatal":
+        headingText = "FATAL ERROR"
+        color = "red"
+    elif type == "link":
+        headingText = "LINK ERROR"
+        color = "yellow"
+    elif type == "lint":
+        headingText = "LINT"
+        color = "yellow"
+    elif type == "warning":
+        headingText = "WARNING"
+        color = "light cyan"
+    if lineNum is not None:
+        headingText = f"LINE {lineNum}"
+    return printColor(headingText + ":", color, "bold") + " " + text
 
 
-def errorAndExit():
+def errorAndExit() -> None:
     failure("Did not generate, due to fatal errors")
     sys.exit(2)

@@ -1,99 +1,80 @@
+from __future__ import annotations
+
+import abc
+import dataclasses
 import re
 from collections import defaultdict
 
-import html5lib
-import attr
-
-from . import constants
-from . import h
-from . import messages as m
+from . import constants, h, messages as m, t
 
 
-@attr.s(slots=True)
-class BiblioEntry:
-    linkText = attr.ib(default=None)
-    originalLinkText = attr.ib(default=None)
-    title = attr.ib(default=None)
-    authors = attr.ib(default=attr.Factory(list))
-    etAl = attr.ib(default=False)
-    status = attr.ib(default=None)
-    date = attr.ib(default=None)
-    snapshot_url = attr.ib(default=None)
-    current_url = attr.ib(default=None)
-    preferredURL = attr.ib(default=None)
-    url = attr.ib(default=None)
-    obsoletedBy = attr.ib(default="")
-    other = attr.ib(default=None)
-    biblioFormat = attr.ib(default=None)
-    order = attr.ib(default=None)
+@dataclasses.dataclass
+class BiblioEntry(metaclass=abc.ABCMeta):
+    linkText: str
+    title: str | None = None
+    snapshotURL: str | None = None
+    currentURL: str | None = None
+    preferredStatus: str = constants.refStatus.snapshot
+    originalLinkText: str | None = None
+    obsoletedBy: str | None = None
+    order: int = 0
 
-    def __attrs_post_init__(self):
-        if self.preferredURL is None:
-            self.preferredURL = constants.refStatus.snapshot
+    @property
+    def url(self) -> str:
+        if self.snapshotURL is None and self.currentURL is None:
+            return ""
+
+        if self.preferredStatus == constants.refStatus.snapshot:
+            # At least one of these is non-None so this is safe
+            return t.cast(str, self.snapshotURL or self.currentURL)
+        elif self.preferredStatus == constants.refStatus.current:
+            return t.cast(str, self.currentURL or self.snapshotURL)
         else:
-            self.preferredURL = constants.refStatus[self.preferredURL]
-        if self.preferredURL == constants.refStatus.snapshot:
-            self.url = self.snapshot_url or self.current_url
-        elif self.preferredURL == constants.refStatus.current:
-            self.url = self.current_url or self.snapshot_url
-        else:
-            raise ValueError(f"Invalid preferredURL value: {self.preferredURL}")
+            raise ValueError(f"Invalid preferredStatus value: {self.preferredStatus}")
 
-        if isinstance(self.authors, str):
-            self.authors = [self.authors]
+    def toHTML(self) -> t.NodesT:
+        ...
 
-    def __str__(self):
-        str = ""
-        etAl = self.etAl
+    def valid(self) -> bool:
+        ...
 
-        if len(self.authors) == 1:
-            str += self.authors[0]
-        elif len(self.authors) < 4:
-            str += "; ".join(self.authors)
-        elif len(self.authors) != 0:
-            str += self.authors[0]
-            etAl = True
+    def strip(self) -> BiblioEntry:
+        self.linkText = self.linkText.strip()
+        if self.title:
+            self.title = self.title.strip()
+        if self.snapshotURL:
+            self.snapshotURL = self.snapshotURL.strip()
+        if self.currentURL:
+            self.currentURL = self.currentURL.strip()
+        if self.obsoletedBy:
+            self.obsoletedBy = self.obsoletedBy.strip()
+        return self
 
-        if str != "":
-            str += "; et al. " if etAl else ". "
 
-        if self.url:
-            str += f"<a href='{self.url}'>{self.title}</a>. "
-        else:
-            str += f"{self.title}. "
+@dataclasses.dataclass
+class NormalBiblioEntry(BiblioEntry):
+    authors: list[str] = dataclasses.field(default_factory=list)
+    etAl: bool = False
+    status: str | None = None
+    date: str | None = None
+    other: str | None = None
 
-        if self.preferredURL == "current" and self.current_url:
-            pass
-        else:
-            if self.date:
-                str += self.date + ". "
-            if self.status:
-                str += self.status + ". "
+    def toHTML(self) -> t.NodesT:
+        ret: list[t.NodesT] = []
 
-        if self.other:
-            str += self.other + " "
-
-        if self.url:
-            str += "URL: <a href='{0}'>{0}</a>".format(self.url)
-
-        return str
-
-    def toHTML(self):
-        ret = []
-
-        str = ""
+        s = ""
         etAl = self.etAl
         if len(self.authors) == 1:
-            str += self.authors[0]
+            s += self.authors[0]
         elif len(self.authors) < 4:
-            str += "; ".join(self.authors)
+            s += "; ".join(self.authors)
         elif len(self.authors) != 0:
-            str += self.authors[0]
+            s += self.authors[0]
             etAl = True
 
-        if str != "":
-            str += "; et al. " if etAl else ". "
-        ret.append(str)
+        if s != "":
+            s += "; et al. " if etAl else ". "
+        ret.append(s)
 
         if self.url:
             ret.append(h.E.a({"href": self.url}, h.E.cite(self.title)))
@@ -102,17 +83,17 @@ class BiblioEntry:
             ret.append(h.E.cite(self.title))
             ret.append(". ")
 
-        str = ""
-        if self.preferredURL == "current" and self.current_url:
+        s = ""
+        if self.preferredStatus == "current" and self.currentURL:
             pass
         else:
             if self.date:
-                str += self.date + ". "
+                s += self.date + ". "
             if self.status:
-                str += self.status + ". "
+                s += self.status + ". "
         if self.other:
-            str += self.other + " "
-        ret.append(str)
+            s += self.other + " "
+        ret.append(s)
 
         if self.url:
             ret.append("URL: ")
@@ -120,44 +101,45 @@ class BiblioEntry:
 
         return ret
 
-    def valid(self):
-        if self.title is None:
-            return False
-        return True
+    def valid(self) -> bool:
+        return self.title is not None
+
+    def strip(self) -> NormalBiblioEntry:
+        super().strip()
+        if self.authors:
+            self.authors = [x.strip() for x in self.authors]
+        if self.status:
+            self.status = self.status.strip()
+        if self.date:
+            self.date = self.date.strip()
+        if self.other:
+            self.other = self.other.strip()
+        return self
 
 
-class SpecBasedBiblioEntry(BiblioEntry):
+class SpecBiblioEntry(BiblioEntry):
     """
     Generates a "fake" biblio entry from a spec reference,
     for when we don't have "real" bibliography data for a reference.
     """
 
-    def __init__(self, spec, preferredURL=None):
-        super().__init__()
-        if preferredURL is None:
-            preferredURL = constants.refStatus.snapshot
-        self.spec = spec
-        self.linkText = spec["vshortname"]
-        self._valid = True
-        preferredURL = constants.refStatus[preferredURL]
-        if preferredURL == constants.refStatus.snapshot:
-            self.url = spec["snapshot_url"] or spec["current_url"]
-        elif preferredURL == constants.refStatus.current:
-            self.url = spec["current_url"] or spec["snapshot_url"]
-        else:
-            raise ValueError(f"Invalid preferredURL value: {preferredURL}")
-        if not self.url:
-            self._valid = False
-        assert self.url
+    def __init__(self, spec: dict[str, str], preferredStatus: str | None = None, order: int = 0):
+        super().__init__(
+            linkText=spec["vshortname"],
+            title=spec["description"],
+            snapshotURL=spec["snapshot_url"],
+            currentURL=spec["current_url"],
+            preferredStatus=preferredStatus or constants.refStatus.snapshot,
+            order=order,
+        )
 
-    def valid(self):
-        return self._valid
+    def valid(self) -> bool:
+        return self.snapshotURL is not None or self.currentURL is not None
 
-    def toHTML(self):
-        return [self.spec["description"], " URL: ", h.E.a({"href": self.url}, self.url)]
+    def toHTML(self) -> t.NodesT:
+        return [self.title, " URL: ", h.E.a({"href": self.url}, self.url)]
 
 
-@attr.s(slots=True)
 class StringBiblioEntry(BiblioEntry):
     """
     Generates a barebones biblio entry from a preformatted biblio string.
@@ -165,30 +147,51 @@ class StringBiblioEntry(BiblioEntry):
     don't use it on purpose for real things in the future.
     """
 
-    data = attr.ib(default="")
-    linkText = attr.ib(default="")
+    data: str
 
-    def __attrs_post_init__(self):
-        doc = html5lib.parse(self.data, treebuilder="lxml", namespaceHTMLElements=False)
-        title = h.find("cite", doc)
-        if title is not None:
-            self.title = h.textContent(title)
+    def __init__(self, linkText: str, data: str, order: int = 0):
+        doc = h.parseDocument(data)
+        titleEl = h.find("cite", doc)
+        if titleEl is not None:
+            title = h.textContent(titleEl)
         else:
-            self.title = h.textContent(doc.getroot())
+            title = h.textContent(doc.getroot())
+        super().__init__(
+            linkText=linkText,
+            title=title,
+            order=order,
+        )
+        self.data = data
 
-    def valid(self):
+    def valid(self) -> bool:
         return True
 
-    def toHTML(self):
-        return h.parseHTML(self.data)
-
-    def __str__(self):
-        return self.data
+    def toHTML(self) -> t.NodesT:
+        return h.parseHTML(self.data.strip())
 
 
-def processReferBiblioFile(lines, storage, order):
+class AliasBiblioEntry(BiblioEntry):
+    """
+    Represents an alias entry,
+    which is just an alternate name for some other entry.
+    """
+
+    aliasOf: str
+
+    def __init__(self, linkText: str, aliasOf: str, order: int = 0):
+        super().__init__(linkText=linkText, order=order)
+        self.aliasOf = aliasOf.strip()
+
+    def valid(self) -> bool:
+        return True
+
+    def toHTML(self) -> t.NodesT:
+        return [h.E.small({}, f"(alias of {self.aliasOf})")]
+
+
+def processReferBiblioFile(lines: t.Sequence[str], storage: t.BiblioStorageT, order: int) -> t.BiblioStorageT:
     singularReferCodes = {
-        "U": "snapshot_url",
+        "U": "snapshotURL",
         "T": "title",
         "D": "date",
         "S": "status",
@@ -201,45 +204,49 @@ def processReferBiblioFile(lines, storage, order):
     }
     unusedReferCodes = set("BCIJNPRVX")
 
-    biblio = None
-    for _, line in enumerate(lines):
-        line = line.strip()
-        if line == "":
-            # Empty line
-            if biblio is not None:
-                storage[biblio["linkText"].lower()].append(biblio)
-                biblio = None
-            continue
-        if line.startswith("#") or line.startswith("%#"):
-            # Comment
-            continue
+    for group in groupsFromReferFile(lines):
+        biblio: dict[str, t.Any] = {"order": order}
+        for line in group:
+            match = re.match(r"%(\w)\s+(.*)", line)
+            if match:
+                letter, value = match.groups()
+            else:
+                m.die(f"Biblio line in unexpected format:\n{line}")
+                continue
 
-        if biblio is None:
-            biblio = defaultdict(list)
-            biblio["order"] = order
-            biblio["biblioFormat"] = "dict"
-
-        match = re.match(r"%(\w)\s+(.*)", line)
-        if match:
-            letter, value = match.groups()
-        else:
-            m.die(f"Biblio line in unexpected format:\n{line}")
-            continue
-
-        if letter in singularReferCodes:
-            biblio[singularReferCodes[letter]] = value
-        elif letter in pluralReferCodes:
-            biblio[pluralReferCodes[letter]].append(value)
-        elif letter in unusedReferCodes:
-            pass
-        else:
-            m.die(f"Unknown line type {letter}:\n{line}")
-    if biblio is not None:
-        storage[biblio["linkText"].lower()] = biblio
+            if letter in singularReferCodes:
+                biblio[singularReferCodes[letter]] = value
+            elif letter in pluralReferCodes:
+                biblio.setdefault(pluralReferCodes[letter], []).append(value)
+            elif letter in unusedReferCodes:
+                pass
+            else:
+                m.die(f"Unknown line type {letter}:\n{line}")
+                continue
+        storage[biblio["linkText"].lower()].append(NormalBiblioEntry(**biblio))
     return storage
 
 
-def processSpecrefBiblioFile(text, storage, order):
+def groupsFromReferFile(lines: t.Sequence[str]) -> t.Generator[list[str], None, None]:
+    group: list[str] = []
+    for line in lines:
+        line = line.strip()
+
+        if line == "":
+            if group:
+                yield group
+                group = []
+        elif line.startswith("#") or line.startswith("%#"):
+            # Comment
+            continue
+        else:
+            group.append(line)
+    # yield the final group, if there wasn't a trailing blank line
+    if group:
+        yield group
+
+
+def processSpecrefBiblioFile(text: str, storage: t.BiblioStorageT, order: int) -> t.BiblioStorageT:
     r"""
     A SpecRef file is a JSON object, where keys are ids
     and values are either <alias>, <legacyRef>, or <ref>.
@@ -284,70 +291,71 @@ def processSpecrefBiblioFile(text, storage, order):
     fields = {
         "authors": "authors",
         "etAl": "etAl",
-        "href": "snapshot_url",
-        "edDraft": "current_url",
+        "href": "snapshotURL",
+        "edDraft": "currentURL",
         "title": "title",
         "date": "date",
         "status": "status",
     }
 
-    obsoletedBy = {}
+    obsoletedBy: dict[str, str] = {}
+    biblio: BiblioEntry
     for biblioKey, data in datas.items():
-        biblio = {"linkText": biblioKey, "order": order}
+        biblioKey = biblioKey.strip()
         if isinstance(data, str):
             # Handle <legacyRef>
-            biblio["biblioFormat"] = "string"
-            biblio["data"] = data.replace("\n", " ")
+            biblio = StringBiblioEntry(linkText=biblioKey, order=order, data=data.replace("\n", " "))
         elif "aliasOf" in data:
             # Handle <alias>
             if biblioKey.lower() == data["aliasOf"].lower():
                 # SpecRef uses aliases to handle capitalization differences,
                 # which I don't care about.
                 continue
-            biblio["biblioFormat"] = "alias"
-            biblio["aliasOf"] = data["aliasOf"].lower()
+            biblio = AliasBiblioEntry(linkText=biblioKey, order=order, aliasOf=data["aliasOf"])
         else:
             # Handle <ref>
-            biblio["biblioFormat"] = "dict"
+            bib = {"linkText": biblioKey, "order": order}
             for jsonField, biblioField in fields.items():
                 if jsonField in data:
-                    biblio[biblioField] = data[jsonField]
+                    bib[biblioField] = data[jsonField]
             if "versionOf" in data:
                 # "versionOf" entries are all snapshot urls,
                 # so you want the href *all* the time.
-                biblio["current_url"] = data["href"]
+                bib["currentURL"] = data["href"]
             if "obsoletedBy" in data:
                 for v in data["obsoletedBy"]:
                     obsoletedBy[biblioKey.lower()] = v.lower()
             if "obsoletes" in data:
                 for v in data["obsoletes"]:
                     obsoletedBy[v.lower()] = biblioKey.lower()
+            biblio = NormalBiblioEntry(**bib)
         storage[biblioKey.lower()].append(biblio)
     for old, new in obsoletedBy.items():
         if old in storage:
             for biblio in storage[old]:
-                biblio["obsoletedBy"] = new
+                biblio.obsoletedBy = new
     return storage
 
 
-def loadBiblioDataFile(lines, storage):
+def loadBiblioDataFile(lines: t.Iterator[str], storage: t.BiblioStorageT) -> None:
+    b: dict[str, t.Any]
+    biblio: BiblioEntry
     try:
         while True:
             fullKey = next(lines)
             prefix, key = fullKey[0], fullKey[2:].strip()
             if prefix == "d":
                 b = {
-                    "linkText": next(lines),
+                    "linkText": next(lines).strip(),
                     "date": next(lines),
                     "status": next(lines),
                     "title": next(lines),
-                    "snapshot_url": next(lines),
-                    "current_url": next(lines),
+                    "snapshotURL": next(lines),
+                    "currentURL": next(lines),
                     "obsoletedBy": next(lines),
                     "other": next(lines),
                     "etAl": next(lines) != "\n",
                     "order": 3,
-                    "biblioFormat": "dict",
                     "authors": [],
                 }
                 while True:
@@ -355,39 +363,40 @@ def loadBiblioDataFile(lines, storage):
                     if line == "-\n":
                         break
                     b["authors"].append(line)
+                biblio = NormalBiblioEntry(**b)
             elif prefix == "s":
                 b = {
-                    "linkText": next(lines),
+                    "linkText": next(lines).strip(),
                     "data": next(lines),
-                    "biblioFormat": "string",
                     "order": 3,
                 }
                 line = next(lines)  # Eat the -
+                biblio = StringBiblioEntry(**b)
             elif prefix == "a":
                 b = {
-                    "linkText": next(lines),
-                    "aliasOf": next(lines),
-                    "biblioFormat": "alias",
+                    "linkText": next(lines).strip(),
+                    "aliasOf": next(lines).strip(),
                     "order": 3,
                 }
                 line = next(lines)  # Eat the -
+                biblio = AliasBiblioEntry(**b)
             else:
                 m.die(f"Unknown biblio prefix '{prefix}' on key '{fullKey}'")
                 continue
-            storage[key].append(b)
+            storage[key].append(biblio)
     except StopIteration:
         pass
 
 
-def levenshtein(a, b):
+def levenshtein(a: str, b: str) -> int:
     "Calculates the Levenshtein distance between a and b."
-    n, m = len(a), len(b)
+    n, m = len(a), len(b)  # pylint: disable=redefined-outer-name
     if n > m:
         # Make sure n <= m, to use O(min(n,m)) space
         a, b = b, a
         n, m = m, n
 
-    current = list(range(n + 1))
+    current: list[int] = list(range(n + 1))
     for i in range(1, m + 1):
         previous, current = current, [i] + [0] * n
         for j in range(1, n + 1):
@@ -400,40 +409,37 @@ def levenshtein(a, b):
     return current[n]
 
 
-def findCloseBiblios(biblioKeys, target, n=5):
+def findCloseBiblios(biblioKeys: t.Sequence[str], target: str, n: int = 5) -> list[str]:
     """
     Finds biblio entries close to the target.
     Returns all biblios with target as the substring,
     plus the 5 closest ones per levenshtein distance.
     """
     target = target.lower()
-    names = []
-    superStrings = []
-
-    def addName(name, distance):
-        tuple = (name, distance)
-        if len(names) < n:
-            names.append(tuple)
-            names.sort(key=lambda x: x[1])
-        elif distance >= names[-1][1]:
-            pass
-        else:
-            for i, entry in enumerate(names):
-                if distance < entry[1]:
-                    names.insert(i, tuple)
-                    names.pop()
-                    break
-        return names
+    names: list[tuple[str, int]] = []
+    superStrings: list[str] = []
 
     for name in biblioKeys:
         if target in name:
             superStrings.append(name)
         else:
-            addName(name, levenshtein(name, target))
+            distance = levenshtein(name, target)
+            tup = (name, distance)
+            if len(names) < n:
+                names.append(tup)
+                names.sort(key=lambda x: x[1])
+            elif distance >= names[-1][1]:
+                pass
+            else:
+                for i, entry in enumerate(names):
+                    if distance < entry[1]:
+                        names.insert(i, tup)
+                        names.pop()
+                        break
     return sorted(s.strip() for s in superStrings) + [name.strip() for name, d in names]
 
 
-def dedupBiblioReferences(doc):
+def dedupBiblioReferences(doc: t.SpecT) -> None:
     """
     SpecRef has checks in its database preventing multiple references from having the same URL.
     Shepherd, while it doesn't have an explicit check for this,
@@ -448,8 +454,8 @@ def dedupBiblioReferences(doc):
     It then adjusts doc.externalRefsUsed to point to the SpecRef biblio.
     """
 
-    def isShepherdRef(ref):
-        return isinstance(ref, SpecBasedBiblioEntry)
+    def isShepherdRef(ref: BiblioEntry) -> bool:
+        return isinstance(ref, SpecBiblioEntry)
 
     normSpecRefRefs = {}
     normShepherdRefs = {}
@@ -501,7 +507,7 @@ def dedupBiblioReferences(doc):
     dupedUrls = shepherdUrls & specRefUrls
 
     # Remove all the Shepherd refs that are left in duped
-    poppedKeys = defaultdict(dict)
+    poppedKeys: t.DefaultDict[str, dict[str, str]] = defaultdict(dict)
     for key, ref in list(doc.informativeRefs.items()):
         if ref.url in dupedUrls:
             if isShepherdRef(ref):
@@ -522,7 +528,20 @@ def dedupBiblioReferences(doc):
     for keys in poppedKeys.values():
         if "shepherd" not in keys or "specref" not in keys:
             continue
-        if keys["shepherd"] in doc.externalRefsUsed:
-            for k, v in list(doc.externalRefsUsed[keys["shepherd"]].items()):
-                doc.externalRefsUsed[keys["specref"]][k] = v
-        del doc.externalRefsUsed[keys["shepherd"]]
+        oldName = keys["shepherd"]
+        newName = keys["specref"]
+        if oldName in doc.externalRefsUsed.specs:
+            oldSpecData = doc.externalRefsUsed.specs[oldName]
+            del doc.externalRefsUsed.specs[oldName]
+            if newName not in doc.externalRefsUsed.specs:
+                # just move it over
+                doc.externalRefsUsed.specs[newName] = oldSpecData
+                continue
+            else:
+                # Merge it in
+                newSpecData = doc.externalRefsUsed.specs[newName]
+                if newSpecData.biblio is None:
+                    newSpecData.biblio = oldSpecData.biblio
+                for refGroup in oldSpecData.refs.values():
+                    for forVal, refWrapper in refGroup.valuesByFor.items():
+                        newSpecData.addRef(refWrapper, forVal)

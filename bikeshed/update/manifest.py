@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import hashlib
 import os
@@ -9,9 +11,18 @@ import aiofiles
 import aiohttp
 import requests
 import tenacity
-from result import Err, Ok
+from result import Err, Ok, Result
 
-from .. import messages as m
+from .. import messages as m, t
+
+
+def isOk(x: t.Any) -> t.TypeGuard[Ok]:
+    return isinstance(x, Ok)
+
+
+def isErr(x: t.Any) -> t.TypeGuard[Err]:
+    return isinstance(x, Err)
+
 
 # Manifest creation relies on these data structures.
 # Add to them whenever new types of data files are created.
@@ -38,7 +49,7 @@ knownFolders = [
     "mdn",
 ]
 
-ghPrefix = "https://raw.githubusercontent.com/tabatkins/bikeshed-data/master/data/"
+ghPrefix = "https://raw.githubusercontent.com/speced/bikeshed-data/master/data/"
 
 # To avoid 'Event loop is closed' RuntimeError due to compatibility issue with aiohttp
 if sys.platform.startswith("win") and sys.version_info >= (3, 8):
@@ -51,7 +62,7 @@ if sys.platform.startswith("win") and sys.version_info >= (3, 8):
             asyncio.set_event_loop_policy(WindowsSelectorEventLoopPolicy())
 
 
-def createManifest(path, dryRun=False):
+def createManifest(path: str, dryRun: bool = False) -> str:
     """Generates a manifest file for all the data files."""
     manifests = []
     for absPath, relPath in getDatafilePaths(path):
@@ -75,7 +86,7 @@ def createManifest(path, dryRun=False):
     return manifest
 
 
-def keyManifest(manifest):
+def keyManifest(manifest: tuple[str, str]) -> tuple[int, int | str, str]:
     name = manifest[0]
     if "/" in name:
         dir, _, file = name.partition("/")
@@ -84,11 +95,11 @@ def keyManifest(manifest):
         return 0, len(name), name
 
 
-def hashFile(fh):
+def hashFile(fh: t.TextIO) -> str:
     return hashlib.md5(fh.read().encode("ascii", "xmlcharrefreplace")).hexdigest()
 
 
-def getDatafilePaths(basePath):
+def getDatafilePaths(basePath: str) -> t.Generator[tuple[str, str], None, None]:
     for root, dirs, files in os.walk(basePath):
         if "readonly" in dirs:
             continue
@@ -99,11 +110,11 @@ def getDatafilePaths(basePath):
             yield filePath, os.path.relpath(filePath, basePath)
 
 
-def updateByManifest(path, dryRun=False):
+def updateByManifest(path: str, dryRun: bool = False, force: bool = False) -> str | None:
     """
     Attempts to update only the recently updated datafiles by using a manifest file.
-    Returns False if updating failed and a full update should be performed;
-    returns True if updating was a success.
+    Returns None if updating failed and a full update should be performed;
+    returns the manifest if updating was a success.
     """
     m.say("Updating via manifest...")
 
@@ -131,36 +142,37 @@ def updateByManifest(path, dryRun=False):
             f"Couldn't download remote manifest file, so can't update. Please report this!\n{e}",
         )
         m.warn("Update manually with `bikeshed update --skip-manifest`.")
-        return False
+        return None
 
-    if remoteDt is None:
+    if not isinstance(remoteDt, datetime):
         m.die("Something's gone wrong with the remote data; I can't read its timestamp. Please report this!")
-        return
+        return None
 
     if localDt == "error":
         # A previous update run didn't complete successfully,
         # so I definitely need to try again.
         m.warn("Previous update had some download errors, so re-running...")
-    elif localDt is not None:
+    elif isinstance(localDt, datetime):
         if (remoteDt - datetime.utcnow()).days >= 2:
             m.warn(
                 "Remote data is more than two days old; the update process has probably fallen over. Please report this!"
             )
-        if localDt == remoteDt and localDt != 0:
-            m.say(f"Local data is already up-to-date with remote ({localDt.strftime('%Y-%m-%d %H:%M:%S')})")
-            return True
-        elif localDt > remoteDt:
-            # No need to update, local data is more recent.
-            m.say(
-                f"Local data is fresher ({localDt.strftime('%Y-%m-%d %H:%M:%S')}) than remote ({remoteDt.strftime('%Y-%m-%d %H:%M:%S')}), so nothing to update.",
-            )
-            return True
+        if not force:
+            if localDt == remoteDt and localDt != 0:
+                m.say(f"Local data is already up-to-date with remote ({localDt.strftime('%Y-%m-%d %H:%M:%S')})")
+                return "\n".join(localManifest)
+            elif localDt > remoteDt:
+                # No need to update, local data is more recent.
+                m.say(
+                    f"Local data is fresher ({localDt.strftime('%Y-%m-%d %H:%M:%S')}) than remote ({remoteDt.strftime('%Y-%m-%d %H:%M:%S')}), so nothing to update.",
+                )
+                return "\n".join(localManifest)
 
     if len(localFiles) == 0:
         m.say("The local manifest is borked or missing; re-downloading everything...")
     if len(remoteFiles) == 0:
         m.die("The remote data doesn't have any data in it. Please report this!")
-        return
+        return None
     newPaths = []
     for filePath, hash in remoteFiles.items():
         if hash != localFiles.get(filePath):
@@ -185,7 +197,7 @@ def updateByManifest(path, dryRun=False):
                 fh.write(newManifest)
         except Exception as e:
             m.warn(f"Couldn't save new manifest file.\n{e}")
-            return False
+            return None
     if newManifest is None:
         newManifest = createManifest(path, dryRun=True)
 
@@ -200,7 +212,7 @@ def updateByManifest(path, dryRun=False):
         return newManifest
 
 
-async def updateFiles(localPrefix, newPaths):
+async def updateFiles(localPrefix: str, newPaths: list[str]) -> tuple[list[str], list[str]]:
     tasks = set()
     async with aiohttp.ClientSession() as session:
         for filePath in newPaths:
@@ -211,9 +223,9 @@ async def updateFiles(localPrefix, newPaths):
         messageDelta = 2
         goodPaths = []
         badPaths = []
-        for coro in asyncio.as_completed(tasks):
-            result = await coro
-            if result.is_ok():
+        for future in asyncio.as_completed(tasks):
+            result = await future
+            if isOk(result):
                 goodPaths.append(result.value)
             else:
                 badPaths.append(result.value)
@@ -227,29 +239,33 @@ async def updateFiles(localPrefix, newPaths):
     return goodPaths, badPaths
 
 
-async def updateFile(localPrefix, filePath, session):
+async def updateFile(localPrefix: str, filePath: str, session: t.Any) -> Result[str, str]:
     remotePath = ghPrefix + filePath
     localPath = localizePath(localPrefix, filePath)
     res = await downloadFile(remotePath, session)
-    if res.is_ok():
+    if isOk(res):
         res = await saveFile(localPath, res.ok())
     else:
         m.warn(f"Error downloading {filePath}, full error was:\n{await errorFromAsyncErr(res)}")
-    if res.is_err():
-        res = Err(filePath)
-    return res
+    ret: Result[str, str]
+    if isErr(res):
+        ret = Err(filePath)
+    else:
+        ret = t.cast("Ok[str]", res)
+    return ret
 
 
-async def errorFromAsyncErr(res):
-    if res.is_ok():
-        return res.ok()
+async def errorFromAsyncErr(res: Result[str, t.Awaitable[str]]) -> str | Exception:
+    if isOk(res):
+        return t.cast(str, res.ok())
     try:
-        await res.err()
+        x = await t.cast("t.Awaitable[str]", res.err())
     except Exception as e:
         return e
+    return x
 
 
-def wrapError(retry_state):
+def wrapError(retry_state: t.Any) -> Err[t.Awaitable[str]]:
     return Err(asyncio.wrap_future(retry_state.outcome))
 
 
@@ -259,7 +275,7 @@ def wrapError(retry_state):
     wait=tenacity.wait_random(1, 2),
     retry_error_callback=wrapError,
 )
-async def downloadFile(path, session):
+async def downloadFile(path: str, session: t.Any) -> Result[str, t.Awaitable[str]]:
     resp = await session.request(method="GET", url=path)
     resp.raise_for_status()
     return Ok(await resp.text())
@@ -271,7 +287,7 @@ async def downloadFile(path, session):
     wait=tenacity.wait_random(1, 2),
     retry_error_callback=wrapError,
 )
-async def saveFile(path, data):
+async def saveFile(path: str, data: str) -> Result[str, t.Awaitable[str]]:
     dirPath = os.path.dirname(path)
     if not os.path.exists(dirPath):
         os.makedirs(dirPath)
@@ -280,11 +296,11 @@ async def saveFile(path, data):
         return Ok(path)
 
 
-def localizePath(root, relPath):
+def localizePath(root: str, relPath: str) -> str:
     return os.path.join(root, *relPath.split("/"))
 
 
-def dictFromManifest(lines):
+def dictFromManifest(lines: list[str]) -> dict[str, str]:
     """
     Converts a manifest file, where each line is
     <hash>[space]<filepath>
@@ -304,17 +320,21 @@ def dictFromManifest(lines):
     return ret
 
 
-def dtFromManifest(lines):
+def dtFromManifest(lines: list[str]) -> datetime | str | None:
     if lines[0].strip() == "error":
         return "error"
     try:
         return datetime.strptime(lines[0].strip(), "%Y-%m-%d %H:%M:%S.%f")
     except ValueError:
         # Sigh, something borked
-        return
+        return None
 
 
-def createFinishedManifest(manifestLines, goodPaths, badPaths):  # pylint: disable=unused-argument
+def createFinishedManifest(
+    manifestLines: list[str],
+    goodPaths: list[str],  # pylint: disable=unused-argument
+    badPaths: list[str],
+) -> str:
     if not badPaths:
         return "\n".join(manifestLines)
 
@@ -327,7 +347,6 @@ def createFinishedManifest(manifestLines, goodPaths, badPaths):  # pylint: disab
     # Now go thru and blank out the hashes for the bad paths,
     # so I'll definitely try to regenerate them later.
 
-    badPaths = set(badPaths)
     for i, line in enumerate(manifestLines[1:], 1):
         prefix, _, path = line.strip().rpartition(" ")
         if path in badPaths:

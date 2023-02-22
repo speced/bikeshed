@@ -38,9 +38,7 @@ from .main import (
     chrootPath,
     doEvery,
 )
-from .Nil import Nil
-from .printjson import printjson
-from .retrieve import DataFileRequester, defaultRequester, retrieveBoilerplateFile
+from .printjson import printjson, getjson
 from .status import (
     shortToLongStatus,
     snapshotStatuses,

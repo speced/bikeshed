@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import os
 import re
@@ -5,17 +7,16 @@ from collections import defaultdict
 
 import requests
 
-from .. import biblio, messages as m
-from ..DefaultOrderedDict import DefaultOrderedDict
+from .. import biblio, messages as m, t
 
 
-def update(path, dryRun=False):
+def update(path: str, dryRun: bool = False) -> set[str] | None:
     m.say("Downloading biblio data...")
-    biblios = defaultdict(list)
+    biblios: t.BiblioStorageT = defaultdict(list)
     biblio.processSpecrefBiblioFile(getSpecrefData(), biblios, order=3)
     biblio.processSpecrefBiblioFile(getWG21Data(), biblios, order=3)
     biblio.processReferBiblioFile(getCSSWGData(), biblios, order=4)
-    writtenPaths = set()
+    writtenPaths: set[str] = set()
     if not dryRun:
         groupedBiblios, allNames = groupBiblios(biblios)
         # Save each group to a file
@@ -27,7 +28,7 @@ def update(path, dryRun=False):
                     writeBiblioFile(fh, biblios)
             except Exception as e:
                 m.die(f"Couldn't save biblio database to disk.\n{e}")
-                return
+                return None
 
         # biblio-keys is used to help correct typos,
         # so remove all the useless purely-numbered name types,
@@ -74,7 +75,7 @@ def update(path, dryRun=False):
                 fh.write(str(json.dumps(reducedNames, indent=0, ensure_ascii=False, sort_keys=True)))
         except Exception as e:
             m.die(f"Couldn't save biblio database to disk.\n{e}")
-            return
+            return None
 
         # Collect all the number-suffix names which also exist un-numbered
         numberedNames = collectNumberedNames(reducedNames)
@@ -89,7 +90,7 @@ def update(path, dryRun=False):
     return writtenPaths
 
 
-def getSpecrefData():
+def getSpecrefData() -> str:
     try:
         return requests.get("https://api.specref.org/bibrefs").text
     except Exception as e:
@@ -97,7 +98,7 @@ def getSpecrefData():
         return "{}"
 
 
-def getWG21Data():
+def getWG21Data() -> str:
     try:
         return requests.get("https://wg21.link/specref.json").text
     except Exception as e:
@@ -105,7 +106,7 @@ def getWG21Data():
         return "{}"
 
 
-def getCSSWGData():
+def getCSSWGData() -> list[str]:
     try:
         return requests.get("https://raw.githubusercontent.com/w3c/csswg-drafts/master/biblio.ref").text.splitlines()
     except Exception as e:
@@ -113,18 +114,20 @@ def getCSSWGData():
         return []
 
 
-def groupBiblios(biblios):
+def groupBiblios(biblios: t.BiblioStorageT) -> tuple[dict[str, t.BiblioStorageT], list[str]]:
     # Group the biblios by the first two letters of their keys
-    groupedBiblios = DefaultOrderedDict(DefaultOrderedDict)
+    groupedBiblios: dict[str, t.BiblioStorageT] = {}
     allNames = []
     for k, v in sorted(biblios.items(), key=lambda x: x[0].lower()):
         allNames.append(k)
         group = k[0:2]
+        if group not in groupedBiblios:
+            groupedBiblios[group] = defaultdict(list)
         groupedBiblios[group][k] = v
     return groupedBiblios, allNames
 
 
-def writeBiblioFile(fh, biblios):
+def writeBiblioFile(fh: t.TextIO, biblios: t.BiblioStorageT) -> None:
     """
     Each line is a value for a specific key, in the order:
 
@@ -142,51 +145,47 @@ def writeBiblioFile(fh, biblios):
 
     Each entry (including last) is ended by a line containing a single - character.
     """
-    typePrefixes = {"dict": "d", "string": "s", "alias": "a"}
     for key, entries in biblios.items():
-        b = sorted(entries, key=lambda x: x["order"])[0]
-        format = b["biblioFormat"]
-        fh.write("{prefix}:{key}\n".format(prefix=typePrefixes[format], key=key.lower()))
-        if format == "dict":
-            for field in [
-                "linkText",
-                "date",
-                "status",
-                "title",
-                "snapshot_url",
-                "current_url",
-                "obsoletedBy",
-                "other",
-            ]:
-                fh.write(b.get(field, "") + "\n")
-            if b.get("etAl", False):
+        b = sorted(entries, key=lambda x: x.order)[0]
+        if isinstance(b, biblio.NormalBiblioEntry):
+            fh.write("d:" + key.lower() + "\n")
+            fh.write(b.linkText + "\n")
+            fh.write((b.date or "") + "\n")
+            fh.write((b.status or "") + "\n")
+            fh.write((b.title or "") + "\n")
+            fh.write((b.snapshotURL or "") + "\n")
+            fh.write((b.currentURL or "") + "\n")
+            fh.write((b.obsoletedBy or "") + "\n")
+            fh.write((b.other or "") + "\n")
+            if b.etAl:
                 fh.write("1\n")
             else:
                 fh.write("\n")
-            for author in b.get("authors", []):
+            for author in b.authors:
                 fh.write(author + "\n")
-        elif format == "string":
-            fh.write(b["linkText"] + "\n")
-            fh.write(b["data"] + "\n")
-        elif format == "alias":
-            fh.write(b["linkText"] + "\n")
-            fh.write(b["aliasOf"] + "\n")
+        elif isinstance(b, biblio.StringBiblioEntry):
+            fh.write("s:" + key.lower() + "\n")
+            fh.write(b.linkText + "\n")
+            fh.write(b.data + "\n")
+        elif isinstance(b, biblio.AliasBiblioEntry):
+            fh.write("a:" + key.lower() + "\n")
+            fh.write(b.linkText + "\n")
+            fh.write(b.aliasOf + "\n")
         else:
             m.die(f"The biblio key '{key}' has an unknown biblio type '{format}'.")
             continue
         fh.write("-" + "\n")
 
 
-def collectNumberedNames(names):
+def collectNumberedNames(names: t.Sequence[str]) -> defaultdict[str, list[str]]:
     """
     Collects the set of names that have numeric suffixes
     (excluding ones that look like dates)
     for better error-correction.
     """
 
-    names = set(names)
     prefixes = defaultdict(list)
-    for name in names:
+    for name in set(names):
         # Ignoring 4+ digits, as they're probably years or isodates.
         match = re.match(r"(.+\D)\d{1,3}$", name)
         if match:

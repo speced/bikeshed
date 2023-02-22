@@ -1,9 +1,44 @@
+from __future__ import annotations
+
+import abc
+import dataclasses
 import itertools
 
 from . import dom
+from .. import t
 
 
-def mergeTrees(tree1, tree2):
+# WARNING: This file isn't in use yet
+# (as evidenced by mergeTrees() logging stuff and returning nothing)
+
+
+@dataclasses.dataclass
+class Tag(metaclass=abc.ABCMeta):
+    item: t.Any
+
+
+@dataclasses.dataclass
+class TagStart(Tag):
+    item: t.ElementT
+    length: int
+
+
+@dataclasses.dataclass
+class TagEnd(Tag):
+    item: t.ElementT
+    length: int
+
+
+@dataclasses.dataclass
+class TagStr(Tag):
+    item: str
+
+
+if t.TYPE_CHECKING:
+    TagStream: t.TypeAlias = t.Generator[Tag, None, None]
+
+
+def mergeTrees(tree1: t.ElementT, tree2: t.ElementT) -> list:
     """
     Attempts to merge two HTML trees
     of the same text content.
@@ -20,16 +55,16 @@ def mergeTrees(tree1, tree2):
         digestTree(tree2),
     ):
         print("*")
-        if node["type"] == "end":
-            print(f"</{node['item'].tag}>")
-        elif node["type"] == "start":
-            print(dom.serializeTag(node["item"]))
+        if isinstance(node, TagEnd):
+            print(f"</{node.item.tag}>")
+        elif isinstance(node, TagStart):
+            print(dom.serializeTag(node.item))
         else:
-            print(node["item"])
+            print(node.item)
     return []
 
 
-def digestTree(root, nested=False):
+def digestTree(root: t.ElementT, nested: bool = False) -> TagStream:
     """
     Turns a tree into a stream of {text, element, end-of-element} items.
     The 'element' item is the element itself, empty, emitted at the start tag;
@@ -39,28 +74,17 @@ def digestTree(root, nested=False):
     length = textLength(root)
     children = dom.childNodes(root, clear=True)
     if nested:
-        yield {
-            "type": "start",
-            "item": root,
-            "length": length,
-        }
+        yield TagStart(item=root, length=length)
     for node in children:
         if isinstance(node, str):
-            yield {
-                "type": "str",
-                "item": node,
-            }
+            yield TagStr(item=node)
         else:
             yield from digestTree(node, nested=True)
     if nested:
-        yield {
-            "type": "end",
-            "item": root,
-            "length": length,
-        }
+        yield TagEnd(item=root, length=length)
 
 
-def textLength(el):
+def textLength(el: t.ElementT) -> int:
     length = 0
     for node in dom.childNodes(el):
         if isinstance(node, str):
@@ -70,7 +94,7 @@ def textLength(el):
     return length
 
 
-def mergeStreams(s1, s2):
+def mergeStreams(s1: TagStream, s2: TagStream) -> TagStream:
     """
     Merges two digested streams into a single one.
     Emits the same stream as digestTree(),
@@ -78,14 +102,14 @@ def mergeStreams(s1, s2):
     """
 
     # "Pending" nodes that haven't been emitted yet, from each stream
-    p1 = None
-    p2 = None
+    p1: Tag | None = None
+    p2: Tag | None = None
 
     # Stack of open elements, to track that things merged validly.
-    openStack = []
+    openStack: list[Tag] = []
 
-    def popStack(endNode):
-        if openStack[-1]["item"] != endNode["item"]:
+    def popStack(endNode: Tag) -> bool:
+        if openStack[-1].item != endNode.item:
             raise ValueError("mergeStreams() can't merge these trees, due to overlapping elements.")
         openStack.pop()
         return True
@@ -97,22 +121,23 @@ def mergeStreams(s1, s2):
                 p1 = next(s1)
             if p2 is None:
                 p2 = next(s2)
-
+            assert p1 is not None
+            assert p2 is not None
             # If either is an EOE, emit that
             # If one is element and one is text, emit the element
             # If both are text, emit the shortest common prefix
             # If both are elements, emit the one with the bigger length
 
             # Both EOE
-            if p1["type"] == "end" and p2["type"] == "end":
+            if isinstance(p1, TagEnd) and isinstance(p2, TagEnd):
                 # The shorter would have its start emitted more recently.
                 # If equal, p2 would have been emitted more recently,
                 # because I bias toward emitting p1 start tags first when equal.
-                if p1["length"] < p2["length"]:
+                if p1.length < p2.length:
                     popStack(p1)
                     yield p1
                     p1 = None
-                elif p1["length"] > p2["length"]:
+                elif p1.length > p2.length:
                     popStack(p2)
                     yield p2
                     p2 = None
@@ -120,28 +145,29 @@ def mergeStreams(s1, s2):
                     popStack(p2)
                     yield p2
                     p2 = None
+                continue
 
             # Either EOE
-            if p1["type"] == "end":
+            if isinstance(p1, TagEnd):
                 popStack(p1)
                 yield p1
                 p1 = None
                 continue
-            if p2["type"] == "end":
+            if isinstance(p2, TagEnd):
                 popStack(p2)
                 yield p2
                 p2 = None
                 continue
 
             # Both strings
-            if p1["type"] == "str" and p2["type"] == "str":
-                if len(p1["item"]) < len(p2["item"]):
+            if isinstance(p1, TagStr) and isinstance(p2, TagStr):
+                if len(p1.item) < len(p2.item):
                     yield p1
-                    p2["item"] = p2["item"][len(p1) :]
+                    p2.item = p2.item[len(p1.item) :]
                     p1 = None
-                elif len(p1["item"]) > len(p2["item"]):
+                elif len(p1.item) > len(p2.item):
                     yield p2
-                    p1["item"] = p1["item"][len(p2) :]
+                    p1.item = p1.item[len(p2.item) :]
                     p2 = None
                 else:
                     yield p1
@@ -150,12 +176,12 @@ def mergeStreams(s1, s2):
                 continue
 
             # Both elements
-            if p1["type"] == "start" and p2["type"] == "start":
-                if p1["length"] < p2["length"]:
+            if isinstance(p1, TagStart) and isinstance(p2, TagStart):
+                if p1.length < p2.length:
                     yield p2
                     openStack.append(p2)
                     p2 = None
-                elif p1["length"] > p2["length"]:
+                elif p1.length > p2.length:
                     yield p1
                     openStack.append(p1)
                     p1 = None
@@ -167,7 +193,7 @@ def mergeStreams(s1, s2):
                 continue
 
             # One element, one text
-            if p1["type"] == "start":
+            if isinstance(p1, TagStart):
                 yield p1
                 openStack.append(p1)
                 p1 = None

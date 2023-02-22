@@ -1,148 +1,158 @@
-import copy
+# pylint: disable=unused-argument
+
+from __future__ import annotations
+
+import dataclasses
 import json
 import os
 import re
 import subprocess
-from collections import OrderedDict, defaultdict
+from collections import OrderedDict, defaultdict, Counter
 from datetime import date, datetime, timedelta
 from functools import partial
 
-import attr
 from isodate import Duration, parse_duration
 
-from . import config, constants, datablocks, markdown, h, messages as m, repository
-from .DefaultOrderedDict import DefaultOrderedDict
+from . import config, constants, datablocks, markdown, h, messages as m, repository, t
+from .translate import _
+
+if t.TYPE_CHECKING:
+    from .line import Line
+
+    class DurationT:
+        pass
 
 
 class MetadataManager:
     @property
-    def vshortname(self):
+    def vshortname(self) -> str | None:
         if self.level:
             return f"{self.shortname}-{self.level}"
         return self.shortname
 
     @property
-    def displayVshortname(self):
+    def displayVshortname(self) -> str | None:
         if self.level:
             return f"{self.displayShortname}-{self.level}"
         return self.displayShortname
 
-    def __init__(self):
-        self.hasMetadata = False
+    def __init__(self) -> None:
+        self.hasMetadata: bool = False
 
         # All metadata ever passed to .addData()
-        self.allData = defaultdict(list)
+        self.allData: t.DefaultDict[str, list[str]] = defaultdict(list)
 
         # required metadata
-        self.abstract = []
-        self.ED = None
-        self.level = None
-        self.shortname = None
-        self.status = None
-        self.rawStatus = None
+        self.abstract: list[str] = []
+        self.ED: str | None = None
+        self.level: str | None = None
+        self.displayShortname: str | None = None
+        self.shortname: str | None = None
+        self.status: str | None = None
+        self.rawStatus: str | None = None
 
         # optional metadata
-        self.advisementClass = "advisement"
-        self.assertionClass = "assertion"
-        self.assumeExplicitFor = False
-        self.atRisk = []
-        self.audience = []
-        self.blockElements = []
-        self.boilerplate = config.BoolSet(default=True)
-        self.canIUseURLs = []
-        self.canonicalURL = None
-        self.complainAbout = config.BoolSet()
-        self.customTextMacros = []
-        self.customWarningText = []
-        self.customWarningTitle = None
-        self.date = datetime.utcnow().date()
-        self.deadline = None
-        self.defaultHighlight = None
-        self.defaultBiblioDisplay = "index"
-        self.defaultRefStatus = None
-        self.displayShortname = None
-        self.editors = []
-        self.editorTerm = {"singular": "Editor", "plural": "Editors"}
-        self.expires = None
-        self.externalInfotrees = config.BoolSet(default=False)
-        self.favicon = None
-        self.forceCrossorigin = False
-        self.group = None
-        self.h1 = None
-        self.ignoreCanIUseUrlFailure = []
-        self.ignoredTerms = []
-        self.ignoredVars = []
-        self.implementationReport = None
-        self.includeCanIUsePanels = False
-        self.includeMdnPanels = False
-        self.indent = 4
-        self.inferCSSDfns = False
-        self.informativeClasses = []
-        self.inlineGithubIssues = False
-        self.inlineTagCommands = {}
-        self.issueClass = "issue"
-        self.issues = []
-        self.issueTrackerTemplate = None
-        self.lineNumbers = False
-        self.linkDefaults = defaultdict(list)
-        self.localBoilerplate = config.BoolSet(default=False)
-        self.logo = None
-        self.mailingList = None
-        self.mailingListArchives = None
-        self.markupShorthands = config.BoolSet(["css", "dfn", "biblio", "markup", "idl", "algorithm"])
-        self.maxToCDepth = float("inf")
-        self.metadataInclude = config.BoolSet(default=True)
-        self.metadataOrder = ["*", "!*"]
-        self.noAbstract = False
-        self.noEditor = False
-        self.noteClass = "note"
-        self.opaqueElements = ["pre", "xmp", "script", "style"]
-        self.prepTR = False
-        self.previousEditors = []
-        self.previousVersions = []
-        self.removeMultipleLinks = False
-        self.repository = config.Nil()
-        self.requiredIDs = []
-        self.slimBuildArtifact = False
-        self.statusText = []
-        self.testSuite = None
-        self.title = None
-        self.toggleDiffs = False
-        self.TR = None
-        self.trackingVectorAltText = "(This is a tracking vector.)"
-        self.trackingVectorClass = "tracking-vector"
-        self.trackingVectorImage = None
-        self.trackingVectorImageHeight = "64"
-        self.trackingVectorImageWidth = "46"
-        self.trackingVectorTitle = "There is a tracking vector here."
-        self.translateIDs = defaultdict(list)
-        self.translations = []
-        self.useDfnPanels = True
-        self.useIAutolinks = False
-        self.versionHistory = []
-        self.warning = None
-        self.workStatus = None
-        self.wptDisplay = "none"
-        self.wptPathPrefix = None
-        self.imgAutoSize = True
+        self.advisementClass: str = "advisement"
+        self.assertionClass: str = "assertion"
+        self.assumeExplicitFor: bool = False
+        self.atRisk: list[str] = []
+        self.audience: list[str] = []
+        self.blockElements: list[str] = []
+        self.boilerplate: config.BoolSet = config.BoolSet(default=True)
+        self.canIUseURLs: list[str] = []
+        self.canonicalURL: str | None = None
+        self.complainAbout: config.BoolSet = config.BoolSet(["mixed-indents"])
+        self.customTextMacros: list[tuple[str, str]] = []
+        self.customWarningText: list[str] = []
+        self.customWarningTitle: str | None = None
+        self.date: date = datetime.utcnow().date()
+        self.deadline: date | None = None
+        self.defaultHighlight: str | None = None
+        self.defaultBiblioDisplay: str = "index"
+        self.defaultRefStatus: str | None = None
+        self.editors: list[dict[str, str | None]] = []
+        self.editorTerm: dict[str, str] = {"singular": _("Editor"), "plural": _("Editors")}
+        self.expires: date | None = None
+        self.externalInfotrees: config.BoolSet = config.BoolSet(default=False)
+        self.favicon: str | None = None
+        self.forceCrossorigin: bool = False
+        self.group: str | None = None
+        self.h1: str | None = None
+        self.ignoreCanIUseUrlFailure: list[str] = []
+        self.ignoredTerms: list[str] = []
+        self.ignoredVars: list[str] = []
+        self.implementationReport: str | None = None
+        self.includeCanIUsePanels: bool = False
+        self.includeMdnPanels: bool = False
+        self.indent: int = 4
+        self.inferCSSDfns: bool = False
+        self.informativeClasses: list[str] = []
+        self.inlineGithubIssues: bool = False
+        self.inlineTagCommands: dict[str, str] = {}
+        self.issueClass: str = "issue"
+        self.issues: list[tuple[str, str]] = []
+        self.issueTrackerTemplate: str | None = None
+        self.lineNumbers: bool = False
+        self.linkDefaults: t.LinkDefaultsT = defaultdict(list)
+        self.localBoilerplate: config.BoolSet = config.BoolSet(default=False)
+        self.logo: str | None = None
+        self.mailingList: str | None = None
+        self.mailingListArchives: str | None = None
+        self.markupShorthands: config.BoolSet = config.BoolSet(
+            ["css", "dfn", "biblio", "markup", "http", "idl", "algorithm"]
+        )
+        self.maxToCDepth: int | float | None = float("inf")
+        self.metadataInclude: config.BoolSet = config.BoolSet(default=True)
+        self.metadataOrder: list[str] = ["*", "!*"]
+        self.noAbstract: bool = False
+        self.noEditor: bool = False
+        self.noteClass: str = "note"
+        self.opaqueElements: list[str] = ["pre", "xmp", "script", "style"]
+        self.prepTR: bool = False
+        self.previousEditors: list[dict[str, str | None]] = []
+        self.previousVersions: list[dict[str, str]] = []
+        self.removeMultipleLinks: bool = False
+        self.repository: repository.Repository | None = None
+        self.requiredIDs: list[str] = []
+        self.slimBuildArtifact: bool = False
+        self.statusText: list[str] = []
+        self.testSuite: str | None = None
+        self.title: str | None = None
+        self.toggleDiffs: bool = False
+        self.TR: str | None = None
+        self.trackingVectorAltText: str = _("(This is a tracking vector.)")
+        self.trackingVectorClass: str = "tracking-vector"
+        self.trackingVectorImage: str | None = None
+        self.trackingVectorImageHeight: str = "64"
+        self.trackingVectorImageWidth: str = "46"
+        self.trackingVectorTitle: str = _("There is a tracking vector here.")
+        self.translateIDs: dict[str, str] = {}
+        self.translations: list[dict[str, str]] = []
+        self.useDfnPanels: bool = True
+        self.useIAutolinks: bool = False
+        self.versionHistory: list[str] = []
+        self.warning: str | None = None
+        self.workStatus: str | None = None
+        self.wptDisplay: str = "none"
+        self.wptPathPrefix: str | None = None
+        self.imgAutoSize: bool = True
 
-        self.otherMetadata = DefaultOrderedDict(list)
+        self.otherMetadata: OrderedDict[str, list[t.NodesT]] = OrderedDict()
 
-        self.manuallySetKeys = set()
+        self.manuallySetKeys: set[str] = set()
 
-    def addData(self, key, val, lineNum=None):
+    def addData(self, key: str, val: str, lineNum: str | int | None = None) -> MetadataManager:
         key = key.strip()
-        if isinstance(val, str):
-            if key in ["Abstract"]:
-                val = val.strip("\n")
-            else:
-                val = val.strip()
+        if key in ["Abstract"]:
+            val = val.strip("\n")
+        else:
+            val = val.strip()
 
         if key.startswith("!"):
             self.allData[key].append(val)
             key = key[1:]
-            self.otherMetadata[key].append(val)
-            return
+            self.otherMetadata.setdefault(key, []).append(val)
+            return self
 
         if key not in ("ED", "TR", "URL"):
             key = key.title()
@@ -150,20 +160,22 @@ class MetadataManager:
 
         if key not in knownKeys:
             m.die(f'Unknown metadata key "{key}". Prefix custom keys with "!".', lineNum=lineNum)
-            return
+            return self
         md = knownKeys[key]
 
-        val = md.parse(key=key, val=val, lineNum=lineNum)
+        val = md.parse(key, val, lineNum=lineNum)
 
         self.addParsedData(key, val)
+        return self
 
-    def addParsedData(self, key, val):
+    def addParsedData(self, key: str, val: t.Any) -> MetadataManager:
         md = knownKeys[key]
         result = md.join(getattr(self, md.attrName), val)
         setattr(self, md.attrName, result)
         self.manuallySetKeys.add(key)
+        return self
 
-    def computeImplicitMetadata(self, doc):
+    def computeImplicitMetadata(self, doc: t.SpecT) -> None:
         # Do some "computed metadata", based on the value of other metadata.
         # Only call this when you're sure all metadata sources are parsed.
         if self.group == "byos":
@@ -171,7 +183,7 @@ class MetadataManager:
         if not self.repository and doc:
             self.repository = getSpecRepository(doc)
         if (
-            self.repository.type == "github"
+            isinstance(self.repository, repository.GithubRepository)
             and "feedback-header" in self.boilerplate
             and "repository-issue-tracking" in self.boilerplate
         ):
@@ -190,13 +202,13 @@ class MetadataManager:
         if self.displayShortname:
             self.shortname = self.displayShortname.lower()
 
-    def validate(self):
+    def validate(self) -> bool:
         if self.group == "byos":
             return True
 
         if not self.hasMetadata:
             m.die("The document requires at least one <pre class=metadata> block.")
-            return
+            return False
 
         if self.status in ("w3c/IG-NOTE", "w3c/WG-NOTE"):
             m.die(
@@ -251,22 +263,25 @@ class MetadataManager:
             m.warn("Some recommended metadata is missing:\n" + "\n".join(warnings))
         if errors:
             m.die("Not all required metadata was provided:\n" + "\n".join(errors))
-            return
+            return False
+        return True
 
-    def fillTextMacros(self, macros, doc):
+    def fillTextMacros(self, macros: t.DefaultDict[str, str], doc: t.SpecT) -> None:
         # Fills up a set of text macros based on metadata.
         if self.title:
             macros["title"] = self.title
             macros["spectitle"] = self.title
         if self.h1:
             macros["spectitle"] = self.h1
-        macros["shortname"] = self.displayShortname
+        if self.displayShortname:
+            macros["shortname"] = self.displayShortname
         if self.statusText:
             macros["statustext"] = "\n".join(markdown.parse(self.statusText, self.indent))
         else:
             macros["statustext"] = ""
         macros["level"] = str(self.level)
-        macros["vshortname"] = self.displayVshortname
+        if self.displayVshortname:
+            macros["vshortname"] = self.displayVshortname
         if self.status == "FINDING" and self.group:
             macros["longstatus"] = f"Finding of the {self.group}"
         elif self.status in config.shortToLongStatus:
@@ -281,7 +296,7 @@ class MetadataManager:
             macros["status"] = "NOTE"
         elif self.status == "w3c/NOTE-ED":
             macros["status"] = "ED"
-        else:
+        elif self.rawStatus:
             macros["status"] = self.rawStatus
         if self.workStatus:
             macros["workstatus"] = self.workStatus
@@ -294,7 +309,7 @@ class MetadataManager:
         elif self.noAbstract:
             macros["abstract"] = ""
             macros["abstractattr"] = ""
-        macros["year"] = self.date.year
+        macros["year"] = str(self.date.year)
         macros["date"] = self.date.strftime(f"{self.date.day} %B %Y")
         macros["date-dmmy"] = self.date.strftime(f"{self.date.day} %B %Y")  # same as plain 'date'
         macros["cdate"] = self.date.strftime("%Y%m%d")
@@ -318,7 +333,7 @@ class MetadataManager:
             macros["version"] = self.ED
         macros["annotations"] = constants.testAnnotationURL
         if doc and self.vshortname in doc.testSuites:
-            macros["testsuite"] = doc.testSuites[self.vshortname]["vshortname"]
+            macros["testsuite"] = doc.testSuites[self.vshortname].vshortname
         if self.warning and len(self.warning) >= 2:
             macros["replacedby"] = self.warning[1]
         if self.warning and len(self.warning) >= 3:
@@ -328,7 +343,7 @@ class MetadataManager:
         if self.logo:
             macros["logo"] = self.logo
         if self.repository:
-            macros["repository"] = self.repository.name
+            macros["repository"] = self.repository.name or _("Unnamed Repo")
             macros["repositoryurl"] = self.repository.url
         if self.mailingList:
             macros["mailinglist"] = self.mailingList
@@ -367,7 +382,14 @@ class MetadataManager:
             macros[name.lower()] = text
 
 
-def parseDate(key, val, lineNum):
+if t.TYPE_CHECKING:
+
+    class ParseFunc(t.Protocol):
+        def __call__(self, key: str, val: str, lineNum: str | int | None) -> t.Any:
+            ...
+
+
+def parseDate(key: str, val: str, lineNum: str | int | None) -> date | None:
     if val == "now":
         return datetime.utcnow().date()
     try:
@@ -377,14 +399,14 @@ def parseDate(key, val, lineNum):
         return None
 
 
-def parseDateOrDuration(key, val, lineNum):
+def parseDateOrDuration(key: str, val: str, lineNum: str | int | None) -> date | timedelta | None:
     if val == "now":
         return datetime.utcnow().date()
     if val == "never" or boolish(val) is False:
         return None
     try:
         if val.startswith("P"):
-            return parse_duration(val)
+            return t.cast(timedelta, parse_duration(val))
         return datetime.strptime(val, "%Y-%m-%d").date()
     except ValueError:
         m.die(
@@ -394,49 +416,50 @@ def parseDateOrDuration(key, val, lineNum):
         return None
 
 
-def canonicalizeExpiryDate(base, expires):
+def canonicalizeExpiryDate(base: date, expires: timedelta | datetime | date | None) -> date | None:
     if expires is None:
         return None
     if isinstance(expires, timedelta):
         return base + expires
     if isinstance(expires, Duration):
-        return base + expires
+        return t.cast(date, base + expires)
     if isinstance(expires, datetime):
         return expires.date()
     if isinstance(expires, date):
         return expires
-    m.die(f"Unexpected expiry type: canonicalizeExpiryDate({base}, {expires})", base, expires)
+    m.die(f"Unexpected expiry type: canonicalizeExpiryDate({base}, {expires})")
     return None
 
 
-def parseLevel(key, val, lineNum):  # pylint: disable=unused-argument
+def parseLevel(key: str, val: str, lineNum: str | int | None) -> str:
     val = val.lower().strip()
     if val == "none":
         return ""
     return val.strip()
 
 
-def parseInteger(key, val, lineNum):  # pylint: disable=unused-argument
+def parseInteger(key: str, val: str, lineNum: str | int | None) -> int:
     return int(val)
 
 
-def parseBoolean(key, val, lineNum):
+def parseBoolean(key: str, val: str, lineNum: str | int | None) -> bool | None:
     b = boolish(val)
     if b is None:
         m.die(f"The {key} field must be true/false, yes/no, y/n, or on/off. Got '{val}' instead.", lineNum=lineNum)
     return b
 
 
-def parseSoftBoolean(key, val, lineNum):
+def parseSoftBoolean(key: str, val: str, lineNum: str | int | None) -> bool | t.Literal["maybe"] | None:
     b = boolish(val)
     if b is not None:
         return b
     if val.lower() in ["maybe", "if possible", "if needed"]:
         return "maybe"
     m.die(f"The {key} field must be boolish, or 'maybe'. Got '{val}' instead.", lineNum=lineNum)
+    return None
 
 
-def boolish(val):
+def boolish(val: str) -> bool | None:
     if val.lower() in ("true", "yes", "y", "on"):
         return True
     if val.lower() in ("false", "no", "n", "off"):
@@ -444,7 +467,7 @@ def boolish(val):
     return None
 
 
-def parseWarning(key, val, lineNum):
+def parseWarning(key: str, val: str, lineNum: str | int | None) -> tuple[str, ...] | None:
     if val.lower() == "obsolete":
         return ("warning-obsolete",)
     if val.lower() == "not ready":
@@ -477,14 +500,14 @@ def parseWarning(key, val, lineNum):
     return None
 
 
-def parseEditor(key, val, lineNum):
+def parseEditor(key: str, val: str, lineNum: None | str | int) -> list[dict[str, str | None]]:
     pieces = [h.unescape(piece.strip()) for piece in val.split(",")]
 
-    def looksLinkish(string):
-        return re.match(r"\w+:", string) or looksEmailish(string)
+    def looksLinkish(string: str) -> bool:
+        return bool(re.match(r"\w+:", string)) or looksEmailish(string)
 
-    def looksEmailish(string):
-        return re.match(r".+@.+\..+", string)
+    def looksEmailish(string: str) -> bool:
+        return bool(re.match(r".+@.+\..+", string))
 
     data = {
         "name": pieces[0],
@@ -556,16 +579,16 @@ def parseEditor(key, val, lineNum):
     return [data]
 
 
-def parseCommaSeparated(key, val, lineNum):  # pylint: disable=unused-argument
+def parseCommaSeparated(key: str, val: str, lineNum: str | int | None) -> list[str]:
     return [term.strip().lower() for term in val.split(",")]
 
 
-def parseIdList(key, val, lineNum):  # pylint: disable=unused-argument
+def parseIdList(key: str, val: str, lineNum: str | int | None) -> list[str]:
     return [term.strip() for term in val.split(",")]
 
 
-def parseLinkDefaults(key, val, lineNum):
-    defaultSpecs = defaultdict(list)
+def parseLinkDefaults(key: str, val: str, lineNum: str | int | None) -> t.LinkDefaultsT:
+    defaultSpecs: t.LinkDefaultsT = defaultdict(list)
     for default in val.split(","):
         match = re.match(
             r"^([\w\d-]+)  (?:\s+\( ({}) (?:\s+(snapshot|current))? \) )  \s+(.*)$".format(
@@ -591,7 +614,7 @@ def parseLinkDefaults(key, val, lineNum):
     return defaultSpecs
 
 
-def parseBoilerplate(key, val, lineNum):  # pylint: disable=unused-argument
+def parseBoilerplate(key: str, val: str, lineNum: str | int | None) -> config.BoolSet:
     boilerplate = config.BoolSet(default=True)
     for command in val.split(","):
         pieces = command.lower().strip().split()
@@ -616,7 +639,7 @@ def parseBoilerplate(key, val, lineNum):  # pylint: disable=unused-argument
     return boilerplate
 
 
-def parseBiblioDisplay(key, val, lineNum):
+def parseBiblioDisplay(key: str, val: str, lineNum: str | int | None) -> str:
     val = val.strip().lower()
     if val in constants.biblioDisplay:
         return val
@@ -624,7 +647,7 @@ def parseBiblioDisplay(key, val, lineNum):
     return constants.biblioDisplay.index
 
 
-def parseRefStatus(key, val, lineNum):
+def parseRefStatus(key: str, val: str, lineNum: str | int | None) -> str:
     val = val.strip().lower()
     if val == "dated":
         # Legacy term that used to be allowed
@@ -635,13 +658,15 @@ def parseRefStatus(key, val, lineNum):
     return constants.refStatus.current
 
 
-def parseComplainAbout(key, val, lineNum):
-    validLabels = frozenset(["missing-example-ids", "broken-links", "accidental-2119", "missing-exposed"])
+def parseComplainAbout(key: str, val: str, lineNum: str | int | None) -> config.BoolSet:
+    validLabels = frozenset(
+        ["missing-example-ids", "broken-links", "accidental-2119", "missing-exposed", "mixed-indents"]
+    )
     ret = parseBoolishList(key, val.lower(), default=False, validLabels=validLabels, lineNum=lineNum)
     return ret
 
 
-def parseExternalInfotrees(key, val, lineNum):
+def parseExternalInfotrees(key: str, val: str, lineNum: str | int | None) -> config.BoolSet:
     return parseBoolishList(
         key,
         val.lower(),
@@ -651,16 +676,19 @@ def parseExternalInfotrees(key, val, lineNum):
     )
 
 
-def parseBoolishList(key, val, default=None, validLabels=None, extraValues=None, lineNum=None):
-    # Parses anything defined as "label <boolish>, label <boolish>" into a passed BoolSet
+def parseBoolishList(
+    key: str,
+    val: str,
+    default: bool,
+    validLabels: t.AbstractSet[str] | None = None,
+    extraValues: dict[str, bool] | None = None,
+    lineNum: str | int | None = None,
+) -> config.BoolSet:
+    # Parses anything defined as "label <boolish>, label <boolish>" into a BoolSet
     # Supply a list of valid labels if you want to have them checked,
     # and a dict of {value=>bool} pairs you want in addition to the standard boolish values
-    if default is None:
-        boolset = {}
-    elif default in (True, False):
-        boolset = config.BoolSet(default=default)
-    else:
-        m.die(f"Programming error - parseBoolishList() got a non-bool default value: '{default}'")
+    boolset = config.BoolSet(default=default)
+
     if extraValues is None:
         extraValues = {}
     vals = [v.strip() for v in val.split(",")]
@@ -684,21 +712,23 @@ def parseBoolishList(key, val, default=None, validLabels=None, extraValues=None,
     return boolset
 
 
-def parseLinkedText(key, val, lineNum):  # pylint: disable=unused-argument
+def parseLinkedText(key: str, val: str, lineNum: str | int | None) -> list[tuple[str, str]]:
     # Parses anything defined as "text url, text url, text url" into a list of 2-tuples.
     entries = []
     vals = [v.strip() for v in val.split(",")]
     for v in vals:
-        entries.append(v.rsplit(" ", 1))
+        pieces = v.rsplit(" ", 1)
+        entries.append((pieces[0], pieces[1]))
     return entries
 
 
-def parseMarkupShorthands(key, val, lineNum):  # pylint: disable=unused-argument
+def parseMarkupShorthands(key: str, val: str, lineNum: str | int | None) -> config.BoolSet:
     # Format is comma-separated list of shorthand category followed by boolean.
-    # Output is a dict of the shorthand categories with boolean values.
+    # Output is a boolset of the shorthand categories.
+    # TODO: Just call parseBoolistList instead
     vals = [v.strip() for v in val.lower().split(",")]
     ret = config.BoolSet(default=False)
-    validCategories = frozenset(["css", "markup", "dfn", "biblio", "idl", "markdown", "algorithm"])
+    validCategories = frozenset(["css", "markup", "dfn", "biblio", "http", "idl", "markdown", "algorithm"])
     for v in vals:
         pieces = v.split()
         if len(pieces) != 2:
@@ -721,7 +751,7 @@ def parseMarkupShorthands(key, val, lineNum):  # pylint: disable=unused-argument
     return ret
 
 
-def parseInlineGithubIssues(key, val, lineNum):  # pylint: disable=unused-argument
+def parseInlineGithubIssues(key: str, val: str, lineNum: str | int | None) -> t.Literal[False] | str:
     val = val.lower()
     if val in ["title", "full"]:
         return val
@@ -734,7 +764,7 @@ def parseInlineGithubIssues(key, val, lineNum):  # pylint: disable=unused-argume
     return False
 
 
-def parseTextMacro(key, val, lineNum):  # pylint: disable=unused-argument
+def parseTextMacro(key: str, val: str, lineNum: str | int | None) -> list[tuple[str, str]]:
     # Each Text Macro line is just a macro name (must be uppercase)
     # followed by the text it expands to.
     try:
@@ -748,7 +778,7 @@ def parseTextMacro(key, val, lineNum):  # pylint: disable=unused-argument
     return [(name, text)]
 
 
-def parseWorkStatus(key, val, lineNum):  # pylint: disable=unused-argument
+def parseWorkStatus(key: str, val: str, lineNum: str | int | None) -> str | None:
     # The Work Status is one of (completed, stable, testing, refining, revising, exploring, rewriting, abandoned).
     val = val.strip().lower()
     if val not in (
@@ -769,7 +799,7 @@ def parseWorkStatus(key, val, lineNum):  # pylint: disable=unused-argument
     return val
 
 
-def parseRepository(key, val, lineNum):  # pylint: disable=unused-argument
+def parseRepository(key: str, val: str, lineNum: str | int | None) -> repository.Repository | None:
     # Shortname followed by url, or just url.
     # If just url, I'll try to recognize the shortname from it; otherwise it's the url again.
     val = val.strip()
@@ -789,10 +819,10 @@ def parseRepository(key, val, lineNum):  # pylint: disable=unused-argument
         # Otherwise just use the url as the shortname
         return repository.Repository(url=val)
     m.die(f"Repository must be a url, optionally followed by a shortname. Got '{val}'", lineNum=lineNum)
-    return config.Nil()
+    return None
 
 
-def parseTranslateIDs(key, val, lineNum):  # pylint: disable=unused-argument
+def parseTranslateIDs(key: str, val: str, lineNum: str | int | None) -> dict[str, str]:
     translations = {}
     for v in val.split(","):
         pieces = v.strip().split()
@@ -804,7 +834,7 @@ def parseTranslateIDs(key, val, lineNum):  # pylint: disable=unused-argument
     return translations
 
 
-def parseTranslation(key, val, lineNum):  # pylint: disable=unused-argument
+def parseTranslation(key: str, val: str, lineNum: str | int | None) -> list[dict[str, str | None]]:
     # Format is <lang-code> <url> [ [ , name <name-in-spec-lang> ] || [ , native-name <name-in-the-lang> ] ]?
     pieces = val.split(",")
     if not (1 <= len(pieces) <= 3):
@@ -812,14 +842,14 @@ def parseTranslation(key, val, lineNum):  # pylint: disable=unused-argument
             f"Format of a Translation line is <lang-code> <url> [ [ , name <name-in-spec-lang> ] || [ , native-name <name-in-the-lang> ] ]?. Got:\n{val}",
             lineNum=lineNum,
         )
-        return
+        return []
     firstParts = pieces[0].split()
     if len(firstParts) != 2:
         m.die(
             f"First part of a Translation line must be a lang-code followed by a url. Got:\n{pieces[0]}",
             lineNum=lineNum,
         )
-        return
+        return []
     langCode, url = firstParts
     name = None
     nativeName = None
@@ -837,15 +867,12 @@ def parseTranslation(key, val, lineNum):  # pylint: disable=unused-argument
     return [{"lang-code": langCode, "url": url, "name": name, "native-name": nativeName}]
 
 
-def parseAudience(key, val, lineNum):  # pylint: disable=unused-argument
+def parseAudience(key: str, val: str, lineNum: str | int | None) -> list[str]:
     # WG21 value
     values = [x.strip().upper() for x in val.strip().split(",")]
-    if not values:
-        m.die("Audience metadata must have at least one value if specified.")
-        return []
     if len(values) == 1 and values[0] == "ALL":
         return ["all"]
-    if len(values) >= 1:
+    elif len(values) >= 1:
         ret = []
         namedAudiences = {"CWG", "LWG", "EWG", "LEWG", "DIRECTION"}
         pseudonymAudiences = {
@@ -878,9 +905,12 @@ def parseAudience(key, val, lineNum):  # pylint: disable=unused-argument
                 m.die(f"Unknown 'Audience' value '{v}'.", lineNum=lineNum)
                 continue
         return ret
+    else:
+        m.die("Audience metadata must have at least one value if specified.")
+        return []
 
 
-def parseEditorTerm(key, val, lineNum):  # pylint: disable=unused-argument
+def parseEditorTerm(key: str, val: str, lineNum: str | int | None) -> dict[str, str]:
     values = [x.strip() for x in val.strip().split(",")]
     if len(values) == 2:
         return {"singular": values[0], "plural": values[1]}
@@ -891,7 +921,7 @@ def parseEditorTerm(key, val, lineNum):  # pylint: disable=unused-argument
     return {"singular": "Editor", "plural": "Editors"}
 
 
-def parseMaxToCDepth(key, val, lineNum):  # pylint: disable=unused-argument
+def parseMaxToCDepth(key: str, val: str, lineNum: str | int | None) -> int | float:
     if val.lower() == "none":
         return float("inf")
     try:
@@ -911,12 +941,12 @@ def parseMaxToCDepth(key, val, lineNum):  # pylint: disable=unused-argument
     return v
 
 
-def parseMetadataOrder(key, val, lineNum):  # pylint: disable=unused-argument
+def parseMetadataOrder(key: str, val: str, lineNum: str | int | None) -> list[str]:
     pieces = [x.strip() for x in val.split(",")]
     return pieces
 
 
-def parseWptDisplay(key, val, lineNum):  # pylint: disable=unused-argument
+def parseWptDisplay(key: str, val: str, lineNum: str | int | None) -> str:
     val = val.lower()
     if val in ("none", "inline", "open", "closed"):
         return val
@@ -927,7 +957,7 @@ def parseWptDisplay(key, val, lineNum):  # pylint: disable=unused-argument
     return "none"
 
 
-def parsePreviousVersion(key, val, lineNum):  # pylint: disable=unused-argument
+def parsePreviousVersion(key: str, val: str, lineNum: str | int | None) -> list[dict[str, str]]:
     biblioMatch = re.match(r"from biblio(\s+\S+)?", val.lower())
     if biblioMatch:
         if biblioMatch.group(1):
@@ -936,13 +966,13 @@ def parsePreviousVersion(key, val, lineNum):  # pylint: disable=unused-argument
     return [{"type": "url", "value": val}]
 
 
-def parseInlineTagCommand(key, val, lineNum):  # pylint: disable=unused-argument
+def parseInlineTagCommand(key: str, val: str, lineNum: str | int | None) -> dict[str, str]:
     tag, _, command = val.strip().partition(" ")
     command = command.strip()
     return {tag: command}
 
 
-def parse(lines):
+def parse(lines: t.Sequence[Line]) -> tuple[list[Line], MetadataManager]:
     # Given HTML document text, in the form of an array of text lines,
     # extracts all <pre class=metadata> lines and parses their contents.
     # Returns the text lines, with the metadata-related lines removed,
@@ -962,7 +992,7 @@ def parse(lines):
             else:
                 endTag = r"</xmp>\s*"
             continue
-        if inMetadata and re.match(endTag, line.text):
+        if inMetadata and re.match(t.cast(str, endTag), line.text):
             inMetadata = False
             continue
         if inMetadata:
@@ -974,6 +1004,7 @@ def parse(lines):
                 md.addData(lastKey, line.text, lineNum=line.i)
             elif re.match(r"([^:]+):\s*(.*)", line.text):
                 match = re.match(r"([^:]+):\s*(.*)", line.text)
+                assert match is not None
                 md.addData(match.group(1), match.group(2), lineNum=line.i)
                 lastKey = match.group(1)
             else:
@@ -984,15 +1015,88 @@ def parse(lines):
                 continue
         elif re.match(r"\s*<h1[^>]*>.*?</h1>", line.text):
             if md.title is None:
-                title = re.match(r"\s*<h1[^>]*>(.*?)</h1>", line.text).group(1)
+                match = re.match(r"\s*<h1[^>]*>(.*?)</h1>", line.text)
+                assert match is not None
+                title = match.group(1)
                 md.addData("Title", title, lineNum=line.i)
             newlines.append(line)
         else:
             newlines.append(line)
+    indentInfo = inferIndent(newlines)
+    if "Indent" not in md.manuallySetKeys and indentInfo.size:
+        md.indent = indentInfo.size
+    if "mixed-indents" in md.complainAbout and indentInfo.char:
+        checkForMixedIndents(newlines, indentInfo)
     return newlines, md
 
 
-def fromCommandLine(overrides):
+@dataclasses.dataclass
+class IndentInfo:
+    size: int | None = None
+    char: str | None = None
+    spaceLines: int = 0
+    tabLines: int = 0
+    totalLines: int = 0
+
+
+def inferIndent(lines: t.Sequence[Line]) -> IndentInfo:
+    # If the document uses space indentation,
+    # infer what the indent size is by seeing what % of indents
+    # are divisible by various values.
+    # (If it uses tabs, or no indents at all, returns None.)
+    indentSizes: Counter[int] = Counter()
+    info = IndentInfo()
+    for line in lines:
+        match = re.match("( +)", line.text)
+        if match:
+            indentSizes[len(match.group(1))] += 1
+            info.spaceLines += 1
+        elif line.text[0:1] == "\t":
+            info.tabLines += 1
+        info.totalLines += 1
+    # If very few lines are indented at all, just bail
+    if (info.spaceLines + info.tabLines) < info.totalLines / 20:
+        return info
+    # If tab indents predominate, assume tab-indent.
+    if info.spaceLines < info.tabLines:
+        info.char = "\t"
+    else:
+        info.char = " "
+    # If we have more than a handful of indented lines,
+    # do a pretend Fourier analysis
+    # (see how many lines' indents are evenly divided).
+    # This allows *some* lines to be indented incorrectly
+    # (or space indent + space alignment on code samples).
+    # Add some extra weight for being *exactly* the desired indent,
+    # to counterbalance the fact that every 4-indent line
+    # looks like a 2-indent line as well, etc.
+    if info.spaceLines >= 50:
+        evenDivisions: Counter[int] = Counter()
+        for candidateIndent in range(8, 1, -1):
+            for spaceCount, lineCount in indentSizes.items():
+                if spaceCount % candidateIndent == 0:
+                    evenDivisions[candidateIndent] += lineCount
+                if spaceCount == candidateIndent:
+                    evenDivisions[candidateIndent] += lineCount
+        info.size = evenDivisions.most_common(1)[0][0]
+    return info
+
+
+def checkForMixedIndents(lines: t.Sequence[Line], info: IndentInfo) -> None:
+    badIndentChar = " " if info.char == "\t" else "\t"
+    for line in lines:
+        if not line.text:
+            continue
+        if line.text.startswith(badIndentChar):
+            if info.char == " ":
+                m.lint(f"Your document appears to use spaces to indent, but line {line.i} starts with tabs.")
+            else:
+                m.lint(f"Your document appears to use tabs to indent, but line {line.i} starts with spaces.")
+        if re.match(r"(\t+ +\t)|( +\t)", line.text):
+            m.lint(f"Line {line.i}'s indent contains tabs after spaces.")
+
+
+def fromCommandLine(overrides: list[str]) -> MetadataManager:
     # Given a list of strings representing command-line arguments,
     # finds the args that correspond to metadata keys
     # and fills a MetadataManager accordingly.
@@ -1011,7 +1115,7 @@ def fromCommandLine(overrides):
     return md
 
 
-def fromJson(data, source=""):
+def fromJson(data: str, source: str) -> MetadataManager:
     md = MetadataManager()
     try:
         defaults = json.loads(data, object_pairs_hook=OrderedDict)
@@ -1036,7 +1140,7 @@ def fromJson(data, source=""):
     return md
 
 
-def getSpecRepository(doc):
+def getSpecRepository(doc: t.SpecT) -> repository.Repository | None:
     """
     Attempts to find the name of the repository the spec is a part of.
     Currently only searches for GitHub repos.
@@ -1059,28 +1163,28 @@ def getSpecRepository(doc):
                 search = re.search(search_re, remotes)
                 if search:
                     return repository.GithubRepository(*search.groups())
-            return config.Nil()
+            return None
         except subprocess.CalledProcessError:
             # check_output will throw CalledProcessError when not in a git repo
-            return config.Nil()
-    return config.Nil()
+            return None
+    return None
 
 
-def parseDoc(doc):
+def parseDoc(doc: t.SpecT) -> None:
     # Look through the doc for any additional metadata information that might be needed.
 
     for el in h.findAll(".replace-with-note-class", doc):
         h.removeClass(el, "replace-with-note-class")
-        h.addClass(el, doc.md.noteClass)
+        h.addClass(doc, el, doc.md.noteClass)
     for el in h.findAll(".replace-with-issue-class", doc):
         h.removeClass(el, "replace-with-issue-class")
-        h.addClass(el, doc.md.issueClass)
+        h.addClass(doc, el, doc.md.issueClass)
     for el in h.findAll(".replace-with-assertion-class", doc):
         h.removeClass(el, "replace-with-assertion-class")
-        h.addClass(el, doc.md.assertionClass)
+        h.addClass(doc, el, doc.md.assertionClass)
     for el in h.findAll(".replace-with-advisement-class", doc):
         h.removeClass(el, "replace-with-advisement-class")
-        h.addClass(el, doc.md.advisementClass)
+        h.addClass(doc, el, doc.md.advisementClass)
 
     if (
         "feedback-header" in doc.md.boilerplate
@@ -1091,72 +1195,82 @@ def parseDoc(doc):
         doc.md.issues.append(("Inline In Spec", "#issues-index"))
 
 
-def join(*sources):
+def join(*sources: MetadataManager | None) -> MetadataManager:
     """
     MetadataManager is a monoid
     """
     md = MetadataManager()
-    md.hasMetadata = any(x.hasMetadata for x in sources)
+    md.hasMetadata = any(x.hasMetadata for x in sources if x)
     for mdsource in sources:
+        if mdsource is None:
+            continue
         for k in mdsource.manuallySetKeys:
             mdentry = knownKeys[k]
             md.addParsedData(k, getattr(mdsource, mdentry.attrName))
         for k, v in mdsource.otherMetadata.items():
-            md.otherMetadata[k].extend(v)
+            md.otherMetadata.setdefault(k, []).extend(v)
     return md
 
 
-@attr.s(slots=True, frozen=True)
+@dataclasses.dataclass
 class Metadata:
-    humanName = attr.ib()
-    attrName = attr.ib()
-    join = attr.ib()
-    parse = attr.ib()
+    humanName: str
+    attrName: str
+    join: t.Callable[[t.Any, t.Any], t.Any]
+    parse: ParseFunc
 
 
-def joinValue(a, b):  # pylint: disable=unused-argument
+if t.TYPE_CHECKING:
+    JoinA = t.TypeVar("JoinA")
+    JoinB = t.TypeVar("JoinB")
+
+
+def joinValue(a: JoinA, b: JoinB) -> JoinB:
     return b
 
 
-def joinList(a, b):
-    return a + b
+def joinList(a: t.Sequence[JoinA], b: t.Sequence[JoinB]) -> t.Sequence[JoinA | JoinB]:
+    return a + b  # type: ignore[operator, no-any-return]
 
 
-def joinDict(a, b):
-    x = {}
+def joinDict(a: t.Mapping[str, JoinA], b: t.Mapping[str, JoinB]) -> dict[str, JoinA | JoinB]:
+    x: dict[str, JoinA | JoinB] = {}
     x.update(a)
     x.update(b)
     return x
 
 
-def joinBoolSet(a, b):
-    x = copy.deepcopy(a)
-    x.update(b)
-    return x
-
-
-def joinDdList(a, b):
-    x = defaultdict(list)
+def joinBoolSet(a: config.BoolSet, b: config.BoolSet) -> config.BoolSet:
+    x = config.BoolSet()
     x.update(a)
     x.update(b)
     return x
 
 
-def parseLiteral(key, val, lineNum):  # pylint: disable=unused-argument
+def joinDdList(
+    a: defaultdict[str, list[JoinA]], b: defaultdict[str, list[JoinB]]
+) -> defaultdict[str, list[JoinA | JoinB]]:
+    x: defaultdict[str, list[JoinA | JoinB]] = defaultdict(list)
+    x.update(a)  # type: ignore[arg-type]
+    x.update(b)  # type: ignore[arg-type]
+    return x
+
+
+def parseLiteral(key: str, val: str, lineNum: str | int | None) -> str:
     return val
 
 
-def parseLiteralOrNone(key, val, lineNum):  # pylint: disable=unused-argument
+def parseLiteralOrNone(key: str, val: str, lineNum: str | int | None) -> str | None:
     if val.lower() == "none":
         return None
     return val
 
 
-def parseLiteralCaseless(key, val, lineNum):  # pylint: disable=unused-argument
+def parseLiteralCaseless(key: str, val: str, lineNum: str | int | None) -> str:
     return val.lower()
 
 
-def parseLiteralList(key, val, lineNum):  # pylint: disable=unused-argument
+def parseLiteralList(key: str, val: str, lineNum: str | int | None) -> list[str]:
     return [val]
 
 

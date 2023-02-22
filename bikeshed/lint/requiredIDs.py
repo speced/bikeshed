@@ -1,7 +1,9 @@
-from .. import h, messages as m
+from __future__ import annotations
+
+from .. import h, messages as m, t
 
 
-def requiredIDs(doc):
+def requiredIDs(doc: t.SpecT) -> None:
     if not doc.md.requiredIDs:
         return
     doc_ids = {e.get("id") for e in h.findAll("[id]", doc)}

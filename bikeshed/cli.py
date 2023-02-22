@@ -1,13 +1,13 @@
+from __future__ import annotations
 import argparse
 import json
 import os
 import sys
 
 from . import config, constants, update, messages as m
-from .config.printjson import getjson
 
 
-def main():
+def main() -> None:
     # Hack around argparse's lack of optional subparsers
     if len(sys.argv) == 1:
         sys.argv.append("spec")
@@ -88,8 +88,18 @@ def main():
     subparsers = argparser.add_subparsers(title="Subcommands", dest="subparserName")
 
     specParser = subparsers.add_parser("spec", help="Process a spec source file into a valid output file.")
-    specParser.add_argument("infile", nargs="?", default=None, help="Path to the source file.")
-    specParser.add_argument("outfile", nargs="?", default=None, help="Path to the output file.")
+    specParser.add_argument(
+        "infile",
+        nargs="?",
+        default=None,
+        help='Path to the source file: stdin ("-"), an https URL, a .bs or.src.html file, or a tar archive containing an index.bs file.',
+    )
+    specParser.add_argument(
+        "outfile",
+        nargs="?",
+        default=None,
+        help='Path to the output file: stdout ("-"), or a filename.',
+    )
     specParser.add_argument(
         "--debug",
         dest="debug",
@@ -163,7 +173,12 @@ def main():
         action="store_true",
         help="The spec is self-contained, do not bundle any extra directories in the tar file.",
     )
-    echidnaParser.add_argument("--just-tar", dest="justTar", action="store_true")
+    echidnaParser.add_argument(
+        "--just-tar",
+        dest="justTar",
+        action="store_true",
+        help="Don't actually submit to the echidna service, instead just echo the prepared TAR file to stdout.",
+    )
 
     watchParser = subparsers.add_parser(
         "watch",
@@ -220,9 +235,17 @@ def main():
     )
     updateParser.add_argument(
         "--skip-manifest",
-        dest="force",
-        action="store_true",
+        dest="manifest",
+        action="store_const",
+        const="skip",
         help="Forces Bikeshed to do a full update manually, rather than using the manifest to get the preprocessed update (which can be several minutes old).",
+    )
+    updateParser.add_argument(
+        "--force-manifest",
+        dest="manifest",
+        action="store_const",
+        const="force",
+        help="Force a manifest-based update even if local manifest data is more recent than the remote manifest.",
     )
     updateParser.add_argument("--anchors", action="store_true", help="Download crossref anchor data.")
     updateParser.add_argument("--backrefs", action="store_true", help="Download link backref data.")
@@ -235,12 +258,6 @@ def main():
         dest="linkDefaults",
         action="store_true",
         help="Download link default data.",
-    )
-    updateParser.add_argument(
-        "--test-suites",
-        dest="testSuites",
-        action="store_true",
-        help="Download test suite data.",
     )
     updateParser.add_argument(
         "--languages",
@@ -281,11 +298,6 @@ def main():
         dest="printExports",
         action="store_true",
         help="Prints those terms that will be exported for cross-ref purposes.",
-    )
-    debugCommands.add_argument(
-        "--print-refs-for",
-        dest="linkText",
-        help="Prints the ref data for a given link text.",
     )
     debugCommands.add_argument("--print", dest="code", help="Runs the specified code and prints it.")
     debugCommands.add_argument(
@@ -440,7 +452,7 @@ def main():
         handleWpt(options)
 
 
-def handleUpdate(options):
+def handleUpdate(options: argparse.Namespace) -> None:
     update.update(
         anchors=options.anchors,
         backrefs=options.backrefs,
@@ -449,15 +461,14 @@ def handleUpdate(options):
         caniuse=options.caniuse,
         mdn=options.mdn,
         linkDefaults=options.linkDefaults,
-        testSuites=options.testSuites,
         languages=options.languages,
         wpt=options.wpt,
         dryRun=constants.dryRun,
-        force=options.force,
+        manifestMode=options.manifest,
     )
 
 
-def handleSpec(options, extras):
+def handleSpec(options: argparse.Namespace, extras: list[str]) -> None:
     from . import metadata
     from .Spec import Spec
 
@@ -474,7 +485,7 @@ def handleSpec(options, extras):
     doc.finish(outputFilename=options.outfile)
 
 
-def handleEchidna(options, extras):
+def handleEchidna(options: argparse.Namespace, extras: list[str]) -> None:
     from . import metadata, publish
     from .Spec import Spec
 
@@ -484,7 +495,8 @@ def handleEchidna(options, extras):
     doc.preprocess()
     addDirs = [] if options.selfContained else options.additionalDirectories
     if options.justTar:
-        publish.prepareTar(doc, visibleTar=True, additionalDirectories=addDirs)
+        tarBytes = publish.prepareTar(doc, additionalDirectories=addDirs)
+        sys.stdout.buffer.write(tarBytes)
     else:
         publish.publishEchidna(
             doc,
@@ -497,7 +509,7 @@ def handleEchidna(options, extras):
         )
 
 
-def handleWatch(options, extras):
+def handleWatch(options: argparse.Namespace, extras: list[str]) -> None:
     from . import metadata
     from .Spec import Spec
 
@@ -510,7 +522,7 @@ def handleWatch(options, extras):
     doc.watch(outputFilename=options.outfile)
 
 
-def handleServe(options, extras):
+def handleServe(options: argparse.Namespace, extras: list[str]) -> None:
     from . import metadata
     from .Spec import Spec
 
@@ -522,7 +534,7 @@ def handleServe(options, extras):
     doc.watch(outputFilename=options.outfile, port=int(options.port))
 
 
-def handleDebug(options, extras):
+def handleDebug(options: argparse.Namespace, extras: list[str]) -> None:
     from . import metadata
     from .Spec import Spec
 
@@ -543,18 +555,6 @@ def handleDebug(options, extras):
         doc.mdCommandLine = metadata.fromCommandLine(extras)
         doc.preprocess()
         exec(f"print({options.code})")
-    elif options.linkText:
-        doc = Spec(inputFilename=options.infile)
-        doc.mdCommandLine = metadata.fromCommandLine(extras)
-        doc.preprocess()
-        refs = doc.refs[options.linkText] + doc.refs[options.linkText + "\n"]
-        constants.quiet = options.quiet
-        if not constants.quiet:
-            m.p(f"Refs for '{options.linkText}':")
-        # Get ready for JSONing
-        for ref in refs:
-            ref["level"] = str(ref["level"])
-        m.p(config.printjson(refs))
     elif options.refreshData:
         constants.quiet = 0
         update.updateReadonlyDataFiles()
@@ -564,17 +564,17 @@ def handleDebug(options, extras):
         doc.mdCommandLine = metadata.fromCommandLine(extras)
         doc.preprocess()
         md = {
-            "defaults.include": doc.mdDefaults.allData,
-            "computed-metadata.include": doc.mdOverridingDefaults.allData,
-            "document": doc.mdDocument.allData,
+            "defaults.include": doc.mdDefaults.allData if doc.mdDefaults else [],
+            "computed-metadata.include": doc.mdOverridingDefaults.allData if doc.mdOverridingDefaults else [],
+            "document": doc.mdDocument.allData if doc.mdDocument else [],
             "command-line": doc.mdCommandLine.allData,
         }
-        print(json.dumps(md, indent=2, default=getjson))
+        print(json.dumps(md, indent=2, default=config.getjson))
 
 
-def handleRefs(options, extras):
-    from . import metadata
-    from .refs.ReferenceManager import ReferenceManager
+def handleRefs(options: argparse.Namespace, extras: list[str]) -> None:
+    from . import metadata, datablocks
+    from .refs import ReferenceManager
     from .Spec import Spec
 
     constants.setErrorLevel("nothing")
@@ -586,7 +586,7 @@ def handleRefs(options, extras):
         rm = doc.refs
     else:
         rm = ReferenceManager()
-        rm.initializeRefs()
+        rm.initializeRefs(datablocks=datablocks)
     if options.text:
         options.text = options.text
     refs = rm.queryAllRefs(
@@ -599,12 +599,12 @@ def handleRefs(options, extras):
         exact=options.exact,
     )
     if constants.printMode == "json":
-        m.p(json.dumps(refs, indent=2, default=getjson))
+        m.p(json.dumps(refs, indent=2, default=config.getjson))
     else:
         m.p(config.printjson(refs))
 
 
-def handleIssuesList(options):
+def handleIssuesList(options: argparse.Namespace) -> None:
     from . import issuelist
 
     if options.printTemplate:
@@ -613,7 +613,7 @@ def handleIssuesList(options):
         issuelist.printIssueList(options.infile, options.outfile)
 
 
-def handleSource(options):
+def handleSource(options: argparse.Namespace) -> None:
     if not options.bigText:  # If no options are given, do all options.
         options.bigText = True
     if options.bigText:
@@ -623,7 +623,7 @@ def handleSource(options):
         fonts.replaceComments(font=font, inputFilename=options.infile, outputFilename=options.outfile)
 
 
-def handleTest(options, extras):
+def handleTest(options: argparse.Namespace, extras: list[str]) -> None:
     from . import metadata, test
 
     md = metadata.fromCommandLine(extras)
@@ -636,7 +636,7 @@ def handleTest(options, extras):
         sys.exit(0 if result else 1)
 
 
-def handleProfile(options):
+def handleProfile(options: argparse.Namespace) -> None:
     root = f'--root="{options.root}"' if options.root else ""
     leaf = f'--leaf="{options.leaf}"' if options.leaf else ""
     if options.svgFile:
@@ -653,7 +653,7 @@ def handleProfile(options):
         )
 
 
-def handleTemplate():
+def handleTemplate() -> None:
     m.p(
         """<pre class='metadata'>
 Title: Your Spec Title
@@ -674,7 +674,7 @@ Introduction here.
     )
 
 
-def handleWpt(options):
+def handleWpt(options: argparse.Namespace) -> None:
     if options.template:
         m.p(
             """

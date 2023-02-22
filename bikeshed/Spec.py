@@ -1,8 +1,11 @@
+# pylint: disable=attribute-defined-outside-init
+from __future__ import annotations
+
 import glob
 import json
 import os
 import sys
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from datetime import datetime
 from functools import partial as curry
 
@@ -17,39 +20,47 @@ from . import (
     dfns,
     extensions,
     fingerprinting,
+    func,
     h,
     headings,
     highlight,
     idl,
     includes,
     inlineTags,
+    InputSource,
+    language,
+    line,
     lint,
     markdown,
-    mdnspeclinks,
+    mdn,
     messages as m,
     metadata,
+    refs,
+    retrieve,
     shorthands,
+    t,
+    testsuite,
     unsortedJunk as u,
     wpt,
 )
-from .func import Functor
-from .InputSource import FileInputSource, InputSource
-from .refs import ReferenceManager
+
+if t.TYPE_CHECKING:
+    import widlparser
 
 
 class Spec:
     def __init__(
         self,
-        inputFilename,
-        debug=False,
-        token=None,
-        lineNumbers=False,
-        fileRequester=None,
-        testing=False,
+        inputFilename: str,
+        debug: bool = False,
+        token: str | None = None,
+        lineNumbers: bool = False,
+        fileRequester: retrieve.DataFileRequester | None = None,
+        testing: bool = False,
     ):
         catchArgparseBug(inputFilename)
-        self.valid = False
-        self.lineNumbers = lineNumbers
+        self.valid: bool = False
+        self.lineNumbers: bool = lineNumbers
         if lineNumbers:
             # line-numbers are too hacky, so force this to be a dry run
             constants.dryRun = True
@@ -60,58 +71,56 @@ class Spec:
                 "No input file specified, and no *.bs or *.src.html files found in current directory.\nPlease specify an input file, or use - to pipe from STDIN."
             )
             return
-        self.inputSource = InputSource(inputFilename, chroot=constants.chroot)
-        self.transitiveDependencies = set()
-        self.debug = debug
-        self.token = token
-        self.testing = testing
+        self.inputSource: InputSource.InputSource = InputSource.inputFromName(inputFilename, chroot=constants.chroot)
+        self.transitiveDependencies: set[InputSource.InputSource] = set()
+        self.debug: bool = debug
+        self.token: str | None = token
+        self.testing: bool = testing
+        self.dataFile: retrieve.DataFileRequester
         if fileRequester is None:
-            self.dataFile = config.defaultRequester
+            self.dataFile = retrieve.defaultRequester
         else:
             self.dataFile = fileRequester
 
-        self.md = None
-        self.mdBaseline = None
-        self.mdDocument = None
-        self.mdCommandLine = None
-        self.mdDefaults = None
-        self.mdOverridingDefaults = None
-        self.lines = []
-        self.document = None
-        self.html = None
-        self.head = None
-        self.body = None
-        self.fillContainers = None
+        self.lines: list[line.Line] = []
         self.valid = self.initializeState()
 
-    def initializeState(self):
-        self.normativeRefs = {}
-        self.informativeRefs = {}
-        self.refs = ReferenceManager(fileRequester=self.dataFile, testing=self.testing)
-        self.externalRefsUsed = defaultdict(lambda: defaultdict(dict))
-        self.md = None
-        self.mdBaseline = metadata.MetadataManager()
-        self.mdDocument = None
-        self.mdCommandLine = metadata.MetadataManager()
-        self.mdDefaults = None
-        self.mdOverridingDefaults = None
-        self.biblios = {}
-        self.typeExpansions = {}
-        self.macros = defaultdict(lambda x: "???")
-        self.canIUse = {}
-        self.mdnSpecLinks = {}
-        self.widl = idl.getParser()
-        self.testSuites = json.loads(self.dataFile.fetch("test-suites.json", str=True))
-        self.languages = json.loads(self.dataFile.fetch("languages.json", str=True))
-        self.extraStyles = defaultdict(str)
-        self.extraStyles["style-colors"] = styleColors
-        self.extraStyles["style-darkmode"] = styleDarkMode
-        self.extraStyles["style-md-lists"] = styleMdLists
-        self.extraStyles["style-autolinks"] = styleAutolinks
-        self.extraStyles["style-selflinks"] = styleSelflinks
-        self.extraStyles["style-counters"] = styleCounters
-        self.extraStyles["style-issues"] = styleIssues
-        self.extraScripts = defaultdict(str)
+    def initializeState(self) -> bool:
+        self.normativeRefs: dict[str, biblio.BiblioEntry] = {}
+        self.informativeRefs: dict[str, biblio.BiblioEntry] = {}
+        self.refs: refs.ReferenceManager = refs.ReferenceManager(fileRequester=self.dataFile, testing=self.testing)
+        self.externalRefsUsed: refs.ExternalRefsManager = refs.ExternalRefsManager()
+
+        self.md: metadata.MetadataManager
+        self.mdBaseline: metadata.MetadataManager | None = metadata.MetadataManager()
+        self.mdDocument: metadata.MetadataManager | None = None
+        self.mdCommandLine: metadata.MetadataManager | None = metadata.MetadataManager()
+        self.mdDefaults: metadata.MetadataManager | None = None
+        self.mdOverridingDefaults: metadata.MetadataManager | None = None
+
+        self.typeExpansions: dict[str, str] = {}
+
+        self.cachedLinksFromHref: OrderedDict[str, list[t.ElementT]] = OrderedDict()
+        self.cachedClassTests: dict[tuple[str, str], bool] = {}
+        self.cachedNormativeEls: dict[t.ElementT, bool] = {}
+
+        defaultMacro: t.Callable[[], str] = lambda: "???"
+        self.macros: t.DefaultDict[str, str] = defaultdict(defaultMacro)
+
+        self.widl: widlparser.Parser = idl.getParser()
+
+        self.testSuites: dict[str, testsuite.TestSuite] = fetchTestSuites(self.dataFile)
+        self.languages: dict[str, language.Language] = fetchLanguages(self.dataFile)
+
+        self.extraStyles: t.DefaultDict[str, str] = defaultdict(str)
+        self.extraStyles["style-colors"] = getModuleFile("Spec-colors.css")
+        self.extraStyles["style-darkmode"] = getModuleFile("Spec-darkmode.css")
+        self.extraStyles["style-md-lists"] = getModuleFile("Spec-mdlists.css")
+        self.extraStyles["style-autolinks"] = getModuleFile("Spec-autolinks.css")
+        self.extraStyles["style-selflinks"] = getModuleFile("Spec-selflinks.css")
+        self.extraStyles["style-counters"] = getModuleFile("Spec-counters.css")
+        self.extraStyles["style-issues"] = getModuleFile("Spec-issues.css")
+        self.extraScripts: t.DefaultDict[str, str] = defaultdict(str)
 
         try:
             inputContent = self.inputSource.read()
@@ -127,15 +136,16 @@ class Spec:
 
         return True
 
-    def recordDependencies(self, *inputSources):
+    def recordDependencies(self, *inputSources: InputSource.InputSource) -> None:
         self.transitiveDependencies.update(inputSources)
 
-    def preprocess(self):
+    def preprocess(self) -> Spec:
         self.transitiveDependencies.clear()
         self.assembleDocument()
         self.processDocument()
+        return self
 
-    def assembleDocument(self):
+    def assembleDocument(self) -> Spec:
         # Textual hacks
         u.stripBOM(self)
         if self.lineNumbers:
@@ -148,7 +158,7 @@ class Spec:
         self.md = metadata.join(self.mdBaseline, self.mdDocument, self.mdCommandLine)
         # Using that to determine the Group and Status, load the correct defaults.include boilerplate
         self.mdDefaults = metadata.fromJson(
-            data=config.retrieveBoilerplateFile(self, "defaults", error=True),
+            data=retrieve.retrieveBoilerplateFile(self, "defaults", error=True),
             source="defaults",
         )
         self.md = metadata.join(self.mdBaseline, self.mdDefaults, self.mdDocument, self.mdCommandLine)
@@ -156,7 +166,7 @@ class Spec:
         self.md.fillTextMacros(self.macros, doc=self)
         jsonEscapedMacros = {k: json.dumps(v)[1:-1] for k, v in self.macros.items()}
         computedMdText = h.replaceMacros(
-            config.retrieveBoilerplateFile(self, "computed-metadata", error=True),
+            retrieve.retrieveBoilerplateFile(self, "computed-metadata", error=True),
             macros=jsonEscapedMacros,
         )
         self.mdOverridingDefaults = metadata.fromJson(data=computedMdText, source="computed-metadata")
@@ -175,37 +185,45 @@ class Spec:
         extensions.load(self)
 
         # Initialize things
-        self.refs.initializeRefs(self)
+        self.refs.initializeRefs(doc=self, datablocks=datablocks)
         self.refs.initializeBiblio()
 
         # Deal with further <pre> blocks, and markdown
         self.lines = datablocks.transformDataBlocks(self, self.lines)
+
+        markdownFeatures: set[str] = {"headings"}
         self.lines = markdown.parse(
             self.lines,
             self.md.indent,
             opaqueElements=self.md.opaqueElements,
             blockElements=self.md.blockElements,
+            features=markdownFeatures,
         )
 
         self.refs.setSpecData(self.md)
 
         # Convert to a single string of html now, for convenience.
-        self.html = "".join(line.text for line in self.lines)
+        self.html = "".join(x.text for x in self.lines)
         boilerplate.addHeaderFooter(self)
         self.html = self.fixText(self.html)
 
         # Build the document
         self.document = h.parseDocument(self.html)
-        self.head = h.find("head", self)
-        self.body = h.find("body", self)
+        headEl = h.find("head", self)
+        bodyEl = h.find("body", self)
+        assert headEl is not None
+        assert bodyEl is not None
+        self.head = headEl
+        self.body = bodyEl
         u.correctFrontMatter(self)
         includes.processInclusions(self)
         metadata.parseDoc(self)
+        return self
 
-    def processDocument(self):
+    def processDocument(self) -> Spec:
         # Fill in and clean up a bunch of data
         conditional.processConditionals(self)
-        self.fillContainers = u.locateFillContainers(self)
+        self.fillContainers: t.FillContainersT = u.locateFillContainers(self)
         lint.exampleIDs(self)
         wpt.processWptElements(self)
 
@@ -238,14 +256,13 @@ class Spec:
         # Handle all the links
         u.processBiblioLinks(self)
         u.processDfns(self)
-        idl.processIDL(self)
+        u.processIDL(self)
         dfns.annotateDfns(self)
         u.formatArgumentdefTables(self)
         u.formatElementdefTables(self)
         u.processAutolinks(self)
+        u.fixInterDocumentReferences(self)
         biblio.dedupBiblioReferences(self)
-        u.verifyUsageOfAllLocalBiblios(self)
-        caniuse.addCanIUsePanels(self)
         boilerplate.addIndexSection(self)
         boilerplate.addExplicitIndexes(self)
         boilerplate.addStyles(self)
@@ -259,17 +276,21 @@ class Spec:
         boilerplate.addTOCSection(self)
         u.addSelfLinks(self)
         u.processAutolinks(self)
-        boilerplate.addAnnotations(self)
         boilerplate.removeUnwantedBoilerplate(self)
         # Add MDN panels after all IDs/anchors have been added
-        mdnspeclinks.addMdnPanels(self)
+        mdnPanels = mdn.addMdnPanels(self)
+        ciuPanels = caniuse.addCanIUsePanels(self)
+        if mdnPanels or ciuPanels:
+            self.extraScripts["position-annos"] = getModuleFile("Spec-position-annos.js")
         highlight.addSyntaxHighlighting(self)
         boilerplate.addBikeshedBoilerplate(self)
         fingerprinting.addTrackingVector(self)
         u.fixIntraDocumentReferences(self)
         u.fixInterDocumentReferences(self)
+        u.verifyUsageOfAllLocalBiblios(self)
         u.removeMultipleLinks(self)
         u.forceCrossorigin(self)
+        addDomintroStyles(self)
         lint.brokenLinks(self)
         lint.accidental2119(self)
         lint.missingExposed(self)
@@ -280,14 +301,14 @@ class Spec:
         u.cleanupHTML(self)
         if self.md.prepTR:
             # Don't try and override the W3C's icon.
-            for el in u.findAll("[rel ~= 'icon']", self):
+            for el in h.findAll("[rel ~= 'icon']", self):
                 h.removeNode(el)
             # Make sure the W3C stylesheet is after all other styles.
-            for el in u.findAll("link", self):
-                if el.get("href").startswith("https://www.w3.org/StyleSheets/TR"):
-                    h.appendChild(u.find("head", self), el)
+            for el in h.findAll("link", self):
+                if el.get("href", "").startswith("https://www.w3.org/StyleSheets/TR"):
+                    h.appendChild(self.head, el)
             # Ensure that all W3C links are https.
-            for el in u.findAll("a", self):
+            for el in h.findAll("a", self):
                 href = el.get("href", "")
                 if href.startswith("http://www.w3.org") or href.startswith("http://lists.w3.org"):
                     el.set("href", "https" + href[4:])
@@ -295,23 +316,25 @@ class Spec:
                 if text.startswith("http://www.w3.org") or text.startswith("http://lists.w3.org"):
                     el.text = "https" + text[4:]
             # Loaded from .include files
-            extensions.BSPrepTR(self)  # pylint: disable=no-member
+            extensions.BSPrepTR(self)  # type: ignore # pylint: disable=no-member
 
         return self
 
-    def serialize(self):
+    def serialize(self) -> str | None:
         try:
             rendered = h.Serializer(self.md.opaqueElements, self.md.blockElements).serialize(self.document)
         except Exception as e:
             m.die(str(e))
-            return
+            return None
         rendered = u.finalHackyCleanup(rendered)
         return rendered
 
-    def fixMissingOutputFilename(self, outputFilename):
+    def fixMissingOutputFilename(self, outputFilename: str | None) -> str:
         if outputFilename is None:
             # More sensible defaults!
-            if not isinstance(self.inputSource, FileInputSource):
+            if isinstance(self.inputSource, InputSource.TarInputSource):
+                outputFilename = os.path.splitext(self.inputSource.sourceName)[0] + ".html"
+            elif not isinstance(self.inputSource, InputSource.FileInputSource):
                 outputFilename = "-"
             elif self.inputSource.sourceName.endswith(".bs"):
                 outputFilename = self.inputSource.sourceName[0:-3] + ".html"
@@ -321,12 +344,12 @@ class Spec:
                 outputFilename = "-"
         return outputFilename
 
-    def finish(self, outputFilename=None, newline=None):
+    def finish(self, outputFilename: str | None = None, newline: str | None = None) -> None:
         catchArgparseBug(outputFilename)
         self.printResultMessage()
         outputFilename = self.fixMissingOutputFilename(outputFilename)
         rendered = self.serialize()
-        if not constants.dryRun:
+        if rendered and not constants.dryRun:
             try:
                 if outputFilename == "-":
                     sys.stdout.write(rendered)
@@ -336,7 +359,7 @@ class Spec:
             except Exception as e:
                 m.die(f"Something prevented me from saving the output document to {outputFilename}:\n{e}")
 
-    def printResultMessage(self):
+    def printResultMessage(self) -> None:
         # If I reach this point, I've succeeded, but maybe with reservations.
         fatals = m.messageCounts["fatal"]
         links = m.messageCounts["linkerror"]
@@ -353,12 +376,13 @@ class Spec:
             m.success("Successfully generated, with warnings")
             return
 
-    def watch(self, outputFilename, port=None, localhost=False):
+    def watch(self, outputFilename: str | None, port: int | None = None, localhost: bool = False) -> None:
         import time
 
         outputFilename = self.fixMissingOutputFilename(outputFilename)
         if self.inputSource.mtime() is None:
             m.die(f"Watch mode doesn't support {self.inputSource}")
+            return
         if outputFilename == "-":
             m.die("Watch mode doesn't support streaming to STDOUT.")
             return
@@ -370,7 +394,7 @@ class Spec:
             import threading
 
             class SilentServer(http.server.SimpleHTTPRequestHandler):
-                def log_message(self, format, *args):
+                def log_message(self, format: t.Any, *args: t.Any) -> None:
                     pass
 
             socketserver.TCPServer.allow_reuse_address = True
@@ -414,16 +438,19 @@ class Spec:
         except Exception as e:
             m.die(f"Something went wrong while watching the file:\n{e}")
 
-    def fixText(self, text, moreMacros={}):
+    def fixText(self, text: str, moreMacros: dict[str, str] | None = None) -> str:
         # Do several textual replacements that need to happen *before* the document is parsed as h.
 
         # If markdown shorthands are on, remove all `foo`s while processing,
         # so their contents don't accidentally trigger other stuff.
         # Also handle markdown escapes.
+        if moreMacros is None:
+            moreMacros = {}
+        textFunctor: func.Functor
         if "markdown" in self.md.markupShorthands:
             textFunctor = u.MarkdownCodeSpans(text)
         else:
-            textFunctor = Functor(text)
+            textFunctor = func.Functor(text)
 
         macros = dict(self.macros, **moreMacros)
         textFunctor = textFunctor.map(curry(h.replaceMacros, macros=macros))
@@ -431,19 +458,19 @@ class Spec:
         if "css" in self.md.markupShorthands:
             textFunctor = textFunctor.map(h.replaceAwkwardCSSShorthands)
 
-        return textFunctor.extract()
+        return t.cast(str, textFunctor.extract())
 
-    def printTargets(self):
+    def printTargets(self) -> None:
         m.p("Exported terms:")
-        for el in u.findAll("[data-export]", self):
+        for el in h.findAll("[data-export]", self):
             for term in config.linkTextsFromElement(el):
                 m.p("  " + term)
         m.p("Unexported terms:")
-        for el in u.findAll("[data-noexport]", self):
+        for el in h.findAll("[data-noexport]", self):
             for term in config.linkTextsFromElement(el):
                 m.p("  " + term)
 
-    def isOpaqueElement(self, el):
+    def isOpaqueElement(self, el: t.ElementT) -> bool:
         if el.tag in self.md.opaqueElements:
             return True
         if el.get("data-opaque") is not None:
@@ -451,7 +478,7 @@ class Spec:
         return False
 
 
-def printDone():
+def printDone() -> None:
     contents = f"Finished at {datetime.now().strftime('%H:%M:%S %b-%d-%Y')}"
     contentLen = len(contents) + 2
     if not constants.asciiOnly:
@@ -466,7 +493,7 @@ def printDone():
         m.p("")
 
 
-def findImplicitInputFile():
+def findImplicitInputFile() -> str | None:
     """
     Find what input file the user *probably* wants to use,
     by scanning the current folder.
@@ -493,7 +520,7 @@ def findImplicitInputFile():
     return None
 
 
-def catchArgparseBug(string):
+def catchArgparseBug(string: str | None) -> bool:
     # Argparse has had a long-standing bug
     # https://bugs.python.org/issue22433
     # about spaces in the values of unknown optional arguments
@@ -505,405 +532,32 @@ def catchArgparseBug(string):
 
     if isinstance(string, str) and string.startswith("--") and "=" in string:
         m.die(
-            "You're hitting a bug with Python's argparse library. Please specify both the input and output filenames manually, and move all command-line flags with spaces in their values to after those arguments.\nSee <https://tabatkins.github.io/bikeshed/#md-issues> for details."
+            "You're hitting a bug with Python's argparse library. Please specify both the input and output filenames manually, and move all command-line flags with spaces in their values to after those arguments.\nSee <https://speced.github.io/bikeshed/#md-issues> for details."
         )
         return False
     return True
 
 
-constants.specClass = Spec
+def fetchTestSuites(dataFile: retrieve.DataFileRequester) -> dict[str, testsuite.TestSuite]:
+    return {k: testsuite.TestSuite(**v) for k, v in json.loads(dataFile.fetch("test-suites.json", str=True)).items()}
 
-styleColors = """
-/* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
-:root {
-    color-scheme: light dark;
 
-    --text: black;
-    --bg: white;
-
-    --unofficial-watermark: url(https://www.w3.org/StyleSheets/TR/2016/logos/UD-watermark);
-
-    --logo-bg: #1a5e9a;
-    --logo-active-bg: #c00;
-    --logo-text: white;
-
-    --tocnav-normal-text: #707070;
-    --tocnav-normal-bg: var(--bg);
-    --tocnav-hover-text: var(--tocnav-normal-text);
-    --tocnav-hover-bg: #f8f8f8;
-    --tocnav-active-text: #c00;
-    --tocnav-active-bg: var(--tocnav-normal-bg);
-
-    --tocsidebar-text: var(--text);
-    --tocsidebar-bg: #f7f8f9;
-    --tocsidebar-shadow: rgba(0,0,0,.1);
-    --tocsidebar-heading-text: hsla(203,20%,40%,.7);
-
-    --toclink-text: var(--text);
-    --toclink-underline: #3980b5;
-    --toclink-visited-text: var(--toclink-text);
-    --toclink-visited-underline: #054572;
-
-    --heading-text: #005a9c;
-
-    --hr-text: var(--text);
-
-    --algo-border: #def;
-
-    --del-text: red;
-    --del-bg: transparent;
-    --ins-text: #080;
-    --ins-bg: transparent;
-
-    --a-normal-text: #034575;
-    --a-normal-underline: #bbb;
-    --a-visited-text: var(--a-normal-text);
-    --a-visited-underline: #707070;
-    --a-hover-bg: rgba(75%, 75%, 75%, .25);
-    --a-active-text: #c00;
-    --a-active-underline: #c00;
-
-    --blockquote-border: silver;
-    --blockquote-bg: transparent;
-    --blockquote-text: currentcolor;
-
-    --issue-border: #e05252;
-    --issue-bg: #fbe9e9;
-    --issue-text: var(--text);
-    --issueheading-text: #831616;
-
-    --example-border: #e0cb52;
-    --example-bg: #fcfaee;
-    --example-text: var(--text);
-    --exampleheading-text: #574b0f;
-
-    --note-border: #52e052;
-    --note-bg: #e9fbe9;
-    --note-text: var(--text);
-    --noteheading-text: hsl(120, 70%, 30%);
-    --notesummary-underline: silver;
-
-    --assertion-border: #aaa;
-    --assertion-bg: #eee;
-    --assertion-text: black;
-
-    --advisement-border: orange;
-    --advisement-bg: #fec;
-    --advisement-text: var(--text);
-    --advisementheading-text: #b35f00;
-
-    --warning-border: red;
-    --warning-bg: hsla(40,100%,50%,0.95);
-    --warning-text: var(--text);
-
-    --amendment-border: #330099;
-    --amendment-bg: #F5F0FF;
-    --amendment-text: var(--text);
-    --amendmentheading-text: #220066;
-
-    --def-border: #8ccbf2;
-    --def-bg: #def;
-    --def-text: var(--text);
-    --defrow-border: #bbd7e9;
-
-    --datacell-border: silver;
-
-    --indexinfo-text: #707070;
-
-    --indextable-hover-text: black;
-    --indextable-hover-bg: #f7f8f9;
-
-    --outdatedspec-bg: rgba(0, 0, 0, .5);
-    --outdatedspec-text: black;
-    --outdated-bg: maroon;
-    --outdated-text: white;
-    --outdated-shadow: red;
-
-    --editedrec-bg: darkorange;
-}"""
-
-styleDarkMode = """
-@media (prefers-color-scheme: dark) {
-    :root {
-        --text: #ddd;
-        --bg: black;
-
-        --unofficial-watermark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cg fill='%23100808' transform='translate(200 200) rotate(-45) translate(-200 -200)' stroke='%23100808' stroke-width='3'%3E%3Ctext x='50%25' y='220' style='font: bold 70px sans-serif; text-anchor: middle; letter-spacing: 6px;'%3EUNOFFICIAL%3C/text%3E%3Ctext x='50%25' y='305' style='font: bold 70px sans-serif; text-anchor: middle; letter-spacing: 6px;'%3EDRAFT%3C/text%3E%3C/g%3E%3C/svg%3E");
-
-        --logo-bg: #1a5e9a;
-        --logo-active-bg: #c00;
-        --logo-text: white;
-
-        --tocnav-normal-text: #999;
-        --tocnav-normal-bg: var(--bg);
-        --tocnav-hover-text: var(--tocnav-normal-text);
-        --tocnav-hover-bg: #080808;
-        --tocnav-active-text: #f44;
-        --tocnav-active-bg: var(--tocnav-normal-bg);
-
-        --tocsidebar-text: var(--text);
-        --tocsidebar-bg: #080808;
-        --tocsidebar-shadow: rgba(255,255,255,.1);
-        --tocsidebar-heading-text: hsla(203,20%,40%,.7);
-
-        --toclink-text: var(--text);
-        --toclink-underline: #6af;
-        --toclink-visited-text: var(--toclink-text);
-        --toclink-visited-underline: #054572;
-
-        --heading-text: #8af;
-
-        --hr-text: var(--text);
-
-        --algo-border: #456;
-
-        --del-text: #f44;
-        --del-bg: transparent;
-        --ins-text: #4a4;
-        --ins-bg: transparent;
-
-        --a-normal-text: #6af;
-        --a-normal-underline: #555;
-        --a-visited-text: var(--a-normal-text);
-        --a-visited-underline: var(--a-normal-underline);
-        --a-hover-bg: rgba(25%, 25%, 25%, .2);
-        --a-active-text: #f44;
-        --a-active-underline: var(--a-active-text);
-
-        --borderedblock-bg: rgba(255, 255, 255, .05);
-
-        --blockquote-border: silver;
-        --blockquote-bg: var(--borderedblock-bg);
-        --blockquote-text: currentcolor;
-
-        --issue-border: #e05252;
-        --issue-bg: var(--borderedblock-bg);
-        --issue-text: var(--text);
-        --issueheading-text: hsl(0deg, 70%, 70%);
-
-        --example-border: hsl(50deg, 90%, 60%);
-        --example-bg: var(--borderedblock-bg);
-        --example-text: var(--text);
-        --exampleheading-text: hsl(50deg, 70%, 70%);
-
-        --note-border: hsl(120deg, 100%, 35%);
-        --note-bg: var(--borderedblock-bg);
-        --note-text: var(--text);
-        --noteheading-text: hsl(120, 70%, 70%);
-        --notesummary-underline: silver;
-
-        --assertion-border: #444;
-        --assertion-bg: var(--borderedblock-bg);
-        --assertion-text: var(--text);
-
-        --advisement-border: orange;
-        --advisement-bg: #222218;
-        --advisement-text: var(--text);
-        --advisementheading-text: #f84;
-
-        --warning-border: red;
-        --warning-bg: hsla(40,100%,20%,0.95);
-        --warning-text: var(--text);
-
-        --amendment-border: #330099;
-        --amendment-bg: #080010;
-        --amendment-text: var(--text);
-        --amendmentheading-text: #cc00ff;
-
-        --def-border: #8ccbf2;
-        --def-bg: #080818;
-        --def-text: var(--text);
-        --defrow-border: #136;
-
-        --datacell-border: silver;
-
-        --indexinfo-text: #aaa;
-
-        --indextable-hover-text: var(--text);
-        --indextable-hover-bg: #181818;
-
-        --outdatedspec-bg: rgba(255, 255, 255, .5);
-        --outdatedspec-text: black;
-        --outdated-bg: maroon;
-        --outdated-text: white;
-        --outdated-shadow: red;
-
-        --editedrec-bg: darkorange;
+def fetchLanguages(dataFile: retrieve.DataFileRequester) -> dict[str, language.Language]:
+    return {
+        k: language.Language(v["name"], v["native-name"])
+        for k, v in json.loads(dataFile.fetch("languages.json", str=True)).items()
     }
-    /* In case a transparent-bg image doesn't expect to be on a dark bg,
-       which is quite common in practice... */
-    img { background: white; }
-}"""
-
-styleMdLists = """
-/* This is a weird hack for me not yet following the commonmark spec
-   regarding paragraph and lists. */
-[data-md] > :first-child {
-    margin-top: 0;
-}
-[data-md] > :last-child {
-    margin-bottom: 0;
-}"""
-
-styleAutolinks = """
-.css.css, .property.property, .descriptor.descriptor {
-    color: var(--a-normal-text);
-    font-size: inherit;
-    font-family: inherit;
-}
-.css::before, .property::before, .descriptor::before {
-    content: "‘";
-}
-.css::after, .property::after, .descriptor::after {
-    content: "’";
-}
-.property, .descriptor {
-    /* Don't wrap property and descriptor names */
-    white-space: nowrap;
-}
-.type { /* CSS value <type> */
-    font-style: italic;
-}
-pre .property::before, pre .property::after {
-    content: "";
-}
-[data-link-type="property"]::before,
-[data-link-type="propdesc"]::before,
-[data-link-type="descriptor"]::before,
-[data-link-type="value"]::before,
-[data-link-type="function"]::before,
-[data-link-type="at-rule"]::before,
-[data-link-type="selector"]::before,
-[data-link-type="maybe"]::before {
-    content: "‘";
-}
-[data-link-type="property"]::after,
-[data-link-type="propdesc"]::after,
-[data-link-type="descriptor"]::after,
-[data-link-type="value"]::after,
-[data-link-type="function"]::after,
-[data-link-type="at-rule"]::after,
-[data-link-type="selector"]::after,
-[data-link-type="maybe"]::after {
-    content: "’";
-}
-
-[data-link-type].production::before,
-[data-link-type].production::after,
-.prod [data-link-type]::before,
-.prod [data-link-type]::after {
-    content: "";
-}
-
-[data-link-type=element],
-[data-link-type=element-attr] {
-    font-family: Menlo, Consolas, "DejaVu Sans Mono", monospace;
-    font-size: .9em;
-}
-[data-link-type=element]::before { content: "<" }
-[data-link-type=element]::after  { content: ">" }
-
-[data-link-type=biblio] {
-    white-space: pre;
-}"""
-
-styleSelflinks = """
-:root {
-    --selflink-text: white;
-    --selflink-bg: gray;
-    --selflink-hover-text: black;
-}
-.heading, .issue, .note, .example, li, dt {
-    position: relative;
-}
-a.self-link {
-    position: absolute;
-    top: 0;
-    left: calc(-1 * (3.5rem - 26px));
-    width: calc(3.5rem - 26px);
-    height: 2em;
-    text-align: center;
-    border: none;
-    transition: opacity .2s;
-    opacity: .5;
-}
-a.self-link:hover {
-    opacity: 1;
-}
-.heading > a.self-link {
-    font-size: 83%;
-}
-li > a.self-link {
-    left: calc(-1 * (3.5rem - 26px) - 2em);
-}
-dfn > a.self-link {
-    top: auto;
-    left: auto;
-    opacity: 0;
-    width: 1.5em;
-    height: 1.5em;
-    background: var(--selflink-bg);
-    color: var(--selflink-text);
-    font-style: normal;
-    transition: opacity .2s, background-color .2s, color .2s;
-}
-dfn:hover > a.self-link {
-    opacity: 1;
-}
-dfn > a.self-link:hover {
-    color: var(--selflink-hover-text);
-}
-
-a.self-link::before            { content: "¶"; }
-.heading > a.self-link::before { content: "§"; }
-dfn > a.self-link::before      { content: "#"; }
-"""
-styleDarkMode += """
-@media (prefers-color-scheme: dark) {
-    :root {
-        --selflink-text: black;
-        --selflink-bg: silver;
-        --selflink-hover-text: white;
-    }
-}
-"""
 
 
-styleCounters = """
-body {
-    counter-reset: example figure issue;
-}
-.issue {
-    counter-increment: issue;
-}
-.issue:not(.no-marker)::before {
-    content: "Issue " counter(issue);
-}
+def addDomintroStyles(doc: Spec) -> None:
+    # Adds common WHATWG styles for domintro blocks.
 
-.example {
-    counter-increment: example;
-}
-.example:not(.no-marker)::before {
-    content: "Example " counter(example);
-}
-.invalid.example:not(.no-marker)::before,
-.illegal.example:not(.no-marker)::before {
-    content: "Invalid Example" counter(example);
-}
+    if h.find(".domintro", doc) is None:
+        return
 
-figcaption {
-    counter-increment: figure;
-}
-figcaption:not(.no-marker)::before {
-    content: "Figure " counter(figure) " ";
-}"""
+    doc.extraStyles["styles-domintro"] = getModuleFile("Spec-domintro.css")
 
-styleIssues = """
-a[href].issue-return {
-    float: right;
-    float: inline-end;
-    color: var(--issueheading-text);
-    font-weight: bold;
-    text-decoration: none;
-}
-"""
+
+def getModuleFile(filename: str) -> str:
+    with open(config.scriptPath(filename), "r", encoding="utf-8") as fh:
+        return fh.read()

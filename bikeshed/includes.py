@@ -1,11 +1,13 @@
+from __future__ import annotations
+
 import hashlib
 import itertools
 import re
 
-from . import datablocks, markdown, h, messages as m
+from . import datablocks, markdown, h, messages as m, t
 
 
-def processInclusions(doc):
+def processInclusions(doc: t.SpecT) -> None:
     iters = 0
     while True:
         # Loop because an include can contain more includes.
@@ -24,7 +26,7 @@ def processInclusions(doc):
         handleRawInclude(el, doc)
 
 
-def handleBikeshedInclude(el, doc):
+def handleBikeshedInclude(el: t.ElementT, doc: t.SpecT) -> None:
     macros = {}
     for i in itertools.count(0):
         macroLine = el.get("macro-" + str(i))
@@ -34,7 +36,12 @@ def handleBikeshedInclude(el, doc):
         macros[k.lower()] = v
     if el.get("path"):
         path = el.get("path")
+        assert path is not None
         includedInputSource = doc.inputSource.relative(path)
+        if includedInputSource is None:
+            m.die(f"Tried to include a file at '{path}', but the current input type can't resolve relative paths.")
+            h.removeNode(el)
+            return
         doc.recordDependencies(includedInputSource)
         try:
             lines = includedInputSource.read().rawLines
@@ -48,14 +55,16 @@ def handleBikeshedInclude(el, doc):
         # combined does a good job unless you purposely pervert it
         hash = hashlib.md5((path + "".join(lines)).encode("ascii", "xmlcharrefreplace")).hexdigest()
         if el.get("hash"):
+            hashAttr = el.get("hash")
+            assert hashAttr is not None
             # This came from another included file, check if it's a loop-include
-            if hash in el.get("hash"):
+            if hash in hashAttr:
                 # WHOOPS
                 m.die(f"Include loop detected - “{path}” is included in itself.", el=el)
                 h.removeNode(el)
                 return
-            hash += " " + el.get("hash")
-        depth = int(el.get("depth")) if el.get("depth") is not None else 0
+            hash += " " + hashAttr
+        depth = int(el.get("depth") or "0")
         if depth > 100:
             # Just in case you slip past the nesting restriction
             m.die("Nesting depth > 100, literally wtf are you doing.", el=el)
@@ -79,7 +88,7 @@ def handleBikeshedInclude(el, doc):
         return
 
 
-def handleCodeInclude(el, doc):
+def handleCodeInclude(el: t.ElementT, doc: t.SpecT) -> None:
     if not el.get("path"):
         m.die(
             "Whoops, an include-code block didn't get parsed correctly, so I can't include anything.",
@@ -88,7 +97,12 @@ def handleCodeInclude(el, doc):
         h.removeNode(el)
         return
     path = el.get("path")
+    assert path is not None
     includedInputSource = doc.inputSource.relative(path)
+    if includedInputSource is None:
+        m.die(f"Tried to include a file at '{path}', but the current input type can't resolve relative paths.")
+        h.removeNode(el)
+        return
     doc.recordDependencies(includedInputSource)
     try:
         lines = includedInputSource.read().rawLines
@@ -97,11 +111,13 @@ def handleCodeInclude(el, doc):
         h.removeNode(el)
         return
     if el.get("data-code-show"):
-        showLines = parseRangeString(el.get("data-code-show"))
+        codeShow = el.get("data-code-show")
+        assert codeShow is not None
+        showLines = parseRangeString(codeShow)
         if len(showLines) == 0:
             pass
         elif len(showLines) >= 2:
-            m.die(f"Can only have one include-code 'show' segment, got '{el.get('data-code-show')}'.", el=el)
+            m.die(f"Can only have one include-code 'show' segment, got '{codeShow}'.", el=el)
             return
         else:
             start, end = showLines[0]
@@ -113,10 +129,10 @@ def handleCodeInclude(el, doc):
                     # If manually overridden, leave it alone,
                     # but otherwise DWIM.
                     el.set("line-start", str(start))
-    h.appendChild(el, *lines)
+    h.appendChild(el, *lines, allowEmpty=True)
 
 
-def handleRawInclude(el, doc):
+def handleRawInclude(el: t.ElementT, doc: t.SpecT) -> None:
     if not el.get("path"):
         m.die(
             "Whoops, an include-raw block didn't get parsed correctly, so I can't include anything.",
@@ -124,8 +140,12 @@ def handleRawInclude(el, doc):
         )
         h.removeNode(el)
         return
-    path = el.get("path")
+    path = el.get("path", "")
     includedInputSource = doc.inputSource.relative(path)
+    if includedInputSource is None:
+        m.die(f"Tried to include a file at '{path}', but the current input type can't resolve relative paths.")
+        h.removeNode(el)
+        return
     doc.recordDependencies(includedInputSource)
     try:
         content = includedInputSource.read().content
@@ -137,34 +157,42 @@ def handleRawInclude(el, doc):
     h.replaceNode(el, *subtree)
 
 
-def parseRangeString(rangeStr):
+if t.TYPE_CHECKING:
+    RangeItem: t.TypeAlias = list[int | None]
+    # UGH I DON'T UNDERSTAND THE ERROR HERE
+    # fuck it, replace this with a tiny dataclass anyway
+
+
+def parseRangeString(rangeStr: str) -> list[RangeItem]:
     rangeStr = re.sub(r"\s*", "", rangeStr)
-    return [_f for _f in (parseSingleRange(x) for x in rangeStr.split(",")) if _f]
+    return [_f for _f in (parseSingleRange(x) for x in rangeStr.split(",")) if _f is not None]
 
 
-def parseSingleRange(item):
+def parseSingleRange(item: str) -> RangeItem | None:
     if "-" in item:
         # Range, format of DDD-DDD
-        low, _, high = item.partition("-")
-        if low == "*":
+        low: int | None
+        high: int | None
+        lowStr, _, highStr = item.partition("-")
+        if lowStr == "*":
             low = None
         else:
             try:
-                low = int(low)
+                low = int(lowStr)
             except ValueError:
                 m.die(f"Error parsing include-code 'show' range '{item}' - must be `int-int`.")
-                return
-        if high == "*":
+                return None
+        if highStr == "*":
             high = None
         else:
             try:
-                high = int(high)
+                high = int(highStr)
             except ValueError:
                 m.die(f"Error parsing include-code 'show' range '{item}' - must be `int-int`.")
-                return
-        if low >= high:
+                return None
+        if low is not None and high is not None and low >= high:
             m.die(f"include-code 'show' ranges must be well-formed lo-hi - got '{item}'.")
-            return
+            return None
         return [low, high]
     if item == "*":
         return None
@@ -173,3 +201,4 @@ def parseSingleRange(item):
         return [val, val]
     except ValueError:
         m.die(f"Error parsing include-code 'show' value '{item}' - must be an int or *.")
+        return None

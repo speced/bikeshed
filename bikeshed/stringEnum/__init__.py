@@ -1,1 +1,1 @@
-from .StringEnum import StringEnum
+from .stringenum import StringEnum

@@ -1,26 +1,29 @@
 # pylint: disable=R1732
 
+from __future__ import annotations
+
+import io  # pylint: disable=unused-import
 import logging
 import os
 import tarfile
 import tempfile
 
-from . import extensions
+from . import extensions, t
 
 
 def publishEchidna(
-    doc,
-    username,
-    password,
-    decision,
-    additionalDirectories=None,
-    cc=None,
-    editorial=False,
-):
+    doc: t.SpecT,
+    username: str,
+    password: str,
+    decision: str,
+    additionalDirectories: list[str] | None = None,
+    cc: str | None = None,
+    editorial: bool = False,
+) -> None:
     import requests
 
     logging.captureWarnings(True)  # Silence SNIMissingWarning
-    tar = prepareTar(doc, visibleTar=False, additionalDirectories=additionalDirectories)
+    tarBytes = prepareTar(doc, additionalDirectories=additionalDirectories)
     # curl 'https://labs.w3.org/echidna/api/request' --user '<username>:<password>' -F "tar=@/some/path/spec.tar" -F "decision=<decisionUrl>"
     data = {
         "decision": decision,
@@ -33,10 +36,8 @@ def publishEchidna(
         "https://labs.w3.org/echidna/api/request",
         auth=(username, password),
         data=data,
-        files={"tar": tar.read()},
+        files={"tar": tarBytes},
     )
-    tar.close()
-    os.remove(tar.name)
 
     if r.status_code == 202:
         print("Successfully pushed to Echidna!")
@@ -49,33 +50,33 @@ def publishEchidna(
         print(r.headers)
 
 
-def prepareTar(doc, visibleTar=False, additionalDirectories=None):
+def prepareTar(doc: t.SpecT, additionalDirectories: list[str] | None = None) -> bytes:
     if additionalDirectories is None:
         additionalDirectories = ["images", "diagrams", "examples"]
     # Finish the spec
     specOutput = tempfile.NamedTemporaryFile(delete=False)
     doc.finish(outputFilename=specOutput.name)
     # Build the TAR file
-    if visibleTar:
-        tar = tarfile.open(name="test.tar", mode="w")
-    else:
-        f = tempfile.NamedTemporaryFile(delete=False)
-        tar = tarfile.open(fileobj=f, mode="w")
+    f = tempfile.NamedTemporaryFile(delete=False)
+    tar = tarfile.open(fileobj=f, mode="w")
     tar.add(specOutput.name, arcname="Overview.html")
     # Loaded from .include files
-    additionalFiles = extensions.BSPublishAdditionalFiles(additionalDirectories)  # pylint: disable=no-member
+    additionalFiles = extensions.BSPublishAdditionalFiles(additionalDirectories)  # type: ignore # pylint: disable=no-member
     for fname in additionalFiles:
+        if isinstance(fname, str):
+            inputPath = str(doc.inputSource.relative(fname))
+            outputPath = fname
+        else:
+            inputPath = str(doc.inputSource.relative(fname[0]))
+            outputPath = fname[1]
         try:
-            if isinstance(fname, str):
-                tar.add(fname)
-            elif isinstance(fname, list):
-                tar.add(fname[0], arcname=fname[1])
+            tar.add(inputPath, outputPath)
         except OSError:
             pass
     tar.close()
     specOutput.close()
     os.remove(specOutput.name)
-    if visibleTar:
-        return open("test.tar", "rb")
     f.seek(0)
-    return f
+    tarBytes = f.read()
+    f.close()
+    return tarBytes

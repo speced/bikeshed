@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import os
 import time
@@ -6,20 +8,29 @@ import aiofiles
 import aiohttp
 import requests
 import tenacity
-from result import Err, Ok
+from result import Err, Ok, Result
 
-from .. import messages as m
-
-ghPrefix = "https://raw.githubusercontent.com/tabatkins/bikeshed-boilerplate/main/"
+from .. import messages as m, t
 
 
-def update(path, dryRun=False):
+def isOk(x: t.Any) -> t.TypeGuard[Ok]:
+    return isinstance(x, Ok)
+
+
+def isErr(x: t.Any) -> t.TypeGuard[Err]:
+    return isinstance(x, Err)
+
+
+ghPrefix = "https://raw.githubusercontent.com/speced/bikeshed-boilerplate/main/"
+
+
+def update(path: str, dryRun: bool = False) -> set[str] | None:
     try:
         m.say("Downloading boilerplates...")
         data = requests.get(ghPrefix + "manifest.txt").text
     except Exception as e:
         m.die(f"Couldn't download boilerplates manifest.\n{e}")
-        return
+        return None
 
     newPaths = pathsFromManifest(data)
 
@@ -39,12 +50,12 @@ def update(path, dryRun=False):
         return set(goodPaths)
 
 
-def pathsFromManifest(manifest):
+def pathsFromManifest(manifest: str) -> list[str]:
     lines = manifest.split("\n")[1:]
     return [line.partition(" ")[2] for line in lines if line != ""]
 
 
-async def updateFiles(localPrefix, newPaths):
+async def updateFiles(localPrefix: str, newPaths: t.Sequence[str]) -> tuple[list[str], list[str]]:
     tasks = set()
     async with aiohttp.ClientSession() as session:
         for filePath in newPaths:
@@ -55,8 +66,8 @@ async def updateFiles(localPrefix, newPaths):
         messageDelta = 2
         goodPaths = []
         badPaths = []
-        for coro in asyncio.as_completed(tasks):
-            result = await coro
+        for future in asyncio.as_completed(tasks):
+            result = await future
             if result.is_ok():
                 goodPaths.append(result.value)
             else:
@@ -71,29 +82,33 @@ async def updateFiles(localPrefix, newPaths):
     return goodPaths, badPaths
 
 
-async def updateFile(localPrefix, filePath, session):
+async def updateFile(localPrefix: str, filePath: str, session: t.Any) -> Result[str, str]:
     remotePath = ghPrefix + filePath
     localPath = localizePath(localPrefix, filePath)
     res = await downloadFile(remotePath, session)
-    if res.is_ok():
+    if isOk(res):
         res = await saveFile(localPath, res.ok())
     else:
         m.warn(f"Error downloading {filePath}, full error was:\n{await errorFromAsyncErr(res)}")
-    if res.is_err():
-        res = Err(filePath)
-    return res
+    ret: Result[str, str]
+    if isErr(res):
+        ret = Err(filePath)
+    else:
+        ret = t.cast("Ok[str]", res)
+    return ret
 
 
-async def errorFromAsyncErr(res):
-    if res.is_ok():
-        return res.ok()
+async def errorFromAsyncErr(res: Result[str, t.Awaitable[str]]) -> str | Exception:
+    if isOk(res):
+        return t.cast(str, res.ok())
     try:
-        await res.err()
+        x = await t.cast("t.Awaitable[str]", res.err())
     except Exception as e:
         return e
+    return x
 
 
-def wrapError(retry_state):
+def wrapError(retry_state: t.Any) -> Err[t.Awaitable[str]]:
     return Err(asyncio.wrap_future(retry_state.outcome))
 
 
@@ -103,7 +118,7 @@ def wrapError(retry_state):
     wait=tenacity.wait_random(1, 2),
     retry_error_callback=wrapError,
 )
-async def downloadFile(path, session):
+async def downloadFile(path: str, session: t.Any) -> Result[str, t.Awaitable[str]]:
     resp = await session.request(method="GET", url=path)
     resp.raise_for_status()
     return Ok(await resp.text())
@@ -115,7 +130,7 @@ async def downloadFile(path, session):
     wait=tenacity.wait_random(1, 2),
     retry_error_callback=wrapError,
 )
-async def saveFile(path, data):
+async def saveFile(path: str, data: str) -> Result[str, t.Awaitable[str]]:
     dirPath = os.path.dirname(path)
     if not os.path.exists(dirPath):
         os.makedirs(dirPath)
@@ -124,5 +139,5 @@ async def saveFile(path, data):
         return Ok(path)
 
 
-def localizePath(root, relPath):
+def localizePath(root: str, relPath: str) -> str:
     return os.path.join(root, *relPath.split("/"))

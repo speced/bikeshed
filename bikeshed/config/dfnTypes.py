@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 from collections import defaultdict
 
@@ -44,6 +46,7 @@ dfnClassToType = {
     "contextdef": "context",
     "facetdef": "facet",
     "http-headerdef": "http-header",
+    "permissiondef": "permission",
 }
 
 
@@ -74,6 +77,7 @@ idlTypes = frozenset(
         "iterator",
         "maplike",
         "setlike",
+        "permission",
     ]
 )
 idlNameTypes = frozenset(["interface", "namespace", "dictionary", "enum", "typedef", "callback"])
@@ -118,11 +122,14 @@ typesNotUsingFor = frozenset(
         "exception",
         "typedef",
         "http-header",
+        "permission",
     ]
 )
 assert not (typesUsingFor & typesNotUsingFor)
 lowercaseTypes = (
-    cssTypes | markupTypes | frozenset(["propdesc", "element-sub", "maybe", "dfn", "grammar", "http-header"])
+    cssTypes
+    | markupTypes
+    | frozenset(["propdesc", "element-sub", "maybe", "dfn", "grammar", "http-header", "permission"])
 )
 
 
@@ -146,22 +153,22 @@ specStatuses = frozenset(["current", "snapshot"])
 linkStatuses = frozenset(["current", "snapshot", "local", "anchor-block"])
 
 
-def linkTypeIn(linkTypes, targetTypes="all"):
+def linkTypeIn(startTypes: str | t.AbstractSet[str], targetTypes: str | t.AbstractSet[str] = "all") -> bool:
     # Tests if two link/dfn types are "compatible",
     # such that they share at least one base type when expanded.
     # (All dfn types are "base"; link types like "idl" are shorthand,
     #  and expand into one or more base types.)
     # Called with no arguments,
     # tests if the passed type is a valid dfn/link type.
-    if isinstance(linkTypes, str):
-        linkTypes = linkTypeToDfnType[linkTypes]
+    if isinstance(startTypes, str):
+        startTypes = linkTypeToDfnType[startTypes]
     else:
-        linkTypes = set(linkTypes)
+        startTypes = set(startTypes)
     if isinstance(targetTypes, str):
         targetTypes = linkTypeToDfnType[targetTypes]
     else:
         targetTypes = set(targetTypes)
-    return bool(linkTypes & targetTypes)
+    return bool(startTypes & targetTypes)
 
 
 # Elements that are allowed to provide definitions to Shepherd
@@ -172,7 +179,7 @@ dfnElementsSelector = "dfn:not([data-var-ignore]), h2[data-dfn-type], h3[data-df
 
 # Some of the more significant types and their patterns
 trivialPattern = re.compile(r".+")
-typeRe: t.Dict[str, re.Pattern]
+typeRe: dict[str, re.Pattern]
 typeRe = defaultdict(lambda: trivialPattern)
 typeRe["property"] = re.compile(r"^[\w-]+$")
 typeRe["at-rule"] = re.compile(r"^@[\w-]+$")

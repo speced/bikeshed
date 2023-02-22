@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import os
 from collections import OrderedDict
@@ -7,20 +9,20 @@ import requests
 from .. import messages as m
 
 
-def update(path, dryRun=False):
+def update(path: str, dryRun: bool = False) -> set[str] | None:
     m.say("Downloading MDN Spec Links data...")
     specMapURL = "https://w3c.github.io/mdn-spec-links/SPECMAP.json"
     try:
         response = requests.get(specMapURL)
     except Exception as e:
         m.die(f"Couldn't download the MDN Spec Links data.\n{e}")
-        return
+        return None
 
     try:
-        data = response.json(encoding="utf-8", object_pairs_hook=OrderedDict)
+        data = response.json(object_pairs_hook=OrderedDict)
     except Exception as e:
         m.die(f"The MDN Spec Links data wasn't valid JSON for some reason. Try downloading again?\n{e}")
-        return
+        return None
     writtenPaths = set()
     if not dryRun:
         try:
@@ -46,11 +48,11 @@ def update(path, dryRun=False):
                     fileContents = requests.get(mdnSpecLinksBaseURL + specFilename).text
                 except Exception as e:
                     m.die(f"Couldn't download the MDN Spec Links {specFilename} file.\n{e}")
-                    return
+                    return None
                 with open(p, "w", encoding="utf-8") as fh:
                     fh.write(fileContents)
         except Exception as e:
             m.die(f"Couldn't save MDN Spec Links data to disk.\n{e}")
-            return
+            return None
     m.say("Success!")
     return writtenPaths

@@ -1,7 +1,7 @@
 Bikeshed, a spec preprocessor
 =============================
 
-<img src="https://rawgit.com/tabatkins/bikeshed/master/docs/images/icon.svg" width=100 height=100 align=left>
+<img src="https://rawgit.com/speced/bikeshed/master/docs/images/icon.svg" width=100 height=100 align=left>
 
 Bikeshed is a pre-processor for spec documents,
 turning a source document
@@ -13,30 +13,30 @@ WHATWG,
 the C++ standards committee,
 and elsewhere!
 
-![CI](https://github.com/tabatkins/bikeshed/workflows/CI/badge.svg)
-[![Gitter](https://img.shields.io/badge/Gitter-Join%20Chat%20↣-blue.svg)](https://gitter.im/tabatkins/bikeshed?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
-[![Docs](https://img.shields.io/badge/docs-available-orange.svg)](https://tabatkins.github.io/bikeshed)
-[![Release Notes](https://img.shields.io/badge/release-notes-purple.svg)](https://github.com/tabatkins/bikeshed/issues/1773)
+![CI](https://github.com/speced/bikeshed/workflows/CI/badge.svg)
+[![Gitter](https://img.shields.io/badge/Gitter-Join%20Chat%20↣-blue.svg)](https://gitter.im/speced/bikeshed?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
+[![Docs](https://img.shields.io/badge/docs-available-orange.svg)](https://speced.github.io/bikeshed)
+[![Release Notes](https://img.shields.io/badge/release-notes-purple.svg)](https://github.com/speced/bikeshed/issues/1773)
 
-The processor can be easily [installed](https://tabatkins.github.io/bikeshed/#installing) and run locally (requiring no
+The processor can be easily [installed](https://speced.github.io/bikeshed/#installing) and run locally (requiring no
 network access unless you're updating), or accessed as a CGI without any installation at all: <https://api.csswg.org/bikeshed/>
 
 A short overview of some of Bikeshed's features:
 
-* [automatic linking](https://tabatkins.github.io/bikeshed/#autolinking) of terms to their definitions based on text, so you can simple write `Use <a>some term</a> to...` and have it automatically link to the `<dfn>some term</dfn>` elsewhere in the document, or in another spec entirely!
-* [automatic id generation](https://tabatkins.github.io/bikeshed/#id-gen) for headings and definitions, based on their text.
-* [textual shortcuts for autolinks](https://tabatkins.github.io/bikeshed/#autolink-shortcuts): [[FOO]] for bibliography entries, &lt;&lt;foo>> for grammar productions, 'foo' for CSS property names, {{foo}} for IDL terms, and more.
-* [boilerplate generation](https://tabatkins.github.io/bikeshed/#boilerplate), both wholesale and piecemeal.
-* [Bikeshed-flavored Markdown](https://tabatkins.github.io/bikeshed/#markdown), a slight variant that is extra-friendly to intermixing with normal HTML. (Besides the few intentional divergences, compliance with [CommonMark](http://commonmark.org) is expected.)
-* a [compact syntax](https://tabatkins.github.io/bikeshed/#table-expansion) for writing property-definition tables.
-* [automatic whitespace-prefix stripping](https://tabatkins.github.io/bikeshed/#pre-whitespace-stripping) from `<pre>` contents, so the contents can be indented properly in your HTML.
-* [automatic IDL processing and syntax-checking](https://tabatkins.github.io/bikeshed/#idl) for `<pre class=idl>` contents, so you don't have to mark up every single significant term yourself.
-* [automatic generation of railroad diagrams](https://tabatkins.github.io/bikeshed/#railroad) from `<pre class='railroad'>` contents.
+* [automatic linking](https://speced.github.io/bikeshed/#autolinking) of terms to their definitions based on text, so you can simple write `Use <a>some term</a> to...` and have it automatically link to the `<dfn>some term</dfn>` elsewhere in the document, or in another spec entirely!
+* [automatic id generation](https://speced.github.io/bikeshed/#id-gen) for headings and definitions, based on their text.
+* [textual shortcuts for autolinks](https://speced.github.io/bikeshed/#autolink-shortcuts): [[FOO]] for bibliography entries, &lt;&lt;foo>> for grammar productions, 'foo' for CSS property names, {{foo}} for IDL terms, and more.
+* [boilerplate generation](https://speced.github.io/bikeshed/#boilerplate), both wholesale and piecemeal.
+* [Bikeshed-flavored Markdown](https://speced.github.io/bikeshed/#markdown), a slight variant that is extra-friendly to intermixing with normal HTML. (Besides the few intentional divergences, compliance with [CommonMark](https://commonmark.org) is expected.)
+* a [compact syntax](https://speced.github.io/bikeshed/#table-expansion) for writing property-definition tables.
+* [automatic whitespace-prefix stripping](https://speced.github.io/bikeshed/#pre-whitespace-stripping) from `<pre>` contents, so the contents can be indented properly in your HTML.
+* [automatic IDL processing and syntax-checking](https://speced.github.io/bikeshed/#idl) for `<pre class=idl>` contents, so you don't have to mark up every single significant term yourself.
+* [automatic generation of railroad diagrams](https://speced.github.io/bikeshed/#railroad) from `<pre class='railroad'>` contents.
 
 Documentation Sections
 ----------------------
 
-The full Bikeshed documentation is generated by Bikeshed and [accessible here](https://tabatkins.github.io/bikeshed/).
+The full Bikeshed documentation is generated by Bikeshed and [accessible here](https://speced.github.io/bikeshed/).
 
 Note About Fatal Errors
 -----------------------
@@ -70,7 +70,7 @@ which isn't generally what you want.)
 License
 -------
 
-This document and all associated files in the github project are licensed under [CC0](http://creativecommons.org/publicdomain/zero/1.0/) ![](http://licensebuttons.net/p/zero/1.0/80x15.png).
+This document and all associated files in the github project are licensed under [CC0](https://creativecommons.org/publicdomain/zero/1.0/) ![](https://licensebuttons.net/p/zero/1.0/80x15.png).
 This means you can reuse, remix, or otherwise appropriate this project for your own use **without restriction**.
 (The actual legal meaning can be found at the above link.)
 Don't ask me for permission to use any part of this project, **just use it**.

@@ -7,6 +7,5 @@ __all__ = [
     "updateBiblio",
     "updateCanIUse",
     "updateLinkDefaults",
-    "updateTestSuites",
     "updateLanguages",
 ]

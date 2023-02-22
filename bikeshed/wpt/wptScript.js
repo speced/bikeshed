@@ -6,7 +6,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     const runsUrl = "https://wpt.fyi/api/runs?label=master&label=stable&max-count=1&product=chrome&product=firefox&product=safari&product=edge";
     const runs = await (await fetch(runsUrl)).json();
 
-    const testResults = await( await fetch("https://wpt.fyi/api/search", {
+    const testResults = await (await fetch("https://wpt.fyi/api/search", {
         method:"POST",
         headers:{
             "Content-Type":"application/json",
@@ -23,18 +23,19 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         const passes = result.legacy_status.map(x=>[x.passes, x.total]);
         return [testPath, passes];
     }));
+    const seenTests = new Set();
     document.querySelectorAll(".wpt-name").forEach(nameEl=>{
         const passData = resultsFromPath.get("/" + nameEl.getAttribute("title"));
+        if(!passData) {
+            console.log("Couldn't find test in results:", nameEl);
+            return
+        }
         const numTests = passData[0][1];
         if(numTests > 1) {
             nameEl.insertAdjacentElement("beforeend",
                 el("small", {}, ` (${numTests} tests)`));
         }
         if(passData == undefined) return;
-        passData.forEach((p,i) => {
-            browsers[i].passes += p[0];
-            browsers[i].total += p[1];
-        })
         const resultsEl = el("span",{"class":"wpt-results"},
             ...passData.map((p,i) => el("span",
             {
@@ -44,6 +45,17 @@ document.addEventListener("DOMContentLoaded", async ()=>{
             })),
         );
         nameEl.insertAdjacentElement("afterend", resultsEl);
+
+        // Only update the summary pass/total count if we haven't seen this
+        // test before, to support authors listing the same test multiple times
+        // in a spec.
+        if (!seenTests.has(nameEl.getAttribute("title"))) {
+            seenTests.add(nameEl.getAttribute("title"));
+            passData.forEach((p,i) => {
+                browsers[i].passes += p[0];
+                browsers[i].total += p[1];
+            });
+        }
     });
     const overview = document.querySelector(".wpt-overview");
     if(overview) {
@@ -90,10 +102,10 @@ function formatWptResult({name, version, passes, total}) {
     const shortVersion = /^\d+/.exec(version);
     const icon = []
 
-    if(name == "Chrome") icon.push(el('img', {alt:"", src:"https://wpt.fyi/static/chrome-dev_64x64.png"}));
-    if(name == "Edge") icon.push(el('img', {alt:"", src:"https://wpt.fyi/static/edge-dev_64x64.png"}));
-    if(name == "Safari") icon.push(el('img', {alt:"", src:"https://wpt.fyi/static/safari-preview_64x64.png"}));
-    if(name == "Firefox") icon.push(el('img', {alt:"", src:"https://wpt.fyi/static/firefox-nightly_64x64.png"}));
+    if(name == "Chrome") icon.push(el('img', {alt:"", src:"https://wpt.fyi/static/chrome_64x64.png"}));
+    if(name == "Edge") icon.push(el('img', {alt:"", src:"https://wpt.fyi/static/edge_64x64.png"}));
+    if(name == "Safari") icon.push(el('img', {alt:"", src:"https://wpt.fyi/static/safari_64x64.png"}));
+    if(name == "Firefox") icon.push(el('img', {alt:"", src:"https://wpt.fyi/static/firefox_64x64.png"}));
 
     return el('li', {"class":passClass},
         el('nobr', {'class':'browser'}, ...icon, ` ${name} ${shortVersion}`),

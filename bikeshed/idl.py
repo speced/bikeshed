@@ -1,98 +1,132 @@
+from __future__ import annotations
+
 import re
 
-from widlparser import parser
+import widlparser
 
-from . import config, h, messages as m, unsortedJunk as u
+from . import config, h, messages as m, t
 
 
 class IDLUI:
-    def warn(self, msg):
+    def warn(self, msg: str) -> None:
         m.die(msg.rstrip())
+
+    def note(self, msg: str) -> None:
+        m.warn(msg.rstrip())
 
 
 class IDLSilent:
-    def warn(self, msg):
+    def warn(self, msg: str) -> None:
+        pass
+
+    def note(self, msg: str) -> None:
         pass
 
 
-class DebugMarker:
+if t.TYPE_CHECKING:
+    MarkupReturnT = tuple[str | None, str | None]
+
+
+class DebugMarker(widlparser.protocols.Marker):
     # Debugging tool for IDL markup
 
-    def markup_construct(self, text, construct):  # pylint: disable=unused-argument
+    def markup_construct(
+        self, text: str, construct: widlparser.Construct
+    ) -> MarkupReturnT:  # pylint: disable=unused-argument
         return (
             "<construct-" + construct.idl_type + ">",
             "</construct-" + construct.idl_type + ">",
         )
 
-    def markup_type(self, text, construct):
+    def markup_type(self, text: str, construct: widlparser.Construct) -> MarkupReturnT:
         return (
             '<TYPE for="' + construct.idl_type + '" idlType="' + text + '">',
             "</TYPE>",
         )
 
-    def markup_primitive_type(self, text, construct):
+    def markup_primitive_type(self, text: str, construct: widlparser.Construct) -> MarkupReturnT:
         return (
             '<PRIMITIVE for="' + construct.idl_type + '" idlType="' + text + '">',
             "</PRIMITIVE>",
         )
 
-    def markup_buffer_type(self, text, construct):
+    def markup_buffer_type(self, text: str, construct: widlparser.Construct) -> MarkupReturnT:
         return (
             '<BUFFER for="' + construct.idl_type + '" idlType="' + text + '">',
             "</BUFFER>",
         )
 
-    def markup_string_type(self, text, construct):
+    def markup_string_type(self, text: str, construct: widlparser.Construct) -> MarkupReturnT:
         return (
             '<STRING for="' + construct.idl_type + '" idlType="' + text + '">',
             "</STRING>",
         )
 
-    def markup_object_type(self, text, construct):
+    def markup_object_type(self, text: str, construct: widlparser.Construct) -> MarkupReturnT:
         return (
             '<OBJECT for="' + construct.idl_type + '" idlType="' + text + '">',
             "</OBJECT>",
         )
 
-    def markup_type_name(self, text, construct):  # pylint: disable=unused-argument
+    def markup_type_name(
+        self, text: str, construct: widlparser.Construct
+    ) -> MarkupReturnT:  # pylint: disable=unused-argument
         return ('<TYPE-NAME idlType="' + construct.idl_type + '">', "</TYPE-NAME>")
 
-    def markup_name(self, text, construct):  # pylint: disable=unused-argument
+    def markup_name(
+        self, text: str, construct: widlparser.Construct
+    ) -> MarkupReturnT:  # pylint: disable=unused-argument
         return ('<NAME idlType="' + construct.idl_type + '">', "</NAME>")
 
-    def markup_keyword(self, text, construct):  # pylint: disable=unused-argument
+    def markup_keyword(
+        self, text: str, construct: widlparser.Construct
+    ) -> MarkupReturnT:  # pylint: disable=unused-argument
         return ('<KEYWORD idlType="' + construct.idl_type + '">', "</KEYWORD>")
 
-    def markup_enum_value(self, text, construct):  # pylint: disable=unused-argument
-        return ('<ENUM-VALUE for="' + construct.name + '">', "</ENUM-VALUE>")
+    def markup_enum_value(
+        self, text: str, construct: widlparser.Construct
+    ) -> MarkupReturnT:  # pylint: disable=unused-argument
+        return ('<ENUM-VALUE for="' + t.cast(str, construct.name) + '">', "</ENUM-VALUE>")
 
 
-class IDLMarker:
-    def markup_construct(self, text, construct):  # pylint: disable=unused-argument
+class IDLMarker(widlparser.protocols.Marker):
+    def markup_construct(
+        self, text: str, construct: widlparser.Construct
+    ) -> MarkupReturnT:  # pylint: disable=unused-argument
         # Fires for every 'construct' in the WebIDL.
         # Some things are "productions", not "constructs".
         return (None, None)
 
-    def markup_type(self, text, construct):  # pylint: disable=unused-argument
+    def markup_type(
+        self, text: str, construct: widlparser.Construct
+    ) -> MarkupReturnT:  # pylint: disable=unused-argument
         # Fires for entire type definitions.
         # It'll contain keywords or names, or sometimes more types.
         # For example, a "type" wrapper surrounds an entire union type,
         # as well as its component types.
         return (None, None)
 
-    def markup_primitive_type(self, text, construct):  # pylint: disable=unused-argument
+    def markup_primitive_type(
+        self, text: str, construct: widlparser.Construct
+    ) -> MarkupReturnT:  # pylint: disable=unused-argument
         return ("<a data-link-type=interface>", "</a>")
 
-    def markup_string_type(self, text, construct):  # pylint: disable=unused-argument
+    def markup_string_type(
+        self, text: str, construct: widlparser.Construct
+    ) -> MarkupReturnT:  # pylint: disable=unused-argument
         return ("<a data-link-type=interface>", "</a>")
 
-    def markup_buffer_type(self, text, construct):  # pylint: disable=unused-argument
+    def markup_buffer_type(
+        self, text: str, construct: widlparser.Construct
+    ) -> MarkupReturnT:  # pylint: disable=unused-argument
         return ("<a data-link-type=interface>", "</a>")
 
-    def markup_object_type(self, text, construct):  # pylint: disable=unused-argument
+    def markup_object_type(
+        self, text: str, construct: widlparser.Construct
+    ) -> MarkupReturnT:  # pylint: disable=unused-argument
         return ("<a data-link-type=interface>", "</a>")
 
-    def markup_type_name(self, text, construct):
+    def markup_type_name(self, text: str, construct: widlparser.Construct) -> MarkupReturnT:
         # Fires for non-defining type names, such as arg types.
 
         # The names in [Exposed=Foo] are [Global] tokens, not interface names.
@@ -104,11 +138,11 @@ class IDLMarker:
         if construct.idl_type == "extended-attribute" and construct.name == "PutForwards":
             # In [PutForwards=value] attribute DOMString foo
             # the "value" is a DOMString attr
-            attr = construct.parent
-            if hasattr(attr.member, "rest"):
-                type = attr.member.rest.type
-            elif hasattr(attr.member, "attribute"):
-                type = attr.member.attribute.type
+            member = construct.parent.member  # type: ignore
+            if hasattr(member, "rest"):
+                type = member.rest.type
+            elif hasattr(member, "attribute"):
+                type = member.attribute.type
             typeName = str(type).strip()
             if typeName.endswith("?"):
                 typeName = typeName[:-1]
@@ -132,7 +166,7 @@ class IDLMarker:
 
         return ('<a data-link-type="idl-name">', "</a>")
 
-    def markup_keyword(self, text, construct):
+    def markup_keyword(self, text: str, construct: widlparser.Construct) -> MarkupReturnT:
         # Fires on the various "keywords" of WebIDL -
         # words that are part of the WebIDL syntax,
         # rather than names exposed to JS.
@@ -167,7 +201,9 @@ class IDLMarker:
             )
         return (None, None)
 
-    def markup_name(self, text, construct):  # pylint: disable=unused-argument
+    def markup_name(
+        self, text: str, construct: widlparser.Construct
+    ) -> MarkupReturnT:  # pylint: disable=unused-argument
         # Fires for defining names: method names, arg names, interface names, etc.
         idlType = construct.idl_type
         if idlType not in config.idlTypes:
@@ -185,28 +221,31 @@ class IDLMarker:
             return (None, None)
 
         idlTitle = construct.normal_name
-        if idlType == "method" and idlTitle.startswith("constructor("):
+        if idlType == "method" and idlTitle and idlTitle.startswith("constructor("):
             idlType = "constructor"
 
         extraParameters = ""
         refType = "idl"
         if idlType in config.functionishTypes:
-            idlTitle = "|".join(self.methodLinkingTexts(construct))
+            idlTitle = "|".join(self.methodLinkingTexts(construct))  # type: ignore
         elif idlType == "extended-attribute":
             refType = "link"
         elif idlType == "attribute":
-            if hasattr(construct.member, "rest"):
-                rest = construct.member.rest
-            elif hasattr(construct.member, "attribute"):
-                rest = construct.member.attribute
+            member = construct.member  # type: ignore
+            if hasattr(member, "rest"):
+                rest = member.rest
+            elif hasattr(member, "attribute"):
+                rest = member.attribute
             else:
-                m.die("Can't figure out how to construct attribute-info from:\n  " + construct)
+                m.die(f"Can't figure out how to construct attribute-info from:\n  {construct}")
+                return (None, None)
             if rest.readonly is not None:
                 readonly = "data-readonly"
             else:
                 readonly = ""
             extraParameters = '{} data-type="{}"'.format(readonly, str(rest.type).strip())
         elif idlType == "dict-member":
+            assert isinstance(construct, widlparser.DictionaryMember)
             extraParameters = f'data-type="{construct.type}"'
             if construct.default is not None:
                 value = str(construct.default).split("=", 1)[1].strip()
@@ -216,7 +255,7 @@ class IDLMarker:
                     value = "{}"
                 extraParameters += ' data-default="{}"'.format(h.escapeAttr(value))
         elif idlType in ["interface", "namespace", "dictionary"]:
-            if construct.partial:
+            if construct.partial:  # type: ignore
                 refType = "link"
 
         if refType == "link":
@@ -227,7 +266,7 @@ class IDLMarker:
         if idlType in config.typesUsingFor:
             if idlType == "argument" and construct.parent.idl_type == "method":
                 interfaceName = construct.parent.parent.name
-                methodNames = [f"{interfaceName}/{m}" for m in self.methodLinkingTexts(construct.parent)]
+                methodNames = [f"{interfaceName}/{m}" for m in self.methodLinkingTexts(construct.parent)]  # type: ignore
                 idlFor = "data-idl-for='{}'".format(", ".join(methodNames))
             else:
                 idlFor = f"data-idl-for='{construct.parent.full_name}'"
@@ -245,18 +284,18 @@ class IDLMarker:
             f"</{elementName}>",
         )
 
-    def markup_enum_value(self, text, construct):
+    def markup_enum_value(self, text: str, construct: widlparser.Construct) -> MarkupReturnT:
         return (
             "<idl data-idl-type=enum-value data-idl-for='{}' data-lt='{}'>".format(
-                h.escapeAttr(construct.name), h.escapeAttr(text)
+                h.escapeAttr(t.cast(str, construct.name)), h.escapeAttr(text)
             ),
             "</idl>",
         )
 
-    def encode(self, text):
+    def encode(self, text: str) -> str:
         return h.escapeHTML(text)
 
-    def methodLinkingTexts(self, method):
+    def methodLinkingTexts(self, method: widlparser.OperationRest) -> list[str]:
         """
         Given a method-ish widlparser Construct,
         finds all possible linking texts.
@@ -266,6 +305,7 @@ class IDLMarker:
         "foo(bar)" and "foo()" would both also be valid linking texts.
         """
         for i, arg in enumerate(method.arguments or []):
+            assert isinstance(arg, widlparser.constructs.Argument)
             if arg.optional or arg.variadic:
                 optStart = i
                 break
@@ -275,21 +315,21 @@ class IDLMarker:
         texts = []
 
         if optStart is not None:
-            prefixes = [method.name]
+            prefixes = [t.cast(str, method.name)]
             if method.name == "constructor":
-                prefixes.append(method.parent.name)
+                prefixes.append(t.cast(str, method.parent.name))
             for i in range(optStart, len(method.arguments)):
-                argText = ", ".join(arg.name for arg in method.arguments[:i])
+                argText = ", ".join(t.cast(str, arg.name) for arg in list(method.arguments)[:i])
                 for prefix in prefixes:
                     texts.append(prefix + "(" + argText + ")")
 
-        texts.append(method.normal_name)
+        texts.append(t.cast(str, method.normal_name))
         if method.name == "constructor":
-            texts.append(method.parent.name + method.normal_name[11:])
-        return reversed(texts)
+            texts.append(t.cast(str, method.parent.name) + t.cast(str, method.normal_name)[11:])
+        return list(reversed(texts))
 
 
-def markupIDL(doc):
+def markupIDL(doc: t.SpecT) -> None:
     highlightingOccurred = False
     idlEls = h.findAll("pre.idl:not([data-no-idl]), xmp.idl:not([data-no-idl])", doc)
     for el in h.findAll("script[type=idl]", doc):
@@ -297,24 +337,25 @@ def markupIDL(doc):
         idlEls.append(el)
         el.tag = "pre"
         h.removeAttr(el, "type")
-        h.addClass(el, "idl")
+        h.addClass(doc, el, "idl")
     # One pass with a silent parser to collect the symbol table.
     symbolTable = None
     for el in idlEls:
-        p = parser.Parser(h.textContent(el), ui=IDLSilent(), symbol_table=symbolTable)
+        p = widlparser.parser.Parser(h.textContent(el), ui=IDLSilent(), symbol_table=symbolTable)
         symbolTable = p.symbol_table
     # Then a real pass to actually mark up the IDL,
     # and collect it for the index.
     for el in idlEls:
-        if h.isNormative(el, doc):
+        if h.isNormative(doc, el):
             text = h.textContent(el)
             # Parse once with a fresh parser, so I can spit out just this <pre>'s markup.
-            widl = parser.Parser(text, ui=IDLUI(), symbol_table=symbolTable)
+            widl = widlparser.parser.Parser(text, ui=IDLUI(), symbol_table=symbolTable)
             marker = DebugMarker() if doc.debug else IDLMarker()
+
             h.replaceContents(el, h.parseHTML(str(widl.markup(marker))))
             # Parse a second time with the global one, which collects all data in the doc.
             doc.widl.parse(text)
-        h.addClass(el, "highlight")
+        h.addClass(doc, el, "highlight")
         highlightingOccurred = True
     if doc.md.slimBuildArtifact:
         # Remove the highlight-only spans
@@ -333,75 +374,70 @@ def markupIDL(doc):
             """
 
 
-def processIDL(doc):
+def markupIDLBlock(pre: t.ElementT, doc: t.SpecT) -> set[t.ElementT]:
     localDfns = set()
-    for pre in h.findAll("pre.idl, xmp.idl", doc):
-        if pre.get("data-no-idl") is not None:
-            continue
-        if not h.isNormative(pre, doc):
-            continue
-        forcedInterfaces = []
-        for x in (h.treeAttr(pre, "data-dfn-force") or "").split():
-            x = x.strip()
-            if x.endswith("<interface>"):
-                x = x[:-11]
-            forcedInterfaces.append(x)
-        for el in h.findAll("idl", pre):
-            idlType = el.get("data-idl-type")
-            url = None
-            forceDfn = False
-            ref = None
-            idlText = None
-            for idlText in el.get("data-lt").split("|"):
-                if idlType == "interface" and idlText in forcedInterfaces:
-                    forceDfn = True
-                for linkFor in config.splitForValues(el.get("data-idl-for", "")) or [None]:
-                    ref = doc.refs.getRef(
-                        idlType,
-                        idlText,
-                        linkFor=linkFor,
-                        status="local",
-                        el=el,
-                        error=False,
-                    )
-                    if ref:
-                        url = ref.url
-                        break
+    forcedInterfaces = []
+    for x in (h.treeAttr(pre, "data-dfn-force") or "").split():
+        x = x.strip()
+        if x.endswith("<interface>"):
+            x = x[:-11]
+        forcedInterfaces.append(x)
+    for el in h.findAll("idl", pre):
+        idlType = el.get("data-idl-type")
+        assert isinstance(idlType, str)
+        url = None
+        forceDfn = False
+        ref = None
+        idlText = None
+        for idlText in (el.get("data-lt") or "").split("|"):
+            if idlType == "interface" and idlText in forcedInterfaces:
+                forceDfn = True
+            linkFors = t.cast("list[str|None]", config.splitForValues(el.get("data-idl-for", ""))) or [None]
+            for linkFor in linkFors:
+                ref = doc.refs.getRef(
+                    idlType,
+                    idlText,
+                    linkFor=linkFor,
+                    status="local",
+                    el=el,
+                    error=False,
+                )
                 if ref:
+                    url = ref.url
                     break
-            if url is None or forceDfn:
-                el.tag = "dfn"
-                el.set("data-dfn-type", idlType)
-                del el.attrib["data-idl-type"]
-                if el.get("data-idl-for"):
-                    el.set("data-dfn-for", el.get("data-idl-for"))
-                    del el.attrib["data-idl-for"]
-            else:
-                # Copy over the auto-generated linking text to the manual dfn.
-                dfn = h.find(url, doc)
-                lts = combineIdlLinkingTexts(el.get("data-lt"), dfn.get("data-lt"))
-                dfn.set("data-lt", lts)
-                localDfns.add(dfn)
+            if ref:
+                break
+        if url is None or forceDfn:
+            el.tag = "dfn"
+            el.set("data-dfn-type", idlType)
+            del el.attrib["data-idl-type"]
+            if el.get("data-idl-for"):
+                el.set("data-dfn-for", el.get("data-idl-for") or "")
+                del el.attrib["data-idl-for"]
+        else:
+            # Copy over the auto-generated linking text to the manual dfn.
+            dfn = h.find(url, doc)
+            # How in the hell does this work, the url is not a selector???
+            assert dfn is not None
+            lts = combineIdlLinkingTexts(el.get("data-lt"), dfn.get("data-lt"))
+            dfn.set("data-lt", lts)
+            localDfns.add(dfn)
 
-                # Reset the <idl> element to be a link to the manual dfn.
-                el.tag = "a"
-                el.set("data-link-type", idlType)
-                el.set("data-lt", idlText)
-                del el.attrib["data-idl-type"]
-                if el.get("data-idl-for"):
-                    el.set("data-link-for", el.get("data-idl-for"))
-                    del el.attrib["data-idl-for"]
-                if el.get("id"):
-                    # ID was defensively added by the Marker.
-                    del el.attrib["id"]
-
-    dfns = h.findAll("pre.idl:not([data-no-idl]) dfn, xmp.idl:not([data-no-idl]) dfn", doc) + list(localDfns)
-    u.classifyDfns(doc, dfns)
-    h.fixupIDs(doc, dfns)
-    doc.refs.addLocalDfns(dfn for dfn in dfns if dfn.get("id") is not None)
+            # Reset the <idl> element to be a link to the manual dfn.
+            el.tag = "a"
+            el.set("data-link-type", idlType)
+            el.set("data-lt", idlText)
+            del el.attrib["data-idl-type"]
+            if el.get("data-idl-for"):
+                el.set("data-link-for", el.get("data-idl-for") or "")
+                del el.attrib["data-idl-for"]
+            if el.get("id"):
+                # ID was defensively added by the Marker.
+                del el.attrib["id"]
+    return localDfns
 
 
-def combineIdlLinkingTexts(t1, t2):
+def combineIdlLinkingTexts(t1: str | None, t2: str | None) -> str:
     t1s = [normalizeIdlWhitespace(x) for x in (t1 or "").split("|")]
     t2s = [normalizeIdlWhitespace(x) for x in (t2 or "").split("|")]
     for lt in t2s:
@@ -410,7 +446,7 @@ def combineIdlLinkingTexts(t1, t2):
     return "|".join(t1s)
 
 
-def normalizeIdlWhitespace(text):
+def normalizeIdlWhitespace(text: str) -> str:
     # Remove all whitespace...
     text = re.sub(r"\s+", "", text)
     # Then add whitespace after commas
@@ -418,5 +454,161 @@ def normalizeIdlWhitespace(text):
     return text
 
 
-def getParser():
-    return parser.Parser(ui=IDLSilent())
+def getParser() -> widlparser.parser.Parser:
+    return widlparser.parser.Parser(ui=IDLSilent())
+
+
+def nodesFromType(prod: widlparser.productions.Production) -> t.ElementT:
+    return h.E.code({"class": "idl"}, _nodesFromProduction(prod))
+
+
+def _nodesFromProduction(prod: widlparser.productions.Production | widlparser.protocols.Construct) -> t.NodesT:
+    # pylint: disable=protected-access
+    # Things that should be directly linkifiable from their text
+    if isinstance(
+        prod,
+        (
+            widlparser.productions.Symbol,
+            widlparser.productions.IntegerType,
+            widlparser.productions.UnsignedIntegerType,
+            widlparser.productions.FloatType,
+            widlparser.productions.UnrestrictedFloatType,
+            widlparser.productions.PrimitiveType,
+            widlparser.productions.Identifier,
+            widlparser.productions.TypeIdentifier,
+            widlparser.productions.AnyType,
+        ),
+    ):
+        return h.E.a({"data-link-type": "idl-name"}, str(prod))
+
+    # Possibly-decorated containers, with .type
+    elif isinstance(
+        prod,
+        (
+            widlparser.productions.SingleType,
+            widlparser.productions.ConstType,
+            widlparser.productions.UnionMemberType,
+            widlparser.productions.Type,
+            widlparser.productions.TypeWithExtendedAttributes,
+        ),
+    ):
+        tail = []
+        if isinstance(prod, widlparser.productions.ConstType) and prod.null is not None:
+            tail.append(str(prod.null))
+        if (
+            isinstance(
+                prod,
+                (
+                    widlparser.productions.UnionMemberType,
+                    widlparser.productions.Type,
+                    widlparser.productions.TypeWithExtendedAttributes,
+                ),
+            )
+            and prod.suffix is not None
+        ):
+            tail.append(str(prod.suffix))
+        head = []
+        if (
+            isinstance(
+                prod,
+                (
+                    widlparser.productions.UnionMemberType,
+                    widlparser.productions.TypeWithExtendedAttributes,
+                ),
+            )
+            and prod._extended_attributes is not None
+        ):
+            head.append(_nodesFromProduction(prod._extended_attributes))
+            head.append(" ")
+        if head or tail:
+            return [*head, _nodesFromProduction(prod.type), *tail]
+        else:
+            return _nodesFromProduction(prod.type)
+
+    # NonAnyType is complicated
+    elif isinstance(prod, widlparser.productions.NonAnyType):
+        tail = []
+        if prod.null:
+            tail.append(str(prod.null))
+        if prod.suffix:
+            tail.append(str(prod.suffix))
+        if prod.sequence:
+            return [
+                h.E.a({"data-link-type": "dfn"}, "sequence"),
+                "<",
+                _nodesFromProduction(prod.type),
+                ">",
+                *tail,
+            ]
+        elif prod.promise:
+            return [h.E.a({"data-link-type": "interface"}, "Promise"), "<", _nodesFromProduction(prod.type), ">", *tail]
+        elif prod.record:
+            assert prod.key_type is not None
+            return [
+                h.E.a({"data-link-type": "dfn", "data-link-spec": "webidl"}, "record"),
+                "<",
+                _nodesFromProduction(prod.key_type),
+                ", ",
+                _nodesFromProduction(prod.type),
+                ">",
+                *tail,
+            ]
+        else:
+            if tail:
+                return [_nodesFromProduction(prod.type), *tail]
+            else:
+                return _nodesFromProduction(prod.type)
+
+    # UnionType
+    elif isinstance(prod, widlparser.productions.UnionType):
+        return ["(", *config.intersperse([_nodesFromProduction(p) for p in prod.types], " or "), ")"]
+
+    # Extended Attributes
+    elif isinstance(prod, widlparser.productions.ExtendedAttributeList):
+        return ["[", *config.intersperse([_nodesFromProduction(p) for p in prod.attributes], " or "), "]"]
+    elif isinstance(prod, widlparser.constructs.ExtendedAttribute):
+        prod = prod.attribute
+        if isinstance(prod, widlparser.constructs.ExtendedAttributeNoArgs):
+            return h.E.a({"data-link-type": "extended-attribute"}, str(prod))
+        elif isinstance(prod, widlparser.constructs.ExtendedAttributeIdent):
+            return [h.E.a({"data-link-type": "extended-attribute"}, str(prod._attribute)), "=", str(prod._value)]
+        elif isinstance(prod, widlparser.constructs.ExtendedAttributeIdentList):
+            return [
+                h.E.a({"data-link-type": "extended-attribute"}, str(prod._attribute)),
+                "=(",
+                _nodesFromProduction(prod._value),
+                _nodesFromProduction(prod.next) if prod.next else "",
+                ")",
+            ]
+        # punt on the rest
+        else:
+            return str(prod)
+
+    # The rest of a comma-separated ident list
+    elif isinstance(prod, widlparser.productions.TypeIdentifiers):
+        nodes = [", ", h.E.a({"data-link-type": "idl-name"}, str(prod._name))]
+        while prod.next:
+            prod = prod.next
+            nodes.append(", ")
+            nodes.append(h.E.a({"data-link-type": "idl-name"}, str(prod._name)))
+        return nodes
+
+    # Things that should just be returned as text
+    elif isinstance(
+        prod,
+        (
+            widlparser.productions.String,
+            widlparser.productions.Integer,
+            widlparser.productions.FloatLiteral,
+            widlparser.productions.ConstValue,
+            widlparser.productions.EnumValue,
+            widlparser.productions.EnumValueList,
+            widlparser.productions.Default,
+            widlparser.productions.ArgumentName,
+        ),
+    ):
+        return str(prod)
+
+    # Anything else, also return as plain str, but warn.
+    m.warn(f"Unhandled IDL production type '{type(prod)}' in _nodesFromProduction, please report as a Bikeshed issue.")
+    return str(prod)

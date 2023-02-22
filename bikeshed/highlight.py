@@ -1,22 +1,38 @@
+# pylint: disable=unused-argument
+
+from __future__ import annotations
+
 import collections
+import dataclasses
 import itertools
 import re
 
-from . import h, messages as m
+from . import h, messages as m, t
+
+if t.TYPE_CHECKING:
+    import pygments
+    from . import lexers
+
+    T = t.TypeVar("T")
 
 
-def loadCSSLexer():
+def loadCSSLexer() -> lexers.CSSLexer:
     from .lexers import CSSLexer
 
     return CSSLexer()
 
 
-customLexers = {"css": loadCSSLexer}
-
-ColoredText = collections.namedtuple("ColoredText", ["text", "color"])
+customLexers: dict[str, pygments.lexer.Lexer] = {"css": loadCSSLexer}
 
 
-def addSyntaxHighlighting(doc):
+@dataclasses.dataclass
+class ColoredText:
+    text: str
+    # None indicates uncolored text
+    color: str | None
+
+
+def addSyntaxHighlighting(doc: t.SpecT) -> None:
     if doc.md.slimBuildArtifact:
         return
     normalizeHighlightMarkers(doc)
@@ -32,15 +48,15 @@ def addSyntaxHighlighting(doc):
             # Element was already highlighted, but needs styles
             highlightingOccurred = True
         elif lang:
-            highlightEl(el, lang)
+            highlightEl(doc, el, lang)
             highlightingOccurred = True
         # Find whether to add line numbers
-        addLineNumbers, lineStart, lineHighlights = determineLineNumbers(doc, el)
-        if addLineNumbers or lineHighlights:
-            addLineWrappers(el, numbers=addLineNumbers, start=lineStart, highlights=lineHighlights)
-            if addLineNumbers:
+        ln = determineLineNumbers(doc, el)
+        if ln.addNumbers or ln.highlights:
+            addLineWrappers(doc, el, ln)
+            if ln.addNumbers:
                 lineWrappingOccurred = True
-            if lineHighlights:
+            if ln.highlights:
                 lineHighlightingOccurred = True
 
     if highlightingOccurred:
@@ -54,13 +70,13 @@ def addSyntaxHighlighting(doc):
         doc.extraStyles["style-darkmode"] += getLineHighlightingDarkmodeStyles()
 
 
-def determineHighlightLang(doc, el):
+def determineHighlightLang(doc: t.SpecT, el: t.ElementT) -> str | t.Literal[False] | None:
     # Either returns a normalized highlight lang,
     # False indicating the element was already highlighted,
     # or None indicating the element shouldn't be highlighted.
     attr, lang = h.closestAttr(el, "nohighlight", "highlight")
     lang = normalizeLanguageName(lang)
-    if lang == "webidl" and el.tag == "code" and h.parentElement(el).tag == "dfn":
+    if lang == "webidl" and el.tag == "code" and h.tagName(h.parentElement(el)) == "dfn":
         # No such thing as a dfn that needs to be WebIDL-highlighted.
         # This is probably happening from a <dfn idl-type> inside a <pre highlight=idl>.
         return None
@@ -69,12 +85,23 @@ def determineHighlightLang(doc, el):
     if attr == "highlight":
         return lang
     # Highlight-by-default, if applicable.
-    if el.tag in ["pre", "xmp"] and h.hasClass(el, "idl"):
+    if el.tag in ["pre", "xmp"] and h.hasClass(doc, el, "idl"):
         return "webidl"
     return doc.md.defaultHighlight
 
 
-def determineLineNumbers(doc, el):
+@dataclasses.dataclass
+class LineNumberOptions:
+    # Whether to add line numbers
+    addNumbers: bool
+    # What line number the snippet starts at
+    startingLine: int
+    # Which lines, if any, to specially highlight
+    # (relative to the starting line)
+    highlights: set[int]
+
+
+def determineLineNumbers(doc: t.SpecT, el: t.ElementT) -> LineNumberOptions:
     lAttr, _ = h.closestAttr(el, "no-line-numbers", "line-numbers")
     if lAttr == "no-line-numbers" or el.tag == "code":
         addLineNumbers = False
@@ -83,14 +110,14 @@ def determineLineNumbers(doc, el):
     else:
         addLineNumbers = doc.md.lineNumbers
 
-    lineStart = el.get("line-start")
-    if lineStart is None:
+    ls = el.get("line-start")
+    if ls is None:
         lineStart = 1
     else:
         try:
-            lineStart = int(lineStart)
+            lineStart = int(ls)
         except ValueError:
-            m.die(f"line-start attribute must have an integer value. Got '{lineStart}'.", el=el)
+            m.die(f"line-start attribute must have an integer value. Got '{ls}'.", el=el)
             lineStart = 1
 
     lh = el.get("line-highlight")
@@ -104,37 +131,39 @@ def determineLineNumbers(doc, el):
                 # Range, format of DDD-DDD
                 low, _, high = item.partition("-")
                 try:
-                    low = int(low)
-                    high = int(high)
+                    lowVal = int(low)
+                    highVal = int(high)
                 except ValueError:
                     m.die(f"Error parsing line-highlight range '{item}' - must be `int-int`.", el=el)
                     continue
-                if low >= high:
+                if lowVal >= highVal:
                     m.die(f"line-highlight ranges must be well-formed lo-hi - got '{item}'.", el=el)
                     continue
-                lineHighlights.update(list(range(low, high + 1)))
+                lineHighlights.update(list(range(lowVal, highVal + 1)))
             else:
                 try:
-                    item = int(item)
+                    itemVal = int(item)
                 except ValueError:
                     m.die(f"Error parsing line-highlight value '{item}' - must be integers.", el=el)
                     continue
-                lineHighlights.add(item)
+                lineHighlights.add(itemVal)
 
-    return addLineNumbers, lineStart, lineHighlights
+    return LineNumberOptions(addLineNumbers, lineStart, lineHighlights)
 
 
-def highlightEl(el, lang):
+def highlightEl(doc: t.SpecT, el: t.ElementT, lang: str) -> None:
     text = h.textContent(el)
+    coloredText: t.Deque[ColoredText] | None
     if lang == "webidl":
         coloredText = highlightWithWebIDL(text, el=el)
     else:
         coloredText = highlightWithPygments(text, lang, el=el)
-    mergeHighlighting(el, coloredText)
-    h.addClass(el, "highlight")
+    if coloredText is not None:
+        mergeHighlighting(el, coloredText)
+        h.addClass(doc, el, "highlight")
 
 
-def highlightWithWebIDL(text, el):
+def highlightWithWebIDL(text: str, el: t.ElementT) -> t.Deque[ColoredText] | None:
     """
     Trick the widlparser emitter,
     which wants to output HTML via wrapping with start/end tags,
@@ -145,23 +174,34 @@ def highlightWithWebIDL(text, el):
     All other text is colored with the attr currently on top of the stack.
     """
     from widlparser import parser
+    import widlparser
 
     class IDLUI:
-        def warn(self, msg):
+        def warn(self, msg: str) -> None:
             m.die(msg.rstrip())
+
+        def note(self, msg: str) -> None:
+            m.warn(msg.rstrip())
 
     class HighlightMarker:
         # Just applies highlighting classes to IDL stuff.
-        def markup_type_name(self, text, construct):  # pylint: disable=unused-argument
+
+        def markup_type_name(
+            self, text: str, construct: widlparser.constructs.Construct
+        ) -> tuple[str | None, str | None]:
             return ("\1n\2", "\3")
 
-        def markup_name(self, text, construct):  # pylint: disable=unused-argument
+        def markup_name(self, text: str, construct: widlparser.constructs.Construct) -> tuple[str | None, str | None]:
             return ("\1g\2", "\3")
 
-        def markup_keyword(self, text, construct):  # pylint: disable=unused-argument
+        def markup_keyword(
+            self, text: str, construct: widlparser.constructs.Construct
+        ) -> tuple[str | None, str | None]:
             return ("\1b\2", "\3")
 
-        def markup_enum_value(self, text, construct):  # pylint: disable=unused-argument
+        def markup_enum_value(
+            self, text: str, construct: widlparser.constructs.Construct
+        ) -> tuple[str | None, str | None]:
             return ("\1s\2", "\3")
 
     if "\1" in text or "\2" in text or "\3" in text:
@@ -169,15 +209,15 @@ def highlightWithWebIDL(text, el):
             "WebIDL text contains some U+0001-0003 characters, which are used by the highlighter. This block can't be highlighted. :(",
             el=el,
         )
-        return
+        return None
 
     widl = parser.Parser(text, IDLUI())
-    return coloredTextFromWidlStack(str(widl.markup(HighlightMarker())))
+    return coloredTextFromWidlStack(str(widl.markup(t.cast(widlparser.protocols.Marker, HighlightMarker()))))
 
 
-def coloredTextFromWidlStack(widlText):
-    coloredTexts = collections.deque()
-    colors = []
+def coloredTextFromWidlStack(widlText: str) -> t.Deque[ColoredText]:
+    coloredTexts: t.Deque[ColoredText] = collections.deque()
+    colors: list[str] = []
     currentText = ""
     mode = "text"
     for char in widlText:
@@ -220,8 +260,8 @@ def coloredTextFromWidlStack(widlText):
     return coloredTexts
 
 
-def highlightWithPygments(text, lang, el):
-    import pygments
+def highlightWithPygments(text: str, lang: str, el: t.ElementT) -> t.Deque[ColoredText] | None:
+    import pygments  # pylint: disable=redefined-outer-name
     from pygments.formatters.other import RawTokenFormatter
 
     lexer = lexerFromLang(lang)
@@ -231,7 +271,7 @@ def highlightWithPygments(text, lang, el):
             + h.outerHTML(el),
             el=el,
         )
-        return
+        return None
     rawTokens = str(
         pygments.highlight(text, lexer, RawTokenFormatter()),
         encoding="utf-8",
@@ -240,26 +280,27 @@ def highlightWithPygments(text, lang, el):
     return coloredText
 
 
-def mergeHighlighting(el, coloredText):
+def mergeHighlighting(el: t.ElementT, coloredText: t.Sequence[ColoredText]) -> None:
     # Merges a tree of Pygment-highlighted HTML
     # into the original element's markup.
     # This works because Pygment effectively colors each character with a highlight class,
     # merging them together into runs of text for convenience/efficiency only;
     # the markup structure is a flat list of sibling elements containing raw text
     # (and maybe some un-highlighted raw text between them).
-    def createEl(color, text):
+    def createEl(color: str, text: str) -> t.ElementT:
         return h.createElement("c-", {color: ""}, text)
 
-    def colorizeEl(el, coloredText):
+    def colorizeEl(el: t.ElementT, coloredText: t.Deque[ColoredText]) -> t.ElementT:
         for node in h.childNodes(el, clear=True):
             if h.isElement(node):
                 h.appendChild(el, colorizeEl(node, coloredText))
             else:
-                h.appendChild(el, *colorizeText(node, coloredText))
+                assert isinstance(node, str)
+                h.appendChild(el, *colorizeText(node, coloredText), allowEmpty=True)
         return el
 
-    def colorizeText(text, coloredText):
-        nodes = []
+    def colorizeText(text: str, coloredText: t.Deque[ColoredText]) -> list[t.NodeT]:
+        nodes: list[t.NodeT] = []
         while text and coloredText:
             nextColor = coloredText.popleft()
             if len(nextColor.text) <= len(text):
@@ -281,11 +322,11 @@ def mergeHighlighting(el, coloredText):
         return nodes
 
     # Remove empty colored texts
-    coloredText = collections.deque(x for x in coloredText if x.text)
-    colorizeEl(el, coloredText)
+    filtered = collections.deque(x for x in coloredText if x.text)
+    colorizeEl(el, filtered)
 
 
-def coloredTextFromRawTokens(text):
+def coloredTextFromRawTokens(text: str) -> t.Deque[ColoredText]:
     colorFromName = {
         "Token.Comment": "c",
         "Token.Keyword": "k",
@@ -341,7 +382,7 @@ def coloredTextFromRawTokens(text):
         "Token.Literal.Number.Integer.Long": "il",
     }
 
-    def addCtToList(list, ct):
+    def addCtToList(list: t.Deque[ColoredText], ct: ColoredText) -> None:
         if "\n" in ct.text:
             # Break apart the formatting so that the \n is plain text,
             # so it works better with line numbers.
@@ -353,8 +394,8 @@ def coloredTextFromRawTokens(text):
         else:
             list.append(ct)
 
-    textList = collections.deque()
-    currentCT = None
+    textList: t.Deque[ColoredText] = collections.deque()
+    currentCT: ColoredText | None = None
     for line in text.split("\n"):
         if not line:
             continue
@@ -367,7 +408,7 @@ def coloredTextFromRawTokens(text):
             currentCT = ColoredText(text, color)
         elif currentCT.color == color:
             # Repeated color, merge into current
-            currentCT = currentCT._replace(text=currentCT.text + text)
+            currentCT.text += text
         else:
             addCtToList(textList, currentCT)
             currentCT = ColoredText(text, color)
@@ -376,7 +417,7 @@ def coloredTextFromRawTokens(text):
     return textList
 
 
-def normalizeLanguageName(lang):
+def normalizeLanguageName(lang: str | None) -> str | None:
     # Translates some names to ones Pygment understands
     if lang == "aspnet":
         return "aspx-cs"
@@ -387,15 +428,15 @@ def normalizeLanguageName(lang):
     return lang
 
 
-def normalizeHighlightMarkers(doc):
+def normalizeHighlightMarkers(doc: t.SpecT) -> None:
     # Translate Prism-style highlighting into Pygment-style
     for el in h.findAll("[class*=language-], [class*=lang-]", doc):
-        match = re.search(r"(?:lang|language)-(\w+)", el.get("class"))
+        match = re.search(r"(?:lang|language)-(\w+)", el.get("class") or "")
         if match:
             el.set("highlight", match.group(1))
 
 
-def lexerFromLang(lang):
+def lexerFromLang(lang: str) -> pygments.lexer.Lexer | None:
     if lang in customLexers:
         return customLexers[lang]()
     try:
@@ -407,16 +448,15 @@ def lexerFromLang(lang):
         return None
 
 
-def addLineWrappers(el, numbers=True, start=1, highlights=None):
+def addLineWrappers(doc: t.SpecT, el: t.ElementT, options: LineNumberOptions) -> t.ElementT:
     # Wrap everything between each top-level newline with a line tag.
     # Add an attr for the line number, and if needed, the end line.
-    if highlights is None:
-        highlights = set()
     lineWrapper = h.E.span({"class": "line"})
     for node in h.childNodes(el, clear=True):
         if h.isElement(node):
             h.appendChild(lineWrapper, node)
         else:
+            assert isinstance(node, str)
             while True:
                 if "\n" in node:
                     pre, _, post = node.partition("\n")
@@ -425,6 +465,7 @@ def addLineWrappers(el, numbers=True, start=1, highlights=None):
                     h.appendChild(el, lineWrapper)
                     lineWrapper = h.E.span({"class": "line"})
                     node = post
+                    assert isinstance(node, str)
                 else:
                     h.appendChild(lineWrapper, node)
                     break
@@ -432,39 +473,40 @@ def addLineWrappers(el, numbers=True, start=1, highlights=None):
         h.appendChild(el, h.E.span({"class": "line-no"}))
         h.appendChild(el, lineWrapper)
     # Number the lines
-    lineNumber = start
-    for lineNo, node in grouper(h.childNodes(el), 2):
-        if numbers or lineNumber in highlights:
+    lineNumber = options.startingLine
+    for lineNo, node in t.cast("tuple[t.ElementT, t.ElementT]", grouper(h.childNodes(el), 2)):
+        if options.addNumbers or lineNumber in options.highlights:
             lineNo.set("data-line", str(lineNumber))
-        if lineNumber in highlights:
-            h.addClass(node, "highlight-line")
-            h.addClass(lineNo, "highlight-line")
+        if lineNumber in options.highlights:
+            h.addClass(doc, node, "highlight-line")
+            h.addClass(doc, lineNo, "highlight-line")
         internalNewlines = countInternalNewlines(node)
         if internalNewlines:
             for i in range(1, internalNewlines + 1):
-                if (lineNumber + i) in highlights:
-                    h.addClass(lineNo, "highlight-line")
-                    h.addClass(node, "highlight-line")
+                if (lineNumber + i) in options.highlights:
+                    h.addClass(doc, lineNo, "highlight-line")
+                    h.addClass(doc, node, "highlight-line")
                     lineNo.set("data-line", str(lineNumber))
             lineNumber += internalNewlines
-            if numbers:
+            if options.addNumbers:
                 lineNo.set("data-line-end", str(lineNumber))
         lineNumber += 1
-    h.addClass(el, "line-numbered")
+    h.addClass(doc, el, "line-numbered")
     return el
 
 
-def countInternalNewlines(el):
+def countInternalNewlines(el: t.ElementT) -> int:
     count = 0
     for node in h.childNodes(el):
         if h.isElement(node):
             count += countInternalNewlines(node)
         else:
+            assert isinstance(node, str)
             count += node.count("\n")
     return count
 
 
-def getHighlightStyles():
+def getHighlightStyles() -> str:
     # To regen the styles, edit and run the below
     # from pygments import token
     # from pygments import style
@@ -545,7 +587,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
 """
 
 
-def getHighlightDarkmodeStyles():
+def getHighlightDarkmodeStyles() -> str:
     return """
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -612,7 +654,7 @@ def getHighlightDarkmodeStyles():
 """
 
 
-def getLineNumberStyles():
+def getLineNumberStyles() -> str:
     return """
 :root {
     --highlight-hover-bg: rgba(0, 0, 0, .05);
@@ -648,7 +690,7 @@ def getLineNumberStyles():
 """
 
 
-def getLineNumberDarkmodeStyles():
+def getLineNumberDarkmodeStyles() -> str:
     return """
 @media (prefers-color-scheme: dark) {
     :root {
@@ -658,7 +700,7 @@ def getLineNumberDarkmodeStyles():
 """
 
 
-def getLineHighlightingStyles():
+def getLineHighlightingStyles() -> str:
     return """
 :root {
     --highlight-hover-bg: rgba(0, 0, 0, .05);
@@ -699,7 +741,7 @@ def getLineHighlightingStyles():
 """
 
 
-def getLineHighlightingDarkmodeStyles():
+def getLineHighlightingDarkmodeStyles() -> str:
     return """
 @media (prefers-color-scheme: dark) {
     :root {
@@ -709,7 +751,7 @@ def getLineHighlightingDarkmodeStyles():
 """
 
 
-def grouper(iterable, n, fillvalue=None):
+def grouper(iterable: t.Sequence[T], n: int, fillvalue: T | None = None) -> itertools.zip_longest[tuple[T | None, ...]]:
     "Collect data into fixed-length chunks or blocks"
     # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx
     args = [iter(iterable)] * n
