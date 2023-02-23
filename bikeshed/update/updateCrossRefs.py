@@ -104,6 +104,7 @@ if t.TYPE_CHECKING:
         nightly: t.Required[dict[str, str | list[str]]]
         release: dict[str, str | list[str]]
         seriesVersion: str
+        seriesComposition: str
         links: str
         refs: str
         idl: str
@@ -319,7 +320,13 @@ def specsFromWebref(status: t.Literal["current" | "snapshot"]) -> list[WebrefSpe
     j = dataFromWebref(url)
     if j is None or j.get("results") is None:
         raise Exception(f"No {status} specs data from WebRef. Got:\n{json.dumps(j, indent=1)}")
-    return t.cast("list[WebrefSpecT]", j["results"])
+    rawSpecs = t.cast("list[WebrefSpecT]", j["results"])
+    filteredSpecs: list[WebrefSpecT] = []
+    for spec in rawSpecs:
+        if spec["seriesComposition"] == "fork":
+            continue
+        filteredSpecs.append(spec)
+    return filteredSpecs
 
 
 def anchorsFromWebref(status: t.Literal["current" | "snapshot"], urlSuffix: str) -> list[WebrefAnchorT]:
