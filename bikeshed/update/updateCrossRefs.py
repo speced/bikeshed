@@ -22,6 +22,7 @@ if t.TYPE_CHECKING:
     MethodsT: t.TypeAlias = defaultdict[str, dict[str, t.Any]]
     ForsT: t.TypeAlias = defaultdict[str, list[str]]
 
+    # https://github.com/w3c/reffy/blob/main/schemas/browserlib/extract-headings.json
     class WebrefHeadingT(t.TypedDict, total=False):
         id: t.Required[str]
         href: t.Required[str]
@@ -54,16 +55,16 @@ if t.TYPE_CHECKING:
         total=False,
     )
 
+    # https://github.com/w3c/reffy/blob/main/schemas/browserlib/extract-dfns.json
     WebrefAnchorT = t.TypedDict(
         "WebrefAnchorT",
         {
-            "id": t.Required[str],
-            "type": t.Required[str],
-            "for": list[str],
-            "informative": bool,
-            "access": t.Required[str],
-            "linkingText": list[str],
             "href": t.Required[str],
+            "linkingText": list[str],
+            "type": t.Required[str],
+            "for": t.Required[list[str]],
+            "access": t.Required[str],
+            "informative": t.Required[bool],
         },
         total=False,
     )
@@ -173,7 +174,7 @@ def gatherWebrefData(specs: SpecsT, anchors: AnchorsT, headings: AllHeadingsT) -
 
     progress = alive_it(currentWebrefData, dual_line=True)
     for rawWSpec in t.cast("t.Generator[WebrefSpecT, None, None]", progress):
-        spec = genWebrefSpec(rawWSpec)
+        spec = canonSpecFromWebref(rawWSpec)
         currentUrl = spec["current_url"]
         assert currentUrl is not None
         progress.text(spec["vshortname"].lower())
@@ -181,12 +182,12 @@ def gatherWebrefData(specs: SpecsT, anchors: AnchorsT, headings: AllHeadingsT) -
         specs[spec["vshortname"].lower()] = spec
         specHeadings: HeadingsT = {}
         headings[spec["vshortname"]] = specHeadings
-        rawAnchorData: list[ShepherdAnchorT] = []
 
         if "dfns" in rawWSpec:
             currentAnchors = anchorsFromWebref("current", rawWSpec["dfns"])
             if currentAnchors:
-                rawAnchorData = [convertWebrefAnchor(x, currentUrl, "current") for x in currentAnchors]
+                for anchor in currentAnchors:
+                    addToAnchors(anchor, anchors, spec, "current")
         if "headings" in rawWSpec:
             currentHeadings = headingsFromWebref("current", rawWSpec["headings"])
             if currentHeadings:
@@ -206,17 +207,13 @@ def gatherWebrefData(specs: SpecsT, anchors: AnchorsT, headings: AllHeadingsT) -
                 if "dfns" in rawSnapshotSpec:
                     snapshotAnchors = anchorsFromWebref("snapshot", rawSnapshotSpec["dfns"])
                     if snapshotAnchors:
-                        rawAnchorData += [
-                            convertWebrefAnchor(x, spec["snapshot_url"], "snapshot") for x in snapshotAnchors
-                        ]
+                        for anchor in snapshotAnchors:
+                            addToAnchors(anchor, anchors, spec, "snapshot")
                 if "headings" in rawSnapshotSpec:
                     snapshotHeadings = headingsFromWebref("snapshot", rawSnapshotSpec["headings"])
                     if snapshotHeadings:
                         for heading in snapshotHeadings:
                             addToHeadings(heading, specHeadings, spec, "snapshot")
-
-        if len(rawAnchorData) > 0:
-            processRawAnchors(rawAnchorData, anchors, spec)
 
 
 def specsFromWebref(status: t.Literal["current" | "snapshot"]) -> list[WebrefSpecT]:
@@ -265,7 +262,7 @@ def dataFromWebref(url: str) -> t.JSONT:
     return t.cast("t.JSONT", data)
 
 
-def genWebrefSpec(rawSpec: WebrefSpecT) -> SpecT:
+def canonSpecFromWebref(rawSpec: WebrefSpecT) -> SpecT:
     """Generate a spec object from data gleaned from Webref"""
     assert rawSpec["shortname"] is not None
     assert rawSpec["series"] is not None
@@ -287,84 +284,36 @@ def genWebrefSpec(rawSpec: WebrefSpecT) -> SpecT:
     return spec
 
 
-def convertWebrefHeading(heading: WebrefHeadingT, specUrl: str, status: str) -> ShepherdAnchorT:
-    """Convert a heading returned by Webref to the anchor format used in Shepherd"""
-    assert heading["id"] is not None
-    assert heading["title"] is not None
-    assert heading["href"] is not None
-    anchor: ShepherdAnchorT = {
-        "name": heading["number"] if "number" in heading else heading["id"],
-        "type": "heading",
-        "for": [],
-        "section": True,
-        "title": heading["title"],
-        "status": status,
-        "normative": True,
-        "export": True,
-        "linking_text": [heading["title"]],
-        "uri": heading["href"].replace(specUrl, ""),
-    }
-    return anchor
-
-
-def convertWebrefAnchor(rawAnchor: WebrefAnchorT, specUrl: str, status: str) -> ShepherdAnchorT:
-    """Convert an anchor returned by Webref to the anchor format used in Shepherd"""
-    assert rawAnchor["id"] is not None
+def addToAnchors(
+    rawAnchor: WebrefAnchorT, anchors: AnchorsT, spec: SpecT, status: t.Literal["current"] | t.Literal["snapshot"]
+) -> None:
+    baseUrl = spec["snapshot_url"] if status == "snapshot" else spec["current_url"]
+    assert baseUrl is not None
     assert rawAnchor["type"] is not None
     assert rawAnchor["linkingText"] is not None
     assert rawAnchor["access"] is not None
     assert rawAnchor["href"] is not None
-    anchor: ShepherdAnchorT = {
-        "name": rawAnchor["id"],
-        "type": rawAnchor["type"],
-        "for": rawAnchor["for"],
-        "section": False,
-        "title": rawAnchor["linkingText"][0],
+    assert rawAnchor["informative"] is not None
+    assert rawAnchor["for"] is not None
+
+    anchor: AnchorT = {
         "status": status,
-        "normative": not rawAnchor["informative"],
+        "type": rawAnchor["type"],
         "export": rawAnchor["access"] == "public",
-        "linking_text": rawAnchor["linkingText"],
-        "uri": rawAnchor["href"].replace(specUrl, ""),
+        "normative": not rawAnchor["informative"],
+        "url": rawAnchor["href"],
+        "for": rawAnchor["for"],
+        "spec": spec["vshortname"],
+        "shortname": spec["shortname"],
+        "level": int(spec["level"] or "1"),
     }
-    return anchor
-
-
-def fixupAnchor(anchor: ShepherdAnchorT) -> ShepherdAnchorT:
-    """Miscellaneous fixes to the anchors before I start processing"""
-
-    # This one issue was annoying
-    if anchor.get("title", None) == "'@import'":
-        anchor["title"] = "@import"
-
-    # css3-tables has this a bunch, for some strange reason
-    if (anchor.get("uri") or "").startswith("??"):
-        anchor["uri"] = t.cast(str, anchor.get("uri"))[2:]
-
-    # If any smart quotes crept in, replace them with ASCII.
-    linkingTexts: list[str] = anchor.get("linking_text") or [t.cast(str, anchor.get("title"))]
-    for i, text in enumerate(linkingTexts):
-        if text is None:
-            continue
-        if "’" in text or "‘" in text:
-            text = re.sub(r"‘|’", "'", text)
-            linkingTexts[i] = text
-        if "“" in text or "”" in text:
-            text = re.sub(r"“|”", '"', text)
-            linkingTexts[i] = text
-    anchor["linking_text"] = linkingTexts
-
-    # Normalize whitespace to a single space
-    def strip(s: str) -> str:
-        return re.sub(r"\s+", " ", s.strip())
-
-    anchor["name"] = strip(anchor["name"])
-    anchor["type"] = strip(anchor["type"])
-    anchor["for"] = [strip(x) for x in anchor.get("for", [])]
-    anchor["status"] = strip(anchor["status"])
-    anchor["linking_text"] = [strip(x) for x in anchor.get("linking_text", []) if x is not None]
-    anchor["uri"] = strip(anchor["uri"])
-
-    return anchor
+    for text in rawAnchor["linkingText"]:
+        text = re.sub(r"‘|’", "'", text)
+        text = re.sub(r"“|”", '"', text)
+        if anchor["type"] in config.lowercaseTypes:
+            text = text.lower()
+        text = re.sub(r"\s+", " ", text)
+        anchors[text].append(anchor)
 
 
 def addToHeadings(
@@ -434,45 +383,6 @@ def cleanSpecHeadings(headings: AllHeadingsT) -> None:
                 # Go ahead and collapse them.
                 specHeadings[k] = specHeadings[v[0]]
                 del specHeadings[v[0]]
-
-
-def addToAnchors(rawAnchor: ShepherdAnchorT, anchors: AnchorsT, spec: SpecT) -> None:
-    if rawAnchor["status"] == "snapshot":
-        baseUrl = spec["snapshot_url"]
-    else:
-        baseUrl = spec["current_url"]
-    assert baseUrl is not None
-    anchor: AnchorT = {
-        "status": rawAnchor["status"],
-        "type": rawAnchor["type"],
-        "spec": spec["vshortname"],
-        "shortname": spec["shortname"],
-        "level": int(spec["level"] or "1"),
-        "export": rawAnchor.get("export", False),
-        "normative": rawAnchor.get("normative", False),
-        "url": baseUrl + rawAnchor["uri"],
-        "for": rawAnchor.get("for", []),
-    }
-    for text in rawAnchor["linking_text"]:
-        if anchor["type"] in config.lowercaseTypes:
-            text = text.lower()
-        text = re.sub(r"\s+", " ", text)
-        anchors[text].append(anchor)
-
-
-def processRawAnchors(rawAnchorData: list[ShepherdAnchorT], anchors: AnchorsT, spec: SpecT) -> None:
-    for rawAnchor in rawAnchorData:
-        rawAnchor = fixupAnchor(rawAnchor)
-        linkingTexts = rawAnchor["linking_text"]
-        assert linkingTexts is not None
-        if len(linkingTexts) == 0:
-            # Happens if it had no linking text at all originally
-            continue
-        if len(linkingTexts) == 1 and linkingTexts[0].strip() == "":
-            # Happens if it was marked with an empty lt and Shepherd still picked it up
-            continue
-        if rawAnchor["type"] in config.dfnTypes.union(["dfn"]):
-            addToAnchors(rawAnchor, anchors, spec=spec)
 
 
 def extractMethodData(anchors: AnchorsT) -> MethodsT:
