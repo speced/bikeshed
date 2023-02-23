@@ -133,7 +133,6 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
     headings: AllHeadingsT = {}
 
     gatherWebrefData(specs, anchors, headings)
-    gatherShepherdData(specs, anchors, headings)
     cleanSpecHeadings(headings)
     methods = extractMethodData(anchors)
     fors = extractForsData(anchors)
@@ -236,85 +235,6 @@ def gatherWebrefData(specs: SpecsT, anchors: AnchorsT, headings: AllHeadingsT) -
             processRawAnchors(rawAnchorData, anchors, specHeadings, spec)
 
 
-def gatherShepherdData(specs: SpecsT, anchors: AnchorsT, headings: AllHeadingsT) -> None:
-    m.say("Downloading anchor data from Shepherd...")
-    shepherd = APIClient(
-        "https://api.csswg.org/shepherd/",
-        version="vnd.csswg.shepherd.v1",
-        ca_cert_path=certifi.where(),
-    )
-    rawSpecData = dataFromApi(shepherd, "specifications", draft=True)
-    if not rawSpecData:
-        return None
-
-    neededShepherdSpecs = [
-        "css-2022",
-        "css-color-3",
-        "css-color-6",
-        "css-color-hdr-1",
-        "css-conditional-values-1",
-        "css-contain-1",
-        "css-display-4",
-        "css-forms-1",
-        "css-grid-1",
-        "css-ui-3",
-        "css-writing-modes-3",
-        "dom-level-2-style",
-        "mediaqueries-3",
-    ]
-    lastMsgTime: float = 0
-    for i, rawSSpec in enumerate(rawSpecData.values(), 1):
-        lastMsgTime = config.doEvery(
-            s=5,
-            lastTime=lastMsgTime,
-            action=progressMessager(i, len(rawSpecData)),
-        )
-        if rawSSpec["name"] not in neededShepherdSpecs:
-            continue
-        if isSpecInList(genSpec(rawSSpec), specs):
-            # Gradually stop as they get filled in
-            continue
-        print(rawSSpec["name"])
-        rawSSpec = dataFromApi(shepherd, "specifications", draft=False, anchors=False, spec=rawSSpec["name"])
-        spec = genSpec(rawSSpec)
-        assert spec["vshortname"] is not None
-        specs[spec["vshortname"]] = spec
-        specHeadings: HeadingsT = {}
-        headings[spec["vshortname"]] = specHeadings
-
-        rawAnchorData = [setStatus(x, "snapshot") for x in linearizeAnchorTree(rawSSpec.get("anchors", []))] + [
-            setStatus(x, "current") for x in linearizeAnchorTree(rawSSpec.get("draft_anchors", []))
-        ]
-        processRawAnchors(rawAnchorData, anchors, specHeadings, spec)
-
-
-@tenacity.retry(reraise=True, stop=tenacity.stop_after_attempt(3), wait=tenacity.wait_random(1, 2))
-def dataFromApi(api: APIClient, *args: t.Any, **kwargs: t.Any) -> t.JSONT:
-    anchorDataContentTypes = [
-        "application/json",
-        "application/vnd.csswg.shepherd.v1+json",
-    ]
-    res = api.get(*args, **kwargs)
-    if not res:
-        raise Exception(
-            "Unknown error fetching anchor data. This might be transient; try again in a few minutes, and if it's still broken, please report it on GitHub."
-        )
-    data = res.data
-    if res.status_code == 406:
-        raise Exception(
-            "This version of the anchor-data API is no longer supported. Try updating Bikeshed. If the error persists, please report it on GitHub."
-        )
-    if res.content_type not in anchorDataContentTypes:
-        raise Exception(f"Unrecognized anchor-data content-type '{res.content_type}'.")
-    if res.status_code >= 300:
-        raise Exception(
-            f"Unknown error fetching anchor data; got status {res.status_code} and bytes:\n{data.decode('utf-8')}"
-        )
-    if isinstance(data, bytes):
-        raise Exception(f"Didn't get expected JSON data. Got:\n{data.decode('utf-8')}")
-    return t.cast("t.JSONT", data)
-
-
 def specsFromWebref(status: t.Literal["current" | "snapshot"]) -> list[WebrefSpecT]:
     url = ("ed" if status == "current" else "tr") + "/index.json"
     j = dataFromWebref(url)
@@ -359,56 +279,6 @@ def dataFromWebref(url: str) -> t.JSONT:
             f"Data retrieved from Webref wasn't valid JSON for some reason. Try downloading again?\n{e}"
         ) from e
     return t.cast("t.JSONT", data)
-
-
-def linearizeAnchorTree(multiTree: list, rawAnchors: list[dict[str, t.Any]] | None = None) -> list[ShepherdAnchorT]:
-    if rawAnchors is None:
-        rawAnchors = []
-    # Call with multiTree being a list of trees
-    for item in multiTree:
-        if (item["type"] in config.dfnTypes.union(["dfn"])) or ("section" in item and item["section"] is True):
-            rawAnchors.append(item)
-        if item.get("children"):
-            linearizeAnchorTree(item["children"], rawAnchors)
-            del item["children"]
-    return t.cast("list[ShepherdAnchorT]", rawAnchors)
-
-
-def genSpec(rawSpec: ShepherdSpecT) -> SpecT:
-    assert rawSpec["name"] is not None
-    assert rawSpec["short_name"] is not None
-    assert rawSpec["title"] is not None
-    assert rawSpec["description"] is not None
-    spec: SpecT = {
-        "vshortname": rawSpec["name"],
-        "shortname": rawSpec["short_name"],
-        "snapshot_url": rawSpec.get("base_uri"),
-        "current_url": rawSpec.get("draft_uri"),
-        "title": rawSpec["title"],
-        "description": rawSpec["description"],
-        "abstract": rawSpec.get("abstract"),
-        "level": None,
-    }
-    vShortname = spec["vshortname"]
-    if spec["shortname"] is not None and vShortname.startswith(spec["shortname"]):
-        # S = "foo", V = "foo-3"
-        # Strip the prefix
-        level = vShortname[len(spec["shortname"]) :]
-        if level.startswith("-"):
-            level = level[1:]
-        if level.isdigit():
-            spec["level"] = int(level)
-        else:
-            spec["level"] = 1
-    elif spec["shortname"] is None and re.match(r"(.*)-(\d+)", vShortname):
-        # S = None, V = "foo-3"
-        match = t.cast(re.Match, re.match(r"(.*)-(\d+)", vShortname))
-        spec["shortname"] = match.group(1)
-        spec["level"] = int(match.group(2))
-    else:
-        spec["shortname"] = vShortname
-        spec["level"] = 1
-    return spec
 
 
 def genWebrefSpec(rawSpec: WebrefSpecT) -> SpecT:
