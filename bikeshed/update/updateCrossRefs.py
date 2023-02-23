@@ -5,11 +5,9 @@ import os
 import re
 from collections import defaultdict
 
-import certifi
 import tenacity
 import requests
 from alive_progress import alive_it
-from json_home_client import Client as APIClient
 
 from .. import config, messages as m, t
 
@@ -24,12 +22,21 @@ if t.TYPE_CHECKING:
     MethodsT: t.TypeAlias = defaultdict[str, dict[str, t.Any]]
     ForsT: t.TypeAlias = defaultdict[str, list[str]]
 
+    class WebrefHeadingT(t.TypedDict, total=False):
+        id: t.Required[str]
+        href: t.Required[str]
+        title: t.Required[str]
+        level: t.Required[int]
+        number: str
+
     class HeadingT(t.TypedDict):
         url: str
         number: str
         text: str
         spec: str
 
+    # Need to use function form due to "for" key
+    # being invalid as a property name
     ShepherdAnchorT = t.TypedDict(
         "ShepherdAnchorT",
         {
@@ -61,15 +68,6 @@ if t.TYPE_CHECKING:
         total=False,
     )
 
-    class WebrefHeadingT(t.TypedDict, total=False):
-        id: t.Required[str]
-        href: t.Required[str]
-        title: t.Required[str]
-        level: t.Required[int]
-        number: str
-
-    # Need to use function form due to "for" key
-    # being invalid as a property name
     AnchorT = t.TypedDict(
         "AnchorT",
         {
@@ -84,16 +82,6 @@ if t.TYPE_CHECKING:
             "for": list[str],
         },
     )
-
-    class ShepherdSpecT(t.TypedDict, total=False):
-        name: t.Required[str]
-        short_name: t.Required[str]
-        title: t.Required[str]
-        level: t.Required[int]
-        description: str | None
-        base_uri: str | None
-        draft_uri: str | None
-        abstract: str | None
 
     class WebrefSpecT(t.TypedDict, total=False):
         url: t.Required[str]
@@ -121,10 +109,6 @@ if t.TYPE_CHECKING:
         description: str | None
         abstract: str | None
         level: int | None
-
-
-def progressMessager(index: int, total: int) -> t.Callable[[], None]:
-    return lambda: m.say(f"Downloading data for spec {index}/{total}...")
 
 
 def update(path: str, dryRun: bool = False) -> set[str] | None:
@@ -206,7 +190,8 @@ def gatherWebrefData(specs: SpecsT, anchors: AnchorsT, headings: AllHeadingsT) -
         if "headings" in rawWSpec:
             currentHeadings = headingsFromWebref("current", rawWSpec["headings"])
             if currentHeadings:
-                rawAnchorData += [convertWebrefHeading(x, currentUrl, "current") for x in currentHeadings]
+                for heading in currentHeadings:
+                    addToHeadings(heading, specHeadings, spec, "current")
 
         # Complete list of anchors/headings with those from the snapshot version of the spec
         if spec["snapshot_url"] is not None and snapshotWebrefData is not None:
@@ -227,12 +212,11 @@ def gatherWebrefData(specs: SpecsT, anchors: AnchorsT, headings: AllHeadingsT) -
                 if "headings" in rawSnapshotSpec:
                     snapshotHeadings = headingsFromWebref("snapshot", rawSnapshotSpec["headings"])
                     if snapshotHeadings:
-                        rawAnchorData += [
-                            convertWebrefHeading(x, spec["snapshot_url"], "snapshot") for x in snapshotHeadings
-                        ]
+                        for heading in snapshotHeadings:
+                            addToHeadings(heading, specHeadings, spec, "snapshot")
 
         if len(rawAnchorData) > 0:
-            processRawAnchors(rawAnchorData, anchors, specHeadings, spec)
+            processRawAnchors(rawAnchorData, anchors, spec)
 
 
 def specsFromWebref(status: t.Literal["current" | "snapshot"]) -> list[WebrefSpecT]:
@@ -383,47 +367,51 @@ def fixupAnchor(anchor: ShepherdAnchorT) -> ShepherdAnchorT:
     return anchor
 
 
-def addToHeadings(rawAnchor: ShepherdAnchorT, specHeadings: HeadingsT, spec: SpecT) -> None:
-    uri = rawAnchor["uri"]
-    assert uri is not None
-    if rawAnchor["status"] == "snapshot":
-        baseUrl = spec["snapshot_url"]
-    else:
-        baseUrl = spec["current_url"]
-    assert baseUrl is not None
+def addToHeadings(
+    rawAnchor: WebrefHeadingT,
+    specHeadings: HeadingsT,
+    spec: SpecT,
+    status: t.Literal["current"] | t.Literal["snapshot"],
+) -> None:
     heading: HeadingT = {
-        "url": baseUrl + uri,
-        "number": rawAnchor["name"] if re.match(r"[\d.]+$", rawAnchor["name"]) else "",
+        "url": rawAnchor["href"],
+        "number": rawAnchor["number"] if "number" in rawAnchor else "",
         "text": rawAnchor["title"],
         "spec": spec["title"],
     }
-    if uri[0] == "#":
+    specUrl = spec["snapshot_url"] if status == "snapshot" else spec["current_url"]
+    assert specUrl is not None
+    if heading["url"].startswith(specUrl):
+        truncatedUrl = heading["url"][len(specUrl) :]
+    else:
+        print(f"Invalid heading - URL doesn't start with the spec's url <{specUrl}>.\n{heading}")
+        return
+    if truncatedUrl[0] == "#":
         # Either single-page spec, or link on the top page of a multi-page spec
-        fragment = uri
+        fragment = truncatedUrl
         shorthand = "/" + fragment
     else:
         # Multi-page spec, need to guard against colliding IDs
-        if "#" in uri:
+        if "#" in truncatedUrl:
             # url to a heading in the page, like "foo.html#bar"
-            match = re.match(r"([\w-]+).*?(#.*)", uri)
+            match = re.match(r"([\w-]+).*?(#.*)", truncatedUrl)
             if not match:
                 m.die(
-                    f"Unexpected URI pattern '{uri}' for spec '{spec['vshortname']}'. Please report this to the Bikeshed maintainer.",
+                    f"Unexpected URI pattern '{truncatedUrl}' for spec '{spec['vshortname']}'. Please report this to the Bikeshed maintainer.",
                 )
                 return
             page, fragment = match.groups()
             page = "/" + page
         else:
             # url to a page itself, like "foo.html"
-            page, _, _ = uri.partition(".")
+            page, _, _ = truncatedUrl.partition(".")
             page = "/" + page
             fragment = "#"
         shorthand = page + fragment
     if shorthand not in specHeadings:
         specHeadings[shorthand] = {}
     headingGroup = t.cast("HeadingGroupT", specHeadings[shorthand])
-    headingGroup[rawAnchor["status"]] = heading
-    assert rawAnchor["status"] is not None
+    headingGroup[status] = heading
     if fragment not in specHeadings:
         specHeadings[fragment] = []
     keyList = t.cast("list[HeadingKeyT]", specHeadings[fragment])
@@ -472,9 +460,7 @@ def addToAnchors(rawAnchor: ShepherdAnchorT, anchors: AnchorsT, spec: SpecT) -> 
         anchors[text].append(anchor)
 
 
-def processRawAnchors(
-    rawAnchorData: list[ShepherdAnchorT], anchors: AnchorsT, specHeadings: HeadingsT, spec: SpecT
-) -> None:
+def processRawAnchors(rawAnchorData: list[ShepherdAnchorT], anchors: AnchorsT, spec: SpecT) -> None:
     for rawAnchor in rawAnchorData:
         rawAnchor = fixupAnchor(rawAnchor)
         linkingTexts = rawAnchor["linking_text"]
@@ -485,8 +471,6 @@ def processRawAnchors(
         if len(linkingTexts) == 1 and linkingTexts[0].strip() == "":
             # Happens if it was marked with an empty lt and Shepherd still picked it up
             continue
-        if "section" in rawAnchor and rawAnchor["section"] is True:
-            addToHeadings(rawAnchor, specHeadings, spec=spec)
         if rawAnchor["type"] in config.dfnTypes.union(["dfn"]):
             addToAnchors(rawAnchor, anchors, spec=spec)
 
@@ -535,23 +519,6 @@ def extractForsData(anchors: AnchorsT) -> ForsT:
     for key, val in list(fors.items()):
         fors[key] = sorted(set(val))
     return fors
-
-
-def setStatus(obj: ShepherdAnchorT, status: str) -> ShepherdAnchorT:
-    obj["status"] = status
-    return obj
-
-
-def isSpecInList(spec: SpecT, specs: SpecsT) -> bool:
-    if spec["vshortname"].lower() in specs:
-        return True
-    for s in specs.values():
-        # Shortnames don't always match. Let's compare URLs
-        if (s["snapshot_url"] is not None and s["snapshot_url"] == spec["snapshot_url"]) or (
-            s["current_url"] is not None and s["current_url"] == spec["current_url"]
-        ):
-            return True
-    return False
 
 
 def writeAnchorsFile(anchors: AnchorsT, path: str) -> set[str]:
