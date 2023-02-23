@@ -36,25 +36,6 @@ if t.TYPE_CHECKING:
         text: str
         spec: str
 
-    # Need to use function form due to "for" key
-    # being invalid as a property name
-    ShepherdAnchorT = t.TypedDict(
-        "ShepherdAnchorT",
-        {
-            "name": t.Required[str],
-            "type": t.Required[str],
-            "for": list[str],
-            "section": bool,
-            "title": str,
-            "status": t.Required[str],
-            "normative": bool,
-            "export": bool,
-            "linking_text": list[str],
-            "uri": t.Required[str],
-        },
-        total=False,
-    )
-
     # https://github.com/w3c/reffy/blob/main/schemas/browserlib/extract-dfns.json
     WebrefAnchorT = t.TypedDict(
         "WebrefAnchorT",
