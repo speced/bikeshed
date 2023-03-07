@@ -14,42 +14,45 @@ from . import dom
 
 
 def test() -> None:
-    nodes = []
-    with io.open(os.path.abspath("tests/abstract001.html"), "r") as fh:
-        i = 0
-        s = Stream(fh.read())
-        _, i = parseDoctype(s, i)
-        while not s.eof(i):
-            print(s.loc(i))
-            text, i = s.skip(i, "<")
-            if text:
-                nodes.append(text)
+    import json
 
-            comment, i = parseComment(s, i)
-            if comment is not Failure:
-                nodes.append(comment)
+    with io.open(os.path.abspath("test.txt"), "r") as fh:
+        vals = "\n".join(x for x in json.load(fh).values())
+        list(nodesFromHtml(vals))
 
-            startTag, i = parseStartTag(s, i)
-            if startTag is not Failure:
-                nodes.append(startTag)
-                if startTag.tag == "script":
-                    text, i = parseScriptToEnd(s, i)
-                    nodes.append(text)
-                    nodes.append(EndTag(-1, "script"))
-                elif startTag.tag == "style":
-                    text, i = parseStyleToEnd(s, i)
-                    nodes.append(text)
-                    nodes.append(EndTag(-1, "style"))
-                elif startTag.tag == "xmp":
-                    text, i = parseXmpToEnd(s, i)
-                    nodes.append(text)
-                    nodes.append(EndTag(-1, "xmp"))
 
-            endTag, i = parseEndTag(s, i)
-            if endTag is not Failure:
-                nodes.append(endTag)
-        for node in nodes:
-            print(node, end="")
+def nodesFromHtml(data: str) -> t.Generator[str | StartTag | EndTag | Comment, None, None]:
+    i = 0
+    s = Stream(data)
+    _, i = parseDoctype(s, i)
+    while not s.eof(i):
+        text, i = s.skip(i, "<")
+        if text:
+            yield text
+
+        comment, i = parseComment(s, i)
+        if comment is not Failure:
+            yield comment
+
+        startTag, i = parseStartTag(s, i)
+        if startTag is not Failure:
+            yield startTag
+            if startTag.tag == "script":
+                text, i = parseScriptToEnd(s, i)
+                yield text
+                yield EndTag(-1, "script")
+            elif startTag.tag == "style":
+                text, i = parseStyleToEnd(s, i)
+                yield text
+                yield EndTag(-1, "style")
+            elif startTag.tag == "xmp":
+                text, i = parseXmpToEnd(s, i)
+                yield text
+                yield EndTag(-1, "xmp")
+
+        endTag, i = parseEndTag(s, i)
+        if endTag is not Failure:
+            yield endTag
 
 
 #
