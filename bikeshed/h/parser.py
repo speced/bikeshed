@@ -7,7 +7,9 @@ import io
 import os
 import re
 import typing
+import dataclasses
 from dataclasses import dataclass, field
+
 
 from .. import messages as m, t
 from . import dom
@@ -197,14 +199,25 @@ class StartTag:
     line: int
     tag: str
     attrs: dict[str, str] = field(default_factory=dict)
+    classes: set[str] = field(default_factory=set)
 
     def __str__(self) -> str:
-        start = f"<{self.tag}:{self.line}"
+        start = f"<{self.tag} line-number={self.line}"
+        attrs = ""
         if self.attrs:
-            attrs = " " + " ".join(f'{name}="{val}"' for name, val in self.attrs.items())
-        else:
-            attrs = ""
+            attrs += " " + " ".join(f'{name}="{dom.escapeAttr(val)}"' for name, val in sorted(self.attrs.items()))
+        if self.classes:
+            attrs += f' class="{" ".join(sorted(self.classes))}"'
         return start + attrs + ">"
+
+    def finalize(self) -> StartTag:
+        if "class" in self.attrs:
+            self.classes = set(self.attrs["class"].split())
+            del self.attrs["class"]
+        return self
+
+    def clone(self, **kwargs: t.Any) -> StartTag:
+        return dataclasses.replace(self, **kwargs)
 
 
 @dataclass
@@ -213,7 +226,7 @@ class EndTag:
     tag: str
 
     def __str__(self) -> str:
-        return f"</{self.tag}:{self.line}>"
+        return f"</{self.tag}>"
 
 
 @dataclass

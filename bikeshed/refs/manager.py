@@ -130,7 +130,8 @@ class ReferenceManager:
         initFors()
         if doc and doc.inputSource and doc.inputSource.hasDirectory:
             ldLines = self.dataFile.fetch("link-defaults.infotree").read().split("\n")
-            datablocks.transformInfo(lines=ldLines, doc=doc, firstLine=ldLines[0], tagName="pre", lineNum=None)
+            fakeTag = h.StartTag(tag="pre", line=-1)
+            datablocks.transformInfo(lines=ldLines, doc=doc, firstLine=ldLines[0], startTag=fakeTag)
 
             # Get local anchor data
             shouldGetLocalAnchorData = doc.md.externalInfotrees["anchors.bsdata"]
