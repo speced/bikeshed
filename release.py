@@ -66,6 +66,10 @@ def createRelease():
     with open("semver.txt", "w", encoding="utf-8") as fh:
         fh.write(newVersion)
 
+    # Write it into the bikeshed folder as well, so it'll get installed
+    with open("bikeshed/semver.txt", "w", encoding="utf-8") as fh:
+        fh.write(newVersion)
+
     try:
         # Clear out the build artifacts, build it, upload, and clean up again.
         subprocess.call("rm -r build dist", shell=True)
@@ -105,6 +109,7 @@ def createRelease():
         raise
 
     # Clean up with a final commit of the changed version files
+    subprocess.check_call("rm bikeshed/semver.txt")
     subprocess.check_call(
         "git add semver.txt bikeshed/spec-data/readonly/bikeshed-version.txt",
         shell=True,

@@ -17,8 +17,13 @@ def main() -> None:
             semver = fh.read().strip()
             semverText = f"Bikeshed v{semver}: "
     except FileNotFoundError:
-        semver = "???"
-        semverText = ""
+        try:
+            with open(config.scriptPath("semver.txt"), encoding="utf-8") as fh:
+                semver = fh.read().strip()
+                semverText = f"Bikeshed v{semver}: "
+        except FileNotFoundError:
+            semver = "???"
+            semverText = ""
 
     argparser = argparse.ArgumentParser(description=f"{semverText}Processes spec source files into valid HTML.")
     argparser.add_argument("--version", action="version", version=semver)
