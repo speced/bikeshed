@@ -148,7 +148,7 @@ class Stream:
     _lineBreaks: list[int]
     startLine: int
 
-    def __init__(self, chars: str, startLine: int=1):
+    def __init__(self, chars: str, startLine: int = 1):
         self._chars = chars
         self._lineBreaks = []
         self.startLine = startLine
