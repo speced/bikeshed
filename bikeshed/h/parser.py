@@ -146,10 +146,12 @@ class Result:
 class Stream:
     _chars: str
     _lineBreaks: list[int]
+    startLine: int
 
-    def __init__(self, chars: str):
+    def __init__(self, chars: str, startLine: int=1):
         self._chars = chars
         self._lineBreaks = []
+        self.startLine = startLine
         for i, char in enumerate(chars):
             if char == "\n":
                 self._lineBreaks.append(i)
@@ -166,7 +168,7 @@ class Stream:
     def line(self, index: int) -> int:
         # Zero-based line index
         lineIndex = bisect.bisect_left(self._lineBreaks, index)
-        return lineIndex + 1
+        return lineIndex + self.startLine
 
     def col(self, index: int) -> int:
         lineIndex = bisect.bisect_left(self._lineBreaks, index)

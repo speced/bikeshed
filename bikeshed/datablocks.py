@@ -84,7 +84,7 @@ def transformDataBlocks(doc: t.SpecT, lines: list[Line] | list[str]) -> list[Lin
     newLines: list[Line] = []
     for line in _lines:
         # Look for the start of a block.
-        startTag, _ = h.parseStartTag(h.Stream(line.text.lstrip()), 0)
+        startTag, _ = h.parseStartTag(h.Stream(line.text.lstrip(), startLine=line.i), 0)
         if startTag is h.Failure:
             startTag = None
         if startTag and startTag.tag not in ("pre", "xmp"):
