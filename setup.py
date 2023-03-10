@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 with open("README.md", encoding="utf-8") as fh:
     long_description = fh.read()
-with open("semver.txt", encoding="utf-8") as fh:
+with open("bikeshed/semver.txt", encoding="utf-8") as fh:
     semver = fh.read().strip()
 with open("requirements.txt", encoding="utf-8") as fh:
     install_requires = [x.strip() for x in fh.read().strip().split("\n") if len(x) and x[0].isalpha()]
