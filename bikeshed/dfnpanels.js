@@ -1,5 +1,11 @@
 "use strict";
 {
+    const dfnsJson = window.dfnsJson;
+
+    window.setDfnJson = (key, value) => {
+        dfnsJson[key] = value;
+    }
+
     function queryAll(sel) {
         return [].slice.call(document.querySelectorAll(sel));
     }
