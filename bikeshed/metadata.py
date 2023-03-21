@@ -13,7 +13,7 @@ from functools import partial
 
 from isodate import Duration, parse_duration
 
-from . import config, constants, datablocks, markdown, h, messages as m, repository, t
+from . import config, constants, markdown, h, messages as m, repository, t
 from .translate import _
 
 if t.TYPE_CHECKING:
