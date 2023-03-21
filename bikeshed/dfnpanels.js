@@ -1,6 +1,6 @@
 "use strict";
 {
-    const dfnsJson = window.dfnsJson;
+    const dfnsJson = window.dfnsJson || {};
 
     window.setDfnJson = (key, value) => {
         dfnsJson[key] = value;
@@ -9,6 +9,56 @@
     function queryAll(sel) {
         return [].slice.call(document.querySelectorAll(sel));
     }
+
+    function genDfnPanel([key, value], index) {
+        const {id, url, dfnText, items, external}  = value;
+        const itemsHtml = /* html */`<ul>
+            ${items.map((item) => {
+                const idsHtml = [];
+                item.ids.forEach((id, index) => {
+                    const href = `#${external ? id.linkID : id.refID}`;
+                    if (index == 0) {
+                        idsHtml.push(
+                            /* html */`<a href="${href}"
+                            ${external ? '' :  '"data-silently-dedup"'}
+                            >${item.text}</a>`
+                        );
+                    } else  {
+                        idsHtml.push(
+                            /* html */`<a href="${href}">(${index+1})</a>`
+                        );
+                    }
+                })
+                return /* html */`<li>${idsHtml.join('\n')}</li>`;
+            })}
+        </ul>`;
+
+        return /* html */`<aside
+            aria-labelledby="infopaneltitle-for-${id}"
+            class="dfn-panel"
+            data-for="${id}"
+            id="infopanel-for-${id}">
+            <span
+                id="infopaneltitle-for-${id}"
+                style="display:none">
+                Info about the '${dfnText}'
+                ${external ? 'external': ''} reference.
+            </span>
+            <a href=${url}>${url}</a>
+            <b>Referenced in:</b>
+            ${itemsHtml}
+        </aside>`;
+    }
+
+    // Generate dfn panels.
+    function genAllDfnPanels() {
+        const html = Object.entries(dfnsJson).map(genDfnPanel).join('\n');
+        const div = document.createElement('div');
+        div.innerHTML = html;
+        document.body.appendChild(div);
+    }
+
+    genAllDfnPanels();
 
     // Add popup behavior to all dfns to show the corresponding dfn-panel.
     var dfns = document.querySelectorAll('.dfn-paneled');

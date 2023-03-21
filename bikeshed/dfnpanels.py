@@ -92,27 +92,28 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
                         ),
                     )
                 idsJson.append({
-                    "refID": refID,
+                    "refID": h.escapeUrlFrag(refID),
                 })
             itemsJson.append({
                 "ids": idsJson,
-                "text": ('"' + text + '"'),
+                "text": text,
             })
-        h.appendChild(doc.body, panel)
+        # h.appendChild(doc.body, panel)
         panelJson = {
             "id": id,
+            "url": "#" + h.escapeUrlFrag(id),
             "dfnText": dfnText,
             "items": itemsJson,
         }
+        h.appendChild(doc.body, h.E.script(
+    """
+    window.dfnsJson = window.dfnsJson || {};
+    """ +
+        f"window.dfnsJson['{id}'] = {panelJson};\n"))
         dfnsJson.append(panelJson)
     if atLeastOnePanel:
         doc.extraScripts["script-dfn-panel"] = getModuleFile("dfnpanels.js")
         doc.extraStyles["style-dfn-panel"] = getModuleFile("dfnpanels.css")
-        h.appendChild(doc.body, h.E.script(
-    """
-    dfnsJson = dfnsJson || {};
-    """ +
-    f"dfnsJson['{id}'] = {panelJson};\n"))
 
 
 def addExternalDfnPanel(termEl: t.ElementT, ref: r.RefWrapper, doc: t.SpecT) -> None:
@@ -191,24 +192,26 @@ def addExternalDfnPanel(termEl: t.ElementT, ref: r.RefWrapper, doc: t.SpecT) -> 
                         ),
                     )
                 idsJson.append({
-                    "linkID": linkID,
+                    "linkID": h.escapeUrlFrag(linkID),
                 })
             itemsJson.append({
                 "ids": idsJson,
-                "text": ('"' + text + '"'),
+                "text": text,
             })
-        h.appendChild(doc.body, panel)
+        # h.appendChild(doc.body, panel)
         panelJson = {
+            "extermal": 1,
             "id": termID,
-            "href": ref.url,
+            "url": ref.url,
+            "dfnText": termText,
             "items": itemsJson,
         }
         dfnsJson.append(panelJson)
     h.appendChild(doc.body, h.E.script(
     """
-    dfnsJson = dfnsJson || {};
+    window.dfnsJson = window.dfnsJson || {};
     """ +
-    f"dfnsJson['{termID}'] = {panelJson};\n"))
+    f"window.dfnsJson['{termID}'] = {panelJson};\n"))
 
 def uniqueId(s: str) -> str:
     # Turns a unique string into a more compact (and ID-safe)
