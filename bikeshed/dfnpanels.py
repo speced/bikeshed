@@ -69,7 +69,6 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
     h.appendChild(doc.body, h.E.script(
         scriptLines
     ))
-    # dfnsJson.append(panelJson)
     if atLeastOnePanel:
         doc.extraScripts["script-dfn-panel"] = getModuleFile("dfnpanels.js")
         doc.extraStyles["style-dfn-panel"] = getModuleFile("dfnpanels.css")
