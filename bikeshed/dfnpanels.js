@@ -10,14 +10,15 @@
                 item.ids.forEach((id, index) => {
                     const href = `#${external ? id.linkID : id.refID}`;
                     if (index == 0) {
-                        idsHtml.push(
-                            /* html */`<a href="${href}"
-                            ${external ? '' :  '"data-silently-dedup"'}
-                            >${item.text}</a>`
+                        const silentlyDedup =
+                            external ? '' :  '"data-silently-dedup"';
+                        idsHtml.push(/* html */`
+                            <a href="${href}" ${silentlyDedup}>
+                                ${item.text}</a>`
                         );
                     } else  {
-                        idsHtml.push(
-                            /* html */`<a href="${href}">(${index+1})</a>`
+                        idsHtml.push(/* html */`
+                            <a href="${href}">(${index+1})</a>`
                         );
                     }
                 })
@@ -25,20 +26,20 @@
             })}
         </ul>`;
 
-        return /* html */`<aside
-            aria-labelledby="infopaneltitle-for-${id}"
-            class="dfn-panel"
-            data-for="${id}"
-            id="infopanel-for-${id}">
-            <span
-                id="infopaneltitle-for-${id}"
-                style="display:none">
-                Info about the '${dfnText}'
-                ${external ? 'external': ''} reference.
-            </span>
-            <a href=${url}>${url}</a>
-            <b>Referenced in:</b>
-            ${itemsHtml}
+        return /* html */`
+            <aside
+                class="dfn-panel"
+                id="infopanel-for-${id}"
+                data-for="${id}"
+                aria-labelledby="infopaneltitle-for-${id}">
+                <span
+                    id="infopaneltitle-for-${id}" style="display:none">
+                    Info about the '${dfnText}'
+                    ${external ? 'external': ''} reference.
+                </span>
+                <a href=${url}>${url}</a>
+                <b>Referenced in:</b>
+                ${itemsHtml}
         </aside>`;
     }
 
