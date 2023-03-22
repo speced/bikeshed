@@ -2,14 +2,6 @@
 {
     const dfnsJson = window.dfnsJson || {};
 
-    window.setDfnJson = (key, value) => {
-        dfnsJson[key] = value;
-    }
-
-    function queryAll(sel) {
-        return [].slice.call(document.querySelectorAll(sel));
-    }
-
     function genDfnPanel([key, value], index) {
         const {id, url, dfnText, items, external}  = value;
         const itemsHtml = /* html */`<ul>
@@ -50,7 +42,6 @@
         </aside>`;
     }
 
-    // Generate dfn panels.
     function genAllDfnPanels() {
         const html = Object.entries(dfnsJson).map(genDfnPanel).join('\n');
         const div = document.createElement('div');
@@ -59,6 +50,10 @@
     }
 
     genAllDfnPanels();
+
+    function queryAll(sel) {
+        return [].slice.call(document.querySelectorAll(sel));
+    }
 
     // Add popup behavior to all dfns to show the corresponding dfn-panel.
     var dfns = document.querySelectorAll('.dfn-paneled');
