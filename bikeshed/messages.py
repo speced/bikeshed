@@ -40,9 +40,8 @@ def p(msg: str | tuple[str, str], sep: str | None = None, end: str | None = None
 
 
 def die(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None) -> None:
-    if lineNum is None and el is not None and el.get("line-number"):
-        lineNum = el.get("line-number")
-    formattedMsg = formatMessage("fatal", msg, lineNum=lineNum)
+    line = normalizeLinenum(el, lineNum)
+    formattedMsg = formatMessage("fatal", msg, lineNum=line)
     if formattedMsg not in messages:
         messageCounts["fatal"] += 1
         messages.add(formattedMsg)
@@ -53,15 +52,14 @@ def die(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None
 
 
 def linkerror(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None) -> None:
-    if lineNum is None and el is not None and el.get("line-number"):
-        lineNum = el.get("line-number")
+    line = normalizeLinenum(el, lineNum)
     suffix = ""
     if el is not None:
         if el.get("bs-autolink-syntax"):
             suffix = "\n" + t.cast(str, el.get("bs-autolink-syntax"))
         else:
             suffix = "\n" + lxml.html.tostring(el, with_tail=False, encoding="unicode")
-    formattedMsg = formatMessage("link", msg + suffix, lineNum=lineNum)
+    formattedMsg = formatMessage("link", msg + suffix, lineNum=line)
     if formattedMsg not in messages:
         messageCounts["linkerror"] += 1
         messages.add(formattedMsg)
@@ -72,15 +70,14 @@ def linkerror(msg: str, el: t.ElementT | None = None, lineNum: str | int | None 
 
 
 def lint(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None) -> None:
-    if lineNum is None and el is not None and el.get("line-number"):
-        lineNum = el.get("line-number")
+    line = normalizeLinenum(el, lineNum)
     suffix = ""
     if el is not None:
         if el.get("bs-autolink-syntax"):
             suffix = "\n" + t.cast(str, el.get("bs-autolink-syntax"))
         else:
             suffix = "\n" + lxml.html.tostring(el, with_tail=False, encoding="unicode")
-    formattedMsg = formatMessage("lint", msg + suffix, lineNum=lineNum)
+    formattedMsg = formatMessage("lint", msg + suffix, lineNum=line)
     if formattedMsg not in messages:
         messageCounts["lint"] += 1
         messages.add(formattedMsg)
@@ -91,9 +88,8 @@ def lint(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = Non
 
 
 def warn(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None) -> None:
-    if lineNum is None and el is not None and el.get("line-number"):
-        lineNum = el.get("line-number")
-    formattedMsg = formatMessage("warning", msg, lineNum=lineNum)
+    line = normalizeLinenum(el, lineNum)
+    formattedMsg = formatMessage("warning", msg, lineNum=line)
     if formattedMsg not in messages:
         messageCounts["warning"] += 1
         messages.add(formattedMsg)
@@ -101,6 +97,17 @@ def warn(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = Non
             p(formattedMsg)
     if constants.errorLevelAt("warning"):
         errorAndExit()
+
+
+def normalizeLinenum(el: t.ElementT | None, lineNum: str | int | None) -> str | None:
+    if isinstance(lineNum, str):
+        return lineNum
+    elif isinstance(lineNum, int):
+        return str(lineNum)
+    elif el is not None and el.get("bs-line-number"):
+        return el.get("bs-line-number")
+    else:
+        return None
 
 
 def say(msg: str) -> None:
@@ -165,19 +172,23 @@ def printColor(text: str, color: str = "white", *styles: str) -> str:
     return text
 
 
-def formatMessage(type: str, text: str, lineNum: str | int | None = None) -> str | tuple[str, str]:
+def formatMessage(type: str, text: str, lineNum: str | None = None) -> str | tuple[str, str]:
     if constants.printMode == "markup":
+        if lineNum is not None:
+            locText = f"LINE {lineNum}: "
+        else:
+            locText = ""
         text = text.replace("<", "&lt;")
         if type == "fatal":
-            return f"<fatal>{text}</fatal>"
+            return f"<fatal>{locText}{text}</fatal>"
         if type == "link":
-            return f"<linkerror>{text}</linkerror>"
+            return f"<linkerror>{locText}{text}</linkerror>"
         if type == "lint":
-            return f"<lint>{text}</lint>"
+            return f"<lint>{locText}{text}</lint>"
         if type == "warning":
-            return f"<warning>{text}</warning>"
+            return f"<warning>{locText}{text}</warning>"
         if type == "message":
-            return f"<message>{text}</message>"
+            return f"<message>{locText}{text}</message>"
         if type == "success":
             return f"<final-success>{text}</final-success>"
         if type == "failure":
