@@ -821,7 +821,7 @@ def replaceAwkwardCSSShorthands(text: str) -> str:
         escape, text = match.groups()
         if escape:
             return escapeHTML(match.group(0)[1:])
-        return f"<fake-production-placeholder class=production bs-autolink-syntax='{syntaxAttr}' data-opaque>{text}</fake-production-placeholder>"
+        return f"<fake-production-placeholder class=production bs-autolink-syntax='{syntaxAttr}' bs-opaque>{text}</fake-production-placeholder>"
 
     text = re.sub(r"(\\)?<<([^>\n]+)>>", replaceProduction, text)
 

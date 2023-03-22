@@ -75,6 +75,7 @@ from .serializer import Serializer
 from .parser import test
 from .parser import (
     Comment,
+    debugNodes,
     EndTag,
     Failure,
     initialDocumentParse,

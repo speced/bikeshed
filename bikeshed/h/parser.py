@@ -157,6 +157,10 @@ def linesFromNodes(nodes: t.Iterable[ParserNode]) -> list[str]:
     return strFromNodes(nodes).split("\n")
 
 
+def debugNodes(nodes: t.Iterable[ParserNode]) -> str:
+    return "\n".join(repr(x) for x in nodes)
+
+
 #
 #
 #
@@ -829,7 +833,7 @@ def parseCSSProduction(s: Stream, start: int) -> Result:
         line=s.line(start),
         endLine=s.line(start),
         tag="fake-production-placeholder",
-        attrs={"bs-autolink-syntax": s[start:i], "class": "production", "data-opaque": ""},
+        attrs={"bs-autolink-syntax": s[start:i], "class": "production", "bs-opaque": ""},
     ).finalize()
     el = WholeElement(
         line=startTag.line,
@@ -888,6 +892,7 @@ def parseCodeSpan(s: Stream, start: int) -> Result:
             line=s.line(start),
             endLine=s.line(start),
             tag="code",
+            attrs={"bs-autolink-syntax": s[start:i], "bs-opaque": ""},
         ),
         endLine=s.line(i - 1),
     )
