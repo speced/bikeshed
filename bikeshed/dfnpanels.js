@@ -8,7 +8,7 @@
             ${items.map((item) => {
                 const idsHtml = [];
                 item.ids.forEach((id, index) => {
-                    const href = `#${external ? id.linkID : id.refID}`;
+                    const href = `${external ? id.linkID : id.refID}`;
                     if (index == 0) {
                         const silentlyDedup =
                             external ? '' :  '"data-silently-dedup"';
