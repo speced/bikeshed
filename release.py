@@ -15,7 +15,7 @@ def createRelease():
         print("Working tree is dirty. Finish committing files or stash, then try again.")
         sys.exit(1)
 
-    with open("semver.txt", encoding="utf-8") as fh:
+    with open("bikeshed/semver.txt", encoding="utf-8") as fh:
         currentVersion = fh.read().strip()
         semver = parseSemver(currentVersion)
 
@@ -63,7 +63,7 @@ def createRelease():
         fh.write(bikeshedVersion)
 
     # Update the semver
-    with open("semver.txt", "w", encoding="utf-8") as fh:
+    with open("bikeshed/semver.txt", "w", encoding="utf-8") as fh:
         fh.write(newVersion)
 
     try:

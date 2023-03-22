@@ -125,11 +125,15 @@ def rebase(patterns: list[str] | None = None, md: t.MetadataManager | None = Non
         return True
     pathProgress = alive_it(paths, dual_line=True, length=20)
     for path in pathProgress:
-        name = testNameForPath(path)
-        pathProgress.text(name)
-        m.resetSeenMessages()
-        doc = processTest(path, md)
-        doc.finish(newline="\n")
+        try:
+            name = testNameForPath(path)
+            pathProgress.text(name)
+            m.resetSeenMessages()
+            doc = processTest(path, md)
+            doc.finish(newline="\n")
+        except Exception as e:
+            print(path)
+            raise e
     return True
 
 
@@ -151,7 +155,7 @@ def addTestMetadata(doc: t.SpecT) -> None:
     assert doc.mdCommandLine is not None
     doc.mdBaseline.addData("Boilerplate", "omit feedback-header, omit generator, omit document-revision")
     doc.mdBaseline.addData("Repository", "test/test")
-    _, md = metadata.parse(lines=doc.lines)
+    _, md = metadata.parse(doc.nodes)
     if "Date" not in md.manuallySetKeys:
         doc.mdCommandLine.addData("Date", "1970-01-01")
     if "Inline Github Issue" not in md.manuallySetKeys:

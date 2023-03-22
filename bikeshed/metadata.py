@@ -13,7 +13,7 @@ from functools import partial
 
 from isodate import Duration, parse_duration
 
-from . import config, constants, datablocks, markdown, h, messages as m, repository, t
+from . import config, constants, markdown, h, messages as m, repository, t
 from .translate import _
 
 if t.TYPE_CHECKING:
@@ -303,9 +303,8 @@ class MetadataManager:
         if self.TR:
             macros["latest"] = self.TR
         if self.abstract:
-            abstractLines = datablocks.transformDataBlocks(doc, self.abstract)
-            macros["abstract"] = "\n".join(markdown.parse(abstractLines, self.indent))
-            macros["abstractattr"] = h.escapeAttr("  ".join(abstractLines).replace("<<", "<").replace(">>", ">"))
+            macros["abstract"] = "\n".join(markdown.parse(self.abstract, self.indent))
+            macros["abstractattr"] = h.escapeAttr("  ".join(self.abstract).replace("<<", "<").replace(">>", ">"))
         elif self.noAbstract:
             macros["abstract"] = ""
             macros["abstractattr"] = ""
@@ -972,62 +971,66 @@ def parseInlineTagCommand(key: str, val: str, lineNum: str | int | None) -> dict
     return {tag: command}
 
 
-def parse(lines: t.Sequence[Line]) -> tuple[list[Line], MetadataManager]:
-    # Given HTML document text, in the form of an array of text lines,
-    # extracts all <pre class=metadata> lines and parses their contents.
-    # Returns the text lines, with the metadata-related lines removed,
-    # and a filled MetadataManager object
+def parse(nodes: list[h.ParserNode]) -> tuple[list[h.ParserNode], MetadataManager]:
+    # Given a list of parser nodes,
+    # extracts all <pre class=metadata> blocks and parses their contents.
+    # Returns the nodes, with the metadata-blocks removed,
+    # and a filled MetadataManager object.
 
-    newlines = []
-    inMetadata = False
     lastKey = None
-    endTag = None
     md = MetadataManager()
-    for line in lines:
-        if not inMetadata and re.match(r"<(pre|xmp) [^>]*class=[^>]*metadata[^>]*>", line.text):
-            inMetadata = True
-            md.hasMetadata = True
-            if line.text.startswith("<pre"):
-                endTag = r"</pre>\s*"
-            else:
-                endTag = r"</xmp>\s*"
-            continue
-        if inMetadata and re.match(t.cast(str, endTag), line.text):
-            inMetadata = False
-            continue
-        if inMetadata:
-            # Skip newlines except for multiline blocks
-            if line.text.strip() == "" and lastKey not in ("Abstract", "Status Text"):
-                continue
-            if lastKey and (line.text.strip() == "" or re.match(r"\s+", line.text)):
-                # empty lines, or lines that start with 1+ spaces, continue previous key
-                md.addData(lastKey, line.text, lineNum=line.i)
-            elif re.match(r"([^:]+):\s*(.*)", line.text):
-                match = re.match(r"([^:]+):\s*(.*)", line.text)
-                assert match is not None
-                md.addData(match.group(1), match.group(2), lineNum=line.i)
-                lastKey = match.group(1)
-            else:
+    mdCount = 0
+    newNodes: list[h.ParserNode] = []
+    for node in nodes:
+        if isinstance(node, h.RawElement) and node.tag == "xmp" and "metadata" in node.startTag.classes:
+            mdCount += 1
+            if mdCount > 1:
                 m.die(
-                    f"Incorrectly formatted metadata line:\n{line.text}",
-                    lineNum=line.i,
+                    "The document should contain only a single metadata block. Please merge this one with the initial block.",
+                    lineNum=node.line,
                 )
-                continue
-        elif re.match(r"\s*<h1[^>]*>.*?</h1>", line.text):
-            if md.title is None:
-                match = re.match(r"\s*<h1[^>]*>(.*?)</h1>", line.text)
-                assert match is not None
-                title = match.group(1)
-                md.addData("Title", title, lineNum=line.i)
-            newlines.append(line)
-        else:
-            newlines.append(line)
-    indentInfo = inferIndent(newlines)
-    if "Indent" not in md.manuallySetKeys and indentInfo.size:
-        md.indent = indentInfo.size
-    if "mixed-indents" in md.complainAbout and indentInfo.char:
-        checkForMixedIndents(newlines, indentInfo)
-    return newlines, md
+            if node.line != 1:
+                m.die(
+                    "The document's metadata block should be the first thing in the document. Please move this block to the top.",
+                    lineNum=node.line,
+                )
+            lines = node.data.split("\n")
+            for i, line in enumerate(lines, node.line):
+                # Skip newlines except for multiline blocks
+                if line.strip() == "" and lastKey not in ("Abstract", "Status Text"):
+                    continue
+                if lastKey and (line.strip() == "" or re.match(r"\s+", line)):
+                    # empty lines, or lines that start with 1+ spaces, continue previous key
+                    md.addData(lastKey, line, lineNum=i)
+                elif re.match(r"([^:]+):\s*(.*)", line):
+                    match = re.match(r"([^:]+):\s*(.*)", line)
+                    assert match is not None
+                    md.addData(match.group(1), match.group(2), lineNum=i)
+                    lastKey = match.group(1)
+                else:
+                    m.die(
+                        f"Incorrectly formatted metadata line:\n{line}",
+                        lineNum=i,
+                    )
+                    continue
+            # Emit blank lines to replace the node
+            blanks = "\n".join("" for x in lines)
+            newNodes.append(h.Text(node.line, node.endLine, blanks))
+            continue
+        if isinstance(node, h.StartTag) and node.tag.lower() == "h1" and md.title is None:
+            m.die(
+                "Using <h1> to indicate the document title is no longer supported. Please use `Title: ...` metadata.",
+                lineNum=node.line,
+            )
+        newNodes.append(node)
+    if mdCount > 0:
+        md.hasMetadata = True
+    # indentInfo = inferIndent(newlines)
+    # if "Indent" not in md.manuallySetKeys and indentInfo.size:
+    #     md.indent = indentInfo.size
+    # if "mixed-indents" in md.complainAbout and indentInfo.char:
+    #     checkForMixedIndents(newlines, indentInfo)
+    return newNodes, md
 
 
 @dataclasses.dataclass

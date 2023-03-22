@@ -17,8 +17,13 @@ def main() -> None:
             semver = fh.read().strip()
             semverText = f"Bikeshed v{semver}: "
     except FileNotFoundError:
-        semver = "???"
-        semverText = ""
+        try:
+            with open(config.scriptPath("semver.txt"), encoding="utf-8") as fh:
+                semver = fh.read().strip()
+                semverText = f"Bikeshed v{semver}: "
+        except FileNotFoundError:
+            semver = "???"
+            semverText = ""
 
     argparser = argparse.ArgumentParser(description=f"{semverText}Processes spec source files into valid HTML.")
     argparser.add_argument("--version", action="version", version=semver)
@@ -573,7 +578,7 @@ def handleDebug(options: argparse.Namespace, extras: list[str]) -> None:
 
 
 def handleRefs(options: argparse.Namespace, extras: list[str]) -> None:
-    from . import metadata, datablocks
+    from . import metadata
     from .refs import ReferenceManager
     from .Spec import Spec
 
@@ -586,7 +591,7 @@ def handleRefs(options: argparse.Namespace, extras: list[str]) -> None:
         rm = doc.refs
     else:
         rm = ReferenceManager()
-        rm.initializeRefs(datablocks=datablocks)
+        rm.initializeRefs()
     if options.text:
         options.text = options.text
     refs = rm.queryAllRefs(
