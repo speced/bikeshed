@@ -25,6 +25,7 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
             continue
         allRefs.setdefault(href[1:], []).append(a)
     scriptLines = ["\nwindow.dfnsJson ??= {};\n"]
+    refIDCount = {}
     for dfn in dfns:
         id = dfn.get("id")
         dfnText = h.textContent(dfn)
@@ -51,7 +52,11 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
                 refID = el.get("id")
                 if refID is None:
                     refID = f"ref-for-{id}"
-                    el.set("id", h.safeID(doc, refID))
+                # Not sure ref counting is correct or needed
+                refIDCount[refID] = refIDCount.get(refID, 0) + 1
+                refID = f"{refID}-{refIDCount[refID]}"
+                # Should we be using the safeID?
+                el.set("id", h.safeID(doc, refID))
                 idsJson.append({
                     "refID": h.escapeUrlFrag(refID),
                 })
