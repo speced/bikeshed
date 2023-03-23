@@ -190,9 +190,7 @@ def checkVarHygiene(doc: t.SpecT) -> None:
 def addVarClickHighlighting(doc: t.SpecT) -> None:
     if doc.md.slimBuildArtifact:
         return
-    doc.extraStyles[
-        "style-var-click-highlighting"
-    ] = getModuleFile("var-click-highlighting.css")
+    doc.extraStyles["style-var-click-highlighting"] = getModuleFile("var-click-highlighting.css")
     # Colors were chosen in Lab using https://nixsensor.com/free-color-converter/
     # D50 2deg illuminant, L in [0,100], a and b in [-128, 128]
     # 0 = lab(85,0,85)
@@ -208,9 +206,7 @@ def addVarClickHighlighting(doc: t.SpecT) -> None:
     # Specifically: find lowest-indexed color with lowest usage.
     # (Usually this'll be zero, but if you click too many vars in same algo, can repeat.)
     # If you unclick then click again on same var, it should get same color if possible.
-    doc.extraScripts[
-        "script-var-click-highlighting"
-    ] = getModuleFile("var-click-highlighting.js")
+   doc.extraScripts["script-var-click-highlighting"] = getModuleFile("var-click-highlighting.js")
 
 
 def fixIntraDocumentReferences(doc: t.SpecT) -> None:
