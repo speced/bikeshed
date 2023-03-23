@@ -493,15 +493,56 @@ dfn > a.self-link::before      { content: "#"; }
    <li><a href="#this-should-have-one-code">this should have one code</a><span>, in § 1</span>
    <li><a href="#foo">this shouldn’t have a code</a><span>, in § Unnumbered section</span>
   </ul>
-  <aside aria-labelledby="infopaneltitle-for-foo" class="dfn-panel" data-for="foo" id="infopanel-for-foo">
-   <span id="infopaneltitle-for-foo" style="display:none">Info about the '1. this shouldn’t have a code' definition.</span><b><a href="#foo">#foo</a></b><b>Referenced in:</b>
-   <ul>
-    <li><a href="#ref-for-foo">1. this shouldn’t have a code</a>
-   </ul>
-  </aside>
+<script>
+window.dfnsJson ??= {};
+window.dfnsJson['foo'] = {'id': 'foo', 'url': '#foo', 'dfnText': '1. this shouldn’t have a code', 'items': [{'ids': [{'refID': 'ref-for-foo-1'}], 'text': '1. this shouldn’t have a code'}]};
+</script>
 <script>/* script-dfn-panel */
 "use strict";
 {
+    const dfnsJson = window.dfnsJson || {};
+
+    function genDfnPanel([key, value], index) {
+        const {id, url, dfnText, items, external}  = value;
+        const itemsHtml = /* html */`<ul>
+            ${items.map((item) => {
+                const idsHtml =  item.ids.map((id, index) => {
+                    const href = `${external ? id.linkID : id.refID}`;
+                    const anchorText =
+                        (index == 0) ? item.text : `(${index+1})`;
+                    return /* html */`
+                        <a href="${href}">${anchorText}</a>`;
+                })
+                return /* html */`<li>${idsHtml.join('\n')}</li>`;
+            })}
+        </ul>`;
+
+        return /* html */`
+            <aside
+                class="dfn-panel"
+                id="infopanel-for-${id}"
+                data-for="${id}"
+                aria-labelledby="infopaneltitle-for-${id}">
+                <span
+                    id="infopaneltitle-for-${id}" style="display:none">
+                    Info about the '${dfnText}'
+                    ${external ? 'external': ''} reference.
+                </span>
+                <a href=${url}>${url}</a>
+                <b>Referenced in:</b>
+                ${itemsHtml}
+        </aside>`;
+    }
+
+    function genAllDfnPanels() {
+        const html = Object.entries(dfnsJson).map(genDfnPanel).join('\n');
+        const div = document.createElement('div');
+        div.innerHTML = html;
+        document.body.appendChild(div);
+    }
+
+    genAllDfnPanels();
+
     function queryAll(sel) {
         return [].slice.call(document.querySelectorAll(sel));
     }
