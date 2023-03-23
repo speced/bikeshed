@@ -44,8 +44,7 @@ def handleBikeshedInclude(el: t.ElementT, doc: t.SpecT) -> None:
             return
         doc.recordDependencies(includedInputSource)
         try:
-            text = includedInputSource.read().content
-            nodes = list(h.initialDocumentParse(text))
+            lines = includedInputSource.read().rawLines
         except Exception as err:
             m.die(f"Couldn't find include file '{path}'. Error was:\n{err}", el=el)
             h.removeNode(el)
@@ -54,7 +53,7 @@ def handleBikeshedInclude(el: t.ElementT, doc: t.SpecT) -> None:
         # can't use just path, because they're relative; including "foo/bar.txt" might use "foo/bar.txt" further nested
         # can't use just content, because then you can't do the same thing twice.
         # combined does a good job unless you purposely pervert it
-        hash = hashlib.md5((path + text).encode("ascii", "xmlcharrefreplace")).hexdigest()
+        hash = hashlib.md5((path + "".join(lines)).encode("ascii", "xmlcharrefreplace")).hexdigest()
         if el.get("hash"):
             hashAttr = el.get("hash")
             assert hashAttr is not None
@@ -71,8 +70,7 @@ def handleBikeshedInclude(el: t.ElementT, doc: t.SpecT) -> None:
             m.die("Nesting depth > 100, literally wtf are you doing.", el=el)
             h.removeNode(el)
             return
-        nodes = datablocks.transformDataBlocks(doc, nodes)
-        lines = "".join(str(x) for x in nodes).split("\n")
+        lines = datablocks.transformDataBlocks(doc, lines)
         lines = markdown.parse(lines, doc.md.indent, opaqueElements=doc.md.opaqueElements)
         text = "".join(lines)
         text = doc.fixText(text, moreMacros=macros)

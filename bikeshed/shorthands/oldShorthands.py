@@ -15,9 +15,9 @@ def transformProductionPlaceholders(doc: t.SpecT) -> None:
         (\S+)
         (?:\s+
             \[\s*
-            (-?(?:\d+[\w-]*|∞|&infin;|[Ii]nfinity))\s*
+            (-?(?:\d+[\w-]*|∞|[Ii]nfinity))\s*
             ,\s*
-            (-?(?:\d+[\w-]*|∞|&infin;|[Ii]nfinity))\s*
+            (-?(?:\d+[\w-]*|∞|[Ii]nfinity))\s*
             \]\s*
         )?$
         """,
@@ -113,7 +113,7 @@ def parseRangeComponent(val: str) -> tuple[str | None, float | int]:
         signVal = -1
         val = val[1:]
 
-    if val.lower() in ("infinity", "&infin;"):
+    if val.lower() == "infinity":
         val = "∞"
     if val == "∞":
         return sign + val, signVal * float("inf")
