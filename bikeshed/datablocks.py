@@ -281,7 +281,24 @@ def splitOnEndTag(text: str, tagName: str, startLine: int) -> tuple[str, str] | 
     return ("".join(str(x) for x in nodes[:endTagIndex]), "".join(str(x) for x in nodes[endTagIndex + 1 :]))
 
 
-def transformPre(lines: list[str], startTag: h.StartTag, indent: str, doc: t.SpecT) -> list[str]:
+def transformPre(lines: list[str], startTag: h.StartTag, indent: str, doc: t.SpecT) -> list[str] | list[h.ParserNode]:
+    if startTag.tag.lower() == "xmp":
+        # Just do the indent conversion
+        lines = [line.replace("\t", "  ") for line in lines]
+        node = h.RawElement(
+            line=startTag.line,
+            endLine = startTag.endLine + len(lines) - 1,
+            tag="xmp",
+            startTag=startTag,
+            data = "\n".join(lines),
+        )
+        indentNode = h.Text(
+            line = startTag.line,
+            endLine = startTag.line,
+            text = indent,
+        )
+        return [indentNode, node]
+
     lines, codeTag = stripCodeWrapper(lines, startLine=startTag.line)
 
     if not lines:
