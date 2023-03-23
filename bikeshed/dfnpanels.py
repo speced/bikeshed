@@ -48,7 +48,7 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
         itemsJson = []
         for text, els in refs.items():
             idsJson = []
-            for _, el in enumerate(els):
+            for _i, el in enumerate(els):
                 refID = el.get("id")
                 if refID is None:
                     refID = f"ref-for-{id}"
@@ -111,7 +111,7 @@ def addExternalDfnPanel(termEl: t.ElementT, ref: r.RefWrapper, doc: t.SpecT) -> 
         itemsJson = []
         for text, els in linksBySection.items():
             idsJson = []
-            for _, el in enumerate(els):
+            for _i, el in enumerate(els):
                 linkID = el.get("id")
                 if linkID is None:
                     linkID = f"ref-for-{termID}"
