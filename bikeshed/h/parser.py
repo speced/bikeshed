@@ -7,10 +7,7 @@ import io
 import os
 import re
 import typing
-import dataclasses
 from dataclasses import dataclass, field
-from abc import ABCMeta
-
 
 from .. import messages as m, t
 from . import dom
@@ -24,137 +21,38 @@ def test() -> None:
         list(nodesFromHtml(vals))
 
 
-def nodesFromHtml(data: str, startLine: int = 1) -> t.Generator[ParserNode, None, None]:
+def nodesFromHtml(data: str) -> t.Generator[str | StartTag | EndTag | Comment, None, None]:
     i = 0
-    s = Stream(data, startLine=startLine)
+    s = Stream(data)
     _, i = parseDoctype(s, i)
-    text = ""
-    textI = 0
     while not s.eof(i):
-        node, i = parseNode(s, i)
-        if node is Failure:
-            text += s[i]
-            i += 1
-        else:
-            if text:
-                startLine = s.line(textI)
-                endLine = startLine + len(text.split("\n")) - 1
-                yield Text(startLine, endLine, text)
-                text = ""
-            yield node
-            textI = i
-    if text:
-        startLine = s.line(textI)
-        endLine = startLine + len(text.split("\n")) - 1
-        yield Text(startLine, endLine, text)
+        text, i = s.skip(i, "<")
+        if text:
+            yield text
 
-
-def parseNode(s: Stream, start: int) -> Result:
-    # Produces a non-Text ParserNode (not a string)
-    if s.eof(start):
-        return Result.fail(start)
-
-    if s[start] == "<":
-        comment, i = parseComment(s, start)
+        comment, i = parseComment(s, i)
         if comment is not Failure:
-            return Result(comment, i)
+            yield comment
 
-        startTag, i = parseStartTag(s, start)
+        startTag, i = parseStartTag(s, i)
         if startTag is not Failure:
-            if startTag.tag == "pre":
-                el, endI = parseMetadataBlock(s, start)
-                if el is not Failure:
-                    return Result(el, endI)
+            yield startTag
             if startTag.tag == "script":
                 text, i = parseScriptToEnd(s, i)
-                el = RawElement(
-                    line=startTag.line,
-                    tag="script",
-                    startTag=startTag,
-                    data=text,
-                    endLine=s.line(i - 1),
-                )
-                return Result(el, i)
+                yield text
+                yield EndTag(-1, "script")
             elif startTag.tag == "style":
                 text, i = parseStyleToEnd(s, i)
-                el = RawElement(
-                    line=startTag.line,
-                    tag="style",
-                    startTag=startTag,
-                    data=text,
-                    endLine=s.line(i - 1),
-                )
-                return Result(el, i)
+                yield text
+                yield EndTag(-1, "style")
             elif startTag.tag == "xmp":
                 text, i = parseXmpToEnd(s, i)
-                el = RawElement(
-                    line=startTag.line,
-                    tag="xmp",
-                    startTag=startTag,
-                    data=text,
-                    endLine=s.line(i - 1),
-                )
-                return Result(el, i)
-            else:
-                return Result(startTag, i)
+                yield text
+                yield EndTag(-1, "xmp")
 
-        endTag, i = parseEndTag(s, start)
+        endTag, i = parseEndTag(s, i)
         if endTag is not Failure:
-            return Result(endTag, i)
-
-        el, i = parseCSSProduction(s, start)
-        if el is not Failure:
-            return Result(el, i)
-    # This isn't quite correct to handle here,
-    # but it'll have to wait until I munge
-    # the markdown and HTML parsers together.
-    if s[start] in ("`", "~"):
-        el, i = parseFencedCodeBlock(s, start)
-        if el is not Failure:
-            return Result(el, i)
-    if s[start] == "`":
-        el, i = parseCodeSpan(s, start)
-        if el is not Failure:
-            return Result(el, i)
-    if s[start : start + 2] == "\\`":
-        node = Text(
-            line=s.line(start),
-            endLine=s.line(start),
-            text="`",
-        )
-        return Result(node, start + 2)
-
-    return Result.fail(start)
-
-
-def initialDocumentParse(text: str, startLine: int = 1) -> list[ParserNode]:
-    # Just do a document parse.
-    # This will add `bs-line-number` attributes,
-    # normalize any difficult shorthands
-    # (ones that look like tags, or that contain raw text),
-    # and blank out comments.
-
-    nodes: list[ParserNode] = []
-    for node in nodesFromHtml(text, startLine=startLine):
-        if isinstance(node, Comment):
-            lines = node.data.split("\n")
-            if len(lines) < 2:
-                # doesn't span lines, I can just drop it
-                continue
-            # Otherwise, replace it with the same number
-            # of blank lines
-            nodes.append(Text(node.line, node.line + len(lines) - 1, "\n".join("" for x in lines)))
-        else:
-            nodes.append(node)
-    return nodes
-
-
-def strFromNodes(nodes: t.Iterable[ParserNode]) -> str:
-    return "".join(str(x) for x in nodes)
-
-
-def linesFromNodes(nodes: t.Iterable[ParserNode]) -> list[str]:
-    return strFromNodes(nodes).split("\n")
+            yield endTag
 
 
 #
@@ -246,12 +144,10 @@ class Result:
 class Stream:
     _chars: str
     _lineBreaks: list[int]
-    startLine: int
 
-    def __init__(self, chars: str, startLine: int = 1):
+    def __init__(self, chars: str):
         self._chars = chars
         self._lineBreaks = []
-        self.startLine = startLine
         for i, char in enumerate(chars):
             if char == "\n":
                 self._lineBreaks.append(i)
@@ -268,7 +164,7 @@ class Stream:
     def line(self, index: int) -> int:
         # Zero-based line index
         lineIndex = bisect.bisect_left(self._lineBreaks, index)
-        return lineIndex + self.startLine
+        return lineIndex + 1
 
     def col(self, index: int) -> int:
         lineIndex = bisect.bisect_left(self._lineBreaks, index)
@@ -280,156 +176,53 @@ class Stream:
     def loc(self, index: int) -> str:
         return f"{self.line(index)}:{self.col(index)}"
 
-    def skipTo(self, start: int, text: str) -> Result:
-        # Skip forward until encountering `text`.
-        # Produces the text encountered before this point.
+    def skip(self, start: int, ch: str) -> Result:
         i = start
-        textLen = len(text)
-        while not self.eof(i):
-            if self[i : i + textLen] == text:
-                break
+        chLen = len(ch)
+        while self[i : i + chLen] != ch and not self.eof(i):
             i += 1
-        if self[i : i + textLen] == text:
-            return Result(self[start:i], i)
-        else:
-            return Result.fail(start)
-
-    def matchRe(self, start: int, pattern: re.Pattern) -> Result:
-        match = pattern.match(self._chars, start)
-        if match:
-            return Result(match, match.end())
-        else:
-            return Result.fail(start)
-
-    def searchRe(self, start: int, pattern: re.Pattern) -> Result:
-        match = pattern.search(self._chars, start)
-        if match:
-            return Result(match, match.end())
-        else:
-            return Result.fail(start)
+        return Result(self[start:i], i)
 
     def skipToNextLine(self, start: int) -> Result:
-        # Skips to the next line.
-        # Produces the leftover text on the current line.
-        textAfter = self.remainingTextOnLine(start)
-        return Result(textAfter, start + len(textAfter))
-
-    def precedingLinebreakIndex(self, start: int) -> int:
-        # Index in self._lineBreaks of the linebreak preceding `start`.
         lineIndex = bisect.bisect_left(self._lineBreaks, start)
-        return lineIndex - 1
-
-    def followingLinebreakIndex(self, start: int) -> int:
-        # Same but the linebreak after.
-        # Note that a newline char is at the end of its line;
-        # the actual break in the line is *after* it.
-        return bisect.bisect_left(self._lineBreaks, start)
-
-    def currentLineStart(self, start: int) -> int:
-        # The index of the first character on the current line.
-        lineIndex = self.precedingLinebreakIndex(start)
-        if lineIndex == -1:
-            return 0
+        if lineIndex + 1 < len(self._lineBreaks):
+            i = self._lineBreaks[lineIndex + 1] + 1
+            return Result(self[start:i], i)
         else:
-            return self._lineBreaks[lineIndex] + 1
-
-    def nextLineStart(self, start: int) -> int:
-        # The index of the first character on the next line.
-        # Returns an OOB index if on the last line.
-        lineIndex = self.followingLinebreakIndex(start)
-        if lineIndex >= len(self._lineBreaks):
-            return len(self._chars)
-        else:
-            return self._lineBreaks[lineIndex] + 1
-
-    def precedingTextOnLine(self, start: int) -> str:
-        # The text on the current line before the start point.
-        return self[self.currentLineStart(start) : start]
-
-    def remainingTextOnLine(self, start: int) -> str:
-        # The text on the current line from the start point on.
-        # Includes the newline, if present.
-        return self[start : self.nextLineStart(start)]
+            return Result(self[start:], len(self._chars))
 
 
 @dataclass
-class ParserNode(metaclass=ABCMeta):
+class StartTag:
     line: int
-    endLine: int
-
-
-@dataclass
-class Text(ParserNode):
-    text: str
-
-    def __str__(self) -> str:
-        return self.text
-
-
-@dataclass
-class StartTag(ParserNode):
     tag: str
     attrs: dict[str, str] = field(default_factory=dict)
-    classes: set[str] = field(default_factory=set)
 
     def __str__(self) -> str:
-        start = f"<{self.tag} bs-line-number={self.line}"
-        attrs = ""
-        for k, v in sorted(self.attrs.items()):
-            if k == "bs-line-number":
-                continue
-            attrs += f' {k}="{dom.escapeAttr(v)}"'
-        if self.classes:
-            attrs += f' class="{" ".join(sorted(self.classes))}"'
+        start = f"<{self.tag}:{self.line}"
+        if self.attrs:
+            attrs = " " + " ".join(f'{name}="{val}"' for name, val in self.attrs.items())
+        else:
+            attrs = ""
         return start + attrs + ">"
-
-    def printEndTag(self) -> str:
-        return f"</{self.tag}>"
-
-    def finalize(self) -> StartTag:
-        if "class" in self.attrs:
-            self.classes = set(self.attrs["class"].split())
-            del self.attrs["class"]
-        return self
-
-    def clone(self, **kwargs: t.Any) -> StartTag:
-        return dataclasses.replace(self, **kwargs)
 
 
 @dataclass
-class EndTag(ParserNode):
+class EndTag:
+    line: int
     tag: str
 
     def __str__(self) -> str:
-        return f"</{self.tag}>"
+        return f"</{self.tag}:{self.line}>"
 
 
 @dataclass
-class Comment(ParserNode):
+class Comment:
+    line: int
     data: str
 
     def __str__(self) -> str:
         return f"<!--{self.data}-->"
-
-
-@dataclass
-class RawElement(ParserNode):
-    tag: str
-    startTag: StartTag
-    data: str
-
-    def __str__(self) -> str:
-        return f"{self.startTag}{self.data}</{self.tag}>"
-
-
-@dataclass
-class WholeElement(ParserNode):
-    tag: str
-    startTag: StartTag
-    text: str
-
-    def __str__(self) -> str:
-        return f"{self.startTag}{dom.escapeHTML(self.text)}</{self.tag}>"
 
 
 #
@@ -485,7 +278,7 @@ def parseStartTag(s: Stream, start: int) -> Result:
     # After this point we're committed to a start tag,
     # so failure will really be a parse error.
 
-    tag = StartTag(line=s.line(start), endLine=s.line(start), tag=tagname)
+    tag = StartTag(s.line(start), tagname)
 
     while True:
         ws, i = parseWhitespace(s, i)
@@ -505,14 +298,12 @@ def parseStartTag(s: Stream, start: int) -> Result:
 
     if s[i] == "/":
         if s[i + 1] == ">" and tagname in ("br", "link", "meta"):
-            tag.endLine = s.line(i + 1)
             return Result(tag, i + 2)
         else:
             m.die(f"Spurious / in <{tagname}>.", lineNum=s.loc(start))
             return Result.fail(start)
 
     if s[i] == ">":
-        tag.endLine = s.line(i)
         return Result(tag, i + 1)
 
     if s.eof(i):
@@ -721,7 +512,7 @@ def parseEndTag(s: Stream, start: int) -> Result:
         m.die(f"Garbage after the tagname in </{tagname}>.", lineNum=s.loc(start))
         return Result.fail(start)
     i += 1
-    return Result(EndTag(s.line(start), s.line(i - 1), tagname), i)
+    return Result(EndTag(s.line(start), tagname), i)
 
 
 def parseComment(s: Stream, start: int) -> Result:
@@ -741,7 +532,7 @@ def parseComment(s: Stream, start: int) -> Result:
         while s[i] != "-" and not s.eof(i):
             i += 1
         if s[i : i + 3] == "-->":
-            return Result(Comment(s.line(start), s.line(i + 2), s[dataStart:i]), i + 3)
+            return Result(Comment(s.line(start), s[dataStart:i]), i + 3)
         if s[i : i + 4] == "--!>":
             m.die("Malformed comment - don't use a ! at the end.", lineNum=s.loc(start))
             return Result.fail(start)
@@ -811,222 +602,6 @@ def parseXmpToEnd(s: Stream, start: int) -> Result:
             return Result(s[start:i], i + 6)
         i += 1
     assert False
-
-
-def parseCSSProduction(s: Stream, start: int) -> Result:
-    if s[start : start + 2] != "<<":
-        return Result.fail(start)
-    i = start + 2
-
-    text, i = s.skipTo(i, ">>")
-    if text is Failure:
-        return Result.fail(start)
-    if "\n" in text:
-        return Result.fail(start)
-    i += 2
-
-    startTag = StartTag(
-        line=s.line(start),
-        endLine=s.line(start),
-        tag="fake-production-placeholder",
-        attrs={"bs-autolink-syntax": s[start:i], "class": "production", "data-opaque": ""},
-    ).finalize()
-    el = WholeElement(
-        line=startTag.line,
-        tag=startTag.tag,
-        startTag=startTag,
-        text=text,
-        endLine=s.line(i - 1),
-    )
-    return Result(el, i)
-
-
-codeSpanStartRe = re.compile(r"`+")
-# A few common lengths to pre-compile for speed.
-codeSpanEnd1Re = re.compile(r"(.*?[^`])(`)([^`]|$)")
-codeSpanEnd2Re = re.compile(r"(.*?[^`])(``)([^`]|$)")
-
-
-def parseCodeSpan(s: Stream, start: int) -> Result:
-    if s[start - 1] == "`" and s[start - 2 : start] != "\\`":
-        return Result.fail(start)
-    if s[start] != "`":
-        return Result.fail(start)
-    match, i = s.matchRe(start, codeSpanStartRe)
-    assert match is not Failure
-    ticks = match.group(0)
-    contentStart = i
-
-    if len(ticks) == 1:
-        endRe = codeSpanEnd1Re
-    elif len(ticks) == 2:
-        endRe = codeSpanEnd2Re
-    else:
-        endRe = re.compile(r"([^`])(" + ticks + ")([^`]|$)")
-    match, _ = s.searchRe(i, endRe)
-    if match is Failure:
-        # Allowed to be unmatched, they're just ticks then.
-        return Result.fail(start)
-    contentEnd = match.end(1)
-    i = match.end(2)
-
-    text = s[contentStart:contentEnd]
-    if len(text.split("\n")) > 5:
-        # Bit of a hack to avoid a stray ` eating a ton of your document.
-        return Result.fail(start)
-    if text.startswith(" ") and text.endswith(" ") and text.strip() != "":
-        # If you start and end with spaces, but aren't *all* spaces,
-        # strip one space off.
-        # (So you can put ticks at the start/end of your code span.)
-        text = text[1:-1]
-
-    el = WholeElement(
-        line=s.line(start),
-        tag="code",
-        text=text,
-        startTag=StartTag(
-            line=s.line(start),
-            endLine=s.line(start),
-            tag="code",
-        ),
-        endLine=s.line(i - 1),
-    )
-    return Result(el, i)
-
-
-fencedStartRe = re.compile(r"`{3,}|~{3,}")
-
-
-def parseFencedCodeBlock(s: Stream, start: int) -> Result:
-    if s.precedingTextOnLine(start).strip() != "":
-        return Result.fail(start)
-
-    match, i = s.matchRe(start, fencedStartRe)
-    if match is Failure:
-        return Result.fail(start)
-    openingFence = match.group(0)
-
-    infoString, i = s.skipToNextLine(i)
-    infoString = infoString.strip()
-    if "`" in infoString:
-        # This isn't allowed, because it collides with inline code spans.
-        return Result.fail(start)
-
-    contents = ""
-    while True:
-        # Ending fence has to use same character and be
-        # at least as long, so just search for the opening
-        # fence itself, as a start.
-
-        text, i = s.skipTo(i, openingFence)
-
-        # No ending fence in the rest of the document
-        if text is Failure:
-            m.die("Hit EOF while parsing fenced code block.", lineNum=s.line(start))
-            contents += s[i:]
-            i = len(s._chars)
-            break
-
-        # Found a possible ending fence, put preceding text
-        # into the contents string.
-        contents += text
-
-        # Ending fence has to have only whitespace preceding it.
-        if s.precedingTextOnLine(i).strip() == "":
-            # Currently this doesn't enforce that the ending fence
-            # needs to be indented to the same level as the opening
-            # fence. I'll fix this better when I munge the HTML
-            # and markdown parsers.
-
-            # Consume the whole fence, since it can be longer.
-            endingFence, i = s.matchRe(i, fencedStartRe)
-            break
-
-        # Otherwise I just hit a line that happens to have
-        # a fence lookalike- on it, but not closing this one.
-        # Skip the fence and continue.
-
-        text, i = s.matchRe(i, fencedStartRe)
-        contents += text
-
-    # At this point i is past the end of the code block.
-    tag = StartTag(
-        line=s.line(start),
-        endLine=s.line(start),
-        tag="xmp",
-    )
-    if infoString:
-        tag.attrs["bs-infostring"] = infoString
-        lang = infoString.split(" ")[0]
-        tag.classes.add(f"language-{lang}")
-    el = RawElement(
-        line=tag.line,
-        tag=tag.tag,
-        startTag=tag,
-        data=contents,
-        endLine=s.line(i - 1),
-    )
-    return Result(el, i)
-
-
-metadataPreEndRe = re.compile(r"</pre>(.*)")
-metadataXmpEndRe = re.compile(r"</xmp>(.*)")
-
-
-def parseMetadataBlock(s: Stream, start: int) -> Result:
-    # Metadata blocks aren't actually HTML elements,
-    # they're line-based BSF-Markdown constructs
-    # and contain unparsed text.
-
-    if start != s.currentLineStart(start):
-        # Metadata blocks must have their start/end tags
-        # on the left margin, completely unindented.
-        return Result.fail(start)
-    startTag, i = parseStartTag(s, start)
-    if startTag is Failure:
-        return Result.fail(start)
-    if startTag.tag not in ("pre", "xmp"):
-        return Result.fail(start)
-    startTag.finalize()
-    if "metadata" not in startTag.classes:
-        return Result.fail(start)
-    startTag.tag = startTag.tag.lower()
-
-    # Definitely in a metadata block now
-    line, i = s.skipToNextLine(i)
-    if line.strip() != "":
-        m.die("Significant text on the same line as the metadata start tag isn't allowed.", lineNum=s.line(start))
-    contents = line
-    endPattern = metadataPreEndRe if startTag.tag == "pre" else metadataXmpEndRe
-    while True:
-        if s.eof(i):
-            m.die("Hit EOF while trying to parse a metadata block.", lineNum=s.line(start))
-            break
-        line, i = s.skipToNextLine(i)
-        match = endPattern.match(line)
-        if not match:
-            contents += line
-            continue
-        # Hit the end tag
-        if match.group(1).strip() != "":
-            m.die("Significant text on the same line as the metadata end tag isn't allowed.", lineNum=s.line(i - 1))
-        break
-    # Since we jump to next line each time, jump back one character
-    # so the newline will show up in the next node,
-    # as the parsers typically do.
-    i -= 1
-
-    # Since the internals aren't parsed, call it an <xmp>
-    # so it'll survive later parses if necessary.
-    startTag.tag = "xmp"
-    el = RawElement(
-        line=startTag.line,
-        tag="xmp",
-        startTag=startTag,
-        data=contents,
-        endLine=s.line(i - 1),
-    )
-    return Result(el, i)
 
 
 #

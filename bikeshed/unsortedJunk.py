@@ -7,19 +7,90 @@ from collections import Counter, defaultdict, namedtuple
 from urllib import parse
 from PIL import Image
 
-from . import biblio, config, dfnpanels, h, t, messages as m, idl, repository
+from . import biblio, config, dfnpanels, h, func, t, messages as m, idl, repository
 from .translate import _
 
 if t.TYPE_CHECKING:
     import widlparser  # pylint: disable=unused-import
     from . import refs
+    from .line import Line
 
 
-def stripBOM(text: str) -> str:
-    if text[0:1] == "\ufeff":
-        m.lint("Your document has a BOM. There's no need for that, please re-save it without a BOM.")
-        text = text[1:]
-    return text
+class MarkdownCodeSpans(func.Functor):
+    # Wraps a string, such that the contained text is "safe"
+    # and contains no markdown code spans.
+    # Thus, functions mapping over the text can freely make substitutions,
+    # knowing they won't accidentally replace stuff in a code span.
+    def __init__(self, text: str):
+        self.__codeSpanReplacements__ = []
+        newText = ""
+        mode = "text"
+        indexSoFar = 0
+        backtickCount = 0
+        for match in re.finditer(r"(\\`)|([\w-]*)(`+)", text):
+            if mode == "text":
+                if match.group(1):
+                    newText += text[indexSoFar : match.start()] + match.group(1)[1]
+                    indexSoFar = match.end()
+                elif match.group(3):
+                    mode = "code"
+                    newText += text[indexSoFar : match.start()]
+                    indexSoFar = match.end()
+                    backtickCount = len(match.group(3))
+                    tag = match.group(2)
+                    literalStart = match.group(0)
+            elif mode == "code":
+                if match.group(1):
+                    pass
+                elif match.group(3):
+                    if len(match.group(3)) != backtickCount:
+                        pass
+                    else:
+                        mode = "text"
+                        innerText = text[indexSoFar : match.start()] + match.group(2)
+                        fullText = literalStart + text[indexSoFar : match.start()] + match.group(0)
+                        replacement = (tag, innerText, fullText)
+                        self.__codeSpanReplacements__.append(replacement)
+                        newText += "\ue0ff"
+                        indexSoFar = match.end()
+        if mode == "text":
+            newText += text[indexSoFar:]
+        elif mode == "code":
+            newText += tag + "`" * backtickCount + text[indexSoFar:]
+
+        super().__init__(newText)
+
+    def map(self, fn: t.Callable) -> MarkdownCodeSpans:
+        x = MarkdownCodeSpans("")
+        x.__val__ = fn(self.__val__)
+        x.__codeSpanReplacements__ = self.__codeSpanReplacements__
+        return x
+
+    def extract(self) -> str:
+        if self.__codeSpanReplacements__:
+            # Reverse the list, so I can use pop() to get them starting from the first.
+            repls = self.__codeSpanReplacements__[::-1]
+
+            def codeSpanReviver(_: t.Any) -> str:
+                # Match object is the PUA character, which I can ignore.
+                repl = repls.pop()
+                if repl[0] == "" or repl[0].endswith("-"):
+                    # Markdown code span, so massage per CommonMark rules.
+                    import string
+
+                    text = h.escapeHTML(repl[1]).strip(string.whitespace)
+                    text = re.sub("[" + string.whitespace + "]{2,}", " ", text)
+                    return f"{repl[0]}<code data-opaque bs-autolink-syntax='{h.escapeAttr(repl[2])}'>{text}</code>"
+                return f"<code data-opaque data-span-tag={repl[0]} bs-autolink-syntax='{h.escapeAttr(repl[2])}'>{h.escapeHTML(repl[1])}</code>"
+
+            return re.sub(r"\ue0ff", codeSpanReviver, self.__val__)
+        return t.cast(str, self.__val__)
+
+
+def stripBOM(doc: t.SpecT) -> None:
+    if len(doc.lines) >= 1 and doc.lines[0].text[0:1] == "\ufeff":
+        doc.lines[0].text = doc.lines[0].text[1:]
+        m.warn("Your document has a BOM. There's no need for that, please re-save it without a BOM.")
 
 
 # Definitions and the like
@@ -190,18 +261,7 @@ def checkVarHygiene(doc: t.SpecT) -> None:
 def addVarClickHighlighting(doc: t.SpecT) -> None:
     if doc.md.slimBuildArtifact:
         return
-    doc.extraStyles[
-        "style-var-click-highlighting"
-    ] = """
-    var { cursor: pointer; }
-    var.selected0 { background-color: #F4D200; box-shadow: 0 0 0 2px #F4D200; }
-    var.selected1 { background-color: #FF87A2; box-shadow: 0 0 0 2px #FF87A2; }
-    var.selected2 { background-color: #96E885; box-shadow: 0 0 0 2px #96E885; }
-    var.selected3 { background-color: #3EEED2; box-shadow: 0 0 0 2px #3EEED2; }
-    var.selected4 { background-color: #EACFB6; box-shadow: 0 0 0 2px #EACFB6; }
-    var.selected5 { background-color: #82DDFF; box-shadow: 0 0 0 2px #82DDFF; }
-    var.selected6 { background-color: #FFBCF2; box-shadow: 0 0 0 2px #FFBCF2; }
-    """
+    doc.extraStyles["style-var-click-highlighting"] = getModuleFile("var-click-highlighting.css")
     # Colors were chosen in Lab using https://nixsensor.com/free-color-converter/
     # D50 2deg illuminant, L in [0,100], a and b in [-128, 128]
     # 0 = lab(85,0,85)
@@ -217,92 +277,7 @@ def addVarClickHighlighting(doc: t.SpecT) -> None:
     # Specifically: find lowest-indexed color with lowest usage.
     # (Usually this'll be zero, but if you click too many vars in same algo, can repeat.)
     # If you unclick then click again on same var, it should get same color if possible.
-    doc.extraScripts[
-        "script-var-click-highlighting"
-    ] = r"""
-    "use strict";
-    {
-        document.addEventListener("click", e=>{
-            if(e.target.nodeName == "VAR") {
-                highlightSameAlgoVars(e.target);
-            }
-        });
-        const indexCounts = new Map();
-        const indexNames = new Map();
-        function highlightSameAlgoVars(v) {
-            // Find the algorithm container.
-            let algoContainer = null;
-            let searchEl = v;
-            while(algoContainer == null && searchEl != document.body) {
-                searchEl = searchEl.parentNode;
-                if(searchEl.hasAttribute("data-algorithm")) {
-                    algoContainer = searchEl;
-                }
-            }
-
-            // Not highlighting document-global vars,
-            // too likely to be unrelated.
-            if(algoContainer == null) return;
-
-            const algoName = algoContainer.getAttribute("data-algorithm");
-            const varName = getVarName(v);
-            const addClass = !v.classList.contains("selected");
-            let highlightClass = null;
-            if(addClass) {
-                const index = chooseHighlightIndex(algoName, varName);
-                indexCounts.get(algoName)[index] += 1;
-                indexNames.set(algoName+"///"+varName, index);
-                highlightClass = nameFromIndex(index);
-            } else {
-                const index = previousHighlightIndex(algoName, varName);
-                indexCounts.get(algoName)[index] -= 1;
-                highlightClass = nameFromIndex(index);
-            }
-
-            // Find all same-name vars, and toggle their class appropriately.
-            for(const el of algoContainer.querySelectorAll("var")) {
-                if(getVarName(el) == varName) {
-                    el.classList.toggle("selected", addClass);
-                    el.classList.toggle(highlightClass, addClass);
-                }
-            }
-        }
-        function getVarName(el) {
-            return el.textContent.replace(/(\s|\xa0)+/, " ").trim();
-        }
-        function chooseHighlightIndex(algoName, varName) {
-            let indexes = null;
-            if(indexCounts.has(algoName)) {
-                indexes = indexCounts.get(algoName);
-            } else {
-                // 7 classes right now
-                indexes = [0,0,0,0,0,0,0];
-                indexCounts.set(algoName, indexes);
-            }
-
-            // If the element was recently unclicked,
-            // *and* that color is still unclaimed,
-            // give it back the same color.
-            const lastIndex = previousHighlightIndex(algoName, varName);
-            if(indexes[lastIndex] === 0) return lastIndex;
-
-            // Find the earliest index with the lowest count.
-            const minCount = Math.min.apply(null, indexes);
-            let index = null;
-            for(var i = 0; i < indexes.length; i++) {
-                if(indexes[i] == minCount) {
-                    return i;
-                }
-            }
-        }
-        function previousHighlightIndex(algoName, varName) {
-            return indexNames.get(algoName+"///"+varName);
-        }
-        function nameFromIndex(index) {
-            return "selected" + index;
-        }
-    }
-    """
+    doc.extraScripts["script-var-click-highlighting"] = getModuleFile("var-click-highlighting.js")
 
 
 def fixIntraDocumentReferences(doc: t.SpecT) -> None:
@@ -1217,6 +1192,7 @@ def cleanupHTML(doc: t.SpecT) -> None:
             )
         h.removeAttr(
             el,
+            "bs-autolink-syntax",
             "data-alternate-id",
             "highlight",
             "nohighlight",
@@ -1257,6 +1233,18 @@ def finalHackyCleanup(text: str) -> str:
     # For hacky last-minute string-based cleanups of the rendered html.
 
     return text
+
+
+def hackyLineNumbers(lines: list[Line]) -> list[Line]:
+    # Hackily adds line-number information to each thing that looks like an open tag.
+    # This is just regex text-munging, so potentially dangerous!
+    for line in lines:
+        line.text = re.sub(
+            r"(^|[^<])(<[\w-]+)([ >])",
+            rf"\1\2 line-number={line.i}\3",
+            line.text,
+        )
+    return lines
 
 
 def correctFrontMatter(doc: t.SpecT) -> None:
@@ -1590,3 +1578,8 @@ def processIDL(doc: t.SpecT) -> None:
     classifyDfns(doc, dfns)
     h.fixupIDs(doc, dfns)
     doc.refs.addLocalDfns(doc, (dfn for dfn in dfns if dfn.get("id") is not None))
+
+
+def getModuleFile(filename: str) -> str:
+    with open(config.scriptPath(".", filename), "r", encoding="utf-8") as fh:
+        return fh.read()

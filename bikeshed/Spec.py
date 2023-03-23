@@ -7,6 +7,7 @@ import os
 import sys
 from collections import defaultdict, OrderedDict
 from datetime import datetime
+from functools import partial as curry
 
 from . import (
     biblio,
@@ -19,6 +20,7 @@ from . import (
     dfns,
     extensions,
     fingerprinting,
+    func,
     h,
     headings,
     highlight,
@@ -27,6 +29,7 @@ from . import (
     inlineTags,
     InputSource,
     language,
+    line,
     lint,
     markdown,
     mdn,
@@ -58,6 +61,9 @@ class Spec:
         catchArgparseBug(inputFilename)
         self.valid: bool = False
         self.lineNumbers: bool = lineNumbers
+        if lineNumbers:
+            # line-numbers are too hacky, so force this to be a dry run
+            constants.dryRun = True
         if inputFilename is None:
             inputFilename = findImplicitInputFile()
         if inputFilename is None:  # still
@@ -76,7 +82,7 @@ class Spec:
         else:
             self.dataFile = fileRequester
 
-        self.nodes: list[h.ParserNode] = []
+        self.lines: list[line.Line] = []
         self.valid = self.initializeState()
 
     def initializeState(self) -> bool:
@@ -118,8 +124,7 @@ class Spec:
 
         try:
             inputContent = self.inputSource.read()
-            text = u.stripBOM(inputContent.content)
-            self.nodes = list(h.initialDocumentParse(text))
+            self.lines = inputContent.lines
             if inputContent.date is not None:
                 self.mdBaseline.addParsedData("Date", inputContent.date)
         except FileNotFoundError:
@@ -141,9 +146,14 @@ class Spec:
         return self
 
     def assembleDocument(self) -> Spec:
+        # Textual hacks
+        u.stripBOM(self)
+        if self.lineNumbers:
+            self.lines = u.hackyLineNumbers(self.lines)
+        self.lines = markdown.stripComments(self.lines)
         self.recordDependencies(self.inputSource)
         # Extract and process metadata
-        self.nodes, self.mdDocument = metadata.parse(self.nodes)
+        self.lines, self.mdDocument = metadata.parse(lines=self.lines)
         # First load the metadata sources from 'local' data
         self.md = metadata.join(self.mdBaseline, self.mdDocument, self.mdCommandLine)
         # Using that to determine the Group and Status, load the correct defaults.include boilerplate
@@ -175,22 +185,25 @@ class Spec:
         extensions.load(self)
 
         # Initialize things
-        self.refs.initializeRefs(doc=self)
+        self.refs.initializeRefs(doc=self, datablocks=datablocks)
         self.refs.initializeBiblio()
+
         # Deal with further <pre> blocks, and markdown
-        self.nodes = datablocks.transformDataBlocks(self, self.nodes)
+        self.lines = datablocks.transformDataBlocks(self, self.lines)
+
         markdownFeatures: set[str] = {"headings"}
-        lines = markdown.parse(
-            h.linesFromNodes(self.nodes),
+        self.lines = markdown.parse(
+            self.lines,
             self.md.indent,
             opaqueElements=self.md.opaqueElements,
             blockElements=self.md.blockElements,
             features=markdownFeatures,
         )
-        self.html = "\n".join(lines)
 
         self.refs.setSpecData(self.md)
 
+        # Convert to a single string of html now, for convenience.
+        self.html = "".join(x.text for x in self.lines)
         boilerplate.addHeaderFooter(self)
         self.html = self.fixText(self.html)
 
@@ -426,20 +439,26 @@ class Spec:
             m.die(f"Something went wrong while watching the file:\n{e}")
 
     def fixText(self, text: str, moreMacros: dict[str, str] | None = None) -> str:
-        # Do several textual replacements that need to happen *before* the document is parsed as html.
+        # Do several textual replacements that need to happen *before* the document is parsed as h.
 
         # If markdown shorthands are on, remove all `foo`s while processing,
         # so their contents don't accidentally trigger other stuff.
         # Also handle markdown escapes.
         if moreMacros is None:
             moreMacros = {}
+        textFunctor: func.Functor
+        if "markdown" in self.md.markupShorthands:
+            textFunctor = u.MarkdownCodeSpans(text)
+        else:
+            textFunctor = func.Functor(text)
 
         macros = dict(self.macros, **moreMacros)
-        text = h.replaceMacros(text, macros)
-        text = h.fixTypography(text)
+        textFunctor = textFunctor.map(curry(h.replaceMacros, macros=macros))
+        textFunctor = textFunctor.map(h.fixTypography)
         if "css" in self.md.markupShorthands:
-            text = h.replaceAwkwardCSSShorthands(text)
-        return text
+            textFunctor = textFunctor.map(h.replaceAwkwardCSSShorthands)
+
+        return t.cast(str, textFunctor.extract())
 
     def printTargets(self) -> None:
         m.p("Exported terms:")

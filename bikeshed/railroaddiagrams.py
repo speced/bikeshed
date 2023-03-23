@@ -320,18 +320,17 @@ class Diagram(DiagramMultiContainer):
         self.down = 0
         self.height = 0
         self.width = 0
-        if self.items:
-            for item in self.items:
-                if isinstance(item, Style):
-                    continue
-                self.width += item.width + (20 if item.needsSpace else 0)
-                self.up = max(self.up, item.up - self.height)
-                self.height += item.height
-                self.down = max(self.down - item.height, item.down)
-            if self.items[0].needsSpace:
-                self.width -= 10
-            if self.items[-1].needsSpace:
-                self.width -= 10
+        for item in self.items:
+            if isinstance(item, Style):
+                continue
+            self.width += item.width + (20 if item.needsSpace else 0)
+            self.up = max(self.up, item.up - self.height)
+            self.height += item.height
+            self.down = max(self.down - item.height, item.down)
+        if self.items[0].needsSpace:
+            self.width -= 10
+        if self.items[-1].needsSpace:
+            self.width -= 10
         self.formatted = False
 
     def __repr__(self) -> str:
