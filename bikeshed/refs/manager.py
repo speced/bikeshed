@@ -149,9 +149,7 @@ class ReferenceManager:
                     if not anchorFile:
                         raise OSError()
                     anchorLines = anchorFile.read().rawLines
-                    datablocks.transformAnchors(
-                        lines=anchorLines, doc=doc, firstLine=anchorLines[0], startTag=fakeTag
-                    )
+                    datablocks.transformAnchors(lines=anchorLines, doc=doc, firstLine=anchorLines[0], startTag=fakeTag)
                 except OSError:
                     m.warn("anchors.bsdata not found despite being listed in the External Infotrees metadata.")
 
@@ -171,12 +169,7 @@ class ReferenceManager:
                     if not ldFile:
                         raise OSError()
                     ldLines = ldFile.read().rawLines
-                    datablocks.transformInfo(
-                        lines=ldLines,
-                        doc=doc,
-                        firstLine=ldLines[0],
-                        startTag=fakeTag
-                    )
+                    datablocks.transformInfo(lines=ldLines, doc=doc, firstLine=ldLines[0], startTag=fakeTag)
                 except OSError:
                     m.warn("link-defaults.infotree not found despite being listed in the External Infotrees metadata.")
 
