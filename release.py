@@ -15,7 +15,7 @@ def createRelease():
         print("Working tree is dirty. Finish committing files or stash, then try again.")
         sys.exit(1)
 
-    with open("semver.txt", encoding="utf-8") as fh:
+    with open("bikeshed/semver.txt", encoding="utf-8") as fh:
         currentVersion = fh.read().strip()
         semver = parseSemver(currentVersion)
 
@@ -63,7 +63,7 @@ def createRelease():
         fh.write(bikeshedVersion)
 
     # Update the semver
-    with open("semver.txt", "w", encoding="utf-8") as fh:
+    with open("bikeshed/semver.txt", "w", encoding="utf-8") as fh:
         fh.write(newVersion)
 
     try:
@@ -100,13 +100,13 @@ def createRelease():
         subprocess.call("rm -r build dist", shell=True)
     except:
         # roll back the semver
-        with open("semver.txt", "w", encoding="utf-8") as fh:
+        with open("bikeshed/semver.txt", "w", encoding="utf-8") as fh:
             fh.write(currentVersion)
         raise
 
     # Clean up with a final commit of the changed version files
     subprocess.check_call(
-        "git add semver.txt bikeshed/spec-data/readonly/bikeshed-version.txt",
+        "git add bikeshed/semver.txt bikeshed/spec-data/readonly/bikeshed-version.txt",
         shell=True,
     )
     subprocess.check_call(f"git commit -m 'Bump semver to {newVersion}'", shell=True)
