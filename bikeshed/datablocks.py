@@ -1,13 +1,12 @@
 # pylint: disable=unused-argument
 from __future__ import annotations
 
-import dataclasses
 import re
 from collections import OrderedDict, defaultdict
 from functools import reduce
 
-from . import biblio, config, h, messages as m, t
-from .refs.wrapper import RefWrapper
+from . import biblio, config, h, messages as m, refs, t
+from .line import Line
 
 
 # When writing a new transformFoo function,
@@ -21,13 +20,22 @@ if t.TYPE_CHECKING:
     InfoTreeT: t.TypeAlias = list[defaultdict[str, list[str]]]
 
     class TransformFuncT(t.Protocol):
-        def __call__(
-            self, lines: list[str], startTag: h.StartTag, indent: str, doc: t.SpecT
-        ) -> list[str] | list[h.ParserNode]:
+        def __call__(self, lines: list[str], startTag: h.StartTag, firstLine: str, doc: t.SpecT) -> list[str]:
             ...
 
 
-def transformDataBlocks(doc: t.SpecT, nodes: list[h.ParserNode]) -> list[h.ParserNode]:
+if t.TYPE_CHECKING:
+
+    @t.overload
+    def transformDataBlocks(doc: t.SpecT, lines: list[Line]) -> list[Line]:
+        ...
+
+    @t.overload
+    def transformDataBlocks(doc: t.Spec, lines: list[str]) -> list[str]:
+        ...
+
+
+def transformDataBlocks(doc: t.SpecT, lines: list[Line] | list[str]) -> list[Line] | list[str]:
     """
     This function does a single pass through the doc,
     finding all the "data blocks" and processing them.
@@ -45,6 +53,13 @@ def transformDataBlocks(doc: t.SpecT, nodes: list[h.ParserNode]) -> list[h.Parse
     and the line with the content, in case it has useful data in it.
     """
 
+    fromStrings = False
+    if any(isinstance(x, str) for x in lines):
+        fromStrings = True
+        _lines = [Line(-1, t.cast(str, x)) for x in lines]
+    else:
+        _lines = t.cast("list[Line]", lines)
+    inBlock = False
     blockTypes: dict[str, TransformFuncT] = {
         "simpledef": transformSimpleDef,
         "propdef": transformPropdef,
@@ -62,159 +77,111 @@ def transformDataBlocks(doc: t.SpecT, nodes: list[h.ParserNode]) -> list[h.Parse
         "include-raw": transformIncludeRaw,
         "pre": transformPre,
     }
-    newNodes: list[h.ParserNode] = []
-    for node in groupDataBlocks(nodes):
-        if not isinstance(node, DataBlock):
-            newNodes.append(node)
-            continue
-        blockType = blockTypeFromTag(node.startTag, list(blockTypes.keys()))
-        lines = node.data
-        if lines and lines[0].strip() == "":
-            lines = lines[1:]
-        if lines and lines[-1].strip() == "":
-            lines = lines[:-1]
+    blockType: str = ""
+    tagName = ""
+    blockTag: h.StartTag | None = None
+    blockLines: list[Line] = []
+    newLines: list[Line] = []
+    for line in _lines:
+        # Look for the start of a block.
+        startTag, _ = h.parseStartTag(h.Stream(line.text.lstrip()), 0)
+        if startTag is h.Failure:
+            startTag = None
+        if startTag and startTag.tag not in ("pre", "xmp"):
+            startTag = None
 
-        replacements = blockTypes[blockType](
-            lines=removeCommonPrefix(lines, startLine=node.startTag.line),
-            startTag=node.startTag,
-            indent=node.indent,
-            doc=doc,
-        )
-        if replacements and isinstance(replacements[0], str):
-            replacementLines = t.cast("list[str]", replacements)
-            replacementNodes = list(h.nodesFromHtml("\n".join(replacementLines)))
-            # Raw string lines means I haven't thought about line numbers,
-            # so just reset them to the start tag's for attribution.
-            for rNode in replacementNodes:
-                rNode.line = node.startTag.line
-            replacementHeight = len(replacements)
-        else:
-            replacementNodes = t.cast("list[h.ParserNode]", replacements)
-            replacementHeight = len(h.linesFromNodes(replacementNodes))
-        newNodes.extend(replacementNodes)
-        if replacementHeight != node.height:
-            newNodes.append(h.Text(-1, -1, "\n"))
-            newNodes.append(
-                h.Comment(
-                    line=-1,
-                    endLine=-1,
-                    data=f"LINE NUMBER RESET {node.startTag.line + node.height - 2}",
-                    # -2 because I'm introducing two linebreaks
+        # Note that, by design, I don't pay attention to anything on the same line as the start tag,
+        # unless it's single-line.
+        if startTag and not inBlock:
+            blockTag = startTag.finalize()
+            assert blockTag is not None
+            blockTag.line = line.i
+            inBlock = True
+            tagName = blockTag.tag
+            foundTypes = blockTypeFromTag(blockTag, list(blockTypes.keys()))
+            if len(foundTypes) > 1:
+                typeList = config.englishFromList((f"'{x}'" for x in foundTypes), "and")
+                m.die(
+                    f"Found {typeList} classes on the <{blockTag.tag}>, so can't tell which to process the block as. Please use only one.",
+                    lineNum=line.i,
                 )
-            )
-            newNodes.append(h.Text(-1, -1, "\n"))
-
-    return newNodes
-
-
-@dataclasses.dataclass
-class DataBlock:
-    startTag: h.StartTag
-    height: int
-    indent: str
-    data: list[str]
-
-
-def groupDataBlocks(nodes: list[h.ParserNode]) -> t.Generator[h.ParserNode | DataBlock, None, None]:
-    if not nodes:
-        return
-    prevNode = nodes[0]
-    yield prevNode
-    nodeIter = iter(nodes[1:])
-    for node in nodeIter:
-        if isinstance(node, h.RawElement) and node.tag.lower() == "xmp":
-            indent = indentFromNode(prevNode, node)
-            if indent is None:
-                yield node
-                prevNode = node
-                continue
-            yield DataBlock(
-                startTag=node.startTag.finalize(),
-                height=node.endLine - node.line + 1,
-                indent=indent,
-                data=node.data.split("\n"),
-            )
-            prevNode = node
-        elif isinstance(node, h.StartTag) and node.tag.lower() == "pre":
-            indent = indentFromNode(prevNode, node)
-            if indent is None:
-                yield node
-                prevNode = node
-                continue
-            startTag = node
-            contents = []
-            endTag = None
-            for innerNode in nodeIter:
-                if isinstance(innerNode, h.EndTag) and innerNode.tag.lower() == "pre":
-                    endTag = innerNode
-                    break
-                if isinstance(innerNode, h.StartTag) and innerNode.tag.lower() == "pre":
-                    m.die(
-                        f"Nested <pre> elements will break at the moment, sorry. (Parent is at line {startTag.line}.)",
-                        lineNum=innerNode.line,
-                    )
-                contents.append(innerNode)
-            if endTag is None:
-                m.die("Hit EOF while trying to find the </pre>.", lineNum=startTag.line)
-                endTag = h.EndTag(startTag.endLine, startTag.endLine, "pre")
-            yield DataBlock(
-                startTag=startTag.finalize(),
-                height=endTag.endLine - startTag.line + 1,
-                indent=indent,
-                data="".join(str(x) for x in contents).split("\n"),
-            )
-            prevNode = endTag
+                blockType = "pre"
+            elif len(foundTypes) == 0:
+                blockType = "pre"
+            else:
+                blockType = foundTypes[0]
+            assert blockType is not None
+        # Look for the end of a block.
+        match = re.match(r"(.*)</" + tagName + ">(.*)", line.text, re.I)
+        if match and inBlock:
+            inBlock = False
+            assert blockTag is not None
+            if len(blockLines) == 0:
+                # Single-line <pre>.
+                match = re.match(r"(\s*<{0}[^>]*>)(.*)</{0}>(.*)".format(tagName), line.text, re.I)
+                if not match:
+                    m.die(f"Can't figure out how to parse this datablock line:\n{line.text}", lineNum=line.i)
+                    blockLines = []
+                    continue
+                repl = blockTypes[blockType](
+                    lines=[match.group(2)],
+                    startTag=blockTag,
+                    firstLine=match.group(1),
+                    doc=doc,
+                )
+                newLines.extend(Line(line.i, x) for x in repl)
+                line.text = match.group(3)
+                newLines.append(line)
+            elif re.match(r"^\s*$", match.group(1)):
+                # End tag was the first tag on the line.
+                # Remove the tag from the line.
+                repl = blockTypes[blockType](
+                    lines=cleanPrefix([x.text for x in blockLines[1:]]),
+                    startTag=blockTag,
+                    firstLine=blockLines[0].text,
+                    doc=doc,
+                )
+                newLines.extend(Line(blockLines[0].i, x) for x in repl)
+                line.text = match.group(2)
+                newLines.append(line)
+            else:
+                # End tag was at the end of line of useful content.
+                # Process the stuff before it, preserve the stuff after it.
+                repl = blockTypes[blockType](
+                    lines=cleanPrefix([x.text for x in blockLines[1:]] + [match.group(1)]),
+                    startTag=blockTag,
+                    firstLine=blockLines[0].text,
+                    doc=doc,
+                )
+                newLines.extend(Line(blockLines[0].i, x) for x in repl)
+                line.text = match.group(2)
+                newLines.append(line)
+            tagName = ""
+            blockType = ""
+            blockTag = None
+            blockLines = []
+            continue
+        if inBlock:
+            blockLines.append(line)
         else:
-            yield node
-            prevNode = node
+            newLines.append(line)
+
+    # for line in newLines:
+    #    print line
+
+    if fromStrings:
+        return [x.text for x in newLines]
+    return newLines
 
 
-def indentFromNode(node: h.ParserNode, nextNode: h.ParserNode) -> str | None:
-    if not isinstance(node, h.Text):
-        m.die("<pre>/<xmp> elements must be the first tag on their line.", lineNum=nextNode.line)
-        return None
-    lastLine = node.text.split("\n")[-1]
-    if lastLine.strip() != "":
-        m.die("<pre>/<xmp> elements must not have any text on the line before their start tag.", lineNum=nextNode.line)
-        return None
-    return lastLine
-
-
-def stripCodeWrapper(lines: list[str], startLine: int) -> tuple[list[str], h.StartTag | None]:
-    # Removes the <code> that people sometimes wrap their <pre>
-    # contents in.
-    if len(lines) <= 1:
-        return lines, None
-
-    startMatch = splitOnStartTag(lines[0], "code", startLine=startLine)
-    endMatch = splitOnEndTag(lines[-1], "code", startLine=startLine)
-    if not startMatch or not endMatch:
-        return lines, None
-
-    beforeStartTag, startTag, afterStartTag = startMatch
-    beforeEndTag, afterEndTag = endMatch
-    if beforeStartTag.strip() != "" or afterEndTag.strip() != "":
-        return lines, None
-
-    lines[0] = afterStartTag
-    lines[-1] = beforeEndTag
-    return lines, startTag
-
-
-def removeCommonPrefix(lines: list[str], startLine: int) -> list[str]:
+def cleanPrefix(lines: list[str]) -> list[str]:
     # Remove the longest common whitespace prefix from the lines.
-
-    # Skip over empty lines, as their indent might get stripped.
-    indents = [getWsPrefix(line) for line in lines if line.strip() != ""]
-    if len(indents) == 0:
-        return lines
-
-    commonIndent = reduce(commonPrefix, indents)
-    if commonIndent != "":
-        for i, line in enumerate(lines):
-            if line.startswith(commonIndent):
-                lines[i] = line[len(commonIndent) :]
-    return lines
+    # Returns a fresh array, does not mutate the passed lines.
+    if not lines:
+        return []
+    prefix = reduce(commonPrefix, map(getWsPrefix, lines))
+    prefixLen = len(prefix)
+    return [line[prefixLen:] for line in lines]
 
 
 def commonPrefix(line1: str, line2: str) -> str:
@@ -234,89 +201,57 @@ def getWsPrefix(line: str) -> str:
     return t.cast(str, match.group(1))
 
 
-def blockTypeFromTag(tag: h.StartTag, blockTypes: t.Sequence[str]) -> str:
+def blockTypeFromTag(tag: h.StartTag, blockTypes: t.Sequence[str]) -> list[str]:
     # See which of the designated blockTypes classes
     # are present in the tag's classes.
-    foundTypes = list(tag.classes & set(blockTypes))
+    return list(tag.classes & set(blockTypes))
 
-    if len(foundTypes) > 1:
-        typeList = config.englishFromList((f"'{x}'" for x in foundTypes), "and")
-        m.die(
-            f"Found {typeList} classes on the <{tag.tag}>, so can't tell which to process the block as. Please use only one.",
-            lineNum=tag.line,
-        )
-        return "pre"
-    elif len(foundTypes) == 0:
-        return "pre"
+
+def transformPre(lines: list[str], startTag: h.StartTag, firstLine: str, doc: t.SpecT) -> list[str]:
+    # If the last line in the source is a </code></pre>,
+    # the generic processor will turn that into a final </code> line,
+    # which'll mess up the indent finding.
+    # Instead, specially handle this case.
+    if len(lines) == 0:
+        return [firstLine, f"</{startTag.tag}>"]
+
+    if re.match(r"\s*</code>\s*$", lines[-1]):
+        lastLine = f"</code></{startTag.tag}>"
+        lines = lines[:-1]
     else:
-        return foundTypes[0]
+        lastLine = f"</{startTag.tag}>"
 
+    if len(lines) == 0:
+        return [firstLine, lastLine]
 
-def splitOnStartTag(text: str, tagName: str, startLine: int) -> tuple[str, h.StartTag, str] | None:
-    nodes = list(h.nodesFromHtml(text, startLine=startLine))
-    startTagIndex: int
-    for i, node in enumerate(nodes):
-        if isinstance(node, h.StartTag) and node.tag.lower() == tagName:
-            startTagIndex = i
-            startTag = node
-            break
-    else:
-        return None
-    return (
-        "".join(str(x) for x in nodes[:startTagIndex]),
-        startTag,
-        "".join(str(x) for x in nodes[startTagIndex + 1 :]),
-    )
+    indent = float("inf")
+    for i, line in enumerate(lines):
+        if line.strip() == "":
+            continue
 
+        # Use tabs in the source, but spaces in the output,
+        # because tabs are ginormous in HTML.
+        lines[i] = lines[i].replace("\t", "  ")
 
-def splitOnEndTag(text: str, tagName: str, startLine: int) -> tuple[str, str] | None:
-    nodes = list(h.nodesFromHtml(text, startLine=startLine))
-    endTagIndex: int
-    for i, node in enumerate(nodes):
-        if isinstance(node, h.EndTag) and node.tag.lower() == tagName:
-            endTagIndex = i
-            break
-    else:
-        return None
-    return ("".join(str(x) for x in nodes[:endTagIndex]), "".join(str(x) for x in nodes[endTagIndex + 1 :]))
+        # Find the line with the shortest whitespace prefix.
+        # (It might not be the first!)
+        indent = min(indent, len(t.cast("re.Match", re.match(r" *", lines[i])).group(0)))
 
+    if indent == float("inf"):
+        indent = 0
 
-def transformPre(lines: list[str], startTag: h.StartTag, indent: str, doc: t.SpecT) -> list[str] | list[h.ParserNode]:
-    if startTag.tag.lower() == "xmp":
-        # Just do the indent conversion
-        lines = [line.replace("\t", "  ") for line in lines]
-        node = h.RawElement(
-            line=startTag.line,
-            endLine = startTag.endLine + len(lines) - 1,
-            tag="xmp",
-            startTag=startTag,
-            data = "\n".join(lines),
-        )
-        indentNode = h.Text(
-            line = startTag.line,
-            endLine = startTag.line,
-            text = indent,
-        )
-        return [indentNode, node]
-
-    lines, codeTag = stripCodeWrapper(lines, startLine=startTag.line)
-
-    if not lines:
-        return lines
-
-    lines = [line.replace("\t", "  ") for line in lines]
-
-    if codeTag:
-        lines[0] = str(codeTag) + lines[0]
-        lines[-1] += codeTag.printEndTag()
-
-    lines[0] = indent + str(startTag) + lines[0]
-    lines[-1] += startTag.printEndTag()
-
+    # Strip off the whitespace prefix from each line
+    for i, line in enumerate(lines):
+        if line.strip() == "":
+            continue
+        lines[i] = lines[i][t.cast(int, indent) :]
+    # Put the first/last lines back into the results.
+    lines[0] = firstLine.rstrip() + lines[0]
+    lines.append(lastLine)
     return lines
 
 
-def transformSimpleDef(lines: list[str], startTag: h.StartTag, indent: str, doc: t.SpecT) -> list[str]:
+def transformSimpleDef(lines: list[str], startTag: h.StartTag, firstLine: str, doc: t.SpecT) -> list[str]:
     rows = parseDefBlock(lines, "simpledef", lineNum=startTag.line)
     newStartTag = startTag.clone(tag="table")
     newStartTag.classes.remove("simpledef")
@@ -326,12 +261,13 @@ def transformSimpleDef(lines: list[str], startTag: h.StartTag, indent: str, doc:
         ret.append(f"<tr><th>{key}<td>{val}")
     ret.append("</table>")
 
+    indent = getWsPrefix(firstLine)
     ret = [indent + x for x in ret]
 
     return ret
 
 
-def transformPropdef(lines: list[str], startTag: h.StartTag, indent: str, doc: t.SpecT) -> list[str]:
+def transformPropdef(lines: list[str], startTag: h.StartTag, firstLine: str, doc: t.SpecT) -> list[str]:
     attrs: OrderedDict[str, str | None] = OrderedDict()
     parsedAttrs = parseDefBlock(lines, "propdef", lineNum=startTag.line)
     # Displays entries in the order specified in attrs,
@@ -344,11 +280,11 @@ def transformPropdef(lines: list[str], startTag: h.StartTag, indent: str, doc: t
     newStartTag.classes.add("propdef")
     if "Name" in parsedAttrs:
         newStartTag.attrs["data-link-for-hint"] = parsedAttrs["Name"].split(",")[0].strip()
-    if "partial" in newStartTag.classes or "New values" in parsedAttrs:
+    if "partial" in firstLine or "New values" in parsedAttrs:
         attrs["Name"] = None
         attrs["New values"] = None
         newStartTag.classes.add("partial")
-    elif "shorthand" in newStartTag.classes:
+    elif "shorthand" in firstLine:
         attrs["Name"] = None
         attrs["Value"] = None
         for defaultKey in [
@@ -428,6 +364,7 @@ def transformPropdef(lines: list[str], startTag: h.StartTag, indent: str, doc: t
         ret.append(tr + th + td)
     ret.append("</table>")
 
+    indent = getWsPrefix(firstLine)
     ret = [indent + x for x in ret]
 
     return ret
@@ -436,29 +373,28 @@ def transformPropdef(lines: list[str], startTag: h.StartTag, indent: str, doc: t
 # TODO: Make these functions match transformPropdef's new structure
 
 
-def transformDescdef(lines: list[str], startTag: h.StartTag, indent: str, doc: t.SpecT) -> list[str]:
+def transformDescdef(lines: list[str], startTag: h.StartTag, firstLine: str, doc: t.SpecT) -> list[str]:
     newStartTag = startTag.clone(tag="table")
     newStartTag.classes.add("def")
     newStartTag.classes.add("descdef")
     vals = parseDefBlock(lines, "descdef", lineNum=startTag.line)
     newStartTag.attrs["data-dfn-for"] = vals.get("For", "")
-    if "partial" in newStartTag.classes or "New values" in vals:
+    if "partial" in firstLine or "New values" in vals:
         requiredKeys = ["Name", "For"]
         newStartTag.classes.add("partial")
-    if "mq" in newStartTag.classes:
+    if "mq" in firstLine:
         requiredKeys = ["Name", "For", "Value"]
         newStartTag.classes.add("mq")
     else:
         requiredKeys = ["Name", "For", "Value", "Initial"]
     ret = [str(newStartTag)]
     for key in requiredKeys:
-        val = vals.get(key, "")
         if key == "For":
-            ret.append("<tr><th>{}:<td><a at-rule>{}</a>".format(key, val))
+            ret.append("<tr><th>{}:<td><a at-rule>{}</a>".format(key, vals.get(key, "")))
         elif key == "Value":
-            ret.append("<tr><th>{}:<td class='prod'>{}".format(key, val))
+            ret.append("<tr><th>{}:<td class='prod'>{}".format(key, vals.get(key, "")))
         elif key in vals:
-            ret.append("<tr><th>{}:<td>{}".format(key, val))
+            ret.append("<tr><th>{}:<td>{}".format(key, vals.get(key, "")))
         else:
             m.die(f"The descdef for '{vals.get('Name', '???')}' is missing a '{key}' line.", lineNum=startTag.line)
             continue
@@ -468,12 +404,13 @@ def transformDescdef(lines: list[str], startTag: h.StartTag, indent: str, doc: t
         ret.append("<tr><th>{}:<td>{}".format(key, val))
     ret.append("</table>")
 
+    indent = getWsPrefix(firstLine)
     ret = [indent + x for x in ret]
 
     return ret
 
 
-def transformElementdef(lines: list[str], startTag: h.StartTag, indent: str, doc: t.SpecT) -> list[str]:
+def transformElementdef(lines: list[str], startTag: h.StartTag, firstLine: str, doc: t.SpecT) -> list[str]:
     newStartTag = startTag.clone(tag="table")
     newStartTag.classes.add("def")
     newStartTag.classes.add("elementdef")
@@ -541,12 +478,13 @@ def transformElementdef(lines: list[str], startTag: h.StartTag, indent: str, doc
         ret.append(f"<tr><th>{key}:<td>{val}")
     ret.append("</table>")
 
+    indent = getWsPrefix(firstLine)
     ret = [indent + x for x in ret]
 
     return ret
 
 
-def transformArgumentdef(lines: list[str], startTag: h.StartTag, indent: str, doc: t.SpecT) -> list[str]:
+def transformArgumentdef(lines: list[str], startTag: h.StartTag, firstLine: str, doc: t.SpecT) -> list[str]:
     newStartTag = startTag.clone(tag="table")
     newStartTag.classes.add("def")
     newStartTag.classes.add("argumentdef")
@@ -595,6 +533,7 @@ def transformArgumentdef(lines: list[str], startTag: h.StartTag, indent: str, do
 </table>"""
     )
 
+    indent = getWsPrefix(firstLine)
     lines = [indent + line for line in text.split("\n")]
 
     return lines
@@ -627,7 +566,7 @@ def parseDefBlock(
     return vals
 
 
-def transformRailroad(lines: list[str], startTag: h.StartTag, indent: str, doc: t.SpecT) -> list[str]:
+def transformRailroad(lines: list[str], startTag: h.StartTag, firstLine: str, doc: t.SpecT) -> list[str]:
     import io
 
     from . import railroadparser
@@ -678,7 +617,7 @@ def transformRailroad(lines: list[str], startTag: h.StartTag, indent: str, doc: 
             --railroad-fill: hsla(240deg, 20%, 15%);
         }
     }"""
-    code = "\n".join(lines)
+    code = "".join(lines)
     diagram = railroadparser.parse(code)
     if diagram:
         temp = io.StringIO()
@@ -687,22 +626,23 @@ def transformRailroad(lines: list[str], startTag: h.StartTag, indent: str, doc: 
         temp.close()
         ret.append("</div>")
 
+        indent = getWsPrefix(firstLine)
         ret = [indent + x for x in ret]
 
         return ret
     return []
 
 
-def transformBiblio(lines: list[str], startTag: h.StartTag, indent: str, doc: t.SpecT) -> list[str]:
+def transformBiblio(lines: list[str], startTag: h.StartTag, firstLine: str, doc: t.SpecT) -> list[str]:
     storage: t.BiblioStorageT = defaultdict(list)
-    biblio.processSpecrefBiblioFile("\n".join(lines), storage, order=1)
+    biblio.processSpecrefBiblioFile("".join(lines), storage, order=1)
     for k, vs in storage.items():
         doc.refs.biblioKeys.add(k)
         doc.refs.biblios[k].extend(vs)
     return []
 
 
-def transformAnchors(lines: list[str], startTag: h.StartTag, indent: str, doc: t.SpecT) -> list[str]:
+def transformAnchors(lines: list[str], startTag: h.StartTag, firstLine: str, doc: t.SpecT) -> list[str]:
     anchors = parseInfoTree(lines, doc.md.indent, lineNum=startTag.line)
     processAnchors(anchors, doc, lineNum=startTag.line)
     return []
@@ -774,7 +714,7 @@ def processAnchors(anchors: InfoTreeT, doc: t.SpecT, lineNum: int | None = None)
         if anchor["type"][0] in config.lowercaseTypes:
             anchor["text"][0] = anchor["text"][0].lower()
         doc.refs.anchorBlockRefs.refs[anchor["text"][0]].append(
-            RefWrapper(
+            refs.RefWrapper(
                 anchor["text"][0],
                 {
                     "type": anchor["type"][0].lower(),
@@ -794,7 +734,7 @@ def processAnchors(anchors: InfoTreeT, doc: t.SpecT, lineNum: int | None = None)
             doc.refs.anchorBlockRefs.addMethodVariants(anchor["text"][0], anchor.get("for", []), doc.md.shortname)
 
 
-def transformLinkDefaults(lines: list[str], startTag: h.StartTag, indent: str, doc: t.SpecT) -> list[str]:
+def transformLinkDefaults(lines: list[str], startTag: h.StartTag, firstLine: str, doc: t.SpecT) -> list[str]:
     lds = parseInfoTree(lines, doc.md.indent, lineNum=startTag.line)
     processLinkDefaults(lds, doc, lineNum=startTag.line)
     return []
@@ -831,7 +771,7 @@ def processLinkDefaults(lds: InfoTreeT, doc: t.SpecT, lineNum: int | None = None
             doc.md.linkDefaults[text].append((spec, type, status, None))
 
 
-def transformIgnoredSpecs(lines: list[str], startTag: h.StartTag, indent: str, doc: t.SpecT) -> list[str]:
+def transformIgnoredSpecs(lines: list[str], startTag: h.StartTag, firstLine: str, doc: t.SpecT) -> list[str]:
     specs = parseInfoTree(lines, doc.md.indent, lineNum=startTag.line)
     processIgnoredSpecs(specs, doc, lineNum=startTag.line)
     return []
@@ -860,7 +800,7 @@ def processIgnoredSpecs(specs: InfoTreeT, doc: t.SpecT, lineNum: int | None = No
                 doc.refs.ignoredSpecs.add(specName)
 
 
-def transformInfo(lines: list[str], startTag: h.StartTag, indent: str, doc: t.SpecT) -> list[str]:
+def transformInfo(lines: list[str], startTag: h.StartTag, firstLine: str, doc: t.SpecT) -> list[str]:
     # More generic InfoTree system.
     # A <pre class=info> can contain any of the InfoTree collections,
     # identified by an 'info' line.
@@ -891,7 +831,7 @@ def processInfo(infos: InfoTreeT, doc: t.SpecT, lineNum: int | None = None) -> N
         knownInfoTypes[infoType](infoItem, doc, lineNum=0)
 
 
-def transformInclude(lines: list[str], startTag: h.StartTag, indent: str, doc: t.SpecT) -> list[str]:
+def transformInclude(lines: list[str], startTag: h.StartTag, firstLine: str, doc: t.SpecT) -> list[str]:
     newStartTag = startTag.clone(tag="pre")
     newStartTag.classes.add("include")
     infos = parseInfoTree(lines, doc.md.indent, lineNum=startTag.line)
@@ -921,11 +861,12 @@ def transformInclude(lines: list[str], startTag: h.StartTag, indent: str, doc: t
         for i, (macroName, macroVal) in enumerate(macros.items()):
             newStartTag.attrs[f"macro-{i}"] = f"{macroName} {macroVal}"
 
+        indent = getWsPrefix(firstLine)
         return [indent + str(newStartTag) + "</pre>"]
     return []
 
 
-def transformIncludeCode(lines: list[str], startTag: h.StartTag, indent: str, doc: t.SpecT) -> list[str]:
+def transformIncludeCode(lines: list[str], startTag: h.StartTag, firstLine: str, doc: t.SpecT) -> list[str]:
     newStartTag = startTag.clone(tag="pre")
     newStartTag.classes.add("include-code")
     infos = parseInfoTree(lines, doc.md.indent, lineNum=startTag.line)
@@ -981,11 +922,12 @@ def transformIncludeCode(lines: list[str], startTag: h.StartTag, indent: str, do
             newStartTag.attrs["line-highlight"] = ",".join(lineHighlight)
         if lineNumbers:
             newStartTag.attrs["line-numbers"] = ""
+        indent = getWsPrefix(firstLine)
         return [indent + str(newStartTag) + "</pre>"]
     return []
 
 
-def transformIncludeRaw(lines: list[str], startTag: h.StartTag, indent: str, doc: t.SpecT) -> list[str]:
+def transformIncludeRaw(lines: list[str], startTag: h.StartTag, firstLine: str, doc: t.SpecT) -> list[str]:
     newStartTag = startTag.clone(tag="pre")
     newStartTag.classes.add("include-raw")
     infos = parseInfoTree(lines, doc.md.indent, lineNum=startTag.line)
@@ -1002,6 +944,7 @@ def transformIncludeRaw(lines: list[str], startTag: h.StartTag, indent: str, doc
 
     if path:
         newStartTag.attrs["path"] = path
+        indent = getWsPrefix(firstLine)
         return [indent + str(newStartTag) + "</pre>"]
     return []
 

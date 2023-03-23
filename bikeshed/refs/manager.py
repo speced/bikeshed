@@ -6,7 +6,7 @@ import random
 import re
 from collections import defaultdict
 
-from .. import biblio, config, constants, datablocks, h, messages as m, retrieve, t
+from .. import biblio, config, constants, h, messages as m, retrieve, t
 from . import utils, source, headingdata, wrapper
 
 if t.TYPE_CHECKING:
@@ -102,7 +102,7 @@ class ReferenceManager:
         self.specLevel: str | None = None
         self.spec: str | None = None
 
-    def initializeRefs(self, doc: t.SpecT | None = None) -> None:
+    def initializeRefs(self, datablocks: t.ModuleType, doc: t.SpecT | None = None) -> None:
         """
         Load up the xref data
         This is oddly split up into sub-functions to make it easier to track performance.
@@ -130,8 +130,8 @@ class ReferenceManager:
         initFors()
         if doc and doc.inputSource and doc.inputSource.hasDirectory:
             ldLines = self.dataFile.fetch("link-defaults.infotree").read().split("\n")
-            fakeTag = h.StartTag(tag="pre", line=-1, endLine=-1)
-            datablocks.transformInfo(lines=ldLines, doc=doc, indent="", startTag=fakeTag)
+            fakeTag = h.StartTag(tag="pre", line=-1)
+            datablocks.transformInfo(lines=ldLines, doc=doc, firstLine=ldLines[0], startTag=fakeTag)
 
             # Get local anchor data
             shouldGetLocalAnchorData = doc.md.externalInfotrees["anchors.bsdata"]
@@ -149,7 +149,9 @@ class ReferenceManager:
                     if not anchorFile:
                         raise OSError()
                     anchorLines = anchorFile.read().rawLines
-                    datablocks.transformAnchors(lines=anchorLines, doc=doc, indent="", startTag=fakeTag)
+                    datablocks.transformAnchors(
+                        lines=anchorLines, doc=doc, firstLine=anchorLines[0], startTag=fakeTag
+                    )
                 except OSError:
                     m.warn("anchors.bsdata not found despite being listed in the External Infotrees metadata.")
 
@@ -169,7 +171,12 @@ class ReferenceManager:
                     if not ldFile:
                         raise OSError()
                     ldLines = ldFile.read().rawLines
-                    datablocks.transformInfo(lines=ldLines, doc=doc, indent="", startTag=fakeTag)
+                    datablocks.transformInfo(
+                        lines=ldLines,
+                        doc=doc,
+                        firstLine=ldLines[0],
+                        startTag=fakeTag
+                    )
                 except OSError:
                     m.warn("link-defaults.infotree not found despite being listed in the External Infotrees metadata.")
 

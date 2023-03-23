@@ -815,6 +815,16 @@ def replaceMacros(text: str, macros: t.Mapping[str, str]) -> str:
 
 
 def replaceAwkwardCSSShorthands(text: str) -> str:
+    # Replace the <<production>> shortcuts, because they won't survive the HTML parser.
+    def replaceProduction(match: re.Match) -> str:
+        syntaxAttr = escapeAttr(match.group(0))
+        escape, text = match.groups()
+        if escape:
+            return escapeHTML(match.group(0)[1:])
+        return f"<fake-production-placeholder class=production bs-autolink-syntax='{syntaxAttr}' data-opaque>{text}</fake-production-placeholder>"
+
+    text = re.sub(r"(\\)?<<([^>\n]+)>>", replaceProduction, text)
+
     # Replace the ''maybe link'' shortcuts.
     # They'll survive the HTML parser,
     # but the current shorthand-recognizer code won't find them if they contain an element.

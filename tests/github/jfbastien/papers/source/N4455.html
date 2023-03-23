@@ -2151,12 +2151,14 @@ propagation into atomics without other intervening atomics:</p>
 <c- b>void</c-> <c- nf>two</c-><c- p>()</c-> <c- p>{</c->
   <c- n>inc</c-><c- p>(</c-><c- o>&amp;</c-><c- n>x</c-><c- p>);</c->
   <c- n>inc</c-><c- p>(</c-><c- o>&amp;</c-><c- n>x</c-><c- p>);</c->
-<c- p>}</c-></pre>
+<c- p>}</c->
+</pre>
    <p>Becomes:</p>
 <pre class="highlight"><c- n>std</c-><c- o>::</c-><c- n>atomic</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>x</c-><c- p>;</c->
 <c- b>void</c-> <c- nf>two</c-><c- p>()</c-> <c- p>{</c->
   <c- n>x</c-> <c- o>+=</c-> <c- mi>2</c-><c- p>;</c->
-<c- p>}</c-></pre>
+<c- p>}</c->
+</pre>
    <p>The above optimization adds atomicity but cannot hinder forward progress, and is
 therefore correct. This leads to further optimizations such as using the locked <code class="highlight"><c- n>inc</c-></code>/<code class="highlight"><c- n>dec</c-></code> instructions instead of locked <code class="highlight"><c- n>add</c-></code>/<code class="highlight"><c- n>sub</c-></code> when adding/subtracting <code class="highlight"><c- mi>1</c-></code> to an
 atomic on x86:</p>
@@ -2164,12 +2166,14 @@ atomic on x86:</p>
 <c- b>void</c-> <c- nf>inc</c-><c- p>(</c-><c- b>int</c-> <c- n>val</c-><c- p>)</c-> <c- p>{</c->
   <c- n>x</c-> <c- o>+=</c-> <c- mi>1</c-><c- p>;</c->
   <c- n>x</c-> <c- o>+=</c-> <c- n>val</c-><c- p>;</c->
-<c- p>}</c-></pre>
+<c- p>}</c->
+</pre>
    <p>Becomes:</p>
 <pre class="highlight"><c- nl>_Z3inci:</c->
   <c- e>lock</c-> <c- nf>incl</c-> <c- no>x</c-><c- p>(</c-><c- g>%rip</c-><c- p>)</c->
   <c- e>lock</c-> <c- nf>addl</c-> <c- g>%edi</c-><c- p>,</c-> <c- no>x</c-><c- p>(</c-><c- g>%rip</c-><c- p>)</c->
-  <c- nf>retq</c-></pre>
+  <c- nf>retq</c->
+</pre>
    <p>In a similar vein, some opportunities for strength reduction will show up
 because non-trivial code gets inlined which then exposes fairly silly code, such
 as in the following trivial example:</p>
@@ -2177,24 +2181,28 @@ as in the following trivial example:</p>
 <c- b>bool</c-> <c- n>silly</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>atomic</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- o>*</c-><c- n>x</c-><c- p>,</c-> <c- n>T</c-> <c- n>expected</c-><c- p>,</c-> <c- n>T</c-> <c- n>desired</c-><c- p>)</c-> <c- p>{</c->
   <c- n>x</c-><c- o>-></c-><c- n>compare_exchange_strong</c-><c- p>(</c-><c- n>expected</c-><c- p>,</c-> <c- n>desired</c-><c- p>);</c-> <c- c1>// Inlined.</c->
   <c- k>return</c-> <c- n>expected</c-> <c- o>==</c-> <c- n>desired</c-><c- p>;</c->
-<c- p>}</c-></pre>
+<c- p>}</c->
+</pre>
    <p>Becomes:</p>
 <pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>typename</c-> <c- nc>T</c-><c- o>></c->
 <c- b>bool</c-> <c- n>silly</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>atomic</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- o>*</c-><c- n>x</c-><c- p>,</c-> <c- n>T</c-> <c- n>expected</c-><c- p>,</c-> <c- n>T</c-> <c- n>desired</c-><c- p>)</c-> <c- p>{</c->
   <c- k>return</c-> <c- n>x</c-><c- o>-></c-><c- n>compare_exchange_strong</c-><c- p>(</c-><c- n>expected</c-><c- p>,</c-> <c- n>desired</c-><c- p>);</c->
-<c- p>}</c-></pre>
+<c- p>}</c->
+</pre>
    <p>The following works for any memory order but <code class="highlight"><c- n>release</c-></code> and <code class="highlight"><c- n>acq_rel</c-></code>:</p>
 <pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>typename</c-> <c- nc>T</c-><c- o>></c->
 <c- b>bool</c-> <c- n>optme</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>atomic</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- o>*</c-><c- n>x</c-><c- p>,</c-> <c- n>T</c-> <c- n>desired</c-><c- p>)</c-> <c- p>{</c->
   <c- n>T</c-> <c- n>expected</c-> <c- o>=</c-> <c- n>desired</c-><c- p>;</c->
   <c- k>return</c-> <c- n>x</c-><c- o>-></c-><c- n>compare_exchange_strong</c-><c- p>(</c-><c- n>expected</c-><c- p>,</c-> <c- n>desired</c->
     <c- n>std</c-><c- o>::</c-><c- n>memory_order_seq_cst</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>memory_order_relaxed</c-><c- p>);</c->
-<c- p>}</c-></pre>
+<c- p>}</c->
+</pre>
    <p>Becomes:</p>
 <pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>typename</c-> <c- nc>T</c-><c- o>></c->
 <c- b>bool</c-> <c- n>optme</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>atomic</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- o>*</c-><c- n>x</c-><c- p>,</c-> <c- n>T</c-> <c- n>desired</c-><c- p>)</c-> <c- p>{</c->
   <c- k>return</c-> <c- n>x</c-><c- o>-></c-><c- n>load</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>memory_order_seq_cst</c-><c- p>)</c-> <c- o>==</c-> <c- n>desired</c-><c- p>;</c->
-<c- p>}</c-></pre>
+<c- p>}</c->
+</pre>
    <p>The above optimization may require that the compiler mark the transformed load
 as a <em>release sequence</em> as defined in section 1.10 of the C++ standard.</p>
    <p>Similarly, while keeping the resulting memory order stronger or equal to the
@@ -2204,12 +2212,14 @@ individual ones, the following can occur:</p>
   <c- n>T</c-> <c- n>z</c-> <c- o>=</c-> <c- n>x</c-><c- o>-></c-><c- n>load</c-><c- p>();</c->
   <c- n>x</c-><c- o>-></c-><c- n>store</c-><c- p>(</c-><c- n>y</c-><c- p>);</c->
   <c- k>return</c-> <c- n>z</c-><c- p>;</c->
-<c- p>}</c-></pre>
+<c- p>}</c->
+</pre>
    <p>Becomes:</p>
 <pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>typename</c-> <c- nc>T</c-><c- o>></c->
 <c- n>T</c-> <c- n>optmetoo</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>atomic</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- o>*</c-><c- n>x</c-><c- p>,</c-> <c- n>T</c-> <c- n>y</c-><c- p>)</c-> <c- p>{</c->
   <c- k>return</c-> <c- n>x</c-><c- o>-></c-><c- n>exchange</c-><c- p>(</c-><c- n>y</c-><c- p>);</c->
-<c- p>}</c-></pre>
+<c- p>}</c->
+</pre>
    <p>This may not always pay off! In particular, architectures with weaker memory
 models may benefit from having write-after-read operations to the same location
 instead of having an atomic exchange.</p>
@@ -2246,7 +2256,8 @@ ticket changed or data was being modified by the writer:</p>
   <c- n>data1</c-><c- p>.</c-><c- n>store</c-><c- p>(</c-><c- n>d1</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>memory_order_release</c-><c- p>);</c->
   <c- n>data2</c-><c- p>.</c-><c- n>store</c-><c- p>(</c-><c- n>d2</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>memory_order_release</c-><c- p>);</c->
   <c- n>seq</c-><c- p>.</c-><c- n>store</c-><c- p>(</c-><c- n>seq0</c-> <c- o>+</c-> <c- mi>2</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>memory_order_release</c-><c- p>);</c->
-<c- p>}</c-></pre>
+<c- p>}</c->
+</pre>
    <p>The reader’s last ticket load effectively act as a <code class="highlight"><c- n>release</c-></code> load,
 which doesn’t exist in the current memory model but would better express the
 intent of the code while allowing subsequent operations to be moved into the
@@ -2260,7 +2271,8 @@ written as follows:</p>
   <c- n>d1</c-> <c- o>=</c-> <c- n>data1</c-><c- p>.</c-><c- n>load</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>memory_order_relaxed</c-><c- p>);</c->
   <c- n>d2</c-> <c- o>=</c-> <c- n>data2</c-><c- p>.</c-><c- n>load</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>memory_order_relaxed</c-><c- p>);</c->
   <c- n>seq1</c-> <c- o>=</c-> <c- n>seq</c-><c- p>.</c-><c- n>fetch_add</c-><c- p>(</c-><c- mi>0</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>memory_order_release</c-><c- p>);</c->
-<c- p>}</c-> <c- k>while</c-> <c- p>(</c-><c- n>seq0</c-> <c- o>!=</c-> <c- n>seq1</c-> <c- o>||</c-> <c- n>seq0</c-> <c- o>&amp;</c-> <c- mi>1</c-><c- p>);</c-></pre>
+<c- p>}</c-> <c- k>while</c-> <c- p>(</c-><c- n>seq0</c-> <c- o>!=</c-> <c- n>seq1</c-> <c- o>||</c-> <c- n>seq0</c-> <c- o>&amp;</c-> <c- mi>1</c-><c- p>);</c->
+</pre>
    <p>This rewritten code then generates the following x86 assembly:</p>
 <pre class="highlight"><c- nl>.LBB0_1:</c->
       <c- nf>movl</c->    <c- no>seq</c-><c- p>(</c-><c- g>%rip</c-><c- p>),</c-> <c- g>%esi</c->
@@ -2273,7 +2285,8 @@ written as follows:</p>
       <c- nf>cmpl</c->    <c- g>%edi</c-><c- p>,</c-> <c- g>%esi</c->
       <c- nf>jne</c->     <c- no>.LBB0_1</c->
       <c- nf>testl</c->   <c- g>%edx</c-><c- p>,</c-> <c- g>%edx</c->
-      <c- nf>jne</c->     <c- no>.LBB0_1</c-></pre>
+      <c- nf>jne</c->     <c- no>.LBB0_1</c->
+</pre>
    <p>This x86 assembly reduces contention by replacing <code class="highlight"><c- n>fetch_add</c-></code>—an
 instruction requiring exclusive cache line access—to a simple <code class="highlight"><c- n>movl</c-></code>. This optimization is currently only known to be correct on
 x86, is probably correct for other architectures, and is <a href="https://reviews.llvm.org/D5091">currently implemented
@@ -2296,13 +2309,15 @@ when interleaved:</p>
   <c- n>y</c-><c- p>.</c-><c- n>fetch_add</c-><c- p>(</c-><c- mi>1</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>memory_order_relaxed</c-><c- p>);</c->
   <c- n>x</c-><c- p>.</c-><c- n>fetch_add</c-><c- p>(</c-><c- mi>1</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>memory_order_relaxed</c-><c- p>);</c->
   <c- n>y</c-><c- p>.</c-><c- n>fetch_add</c-><c- p>(</c-><c- mi>1</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>memory_order_relaxed</c-><c- p>);</c->
-<c- p>}</c-></pre>
+<c- p>}</c->
+</pre>
    <p>Becomes:</p>
 <pre class="highlight"><c- n>std</c-><c- o>::</c-><c- n>atomic</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>x</c-><c- p>,</c-> <c- n>y</c-><c- p>;</c->
 <c- b>void</c-> <c- nf>relaxed</c-><c- p>()</c-> <c- p>{</c->
   <c- n>x</c-><c- p>.</c-><c- n>fetch_add</c-><c- p>(</c-><c- mi>2</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>memory_order_relaxed</c-><c- p>);</c->
   <c- n>y</c-><c- p>.</c-><c- n>fetch_add</c-><c- p>(</c-><c- mi>2</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>memory_order_relaxed</c-><c- p>);</c->
-<c- p>}</c-></pre>
+<c- p>}</c->
+</pre>
    <p>We aren’t aware of compilers performing this optimization yet, but <a href="https://llvm.org/bugs/show_bug.cgi?id=16477">it is being
 discussed</a>. <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>atomic_signal_fence</c-></code> could be used to prevent
 this reordering and fusion, or one could use a stronger memory ordering for the
@@ -2329,7 +2344,8 @@ accesses. A somewhat surprising example is that the following code can be (<a hr
   <c- n>y</c-><c- p>.</c-><c- n>store</c-><c- p>(</c-><c- mi>0</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>memory_order_seq_cst</c-><c- p>);</c->
   <c- n>x</c-> <c- o>=</c-> <c- mi>1</c-><c- p>;</c->
   <c- k>return</c-> <c- n>z</c-><c- p>;</c->
-<c- p>}</c-></pre>
+<c- p>}</c->
+</pre>
    <p>Becomes:</p>
 <pre class="highlight"><c- b>int</c-> <c- n>x</c-> <c- o>=</c-> <c- mi>0</c-><c- p>;</c->
 <c- n>std</c-><c- o>::</c-><c- n>atomic</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>y</c-><c- p>;</c->
@@ -2339,7 +2355,8 @@ accesses. A somewhat surprising example is that the following code can be (<a hr
   <c- n>y</c-><c- p>.</c-><c- n>store</c-><c- p>(</c-><c- mi>0</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>memory_order_seq_cst</c-><c- p>);</c->
   <c- n>x</c-> <c- o>=</c-> <c- mi>1</c-><c- p>;</c->
   <c- k>return</c-> <c- n>z</c-><c- p>;</c->
-<c- p>}</c-></pre>
+<c- p>}</c->
+</pre>
    <p>The intuition behind the dead store elimination optimization is that the only
 way another thread could have observed the dead store elimination is if their
 code had been racy in the first place: only a <code class="highlight"><c- n>release</c-></code>/<code class="highlight"><c- n>acquire</c-></code> pair could have been synchronized with
@@ -2356,7 +2373,8 @@ transformed as shown (but currently isn’t, at least in LLVM).</p>
   <c- b>int</c-> <c- n>z</c-> <c- o>=</c-> <c- n>y</c-><c- p>.</c-><c- n>load</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>memory_order_acquire</c-><c- p>);</c->
   <c- n>x</c-> <c- o>=</c-> <c- mi>1</c-><c- p>;</c->
   <c- k>return</c-> <c- n>z</c-><c- p>;</c->
-<c- p>}</c-></pre>
+<c- p>}</c->
+</pre>
    <p>Becomes:</p>
 <pre class="highlight"><c- b>int</c-> <c- n>x</c-> <c- o>=</c-> <c- mi>0</c-><c- p>;</c->
 <c- n>std</c-><c- o>::</c-><c- n>atomic</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>y</c-><c- p>;</c->
@@ -2366,7 +2384,8 @@ transformed as shown (but currently isn’t, at least in LLVM).</p>
   <c- c1>// Redundant load eliminated.</c->
   <c- n>x</c-> <c- o>=</c-> <c- mi>1</c-><c- p>;</c->
   <c- k>return</c-> <c- mi>0</c-><c- p>;</c-> <c- c1>// Stored value propagated here.</c->
-<c- p>}</c-></pre>
+<c- p>}</c->
+</pre>
    <p>The above example’s load can be eliminated because there was no synchronization
 with another thread: even if the <code class="highlight"><c- n>release</c-></code> is followed by an <code class="highlight"><c- n>acquire</c-></code> the compiler is allowed to assume that the stored value
 wasn’t modified before the subsequent load, and that the load is therefore
@@ -2380,7 +2399,8 @@ redundant.</p>
   <c- k>while</c-> <c- p>(</c-><c- o>!</c-><c- n>y</c-><c- p>.</c-><c- n>load</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>memory_order_acquire</c-><c- p>));</c->
   <c- n>x</c-> <c- o>=</c-> <c- mi>1</c-><c- p>;</c->
   <c- k>return</c-> <c- n>z</c-><c- p>;</c->
-<c- p>}</c-></pre>
+<c- p>}</c->
+</pre>
    <p>Other optimizations such as global value ordering across atomics can be applied.</p>
    <h3 class="heading settled" data-level="1.3" id="mutex"><span class="secno">1.3. </span><span class="content">Mutex: Safer than Atomics?</span><a class="self-link" href="#mutex"></a></h3>
    <p>The same optimization potential applies to C++'s <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>mutex</c-></code>:
@@ -2403,14 +2423,16 @@ that they are not accessed in other threads concurrently. This is spelled out in
 the C++11 standard in section 1.10 ¶22. For example the following transformation
 could occur:</p>
 <pre class="highlight"><c- c1>// Some code, but no synchronization.</c->
-<c- o>*</c-><c- n>p</c-> <c- o>=</c-> <c- mi>1</c-><c- p>;</c-> <c- c1>// Can be on stack, heap or global.</c-></pre>
+<c- o>*</c-><c- n>p</c-> <c- o>=</c-> <c- mi>1</c-><c- p>;</c-> <c- c1>// Can be on stack, heap or global.</c->
+</pre>
    <p>Becomes:</p>
 <pre class="highlight"><c- c1>// ...</c->
 <c- o>*</c-><c- n>p</c-> <c- o>=</c-> <c- n>RAX</c-><c- p>;</c-> <c- c1>// Spill temporary value.</c->
 <c- c1>// ...</c->
 <c- n>RAX</c-> <c- o>=</c-> <c- o>*</c-><c- n>p</c-><c- p>;</c-> <c- c1>// Restore temporary value.</c->
 <c- c1>// ...</c->
-<c- o>*</c-><c- n>p</c-> <c- o>=</c-> <c- mi>1</c-><c- p>;</c-></pre>
+<c- o>*</c-><c- n>p</c-> <c- o>=</c-> <c- mi>1</c-><c- p>;</c->
+</pre>
    <p>Since we write to <code class="highlight"><c- o>*</c-><c- n>p</c-></code> and there is no synchronization operations,
 other threads do not read/write <code class="highlight"><c- o>*</c-><c- n>p</c-></code> without exercising undefined
 behavior. We can therefore use it as scratch storage—and thus reduce stack frame

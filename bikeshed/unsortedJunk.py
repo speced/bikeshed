@@ -7,19 +7,90 @@ from collections import Counter, defaultdict, namedtuple
 from urllib import parse
 from PIL import Image
 
-from . import biblio, config, dfnpanels, h, t, messages as m, idl, repository
+from . import biblio, config, dfnpanels, h, func, t, messages as m, idl, repository
 from .translate import _
 
 if t.TYPE_CHECKING:
     import widlparser  # pylint: disable=unused-import
     from . import refs
+    from .line import Line
 
 
-def stripBOM(text: str) -> str:
-    if text[0:1] == "\ufeff":
-        m.lint("Your document has a BOM. There's no need for that, please re-save it without a BOM.")
-        text = text[1:]
-    return text
+class MarkdownCodeSpans(func.Functor):
+    # Wraps a string, such that the contained text is "safe"
+    # and contains no markdown code spans.
+    # Thus, functions mapping over the text can freely make substitutions,
+    # knowing they won't accidentally replace stuff in a code span.
+    def __init__(self, text: str):
+        self.__codeSpanReplacements__ = []
+        newText = ""
+        mode = "text"
+        indexSoFar = 0
+        backtickCount = 0
+        for match in re.finditer(r"(\\`)|([\w-]*)(`+)", text):
+            if mode == "text":
+                if match.group(1):
+                    newText += text[indexSoFar : match.start()] + match.group(1)[1]
+                    indexSoFar = match.end()
+                elif match.group(3):
+                    mode = "code"
+                    newText += text[indexSoFar : match.start()]
+                    indexSoFar = match.end()
+                    backtickCount = len(match.group(3))
+                    tag = match.group(2)
+                    literalStart = match.group(0)
+            elif mode == "code":
+                if match.group(1):
+                    pass
+                elif match.group(3):
+                    if len(match.group(3)) != backtickCount:
+                        pass
+                    else:
+                        mode = "text"
+                        innerText = text[indexSoFar : match.start()] + match.group(2)
+                        fullText = literalStart + text[indexSoFar : match.start()] + match.group(0)
+                        replacement = (tag, innerText, fullText)
+                        self.__codeSpanReplacements__.append(replacement)
+                        newText += "\ue0ff"
+                        indexSoFar = match.end()
+        if mode == "text":
+            newText += text[indexSoFar:]
+        elif mode == "code":
+            newText += tag + "`" * backtickCount + text[indexSoFar:]
+
+        super().__init__(newText)
+
+    def map(self, fn: t.Callable) -> MarkdownCodeSpans:
+        x = MarkdownCodeSpans("")
+        x.__val__ = fn(self.__val__)
+        x.__codeSpanReplacements__ = self.__codeSpanReplacements__
+        return x
+
+    def extract(self) -> str:
+        if self.__codeSpanReplacements__:
+            # Reverse the list, so I can use pop() to get them starting from the first.
+            repls = self.__codeSpanReplacements__[::-1]
+
+            def codeSpanReviver(_: t.Any) -> str:
+                # Match object is the PUA character, which I can ignore.
+                repl = repls.pop()
+                if repl[0] == "" or repl[0].endswith("-"):
+                    # Markdown code span, so massage per CommonMark rules.
+                    import string
+
+                    text = h.escapeHTML(repl[1]).strip(string.whitespace)
+                    text = re.sub("[" + string.whitespace + "]{2,}", " ", text)
+                    return f"{repl[0]}<code data-opaque bs-autolink-syntax='{h.escapeAttr(repl[2])}'>{text}</code>"
+                return f"<code data-opaque data-span-tag={repl[0]} bs-autolink-syntax='{h.escapeAttr(repl[2])}'>{h.escapeHTML(repl[1])}</code>"
+
+            return re.sub(r"\ue0ff", codeSpanReviver, self.__val__)
+        return t.cast(str, self.__val__)
+
+
+def stripBOM(doc: t.SpecT) -> None:
+    if len(doc.lines) >= 1 and doc.lines[0].text[0:1] == "\ufeff":
+        doc.lines[0].text = doc.lines[0].text[1:]
+        m.warn("Your document has a BOM. There's no need for that, please re-save it without a BOM.")
 
 
 # Definitions and the like
@@ -1217,6 +1288,7 @@ def cleanupHTML(doc: t.SpecT) -> None:
             )
         h.removeAttr(
             el,
+            "bs-autolink-syntax",
             "data-alternate-id",
             "highlight",
             "nohighlight",
@@ -1257,6 +1329,18 @@ def finalHackyCleanup(text: str) -> str:
     # For hacky last-minute string-based cleanups of the rendered html.
 
     return text
+
+
+def hackyLineNumbers(lines: list[Line]) -> list[Line]:
+    # Hackily adds line-number information to each thing that looks like an open tag.
+    # This is just regex text-munging, so potentially dangerous!
+    for line in lines:
+        line.text = re.sub(
+            r"(^|[^<])(<[\w-]+)([ >])",
+            rf"\1\2 line-number={line.i}\3",
+            line.text,
+        )
+    return lines
 
 
 def correctFrontMatter(doc: t.SpecT) -> None:
