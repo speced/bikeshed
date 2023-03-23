@@ -24,7 +24,7 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
         if not href.startswith("#"):
             continue
         allRefs.setdefault(href[1:], []).append(a)
-    scriptLines = ["\nwindow.dfnsJson ??= {};\n"]
+    scriptLines = []
     refIDCount = {}
     for dfn in dfns:
         id = dfn.get("id")
@@ -74,7 +74,9 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
             "items": itemsJson,
         }
         scriptLines.append(f"window.dfnsJson['{id}'] = {panelJson};\n")
-    h.appendChild(doc.body, h.E.script(scriptLines))
+    if len(scriptLines) > 0:
+        scriptLines.insert(0, "\nwindow.dfnsJson ??= {};\n")
+        h.appendChild(doc.body, h.E.script(scriptLines))
     if atLeastOnePanel:
         doc.extraScripts["script-dfn-panel"] = getModuleFile("dfnpanels.js")
         doc.extraStyles["style-dfn-panel"] = getModuleFile("dfnpanels.css")
