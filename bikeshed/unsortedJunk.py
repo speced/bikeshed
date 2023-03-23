@@ -1495,6 +1495,7 @@ def processIDL(doc: t.SpecT) -> None:
     h.fixupIDs(doc, dfns)
     doc.refs.addLocalDfns(doc, (dfn for dfn in dfns if dfn.get("id") is not None))
 
+
 def getModuleFile(filename: str) -> str:
     with open(config.scriptPath(".", filename), "r", encoding="utf-8") as fh:
         return fh.read()
