@@ -57,13 +57,17 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
                 refID = f"{refID}-{refIDCount[refID]}"
                 # Should we be using the safeID?
                 el.set("id", h.safeID(doc, refID))
-                idsJson.append({
-                    "refID": h.escapeUrlFrag(refID),
-                })
-            itemsJson.append({
-                "ids": idsJson,
-                "text": text,
-            })
+                idsJson.append(
+                    {
+                        "refID": h.escapeUrlFrag(refID),
+                    }
+                )
+            itemsJson.append(
+                {
+                    "ids": idsJson,
+                    "text": text,
+                }
+            )
         panelJson = {
             "id": id,
             "url": "#" + h.escapeUrlFrag(id),
@@ -71,9 +75,7 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
             "items": itemsJson,
         }
         scriptLines.append(f"window.dfnsJson['{id}'] = {panelJson};\n")
-    h.appendChild(doc.body, h.E.script(
-        scriptLines
-    ))
+    h.appendChild(doc.body, h.E.script(scriptLines))
     if atLeastOnePanel:
         doc.extraScripts["script-dfn-panel"] = getModuleFile("dfnpanels.js")
         doc.extraStyles["style-dfn-panel"] = getModuleFile("dfnpanels.css")
@@ -115,13 +117,17 @@ def addExternalDfnPanel(termEl: t.ElementT, ref: r.RefWrapper, doc: t.SpecT) -> 
                 if linkID is None:
                     linkID = f"ref-for-{termID}"
                     el.set("id", h.safeID(doc, linkID))
-                idsJson.append({
-                    "linkID": h.escapeUrlFrag(linkID),
-                })
-            itemsJson.append({
-                "ids": idsJson,
-                "text": text,
-            })
+                idsJson.append(
+                    {
+                        "linkID": h.escapeUrlFrag(linkID),
+                    }
+                )
+            itemsJson.append(
+                {
+                    "ids": idsJson,
+                    "text": text,
+                }
+            )
         panelJson = {
             "extermal": 1,
             "id": termID,
@@ -129,11 +135,16 @@ def addExternalDfnPanel(termEl: t.ElementT, ref: r.RefWrapper, doc: t.SpecT) -> 
             "dfnText": termText,
             "items": itemsJson,
         }
-    h.appendChild(doc.body, h.E.script(
-    """
+    h.appendChild(
+        doc.body,
+        h.E.script(
+            """
     window.dfnsJson ??= {};
-    """ +
-    f"window.dfnsJson['{termID}'] = {panelJson};\n"))
+    """
+            + f"window.dfnsJson['{termID}'] = {panelJson};\n"
+        ),
+    )
+
 
 def uniqueId(s: str) -> str:
     # Turns a unique string into a more compact (and ID-safe)
