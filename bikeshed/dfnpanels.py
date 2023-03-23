@@ -48,15 +48,14 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
         itemsJson = []
         for text, els in refs.items():
             idsJson = []
-            for i, el in enumerate(els):
+            for _, el in enumerate(els):
                 refID = el.get("id")
                 if refID is None:
                     refID = f"ref-for-{id}"
+                    el.set("id", h.safeID(doc, refID))
                 # Not sure ref counting is correct or needed
                 refIDCount[refID] = refIDCount.get(refID, 0) + 1
                 refID = f"{refID}-{refIDCount[refID]}"
-                # Should we be using the safeID?
-                el.set("id", h.safeID(doc, refID))
                 idsJson.append(
                     {
                         "refID": h.escapeUrlFrag(refID),
@@ -112,7 +111,7 @@ def addExternalDfnPanel(termEl: t.ElementT, ref: r.RefWrapper, doc: t.SpecT) -> 
         itemsJson = []
         for text, els in linksBySection.items():
             idsJson = []
-            for i, el in enumerate(els):
+            for _, el in enumerate(els):
                 linkID = el.get("id")
                 if linkID is None:
                     linkID = f"ref-for-{termID}"
