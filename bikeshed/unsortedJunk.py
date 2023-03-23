@@ -206,7 +206,7 @@ def addVarClickHighlighting(doc: t.SpecT) -> None:
     # Specifically: find lowest-indexed color with lowest usage.
     # (Usually this'll be zero, but if you click too many vars in same algo, can repeat.)
     # If you unclick then click again on same var, it should get same color if possible.
-   doc.extraScripts["script-var-click-highlighting"] = getModuleFile("var-click-highlighting.js")
+    doc.extraScripts["script-var-click-highlighting"] = getModuleFile("var-click-highlighting.js")
 
 
 def fixIntraDocumentReferences(doc: t.SpecT) -> None:
