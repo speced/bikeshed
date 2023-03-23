@@ -130,8 +130,7 @@ class ReferenceManager:
         initFors()
         if doc and doc.inputSource and doc.inputSource.hasDirectory:
             ldLines = self.dataFile.fetch("link-defaults.infotree").read().split("\n")
-            fakeTag = h.StartTag(tag="pre", line=-1)
-            datablocks.transformInfo(lines=ldLines, doc=doc, firstLine=ldLines[0], startTag=fakeTag)
+            datablocks.transformInfo(lines=ldLines, doc=doc, firstLine=ldLines[0], tagName="pre", lineNum=None)
 
             # Get local anchor data
             shouldGetLocalAnchorData = doc.md.externalInfotrees["anchors.bsdata"]
@@ -149,7 +148,9 @@ class ReferenceManager:
                     if not anchorFile:
                         raise OSError()
                     anchorLines = anchorFile.read().rawLines
-                    datablocks.transformAnchors(lines=anchorLines, doc=doc, firstLine=anchorLines[0], startTag=fakeTag)
+                    datablocks.transformAnchors(
+                        lines=anchorLines, doc=doc, firstLine=anchorLines[0], tagName="pre", lineNum=None
+                    )
                 except OSError:
                     m.warn("anchors.bsdata not found despite being listed in the External Infotrees metadata.")
 
@@ -169,7 +170,13 @@ class ReferenceManager:
                     if not ldFile:
                         raise OSError()
                     ldLines = ldFile.read().rawLines
-                    datablocks.transformInfo(lines=ldLines, doc=doc, firstLine=ldLines[0], startTag=fakeTag)
+                    datablocks.transformInfo(
+                        lines=ldLines,
+                        doc=doc,
+                        firstLine=ldLines[0],
+                        tagName="pre",
+                        lineNum=None,
+                    )
                 except OSError:
                     m.warn("link-defaults.infotree not found despite being listed in the External Infotrees metadata.")
 
