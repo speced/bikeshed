@@ -261,18 +261,7 @@ def checkVarHygiene(doc: t.SpecT) -> None:
 def addVarClickHighlighting(doc: t.SpecT) -> None:
     if doc.md.slimBuildArtifact:
         return
-    doc.extraStyles[
-        "style-var-click-highlighting"
-    ] = """
-    var { cursor: pointer; }
-    var.selected0 { background-color: #F4D200; box-shadow: 0 0 0 2px #F4D200; }
-    var.selected1 { background-color: #FF87A2; box-shadow: 0 0 0 2px #FF87A2; }
-    var.selected2 { background-color: #96E885; box-shadow: 0 0 0 2px #96E885; }
-    var.selected3 { background-color: #3EEED2; box-shadow: 0 0 0 2px #3EEED2; }
-    var.selected4 { background-color: #EACFB6; box-shadow: 0 0 0 2px #EACFB6; }
-    var.selected5 { background-color: #82DDFF; box-shadow: 0 0 0 2px #82DDFF; }
-    var.selected6 { background-color: #FFBCF2; box-shadow: 0 0 0 2px #FFBCF2; }
-    """
+    doc.extraStyles["style-var-click-highlighting"] = getModuleFile("var-click-highlighting.css")
     # Colors were chosen in Lab using https://nixsensor.com/free-color-converter/
     # D50 2deg illuminant, L in [0,100], a and b in [-128, 128]
     # 0 = lab(85,0,85)
@@ -288,92 +277,7 @@ def addVarClickHighlighting(doc: t.SpecT) -> None:
     # Specifically: find lowest-indexed color with lowest usage.
     # (Usually this'll be zero, but if you click too many vars in same algo, can repeat.)
     # If you unclick then click again on same var, it should get same color if possible.
-    doc.extraScripts[
-        "script-var-click-highlighting"
-    ] = r"""
-    "use strict";
-    {
-        document.addEventListener("click", e=>{
-            if(e.target.nodeName == "VAR") {
-                highlightSameAlgoVars(e.target);
-            }
-        });
-        const indexCounts = new Map();
-        const indexNames = new Map();
-        function highlightSameAlgoVars(v) {
-            // Find the algorithm container.
-            let algoContainer = null;
-            let searchEl = v;
-            while(algoContainer == null && searchEl != document.body) {
-                searchEl = searchEl.parentNode;
-                if(searchEl.hasAttribute("data-algorithm")) {
-                    algoContainer = searchEl;
-                }
-            }
-
-            // Not highlighting document-global vars,
-            // too likely to be unrelated.
-            if(algoContainer == null) return;
-
-            const algoName = algoContainer.getAttribute("data-algorithm");
-            const varName = getVarName(v);
-            const addClass = !v.classList.contains("selected");
-            let highlightClass = null;
-            if(addClass) {
-                const index = chooseHighlightIndex(algoName, varName);
-                indexCounts.get(algoName)[index] += 1;
-                indexNames.set(algoName+"///"+varName, index);
-                highlightClass = nameFromIndex(index);
-            } else {
-                const index = previousHighlightIndex(algoName, varName);
-                indexCounts.get(algoName)[index] -= 1;
-                highlightClass = nameFromIndex(index);
-            }
-
-            // Find all same-name vars, and toggle their class appropriately.
-            for(const el of algoContainer.querySelectorAll("var")) {
-                if(getVarName(el) == varName) {
-                    el.classList.toggle("selected", addClass);
-                    el.classList.toggle(highlightClass, addClass);
-                }
-            }
-        }
-        function getVarName(el) {
-            return el.textContent.replace(/(\s|\xa0)+/, " ").trim();
-        }
-        function chooseHighlightIndex(algoName, varName) {
-            let indexes = null;
-            if(indexCounts.has(algoName)) {
-                indexes = indexCounts.get(algoName);
-            } else {
-                // 7 classes right now
-                indexes = [0,0,0,0,0,0,0];
-                indexCounts.set(algoName, indexes);
-            }
-
-            // If the element was recently unclicked,
-            // *and* that color is still unclaimed,
-            // give it back the same color.
-            const lastIndex = previousHighlightIndex(algoName, varName);
-            if(indexes[lastIndex] === 0) return lastIndex;
-
-            // Find the earliest index with the lowest count.
-            const minCount = Math.min.apply(null, indexes);
-            let index = null;
-            for(var i = 0; i < indexes.length; i++) {
-                if(indexes[i] == minCount) {
-                    return i;
-                }
-            }
-        }
-        function previousHighlightIndex(algoName, varName) {
-            return indexNames.get(algoName+"///"+varName);
-        }
-        function nameFromIndex(index) {
-            return "selected" + index;
-        }
-    }
-    """
+    doc.extraScripts["script-var-click-highlighting"] = getModuleFile("var-click-highlighting.js")
 
 
 def fixIntraDocumentReferences(doc: t.SpecT) -> None:
@@ -1674,3 +1578,8 @@ def processIDL(doc: t.SpecT) -> None:
     classifyDfns(doc, dfns)
     h.fixupIDs(doc, dfns)
     doc.refs.addLocalDfns(doc, (dfn for dfn in dfns if dfn.get("id") is not None))
+
+
+def getModuleFile(filename: str) -> str:
+    with open(config.scriptPath(".", filename), "r", encoding="utf-8") as fh:
+        return fh.read()
