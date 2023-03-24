@@ -54,7 +54,7 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
                     el.set("id", h.safeID(doc, refID))
                 idsJson.append(
                     {
-                        "refID": "#" + h.escapeUrlFrag(refID),
+                        "refID": h.escapeUrlFrag(refID),
                     }
                 )
             itemsJson.append(
@@ -126,7 +126,7 @@ def addExternalDfnPanel(termEl: t.ElementT, ref: r.RefWrapper, doc: t.SpecT) -> 
                 }
             )
         panelJson = {
-            "extermal": 1,
+            "external": 1,
             "id": termID,
             "url": ref.url,
             "dfnText": termText,

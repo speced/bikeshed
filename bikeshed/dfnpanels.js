@@ -2,13 +2,12 @@
 {
     const dfnsJson = window.dfnsJson || {};
 
-    function genDfnPanel([key, value], index) {
+    function genDfnPanel([key, value]) {
         const {id, url, dfnText, items, external}  = value;
         const itemsHtml = items.map((item) => {
             const idsHtml = item.ids.map((id, index) => {
-                const href = `${external ? id.linkID : id.refID}`;
-                const anchorText =
-                    (index == 0) ? item.text : `(${index + 1})`;
+                const href = `#${external ? id.linkID : id.refID}`;
+                const anchorText = (index == 0) ? item.text : `(${index + 1})`;
                 return /* html */`
                     <li><a href="${href}">${anchorText}</a></li>`;
             });
@@ -21,15 +20,14 @@
                 id="infopanel-for-${id}"
                 data-for="${id}"
                 aria-labelledby="infopaneltitle-for-${id}">
-                <span
-                    id="infopaneltitle-for-${id}" style="display:none">
+                <span id="infopaneltitle-for-${id}" style="display:none">
                     Info about the '${dfnText}'
                     ${external ? 'external': ''} reference.
                 </span>
                 <a href=${url}>${url}</a>
                 <b>Referenced in:</b>
                 <ul>${itemsHtml.join('')}</ul>
-        </aside>`;
+            </aside>`;
     }
 
     function genAllDfnPanels() {
