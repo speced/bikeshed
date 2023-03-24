@@ -4,18 +4,16 @@
 
     function genDfnPanel([key, value], index) {
         const {id, url, dfnText, items, external}  = value;
-        const itemsHtml = /* html */`<ul>
-            ${items.map((item) => {
-                const idsHtml =  item.ids.map((id, index) => {
-                    const href = `${external ? id.linkID : id.refID}`;
-                    const anchorText =
-                        (index == 0) ? item.text : `(${index+1})`;
-                    return /* html */`
-                        <a href="${href}">${anchorText}</a>`;
-                })
-                return /* html */`<li>${idsHtml.join('\n')}</li>`;
-            })}
-        </ul>`;
+        const itemsHtml = items.map((item) => {
+            const idsHtml = item.ids.map((id, index) => {
+                const href = `${external ? id.linkID : id.refID}`;
+                const anchorText =
+                    (index == 0) ? item.text : `(${index + 1})`;
+                return /* html */`
+                    <li><a href="${href}">${anchorText}</a></li>`;
+            });
+            return idsHtml.join('');
+        });
 
         return /* html */`
             <aside
@@ -30,7 +28,7 @@
                 </span>
                 <a href=${url}>${url}</a>
                 <b>Referenced in:</b>
-                ${itemsHtml}
+                <ul>${itemsHtml.join('')}</ul>
         </aside>`;
     }
 
@@ -132,7 +130,9 @@
             });
 
             dfnPanel.addEventListener('click', (event) => {
-                pinDfnPanel(dfnPanel);
+                if (event.target.nodeName != 'A') {
+                    pinDfnPanel(dfnPanel);
+                }
                 event.stopPropagation();
             });
 
