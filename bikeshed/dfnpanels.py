@@ -24,6 +24,7 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
         if not href.startswith("#"):
             continue
         allRefs.setdefault(href[1:], []).append(a)
+    scriptLines = []
     for dfn in dfns:
         id = dfn.get("id")
         dfnText = h.textContent(dfn)
@@ -43,52 +44,35 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
             continue
         h.addClass(doc, dfn, "dfn-paneled")
         atLeastOnePanel = True
-        panel = h.E.aside(
-            {
-                "class": "dfn-panel",
-                "data-for": id,
-                "id": f"infopanel-for-{id}",
-                "aria-labelledby": f"infopaneltitle-for-{id}",
-            },
-            h.E.span(
-                {"style": "display:none", "id": f"infopaneltitle-for-{id}"},
-                _(f"Info about the '{dfnText}' definition."),
-            ),
-            h.E.b(h.E.a({"href": "#" + h.escapeUrlFrag(id)}, "#" + id)),
-            h.E.b(_("Referenced in:")),
-        )
-        ul = h.appendChild(panel, h.E.ul())
+        itemsJson = []
         for text, els in refs.items():
-            li = h.appendChild(ul, h.E.li())
-            for i, el in enumerate(els):
+            idsJson = []
+            for _i, el in enumerate(els):
                 refID = el.get("id")
                 if refID is None:
                     refID = f"ref-for-{id}"
                     el.set("id", h.safeID(doc, refID))
-                if i == 0:
-                    h.appendChild(
-                        li,
-                        h.E.a(
-                            {
-                                "href": "#" + h.escapeUrlFrag(refID),
-                                "data-silently-dedup": "",
-                            },
-                            text,
-                        ),
-                    )
-                else:
-                    h.appendChild(
-                        li,
-                        " ",
-                        h.E.a(
-                            {
-                                "href": "#" + h.escapeUrlFrag(refID),
-                                "data-silently-dedup": "",
-                            },
-                            "(" + str(i + 1) + ")",
-                        ),
-                    )
-        h.appendChild(doc.body, panel)
+                idsJson.append(
+                    {
+                        "refID": h.escapeUrlFrag(refID),
+                    }
+                )
+            itemsJson.append(
+                {
+                    "ids": idsJson,
+                    "text": text,
+                }
+            )
+        panelJson = {
+            "id": id,
+            "url": "#" + h.escapeUrlFrag(id),
+            "dfnText": dfnText,
+            "items": itemsJson,
+        }
+        scriptLines.append(f"window.dfnsJson['{id}'] = {panelJson};\n")
+    if len(scriptLines) > 0:
+        scriptLines.insert(0, "\nwindow.dfnsJson ??= {};\n")
+        h.appendChild(doc.body, h.E.script(scriptLines))
     if atLeastOnePanel:
         doc.extraScripts["script-dfn-panel"] = getModuleFile("dfnpanels.js")
         doc.extraStyles["style-dfn-panel"] = getModuleFile("dfnpanels.css")
@@ -116,55 +100,47 @@ def addExternalDfnPanel(termEl: t.ElementT, ref: r.RefWrapper, doc: t.SpecT) -> 
     for link in doc.cachedLinksFromHref[ref.url]:
         section = h.sectionName(doc, link) or _("Unnumbered Section")
         linksBySection.setdefault(section, []).append(link)
+
     if linksBySection:
         h.addClass(doc, termEl, "dfn-paneled")
         termID = uniqueId(ref.url + ref.text)
         termEl.set("id", termID)
         termText = h.textContent(termEl)
-        panel = h.E.aside(
-            {
-                "class": "dfn-panel",
-                "data-for": termID,
-                "id": f"infopanel-for-{termID}",
-                "aria-labelledby": f"infopaneltitle-for-{termID}",
-            },
-            h.E.span(
-                {"style": "display:none", "id": f"infopaneltitle-for-{termID}"},
-                _(f"Info about the '{termText}' external reference."),
-            ),
-            h.E.a({"href": ref.url}, ref.url),
-            h.E.b(_("Referenced in:")),
-        )
-        ul = h.appendChild(panel, h.E.ul())
+        itemsJson = []
         for text, els in linksBySection.items():
-            li = h.appendChild(ul, h.E.li())
-            for i, el in enumerate(els):
+            idsJson = []
+            for _i, el in enumerate(els):
                 linkID = el.get("id")
                 if linkID is None:
                     linkID = f"ref-for-{termID}"
                     el.set("id", h.safeID(doc, linkID))
-                if i == 0:
-                    h.appendChild(
-                        li,
-                        h.E.a(
-                            {
-                                "href": "#" + h.escapeUrlFrag(linkID),
-                            },
-                            text,
-                        ),
-                    )
-                else:
-                    h.appendChild(
-                        li,
-                        " ",
-                        h.E.a(
-                            {
-                                "href": "#" + h.escapeUrlFrag(linkID),
-                            },
-                            "(" + str(i + 1) + ")",
-                        ),
-                    )
-        h.appendChild(doc.body, panel)
+                idsJson.append(
+                    {
+                        "linkID": h.escapeUrlFrag(linkID),
+                    }
+                )
+            itemsJson.append(
+                {
+                    "ids": idsJson,
+                    "text": text,
+                }
+            )
+        panelJson = {
+            "external": 1,
+            "id": termID,
+            "url": ref.url,
+            "dfnText": termText,
+            "items": itemsJson,
+        }
+    h.appendChild(
+        doc.body,
+        h.E.script(
+            """
+    window.dfnsJson ??= {};
+    """
+            + f"window.dfnsJson['{termID}'] = {panelJson};\n"
+        ),
+    )
 
 
 def uniqueId(s: str) -> str:

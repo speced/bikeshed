@@ -1,5 +1,44 @@
 "use strict";
 {
+    const dfnsJson = window.dfnsJson || {};
+
+    function genDfnPanel([key, value]) {
+        const {id, url, dfnText, items, external}  = value;
+        const itemsHtml = items.map((item) => {
+            const idsHtml = item.ids.map((id, index) => {
+                const href = `#${external ? id.linkID : id.refID}`;
+                const anchorText = (index == 0) ? item.text : `(${index + 1})`;
+                return /* html */`
+                    <li><a href="${href}">${anchorText}</a></li>`;
+            });
+            return idsHtml.join('');
+        });
+
+        return /* html */`
+            <aside
+                class="dfn-panel"
+                id="infopanel-for-${id}"
+                data-for="${id}"
+                aria-labelledby="infopaneltitle-for-${id}">
+                <span id="infopaneltitle-for-${id}" style="display:none">
+                    Info about the '${dfnText}'
+                    ${external ? 'external': ''} reference.
+                </span>
+                <a href=${url}>${url}</a>
+                <b>Referenced in:</b>
+                <ul>${itemsHtml.join('')}</ul>
+            </aside>`;
+    }
+
+    function genAllDfnPanels() {
+        const html = Object.entries(dfnsJson).map(genDfnPanel).join('\n');
+        const div = document.createElement('div');
+        div.innerHTML = html;
+        document.body.appendChild(div);
+    }
+
+    genAllDfnPanels();
+
     function queryAll(sel) {
         return [].slice.call(document.querySelectorAll(sel));
     }
@@ -89,7 +128,9 @@
             });
 
             dfnPanel.addEventListener('click', (event) => {
-                pinDfnPanel(dfnPanel);
+                if (event.target.nodeName != 'A') {
+                    pinDfnPanel(dfnPanel);
+                }
                 event.stopPropagation();
             });
 
