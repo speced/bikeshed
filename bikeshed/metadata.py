@@ -79,6 +79,7 @@ class MetadataManager:
         self.group: str | None = None
         self.h1: str | None = None
         self.ignoreCanIUseUrlFailure: list[str] = []
+        self.ignoreMDNFailure: list[str] = []
         self.ignoredTerms: list[str] = []
         self.ignoredVars: list[str] = []
         self.implementationReport: str | None = None
@@ -1309,6 +1310,7 @@ knownKeys = {
     "Ignore Can I Use Url Failure": Metadata(
         "Ignore Can I Use Url Failure", "ignoreCanIUseUrlFailure", joinList, parseLiteralList
     ),
+    "Ignore Mdn Failure": Metadata("Ignore MDN Failure", "ignoreMDNFailure", joinList, parseLiteralList),
     "Ignored Terms": Metadata("Ignored Terms", "ignoredTerms", joinList, parseCommaSeparated),
     "Ignored Vars": Metadata("Ignored Vars", "ignoredVars", joinList, parseCommaSeparated),
     "Image Auto Size": Metadata("Image Auto Size", "imgAutoSize", joinValue, parseBoolean),

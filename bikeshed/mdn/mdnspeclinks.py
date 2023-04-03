@@ -97,7 +97,7 @@ def panelsFromData(doc: t.SpecT, data: MdnDataT) -> list[t.ElementT]:
         allEngines = 0
         featureDivs = []
         targetElement = h.find(f"[id='{elementId}']", doc)
-        if targetElement is None:
+        if targetElement is None and elementId not in doc.md.ignoreMDNFailure:
             m.warn(f"No '{elementId}' ID found, skipping MDN features that would target it.")
             continue
 
