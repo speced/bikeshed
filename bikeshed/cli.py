@@ -667,7 +667,6 @@ Editor: Your Name, Your Company http://example.com/your-company, your-email@exam
 Abstract: A short description of your spec, one or two sentences.
 Complain About: accidental-2119 yes, missing-example-ids yes
 Markup Shorthands: markdown yes, css no
-Assume Explicit For: yes
 </pre>
 
 Introduction {#intro}
