@@ -11,7 +11,7 @@ from lxml import etree
 from lxml.cssselect import CSSSelector
 from lxml.html import tostring
 
-from .. import t
+from .. import config, t
 from ..messages import die, warn
 
 if t.TYPE_CHECKING:
@@ -932,6 +932,16 @@ def circledDigits(num: int) -> str:
     digits = ["⓪", "①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨"]
     result = "".join(digits[int(d)] for d in str(num))
     return result
+
+
+def addDOMHelperScript(doc: t.SpecT) -> None:
+    if "dom-helper" not in doc.extraScripts:
+        doc.extraScripts["script-dom-helper"] = getModuleFile("dom.js");
+
+
+def getModuleFile(filename: str) -> str:
+    with open(config.scriptPath("h", filename), "r", encoding="utf-8") as fh:
+        return fh.read()
 
 
 def createElement(tag: str, attrs: t.Mapping[str, str | None] | None = None, *children: t.NodesT | None) -> t.ElementT:

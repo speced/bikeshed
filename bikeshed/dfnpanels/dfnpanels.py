@@ -68,13 +68,15 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
             "dfnText": dfnText,
             "items": itemsJson,
         }
-        scriptLines.append(f"window.dfnsJson['{id}'] = {panelJson};\n")
+        scriptLines.append(f"window.dfnpanelData['{id}'] = {panelJson};")
     if len(scriptLines) > 0:
-        scriptLines.insert(0, "\nwindow.dfnsJson ??= {};\n")
-        h.appendChild(doc.body, h.E.script(scriptLines))
+        if "script-dfnpanel-json" not in doc.extraScripts:
+            doc.extraScripts["script-dfn-panel-json"] = "window.dfnpanelData = {};\n"
+        doc.extraScripts["script-dfn-panel-json"] += "\n".join(scriptLines)
     if atLeastOnePanel:
         doc.extraScripts["script-dfn-panel"] = getModuleFile("dfnpanels.js")
         doc.extraStyles["style-dfn-panel"] = getModuleFile("dfnpanels.css")
+        h.addDOMHelperScript(doc)
 
 
 def addExternalDfnPanel(termEl: t.ElementT, ref: r.RefWrapper, doc: t.SpecT) -> None:
@@ -131,15 +133,10 @@ def addExternalDfnPanel(termEl: t.ElementT, ref: r.RefWrapper, doc: t.SpecT) -> 
             "dfnText": termText,
             "items": itemsJson,
         }
-    h.appendChild(
-        doc.body,
-        h.E.script(
-            """
-    window.dfnsJson ??= {};
-    """
-            + f"window.dfnsJson['{termID}'] = {panelJson};\n"
-        ),
-    )
+
+    if "script-dfnpanel-json" not in doc.extraScripts:
+        doc.extraScripts["script-dfn-panel-json"] = "window.dfnpanelData = {};\n"
+    doc.extraScripts["script-dfn-panel-json"] += f"window.dfnpanelData['{termID}'] = {panelJson};\n"
 
 
 def uniqueId(s: str) -> str:
@@ -152,6 +149,7 @@ def addExternalDfnPanelStyles(doc: t.SpecT) -> None:
     doc.extraScripts["script-dfn-panel"] = getModuleFile("dfnpanels.js")
     doc.extraStyles["style-dfn-panel"] = getModuleFile("dfnpanels.css")
     doc.extraStyles["style-darkmode"] += getModuleFile("dfnpanels-dark.css")
+    h.addDOMHelperScript(doc)
 
 
 def getModuleFile(filename: str) -> str:

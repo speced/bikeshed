@@ -1,6 +1,7 @@
 from .dom import (
     E,
     addClass,
+    addDOMHelperScript,
     addOldIDs,
     appendChild,
     appendContents,

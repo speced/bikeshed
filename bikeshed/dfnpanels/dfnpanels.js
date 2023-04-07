@@ -4,53 +4,55 @@
 
     function genDfnPanel([key, value]) {
         const {id, url, dfnText, items, external}  = value;
-        const itemsHtml = items.map((item) => {
-            const idsHtml = item.ids.map((id, index) => {
-                const href = `#${external ? id.linkID : id.refID}`;
-                const anchorText = (index == 0) ? item.text : `(${index + 1})`;
-                return /* html */`
-                    <li><a href="${href}">${anchorText}</a></li>`;
-            });
-            return idsHtml.join('');
-        });
 
-        return /* html */`
-            <aside
-                class="dfn-panel"
-                id="infopanel-for-${id}"
-                data-for="${id}"
-                aria-labelledby="infopaneltitle-for-${id}">
-                <span id="infopaneltitle-for-${id}" style="display:none">
-                    Info about the '${dfnText}'
-                    ${external ? 'external': ''} reference.
-                </span>
-                <a href=${url}>${url}</a>
-                <b>Referenced in:</b>
-                <ul>${itemsHtml.join('')}</ul>
-            </aside>`;
+        return mk.aside({
+            class: "dfn-panel",
+            id: `infopanel-for-${id}`,
+            "data-for": id,
+            "aria-labelled-by":`infopaneltitle-for-${id}`,
+            },
+            mk.span({id:`infopaneltitle-for-${id}`, style:"display:none"},
+                `Info about the '${dfnText}' ${external?"external":""} reference.`),
+            mk.a({href:url}, url),
+            mk.b({}, "Referenced in:"),
+            mk.ul({},
+                ...items.map(item=>
+                    mk.li({},
+                        ...item.ids.map((id, index)=>
+                            [
+                                mk.a({
+                                    href: `#${external ? id.linkID : id.refID}`
+                                    },
+                                    (index == 0) ? item.text : `(${index + 1})`
+                                ),
+                                " ",
+                            ]
+                        ),
+                    ),
+                ),
+            ),
+        );
     }
 
     function genAllDfnPanels() {
-        const html = Object.entries(dfnsJson).map(genDfnPanel).join('\n');
-        const div = document.createElement('div');
-        div.innerHTML = html;
-        document.body.appendChild(div);
+        append(document.body,
+            ...Object.entries(window.dfnpanelData).map(genDfnPanel),
+        )
     }
 
-    genAllDfnPanels();
+    document.addEventListener("DOMContentLoaded", ()=>{
+        genAllDfnPanels();
 
-    function queryAll(sel) {
-        return [].slice.call(document.querySelectorAll(sel));
-    }
+        // Add popup behavior to all dfns to show the corresponding dfn-panel.
+        var dfns = queryAll('.dfn-paneled');
+        for (let dfn of dfns) { insertDfnPopupAction(dfn); }
 
-    // Add popup behavior to all dfns to show the corresponding dfn-panel.
-    var dfns = document.querySelectorAll('.dfn-paneled');
-    for (let dfn of dfns) { insertDfnPopupAction(dfn); }
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all dfn panels.
+            hideAllDfnPanels();
+        });
+    })
 
-    document.body.addEventListener("click", (e) => {
-        // If not handled already, just hide all dfn panels.
-        hideAllDfnPanels();
-    });
 
     function hideAllDfnPanels() {
         // Turn off any currently "on" or "activated" panels.
