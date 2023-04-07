@@ -3,13 +3,12 @@ from __future__ import annotations
 import hashlib
 from collections import OrderedDict
 
-from . import h, t
-from .translate import _
-from . import config
+from .. import config, h, t
+from ..translate import _
 
 
 if t.TYPE_CHECKING:
-    from . import refs as r  # pylint: disable=unused-import
+    from .. import refs as r  # pylint: disable=unused-import
 
 
 def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
@@ -156,5 +155,5 @@ def addExternalDfnPanelStyles(doc: t.SpecT) -> None:
 
 
 def getModuleFile(filename: str) -> str:
-    with open(config.scriptPath(".", filename), "r", encoding="utf-8") as fh:
+    with open(config.scriptPath("dfnpanels", filename), "r", encoding="utf-8") as fh:
         return fh.read()
