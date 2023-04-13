@@ -4,7 +4,7 @@ import json
 import os
 import sys
 
-from . import config, constants, update, messages as m
+from . import config, constants, update, messages as m, printjson
 
 
 def main() -> None:
@@ -569,7 +569,7 @@ def handleDebug(options: argparse.Namespace, extras: list[str]) -> None:
             "document": doc.mdDocument.allData if doc.mdDocument else [],
             "command-line": doc.mdCommandLine.allData,
         }
-        print(json.dumps(md, indent=2, default=config.getjson))
+        print(json.dumps(md, indent=2, default=printjson.getjson))
 
 
 def handleRefs(options: argparse.Namespace, extras: list[str]) -> None:
@@ -599,9 +599,9 @@ def handleRefs(options: argparse.Namespace, extras: list[str]) -> None:
         exact=options.exact,
     )
     if constants.printMode == "json":
-        m.p(json.dumps(refs, indent=2, default=config.getjson))
+        m.p(json.dumps(refs, indent=2, default=printjson.getjson))
     else:
-        m.p(config.printjson(refs))
+        m.p(printjson.printjson(refs))
 
 
 def handleIssuesList(options: argparse.Namespace) -> None:

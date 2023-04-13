@@ -1,15 +1,10 @@
 from __future__ import annotations
 
-import hashlib
 import json
 from collections import OrderedDict
 
-from .. import config, h, t
+from .. import config, h, t, messages as m
 from ..translate import _
-
-
-if t.TYPE_CHECKING:
-    from .. import refs as r  # pylint: disable=unused-import
 
 
 def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
@@ -77,7 +72,7 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
         h.addDOMHelperScript(doc)
 
 
-def addExternalDfnPanel(termEl: t.ElementT, ref: r.RefWrapper, doc: t.SpecT) -> None:
+def addExternalDfnPanel(termEl: t.ElementT, ref: t.RefWrapper, doc: t.SpecT) -> None:
     # Constructs "dfn panels" which show all the local references to an external term
 
     # Calculate and cache the doc's links,
@@ -103,7 +98,7 @@ def addExternalDfnPanel(termEl: t.ElementT, ref: r.RefWrapper, doc: t.SpecT) -> 
     h.addClass(doc, termEl, "dfn-paneled")
     termID = termEl.get("id")
     if termID is None:
-        warn("An external reference index entry ended up without an ID:\n{ref}")
+        m.warn("An external reference index entry ended up without an ID:\n{ref}")
         return
     termText = h.textContent(termEl)
     sectionsJson = []
@@ -112,7 +107,7 @@ def addExternalDfnPanel(termEl: t.ElementT, ref: r.RefWrapper, doc: t.SpecT) -> 
         for i, el in enumerate(els):
             linkID = el.get("id")
             if linkID is None:
-                linkID = h.uniqueID("external-link", ref.url, termID)+str(i)
+                linkID = h.uniqueID("external-link", ref.url, termID) + str(i)
                 el.set("id", h.safeID(doc, linkID))
             refsJson.append(
                 {

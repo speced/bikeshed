@@ -463,11 +463,11 @@ class Spec:
     def printTargets(self) -> None:
         m.p("Exported terms:")
         for el in h.findAll("[data-export]", self):
-            for term in config.linkTextsFromElement(el):
+            for term in h.linkTextsFromElement(el):
                 m.p("  " + term)
         m.p("Unexported terms:")
         for el in h.findAll("[data-noexport]", self):
-            for term in config.linkTextsFromElement(el):
+            for term in h.linkTextsFromElement(el):
                 m.p("  " + term)
 
     def isOpaqueElement(self, el: t.ElementT) -> bool:

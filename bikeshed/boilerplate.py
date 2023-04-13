@@ -313,7 +313,7 @@ def addIndexOfLocallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> None:
         dfnType = el.get("data-dfn-type")
         if dfnID is None or dfnType is None:
             continue
-        linkTexts = config.linkTextsFromElement(el)
+        linkTexts = h.linkTextsFromElement(el)
         headingLevel = h.headingLevelOfElement(el) or _("Unnumbered section")
         if dfnType == "argument":
             # Don't generate index entries for arguments.
@@ -524,10 +524,8 @@ def addIndexOfExternallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> Non
     if not doc.externalRefsUsed.hasRefs():
         return
 
-    def makeEntry(ref:t.RefWrapper, contents: t.NodesT) -> t.ElementT:
-        return h.E.span({
-            "id": h.uniqueID("external-term", ref.url, ref.text)
-            }, contents)
+    def makeEntry(ref: t.RefWrapper, contents: t.NodesT) -> t.ElementT:
+        return h.E.span({"id": h.uniqueID("external-term", ref.url, ref.text)}, contents)
 
     ul = h.E.ul({"class": "index"})
 

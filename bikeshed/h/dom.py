@@ -156,6 +156,54 @@ def outerHTML(el: t.NodesT | None, literal: bool = False, with_tail: bool = Fals
     return t.cast(str, tostring(el, with_tail=with_tail, encoding="unicode"))
 
 
+def linkTextsFromElement(el: t.ElementT) -> list[str]:
+    if el.get("data-lt") == "":
+        return []
+    elif el.get("data-lt"):
+        rawText = el.get("data-lt", "")
+        if rawText in ["|", "||", "|||"]:
+            texts = [rawText]
+        else:
+            texts = [x.strip() for x in rawText.split("|")]
+    else:
+        if el.tag in ("dfn", "a"):
+            texts = [textContent(el).strip()]
+        elif el.tag in ("h2", "h3", "h4", "h5", "h6"):
+            textEl = find(".content", el)
+            if textEl is None:
+                textEl = el
+            texts = [textContent(textEl).strip()]
+    if el.get("data-local-lt"):
+        localTexts = [x.strip() for x in el.get("data-local-lt", "").split("|")]
+        for text in localTexts:
+            if text in texts:
+                # lt and local-lt both specify the same thing
+                raise DuplicatedLinkText(text, texts + localTexts, el)
+        texts += localTexts
+
+    texts = [re.sub(r"\s+", " ", x) for x in texts if x != ""]
+    return texts
+
+
+class DuplicatedLinkText(Exception):
+    def __init__(self, offendingText: str, allTexts: list[str], el: t.ElementT):
+        super().__init__()
+        self.offendingText = offendingText
+        self.allTexts = allTexts
+        self.el = el
+
+    def __unicode__(self) -> str:
+        return f"<Text '{self.offendingText}' shows up in both lt and local-lt>"
+
+
+def firstLinkTextFromElement(el: t.ElementT) -> str | None:
+    try:
+        texts = linkTextsFromElement(el)
+    except DuplicatedLinkText as e:
+        texts = e.allTexts
+    return texts[0] if len(texts) > 0 else None
+
+
 def serializeTag(el: t.ElementT) -> str:
     # Serialize *just* the opening tag for the element.
     # Use when you want to output the HTML,
@@ -944,7 +992,7 @@ def circledDigits(num: int) -> str:
 
 def addDOMHelperScript(doc: t.SpecT) -> None:
     if "dom-helper" not in doc.extraScripts:
-        doc.extraScripts["script-dom-helper"] = getModuleFile("dom.js");
+        doc.extraScripts["script-dom-helper"] = getModuleFile("dom.js")
 
 
 def getModuleFile(filename: str) -> str:

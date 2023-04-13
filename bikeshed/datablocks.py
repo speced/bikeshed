@@ -7,7 +7,7 @@ from functools import reduce
 
 import attr
 
-from . import biblio, config, h, messages as m, refs, t
+from . import biblio, config, h, messages as m, printjson, refs, t
 from .line import Line
 
 
@@ -668,14 +668,14 @@ def transformAnchors(lines: list[str], tagName: str, firstLine: str, lineNum: in
 def processAnchors(anchors: InfoTreeT, doc: t.SpecT, lineNum: int | None = None) -> None:
     for anchor in anchors:
         if "type" not in anchor or len(anchor["type"]) != 1:
-            m.die(f"Each anchor needs exactly one type. Got:\n{config.printjson(anchor)}", lineNum=lineNum)
+            m.die(f"Each anchor needs exactly one type. Got:\n{printjson.printjson(anchor)}", lineNum=lineNum)
             continue
         if "text" not in anchor or len(anchor["text"]) != 1:
-            m.die(f"Each anchor needs exactly one text. Got:\n{config.printjson(anchor)}", lineNum=lineNum)
+            m.die(f"Each anchor needs exactly one text. Got:\n{printjson.printjson(anchor)}", lineNum=lineNum)
             continue
         if "url" not in anchor and "urlPrefix" not in anchor:
             m.die(
-                f"Each anchor needs a url and/or at least one urlPrefix. Got:\n{config.printjson(anchor)}",
+                f"Each anchor needs a url and/or at least one urlPrefix. Got:\n{printjson.printjson(anchor)}",
                 lineNum=lineNum,
             )
             continue
@@ -762,19 +762,19 @@ def transformLinkDefaults(
 def processLinkDefaults(lds: InfoTreeT, doc: t.SpecT, lineNum: int | None = None) -> None:
     for ld in lds:
         if len(ld.get("type", [])) != 1:
-            m.die(f"Every link default needs exactly one type. Got:\n{config.printjson(ld)}", lineNum=lineNum)
+            m.die(f"Every link default needs exactly one type. Got:\n{printjson.printjson(ld)}", lineNum=lineNum)
             continue
 
         type = ld["type"][0]
 
         if len(ld.get("spec", [])) != 1:
-            m.die(f"Every link default needs exactly one spec. Got:\n{config.printjson(ld)}", lineNum=lineNum)
+            m.die(f"Every link default needs exactly one spec. Got:\n{printjson.printjson(ld)}", lineNum=lineNum)
             continue
 
         spec = ld["spec"][0]
 
         if len(ld.get("text", [])) != 1:
-            m.die(f"Every link default needs exactly one text. Got:\n{config.printjson(ld)}", lineNum=lineNum)
+            m.die(f"Every link default needs exactly one text. Got:\n{printjson.printjson(ld)}", lineNum=lineNum)
             continue
 
         text = ld["text"][0]
@@ -802,14 +802,14 @@ def processIgnoredSpecs(specs: InfoTreeT, doc: t.SpecT, lineNum: int | None = No
     for spec in specs:
         if len(spec.get("spec", [])) == 0:
             m.die(
-                f"Every ignored spec line needs at least one 'spec' value. Got:\n{config.printjson(spec)}",
+                f"Every ignored spec line needs at least one 'spec' value. Got:\n{printjson.printjson(spec)}",
                 lineNum=lineNum,
             )
             continue
         specNames = spec["spec"]
         if len(spec.get("replacedBy", [])) > 1:
             m.die(
-                f"Every ignored spec line needs at most one 'replacedBy' value. Got:\n{config.printjson(spec)}",
+                f"Every ignored spec line needs at most one 'replacedBy' value. Got:\n{printjson.printjson(spec)}",
                 lineNum=lineNum,
             )
             continue
@@ -840,7 +840,8 @@ def processInfo(infos: InfoTreeT, doc: t.SpecT, lineNum: int | None = None) -> N
     for info in infos:
         if len(info.get("info", [])) != 1:
             m.die(
-                f"Every info-block line needs exactly one 'info' type. Got:\n{config.printjson(info)}", lineNum=lineNum
+                f"Every info-block line needs exactly one 'info' type. Got:\n{printjson.printjson(info)}",
+                lineNum=lineNum,
             )
             continue
         infoType = info["info"][0].lower()

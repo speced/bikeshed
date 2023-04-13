@@ -7,7 +7,7 @@ from collections import Counter, defaultdict, namedtuple
 from urllib import parse
 from PIL import Image
 
-from . import biblio, config, dfnpanels, h, func, t, messages as m, idl, repository
+from . import biblio, config, dfnpanels, h, func, t, messages as m, idl, printjson, repository
 from .translate import _
 
 if t.TYPE_CHECKING:
@@ -182,7 +182,7 @@ def addImplicitAlgorithms(doc: t.SpecT) -> None:
     for el in h.findAll("[data-algorithm='']:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6)", doc):
         dfns = h.findAll("dfn", el)
         if len(dfns) == 1:
-            dfnName = config.firstLinkTextFromElement(dfns[0]) or ""
+            dfnName = h.firstLinkTextFromElement(dfns[0]) or ""
             el.set("data-algorithm", dfnName)
             dfnFor = dfns[0].get("data-dfn-for")
             if dfnFor:
@@ -454,7 +454,7 @@ def classifyDfns(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
             m.die(f"Unknown dfn type '{dfnType}':\n{h.outerHTML(el)}", el=el)
             continue
         dfnFor = h.treeAttr(el, "data-dfn-for")
-        primaryDfnText = config.firstLinkTextFromElement(el)
+        primaryDfnText = h.firstLinkTextFromElement(el)
         if primaryDfnText is None:
             m.die(f"Dfn has no linking text:\n{h.outerHTML(el)}", el=el)
             continue
@@ -1398,7 +1398,7 @@ def inlineRemoteIssues(doc: t.SpecT) -> None:
                 m.die(f"'{doc.token}' is not a valid GitHub OAuth token. See https://github.com/settings/tokens")
             else:
                 m.die(
-                    "401 error when fetching GitHub Issues:\n" + config.printjson(error),
+                    "401 error when fetching GitHub Issues:\n" + printjson.printjson(error),
                 )
             continue
         elif res.status_code == 403:
@@ -1409,12 +1409,12 @@ def inlineRemoteIssues(doc: t.SpecT) -> None:
                 )
             else:
                 m.die(
-                    "403 error when fetching GitHub Issues:\n" + config.printjson(error),
+                    "403 error when fetching GitHub Issues:\n" + printjson.printjson(error),
                 )
             continue
         elif res.status_code >= 400:
             try:
-                error = config.printjson(res.json())
+                error = printjson.printjson(res.json())
             except ValueError:
                 error = "First 100 characters of error:\n" + res.text[0:100]
             m.die(f"{res.status_code} error when fetching GitHub Issues:\n" + error)

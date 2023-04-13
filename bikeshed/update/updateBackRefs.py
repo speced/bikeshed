@@ -52,7 +52,7 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:  # pylint: disab
     #                 {"shortname": referencingShortname, "urls": referencingURLs}
     #             )
 
-    # print(config.printjson(backrefs))
+    # print(printjson.printjson(backrefs))
 
 
 def processRefs(refs: t.Any) -> t.Any:
