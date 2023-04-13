@@ -2,28 +2,26 @@
 {
     const dfnsJson = window.dfnsJson || {};
 
-    function genDfnPanel([key, value]) {
-        const {id, url, dfnText, items, external}  = value;
-
+    function genDfnPanel({dfnID, url, dfnText, refSections, external}) {
         return mk.aside({
             class: "dfn-panel",
-            id: `infopanel-for-${id}`,
-            "data-for": id,
-            "aria-labelled-by":`infopaneltitle-for-${id}`,
+            id: `infopanel-for-${dfnID}`,
+            "data-for": dfnID,
+            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
             },
-            mk.span({id:`infopaneltitle-for-${id}`, style:"display:none"},
+            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
                 `Info about the '${dfnText}' ${external?"external":""} reference.`),
             mk.a({href:url}, url),
             mk.b({}, "Referenced in:"),
             mk.ul({},
-                ...items.map(item=>
+                ...refSections.map(section=>
                     mk.li({},
-                        ...item.ids.map((id, index)=>
+                        ...section.refs.map((ref, refI)=>
                             [
                                 mk.a({
-                                    href: `#${external ? id.linkID : id.refID}`
+                                    href: `#${ref.id}`
                                     },
-                                    (index == 0) ? item.text : `(${index + 1})`
+                                    (refI == 0) ? section.title : `(${refI + 1})`
                                 ),
                                 " ",
                             ]
@@ -35,9 +33,17 @@
     }
 
     function genAllDfnPanels() {
-        append(document.body,
-            ...Object.entries(window.dfnpanelData).map(genDfnPanel),
-        )
+        for(const panelData of Object.values(window.dfnpanelData)) {
+            const dfnID = panelData.dfnID;
+            const dfn = document.getElementById(dfnID);
+            if(!dfn) {
+                console.log(`Can't find dfn#${dfnID}.`, panelData);
+            } else {
+                const panel = genDfnPanel(panelData);
+                append(document.body, panel);
+                insertDfnPopupAction(dfn, panel)
+            }
+        }
     }
 
     document.addEventListener("DOMContentLoaded", ()=>{
@@ -45,7 +51,7 @@
 
         // Add popup behavior to all dfns to show the corresponding dfn-panel.
         var dfns = queryAll('.dfn-paneled');
-        for (let dfn of dfns) { insertDfnPopupAction(dfn); }
+        for(let dfn of dfns) { ; }
 
         document.body.addEventListener("click", (e) => {
             // If not handled already, just hide all dfn panels.
@@ -102,50 +108,44 @@
         }
     }
 
-    function insertDfnPopupAction(dfn) {
+    function insertDfnPopupAction(dfn, dfnPanel) {
         // Find dfn panel
-        const dfnPanel = document.querySelector(`.dfn-panel[data-for='${dfn.id}']`);
-        if (dfnPanel) {
-            const panelWrapper = document.createElement('span');
-            panelWrapper.appendChild(dfnPanel);
-            panelWrapper.style.position = "relative";
-            panelWrapper.style.height = "0px";
-            dfn.insertAdjacentElement("afterend", panelWrapper);
-            dfn.setAttribute('role', 'button');
-            dfn.setAttribute('aria-expanded', 'false')
-            dfn.tabIndex = 0;
-            dfn.classList.add('has-dfn-panel');
-            dfn.addEventListener('click', (event) => {
-                showDfnPanel(dfnPanel, dfn);
+        const panelWrapper = document.createElement('span');
+        panelWrapper.appendChild(dfnPanel);
+        panelWrapper.style.position = "relative";
+        panelWrapper.style.height = "0px";
+        dfn.insertAdjacentElement("afterend", panelWrapper);
+        dfn.setAttribute('role', 'button');
+        dfn.setAttribute('aria-expanded', 'false')
+        dfn.tabIndex = 0;
+        dfn.classList.add('has-dfn-panel');
+        dfn.addEventListener('click', (event) => {
+            showDfnPanel(dfnPanel, dfn);
+            event.stopPropagation();
+        });
+        dfn.addEventListener('keypress', (event) => {
+            const kc = event.keyCode;
+            // 32->Space, 13->Enter
+            if(kc == 32 || kc == 13) {
+                toggleDfnPanel(dfnPanel, dfn);
                 event.stopPropagation();
-            });
-            dfn.addEventListener('keypress', (event) => {
-                const kc = event.keyCode;
-                // 32->Space, 13->Enter
-                if(kc == 32 || kc == 13) {
-                    toggleDfnPanel(dfnPanel, dfn);
-                    event.stopPropagation();
-                    event.preventDefault();
-                }
-            });
+                event.preventDefault();
+            }
+        });
 
-            dfnPanel.addEventListener('click', (event) => {
-                if (event.target.nodeName != 'A') {
-                    pinDfnPanel(dfnPanel);
-                }
+        dfnPanel.addEventListener('click', (event) => {
+            if (event.target.nodeName == 'A') {
+                pinDfnPanel(dfnPanel);
+            }
+            event.stopPropagation();
+        });
+
+        dfnPanel.addEventListener('keydown', (event) => {
+            if(event.keyCode == 27) { // Escape key
+                hideDfnPanel(dfnPanel, dfn);
                 event.stopPropagation();
-            });
-
-            dfnPanel.addEventListener('keydown', (event) => {
-                if(event.keyCode == 27) { // Escape key
-                    hideDfnPanel(dfnPanel, dfn);
-                    event.stopPropagation();
-                    event.preventDefault();
-                }
-            })
-
-        } else {
-            console.log("Couldn't find .dfn-panel[data-for='" + dfn.id + "']");
-        }
+                event.preventDefault();
+            }
+        })
     }
 }

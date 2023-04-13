@@ -846,10 +846,18 @@ def fixupIDs(doc: t.SpecT, els: t.Iterable[t.ElementT]) -> None:
 
 
 def safeID(doc: t.SpecT, id: str) -> str:
+    # Converts generated IDs into author-specified versions,
+    # for when an ID isn't otherwise settable by the author.
     trans = doc.md.translateIDs
     if id in trans:
         return trans[id]
     return id
+
+
+def uniqueID(*s: str) -> str:
+    # Turns a unique string into a more compact (and ID-safe)
+    # hashed string
+    return hashlib.md5("".join(s).encode("utf-8")).hexdigest()[:8]
 
 
 def addOldIDs(els: t.Iterable[t.ElementT]) -> None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from collections import OrderedDict
 
 from .. import config, h, t
@@ -30,12 +31,12 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
         if not id:
             # Something went wrong, bail.
             continue
-        refs: OrderedDict[str, list[t.ElementT]] = OrderedDict()
+        refsFromSection: OrderedDict[str, list[t.ElementT]] = OrderedDict()
         for link in allRefs.get(id, []):
             section = h.sectionName(doc, link)
             if section is not None:
-                refs.setdefault(section, []).append(link)
-        if not refs:
+                refsFromSection.setdefault(section, []).append(link)
+        if not refsFromSection:
             # Just insert a self-link instead
             # unless it already has a self-link, of course
             if h.find(".self-link", dfn) is None:
@@ -43,34 +44,31 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
             continue
         h.addClass(doc, dfn, "dfn-paneled")
         atLeastOnePanel = True
-        itemsJson = []
-        for text, els in refs.items():
-            idsJson = []
-            for _i, el in enumerate(els):
+        sectionsJson = []
+        for text, els in refsFromSection.items():
+            refsJson = []
+            for el in els:
                 refID = el.get("id")
                 if refID is None:
                     refID = f"ref-for-{id}"
                     el.set("id", h.safeID(doc, refID))
-                idsJson.append(
-                    {
-                        "refID": h.escapeUrlFrag(refID),
-                    }
-                )
-            itemsJson.append(
+                refsJson.append({"id": refID})
+            sectionsJson.append(
                 {
-                    "ids": idsJson,
-                    "text": text,
+                    "refs": refsJson,
+                    "title": text,
                 }
             )
         panelJson = {
-            "id": id,
+            "dfnID": id,
             "url": "#" + h.escapeUrlFrag(id),
             "dfnText": dfnText,
-            "items": itemsJson,
+            "refSections": sectionsJson,
+            "external": False,
         }
-        scriptLines.append(f"window.dfnpanelData['{id}'] = {panelJson};")
+        scriptLines.append(f"window.dfnpanelData['{id}'] = {json.dumps(panelJson)};")
     if len(scriptLines) > 0:
-        if "script-dfnpanel-json" not in doc.extraScripts:
+        if "script-dfn-panel-json" not in doc.extraScripts:
             doc.extraScripts["script-dfn-panel-json"] = "window.dfnpanelData = {};\n"
         doc.extraScripts["script-dfn-panel-json"] += "\n".join(scriptLines)
     if atLeastOnePanel:
@@ -97,52 +95,47 @@ def addExternalDfnPanel(termEl: t.ElementT, ref: r.RefWrapper, doc: t.SpecT) -> 
         return
 
     # Group the relevant links according to the section they're in.
-    linksBySection: OrderedDict[str, list[t.ElementT]] = OrderedDict()
+    refsFromSection: OrderedDict[str, list[t.ElementT]] = OrderedDict()
     for link in doc.cachedLinksFromHref[ref.url]:
         section = h.sectionName(doc, link) or _("Unnumbered Section")
-        linksBySection.setdefault(section, []).append(link)
+        refsFromSection.setdefault(section, []).append(link)
 
-    if linksBySection:
-        h.addClass(doc, termEl, "dfn-paneled")
-        termID = uniqueId(ref.url + ref.text)
-        termEl.set("id", termID)
-        termText = h.textContent(termEl)
-        itemsJson = []
-        for text, els in linksBySection.items():
-            idsJson = []
-            for _i, el in enumerate(els):
-                linkID = el.get("id")
-                if linkID is None:
-                    linkID = f"ref-for-{termID}"
-                    el.set("id", h.safeID(doc, linkID))
-                idsJson.append(
-                    {
-                        "linkID": h.escapeUrlFrag(linkID),
-                    }
-                )
-            itemsJson.append(
+    h.addClass(doc, termEl, "dfn-paneled")
+    termID = termEl.get("id")
+    if termID is None:
+        warn("An external reference index entry ended up without an ID:\n{ref}")
+        return
+    termText = h.textContent(termEl)
+    sectionsJson = []
+    for text, els in refsFromSection.items():
+        refsJson = []
+        for i, el in enumerate(els):
+            linkID = el.get("id")
+            if linkID is None:
+                linkID = h.uniqueID("external-link", ref.url, termID)+str(i)
+                el.set("id", h.safeID(doc, linkID))
+            refsJson.append(
                 {
-                    "ids": idsJson,
-                    "text": text,
+                    "id": linkID,
                 }
             )
-        panelJson = {
-            "external": 1,
-            "id": termID,
-            "url": ref.url,
-            "dfnText": termText,
-            "items": itemsJson,
-        }
+        sectionsJson.append(
+            {
+                "refs": refsJson,
+                "title": text,
+            }
+        )
+    panelJson = {
+        "dfnID": termID,
+        "url": ref.url,
+        "dfnText": termText,
+        "refSections": sectionsJson,
+        "external": True,
+    }
 
-    if "script-dfnpanel-json" not in doc.extraScripts:
+    if "script-dfn-panel-json" not in doc.extraScripts:
         doc.extraScripts["script-dfn-panel-json"] = "window.dfnpanelData = {};\n"
-    doc.extraScripts["script-dfn-panel-json"] += f"window.dfnpanelData['{termID}'] = {panelJson};\n"
-
-
-def uniqueId(s: str) -> str:
-    # Turns a unique string into a more compact (and ID-safe)
-    # hashed string
-    return hashlib.md5(s.encode("utf-8")).hexdigest()
+    doc.extraScripts["script-dfn-panel-json"] += f"window.dfnpanelData['{termID}'] = {json.dumps(panelJson)};\n"
 
 
 def addExternalDfnPanelStyles(doc: t.SpecT) -> None:

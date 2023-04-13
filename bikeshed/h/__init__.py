@@ -70,6 +70,7 @@ from .dom import (
     treeAttr,
     unescape,
     unfixTypography,
+    uniqueID,
     wrapContents,
 )
 from .serializer import Serializer

@@ -524,8 +524,10 @@ def addIndexOfExternallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> Non
     if not doc.externalRefsUsed.hasRefs():
         return
 
-    def makeLink(*contents: t.NodesT) -> t.ElementT:
-        return h.E.span({}, *contents)
+    def makeEntry(ref:t.RefWrapper, contents: t.NodesT) -> t.ElementT:
+        return h.E.span({
+            "id": h.uniqueID("external-term", ref.url, ref.text)
+            }, contents)
 
     ul = h.E.ul({"class": "index"})
 
@@ -557,17 +559,17 @@ def addIndexOfExternallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> Non
         for refText, refGroup in specData.sorted():
             if len(refGroup) == 1:
                 ref = refGroup.single()
-                link = makeLink(refText)
-                h.appendChild(termsUl, h.E.li(link))
-                dfnpanels.addExternalDfnPanel(link, ref, doc)
+                entry = makeEntry(ref, refText)
+                h.appendChild(termsUl, h.E.li(entry))
+                dfnpanels.addExternalDfnPanel(entry, ref, doc)
             else:
                 for forVal, ref in refGroup.sorted():
                     if forVal:
-                        link = makeLink(refText, " ", h.E.small({}, f"({_('for')} {forVal})"))
+                        entry = makeEntry(ref, [refText, " ", h.E.small({}, f"({_('for')} {forVal})")])
                     else:
-                        link = makeLink(refText)
-                    h.appendChild(termsUl, h.E.li(link))
-                    dfnpanels.addExternalDfnPanel(link, ref, doc)
+                        entry = makeEntry(ref, refText)
+                    h.appendChild(termsUl, h.E.li(entry))
+                    dfnpanels.addExternalDfnPanel(entry, ref, doc)
             atLeastOnePanel = True
     if atLeastOnePanel:
         dfnpanels.addExternalDfnPanelStyles(doc)
