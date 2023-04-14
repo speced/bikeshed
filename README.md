@@ -1,7 +1,7 @@
 Bikeshed, a spec preprocessor
 =============================
 
-<img src="https://rawgit.com/speced/bikeshed/master/docs/images/icon.svg" width=100 height=100 align=left>
+<img src="https://raw.githubusercontent.com/speced/bikeshed/main/bikeshed.svg" width=100 height=100 align=left>
 
 Bikeshed is a pre-processor for spec documents,
 turning a source document
