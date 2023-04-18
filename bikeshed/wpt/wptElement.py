@@ -22,9 +22,10 @@ def processWptElements(doc: t.SpecT) -> None:
         assert testData is not None
         testNames = testNamesFromEl(el, pathPrefix=pathPrefix)
         for testName in testNames:
-            if testName not in testData:
-                m.warn(f"Couldn't find WPT test '{testName}' - did you misspell something?", el=el)
-                continue
+            if el.get("skip-existence-check") is None:
+                if testName not in testData:
+                    m.warn(f"Couldn't find WPT test '{testName}' - did you misspell something?", el=el)
+                    continue
             seenTestNames.add(testName)
             if atLeastOneVisibleTest is False and el.get("hidden") is None:
                 atLeastOneVisibleTest = True
@@ -77,9 +78,11 @@ def processWptElements(doc: t.SpecT) -> None:
     if atLeastOneVisibleTest:
         if pathPrefix is None:
             pathPrefix = commonPathPrefix(seenTestNames)
-        if pathPrefix and not pathPrefix.startswith("/"):
+        if pathPrefix and pathPrefix.startswith("https:"):
+            pass
+        elif pathPrefix and not pathPrefix.startswith("/"):
             pathPrefix = "/" + pathPrefix
-        if pathPrefix != "/":
+        if pathPrefix and pathPrefix != "/" and not pathPrefix.startswith("https:"):
             doc.md.otherMetadata.setdefault(_("Test Suite"), []).append(
                 h.E.dd(
                     {"class": "wpt-overview"},
@@ -147,8 +150,26 @@ def appendTestList(
     h.appendChild(blockEl, testListEl)
     for testName in testNames:
         if testName not in testData:
-            m.warn(f"Cannot find '{testName}' in the test data.")
-            continue
+            if testName.startswith("https:"):
+                # Assume it's a custom URL, just link to it.
+                singleTestEl = h.E.li(
+                    {"class": "wpt-test"},
+                    h.E.a(
+                        {
+                            "href": testName,
+                            "class": "wpt-name",
+                            # Since the name is a URL and might be long,
+                            # let it break freely.
+                            "style": "word-break: break-all",
+                        },
+                        testName,
+                    ),
+                )
+                h.appendChild(testListEl, singleTestEl)
+                continue
+            else:
+                m.warn(f"Cannot find '{testName}' in the test data.")
+                continue
         if ".https." in testName or ".serviceworker." in testName:
             liveTestScheme = "https"
         else:
