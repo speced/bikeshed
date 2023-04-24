@@ -17,3 +17,9 @@ test('get started link', async ({ page }) => {
   // Expects the URL to contain intro.
   await expect(page).toHaveURL(/.*intro/);
 });
+
+
+test('example test', async ({ page }) => {
+  await page.goto('https://playwright.dev');
+  await expect(page).toHaveScreenshot();
+});
