@@ -88,6 +88,9 @@ class DebugMarker(widlparser.protocols.Marker):
     ) -> MarkupReturnT:  # pylint: disable=unused-argument
         return ('<ENUM-VALUE for="' + t.cast(str, construct.name) + '">', "</ENUM-VALUE>")
 
+    def encode(self, text: str) -> str:
+        return h.escapeHTML(text)
+
 
 class IDLMarker(widlparser.protocols.Marker):
     def markup_construct(
