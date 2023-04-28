@@ -469,7 +469,7 @@ def addLineWrappers(doc: t.SpecT, el: t.ElementT, options: LineNumberOptions) ->
                 else:
                     h.appendChild(lineWrapper, node)
                     break
-    if len(lineWrapper) > 0:
+    if not h.isEmpty(lineWrapper):
         h.appendChild(el, h.E.span({"class": "line-no"}))
         h.appendChild(el, lineWrapper)
     # Number the lines
