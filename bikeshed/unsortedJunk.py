@@ -878,7 +878,9 @@ def decorateAutolink(doc: t.SpecT, el: t.ElementT, linkType: str, linkText: str,
         unused1, unused2, id = ref.url.partition("#")  # pylint: disable=unused-variable
         if id:
             el.set("id", f"ref-for-{id}")
-            el.set("data-silently-dedup", "")
+        else:
+            el.set("id", "ref-for-something")
+        el.set("data-silently-dedup", "")
 
     # Get all the values that the type expands to, add it as a title.
     if linkType == "type":

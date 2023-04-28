@@ -102,12 +102,14 @@ def addExternalDfnPanel(termEl: t.ElementT, ref: t.RefWrapper, doc: t.SpecT) -> 
         return
     termText = h.textContent(termEl)
     sectionsJson = []
+    counter = 0
     for text, els in refsFromSection.items():
         refsJson = []
-        for i, el in enumerate(els):
+        for el in els:
             linkID = el.get("id")
             if linkID is None:
-                linkID = h.uniqueID("external-link", ref.url, termID) + str(i)
+                linkID = h.uniqueID("external-link", ref.url, termID) + str(counter)
+                counter += 1
                 el.set("id", h.safeID(doc, linkID))
             refsJson.append(
                 {
