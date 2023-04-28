@@ -451,27 +451,12 @@ def lexerFromLang(lang: str) -> pygments.lexer.Lexer | None:
 def addLineWrappers(doc: t.SpecT, el: t.ElementT, options: LineNumberOptions) -> t.ElementT:
     # Wrap everything between each top-level newline with a line tag.
     # Add an attr for the line number, and if needed, the end line.
-    lineWrapper = h.E.span({"class": "line"})
-    for node in h.childNodes(el, clear=True):
-        if h.isElement(node):
-            h.appendChild(lineWrapper, node)
-        else:
-            assert isinstance(node, str)
-            while True:
-                if "\n" in node:
-                    pre, _, post = node.partition("\n")
-                    h.appendChild(lineWrapper, pre)
-                    h.appendChild(el, h.E.span({"class": "line-no"}))
-                    h.appendChild(el, lineWrapper)
-                    lineWrapper = h.E.span({"class": "line"})
-                    node = post
-                    assert isinstance(node, str)
-                else:
-                    h.appendChild(lineWrapper, node)
-                    break
-    if not h.isEmpty(lineWrapper):
-        h.appendChild(el, h.E.span({"class": "line-no"}))
-        h.appendChild(el, lineWrapper)
+    for nodes in splitNodesByLinebreaks(h.childNodes(el, clear=True)):
+        h.appendChild(
+            el,
+            h.E.span({"class": "line-no"}),
+            h.E.span({"class": "line"}, nodes),
+        )
     # Number the lines
     lineNumber = options.startingLine
     for lineNo, node in t.cast("tuple[t.ElementT, t.ElementT]", grouper(h.childNodes(el), 2)):
@@ -493,6 +478,31 @@ def addLineWrappers(doc: t.SpecT, el: t.ElementT, options: LineNumberOptions) ->
         lineNumber += 1
     h.addClass(doc, el, "line-numbered")
     return el
+
+
+def splitNodesByLinebreaks(nodes: t.NodesT) -> t.Generator[list[t.NodesT], None, None]:
+    line: list[t.NodesT] = []
+    for node in nodes:
+        if isinstance(node, str):
+            while True:
+                if "\n" in node:
+                    pre, _, post = node.partition("\n")
+                    line.append(pre)
+                    yield line
+                    line = []
+                    node = post
+                else:
+                    line.append(node)
+                    break
+        else:
+            line.append(node)
+    if line:
+        if len(line) == 1 and line[0] == "":
+            # If the file ended with a newline,
+            # the line array will just be a single empty string at this point;
+            # don't emit that.
+            return
+        yield line
 
 
 def countInternalNewlines(el: t.ElementT) -> int:
