@@ -14,7 +14,6 @@ from . import (
     boilerplate,
     caniuse,
     conditional,
-    config,
     constants,
     datablocks,
     dfns,
@@ -38,6 +37,7 @@ from . import (
     refs,
     retrieve,
     shorthands,
+    stylescript,
     t,
     testsuite,
     unsortedJunk as u,
@@ -112,15 +112,14 @@ class Spec:
         self.testSuites: dict[str, testsuite.TestSuite] = fetchTestSuites(self.dataFile)
         self.languages: dict[str, language.Language] = fetchLanguages(self.dataFile)
 
-        self.extraStyles: t.DefaultDict[str, str] = defaultdict(str)
-        self.extraStyles["style-colors"] = getModuleFile("Spec-colors.css")
-        self.extraStyles["style-darkmode"] = getModuleFile("Spec-darkmode.css")
-        self.extraStyles["style-md-lists"] = getModuleFile("Spec-mdlists.css")
-        self.extraStyles["style-autolinks"] = getModuleFile("Spec-autolinks.css")
-        self.extraStyles["style-selflinks"] = getModuleFile("Spec-selflinks.css")
-        self.extraStyles["style-counters"] = getModuleFile("Spec-counters.css")
-        self.extraStyles["style-issues"] = getModuleFile("Spec-issues.css")
-        self.extraScripts: t.DefaultDict[str, str] = defaultdict(str)
+        self.extraStyles = stylescript.StyleManager()
+        self.extraStyles.setFile("colors", "Spec-colors.css")
+        self.extraStyles.setFile("md-lists", "Spec-mdlists.css")
+        self.extraStyles.setFile("autolinks", "Spec-autolinks.css")
+        self.extraStyles.setFile("selflinks", "Spec-selflinks.css")
+        self.extraStyles.setFile("counters", "Spec-counters.css")
+        self.extraStyles.setFile("issues", "Spec-issues.css")
+        self.extraScripts = stylescript.ScriptManager()
 
         try:
             inputContent = self.inputSource.read()
@@ -281,7 +280,7 @@ class Spec:
         mdnPanels = mdn.addMdnPanels(self)
         ciuPanels = caniuse.addCanIUsePanels(self)
         if mdnPanels or ciuPanels:
-            self.extraScripts["position-annos"] = getModuleFile("Spec-position-annos.js")
+            self.extraScripts.setFile("position-annos", "Spec-position-annos.js")
         highlight.addSyntaxHighlighting(self)
         boilerplate.addBikeshedBoilerplate(self)
         fingerprinting.addTrackingVector(self)
@@ -555,9 +554,4 @@ def addDomintroStyles(doc: Spec) -> None:
     if h.find(".domintro", doc) is None:
         return
 
-    doc.extraStyles["styles-domintro"] = getModuleFile("Spec-domintro.css")
-
-
-def getModuleFile(filename: str) -> str:
-    with open(config.scriptPath(filename), "r", encoding="utf-8") as fh:
-        return fh.read()
+    doc.extraStyles.setFile("domintro", "Spec-domintro.css")

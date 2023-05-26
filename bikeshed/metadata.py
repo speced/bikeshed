@@ -65,6 +65,7 @@ class MetadataManager:
         self.customTextMacros: list[tuple[str, str]] = []
         self.customWarningText: list[str] = []
         self.customWarningTitle: str | None = None
+        self.darkMode: bool = True
         self.date: date = datetime.utcnow().date()
         self.deadline: date | None = None
         self.defaultHighlight: str | None = None
@@ -1289,6 +1290,7 @@ knownKeys = {
     "Complain About": Metadata("Complain About", "complainAbout", joinBoolSet, parseComplainAbout),
     "Custom Warning Text": Metadata("Custom Warning Text", "customWarningText", joinList, parseLiteralList),
     "Custom Warning Title": Metadata("Custom Warning Title", "customWarningTitle", joinValue, parseLiteral),
+    "Dark Mode": Metadata("Dark Mode", "darkMode", joinValue, parseBoolean),
     "Date": Metadata("Date", "date", joinValue, parseDate),
     "Deadline": Metadata("Deadline", "deadline", joinValue, parseDate),
     "Default Biblio Display": Metadata("Default Biblio Display", "defaultBiblioDisplay", joinValue, parseBiblioDisplay),

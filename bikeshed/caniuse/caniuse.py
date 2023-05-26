@@ -4,7 +4,7 @@ import json
 from collections import OrderedDict
 from datetime import datetime
 
-from .. import config, h, messages as m, t
+from .. import h, messages as m, t
 from ..translate import _
 
 
@@ -54,8 +54,7 @@ def addCanIUsePanels(doc: t.SpecT) -> list[t.ElementT]:
         panels.append(panel)
 
     if panels:
-        doc.extraStyles["style-caniuse-panel"] = getModuleFile("caniuse.css")
-        doc.extraStyles["style-darkmode"] += getModuleFile("caniuse-dark.css")
+        doc.extraStyles.setFile("caniuse-panel", "caniuse/caniuse.css")
 
     return panels
 
@@ -170,8 +169,3 @@ class CanIUseManager:
         )
         self.features[featureName] = data
         return t.cast("t.JSONT", data)
-
-
-def getModuleFile(filename: str) -> str:
-    with open(config.scriptPath("caniuse", filename), "r", encoding="utf-8") as fh:
-        return fh.read()

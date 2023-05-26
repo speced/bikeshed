@@ -184,22 +184,21 @@ def addExpiryNotice(doc: t.SpecT) -> None:
         boilerplate = "warning-expired"
     else:
         boilerplate = "warning-expires"
-        doc.extraScripts["script-expires"] = expiryScript
+        doc.extraScripts.set(
+            "expires",
+            """
+            const warning = document.querySelector('#expiry-notice');
+            const expiresOn = warning.dataset.expires;
+            const today = new Date().toISOString();
+            if(expires < today) {
+                warning.setAttribute("open", "");
+                for(const swap of warning.querySelectorAll("[data-after-expiry]")) {
+                    swap.textContent = swap.dataset.afterExpiry;
+                }
+            }""",
+        )
     loadBoilerplate(doc, boilerplate, "warning")
     h.addClass(doc, doc.body, boilerplate)
-
-
-expiryScript = """
-const warning = document.querySelector('#expiry-notice');
-const expiresOn = warning.dataset.expires;
-const today = new Date().toISOString();
-if(expires < today) {
-    warning.setAttribute("open", "");
-    for(const swap of warning.querySelectorAll("[data-after-expiry]")) {
-        swap.textContent = swap.dataset.afterExpiry;
-    }
-}
-"""
 
 
 def addObsoletionNotice(doc: t.SpecT) -> None:
@@ -259,25 +258,22 @@ def keyFromStyles(kv: tuple[str, str]) -> tuple[int, str]:
 
 def addBikeshedBoilerplate(doc: t.SpecT) -> None:
     w3cStylesheet = w3cStylesheetInUse(doc)
-    for k, v in sorted(doc.extraStyles.items(), key=keyFromStyles):
-        if k not in doc.md.boilerplate:
+    for style in doc.extraStyles.getAll():
+        if "style-" + style.name not in doc.md.boilerplate:
             continue
-        if w3cStylesheet and k in ["style-colors", "style-darkmode"]:
-            # These are handled by the /TR stylesheet, so don't output them
-            continue
-        container = getFillContainer(k, doc)
+        container = getFillContainer("style-" + style.name, doc)
         if container is None:
             container = getFillContainer("bs-styles", doc, default=True)
         if container is not None:
-            h.appendChild(container, h.E.style(f"/* {k} */\n{v}"))
-    for k, v in sorted(doc.extraScripts.items()):
-        if k not in doc.md.boilerplate:
+            h.appendChild(container, style.toElement(darkMode=doc.md.darkMode))
+    for script in doc.extraScripts.getAll():
+        if "script-" + script.name not in doc.md.boilerplate:
             continue
-        container = getFillContainer(k, doc)
+        container = getFillContainer("script-" + script.name, doc)
         if container is None:
             container = getFillContainer("bs-scripts", doc, default=True)
         if container is not None:
-            h.appendChild(container, h.E.script(f"/* {k} */\n{v}"))
+            h.appendChild(container, script.toElement())
 
 
 def addIndexSection(doc: t.SpecT) -> None:
@@ -1034,13 +1030,14 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
                 }
             ),
         )
-        doc.extraStyles[
-            "style-hidedel"
-        ] = """
+        doc.extraStyles.set(
+            "style-hidedel",
+            """
             #hidedel:checked ~ del, #hidedel:checked ~ * del { display:none; }
             #hidedel ~ #hidedel-label::before, #hidedel ~ * #hidedel-label::before { content: "☐ "; }
             #hidedel:checked ~ #hidedel-label::before, #hidedel:checked ~ * #hidedel-label::before { content: "☑ "; }
-        """
+        """,
+        )
 
     # Merge "custom" metadata into non-custom, when they match up
     # and upgrade html-text values into real elements
