@@ -333,7 +333,6 @@ class MetadataManager:
             macros["history"] = f"https://www.w3.org/standards/history/{self.displayVshortname}"
         elif self.ED:
             macros["version"] = self.ED
-        macros["annotations"] = constants.testAnnotationURL
         if self.warning and len(self.warning) >= 2:
             macros["replacedby"] = self.warning[1]
         if self.warning and len(self.warning) >= 3:
