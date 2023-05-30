@@ -39,7 +39,6 @@ from . import (
     shorthands,
     stylescript,
     t,
-    testsuite,
     unsortedJunk as u,
     wpt,
 )
@@ -109,7 +108,6 @@ class Spec:
 
         self.widl: widlparser.Parser = idl.getParser()
 
-        self.testSuites: dict[str, testsuite.TestSuite] = fetchTestSuites(self.dataFile)
         self.languages: dict[str, language.Language] = fetchLanguages(self.dataFile)
 
         self.extraStyles = stylescript.StyleManager()
@@ -535,10 +533,6 @@ def catchArgparseBug(string: str | None) -> bool:
         )
         return False
     return True
-
-
-def fetchTestSuites(dataFile: retrieve.DataFileRequester) -> dict[str, testsuite.TestSuite]:
-    return {k: testsuite.TestSuite(**v) for k, v in json.loads(dataFile.fetch("test-suites.json", str=True)).items()}
 
 
 def fetchLanguages(dataFile: retrieve.DataFileRequester) -> dict[str, language.Language]:

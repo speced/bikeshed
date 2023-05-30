@@ -996,9 +996,6 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
         )
     if doc.md.testSuite is not None:
         md.setdefault("Test Suite", []).append(h.E.a({"href": doc.md.testSuite}, doc.md.testSuite))
-    elif (doc.md.vshortname in doc.testSuites) and (doc.testSuites[doc.md.vshortname].url is not None):
-        url = doc.testSuites[doc.md.vshortname].url
-        md.setdefault("Test Suite", []).append(h.E.a({"href": url}, url))
     if doc.md.issues:
         if doc.md.TR:
             md.setdefault("Feedback", []).extend([h.E.a({"href": href}, text) for text, href in doc.md.issues])
