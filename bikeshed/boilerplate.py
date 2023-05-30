@@ -257,7 +257,6 @@ def keyFromStyles(kv: tuple[str, str]) -> tuple[int, str]:
 
 
 def addBikeshedBoilerplate(doc: t.SpecT) -> None:
-    w3cStylesheet = w3cStylesheetInUse(doc)
     for style in doc.extraStyles.getAll():
         if "style-" + style.name not in doc.md.boilerplate:
             continue
