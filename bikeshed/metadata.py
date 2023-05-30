@@ -307,10 +307,8 @@ class MetadataManager:
         if self.abstract:
             abstractLines = datablocks.transformDataBlocks(doc, self.abstract)
             macros["abstract"] = "\n".join(markdown.parse(abstractLines, self.indent))
-            macros["abstractattr"] = h.escapeAttr("  ".join(abstractLines).replace("<<", "<").replace(">>", ">"))
         elif self.noAbstract:
             macros["abstract"] = ""
-            macros["abstractattr"] = ""
         macros["year"] = str(self.date.year)
         macros["date"] = self.date.strftime(f"{self.date.day} %B %Y")
         macros["date-dmmy"] = self.date.strftime(f"{self.date.day} %B %Y")  # same as plain 'date'
