@@ -65,6 +65,7 @@ class MetadataManager:
         self.customTextMacros: list[tuple[str, str]] = []
         self.customWarningText: list[str] = []
         self.customWarningTitle: str | None = None
+        self.darkMode: bool = True
         self.date: date = datetime.utcnow().date()
         self.deadline: date | None = None
         self.defaultHighlight: str | None = None
@@ -306,10 +307,8 @@ class MetadataManager:
         if self.abstract:
             abstractLines = datablocks.transformDataBlocks(doc, self.abstract)
             macros["abstract"] = "\n".join(markdown.parse(abstractLines, self.indent))
-            macros["abstractattr"] = h.escapeAttr("  ".join(abstractLines).replace("<<", "<").replace(">>", ">"))
         elif self.noAbstract:
             macros["abstract"] = ""
-            macros["abstractattr"] = ""
         macros["year"] = str(self.date.year)
         macros["date"] = self.date.strftime(f"{self.date.day} %B %Y")
         macros["date-dmmy"] = self.date.strftime(f"{self.date.day} %B %Y")  # same as plain 'date'
@@ -332,9 +331,6 @@ class MetadataManager:
             macros["history"] = f"https://www.w3.org/standards/history/{self.displayVshortname}"
         elif self.ED:
             macros["version"] = self.ED
-        macros["annotations"] = constants.testAnnotationURL
-        if doc and self.vshortname in doc.testSuites:
-            macros["testsuite"] = doc.testSuites[self.vshortname].vshortname
         if self.warning and len(self.warning) >= 2:
             macros["replacedby"] = self.warning[1]
         if self.warning and len(self.warning) >= 3:
@@ -1289,6 +1285,7 @@ knownKeys = {
     "Complain About": Metadata("Complain About", "complainAbout", joinBoolSet, parseComplainAbout),
     "Custom Warning Text": Metadata("Custom Warning Text", "customWarningText", joinList, parseLiteralList),
     "Custom Warning Title": Metadata("Custom Warning Title", "customWarningTitle", joinValue, parseLiteral),
+    "Dark Mode": Metadata("Dark Mode", "darkMode", joinValue, parseBoolean),
     "Date": Metadata("Date", "date", joinValue, parseDate),
     "Deadline": Metadata("Deadline", "deadline", joinValue, parseDate),
     "Default Biblio Display": Metadata("Default Biblio Display", "defaultBiblioDisplay", joinValue, parseBiblioDisplay),

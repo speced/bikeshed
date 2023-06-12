@@ -117,8 +117,11 @@ def updateReadonlyDataFiles() -> None:
 def cleanupFiles(root: str, touchedPaths: dict[str, set[str] | None], dryRun: bool = False) -> None:
     if dryRun:
         return
+    # The paths of all files that were updated this run.
     paths = set()
-    deletableFiles = []
+    # Top-level files that will be deleted if they weren't updated.
+    deletableFiles = ["test-suites.json"]
+    # Folders that will have everything deleted that wasn't updated.
     deletableFolders = []
     if touchedPaths["anchors"] is not None:
         deletableFiles.extend(["specs.json", "methods.json", "fors.json"])

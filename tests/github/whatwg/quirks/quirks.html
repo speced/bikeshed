@@ -18,7 +18,7 @@
   .logo { width:calc(4em + 6px); height:calc(4em + 6px) }
  }
 </style>
-<style>/* style-issues */
+<style>/* Boilerplate: style-issues */
 a[href].issue-return {
     float: right;
     float: inline-end;
@@ -27,7 +27,18 @@ a[href].issue-return {
     text-decoration: none;
 }
 </style>
-<style>/* style-var-click-highlighting */
+<style>/* Boilerplate: style-style-var-click-highlighting */
+/*
+Colors were chosen in Lab using https://nixsensor.com/free-color-converter/
+D50 2deg illuminant, L in [0,100], a and b in [-128, 128]
+0 = lab(85,0,85)
+1 = lab(85,80,30)
+2 = lab(85,-40,40)
+3 = lab(85,-50,0)
+4 = lab(85,5,15)
+5 = lab(85,-10,-50)
+6 = lab(85,35,-15)
+*/
 var { cursor: pointer; }
 var.selected0 { background-color: #F4D200; box-shadow: 0 0 0 2px #F4D200; }
 var.selected1 { background-color: #FF87A2; box-shadow: 0 0 0 2px #FF87A2; }
@@ -787,7 +798,7 @@ if ("serviceWorker" in navigator) {
    <dt id="biblio-cssom-view">[CSSOM-VIEW]
    <dd>Simon Pieters. <a href="https://drafts.csswg.org/cssom-view/"><cite>CSSOM View Module</cite></a>. URL: <a href="https://drafts.csswg.org/cssom-view/">https://drafts.csswg.org/cssom-view/</a>
   </dl>
-<script>/* script-dfn-panel */
+<script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
     const dfnsJson = window.dfnsJson || {};
@@ -940,7 +951,160 @@ if ("serviceWorker" in navigator) {
     }
 }
 </script>
-<script>/* script-dfn-panel-json */
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+    const dfnsJson = window.dfnsJson || {};
+
+    function genDfnPanel({dfnID, url, dfnText, refSections, external}) {
+        return mk.aside({
+            class: "dfn-panel",
+            id: `infopanel-for-${dfnID}`,
+            "data-for": dfnID,
+            "aria-labelled-by":`infopaneltitle-for-${dfnID}`,
+            },
+            mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+                `Info about the '${dfnText}' ${external?"external":""} reference.`),
+            mk.a({href:url}, url),
+            mk.b({}, "Referenced in:"),
+            mk.ul({},
+                ...refSections.map(section=>
+                    mk.li({},
+                        ...section.refs.map((ref, refI)=>
+                            [
+                                mk.a({
+                                    href: `#${ref.id}`
+                                    },
+                                    (refI == 0) ? section.title : `(${refI + 1})`
+                                ),
+                                " ",
+                            ]
+                        ),
+                    ),
+                ),
+            ),
+        );
+    }
+
+    function genAllDfnPanels() {
+        for(const panelData of Object.values(window.dfnpanelData)) {
+            const dfnID = panelData.dfnID;
+            const dfn = document.getElementById(dfnID);
+            if(!dfn) {
+                console.log(`Can't find dfn#${dfnID}.`, panelData);
+            } else {
+                const panel = genDfnPanel(panelData);
+                append(document.body, panel);
+                insertDfnPopupAction(dfn, panel)
+            }
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", ()=>{
+        genAllDfnPanels();
+
+        // Add popup behavior to all dfns to show the corresponding dfn-panel.
+        var dfns = queryAll('.dfn-paneled');
+        for(let dfn of dfns) { ; }
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all dfn panels.
+            hideAllDfnPanels();
+        });
+    })
+
+
+    function hideAllDfnPanels() {
+        // Turn off any currently "on" or "activated" panels.
+        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
+    }
+
+    function showDfnPanel(dfnPanel, dfn) {
+        hideAllDfnPanels(); // Only display one at this time.
+        dfn.setAttribute("aria-expanded", "true");
+        dfnPanel.classList.add("on");
+        dfnPanel.style.left = "5px";
+        dfnPanel.style.top = "0px";
+        const panelRect = dfnPanel.getBoundingClientRect();
+        const panelWidth = panelRect.right - panelRect.left;
+        if (panelRect.right > document.body.scrollWidth) {
+            // Panel's overflowing the screen.
+            // Just drop it below the dfn and flip it rightward instead.
+            // This still wont' fix things if the screen is *really* wide,
+            // but fixing that's a lot harder without 'anchor()'.
+            dfnPanel.style.top = "1.5em";
+            dfnPanel.style.left = "auto";
+            dfnPanel.style.right = "0px";
+        }
+    }
+
+    function pinDfnPanel(dfnPanel) {
+        // Switch it to "activated" state, which pins it.
+        dfnPanel.classList.add("activated");
+        dfnPanel.style.left = null;
+        dfnPanel.style.top = null;
+    }
+
+    function hideDfnPanel(dfnPanel, dfn) {
+        if(!dfn) {
+            dfn = document.getElementById(dfnPanel.getAttribute("data-for"));
+        }
+        dfn.setAttribute("aria-expanded", "false")
+        dfnPanel.classList.remove("on");
+        dfnPanel.classList.remove("activated");
+    }
+
+    function toggleDfnPanel(dfnPanel, dfn) {
+        if(dfnPanel.classList.contains("on")) {
+            hideDfnPanel(dfnPanel, dfn);
+        } else {
+            showDfnPanel(dfnPanel, dfn);
+        }
+    }
+
+    function insertDfnPopupAction(dfn, dfnPanel) {
+        // Find dfn panel
+        const panelWrapper = document.createElement('span');
+        panelWrapper.appendChild(dfnPanel);
+        panelWrapper.style.position = "relative";
+        panelWrapper.style.height = "0px";
+        dfn.insertAdjacentElement("afterend", panelWrapper);
+        dfn.setAttribute('role', 'button');
+        dfn.setAttribute('aria-expanded', 'false')
+        dfn.tabIndex = 0;
+        dfn.classList.add('has-dfn-panel');
+        dfn.addEventListener('click', (event) => {
+            showDfnPanel(dfnPanel, dfn);
+            event.stopPropagation();
+        });
+        dfn.addEventListener('keypress', (event) => {
+            const kc = event.keyCode;
+            // 32->Space, 13->Enter
+            if(kc == 32 || kc == 13) {
+                toggleDfnPanel(dfnPanel, dfn);
+                event.stopPropagation();
+                event.preventDefault();
+            }
+        });
+
+        dfnPanel.addEventListener('click', (event) => {
+            if (event.target.nodeName == 'A') {
+                pinDfnPanel(dfnPanel);
+            }
+            event.stopPropagation();
+        });
+
+        dfnPanel.addEventListener('keydown', (event) => {
+            if(event.keyCode == 27) { // Escape key
+                hideDfnPanel(dfnPanel, dfn);
+                event.stopPropagation();
+                event.preventDefault();
+            }
+        })
+    }
+}
+</script>
+<script>/* Boilerplate: script-dfn-panel-json */
 window.dfnpanelData = {};
 window.dfnpanelData['3a35a92a'] = {"dfnID": "3a35a92a", "url": "https://dbaron.org/css/intrinsic/#inline-intrinsic-min", "dfnText": "min-content width of an inline formatting context", "refSections": [{"refs": [{"id": "ref-for-inline-intrinsic-min"}], "title": "3.8. The table cell width calculation quirk"}], "external": true};
 window.dfnpanelData['e4fa28e9'] = {"dfnID": "e4fa28e9", "url": "https://dbaron.org/css/intrinsic/#autotable", "dfnText": "outer min-content width of a table cell", "refSections": [{"refs": [{"id": "ref-for-autotable"}, {"id": "ref-for-autotable\u2460"}], "title": "3.9. The table cell nowrap minimum width\ncalculation quirk"}], "external": true};
@@ -1061,8 +1225,9 @@ window.dfnpanelData['documents-body-element'] = {"dfnID": "documents-body-elemen
 window.dfnpanelData['quirky-color'] = {"dfnID": "quirky-color", "url": "#quirky-color", "dfnText": "Quirky colors", "refSections": [{"refs": [{"id": "ref-for-quirky-color"}], "title": "1.2. Goals"}, {"refs": [{"id": "ref-for-quirky-color\u2460"}, {"id": "ref-for-quirky-color\u2461"}, {"id": "ref-for-quirky-color\u2462"}, {"id": "ref-for-quirky-color\u2463"}], "title": "3.1. The hashless hex color quirk"}], "external": false};
 window.dfnpanelData['quirky-color-value'] = {"dfnID": "quirky-color-value", "url": "#quirky-color-value", "dfnText": "<quirky-color>", "refSections": [{"refs": [{"id": "ref-for-quirky-color-value"}, {"id": "ref-for-quirky-color-value\u2460"}, {"id": "ref-for-quirky-color-value\u2461"}], "title": "3.1. The hashless hex color quirk"}], "external": false};
 window.dfnpanelData['quirky-length'] = {"dfnID": "quirky-length", "url": "#quirky-length", "dfnText": "Quirky lengths", "refSections": [{"refs": [{"id": "ref-for-quirky-length"}, {"id": "ref-for-quirky-length\u2460"}, {"id": "ref-for-quirky-length\u2461"}], "title": "3.2. The unitless length quirk"}], "external": false};
-window.dfnpanelData['quirky-length-value'] = {"dfnID": "quirky-length-value", "url": "#quirky-length-value", "dfnText": "<quirky-length>", "refSections": [{"refs": [{"id": "ref-for-quirky-length-value"}, {"id": "ref-for-quirky-length-value\u2460"}, {"id": "ref-for-quirky-length-value\u2461"}], "title": "3.2. The unitless length quirk"}], "external": false};</script>
-<script>/* script-dom-helper */
+window.dfnpanelData['quirky-length-value'] = {"dfnID": "quirky-length-value", "url": "#quirky-length-value", "dfnText": "<quirky-length>", "refSections": [{"refs": [{"id": "ref-for-quirky-length-value"}, {"id": "ref-for-quirky-length-value\u2460"}, {"id": "ref-for-quirky-length-value\u2461"}], "title": "3.2. The unitless length quirk"}], "external": false};
+</script>
+<script>/* Boilerplate: script-dom-helper */
 function query(sel) { return document.querySelector(sel); }
 
 function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
@@ -1256,89 +1421,103 @@ function parseHTML(markup) {
 		el.innerHTML = markup;
 		return el.content;
 	}
-}</script>
-<script>/* script-var-click-highlighting */
+}
+</script>
+<script>/* Boilerplate: script-var-click-highlighting */
+/*
+Color-choosing design:
 
-    "use strict";
-    {
-        document.addEventListener("click", e=>{
-            if(e.target.nodeName == "VAR") {
-                highlightSameAlgoVars(e.target);
-            }
-        });
-        const indexCounts = new Map();
-        const indexNames = new Map();
-        function highlightSameAlgoVars(v) {
-            // Find the algorithm container.
-            let algoContainer = null;
-            let searchEl = v;
-            while(algoContainer == null && searchEl != document.body) {
-                searchEl = searchEl.parentNode;
-                if(searchEl.hasAttribute("data-algorithm")) {
-                    algoContainer = searchEl;
-                }
-            }
+Colors are ordered by goodness.
+Each color has a usage count (initially zero).
+Each variable has a last-used color.
 
-            // Not highlighting document-global vars,
-            // too likely to be unrelated.
-            if(algoContainer == null) return;
-
-            const algoName = algoContainer.getAttribute("data-algorithm");
-            const varName = getVarName(v);
-            const addClass = !v.classList.contains("selected");
-            let highlightClass = null;
-            if(addClass) {
-                const index = chooseHighlightIndex(algoName, varName);
-                indexCounts.get(algoName)[index] += 1;
-                indexNames.set(algoName+"///"+varName, index);
-                highlightClass = nameFromIndex(index);
-            } else {
-                const index = previousHighlightIndex(algoName, varName);
-                indexCounts.get(algoName)[index] -= 1;
-                highlightClass = nameFromIndex(index);
-            }
-
-            // Find all same-name vars, and toggle their class appropriately.
-            for(const el of algoContainer.querySelectorAll("var")) {
-                if(getVarName(el) == varName) {
-                    el.classList.toggle("selected", addClass);
-                    el.classList.toggle(highlightClass, addClass);
-                }
+* If the var has a last-used color, and that color's usage is 0,
+    return that color.
+* Otherwise, return the lowest-indexed color with the lowest usage.
+    Increment the color's usage and set it as the last-used color
+    for that var.
+* On unclicking, decrement usage of the color.
+*/
+"use strict";
+{
+    document.addEventListener("click", e=>{
+        if(e.target.nodeName == "VAR") {
+            highlightSameAlgoVars(e.target);
+        }
+    });
+    const indexCounts = new Map();
+    const indexNames = new Map();
+    function highlightSameAlgoVars(v) {
+        // Find the algorithm container.
+        let algoContainer = null;
+        let searchEl = v;
+        while(algoContainer == null && searchEl != document.body) {
+            searchEl = searchEl.parentNode;
+            if(searchEl.hasAttribute("data-algorithm")) {
+                algoContainer = searchEl;
             }
         }
-        function getVarName(el) {
-            return el.textContent.replace(/(\s|\xa0)+/, " ").trim();
-        }
-        function chooseHighlightIndex(algoName, varName) {
-            let indexes = null;
-            if(indexCounts.has(algoName)) {
-                indexes = indexCounts.get(algoName);
-            } else {
-                // 7 classes right now
-                indexes = [0,0,0,0,0,0,0];
-                indexCounts.set(algoName, indexes);
-            }
 
-            // If the element was recently unclicked,
-            // *and* that color is still unclaimed,
-            // give it back the same color.
-            const lastIndex = previousHighlightIndex(algoName, varName);
-            if(indexes[lastIndex] === 0) return lastIndex;
+        // Not highlighting document-global vars,
+        // too likely to be unrelated.
+        if(algoContainer == null) return;
 
-            // Find the earliest index with the lowest count.
-            const minCount = Math.min.apply(null, indexes);
-            let index = null;
-            for(var i = 0; i < indexes.length; i++) {
-                if(indexes[i] == minCount) {
-                    return i;
-                }
+        const algoName = algoContainer.getAttribute("data-algorithm");
+        const varName = getVarName(v);
+        const addClass = !v.classList.contains("selected");
+        let highlightClass = null;
+        if(addClass) {
+            const index = chooseHighlightIndex(algoName, varName);
+            indexCounts.get(algoName)[index] += 1;
+            indexNames.set(algoName+"///"+varName, index);
+            highlightClass = nameFromIndex(index);
+        } else {
+            const index = previousHighlightIndex(algoName, varName);
+            indexCounts.get(algoName)[index] -= 1;
+            highlightClass = nameFromIndex(index);
+        }
+
+        // Find all same-name vars, and toggle their class appropriately.
+        for(const el of algoContainer.querySelectorAll("var")) {
+            if(getVarName(el) == varName) {
+                el.classList.toggle("selected", addClass);
+                el.classList.toggle(highlightClass, addClass);
             }
-        }
-        function previousHighlightIndex(algoName, varName) {
-            return indexNames.get(algoName+"///"+varName);
-        }
-        function nameFromIndex(index) {
-            return "selected" + index;
         }
     }
+    function getVarName(el) {
+        return el.textContent.replace(/(\s|\xa0)+/, " ").trim();
+    }
+    function chooseHighlightIndex(algoName, varName) {
+        let indexes = null;
+        if(indexCounts.has(algoName)) {
+            indexes = indexCounts.get(algoName);
+        } else {
+            // 7 classes right now
+            indexes = [0,0,0,0,0,0,0];
+            indexCounts.set(algoName, indexes);
+        }
+
+        // If the element was recently unclicked,
+        // *and* that color is still unclaimed,
+        // give it back the same color.
+        const lastIndex = previousHighlightIndex(algoName, varName);
+        if(indexes[lastIndex] === 0) return lastIndex;
+
+        // Find the earliest index with the lowest count.
+        const minCount = Math.min.apply(null, indexes);
+        let index = null;
+        for(var i = 0; i < indexes.length; i++) {
+            if(indexes[i] == minCount) {
+                return i;
+            }
+        }
+    }
+    function previousHighlightIndex(algoName, varName) {
+        return indexNames.get(algoName+"///"+varName);
+    }
+    function nameFromIndex(index) {
+        return "selected" + index;
+    }
+}
 </script>
