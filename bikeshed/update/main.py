@@ -47,7 +47,7 @@ def update(
     # fmt: off
     # If all are False, update everything
     if anchors == backrefs == biblio == boilerplate == caniuse == linkDefaults == mdn == languages == wpt == False:  # noqa: E712
-        anchors = backrefs =  biblio =  boilerplate =  caniuse =  linkDefaults =  mdn =  languages =  wpt =  True  # noqa: E222
+        anchors = backrefs =  biblio =  boilerplate =  caniuse =  linkDefaults =  mdn =  languages =  wpt =  True
 
     touchedPaths: dict[str, set[str]|None] = {
         "anchors": updateCrossRefs.update(path=path, dryRun=dryRun) if anchors else None,

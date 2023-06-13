@@ -83,4 +83,3 @@ class BoolSet(collections.abc.MutableMapping):
             self._internal.update(__other)
         for k, v in kwargs.items():
             self[k] = bool(v)
-        return
