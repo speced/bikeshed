@@ -120,7 +120,10 @@ class ReferenceManager:
                 self.foreignRefs.methods[arglessSig] = variants
                 for argfullSig, data in argfulls.items():
                     variants.variants[argfullSig] = source.MethodVariant(
-                        argfullSig, data["args"], data["for"], data["shortname"]
+                        argfullSig,
+                        data["args"],
+                        data["for"],
+                        data["shortname"],
                     )
 
         initMethods()
@@ -139,7 +142,7 @@ class ReferenceManager:
                 m.warn(
                     "Found anchors.bsdata next to the specification without a matching\n"
                     + "External Infotrees: anchors.bsdata yes\n"
-                    + "in the metadata. This data won't be found when building via a URL."
+                    + "in the metadata. This data won't be found when building via a URL.",
                 )
                 # We should remove this after giving specs time to react to the warning:
                 shouldGetLocalAnchorData = True
@@ -150,7 +153,11 @@ class ReferenceManager:
                         raise OSError()
                     anchorLines = anchorFile.read().rawLines
                     datablocks.transformAnchors(
-                        lines=anchorLines, doc=doc, firstLine=anchorLines[0], tagName="pre", lineNum=None
+                        lines=anchorLines,
+                        doc=doc,
+                        firstLine=anchorLines[0],
+                        tagName="pre",
+                        lineNum=None,
                     )
                 except OSError:
                     m.warn("anchors.bsdata not found despite being listed in the External Infotrees metadata.")
@@ -161,7 +168,7 @@ class ReferenceManager:
                 m.warn(
                     "Found link-defaults.infotree next to the specification without a matching\n"
                     + "External Infotrees: link-defaults.infotree yes\n"
-                    + "in the metadata. This data won't be found when building via a URL."
+                    + "in the metadata. This data won't be found when building via a URL.",
                 )
                 # We should remove this after giving specs time to react to the warning:
                 shouldGetLocalLinkDefaults = True
@@ -195,7 +202,11 @@ class ReferenceManager:
             return specHeadings
 
     def fetchHeading(
-        self, spec: str, id: str, status: str | None = None, el: t.ElementT | None = None
+        self,
+        spec: str,
+        id: str,
+        status: str | None = None,
+        el: t.ElementT | None = None,
     ) -> dict[str, str] | None:
         specHeadings = self.fetchHeadings(spec)
         if status is None:
@@ -230,7 +241,7 @@ class ReferenceManager:
                 snapshotURL="https://datatracker.ietf.org/doc/html/rfc2119",
                 order=3,
                 authors=["S. Bradner"],
-            )
+            ),
         )
 
     def setSpecData(self, md: t.MetadataManager) -> None:
@@ -410,12 +421,20 @@ class ReferenceManager:
             # emit a warning (unless it was supressed).
             if localRefs and linkFor is None and any(x.for_ for x in localRefs):
                 forlessRefs, _ = self.anchorBlockRefs.queryRefs(
-                    linkType=linkType, text=text, linkFor="/", export=True, el=el
+                    linkType=linkType,
+                    text=text,
+                    linkFor="/",
+                    export=True,
+                    el=el,
                 )
                 forlessRefs = self.filterObsoletes(forlessRefs)
                 if not forlessRefs:
                     forlessRefs, _ = self.foreignRefs.queryRefs(
-                        linkType=linkType, text=text, linkFor="/", export=True, el=el
+                        linkType=linkType,
+                        text=text,
+                        linkFor="/",
+                        export=True,
+                        el=el,
                     )
                 forlessRefs = self.filterObsoletes(forlessRefs)
                 if forlessRefs:
@@ -628,7 +647,8 @@ class ReferenceManager:
                     m.linkerror(f"No '{linkType}' refs found for '{text}' with for='{linkFor}'.", el=el)
                 else:
                     m.linkerror(
-                        f"No '{linkType}' refs found for '{text}' with for='{linkFor}' in spec '{spec}'.", el=el
+                        f"No '{linkType}' refs found for '{text}' with for='{linkFor}' in spec '{spec}'.",
+                        el=el,
                     )
             return None
         elif failure == "status":
@@ -721,7 +741,7 @@ class ReferenceManager:
             if failFromWrongSuffix and not quiet:
                 numericSuffixes = self.biblioNumericSuffixes[unversionedKey]
                 m.die(
-                    f"A biblio link references {text}, but only {config.englishFromList(numericSuffixes)} exists in SpecRef."
+                    f"A biblio link references {text}, but only {config.englishFromList(numericSuffixes)} exists in SpecRef.",
                 )
             return None
 
@@ -753,12 +773,12 @@ class ReferenceManager:
                 if newBib is None:
                     if not quiet:
                         m.die(
-                            f"[{bib.linkText}] claims to be obsoleted by [{bib.obsoletedBy}], which doesn't exist. Either change the reference, of use [{bib.linkText} obsolete] to ignore the obsoletion chain."
+                            f"[{bib.linkText}] claims to be obsoleted by [{bib.obsoletedBy}], which doesn't exist. Either change the reference, of use [{bib.linkText} obsolete] to ignore the obsoletion chain.",
                         )
                     return None
                 if not quiet:
                     m.linkerror(
-                        f"Obsolete biblio ref: [{bib.linkText}] is replaced by [{newBib.linkText}]. Either update the reference, or use [{bib.linkText} obsolete] if this is an intentionally-obsolete reference."
+                        f"Obsolete biblio ref: [{bib.linkText}] is replaced by [{newBib.linkText}]. Either update the reference, or use [{bib.linkText} obsolete] if this is an intentionally-obsolete reference.",
                     )
                 bib = newBib
 
@@ -852,7 +872,7 @@ def simplifyPossibleRefs(refs: list[RefWrapper], alwaysShowFor: bool = False) ->
                     spec=spec,
                     for_=None,
                     url=fors[0][1],
-                )
+                ),
             )
     return retRefs
 
@@ -912,7 +932,10 @@ def reportMultiplePossibleRefs(
 
 
 def reportAmbiguousForlessLink(
-    el: t.ElementT | None, text: str, forlessRefs: list[RefWrapper], localRefs: list[RefWrapper]
+    el: t.ElementT | None,
+    text: str,
+    forlessRefs: list[RefWrapper],
+    localRefs: list[RefWrapper],
 ) -> None:
     localRefText = "\n".join([refToText(ref) for ref in simplifyPossibleRefs(localRefs, alwaysShowFor=True)])
     forlessRefText = "\n".join([refToText(ref) for ref in simplifyPossibleRefs(forlessRefs, alwaysShowFor=True)])

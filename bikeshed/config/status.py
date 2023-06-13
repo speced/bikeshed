@@ -172,7 +172,7 @@ w3cProcessDocumentStatuses = frozenset(
         "w3c/NOTE-WD",
         "w3c/NOTE-FPWD",
         "w3c/UD",
-    ]
+    ],
 )
 
 # Interest Groups are limited to these statuses
@@ -193,7 +193,7 @@ w3cWGStatuses = frozenset(
         "w3c/CRYD",
         "w3c/CRY",
         "w3c/RY",
-    ]
+    ],
 ).union(w3cProcessDocumentStatuses)
 # The TAG is limited to these statuses
 w3cTAGStatuses = frozenset(
@@ -201,7 +201,7 @@ w3cTAGStatuses = frozenset(
         "DRAFT-FINDING",
         "FINDING",
         "w3c/WG-NOTE",  # despite the TAG not being a WG. I know, it's weird.
-    ]
+    ],
 ).union(w3cProcessDocumentStatuses)
 # Community and Business Groups are limited to these statuses
 w3cCommunityStatuses = frozenset(["w3c/CG-DRAFT", "w3c/CG-FINAL"])
@@ -261,7 +261,7 @@ megaGroups = {
             "wecg",
             "wicg",
             "wintercg",
-        ]
+        ],
     ),
     "whatwg": frozenset(["whatwg"]),
     "tc39": frozenset(["tc39"]),
@@ -289,7 +289,7 @@ megaGroups = {
             "webplatform",
             "webspecs",
             "whatwg",
-        ]
+        ],
     ),
     "khronos": frozenset(["webgl"]),
     "aom": frozenset(["aom"]),
@@ -310,7 +310,7 @@ w3cCgs = frozenset(
         "wecg",
         "wicg",
         "wintercg",
-    ]
+    ],
 )
 assert w3cCgs.issubset(megaGroups["w3c"])
 # Interest Groups within the W3C:
@@ -345,17 +345,17 @@ def canonicalizeStatus(rawStatus: str | None, group: str | None) -> str | None:
 
         if group in w3cIgs and status not in w3cIGStatuses:
             m.warn(
-                f"You used Status: {rawStatus}, but W3C Interest Groups are limited to these statuses: {formatStatusSet(w3cIGStatuses)}."
+                f"You used Status: {rawStatus}, but W3C Interest Groups are limited to these statuses: {formatStatusSet(w3cIGStatuses)}.",
             )
 
         if group == "tag" and status not in w3cTAGStatuses:
             m.warn(
-                f"You used Status: {rawStatus}, but the TAG is are limited to these statuses: {formatStatusSet(w3cTAGStatuses)}"
+                f"You used Status: {rawStatus}, but the TAG is are limited to these statuses: {formatStatusSet(w3cTAGStatuses)}",
             )
 
         if group in w3cCgs and status not in w3cCommunityStatuses:
             m.warn(
-                f"You used Status: {rawStatus}, but W3C Community and Business Groups are limited to these statuses: {formatStatusSet(w3cCommunityStatuses)}."
+                f"You used Status: {rawStatus}, but W3C Community and Business Groups are limited to these statuses: {formatStatusSet(w3cCommunityStatuses)}.",
             )
 
     def megaGroupsForStatus(status: str) -> list[str]:
@@ -416,7 +416,7 @@ def canonicalizeStatus(rawStatus: str | None, group: str | None) -> str | None:
                     msg += f" That status can only be used with the org '{possibleMgs[0]}', like `Status: {possibleMgs[0]}/{status}`"
                 else:
                     msg += " That status can only be used with the orgs {}.".format(
-                        main.englishFromList(f"'{x}'" for x in possibleMgs)
+                        main.englishFromList(f"'{x}'" for x in possibleMgs),
                     )
 
         else:
@@ -448,7 +448,8 @@ def canonicalizeStatus(rawStatus: str | None, group: str | None) -> str | None:
         )
         if group:
             msg += ", and your group '{}' isn't recognized as being in {}.".format(
-                group, "any of those orgs" if len(possibleMgs) > 1 else "that org"
+                group,
+                "any of those orgs" if len(possibleMgs) > 1 else "that org",
             )
             msg += " If this is wrong, please file a Bikeshed issue to categorize your group properly, and/or try:\n"
             msg += "\n".join(f"Status: {mg}/{status}" for mg in possibleMgs)

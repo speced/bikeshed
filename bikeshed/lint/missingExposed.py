@@ -33,7 +33,7 @@ def missingExposed(doc: t.SpecT) -> None:
                     break
             if not good:
                 m.lint(
-                    f"The '{construct.name}' namespace is missing an [Exposed] extended attribute. Does it need [Exposed=Window], or something more?"
+                    f"The '{construct.name}' namespace is missing an [Exposed] extended attribute. Does it need [Exposed=Window], or something more?",
                 )
         elif construct.idl_type == "interface":
             good = False
@@ -46,7 +46,7 @@ def missingExposed(doc: t.SpecT) -> None:
                     break
             if not good:
                 m.lint(
-                    f"The '{construct.name}' interface is missing an [Exposed] extended attribute. Does it need [Exposed=Window], or something more?"
+                    f"The '{construct.name}' interface is missing an [Exposed] extended attribute. Does it need [Exposed=Window], or something more?",
                 )
         elif construct.idl_type == "callback":
             if not hasattr(construct, "interface"):

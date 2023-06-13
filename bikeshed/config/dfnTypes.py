@@ -78,7 +78,7 @@ idlTypes = frozenset(
         "maplike",
         "setlike",
         "permission",
-    ]
+    ],
 )
 idlNameTypes = frozenset(["interface", "namespace", "dictionary", "enum", "typedef", "callback"])
 functionishTypes = frozenset(["function", "method", "constructor", "stringifier"])
@@ -108,7 +108,7 @@ typesUsingFor = frozenset(
         "mode",
         "context",
         "facet",
-    ]
+    ],
 )
 typesNotUsingFor = frozenset(
     [
@@ -123,7 +123,7 @@ typesNotUsingFor = frozenset(
         "typedef",
         "http-header",
         "permission",
-    ]
+    ],
 )
 assert not (typesUsingFor & typesNotUsingFor)
 lowercaseTypes = (

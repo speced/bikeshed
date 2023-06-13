@@ -156,7 +156,7 @@ def updateByManifest(path: str, dryRun: bool = False, force: bool = False) -> st
     elif isinstance(localDt, datetime):
         if (remoteDt - datetime.utcnow()).days >= 2:
             m.warn(
-                f"Remote data ({remoteDt.strftime('%Y-%m-%d %H:%M:%S')}) is more than two days older than local time ({datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}); either your local time is wrong (no worries, this warning will just repeat each time) or the update process has fallen over (please report this!)."
+                f"Remote data ({remoteDt.strftime('%Y-%m-%d %H:%M:%S')}) is more than two days older than local time ({datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}); either your local time is wrong (no worries, this warning will just repeat each time) or the update process has fallen over (please report this!).",
             )
         if not force:
             if localDt == remoteDt and localDt != 0:
@@ -208,7 +208,7 @@ def updateByManifest(path: str, dryRun: bool = False, force: bool = False) -> st
     else:
         phrase = f"were {len(badPaths)} errors" if len(badPaths) > 1 else "was 1 error"
         m.die(
-            f"Done, but there {phrase} (of {len(newPaths)} total) in downloading or saving. Run `bikeshed update` again to retry."
+            f"Done, but there {phrase} (of {len(newPaths)} total) in downloading or saving. Run `bikeshed update` again to retry.",
         )
         return newManifest
 

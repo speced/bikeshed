@@ -52,7 +52,7 @@ def addHeadingIds(doc: t.SpecT, headings: list[t.ElementT]) -> None:
     else:
         m.warn(
             "You should manually provide IDs for your headings:\n"
-            + "\n".join("  " + h.textContent(el) for el in neededIds)
+            + "\n".join("  " + h.textContent(el) for el in neededIds),
         )
 
 
@@ -75,15 +75,15 @@ def checkPrivacySecurityHeadings(headings: list[t.ElementT]) -> None:
             return
     if not security and not privacy:
         m.warn(
-            "This specification has neither a 'Security Considerations' nor a 'Privacy Considerations' section. Please consider adding both, see https://w3ctag.github.io/security-questionnaire/."
+            "This specification has neither a 'Security Considerations' nor a 'Privacy Considerations' section. Please consider adding both, see https://w3ctag.github.io/security-questionnaire/.",
         )
     elif not security:
         m.warn(
-            "This specification does not have a 'Security Considerations' section. Please consider adding one, see https://w3ctag.github.io/security-questionnaire/."
+            "This specification does not have a 'Security Considerations' section. Please consider adding one, see https://w3ctag.github.io/security-questionnaire/.",
         )
     elif not privacy:
         m.warn(
-            "This specification does not have a 'Privacy Considerations' section. Please consider adding one, see https://w3ctag.github.io/security-questionnaire/."
+            "This specification does not have a 'Privacy Considerations' section. Please consider adding one, see https://w3ctag.github.io/security-questionnaire/.",
         )
 
 

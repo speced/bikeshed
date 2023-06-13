@@ -221,7 +221,8 @@ class TarInputSource(InputSource):
                 taritem = tarFile.extractfile(self.tarMemberName)
                 if taritem is None:
                     raise FileNotFoundError(
-                        errno.ENOENT, f"{self.tarMemberName} is in the tar file, but isn't a file itself."
+                        errno.ENOENT,
+                        f"{self.tarMemberName} is in the tar file, but isn't a file itself.",
                     )
                 with taritem as f:
                     # Decode the `bytes` to a `str`. (extractfile can't read as text.)

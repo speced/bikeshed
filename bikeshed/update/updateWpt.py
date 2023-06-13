@@ -23,7 +23,7 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
 
     if jsonData["version"] != 8:
         m.die(
-            f"Bikeshed currently only knows how to handle WPT v8 manifest data, but got v{jsonData['version']}. Please report this to the maintainer!"
+            f"Bikeshed currently only knows how to handle WPT v8 manifest data, but got v{jsonData['version']}. Please report this to the maintainer!",
         )
         return None
 

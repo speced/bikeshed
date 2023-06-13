@@ -239,7 +239,7 @@ def dataFromWebref(url: str) -> t.JSONT:
         data = response.json()
     except Exception as e:
         raise Exception(
-            f"Data retrieved from Webref wasn't valid JSON for some reason. Try downloading again?\n{e}"
+            f"Data retrieved from Webref wasn't valid JSON for some reason. Try downloading again?\n{e}",
         ) from e
     return t.cast("t.JSONT", data)
 
@@ -267,7 +267,10 @@ def canonSpecFromWebref(rawSpec: WebrefSpecT) -> SpecT:
 
 
 def addToAnchors(
-    rawAnchor: WebrefAnchorT, anchors: AnchorsT, spec: SpecT, status: t.Literal["current"] | t.Literal["snapshot"]
+    rawAnchor: WebrefAnchorT,
+    anchors: AnchorsT,
+    spec: SpecT,
+    status: t.Literal["current"] | t.Literal["snapshot"],
 ) -> None:
     baseUrl = spec["snapshot_url"] if status == "snapshot" else spec["current_url"]
     assert baseUrl is not None

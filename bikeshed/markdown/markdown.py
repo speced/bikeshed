@@ -203,7 +203,7 @@ def tokenizeLines(
                     "type": "raw",
                     "prefixlen": prefixCount(ws, numSpacesForIndentation),
                     "line": line,
-                }
+                },
             )
             continue
         match = re.match(rf"\s*<({rawElements})[ >]", line.text)
@@ -213,7 +213,7 @@ def tokenizeLines(
                     "type": "raw",
                     "prefixlen": prefixCount(line.text, numSpacesForIndentation),
                     "line": line,
-                }
+                },
             )
             if re.search(r"</({})>".format(match.group(1)), line.text):
                 # Element started and ended on same line, cool, don't need to do anything.
@@ -225,7 +225,7 @@ def tokenizeLines(
                         "type": "element",
                         "tag": "</{}>".format(match.group(1)),
                         "nest": nest,
-                    }
+                    },
                 )
             continue
         if rawStack:
@@ -311,7 +311,7 @@ def tokenizeLines(
     if False:  # pylint: disable=using-constant-test
         for i, token in enumerate(tokens):
             print(
-                f"{' '*(2-len(str(i)))}{i} {' ' * (11 - len(token['type']))}{token['type']}: {token['line'].text.rstrip()}"
+                f"{' '*(2-len(str(i)))}{i} {' ' * (11 - len(token['type']))}{token['type']}: {token['line'].text.rstrip()}",
             )
 
     return tokens
@@ -403,7 +403,7 @@ def stripPrefix(token: TokenT, numSpacesForIndentation: int, len: int) -> str:
             offset += numSpacesForIndentation
         else:
             m.die(
-                f'Line {token["line"].i} isn\'t indented enough (needs {len} indent{"" if len == 1 else "s"}) to be valid Markdown:\n"{text[:-1]}"'
+                f'Line {token["line"].i} isn\'t indented enough (needs {len} indent{"" if len == 1 else "s"}) to be valid Markdown:\n"{text[:-1]}"',
             )
             return text
     return text[offset:]
@@ -413,7 +413,7 @@ def lineEndsRawBlock(line: l.Line, rawToken: RawTokenT) -> bool:
     elementEnds = bool(rawToken["type"] == "element" and re.search(rawToken["tag"], line.text))
     fencedEnds = bool(
         rawToken["type"] == "fenced"
-        and re.match(r"\s*{}{}*\s*$".format(rawToken["tag"], rawToken["tag"][0]), line.text)
+        and re.match(r"\s*{}{}*\s*$".format(rawToken["tag"], rawToken["tag"][0]), line.text),
     )
     return elementEnds or fencedEnds
 
@@ -535,9 +535,11 @@ def parseSingleLineHeading(stream: TokenStream) -> list[l.Line]:
         lineFromStream(
             stream,
             "<h{level}{idattr} line-number={i}>{text}</h{level}>\n".format(
-                idattr=idattr, i=stream.currline().i, **stream.curr()
+                idattr=idattr,
+                i=stream.currline().i,
+                **stream.curr(),
             ),
-        )
+        ),
     ]
     stream.advance()
     return lines
@@ -553,7 +555,7 @@ def parseMultiLineHeading(stream: TokenStream) -> list[l.Line]:
             "Markdown parser error: tried to parse a multiline heading from:\n"
             + stream.prevraw()
             + stream.currraw()
-            + stream.nextraw()
+            + stream.nextraw(),
         )
     match = re.search(r"(.*?)\s*\{\s*#([^ }]+)\s*\}\s*$", stream.currtext())
     if match:
@@ -572,7 +574,7 @@ def parseMultiLineHeading(stream: TokenStream) -> list[l.Line]:
                 i=stream.currline().i,
                 **stream.curr(),
             ),
-        )
+        ),
     ]
     stream.advance(2)
     return lines
@@ -609,7 +611,8 @@ def parseParagraph(stream: TokenStream) -> list[l.Line]:
         if match:
             line = match.group(2)
             p = "<p line-number={} data-remote-issue-id='{}' class='replace-with-issue-class'>".format(
-                i, match.group(1)
+                i,
+                match.group(1),
             )
         else:
             p = f"<p line-number={i}>"
@@ -649,7 +652,7 @@ def parseBulleted(stream: TokenStream) -> list[l.Line]:
                 lineFromStream(
                     stream,
                     stripPrefix(stream.curr(), numSpacesForIndentation, prefixLen + 1),
-                )
+                ),
             )
 
     def getItems(stream: TokenStream) -> t.Generator[tuple[list[l.Line], int], None, None]:
@@ -701,7 +704,7 @@ def parseNumbered(stream: TokenStream, start: int = 1) -> list[l.Line]:
                 lineFromStream(
                     stream,
                     stripPrefix(stream.curr(), numSpacesForIndentation, prefixLen + 1),
-                )
+                ),
             )
 
     def getItems(stream: TokenStream) -> t.Generator[tuple[list[l.Line], int], None, None]:
@@ -760,7 +763,7 @@ def parseDl(stream: TokenStream) -> list[l.Line]:
                 lineFromStream(
                     stream,
                     stripPrefix(stream.curr(), numSpacesForIndentation, prefixLen + 1),
-                )
+                ),
             )
 
     def getItems(stream: TokenStream) -> t.Generator[tuple[str, list[l.Line], int], None, None]:

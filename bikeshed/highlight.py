@@ -186,7 +186,9 @@ def highlightWithWebIDL(text: str, el: t.ElementT) -> t.Deque[ColoredText] | Non
         # Just applies highlighting classes to IDL stuff.
 
         def markup_type_name(
-            self, text: str, construct: widlparser.constructs.Construct
+            self,
+            text: str,
+            construct: widlparser.constructs.Construct,
         ) -> tuple[str | None, str | None]:
             return ("\1n\2", "\3")
 
@@ -194,12 +196,16 @@ def highlightWithWebIDL(text: str, el: t.ElementT) -> t.Deque[ColoredText] | Non
             return ("\1g\2", "\3")
 
         def markup_keyword(
-            self, text: str, construct: widlparser.constructs.Construct
+            self,
+            text: str,
+            construct: widlparser.constructs.Construct,
         ) -> tuple[str | None, str | None]:
             return ("\1b\2", "\3")
 
         def markup_enum_value(
-            self, text: str, construct: widlparser.constructs.Construct
+            self,
+            text: str,
+            construct: widlparser.constructs.Construct,
         ) -> tuple[str | None, str | None]:
             return ("\1s\2", "\3")
 

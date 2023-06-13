@@ -158,7 +158,7 @@ def extractHeaderInfo(lines: t.Sequence[str], infilename: str) -> HeaderInfo | N
             date = f"{match.group(1)}-{match.group(2)}-{match.group(3)}"
     else:
         m.warn(
-            f"Autodetection of Shortname, Date, and Status failed; draft url does not match the format /status-shortname-date/. Got:\n{url}"
+            f"Autodetection of Shortname, Date, and Status failed; draft url does not match the format /status-shortname-date/. Got:\n{url}",
         )
 
     if date is None:
@@ -213,7 +213,7 @@ Verified: [url]
 Resolved: Editorial/Bugfix (for obvious fixes)/Editors' discretion/[url to minutes]
 ----
 Issue 2.
-..."""
+...""",
     )
 
 
@@ -254,7 +254,7 @@ def printHeader(outfile: t.TextIO, hi: HeaderInfo) -> None:
 <p>An issue can be closed as <code>Accepted</code>, <code>OutOfScope</code>,
 <code>Invalid</code>, <code>Rejected</code>, or <code>Retracted</code>.
 <code>Verified</code> indicates commentor's acceptance of the response.</p>
-"""
+""",
     )
 
 
@@ -336,5 +336,5 @@ def printScript(outfile: t.TextIO) -> None:
     ['a', 'd', 'fo', 'oi', 'r', 'open'].forEach(addCheckbox);
 }());
 </script>
-"""
+""",
     )

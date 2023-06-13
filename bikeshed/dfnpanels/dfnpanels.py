@@ -53,7 +53,7 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
                 {
                     "refs": refsJson,
                     "title": text,
-                }
+                },
             )
         panelJson = {
             "dfnID": id,
@@ -114,13 +114,13 @@ def addExternalDfnPanel(termEl: t.ElementT, ref: t.RefWrapper, doc: t.SpecT) -> 
             refsJson.append(
                 {
                     "id": linkID,
-                }
+                },
             )
         sectionsJson.append(
             {
                 "refs": refsJson,
                 "title": text,
-            }
+            },
         )
     panelJson = {
         "dfnID": termID,

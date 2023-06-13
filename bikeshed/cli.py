@@ -644,14 +644,17 @@ def handleProfile(options: argparse.Namespace) -> None:
     if options.svgFile:
         os.system(
             "time python -m cProfile -o stat.prof -m bikeshed -f spec && gprof2dot -f pstats --skew=.0001 {root} {leaf} stat.prof | dot -Tsvg -o {svg} && rm stat.prof".format(
-                root=root, leaf=leaf, svg=options.svgFile
-            )
+                root=root,
+                leaf=leaf,
+                svg=options.svgFile,
+            ),
         )
     else:
         os.system(
             "time python -m cProfile -o /tmp/stat.prof -m bikeshed -f spec && gprof2dot -f pstats --skew=.0001 {root} {leaf} /tmp/stat.prof | xdot &".format(
-                root=root, leaf=leaf
-            )
+                root=root,
+                leaf=leaf,
+            ),
         )
 
 
@@ -675,7 +678,7 @@ Introduction {#intro}
 =====================
 
 Introduction here.
-"""
+""",
     )
 
 
@@ -726,5 +729,5 @@ assert_true(VALUE HERE, "TEST DESCRIPTION");
 assert_equals(ACTUAL VALUE HERE, EXPECTED VALUE HERE, "TEST DESCRIPTION");
 // lots more at http://web-platform-tests.org/writing-tests/testharness-api.html#list-of-assertions
 </script>
-"""
+""",
         )

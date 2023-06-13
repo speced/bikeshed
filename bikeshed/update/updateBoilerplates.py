@@ -46,7 +46,7 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
     else:
         phrase = f"were {len(badPaths)} errors" if len(badPaths) > 1 else "was 1 error"
         m.die(
-            f"Done, but there {phrase} (of {len(newPaths)} total) in downloading or saving. Run `bikeshed update` again to retry."
+            f"Done, but there {phrase} (of {len(newPaths)} total) in downloading or saving. Run `bikeshed update` again to retry.",
         )
         return set(goodPaths)
 

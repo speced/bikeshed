@@ -49,7 +49,7 @@ class Serializer:
             "progress",
             "math",
             "[]",
-        ]
+        ],
     )
     rawEls = frozenset(["xmp", "script", "style"])
     voidEls = frozenset(
@@ -70,7 +70,7 @@ class Serializer:
             "source",
             "track",
             "wbr",
-        ]
+        ],
     )
     omitEndTagEls = frozenset(
         [
@@ -88,7 +88,7 @@ class Serializer:
             "html",
             "head",
             "body",
-        ]
+        ],
     )
 
     def __init__(self, opaqueElements: t.Iterable[str], blockElements: t.Iterable[str]) -> None:

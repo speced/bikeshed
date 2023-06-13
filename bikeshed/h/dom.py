@@ -1007,7 +1007,9 @@ if t.TYPE_CHECKING:
 
     class ElementCreatorFnT(t.Protocol):
         def __call__(
-            self, attrsOrChild: t.Mapping[str, str | None] | t.NodesT | None = None, *children: t.NodesT | None
+            self,
+            attrsOrChild: t.Mapping[str, str | None] | t.NodesT | None = None,
+            *children: t.NodesT | None,
         ) -> t.ElementT:
             ...
 
@@ -1015,7 +1017,8 @@ if t.TYPE_CHECKING:
 class ElementCreationHelper:
     def __getattr__(self, name: str) -> ElementCreatorFnT:
         def _creater(
-            attrsOrChild: t.Mapping[str, str | None] | t.NodesT | None = None, *children: t.NodesT | None
+            attrsOrChild: t.Mapping[str, str | None] | t.NodesT | None = None,
+            *children: t.NodesT | None,
         ) -> t.ElementT:
             if isNodes(attrsOrChild):
                 return createElement(name, None, attrsOrChild, *children)

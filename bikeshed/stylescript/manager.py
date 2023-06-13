@@ -136,7 +136,7 @@ def removeInlineDarkStyles(name: str, text: str) -> str:
     match = re.search(darkModeRe, text)
     if not match:
         m.warn(
-            f"The {name} stylesheet appears to contain darkmode styles, but they aren't being correctly detected. Please report this to the Bikeshed maintainer."
+            f"The {name} stylesheet appears to contain darkmode styles, but they aren't being correctly detected. Please report this to the Bikeshed maintainer.",
         )
         return text
     text = re.sub(darkModeRe, "", text)

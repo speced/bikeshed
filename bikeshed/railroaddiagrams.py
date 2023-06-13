@@ -616,7 +616,7 @@ class AlternatingSequence(DiagramMultiContainer):
             return super(AlternatingSequence, cls).__new__(cls)
         else:
             raise Exception(
-                "AlternatingSequence takes exactly two arguments, but got {0} arguments.".format(len(items))
+                "AlternatingSequence takes exactly two arguments, but got {0} arguments.".format(len(items)),
             )
 
     def __init__(self, *items: Node) -> None:
@@ -756,7 +756,7 @@ class Choice(DiagramMultiContainer):
             Path(x, y).arc("se").up(distanceFromY - AR * 2).arc("wn").addTo(self)
             item.format(x + AR * 2, y - distanceFromY, innerWidth).addTo(self)
             Path(x + AR * 2 + innerWidth, y - distanceFromY + item.height).arc("ne").down(
-                distanceFromY - item.height + default.height - AR * 2
+                distanceFromY - item.height + default.height - AR * 2,
             ).arc("ws").addTo(self)
             if ni < -1:
                 distanceFromY += max(AR, item.up + VS + above[i + 1].down + above[i + 1].height)
@@ -774,7 +774,7 @@ class Choice(DiagramMultiContainer):
             Path(x, y).arc("ne").down(distanceFromY - AR * 2).arc("ws").addTo(self)
             item.format(x + AR * 2, y + distanceFromY, innerWidth).addTo(self)
             Path(x + AR * 2 + innerWidth, y + distanceFromY + item.height).arc("se").up(
-                distanceFromY - AR * 2 + item.height - default.height
+                distanceFromY - AR * 2 + item.height - default.height,
             ).arc("wn").addTo(self)
             distanceFromY += max(
                 AR,
@@ -888,7 +888,8 @@ class MultipleChoice(DiagramMultiContainer):
             "path",
             attrs={
                 "d": "M {x} {y} h 16 a 4 4 0 0 1 4 4 v 12 a 4 4 0 0 1 -4 4 h -16 z".format(
-                    x=x + self.width - 20, y=y - 10
+                    x=x + self.width - 20,
+                    y=y - 10,
                 ),
                 "class": "diagram-text",
             },
@@ -1053,7 +1054,7 @@ class OneOrMore(DiagramItem):
         Path(x + AR, y).arc("nw").down(distanceFromY - AR * 2).arc("ws").addTo(self)
         self.rep.format(x + AR, y + distanceFromY, self.width - AR * 2).addTo(self)
         Path(x + self.width - AR, y + distanceFromY + self.rep.height).arc("se").up(
-            distanceFromY - AR * 2 + self.rep.height - self.item.height
+            distanceFromY - AR * 2 + self.rep.height - self.item.height,
         ).arc("en").addTo(self)
 
         return self

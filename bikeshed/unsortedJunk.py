@@ -373,7 +373,8 @@ def fillInterDocumentReferenceFromSpecref(doc: t.SpecT, el: t.ElementT, spec: st
         return
     if bib.title is None:
         m.die(
-            f"Can't generate a cross-spec section ref for '{spec}', because the biblio entry has no spec title.", el=el
+            f"Can't generate a cross-spec section ref for '{spec}', because the biblio entry has no spec title.",
+            el=el,
         )
         return
     el.tag = "a"
@@ -531,7 +532,7 @@ def classifyDfns(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
                     "{_for}-{id}".format(
                         _for=singleFor,
                         id=parenlessID + "()",
-                    )
+                    ),
                 )
                 el.set(
                     "data-alternate-id",
@@ -945,7 +946,9 @@ def processIssuesAndExamples(doc: t.SpecT) -> None:
                 remoteIssueURL = doc.md.issueTrackerTemplate.format(remoteIssueID)
             if remoteIssueURL:
                 h.appendChild(
-                    el, " ", h.E.a({"href": remoteIssueURL}, _("[Issue #{number}]").format(number=remoteIssueID))
+                    el,
+                    " ",
+                    h.E.a({"href": remoteIssueURL}, _("[Issue #{number}]").format(number=remoteIssueID)),
                 )
     for el in h.findAll(".example:not([id])", doc):
         el.set("id", h.safeID(doc, "example-" + h.hashContents(el)))
@@ -1281,7 +1284,7 @@ def formatElementdefTables(doc: t.SpecT) -> None:
                                 {"data-link-type": "element-attr", "for": groupName},
                                 ref.text.strip(),
                             ),
-                        )
+                        ),
                     ),
                 )
 
@@ -1395,7 +1398,7 @@ def inlineRemoteIssues(doc: t.SpecT) -> None:
             error = res.json()
             if error["message"].startswith("API rate limit exceeded"):
                 m.die(
-                    "GitHub Issues API rate limit exceeded. Get an OAuth token from https://github.com/settings/tokens to increase your limit, or just wait an hour for your limit to refresh; Bikeshed has cached all the issues so far and will resume from where it left off."
+                    "GitHub Issues API rate limit exceeded. Get an OAuth token from https://github.com/settings/tokens to increase your limit, or just wait an hour for your limit to refresh; Bikeshed has cached all the issues so far and will resume from where it left off.",
                 )
             else:
                 m.die(

@@ -385,7 +385,7 @@ def biblioReplacer(match: re.Match) -> t.NodeT:
     displayDirect = "direct" in modifiers
     if (displayInline + displayIndex + displayDirect) > 1:
         m.die(
-            f"Biblio shorthand {match.group(0)} contains more than one of 'inline', 'index' and 'direct', please pick one."
+            f"Biblio shorthand {match.group(0)} contains more than one of 'inline', 'index' and 'direct', please pick one.",
         )
         return t.cast(str, match.group(0))
     elif displayInline:

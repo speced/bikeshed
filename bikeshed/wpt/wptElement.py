@@ -68,7 +68,7 @@ def processWptElements(doc: t.SpecT) -> None:
             atLeastOneVisibleTest = True
             createHTML(doc, wptRestElements[0], prefixedNames, testData)
             m.warn(
-                "<wpt-rest> is intended for debugging only. Move the tests to <wpt> elements next to what they're testing."
+                "<wpt-rest> is intended for debugging only. Move the tests to <wpt> elements next to what they're testing.",
             )
     else:
         if pathPrefix:
@@ -91,7 +91,7 @@ def processWptElements(doc: t.SpecT) -> None:
                         {"href": f"https://wpt.fyi/results{pathPrefix}"},
                         f"https://wpt.fyi/results{pathPrefix}",
                     ),
-                )
+                ),
             )
 
     if doc.md.wptDisplay != "none" and atLeastOneElement:
@@ -238,7 +238,7 @@ def appendTestList(
             )
         else:
             m.warn(
-                f"Programming error, the test {testName} is of type {testType}, which I don't know how to render. Please report this!"
+                f"Programming error, the test {testName} is of type {testType}, which I don't know how to render. Please report this!",
             )
             continue
         h.appendChild(testListEl, singleTestEl)

@@ -67,7 +67,7 @@ class Spec:
             inputFilename = findImplicitInputFile()
         if inputFilename is None:  # still
             m.die(
-                "No input file specified, and no *.bs or *.src.html files found in current directory.\nPlease specify an input file, or use - to pipe from STDIN."
+                "No input file specified, and no *.bs or *.src.html files found in current directory.\nPlease specify an input file, or use - to pipe from STDIN.",
             )
             return
         self.inputSource: InputSource.InputSource = InputSource.inputFromName(inputFilename, chroot=constants.chroot)
@@ -529,7 +529,7 @@ def catchArgparseBug(string: str | None) -> bool:
 
     if isinstance(string, str) and string.startswith("--") and "=" in string:
         m.die(
-            "You're hitting a bug with Python's argparse library. Please specify both the input and output filenames manually, and move all command-line flags with spaces in their values to after those arguments.\nSee <https://speced.github.io/bikeshed/#md-issues> for details."
+            "You're hitting a bug with Python's argparse library. Please specify both the input and output filenames manually, and move all command-line flags with spaces in their values to after those arguments.\nSee <https://speced.github.io/bikeshed/#md-issues> for details.",
         )
         return False
     return True

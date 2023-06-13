@@ -119,7 +119,7 @@ def panelsFromData(doc: t.SpecT, data: MdnDataT) -> list[t.ElementT]:
                     browsersWithBorrowedEngines,
                     browsersWithRetiredEngines,
                     browsersForMobileDevices,
-                )
+                ),
             )
 
         summary = h.E.summary()
@@ -280,7 +280,11 @@ def mdnPanelFor(
 
 
 def browserCompatSpan(
-    browserCodeName: str, browserFullName: str, statusCode: str, minVersion: str, needsFlag: bool
+    browserCodeName: str,
+    browserFullName: str,
+    statusCode: str,
+    minVersion: str,
+    needsFlag: bool,
 ) -> t.ElementT:
     # browserCodeName: e.g. "chrome"
     # browserFullName: e.g. "Chrome for Android"

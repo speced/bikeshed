@@ -26,7 +26,11 @@ class DataFileRequester:
 
     @t.overload
     def fetch(
-        self, *segs: str, str: t.Literal[False], okayToFail: bool = False, fileType: str | None = None
+        self,
+        *segs: str,
+        str: t.Literal[False],
+        okayToFail: bool = False,
+        fileType: str | None = None,
     ) -> io.TextIOWrapper:
         ...
 
@@ -35,7 +39,11 @@ class DataFileRequester:
         ...
 
     def fetch(
-        self, *segs: str, str: bool = False, okayToFail: bool = False, fileType: str | None = None
+        self,
+        *segs: str,
+        str: bool = False,
+        okayToFail: bool = False,
+        fileType: str | None = None,
     ) -> str | io.TextIOWrapper:
         location = self._buildPath(segs=segs, fileType=fileType or self.fileType)
         try:
@@ -138,7 +146,7 @@ def retrieveBoilerplateFile(
                 m.warn(
                     f"Found {f} next to the specification without a matching\n"
                     + f"Local Boilerplate: {name} yes\n"
-                    + "in the metadata. This include won't be found when building via a URL."
+                    + "in the metadata. This include won't be found when building via a URL.",
                 )
                 # We should remove this after giving specs time to react to the warning:
                 sources.append(doc.inputSource.relative(f))
@@ -164,6 +172,6 @@ def retrieveBoilerplateFile(
                 pass
     if error:
         m.die(
-            f"Couldn't find an appropriate include file for the {name} inclusion, given group='{group}' and status='{status}'."
+            f"Couldn't find an appropriate include file for the {name} inclusion, given group='{group}' and status='{status}'.",
         )
     return ""

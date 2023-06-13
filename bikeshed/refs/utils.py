@@ -39,7 +39,7 @@ def filterOldVersions(refs: list[t.RefWrapper], status: str | None = None) -> li
     # unless that doesn't exist, in which case just prefer the latest level.
     shortnameLevels: defaultdict[str, defaultdict[str, list[t.RefWrapper]]] = defaultdict(lambda: defaultdict(list))
     snapshotShortnameLevels: defaultdict[str, defaultdict[str, list[t.RefWrapper]]] = defaultdict(
-        lambda: defaultdict(list)
+        lambda: defaultdict(list),
     )
     for ref in refs:
         shortnameLevels[ref.shortname][ref.level].append(ref)

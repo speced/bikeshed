@@ -32,7 +32,9 @@ class DebugMarker(widlparser.protocols.Marker):
     # Debugging tool for IDL markup
 
     def markup_construct(
-        self, text: str, construct: widlparser.Construct
+        self,
+        text: str,
+        construct: widlparser.Construct,
     ) -> MarkupReturnT:  # pylint: disable=unused-argument
         return (
             "<construct-" + construct.idl_type + ">",
@@ -70,22 +72,30 @@ class DebugMarker(widlparser.protocols.Marker):
         )
 
     def markup_type_name(
-        self, text: str, construct: widlparser.Construct
+        self,
+        text: str,
+        construct: widlparser.Construct,
     ) -> MarkupReturnT:  # pylint: disable=unused-argument
         return ('<TYPE-NAME idlType="' + construct.idl_type + '">', "</TYPE-NAME>")
 
     def markup_name(
-        self, text: str, construct: widlparser.Construct
+        self,
+        text: str,
+        construct: widlparser.Construct,
     ) -> MarkupReturnT:  # pylint: disable=unused-argument
         return ('<NAME idlType="' + construct.idl_type + '">', "</NAME>")
 
     def markup_keyword(
-        self, text: str, construct: widlparser.Construct
+        self,
+        text: str,
+        construct: widlparser.Construct,
     ) -> MarkupReturnT:  # pylint: disable=unused-argument
         return ('<KEYWORD idlType="' + construct.idl_type + '">', "</KEYWORD>")
 
     def markup_enum_value(
-        self, text: str, construct: widlparser.Construct
+        self,
+        text: str,
+        construct: widlparser.Construct,
     ) -> MarkupReturnT:  # pylint: disable=unused-argument
         return ('<ENUM-VALUE for="' + t.cast(str, construct.name) + '">', "</ENUM-VALUE>")
 
@@ -95,14 +105,18 @@ class DebugMarker(widlparser.protocols.Marker):
 
 class IDLMarker(widlparser.protocols.Marker):
     def markup_construct(
-        self, text: str, construct: widlparser.Construct
+        self,
+        text: str,
+        construct: widlparser.Construct,
     ) -> MarkupReturnT:  # pylint: disable=unused-argument
         # Fires for every 'construct' in the WebIDL.
         # Some things are "productions", not "constructs".
         return (None, None)
 
     def markup_type(
-        self, text: str, construct: widlparser.Construct
+        self,
+        text: str,
+        construct: widlparser.Construct,
     ) -> MarkupReturnT:  # pylint: disable=unused-argument
         # Fires for entire type definitions.
         # It'll contain keywords or names, or sometimes more types.
@@ -111,22 +125,30 @@ class IDLMarker(widlparser.protocols.Marker):
         return (None, None)
 
     def markup_primitive_type(
-        self, text: str, construct: widlparser.Construct
+        self,
+        text: str,
+        construct: widlparser.Construct,
     ) -> MarkupReturnT:  # pylint: disable=unused-argument
         return ("<a data-link-type=interface>", "</a>")
 
     def markup_string_type(
-        self, text: str, construct: widlparser.Construct
+        self,
+        text: str,
+        construct: widlparser.Construct,
     ) -> MarkupReturnT:  # pylint: disable=unused-argument
         return ("<a data-link-type=interface>", "</a>")
 
     def markup_buffer_type(
-        self, text: str, construct: widlparser.Construct
+        self,
+        text: str,
+        construct: widlparser.Construct,
     ) -> MarkupReturnT:  # pylint: disable=unused-argument
         return ("<a data-link-type=interface>", "</a>")
 
     def markup_object_type(
-        self, text: str, construct: widlparser.Construct
+        self,
+        text: str,
+        construct: widlparser.Construct,
     ) -> MarkupReturnT:  # pylint: disable=unused-argument
         return ("<a data-link-type=interface>", "</a>")
 
@@ -185,7 +207,7 @@ class IDLMarker(widlparser.protocols.Marker):
             # Otherwise, you *can* point to/dfn stringification behavior if you want.
             return (
                 "<idl data-export data-idl-type=dfn data-idl-for='{0}' data-lt='stringification behavior' id='{0}-stringification-behavior'>".format(
-                    construct.parent.full_name
+                    construct.parent.full_name,
                 ),
                 "</idl>",
             )
@@ -206,7 +228,9 @@ class IDLMarker(widlparser.protocols.Marker):
         return (None, None)
 
     def markup_name(
-        self, text: str, construct: widlparser.Construct
+        self,
+        text: str,
+        construct: widlparser.Construct,
     ) -> MarkupReturnT:  # pylint: disable=unused-argument
         # Fires for defining names: method names, arg names, interface names, etc.
         idlType = construct.idl_type
@@ -216,7 +240,7 @@ class IDLMarker(widlparser.protocols.Marker):
         if idlType == "constructor":
             # the [Constructor] extended attr, now deprecated
             m.die(
-                f"The [Constructor] extended attribute (on {construct.parent.name}) is deprecated, please switch to a constructor() method."
+                f"The [Constructor] extended attribute (on {construct.parent.name}) is deprecated, please switch to a constructor() method.",
             )
             return (None, None)
 
@@ -291,7 +315,8 @@ class IDLMarker(widlparser.protocols.Marker):
     def markup_enum_value(self, text: str, construct: widlparser.Construct) -> MarkupReturnT:
         return (
             "<idl data-idl-type=enum-value data-idl-for='{}' data-lt='{}'>".format(
-                h.escapeAttr(t.cast(str, construct.name)), h.escapeAttr(text)
+                h.escapeAttr(t.cast(str, construct.name)),
+                h.escapeAttr(text),
             ),
             "</idl>",
         )

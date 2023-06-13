@@ -12,8 +12,8 @@ def verify_python_version() -> None:
             """Bikeshed has updated to Python 3, but you are trying to run it with
     Python {}. For instructions on upgrading, please check:
     https://speced.github.io/bikeshed/#installing""".format(
-                platform.python_version()
-            )
+                platform.python_version(),
+            ),
         )
         sys.exit(1)
 
@@ -22,8 +22,8 @@ def verify_python_version() -> None:
             """Bikeshed now requires Python 3.7; you are on {}.
     For instructions on how to set up a pyenv with 3.7, see:
     https://speced.github.io/bikeshed/#installing""".format(
-                platform.python_version()
-            )
+                platform.python_version(),
+            ),
         )
         sys.exit(1)
 
@@ -38,7 +38,8 @@ def verify_requirements() -> None:
     import pkg_resources
 
     requirements_file_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "requirements.txt"
+        os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+        "requirements.txt",
     )
     if os.path.exists(requirements_file_path):
         requirements_met = True
@@ -50,8 +51,9 @@ def verify_requirements() -> None:
                     if distribution not in requirement:
                         print(
                             "Package {} version {} is not supported.".format(
-                                requirement.project_name, distribution.version
-                            )
+                                requirement.project_name,
+                                distribution.version,
+                            ),
                         )
                         requirements_met = False
                 except Exception:

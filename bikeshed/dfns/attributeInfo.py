@@ -116,7 +116,7 @@ def htmlFromInfo(info: TargetInfo) -> t.NodesT:
             [
                 " of type ",
                 h.E.code({"class": "idl-code"}, info.type),
-            ]
+            ],
         )
     else:
         # Everything else
@@ -124,7 +124,7 @@ def htmlFromInfo(info: TargetInfo) -> t.NodesT:
             [
                 " of type ",
                 h.E.a({"data-link-type": "idl-name"}, info.type),
-            ]
+            ],
         )
 
     if info.readonly:
