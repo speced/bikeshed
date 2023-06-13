@@ -91,7 +91,7 @@ class Serializer:
         ]
     )
 
-    def __init__(self, opaqueElements: t.Iterable[str], blockElements: t.Iterable[str]):
+    def __init__(self, opaqueElements: t.Iterable[str], blockElements: t.Iterable[str]) -> None:
         self.opaqueEls = frozenset(opaqueElements)
         self.blockEls = frozenset(blockElements)
 

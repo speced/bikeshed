@@ -123,7 +123,7 @@ class SpecBiblioEntry(BiblioEntry):
     for when we don't have "real" bibliography data for a reference.
     """
 
-    def __init__(self, spec: dict[str, str], preferredStatus: str | None = None, order: int = 0):
+    def __init__(self, spec: dict[str, str], preferredStatus: str | None = None, order: int = 0) -> None:
         super().__init__(
             linkText=spec["vshortname"],
             title=spec["description"],
@@ -149,7 +149,7 @@ class StringBiblioEntry(BiblioEntry):
 
     data: str
 
-    def __init__(self, linkText: str, data: str, order: int = 0):
+    def __init__(self, linkText: str, data: str, order: int = 0) -> None:
         doc = h.parseDocument(data)
         titleEl = h.find("cite", doc)
         if titleEl is not None:
@@ -178,7 +178,7 @@ class AliasBiblioEntry(BiblioEntry):
 
     aliasOf: str
 
-    def __init__(self, linkText: str, aliasOf: str, order: int = 0):
+    def __init__(self, linkText: str, aliasOf: str, order: int = 0) -> None:
         super().__init__(linkText=linkText, order=order)
         self.aliasOf = aliasOf.strip()
 

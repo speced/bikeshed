@@ -20,7 +20,7 @@ from .. import h, messages as m, t
 
 
 class SpecHeadings:
-    def __init__(self, spec: str, data: dict[str, list[str] | dict[str, dict[str, str]]]):
+    def __init__(self, spec: str, data: dict[str, list[str] | dict[str, dict[str, str]]]) -> None:
         self.spec = spec
         self.data = data
 

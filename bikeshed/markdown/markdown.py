@@ -813,7 +813,7 @@ class TokenStream:
         numSpacesForIndentation: int,
         before: TokenT | None = None,
         after: TokenT | None = None,
-    ):
+    ) -> None:
         self.tokens = tokens
         self.i = 0
         self.numSpacesForIndentation = numSpacesForIndentation

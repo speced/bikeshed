@@ -12,7 +12,7 @@ class StringEnum:
     or as a dictionary (`someEnum["foo"]`).
     """
 
-    def __init__(self, *vals: str):
+    def __init__(self, *vals: str) -> None:
         self._vals = {}
         for val in vals:
             self._vals[val] = val

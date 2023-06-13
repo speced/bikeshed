@@ -74,7 +74,7 @@ class Font:
 
     """
 
-    def __init__(self, fontfilename: str = config.scriptPath("bigblocks.bsfont")):
+    def __init__(self, fontfilename: str = config.scriptPath("bigblocks.bsfont")) -> None:
         try:
             with open(fontfilename, encoding="utf-8") as fh:
                 lines = fh.readlines()

@@ -43,7 +43,7 @@ class ReferenceManager:
         defaultStatus: str | None = None,
         fileRequester: t.DataFileRequester | None = None,
         testing: bool = False,
-    ):
+    ) -> None:
         self.dataFile: t.DataFileRequester
         if fileRequester is None:
             self.dataFile = retrieve.defaultRequester

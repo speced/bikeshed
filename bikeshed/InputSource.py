@@ -104,7 +104,7 @@ class InputSource:
 
 
 class StdinInputSource(InputSource):
-    def __init__(self, sourceName: str, **kwargs: t.Any):  # pylint: disable=unused-argument
+    def __init__(self, sourceName: str, **kwargs: t.Any) -> None:  # pylint: disable=unused-argument
         assert sourceName == "-"
         self.type = "stdin"
         self.sourceName = sourceName
@@ -118,7 +118,7 @@ class StdinInputSource(InputSource):
 
 
 class UrlInputSource(InputSource):
-    def __init__(self, sourceName: str, **kwargs: t.Any):  # pylint: disable=unused-argument
+    def __init__(self, sourceName: str, **kwargs: t.Any) -> None:  # pylint: disable=unused-argument
         assert sourceName.startswith("https:")
         self.sourceName = sourceName
         self.type = "url"
@@ -155,7 +155,7 @@ class UrlInputSource(InputSource):
 
 
 class FileInputSource(InputSource):
-    def __init__(self, sourceName: str, *, chroot: bool, chrootPath: str | None = None):
+    def __init__(self, sourceName: str, *, chroot: bool, chrootPath: str | None = None) -> None:
         self.sourceName = sourceName
         self.chrootPath = chrootPath
         self.type = "file"
@@ -201,7 +201,7 @@ class FileInputSource(InputSource):
 
 
 class TarInputSource(InputSource):
-    def __init__(self, sourceName: str, *, tarMemberName: str = "index.bs", **_: t.Any):
+    def __init__(self, sourceName: str, *, tarMemberName: str = "index.bs", **_: t.Any) -> None:
         self.sourceName = sourceName
         self.tarMemberName = tarMemberName
         self.type = "tar"

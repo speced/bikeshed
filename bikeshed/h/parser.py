@@ -145,7 +145,7 @@ class Stream:
     _chars: str
     _lineBreaks: list[int]
 
-    def __init__(self, chars: str):
+    def __init__(self, chars: str) -> None:
         self._chars = chars
         self._lineBreaks = []
         for i, char in enumerate(chars):

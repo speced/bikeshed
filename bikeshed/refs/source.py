@@ -32,7 +32,7 @@ class RefSource:
         ignored: set[str] | None = None,
         replaced: set[tuple[str, str]] | None = None,
         fileRequester: t.DataFileRequester | None = None,
-    ):
+    ) -> None:
         if fileRequester is None:
             self.dataFile = retrieve.defaultRequester
         else:

@@ -23,7 +23,7 @@ class UnknownRepository(Repository):
 
 
 class GithubRepository(Repository):
-    def __init__(self, ns: str, user: str, repo: str):
+    def __init__(self, ns: str, user: str, repo: str) -> None:
         super().__init__(
             url=f"https://github.{ns}/{user}/{repo}",
             name=f"{user}/{repo}",

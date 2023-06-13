@@ -21,7 +21,7 @@ class MarkdownCodeSpans(func.Functor):
     # and contains no markdown code spans.
     # Thus, functions mapping over the text can freely make substitutions,
     # knowing they won't accidentally replace stuff in a code span.
-    def __init__(self, text: str):
+    def __init__(self, text: str) -> None:
         self.__codeSpanReplacements__ = []
         newText = ""
         mode = "text"

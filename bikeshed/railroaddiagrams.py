@@ -72,7 +72,7 @@ def addDebug(el: DiagramItem) -> None:
 
 
 class DiagramItem:
-    def __init__(self, name: str, attrs: Opt[AttrsT] = None, text: Opt[Node] = None):
+    def __init__(self, name: str, attrs: Opt[AttrsT] = None, text: Opt[Node] = None) -> None:
         self.name = name
         # up = distance it projects above the entry line
         self.up: float = 0
@@ -123,7 +123,7 @@ class DiagramMultiContainer(DiagramItem):
         items: Seq[Node],
         attrs: Opt[Dict[str, str]] = None,
         text: Opt[str] = None,
-    ):
+    ) -> None:
         DiagramItem.__init__(self, name, attrs, text)
         self.items: List[DiagramItem] = [wrapString(item) for item in items]
 
@@ -137,7 +137,7 @@ class DiagramMultiContainer(DiagramItem):
 
 
 class Path:
-    def __init__(self, x: float, y: float):
+    def __init__(self, x: float, y: float) -> None:
         self.x = x
         self.y = y
         self.attrs = {"d": f"M{x} {y}"}
@@ -282,7 +282,7 @@ DEFAULT_STYLE = """\
 
 
 class Style:
-    def __init__(self, css: str):
+    def __init__(self, css: str) -> None:
         self.css = css
 
     def __repr__(self) -> str:
@@ -301,7 +301,7 @@ class Style:
 
 
 class Diagram(DiagramMultiContainer):
-    def __init__(self, *items: Node, **kwargs: str):
+    def __init__(self, *items: Node, **kwargs: str) -> None:
         # Accepts a type=[simple|complex] kwarg
         DiagramMultiContainer.__init__(
             self,
@@ -398,7 +398,7 @@ class Diagram(DiagramMultiContainer):
 
 
 class Sequence(DiagramMultiContainer):
-    def __init__(self, *items: Node):
+    def __init__(self, *items: Node) -> None:
         DiagramMultiContainer.__init__(self, "g", items)
         self.needsSpace = True
         self.up = 0
@@ -439,7 +439,7 @@ class Sequence(DiagramMultiContainer):
 
 
 class Stack(DiagramMultiContainer):
-    def __init__(self, *items: Node):
+    def __init__(self, *items: Node) -> None:
         DiagramMultiContainer.__init__(self, "g", items)
         self.needsSpace = True
         self.width = max(item.width + (20 if item.needsSpace else 0) for item in self.items)
@@ -505,7 +505,7 @@ class OptionalSequence(DiagramMultiContainer):
         else:
             return super(OptionalSequence, cls).__new__(cls)
 
-    def __init__(self, *items: Node):
+    def __init__(self, *items: Node) -> None:
         DiagramMultiContainer.__init__(self, "g", items)
         self.needsSpace = False
         self.width = 0
@@ -620,7 +620,7 @@ class AlternatingSequence(DiagramMultiContainer):
                 "AlternatingSequence takes exactly two arguments, but got {0} arguments.".format(len(items))
             )
 
-    def __init__(self, *items: Node):
+    def __init__(self, *items: Node) -> None:
         DiagramMultiContainer.__init__(self, "g", items)
         self.needsSpace = False
 
@@ -709,7 +709,7 @@ class AlternatingSequence(DiagramMultiContainer):
 
 
 class Choice(DiagramMultiContainer):
-    def __init__(self, default: int, *items: Node):
+    def __init__(self, default: int, *items: Node) -> None:
         DiagramMultiContainer.__init__(self, "g", items)
         assert default < len(items)
         self.default = default
@@ -785,7 +785,7 @@ class Choice(DiagramMultiContainer):
 
 
 class MultipleChoice(DiagramMultiContainer):
-    def __init__(self, default: int, type: str, *items: Node):
+    def __init__(self, default: int, type: str, *items: Node) -> None:
         DiagramMultiContainer.__init__(self, "g", items)
         assert 0 <= default < len(items)
         assert type in ["any", "all"]
@@ -909,7 +909,7 @@ class HorizontalChoice(DiagramMultiContainer):
         else:
             return super(HorizontalChoice, cls).__new__(cls)
 
-    def __init__(self, *items: Node):
+    def __init__(self, *items: Node) -> None:
         DiagramMultiContainer.__init__(self, "g", items)
         allButLast = self.items[:-1]
         middles = self.items[1:-1]
@@ -1024,7 +1024,7 @@ def Optional(item: Node, skip: bool = False) -> Choice:
 
 
 class OneOrMore(DiagramItem):
-    def __init__(self, item: Node, repeat: Opt[Node] = None):
+    def __init__(self, item: Node, repeat: Opt[Node] = None) -> None:
         DiagramItem.__init__(self, "g")
         self.item = wrapString(item)
         repeat = repeat or Skip()
@@ -1074,7 +1074,7 @@ def ZeroOrMore(item: Node, repeat: Opt[Node] = None, skip: bool = False) -> Choi
 
 
 class Group(DiagramItem):
-    def __init__(self, item: Node, label: Opt[Node] = None):
+    def __init__(self, item: Node, label: Opt[Node] = None) -> None:
         DiagramItem.__init__(self, "g")
         self.item = wrapString(item)
         self.label: Opt[DiagramItem]
@@ -1136,7 +1136,7 @@ class Group(DiagramItem):
 
 
 class Start(DiagramItem):
-    def __init__(self, type: str = "simple", label: Opt[str] = None):
+    def __init__(self, type: str = "simple", label: Opt[str] = None) -> None:
         DiagramItem.__init__(self, "g")
         if label:
             self.width = max(20, len(label) * CHAR_WIDTH + 10)
@@ -1167,7 +1167,7 @@ class Start(DiagramItem):
 
 
 class End(DiagramItem):
-    def __init__(self, type: str = "simple"):
+    def __init__(self, type: str = "simple") -> None:
         DiagramItem.__init__(self, "path")
         self.width = 20
         self.up = 10
@@ -1187,7 +1187,7 @@ class End(DiagramItem):
 
 
 class Terminal(DiagramItem):
-    def __init__(self, text: str, href: Opt[str] = None, title: Opt[str] = None, cls: str = ""):
+    def __init__(self, text: str, href: Opt[str] = None, title: Opt[str] = None, cls: str = "") -> None:
         DiagramItem.__init__(self, "g", {"class": " ".join(["terminal", cls])})
         self.text = text
         self.href = href
@@ -1232,7 +1232,7 @@ class Terminal(DiagramItem):
 
 
 class NonTerminal(DiagramItem):
-    def __init__(self, text: str, href: Opt[str] = None, title: Opt[str] = None, cls: str = ""):
+    def __init__(self, text: str, href: Opt[str] = None, title: Opt[str] = None, cls: str = "") -> None:
         DiagramItem.__init__(self, "g", {"class": " ".join(["non-terminal", cls])})
         self.text = text
         self.href = href
@@ -1275,7 +1275,7 @@ class NonTerminal(DiagramItem):
 
 
 class Comment(DiagramItem):
-    def __init__(self, text: str, href: Opt[str] = None, title: Opt[str] = None, cls: str = ""):
+    def __init__(self, text: str, href: Opt[str] = None, title: Opt[str] = None, cls: str = "") -> None:
         DiagramItem.__init__(self, "g", {"class": " ".join(["non-terminal", cls])})
         self.text = text
         self.href = href

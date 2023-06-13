@@ -14,7 +14,7 @@ class BoolSet(collections.abc.MutableMapping):
     Can also set whether the default should consider unset values to be True or False by default.
     """
 
-    def __init__(self, values: t.Any = None, default: bool = False):
+    def __init__(self, values: t.Any = None, default: bool = False) -> None:
         self._internal: dict[t.Any, bool] = {}
         if isinstance(values, collections.abc.Mapping):
             for k, v in values.items():

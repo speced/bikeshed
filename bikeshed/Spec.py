@@ -56,7 +56,7 @@ class Spec:
         lineNumbers: bool = False,
         fileRequester: retrieve.DataFileRequester | None = None,
         testing: bool = False,
-    ):
+    ) -> None:
         catchArgparseBug(inputFilename)
         self.valid: bool = False
         self.lineNumbers: bool = lineNumbers

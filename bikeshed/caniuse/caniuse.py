@@ -144,7 +144,7 @@ def validateCanIUseURLs(doc: t.SpecT, canIUseData: CanIUseManager, elements: lis
 
 
 class CanIUseManager:
-    def __init__(self, dataFile: t.DataFileRequester):
+    def __init__(self, dataFile: t.DataFileRequester) -> None:
         self.dataFile = dataFile
         data = json.loads(
             self.dataFile.fetch("caniuse", "data.json", str=True),

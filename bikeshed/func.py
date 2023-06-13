@@ -6,7 +6,7 @@ from . import t
 class Functor:
     # Pointed and Co-Pointed by default;
     # override these yourself if you need to.
-    def __init__(self, val: t.Any):
+    def __init__(self, val: t.Any) -> None:
         self.__val__ = val
 
     def extract(self) -> t.Any:
