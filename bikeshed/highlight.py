@@ -60,14 +60,11 @@ def addSyntaxHighlighting(doc: t.SpecT) -> None:
                 lineHighlightingOccurred = True
 
     if highlightingOccurred:
-        doc.extraStyles["style-syntax-highlighting"] += getHighlightStyles()
-        doc.extraStyles["style-darkmode"] += getHighlightDarkmodeStyles()
+        doc.extraStyles.set("syntax-highlighting", getHighlightStyles(), dark=getHighlightDarkmodeStyles())
     if lineWrappingOccurred:
-        doc.extraStyles["style-line-numbers"] += getLineNumberStyles()
-        doc.extraStyles["style-darkmode"] += getLineNumberDarkmodeStyles()
+        doc.extraStyles.set("line-numbers", getLineNumberStyles(), dark=getLineNumberDarkmodeStyles())
     if lineHighlightingOccurred:
-        doc.extraStyles["style-line-highlighting"] += getLineHighlightingStyles()
-        doc.extraStyles["style-darkmode"] += getLineHighlightingDarkmodeStyles()
+        doc.extraStyles.set("line-highlighting", getLineHighlightingStyles(), dark=getLineHighlightingDarkmodeStyles())
 
 
 def determineHighlightLang(doc: t.SpecT, el: t.ElementT) -> str | t.Literal[False] | None:

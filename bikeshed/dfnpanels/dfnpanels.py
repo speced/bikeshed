@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from collections import OrderedDict
 
-from .. import config, h, t, messages as m
+from .. import h, t, messages as m
 from ..translate import _
 
 
@@ -63,12 +63,11 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
         }
         scriptLines.append(f"window.dfnpanelData['{id}'] = {json.dumps(panelJson)};")
     if len(scriptLines) > 0:
-        if "script-dfn-panel-json" not in doc.extraScripts:
-            doc.extraScripts["script-dfn-panel-json"] = "window.dfnpanelData = {};\n"
-        doc.extraScripts["script-dfn-panel-json"] += "\n".join(scriptLines)
+        jsonBlock = doc.extraScripts.setDefault("dfn-panel-json", "window.dfnpanelData = {};\n")
+        jsonBlock.text += "\n".join(scriptLines)
     if atLeastOnePanel:
-        doc.extraScripts["script-dfn-panel"] = getModuleFile("dfnpanels.js")
-        doc.extraStyles["style-dfn-panel"] = getModuleFile("dfnpanels.css")
+        doc.extraScripts.setFile("dfn-panel", "dfnpanels/dfnpanels.js")
+        doc.extraStyles.setFile("dfn-panel", "dfnpanels/dfnpanels.css")
         h.addDOMHelperScript(doc)
 
 
@@ -130,18 +129,11 @@ def addExternalDfnPanel(termEl: t.ElementT, ref: t.RefWrapper, doc: t.SpecT) -> 
         "external": True,
     }
 
-    if "script-dfn-panel-json" not in doc.extraScripts:
-        doc.extraScripts["script-dfn-panel-json"] = "window.dfnpanelData = {};\n"
-    doc.extraScripts["script-dfn-panel-json"] += f"window.dfnpanelData['{termID}'] = {json.dumps(panelJson)};\n"
+    jsonBlock = doc.extraScripts.setDefault("dfn-panel-json", "window.dfnpanelData = {};\n")
+    jsonBlock.text += f"window.dfnpanelData['{termID}'] = {json.dumps(panelJson)};\n"
 
 
 def addExternalDfnPanelStyles(doc: t.SpecT) -> None:
-    doc.extraScripts["script-dfn-panel"] = getModuleFile("dfnpanels.js")
-    doc.extraStyles["style-dfn-panel"] = getModuleFile("dfnpanels.css")
-    doc.extraStyles["style-darkmode"] += getModuleFile("dfnpanels-dark.css")
+    doc.extraScripts.setFile("dfn-panel", "dfnpanels/dfnpanels.js")
+    doc.extraStyles.setFile("dfn-panel", "dfnpanels/dfnpanels.css")
     h.addDOMHelperScript(doc)
-
-
-def getModuleFile(filename: str) -> str:
-    with open(config.scriptPath("dfnpanels", filename), "r", encoding="utf-8") as fh:
-        return fh.read()

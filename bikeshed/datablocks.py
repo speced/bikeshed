@@ -592,9 +592,9 @@ def transformRailroad(lines: list[str], tagName: str, firstLine: str, lineNum: i
     from . import railroadparser
 
     ret = ["<div class='railroad'>"]
-    doc.extraStyles[
-        "style-railroad"
-    ] = """
+    doc.extraStyles.set(
+        "style-railroad",
+        """
     :root {
         --railroad-bg: hsl(30, 20%, 95%);
         --railroad-stroke: black;
@@ -623,17 +623,15 @@ def transformRailroad(lines: list[str], tagName: str, firstLine: str, lineNum: i
         stroke-width:3px;
         stroke: var(--railroad-stroke);
         fill: var(--railroad-fill);
-    }"""
-    doc.extraStyles[
-        "style-darkmode"
-    ] += """
-    @media (prefers-color-scheme: dark) {
+    }""",
+        dark="""@media (prefers-color-scheme: dark) {
         :root {
             --railroad-bg: rgba(255, 255, 255, .05);
             --railroad-stroke: #bbb;
             --railroad-fill: hsla(240deg, 20%, 15%);
         }
-    }"""
+    }""",
+    )
     code = "".join(lines)
     diagram = railroadparser.parse(code)
     if diagram:
