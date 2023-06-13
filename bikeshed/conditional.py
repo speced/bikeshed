@@ -73,7 +73,7 @@ def evalConditions(doc: t.SpecT, el: t.ElementT, conditionString: str) -> t.Gene
             yield (h.find(f'[boilerplate="{h.escapeCSSIdent(cond.value)}"]', doc) is not None)
         else:
             m.die(
-                f"Program error, some type of include/exclude-if condition wasn't handled: '{repr(cond)}'. Please report!",
+                f"Program error, some type of include/exclude-if condition wasn't handled: '{cond!r}'. Please report!",
                 el,
             )
             yield False

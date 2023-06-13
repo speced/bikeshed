@@ -241,7 +241,7 @@ class Path:
         return self
 
     def __repr__(self) -> str:
-        return f"Path({repr(self.x)}, {repr(self.y)})"
+        return f"Path({self.x!r}, {self.y!r})"
 
 
 def wrapString(value: Node) -> DiagramItem:
@@ -285,7 +285,7 @@ class Style:
         self.css = css
 
     def __repr__(self) -> str:
-        return f"Style({repr(self.css)})"
+        return f"Style({self.css!r})"
 
     def addTo(self, parent: DiagramItem) -> Style:
         parent.children.append(self)
@@ -336,7 +336,7 @@ class Diagram(DiagramMultiContainer):
         items = ", ".join(map(repr, self.items[1:-1]))
         pieces = [] if not items else [items]
         if self.type != "simple":
-            pieces.append(f"type={repr(self.type)}")
+            pieces.append(f"type={self.type!r}")
         return f'Diagram({", ".join(pieces)})'
 
     def format(
@@ -814,7 +814,7 @@ class MultipleChoice(DiagramMultiContainer):
 
     def __repr__(self) -> str:
         items = ", ".join(repr(item) for item in self.items)
-        return f"MultipleChoice({repr(self.default)}, {repr(self.type)}, {items})"
+        return f"MultipleChoice({self.default!r}, {self.type!r}, {items})"
 
     def format(self, x: float, y: float, width: float) -> MultipleChoice:
         leftGap, rightGap = determineGaps(width, self.width)
@@ -1064,7 +1064,7 @@ class OneOrMore(DiagramItem):
         self.rep.walk(cb)
 
     def __repr__(self) -> str:
-        return f"OneOrMore({repr(self.item)}, repeat={repr(self.rep)})"
+        return f"OneOrMore({self.item!r}, repeat={self.rep!r})"
 
 
 def ZeroOrMore(item: Node, repeat: Opt[Node] = None, skip: bool = False) -> Choice:
@@ -1162,7 +1162,7 @@ class Start(DiagramItem):
         return self
 
     def __repr__(self) -> str:
-        return f"Start(type={repr(self.type)}, label={repr(self.label)})"
+        return f"Start(type={self.type!r}, label={self.label!r})"
 
 
 class End(DiagramItem):
@@ -1182,7 +1182,7 @@ class End(DiagramItem):
         return self
 
     def __repr__(self) -> str:
-        return f"End(type={repr(self.type)})"
+        return f"End(type={self.type!r})"
 
 
 class Terminal(DiagramItem):
@@ -1199,7 +1199,7 @@ class Terminal(DiagramItem):
         addDebug(self)
 
     def __repr__(self) -> str:
-        return f"Terminal({repr(self.text)}, href={repr(self.href)}, title={repr(self.title)}, cls={repr(self.cls)})"
+        return f"Terminal({self.text!r}, href={self.href!r}, title={self.title!r}, cls={self.cls!r})"
 
     def format(self, x: float, y: float, width: float) -> Terminal:
         leftGap, rightGap = determineGaps(width, self.width)
@@ -1244,7 +1244,7 @@ class NonTerminal(DiagramItem):
         addDebug(self)
 
     def __repr__(self) -> str:
-        return f"NonTerminal({repr(self.text)}, href={repr(self.href)}, title={repr(self.title)}, cls={repr(self.cls)})"
+        return f"NonTerminal({self.text!r}, href={self.href!r}, title={self.title!r}, cls={self.cls!r})"
 
     def format(self, x: float, y: float, width: float) -> NonTerminal:
         leftGap, rightGap = determineGaps(width, self.width)
@@ -1287,7 +1287,7 @@ class Comment(DiagramItem):
         addDebug(self)
 
     def __repr__(self) -> str:
-        return f"Comment({repr(self.text)}, href={repr(self.href)}, title={repr(self.title)}, cls={repr(self.cls)})"
+        return f"Comment({self.text!r}, href={self.href!r}, title={self.title!r}, cls={self.cls!r})"
 
     def format(self, x: float, y: float, width: float) -> Comment:
         leftGap, rightGap = determineGaps(width, self.width)

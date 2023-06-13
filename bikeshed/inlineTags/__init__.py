@@ -30,7 +30,7 @@ def processTags(doc: t.SpecT) -> None:
                 return
             if p.returncode:
                 m.die(
-                    f"When trying to process {h.outerHTML(el)}, got return code {p.returncode} and the following stderr:\n{str(err)}",
+                    f"When trying to process {h.outerHTML(el)}, got return code {p.returncode} and the following stderr:\n{err!s}",
                     el=el,
                 )
                 continue

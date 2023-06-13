@@ -1150,7 +1150,7 @@ def getSpecRepository(doc: t.SpecT) -> repository.Repository | None:
         try:
             with open(os.devnull, "wb") as fnull:
                 remotes = str(
-                    subprocess.check_output(["git", "remote", "-v"], stderr=fnull, cwd=source_dir),
+                    subprocess.check_output(["git", "remote", "-v"], stderr=fnull, cwd=source_dir),  # noqa: S603
                     encoding="utf-8",
                 )
             searches = [

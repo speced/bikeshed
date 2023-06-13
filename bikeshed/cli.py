@@ -643,18 +643,11 @@ def handleProfile(options: argparse.Namespace) -> None:
     leaf = f'--leaf="{options.leaf}"' if options.leaf else ""
     if options.svgFile:
         os.system(
-            "time python -m cProfile -o stat.prof -m bikeshed -f spec && gprof2dot -f pstats --skew=.0001 {root} {leaf} stat.prof | dot -Tsvg -o {svg} && rm stat.prof".format(
-                root=root,
-                leaf=leaf,
-                svg=options.svgFile,
-            ),
+            f"time python -m cProfile -o stat.prof -m bikeshed -f spec && gprof2dot -f pstats --skew=.0001 {root} {leaf} stat.prof | dot -Tsvg -o {options.svgFile} && rm stat.prof",  # noqa: S605
         )
     else:
         os.system(
-            "time python -m cProfile -o /tmp/stat.prof -m bikeshed -f spec && gprof2dot -f pstats --skew=.0001 {root} {leaf} /tmp/stat.prof | xdot &".format(
-                root=root,
-                leaf=leaf,
-            ),
+            f"time python -m cProfile -o /tmp/stat.prof -m bikeshed -f spec && gprof2dot -f pstats --skew=.0001 {root} {leaf} /tmp/stat.prof | xdot &",  # noqa: S605
         )
 
 

@@ -124,10 +124,10 @@ def parseMetadata(lines: list[str]) -> tuple[FontMetadata, list[str]]:
             continue
     if height is None:
         m.die("Missing 'Character Height' metadata.")
-        raise Exception("")
+        raise Exception
     if spaceWidth is None:
         m.die("Missing 'Space Width' metadata.")
-        raise Exception("")
+        raise Exception
     md = FontMetadata(height, spaceWidth)
     return md, lines[i:]
 
