@@ -52,7 +52,7 @@ class DataFileRequester:
                 with open(location, encoding="utf-8") as fh:
                     return fh.read()
             else:
-                return open(location, encoding="utf-8") # noqa: SIM115
+                return open(location, encoding="utf-8")  # noqa: SIM115
         except OSError:
             if self.fallback:
                 try:

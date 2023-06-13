@@ -34,4 +34,3 @@ class StringEnum:
         """will only get called for undefined attributes"""
         msg = f"No member '{name}' contained in StringEnum."
         raise IndexError(msg)
-        return ""
