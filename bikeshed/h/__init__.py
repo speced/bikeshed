@@ -1,6 +1,6 @@
 from .dom import (
-    E,
     addClass,
+    addDOMHelperScript,
     addOldIDs,
     appendChild,
     appendContents,
@@ -13,6 +13,8 @@ from .dom import (
     closestAttr,
     createElement,
     dedupIDs,
+    DuplicatedLinkText,
+    E,
     emptyText,
     escapeAttr,
     escapeCSSIdent,
@@ -21,6 +23,7 @@ from .dom import (
     filterAncestors,
     find,
     findAll,
+    firstLinkTextFromElement,
     fixSurroundingTypography,
     fixTypography,
     fixupIDs,
@@ -40,6 +43,7 @@ from .dom import (
     isEmpty,
     isNormative,
     isOddNode,
+    linkTextsFromElement,
     moveContents,
     nextSiblingElement,
     nextSiblingNode,
@@ -69,6 +73,7 @@ from .dom import (
     treeAttr,
     unescape,
     unfixTypography,
+    uniqueID,
     wrapContents,
 )
 from .serializer import Serializer

@@ -267,8 +267,8 @@ class ReferenceManager:
             elId = el.get("id")
             assert elId is not None
             try:
-                linkTexts = config.linkTextsFromElement(el)
-            except config.DuplicatedLinkText as e:
+                linkTexts = h.linkTextsFromElement(el)
+            except h.DuplicatedLinkText as e:
                 m.die(
                     f"The term '{e.offendingText}' is in both lt and local-lt of the element {h.outerHTML(e.el)}.",
                     el=e.el,

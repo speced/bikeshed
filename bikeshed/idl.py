@@ -88,6 +88,9 @@ class DebugMarker(widlparser.protocols.Marker):
     ) -> MarkupReturnT:  # pylint: disable=unused-argument
         return ('<ENUM-VALUE for="' + t.cast(str, construct.name) + '">', "</ENUM-VALUE>")
 
+    def encode(self, text: str) -> str:
+        return h.escapeHTML(text)
+
 
 class IDLMarker(widlparser.protocols.Marker):
     def markup_construct(
@@ -365,13 +368,14 @@ def markupIDL(doc: t.SpecT) -> None:
                 h.replaceNode(span, *contents)
         return
     if highlightingOccurred:
-        doc.extraStyles[
-            "style-syntax-highlighting"
-        ] += """
+        doc.extraStyles.set(
+            "style-syntax-highlighting",
+            """
             pre.idl.highlight {
                 background: var(--borderedblock-bg, var(--def-bg));
             }
-            """
+            """,
+        )
 
 
 def markupIDLBlock(pre: t.ElementT, doc: t.SpecT) -> set[t.ElementT]:

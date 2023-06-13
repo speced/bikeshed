@@ -184,22 +184,21 @@ def addExpiryNotice(doc: t.SpecT) -> None:
         boilerplate = "warning-expired"
     else:
         boilerplate = "warning-expires"
-        doc.extraScripts["script-expires"] = expiryScript
+        doc.extraScripts.set(
+            "expires",
+            """
+            const warning = document.querySelector('#expiry-notice');
+            const expiresOn = warning.dataset.expires;
+            const today = new Date().toISOString();
+            if(expires < today) {
+                warning.setAttribute("open", "");
+                for(const swap of warning.querySelectorAll("[data-after-expiry]")) {
+                    swap.textContent = swap.dataset.afterExpiry;
+                }
+            }""",
+        )
     loadBoilerplate(doc, boilerplate, "warning")
     h.addClass(doc, doc.body, boilerplate)
-
-
-expiryScript = """
-const warning = document.querySelector('#expiry-notice');
-const expiresOn = warning.dataset.expires;
-const today = new Date().toISOString();
-if(expires < today) {
-    warning.setAttribute("open", "");
-    for(const swap of warning.querySelectorAll("[data-after-expiry]")) {
-        swap.textContent = swap.dataset.afterExpiry;
-    }
-}
-"""
 
 
 def addObsoletionNotice(doc: t.SpecT) -> None:
@@ -258,26 +257,22 @@ def keyFromStyles(kv: tuple[str, str]) -> tuple[int, str]:
 
 
 def addBikeshedBoilerplate(doc: t.SpecT) -> None:
-    w3cStylesheet = w3cStylesheetInUse(doc)
-    for k, v in sorted(doc.extraStyles.items(), key=keyFromStyles):
-        if k not in doc.md.boilerplate:
+    for style in doc.extraStyles.getAll():
+        if "style-" + style.name not in doc.md.boilerplate:
             continue
-        if w3cStylesheet and k in ["style-colors", "style-darkmode"]:
-            # These are handled by the /TR stylesheet, so don't output them
-            continue
-        container = getFillContainer(k, doc)
+        container = getFillContainer("style-" + style.name, doc)
         if container is None:
             container = getFillContainer("bs-styles", doc, default=True)
         if container is not None:
-            h.appendChild(container, h.E.style(f"/* {k} */\n{v}"))
-    for k, v in sorted(doc.extraScripts.items()):
-        if k not in doc.md.boilerplate:
+            h.appendChild(container, style.toElement(darkMode=doc.md.darkMode))
+    for script in doc.extraScripts.getAll():
+        if "script-" + script.name not in doc.md.boilerplate:
             continue
-        container = getFillContainer(k, doc)
+        container = getFillContainer("script-" + script.name, doc)
         if container is None:
             container = getFillContainer("bs-scripts", doc, default=True)
         if container is not None:
-            h.appendChild(container, h.E.script(f"/* {k} */\n{v}"))
+            h.appendChild(container, script.toElement())
 
 
 def addIndexSection(doc: t.SpecT) -> None:
@@ -313,7 +308,7 @@ def addIndexOfLocallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> None:
         dfnType = el.get("data-dfn-type")
         if dfnID is None or dfnType is None:
             continue
-        linkTexts = config.linkTextsFromElement(el)
+        linkTexts = h.linkTextsFromElement(el)
         headingLevel = h.headingLevelOfElement(el) or _("Unnumbered section")
         if dfnType == "argument":
             # Don't generate index entries for arguments.
@@ -524,8 +519,8 @@ def addIndexOfExternallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> Non
     if not doc.externalRefsUsed.hasRefs():
         return
 
-    def makeLink(*contents: t.NodesT) -> t.ElementT:
-        return h.E.span({}, *contents)
+    def makeEntry(ref: t.RefWrapper, contents: t.NodesT) -> t.ElementT:
+        return h.E.span({"id": h.uniqueID("external-term", ref.url, ref.text)}, contents)
 
     ul = h.E.ul({"class": "index"})
 
@@ -557,17 +552,17 @@ def addIndexOfExternallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> Non
         for refText, refGroup in specData.sorted():
             if len(refGroup) == 1:
                 ref = refGroup.single()
-                link = makeLink(refText)
-                h.appendChild(termsUl, h.E.li(link))
-                dfnpanels.addExternalDfnPanel(link, ref, doc)
+                entry = makeEntry(ref, refText)
+                h.appendChild(termsUl, h.E.li(entry))
+                dfnpanels.addExternalDfnPanel(entry, ref, doc)
             else:
                 for forVal, ref in refGroup.sorted():
                     if forVal:
-                        link = makeLink(refText, " ", h.E.small({}, f"({_('for')} {forVal})"))
+                        entry = makeEntry(ref, [refText, " ", h.E.small({}, f"({_('for')} {forVal})")])
                     else:
-                        link = makeLink(refText)
-                    h.appendChild(termsUl, h.E.li(link))
-                    dfnpanels.addExternalDfnPanel(link, ref, doc)
+                        entry = makeEntry(ref, refText)
+                    h.appendChild(termsUl, h.E.li(entry))
+                    dfnpanels.addExternalDfnPanel(entry, ref, doc)
             atLeastOnePanel = True
     if atLeastOnePanel:
         dfnpanels.addExternalDfnPanelStyles(doc)
@@ -1001,9 +996,6 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
         )
     if doc.md.testSuite is not None:
         md.setdefault("Test Suite", []).append(h.E.a({"href": doc.md.testSuite}, doc.md.testSuite))
-    elif (doc.md.vshortname in doc.testSuites) and (doc.testSuites[doc.md.vshortname].url is not None):
-        url = doc.testSuites[doc.md.vshortname].url
-        md.setdefault("Test Suite", []).append(h.E.a({"href": url}, url))
     if doc.md.issues:
         if doc.md.TR:
             md.setdefault("Feedback", []).extend([h.E.a({"href": href}, text) for text, href in doc.md.issues])
@@ -1034,13 +1026,14 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
                 }
             ),
         )
-        doc.extraStyles[
-            "style-hidedel"
-        ] = """
+        doc.extraStyles.set(
+            "style-hidedel",
+            """
             #hidedel:checked ~ del, #hidedel:checked ~ * del { display:none; }
             #hidedel ~ #hidedel-label::before, #hidedel ~ * #hidedel-label::before { content: "☐ "; }
             #hidedel:checked ~ #hidedel-label::before, #hidedel:checked ~ * #hidedel-label::before { content: "☑ "; }
-        """
+        """,
+        )
 
     # Merge "custom" metadata into non-custom, when they match up
     # and upgrade html-text values into real elements
