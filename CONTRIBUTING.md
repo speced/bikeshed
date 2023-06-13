@@ -29,12 +29,11 @@ Bikeshed uses a number of services to lint its codebase.
 If you don't run these beforehand,
 your contributions might fail just due to violating the linting rules.
 
-To lint everything, first install `ruff`, `pylint`, and `black` from `pypi`.
-Then, from the root directory of the project, run `ruff check .`, `pylint bikeshed`, and `black .`.
+To lint everything, first install `ruff`, `pylint`, `mypy`, and `black` from `pypi`.
+(You can automatically get the versions that the project currently uses by running `pip install -r requirements-dev.txt` from the project root.)
+Then, from the root directory of the project, run `ruff check bikeshed`, `pylint bikeshed`, `black .`, and `mypy`.
 Fix anything that any of these are complaining about;
 if they are all happy, you're good.
-
-(mypy will also become part of this, but it's in-progress currently.)
 
 Running Tests
 -------------
