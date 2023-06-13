@@ -31,7 +31,8 @@ class BiblioEntry(metaclass=abc.ABCMeta):
         elif self.preferredStatus == constants.refStatus.current:
             return t.cast(str, self.currentURL or self.snapshotURL)
         else:
-            raise ValueError(f"Invalid preferredStatus value: {self.preferredStatus}")
+            msg = f"Invalid preferredStatus value: {self.preferredStatus}"
+            raise ValueError(msg)
 
     def toHTML(self) -> t.NodesT:
         ...

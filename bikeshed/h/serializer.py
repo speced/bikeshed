@@ -201,7 +201,8 @@ class Serializer:
         self.startTag(tag, el, write)
         for node in dom.childNodes(el):
             if self.isElement(node):
-                raise Exception(f"Somehow a CDATA element got an element child:\n{dom.outerHTML(el)}")
+                msg = f"Somehow a CDATA element got an element child:\n{dom.outerHTML(el)}"
+                raise Exception(msg)
             else:
                 assert isinstance(node, str)
                 write(node)

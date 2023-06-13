@@ -318,7 +318,8 @@ def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: bool = False) ->
                 # doesn't get moved into the appended child or anything.
                 parent.append(child)
     if child is None and not allowEmpty:
-        raise Exception("Empty child list appended without allowEmpty=True")
+        msg = "Empty child list appended without allowEmpty=True"
+        raise Exception(msg)
     if isElement(child):
         return child
     else:

@@ -202,7 +202,8 @@ def specsFromWebref(status: t.Literal["current" | "snapshot"]) -> list[WebrefSpe
     url = ("ed" if status == "current" else "tr") + "/index.json"
     j = dataFromWebref(url)
     if j is None or j.get("results") is None:
-        raise Exception(f"No {status} specs data from WebRef. Got:\n{json.dumps(j, indent=1)}")
+        msg = f"No {status} specs data from WebRef. Got:\n{json.dumps(j, indent=1)}"
+        raise Exception(msg)
     rawSpecs = t.cast("list[WebrefSpecT]", j["results"])
     filteredSpecs: list[WebrefSpecT] = []
     for spec in rawSpecs:
@@ -216,7 +217,8 @@ def anchorsFromWebref(status: t.Literal["current" | "snapshot"], urlSuffix: str)
     url = ("ed" if status == "current" else "tr") + "/" + urlSuffix
     j = dataFromWebref(url)
     if j is None or j.get("dfns") is None:
-        raise Exception(f"No WebRef dfns data at {url}. Got:\n{json.dumps(j, indent=1)}")
+        msg = f"No WebRef dfns data at {url}. Got:\n{json.dumps(j, indent=1)}"
+        raise Exception(msg)
     return t.cast("list[WebrefAnchorT]", j["dfns"])
 
 
@@ -224,7 +226,8 @@ def headingsFromWebref(status: t.Literal["current" | "snapshot"], urlSuffix: str
     url = ("ed" if status == "current" else "tr") + "/" + urlSuffix
     j = dataFromWebref(url)
     if j is None or j.get("headings") is None:
-        raise Exception(f"No WebRef headings data at {url}. Got:\n{json.dumps(j, indent=1)}")
+        msg = f"No WebRef headings data at {url}. Got:\n{json.dumps(j, indent=1)}"
+        raise Exception(msg)
     return t.cast("list[WebrefHeadingT]", j["headings"])
 
 
@@ -234,13 +237,13 @@ def dataFromWebref(url: str) -> t.JSONT:
     try:
         response = requests.get(webrefAPIUrl + url, timeout=5)
     except Exception as e:
-        raise Exception(f"Couldn't download data from Webref.\n{e}") from e
+        msg = f"Couldn't download data from Webref.\n{e}"
+        raise Exception(msg) from e
     try:
         data = response.json()
     except Exception as e:
-        raise Exception(
-            f"Data retrieved from Webref wasn't valid JSON for some reason. Try downloading again?\n{e}",
-        ) from e
+        msg = f"Data retrieved from Webref wasn't valid JSON for some reason. Try downloading again?\n{e}"
+        raise Exception(msg) from e
     return t.cast("t.JSONT", data)
 
 

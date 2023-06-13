@@ -311,7 +311,8 @@ class RefSource:
             elif status in config.linkStatuses:
                 return [x for x in refs if x.status == status]
 
-            raise Exception(f"Status value of '{status}' not handled")
+            msg = f"Status value of '{status}' not handled"
+            raise Exception(msg)
 
         if status:
             refs = filterByStatus(refs, status)

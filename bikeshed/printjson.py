@@ -81,4 +81,5 @@ def printjsonprimitive(x: t.Any) -> str:
         return "null"
     if h.isElement(x):
         return repr(x) + ":" + h.outerHTML(x)
-    raise ValueError(f"Could not print value: {x}")
+    msg = f"Could not print value: {x}"
+    raise ValueError(msg)

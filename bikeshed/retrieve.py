@@ -12,7 +12,8 @@ from . import messages as m
 class DataFileRequester:
     def __init__(self, fileType: str | None = None, fallback: DataFileRequester | None = None) -> None:
         if fileType not in ("readonly", "latest"):
-            raise Exception(f"Bad value for DataFileRequester.type, got '{fileType}'.")
+            msg = f"Bad value for DataFileRequester.type, got '{fileType}'."
+            raise Exception(msg)
         self.fileType: str = fileType
         # fallback is another requester, used if the main one fails.
         self.fallback = fallback
@@ -96,7 +97,8 @@ class DataFileRequester:
                 return ""
             else:
                 return io.StringIO("")
-        raise OSError(f"Couldn't find file '{location}'")
+        msg = f"Couldn't find file '{location}'"
+        raise OSError(msg)
 
 
 defaultRequester = DataFileRequester(fileType="latest", fallback=DataFileRequester(fileType="readonly"))

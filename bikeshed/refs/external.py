@@ -57,7 +57,8 @@ class ExternalRefsGroup:
         if len(self.valuesByFor) == 1:
             return list(self.valuesByFor.values())[0]
         else:
-            raise IndexError(f"There are {len(self.valuesByFor)} values, not just 1.")
+            msg = f"There are {len(self.valuesByFor)} values, not just 1."
+            raise IndexError(msg)
 
     def sorted(self) -> t.Generator[tuple[str | None, t.RefWrapper], None, None]:
         if None in self.valuesByFor:

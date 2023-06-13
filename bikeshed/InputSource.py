@@ -71,7 +71,8 @@ class InputSource:
 
     def directory(self) -> str:
         """Suitable for passing to subprocess(cwd=)."""
-        raise TypeError("{} instances don't have directories.".format(type(self)))
+        msg = f"{type(self)} instances don't have directories."
+        raise TypeError(msg)
 
     def relative(self, _: t.Any) -> InputSource | None:
         """Resolves relativePath relative to this InputSource.
@@ -236,7 +237,8 @@ class TarInputSource(InputSource):
 
     def directory(self) -> str:
         # It would be possible to produce a file listing. But not a meaningful directory path.
-        raise TypeError("{} instances don't have directories.".format(type(self)))
+        msg = f"{type(self)} instances don't have directories."
+        raise TypeError(msg)
 
     def relative(self, relativePath: str) -> TarInputSource:
         """Returns an InputSource relative to this file. Since a TarInputSource is always inside the
