@@ -95,7 +95,7 @@ if t.TYPE_CHECKING:
 
 
 def update(path: str, dryRun: bool = False) -> set[str] | None:
-    specs: SpecsT = dict()
+    specs: SpecsT = {}
     anchors: AnchorsT = defaultdict(list)
     headings: AllHeadingsT = {}
 

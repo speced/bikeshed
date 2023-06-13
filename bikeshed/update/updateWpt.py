@@ -52,7 +52,7 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
             m.die(f"Couldn't save web-platform-tests data to disk.\n{e}")
             return None
     m.say("Success!")
-    return set([filePath])
+    return {filePath}
 
 
 def collectPaths(pathListSoFar: list[str], pathTrie: dict[str, dict | str], pathPrefix: str) -> list[str]:

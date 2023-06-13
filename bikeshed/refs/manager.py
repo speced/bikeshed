@@ -54,7 +54,7 @@ class ReferenceManager:
         self.testing: bool = testing
 
         # Dict of {spec vshortname => spec data}
-        self.specs: dict[str, SpecDataT] = dict()
+        self.specs: dict[str, SpecDataT] = {}
 
         # Dict of {linking text => link-defaults data}
         self.defaultSpecs: t.LinkDefaultsT = defaultdict(list)
@@ -76,13 +76,13 @@ class ReferenceManager:
 
         # Dict of {suffixless key => [keys with numeric suffixes]}
         # (So you can tell when it's appropriate to default a numeric-suffix ref to a suffixless one.)
-        self.biblioNumericSuffixes: dict[str, list[str]] = dict()
+        self.biblioNumericSuffixes: dict[str, list[str]] = {}
 
         # Dict of {base key name => preferred display name}
-        self.preferredBiblioNames: dict[str, str] = dict()
+        self.preferredBiblioNames: dict[str, str] = {}
 
         # Dict of {spec vshortname => headings}
-        self.headings: dict[str, headingdata.SpecHeadings] = dict()
+        self.headings: dict[str, headingdata.SpecHeadings] = {}
 
         self.defaultStatus: str
         if defaultStatus is None:
@@ -330,7 +330,7 @@ class ReferenceManager:
                     if match:
                         dfnFor.add(match.group(1).strip())
                 # convert back into a list now, for easier JSONing
-                dfnForList = list(sorted(dfnFor))
+                dfnForList = sorted(dfnFor)
                 ref = wrapper.RefWrapper(
                     linkText,
                     {

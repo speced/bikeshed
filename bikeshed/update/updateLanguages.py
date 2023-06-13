@@ -28,4 +28,4 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
             m.die(f"Couldn't save languages database to disk.\n{e}")
             return None
     m.say("Success!")
-    return set([filePath])
+    return {filePath}

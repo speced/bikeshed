@@ -1139,7 +1139,7 @@ def addReferencesSection(doc: t.SpecT) -> None:
     )
 
     normRefs = sorted(doc.normativeRefs.values(), key=lambda r: r.linkText.lower())
-    normRefKeys = set(r.linkText.lower() for r in doc.normativeRefs.values())
+    normRefKeys = {r.linkText.lower() for r in doc.normativeRefs.values()}
     if len(normRefs) > 0:
         dl = h.appendChild(
             container,

@@ -32,7 +32,7 @@ class ScriptManager:
         raise KeyError()
 
     def getAll(self) -> list[Script]:
-        return list(sorted(self.scripts, key=lambda x: x.name))
+        return sorted(self.scripts, key=lambda x: x.name)
 
     def has(self, name: str) -> bool:
         for x in self.scripts:
@@ -72,7 +72,7 @@ class StyleManager:
         raise KeyError()
 
     def getAll(self) -> list[Style]:
-        return list(sorted(self.styles, key=lambda x: x.name))
+        return sorted(self.styles, key=lambda x: x.name)
 
     def has(self, name: str) -> bool:
         for x in self.styles:
