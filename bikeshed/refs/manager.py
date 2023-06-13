@@ -150,7 +150,7 @@ class ReferenceManager:
                 try:
                     anchorFile = doc.inputSource.relative("anchors.bsdata")
                     if not anchorFile:
-                        raise OSError()
+                        raise OSError
                     anchorLines = anchorFile.read().rawLines
                     datablocks.transformAnchors(
                         lines=anchorLines,
@@ -176,7 +176,7 @@ class ReferenceManager:
                 try:
                     ldFile = doc.inputSource.relative("link-defaults.infotree")
                     if not ldFile:
-                        raise OSError()
+                        raise OSError
                     ldLines = ldFile.read().rawLines
                     datablocks.transformInfo(
                         lines=ldLines,

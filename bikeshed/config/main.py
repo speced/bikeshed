@@ -173,7 +173,7 @@ def chrootPath(rootPath: str, path: str) -> str:
         messages.die(
             f"Attempted to access a file ({path}) outside the source document's directory ({rootPath}). See --allow-nonlocal-files.",
         )
-        raise Exception()
+        raise Exception
     else:
         return path
 

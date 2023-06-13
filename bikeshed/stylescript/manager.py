@@ -29,7 +29,7 @@ class ScriptManager:
         for x in self.scripts:
             if x.name == name:
                 return x
-        raise KeyError()
+        raise KeyError
 
     def getAll(self) -> list[Script]:
         return sorted(self.scripts, key=lambda x: x.name)
@@ -69,7 +69,7 @@ class StyleManager:
         for x in self.styles:
             if x.name == name:
                 return x
-        raise KeyError()
+        raise KeyError
 
     def getAll(self) -> list[Style]:
         return sorted(self.styles, key=lambda x: x.name)

@@ -48,7 +48,7 @@ def addBikeshedVersion(doc: t.SpecT) -> None:
         if "bikeshed" not in origin:
             # In a repo, but not bikeshed's;
             # probably pip-installed into an environment's repo or something.
-            raise Exception()
+            raise Exception
         # Otherwise, success, this is a -e install,
         # so we're in Bikeshed's repo.
         bikeshedVersion = (
