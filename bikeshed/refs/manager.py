@@ -429,7 +429,7 @@ class ReferenceManager:
                     chosenRef = sorted(localRefs, key=lambda x: x.url)[0]
                 else:
                     # CHAOS MODE (so you're less likely to rely on it)
-                    chosenRef = random.choice(localRefs)
+                    chosenRef = random.choice(localRefs)  # noqa: S311
                 if error:
                     m.linkerror(
                         f"Multiple possible '{linkType}' local refs for '{text}'.\nRandomly chose one of them; other instances might get a different random choice.",

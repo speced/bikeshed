@@ -28,7 +28,7 @@ ghPrefix = "https://raw.githubusercontent.com/speced/bikeshed-boilerplate/main/"
 def update(path: str, dryRun: bool = False) -> set[str] | None:
     try:
         m.say("Downloading boilerplates...")
-        data = requests.get(ghPrefix + "manifest.txt").text
+        data = requests.get(ghPrefix + "manifest.txt", timeout=5).text
     except Exception as e:
         m.die(f"Couldn't download boilerplates manifest.\n{e}")
         return None

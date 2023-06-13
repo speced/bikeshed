@@ -232,7 +232,7 @@ def headingsFromWebref(status: t.Literal["current" | "snapshot"], urlSuffix: str
 def dataFromWebref(url: str) -> t.JSONT:
     webrefAPIUrl = "https://raw.githubusercontent.com/w3c/webref/main/"
     try:
-        response = requests.get(webrefAPIUrl + url)
+        response = requests.get(webrefAPIUrl + url, timeout=5)
     except Exception as e:
         raise Exception(f"Couldn't download data from Webref.\n{e}") from e
     try:

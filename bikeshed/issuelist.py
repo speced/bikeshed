@@ -49,7 +49,7 @@ def printIssueList(infilename: str | None = None, outfilename: str | None = None
                 infile = open(infilename + suffix, encoding="utf-8")
                 infilename += suffix
                 break
-            except Exception:
+            except Exception:  # noqa: S110
                 pass
         else:
             m.die("Couldn't read from the infile(s)")

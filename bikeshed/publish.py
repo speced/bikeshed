@@ -37,6 +37,7 @@ def publishEchidna(
         auth=(username, password),
         data=data,
         files={"tar": tarBytes},
+        timeout=3,
     )
 
     if r.status_code == 202:

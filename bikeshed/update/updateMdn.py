@@ -13,7 +13,7 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
     m.say("Downloading MDN Spec Links data...")
     specMapURL = "https://w3c.github.io/mdn-spec-links/SPECMAP.json"
     try:
-        response = requests.get(specMapURL)
+        response = requests.get(specMapURL, timeout=5)
     except Exception as e:
         m.die(f"Couldn't download the MDN Spec Links data.\n{e}")
         return None
@@ -45,7 +45,7 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
                 writtenPaths.add(p)
                 mdnSpecLinksBaseURL = "https://w3c.github.io/mdn-spec-links/"
                 try:
-                    fileContents = requests.get(mdnSpecLinksBaseURL + specFilename).text
+                    fileContents = requests.get(mdnSpecLinksBaseURL + specFilename, timeout=5).text
                 except Exception as e:
                     m.die(f"Couldn't download the MDN Spec Links {specFilename} file.\n{e}")
                     return None

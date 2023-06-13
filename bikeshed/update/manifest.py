@@ -135,7 +135,7 @@ def updateByManifest(path: str, dryRun: bool = False, force: bool = False) -> st
 
     m.say("Fetching remote manifest data...")
     try:
-        remoteManifest = requests.get(ghPrefix + "manifest.txt").text.splitlines()
+        remoteManifest = requests.get(ghPrefix + "manifest.txt", timeout=5).text.splitlines()
         remoteDt = dtFromManifest(remoteManifest)
         remoteFiles = dictFromManifest(remoteManifest)
     except Exception as e:

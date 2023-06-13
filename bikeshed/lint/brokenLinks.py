@@ -32,7 +32,7 @@ def brokenLinks(doc: t.SpecT) -> None:
             # Can't check mailto links
             continue
         try:
-            res = requests.get(href, verify=False, timeout=5)
+            res = requests.get(href, timeout=5)
         except requests.exceptions.Timeout:
             m.lint(f"Checking the following link timed out:\n{h.outerHTML(el)}", el=el)
         except Exception as e:

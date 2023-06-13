@@ -1364,7 +1364,7 @@ def inlineRemoteIssues(doc: t.SpecT) -> None:
 
         res = None
         try:
-            res = requests.get(url, headers=headers)
+            res = requests.get(url, headers=headers, timeout=5)
         except requests.exceptions.ConnectionError:
             # Offline or something, recover if possible
             if key in responses:

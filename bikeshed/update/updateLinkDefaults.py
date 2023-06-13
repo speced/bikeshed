@@ -11,7 +11,8 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
     try:
         m.say("Downloading link defaults...")
         data = requests.get(
-            "https://raw.githubusercontent.com/speced/bikeshed/main/bikeshed/spec-data/readonly/link-defaults.infotree"
+            "https://raw.githubusercontent.com/speced/bikeshed/main/bikeshed/spec-data/readonly/link-defaults.infotree",
+            timeout=5,
         ).text
     except Exception as e:
         m.die(f"Couldn't download link defaults data.\n{e}")

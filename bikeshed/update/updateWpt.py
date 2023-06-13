@@ -10,7 +10,7 @@ from .. import messages as m
 def update(path: str, dryRun: bool = False) -> set[str] | None:
     try:
         m.say("Downloading web-platform-tests data...")
-        response = requests.get("https://wpt.fyi/api/manifest")
+        response = requests.get("https://wpt.fyi/api/manifest", timeout=5)
         sha = response.headers["x-wpt-sha"]
         jsonData = response.json()
     except Exception as e:
