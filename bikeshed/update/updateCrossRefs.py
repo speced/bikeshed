@@ -5,11 +5,12 @@ import os
 import re
 from collections import defaultdict
 
-import tenacity
 import requests
+import tenacity
 from alive_progress import alive_it
 
-from .. import config, messages as m, t
+from .. import config, t
+from .. import messages as m
 
 if t.TYPE_CHECKING:
     AnchorsT: t.TypeAlias = defaultdict[str, list[AnchorT]]

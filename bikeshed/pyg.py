@@ -1,8 +1,6 @@
 import re
 
-from pygments import token
-from pygments import style
-from pygments import formatters
+from pygments import formatters, style, token
 
 # dark
 text = "#657b83"

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import widlparser  # pylint: disable=unused-import
 
-from .. import messages as m, t
+from .. import messages as m
+from .. import t
 
 
 def missingExposed(doc: t.SpecT) -> None:

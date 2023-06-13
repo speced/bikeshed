@@ -7,7 +7,8 @@ from collections import defaultdict
 
 import requests
 
-from .. import biblio, messages as m, t
+from .. import biblio, t
+from .. import messages as m
 
 
 def update(path: str, dryRun: bool = False) -> set[str] | None:

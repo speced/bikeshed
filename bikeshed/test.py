@@ -4,9 +4,11 @@ import difflib
 import glob
 import os
 import re
+
 from alive_progress import alive_it
 
-from . import config, messages as m, metadata, retrieve, t
+from . import config, metadata, retrieve, t
+from . import messages as m
 from .Spec import Spec
 
 TEST_DIR = os.path.abspath(os.path.join(config.scriptPath(), "..", "tests"))

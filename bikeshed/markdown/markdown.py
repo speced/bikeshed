@@ -3,7 +3,9 @@ from __future__ import annotations
 import functools
 import re
 
-from .. import h, line as l, messages as m, t
+from .. import h, t
+from .. import line as l
+from .. import messages as m
 
 if t.TYPE_CHECKING:
 

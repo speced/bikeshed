@@ -1,7 +1,7 @@
 import re
 
-from pygments.lexer import bygroups, RegexLexer
-from pygments.token import Comment, Name, Literal, Keyword, Punctuation, Text
+from pygments.lexer import RegexLexer, bygroups
+from pygments.token import Comment, Keyword, Literal, Name, Punctuation, Text
 
 
 class CSSLexer(RegexLexer):

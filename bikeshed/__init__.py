@@ -64,7 +64,9 @@ def verify_requirements() -> None:
 
 verify_requirements()
 
-from . import config  # noqa: E402
-from . import update  # noqa: E402
+from . import (
+    config,  # noqa: E402
+    update,  # noqa: E402
+)
 from .cli import main  # noqa: E402
 from .Spec import Spec  # noqa: E402

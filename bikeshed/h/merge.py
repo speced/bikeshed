@@ -4,9 +4,8 @@ import abc
 import dataclasses
 import itertools
 
-from . import dom
 from .. import t
-
+from . import dom
 
 # WARNING: This file isn't in use yet
 # (as evidenced by mergeTrees() logging stuff and returning nothing)

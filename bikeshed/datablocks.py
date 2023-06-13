@@ -7,9 +7,9 @@ from functools import reduce
 
 import attr
 
-from . import biblio, config, h, messages as m, printjson, refs, t
+from . import biblio, config, h, printjson, refs, t
+from . import messages as m
 from .line import Line
-
 
 # When writing a new transformFoo function,
 # PAY ATTENTION TO THE INDENT OF THE FIRST LINE

@@ -7,7 +7,8 @@ import glob
 import re
 import sys
 
-from . import messages as m, t
+from . import messages as m
+from . import t
 
 if t.TYPE_CHECKING:
     import io  # pylint: disable=unused-import

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from .. import h, messages as m, t
+from .. import h, t
+from .. import messages as m
 
 # Heading data for a spec is a dict.
 # Each key is either an id, like "#id",

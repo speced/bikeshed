@@ -6,8 +6,7 @@ import re
 
 import lxml
 
-from .. import messages
-from .. import t
+from .. import messages, t
 
 
 def englishFromList(items: t.Iterable[str], conjunction: str = "or") -> str:

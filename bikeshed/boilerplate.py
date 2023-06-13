@@ -8,7 +8,9 @@ import subprocess
 from collections import OrderedDict, defaultdict
 from datetime import datetime
 
-from . import conditional, config, dfnpanels, h, messages as m, refs as r, retrieve, t
+from . import conditional, config, dfnpanels, h, retrieve, t
+from . import messages as m
+from . import refs as r
 from .translate import _
 
 if t.TYPE_CHECKING:

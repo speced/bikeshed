@@ -1,7 +1,9 @@
 from __future__ import annotations
+
 import os
 
-from .. import config, messages as m, t
+from .. import config, t
+from .. import messages as m
 from . import (
     manifest,
     updateBackRefs,

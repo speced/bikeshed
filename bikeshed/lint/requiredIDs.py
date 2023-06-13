@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from .. import h, messages as m, t
+from .. import h, t
+from .. import messages as m
 
 
 def requiredIDs(doc: t.SpecT) -> None:

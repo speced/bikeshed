@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from . import config, h, messages as m, t
+from . import config, h, t
+from . import messages as m
 
 
 def processHeadings(doc: t.SpecT, scope: str = "doc") -> None:

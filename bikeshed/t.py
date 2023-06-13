@@ -33,13 +33,13 @@ if TYPE_CHECKING:
         TypeGuard,
         TypeVar,
     )
-    from typing_extensions import (
-        Required,
-        NotRequired,
-    )
-    from _typeshed import SupportsKeysAndGetItem
 
+    from _typeshed import SupportsKeysAndGetItem
     from lxml import etree
+    from typing_extensions import (
+        NotRequired,
+        Required,
+    )
 
     ElementT: TypeAlias = etree._Element
     DocumentT: TypeAlias = etree._ElementTree
@@ -55,18 +55,17 @@ if TYPE_CHECKING:
     # Similar for JSON
     JSONT: TypeAlias = dict[str, Any]
 
-    from types import ModuleType
-
     import sys
+    from types import ModuleType
 
     if "Spec" not in sys.modules:
         from .Spec import Spec
     SpecT = Spec
 
     from .biblio import BiblioEntry
-    from .retrieve import DataFileRequester
     from .metadata import MetadataManager
-    from .refs import RefSource, ReferenceManager, RefWrapper, MethodVariants, MethodVariant
+    from .refs import MethodVariant, MethodVariants, ReferenceManager, RefSource, RefWrapper
+    from .retrieve import DataFileRequester
 
     BiblioStorageT: TypeAlias = DefaultDict[str, list[BiblioEntry]]
 

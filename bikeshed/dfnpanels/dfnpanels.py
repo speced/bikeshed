@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 from collections import OrderedDict
 
-from .. import h, t, messages as m
+from .. import h, t
+from .. import messages as m
 from ..translate import _
 
 

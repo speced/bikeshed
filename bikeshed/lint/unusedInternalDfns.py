@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from .. import h, t
+from .. import messages as m
 from ..config import dfnElementsSelector
-from .. import h, messages as m, t
 
 
 def unusedInternalDfns(doc: t.SpecT) -> None:

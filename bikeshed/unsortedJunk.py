@@ -5,13 +5,16 @@ import logging
 import re
 from collections import Counter, defaultdict, namedtuple
 from urllib import parse
+
 from PIL import Image
 
-from . import biblio, config, dfnpanels, h, func, t, messages as m, idl, printjson, repository
+from . import biblio, config, dfnpanels, func, h, idl, printjson, repository, t
+from . import messages as m
 from .translate import _
 
 if t.TYPE_CHECKING:
     import widlparser  # pylint: disable=unused-import
+
     from . import refs
     from .line import Line
 

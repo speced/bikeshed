@@ -1,7 +1,9 @@
 from __future__ import annotations
+
 import re
 
-from .. import h, messages as m, t
+from .. import h, t
+from .. import messages as m
 
 
 def accidental2119(doc: t.SpecT) -> None:

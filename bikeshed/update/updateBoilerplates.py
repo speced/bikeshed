@@ -10,7 +10,8 @@ import requests
 import tenacity
 from result import Err, Ok, Result
 
-from .. import messages as m, t
+from .. import messages as m
+from .. import t
 
 
 def isOk(x: t.Any) -> t.TypeGuard[Ok]:

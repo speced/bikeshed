@@ -9,7 +9,8 @@ import re
 import typing
 from dataclasses import dataclass, field
 
-from .. import messages as m, t
+from .. import messages as m
+from .. import t
 from . import dom
 
 

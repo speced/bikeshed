@@ -1,10 +1,12 @@
 from __future__ import annotations
+
 import argparse
 import json
 import os
 import sys
 
-from . import config, constants, update, messages as m, printjson
+from . import config, constants, printjson, update
+from . import messages as m
 
 
 def main() -> None:
@@ -573,7 +575,7 @@ def handleDebug(options: argparse.Namespace, extras: list[str]) -> None:
 
 
 def handleRefs(options: argparse.Namespace, extras: list[str]) -> None:
-    from . import metadata, datablocks
+    from . import datablocks, metadata
     from .refs import ReferenceManager
     from .Spec import Spec
 

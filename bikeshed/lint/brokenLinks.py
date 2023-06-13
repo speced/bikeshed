@@ -1,8 +1,10 @@
 from __future__ import annotations
+
 import logging
 import time
 
-from .. import h, messages as m, t
+from .. import h, t
+from .. import messages as m
 
 
 def brokenLinks(doc: t.SpecT) -> None:

@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import math as Math
-
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -14,13 +13,13 @@ if TYPE_CHECKING:
         Dict,
         Generator,
         List,
-        Optional as Opt,
-        Sequence as Seq,
         Tuple,
         Type,
         TypeVar,
         Union,
     )
+    from typing import Optional as Opt
+    from typing import Sequence as Seq
 
     T = TypeVar("T")
     Node = Union[str, DiagramItem]  # pylint: disable=used-before-assignment

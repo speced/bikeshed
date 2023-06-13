@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 from collections import OrderedDict
 
-from .. import h, messages as m, t
+from .. import h, t
+from .. import messages as m
 from ..translate import _
 
 if t.TYPE_CHECKING:

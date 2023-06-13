@@ -1,8 +1,10 @@
 from __future__ import annotations
+
 import dataclasses
 import re
 
-from . import config, h, messages as m, t
+from . import config, h, t
+from . import messages as m
 
 # Any element can have an include-if or exclude-if attribute,
 # containing a comma-separated list of conditions (described below).

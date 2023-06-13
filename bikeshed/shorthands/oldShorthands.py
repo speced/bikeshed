@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import re
 
-from .. import config, h, messages as m, t
+from .. import config, h, t
+from .. import messages as m
 
 
 def transformProductionPlaceholders(doc: t.SpecT) -> None:

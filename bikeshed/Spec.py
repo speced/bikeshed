@@ -5,11 +5,12 @@ import glob
 import json
 import os
 import sys
-from collections import defaultdict, OrderedDict
+from collections import OrderedDict, defaultdict
 from datetime import datetime
 from functools import partial as curry
 
 from . import (
+    InputSource,
     biblio,
     boilerplate,
     caniuse,
@@ -26,22 +27,21 @@ from . import (
     idl,
     includes,
     inlineTags,
-    InputSource,
     language,
     line,
     lint,
     markdown,
     mdn,
-    messages as m,
     metadata,
     refs,
     retrieve,
     shorthands,
     stylescript,
     t,
-    unsortedJunk as u,
     wpt,
 )
+from . import messages as m
+from . import unsortedJunk as u
 
 if t.TYPE_CHECKING:
     import widlparser

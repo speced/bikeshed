@@ -3,7 +3,6 @@ from __future__ import annotations
 import collections.abc
 import hashlib
 import re
-
 from collections import OrderedDict
 
 import html5lib

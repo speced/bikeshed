@@ -4,7 +4,8 @@ import hashlib
 import itertools
 import re
 
-from . import datablocks, markdown, h, messages as m, t
+from . import datablocks, h, markdown, t
+from . import messages as m
 
 
 def processInclusions(doc: t.SpecT) -> None:

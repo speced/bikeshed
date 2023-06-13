@@ -5,7 +5,8 @@ import dataclasses
 import re
 from collections import defaultdict
 
-from . import constants, h, messages as m, t
+from . import constants, h, t
+from . import messages as m
 
 
 @dataclasses.dataclass

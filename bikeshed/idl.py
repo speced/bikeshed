@@ -4,7 +4,8 @@ import re
 
 import widlparser
 
-from . import config, h, messages as m, t
+from . import config, h, t
+from . import messages as m
 
 
 class IDLUI:

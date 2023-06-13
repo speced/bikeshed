@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from .. import messages as m, t
+from .. import messages as m
+from .. import t
 from . import main
 
 shortToLongStatus = {

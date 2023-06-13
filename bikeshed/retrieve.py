@@ -5,7 +5,8 @@ from __future__ import annotations
 import io
 import os
 
-from . import config, InputSource, messages as m, t
+from . import InputSource, config, t
+from . import messages as m
 
 
 class DataFileRequester:

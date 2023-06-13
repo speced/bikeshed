@@ -6,8 +6,9 @@ import random
 import re
 from collections import defaultdict
 
-from .. import biblio, config, constants, h, messages as m, retrieve, t
-from . import utils, source, headingdata, wrapper
+from .. import biblio, config, constants, h, retrieve, t
+from .. import messages as m
+from . import headingdata, source, utils, wrapper
 
 if t.TYPE_CHECKING:
     from .wrapper import RefWrapper

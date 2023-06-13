@@ -5,7 +5,8 @@ import dataclasses
 import re
 from collections import defaultdict
 
-from .. import config, constants, messages as m, retrieve, t
+from .. import config, constants, retrieve, t
+from .. import messages as m
 from . import utils, wrapper
 
 

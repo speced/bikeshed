@@ -4,7 +4,8 @@ import json
 from collections import OrderedDict
 from datetime import datetime
 
-from .. import h, messages as m, t
+from .. import h, t
+from .. import messages as m
 from ..translate import _
 
 

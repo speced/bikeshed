@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import dataclasses
 
-from . import railroaddiagrams as rr, messages as m, t
+from . import messages as m
+from . import railroaddiagrams as rr
+from . import t
 
 
 def parse(string: str) -> rr.Diagram | None:

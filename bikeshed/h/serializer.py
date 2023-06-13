@@ -3,8 +3,8 @@ from __future__ import annotations
 import io
 import itertools
 
-from . import dom
 from .. import t
+from . import dom
 
 if t.TYPE_CHECKING:
     WriterFn: t.TypeAlias = t.Callable[[str], t.Any]

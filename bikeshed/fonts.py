@@ -6,9 +6,11 @@ import re
 import sys
 
 if __name__ == "__main__":
-    from bikeshed import config, messages as m, t
+    from bikeshed import config, t
+    from bikeshed import messages as m
 else:
-    from . import config, messages as m, t
+    from . import config, t
+    from . import messages as m
 
 if t.TYPE_CHECKING:
     Characters: t.TypeAlias = dict[str, list[str]]

@@ -7,13 +7,14 @@ import json
 import os
 import re
 import subprocess
-from collections import OrderedDict, defaultdict, Counter
+from collections import Counter, OrderedDict, defaultdict
 from datetime import date, datetime, timedelta
 from functools import partial
 
 from isodate import Duration, parse_duration
 
-from . import config, constants, datablocks, markdown, h, messages as m, repository, t
+from . import config, constants, datablocks, h, markdown, repository, t
+from . import messages as m
 from .translate import _
 
 if t.TYPE_CHECKING:
