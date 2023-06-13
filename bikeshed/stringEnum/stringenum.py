@@ -32,5 +32,6 @@ class StringEnum:
 
     def __getattr__(self, name: str) -> str:
         """will only get called for undefined attributes"""
-        print(f"No member '{name}' contained in StringEnum.")
+        msg = f"No member '{name}' contained in StringEnum."
+        raise IndexError(msg)
         return ""

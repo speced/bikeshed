@@ -184,7 +184,7 @@ def gatherWebrefData(specs: SpecsT, anchors: AnchorsT, headings: AllHeadingsT) -
                     rawSnapshotSpec = s
                     break
             else:
-                print(f"Despite claiming to have a snapshot url, no snapshot data found for '{spec['vshortname']}'.")
+                m.warn(f"Despite claiming to have a snapshot url, no snapshot data found for '{spec['vshortname']}'.")
             if rawSnapshotSpec:
                 if "dfns" in rawSnapshotSpec:
                     snapshotAnchors = anchorsFromWebref("snapshot", rawSnapshotSpec["dfns"])
@@ -321,7 +321,7 @@ def addToHeadings(
     if heading["url"].startswith(specUrl):
         truncatedUrl = heading["url"][len(specUrl) :]
     else:
-        print(f"Invalid heading - URL doesn't start with the spec's url <{specUrl}>.\n{heading}")
+        m.warn(f"Invalid heading - URL doesn't start with the spec's url <{specUrl}>.\n{heading}")
         return
     if truncatedUrl[0] == "#":
         # Either single-page spec, or link on the top page of a multi-page spec

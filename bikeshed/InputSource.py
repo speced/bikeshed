@@ -14,6 +14,7 @@ import requests
 import tenacity
 
 from . import config, line, t
+from . import messages as m
 
 
 @attr.s(auto_attribs=True)
@@ -100,7 +101,7 @@ class InputSource:
         on the subclasses that __new__ dynamically dispatches to.
         See https://stackoverflow.com/a/60731663/455535
         """
-        print(f"No member '{name}' contained in InputSource.")
+        m.warn(f"No member '{name}' contained in InputSource.")
         return ""
 
 

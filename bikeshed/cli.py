@@ -571,7 +571,7 @@ def handleDebug(options: argparse.Namespace, extras: list[str]) -> None:
             "document": doc.mdDocument.allData if doc.mdDocument else [],
             "command-line": doc.mdCommandLine.allData,
         }
-        print(json.dumps(md, indent=2, default=printjson.getjson))
+        print(json.dumps(md, indent=2, default=printjson.getjson))  # noqa: T201
 
 
 def handleRefs(options: argparse.Namespace, extras: list[str]) -> None:

@@ -185,7 +185,7 @@ def updateByManifest(path: str, dryRun: bool = False, force: bool = False) -> st
                 os.remove(localizePath(path, filePath))
                 deletedPaths.append(filePath)
         if deletedPaths:
-            print("Deleted {} old data file{}.".format(len(deletedPaths), "s" if len(deletedPaths) > 1 else ""))
+            m.say("Deleted {} old data file{}.".format(len(deletedPaths), "s" if len(deletedPaths) > 1 else ""))
 
     newManifest = None
     if not dryRun:

@@ -877,10 +877,6 @@ def decorateAutolink(doc: t.SpecT, el: t.ElementT, linkType: str, linkText: str,
         if linkText in doc.typeExpansions:
             titleText = doc.typeExpansions[linkText]
         else:
-            if linkText == "":
-                print(h.outerHTML(el, literal=True))
-                assert linkText != ""
-
             typeRefs = doc.refs.queryAllRefs(linkFor=linkText, ignoreObsoletes=True)
             texts = sorted({ref.text for ref in typeRefs})
             if typeRefs:

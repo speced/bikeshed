@@ -9,6 +9,7 @@ import tarfile
 import tempfile
 
 from . import extensions, t
+from . import messages as m
 
 
 def publishEchidna(
@@ -41,14 +42,14 @@ def publishEchidna(
     )
 
     if r.status_code == 202:
-        print("Successfully pushed to Echidna!")
-        print("Check the URL in a few seconds to see if it was published successfully:")
-        print("https://labs.w3.org/echidna/api/status?id=" + r.text)
+        m.say("Successfully pushed to Echidna!")
+        m.say("Check the URL in a few seconds to see if it was published successfully:")
+        m.say("https://labs.w3.org/echidna/api/status?id=" + r.text)
     else:
-        print("There was an error publishing your spec. Here's some information that might help?")
-        print(r.status_code)
-        print(r.text)
-        print(r.headers)
+        m.say("There was an error publishing your spec. Here's some information that might help?")
+        m.say(r.status_code)
+        m.say(r.text)
+        m.say(r.headers)
 
 
 def prepareTar(doc: t.SpecT, additionalDirectories: list[str] | None = None) -> bytes:

@@ -397,7 +397,7 @@ class Spec:
             socketserver.TCPServer.allow_reuse_address = True
             server = socketserver.TCPServer(("localhost" if localhost else "", port), SilentServer)
 
-            print(f"Serving at port {port}")
+            print(f"Serving at port {port}")  # noqa: T201
             thread = threading.Thread(target=server.serve_forever)
             thread.daemon = True
             thread.start()

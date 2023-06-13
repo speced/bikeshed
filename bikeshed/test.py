@@ -82,7 +82,7 @@ def runAllTests(
             else:
                 fails.append(testName)
     except:  # pylint: disable=bare-except
-        print(testName)
+        m.say(testName)
     if numPassed == total:
         m.p(m.printColor("✔ All tests passed.", color="green"))
         return True

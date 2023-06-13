@@ -4,6 +4,7 @@ import abc
 import dataclasses
 import itertools
 
+from .. import messages as m
 from .. import t
 from . import dom
 
@@ -53,13 +54,13 @@ def mergeTrees(tree1: t.ElementT, tree2: t.ElementT) -> list:
         digestTree(tree1),
         digestTree(tree2),
     ):
-        print("*")
+        m.say("*")
         if isinstance(node, TagEnd):
-            print(f"</{node.item.tag}>")
+            m.say(f"</{node.item.tag}>")
         elif isinstance(node, TagStart):
-            print(dom.serializeTag(node.item))
+            m.say(dom.serializeTag(node.item))
         else:
-            print(node.item)
+            m.say(node.item)
     return []
 
 

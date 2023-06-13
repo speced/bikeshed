@@ -41,4 +41,4 @@ class PrismStyle(style.Style):
 
 css = formatters.HtmlFormatter(style=PrismStyle).get_style_defs(".c")  # pylint: disable=no-member
 css = re.sub(r"\.c \.(\w+)", r"c-[\1]", css)
-print(css)
+print(css)  # noqa: T201

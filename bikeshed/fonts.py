@@ -234,7 +234,7 @@ def main() -> None:
     options = argparser.parse_args()
     font = Font(options.fontPath)
     for line in font.write(options.text):
-        print(line, end="")
+        print(line, end="")  # noqa: T201
 
 
 if __name__ == "__main__":
