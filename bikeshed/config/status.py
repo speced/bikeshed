@@ -226,6 +226,8 @@ megaGroups = {
             "immersivewebwg",
             "mediacapture",
             "mediawg",
+            "patcg",
+            "patcg-id",
             "ping",
             "pngwg",
             "privacycg",
@@ -296,6 +298,8 @@ w3cCgs = frozenset(
     [
         "fedidcg",
         "immersivewebcg",
+        "patcg",
+        "patcg-id",
         "privacycg",
         "processcg",
         "ricg",

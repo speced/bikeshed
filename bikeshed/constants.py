@@ -8,7 +8,6 @@ quiet: float = 0
 asciiOnly: bool = False
 refStatus: StringEnum = StringEnum("current", "snapshot")
 biblioDisplay: StringEnum = StringEnum("index", "inline", "direct")
-testAnnotationURL: str = "https://test.csswg.org/harness/annotate.js"
 chroot: bool = True
 executeCode: bool = False
 

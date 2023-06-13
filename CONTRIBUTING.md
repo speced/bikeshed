@@ -29,8 +29,8 @@ Bikeshed uses a number of services to lint its codebase.
 If you don't run these beforehand,
 your contributions might fail just due to violating the linting rules.
 
-To lint everything, first install `flake8`, `pylint`, and `black` from `pypi`.
-Then, from the root directory of the project, run `flake8 bikeshed`, `pylint bikeshed`, and `black .`.
+To lint everything, first install `ruff`, `pylint`, and `black` from `pypi`.
+Then, from the root directory of the project, run `ruff check .`, `pylint bikeshed`, and `black .`.
 Fix anything that any of these are complaining about;
 if they are all happy, you're good.
 

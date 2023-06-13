@@ -7,7 +7,7 @@ from collections import Counter, defaultdict, namedtuple
 from urllib import parse
 from PIL import Image
 
-from . import biblio, config, dfnpanels, h, func, t, messages as m, idl, repository
+from . import biblio, config, dfnpanels, h, func, t, messages as m, idl, printjson, repository
 from .translate import _
 
 if t.TYPE_CHECKING:
@@ -182,7 +182,7 @@ def addImplicitAlgorithms(doc: t.SpecT) -> None:
     for el in h.findAll("[data-algorithm='']:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6)", doc):
         dfns = h.findAll("dfn", el)
         if len(dfns) == 1:
-            dfnName = config.firstLinkTextFromElement(dfns[0]) or ""
+            dfnName = h.firstLinkTextFromElement(dfns[0]) or ""
             el.set("data-algorithm", dfnName)
             dfnFor = dfns[0].get("data-dfn-for")
             if dfnFor:
@@ -261,23 +261,8 @@ def checkVarHygiene(doc: t.SpecT) -> None:
 def addVarClickHighlighting(doc: t.SpecT) -> None:
     if doc.md.slimBuildArtifact:
         return
-    doc.extraStyles["style-var-click-highlighting"] = getModuleFile("var-click-highlighting.css")
-    # Colors were chosen in Lab using https://nixsensor.com/free-color-converter/
-    # D50 2deg illuminant, L in [0,100], a and b in [-128, 128]
-    # 0 = lab(85,0,85)
-    # 1 = lab(85,80,30)
-    # 2 = lab(85,-40,40)
-    # 3 = lab(85,-50,0)
-    # 4 = lab(85,5,15)
-    # 5 = lab(85,-10,-50)
-    # 6 = lab(85,35,-15)
-
-    # Color-choosing design.
-    # Start with 1, increment as new ones get selected.
-    # Specifically: find lowest-indexed color with lowest usage.
-    # (Usually this'll be zero, but if you click too many vars in same algo, can repeat.)
-    # If you unclick then click again on same var, it should get same color if possible.
-    doc.extraScripts["script-var-click-highlighting"] = getModuleFile("var-click-highlighting.js")
+    doc.extraStyles.setFile("style-var-click-highlighting", "var-click-highlighting.css")
+    doc.extraScripts.setFile("var-click-highlighting", "var-click-highlighting.js")
 
 
 def fixIntraDocumentReferences(doc: t.SpecT) -> None:
@@ -454,7 +439,7 @@ def classifyDfns(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
             m.die(f"Unknown dfn type '{dfnType}':\n{h.outerHTML(el)}", el=el)
             continue
         dfnFor = h.treeAttr(el, "data-dfn-for")
-        primaryDfnText = config.firstLinkTextFromElement(el)
+        primaryDfnText = h.firstLinkTextFromElement(el)
         if primaryDfnText is None:
             m.die(f"Dfn has no linking text:\n{h.outerHTML(el)}", el=el)
             continue
@@ -878,7 +863,9 @@ def decorateAutolink(doc: t.SpecT, el: t.ElementT, linkType: str, linkText: str,
         unused1, unused2, id = ref.url.partition("#")  # pylint: disable=unused-variable
         if id:
             el.set("id", f"ref-for-{id}")
-            el.set("data-silently-dedup", "")
+        else:
+            el.set("id", "ref-for-something")
+        el.set("data-silently-dedup", "")
 
     # Get all the values that the type expands to, add it as a title.
     if linkType == "type":
@@ -1398,7 +1385,7 @@ def inlineRemoteIssues(doc: t.SpecT) -> None:
                 m.die(f"'{doc.token}' is not a valid GitHub OAuth token. See https://github.com/settings/tokens")
             else:
                 m.die(
-                    "401 error when fetching GitHub Issues:\n" + config.printjson(error),
+                    "401 error when fetching GitHub Issues:\n" + printjson.printjson(error),
                 )
             continue
         elif res.status_code == 403:
@@ -1409,12 +1396,12 @@ def inlineRemoteIssues(doc: t.SpecT) -> None:
                 )
             else:
                 m.die(
-                    "403 error when fetching GitHub Issues:\n" + config.printjson(error),
+                    "403 error when fetching GitHub Issues:\n" + printjson.printjson(error),
                 )
             continue
         elif res.status_code >= 400:
             try:
-                error = config.printjson(res.json())
+                error = printjson.printjson(res.json())
             except ValueError:
                 error = "First 100 characters of error:\n" + res.text[0:100]
             m.die(f"{res.status_code} error when fetching GitHub Issues:\n" + error)
@@ -1578,8 +1565,3 @@ def processIDL(doc: t.SpecT) -> None:
     classifyDfns(doc, dfns)
     h.fixupIDs(doc, dfns)
     doc.refs.addLocalDfns(doc, (dfn for dfn in dfns if dfn.get("id") is not None))
-
-
-def getModuleFile(filename: str) -> str:
-    with open(config.scriptPath(".", filename), "r", encoding="utf-8") as fh:
-        return fh.read()

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from collections import OrderedDict
 
-from .. import config, h, messages as m, t
+from .. import h, messages as m, t
 from ..translate import _
 
 if t.TYPE_CHECKING:
@@ -47,8 +47,7 @@ def addMdnPanels(doc: t.SpecT) -> list[t.ElementT]:
 
     panels = panelsFromData(doc, data)
     if panels:
-        doc.extraStyles["style-mdn-anno"] = getModuleFile("mdn.css")
-        doc.extraStyles["style-darkmode"] += getModuleFile("mdn-dark.css")
+        doc.extraStyles.setFile("mdn-anno", "mdn/mdn.css")
 
     return panels
 
@@ -97,7 +96,7 @@ def panelsFromData(doc: t.SpecT, data: MdnDataT) -> list[t.ElementT]:
         allEngines = 0
         featureDivs = []
         targetElement = h.find(f"[id='{elementId}']", doc)
-        if targetElement is None:
+        if targetElement is None and elementId not in doc.md.ignoreMDNFailure:
             m.warn(f"No '{elementId}' ID found, skipping MDN features that would target it.")
             continue
 
@@ -294,8 +293,3 @@ def browserCompatSpan(
     h.appendChild(outer, h.E.span({}, browserFullName))
     h.appendChild(outer, h.E.span(minVersionAttributes, flagSymbol + minVersion))
     return outer
-
-
-def getModuleFile(filename: str) -> str:
-    with open(config.scriptPath("mdn", filename), "r", encoding="utf-8") as fh:
-        return fh.read()

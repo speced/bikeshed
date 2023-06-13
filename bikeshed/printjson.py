@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .. import h, messages as m, t
+from . import h, messages as m, t
 
 
 def printjson(x: t.Any, indent: str | int = 2, level: int = 0) -> str:

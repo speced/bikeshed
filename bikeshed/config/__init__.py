@@ -28,9 +28,6 @@ from .main import (
     processTextNodes,
     reSubObject,
     simplifyText,
-    linkTextsFromElement,
-    DuplicatedLinkText,
-    firstLinkTextFromElement,
     splitForValues,
     groupFromKey,
     flatten,
@@ -38,7 +35,6 @@ from .main import (
     chrootPath,
     doEvery,
 )
-from .printjson import printjson, getjson
 from .status import (
     shortToLongStatus,
     snapshotStatuses,

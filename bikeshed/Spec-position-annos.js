@@ -25,7 +25,6 @@ function repositionAnnoPanels(){
     }
     let vSoFar = 0;
     for(const panel of panels.sort(cmpTops)) {
-        console.log(panel.top, vSoFar);
         if(panel.top < vSoFar) {
             panel.top = vSoFar;
             panel.style.top = vSoFar + "px";

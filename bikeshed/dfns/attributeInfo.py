@@ -23,7 +23,7 @@ def addAttributeInfoSpans(doc: t.SpecT) -> None:
             attrName = "data-dict-member-info"
         else:
             continue
-        spanFor = config.firstLinkTextFromElement(dfn)
+        spanFor = h.firstLinkTextFromElement(dfn)
         if spanFor is None:
             continue
         # Internal slots (denoted by [[foo]] naming scheme) don't have attribute info

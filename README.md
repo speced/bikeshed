@@ -1,7 +1,7 @@
 Bikeshed, a spec preprocessor
 =============================
 
-<img src="https://rawgit.com/speced/bikeshed/master/docs/images/icon.svg" width=100 height=100 align=left>
+<img src="https://raw.githubusercontent.com/speced/bikeshed/main/bikeshed.svg" width=100 height=100 align=left>
 
 Bikeshed is a pre-processor for spec documents,
 turning a source document
@@ -14,7 +14,7 @@ the C++ standards committee,
 and elsewhere!
 
 ![CI](https://github.com/speced/bikeshed/workflows/CI/badge.svg)
-[![Gitter](https://img.shields.io/badge/Gitter-Join%20Chat%20↣-blue.svg)](https://gitter.im/speced/bikeshed?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
+[![Gitter](https://img.shields.io/badge/Gitter-Join%20Chat%20↣-blue.svg)](https://gitter.im/tabatkins/bikeshed?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 [![Docs](https://img.shields.io/badge/docs-available-orange.svg)](https://speced.github.io/bikeshed)
 [![Release Notes](https://img.shields.io/badge/release-notes-purple.svg)](https://github.com/speced/bikeshed/issues/1773)
 
