@@ -216,9 +216,9 @@ def addAtRisk(doc: t.SpecT) -> None:
         html += "<li>" + doc.fixText(feature)
     html += (
         "</ul><p>“At-risk” is a W3C Process term-of-art, and does not necessarily imply that the feature is in danger of being dropped or delayed. "
-        "It means that the WG believes the feature may have difficulty being interoperably implemented in a timely manner, "
-        "and marking it as such allows the WG to drop the feature if necessary when transitioning to the Proposed Rec stage, "
-        "without having to publish a new Candidate Rec without the feature first."
+        + "It means that the WG believes the feature may have difficulty being interoperably implemented in a timely manner, "
+        + "and marking it as such allows the WG to drop the feature if necessary when transitioning to the Proposed Rec stage, "
+        + "without having to publish a new Candidate Rec without the feature first."
     )
     fillWith("at-risk", h.parseHTML(html), doc=doc)
 
