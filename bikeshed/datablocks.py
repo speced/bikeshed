@@ -1234,7 +1234,7 @@ def parseTag(text: str, lineNumber: int | None) -> StartTag | None:
             continue
         if state == "attribute-value-double-quoted":
             attrValue = ""
-            while not eof(i, text) and not text[i] == '"':
+            while not eof(i, text) and text[i] != '"':
                 attrValue += text[i]
                 i += 1
             tag.attrs[attrName] = attrValue
@@ -1246,7 +1246,7 @@ def parseTag(text: str, lineNumber: int | None) -> StartTag | None:
             return None
         if state == "attribute-value-single-quoted":
             attrValue = ""
-            while not eof(i, text) and not text[i] == "'":
+            while not eof(i, text) and text[i] != "'":
                 attrValue += text[i]
                 i += 1
             tag.attrs[attrName] = attrValue

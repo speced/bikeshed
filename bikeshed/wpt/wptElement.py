@@ -298,7 +298,7 @@ def normalizePathSegment(pathSeg: str | None) -> str | None:
 
 def checkForOmittedTests(pathPrefix: str, testData: dict[str, str], seenTestNames: set[str]) -> None:
     unseenTests = []
-    for testPath in testData.keys():
+    for testPath in testData:
         if ".tentative." in testPath:
             continue
         if prefixInPath(pathPrefix, testPath):

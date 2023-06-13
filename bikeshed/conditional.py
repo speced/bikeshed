@@ -63,7 +63,7 @@ def evalConditions(doc: t.SpecT, el: t.ElementT, conditionString: str) -> t.Gene
         if cond.type == "status":
             yield config.looselyMatch(cond.value, doc.md.status)
         elif cond.type == "text macro":
-            for k in doc.macros.keys():
+            for k in doc.macros:
                 if k.upper() == cond.value:
                     yield True
                     break

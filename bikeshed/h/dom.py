@@ -647,10 +647,7 @@ def removeAttr(el: t.ElementT, *attrNames: str) -> t.ElementT:
 
 def hasAttr(el: t.ElementT, *attrNames: str) -> bool:
     # Returns True if the element has at least one of the named attributes
-    for attrName in attrNames:
-        if attrName in el.attrib:
-            return True
-    return False
+    return any(attrName in el.attrib for attrName in attrNames)
 
 
 def hasAttrs(el: t.ElementT) -> bool:
@@ -709,10 +706,7 @@ def isNodes(nodes: t.Any) -> t.TypeGuard[t.NodesT]:
         return True
     if not isinstance(nodes, list):
         return False
-    for child in nodes:
-        if not isNodes(child):
-            return False
-    return True
+    return all(isNodes(child) for child in nodes)
 
 
 def isOddNode(node: t.Any) -> bool:

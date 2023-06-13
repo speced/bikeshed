@@ -35,7 +35,7 @@ def printjsonobject(x: t.Any, indent: str, level: int) -> str:
     x = getjson(x)
     ret = ""
     maxKeyLength = 0
-    for k in x.keys():
+    for k in x:
         maxKeyLength = max(maxKeyLength, len(k))
     for k, v in x.items():
         ret += (

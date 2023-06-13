@@ -35,10 +35,7 @@ class ScriptManager:
         return sorted(self.scripts, key=lambda x: x.name)
 
     def has(self, name: str) -> bool:
-        for x in self.scripts:
-            if x.name == name:
-                return True
-        return False
+        return any(x.name == name for x in self.scripts)
 
 
 @dataclasses.dataclass
@@ -75,10 +72,7 @@ class StyleManager:
         return sorted(self.styles, key=lambda x: x.name)
 
     def has(self, name: str) -> bool:
-        for x in self.styles:
-            if x.name == name:
-                return True
-        return False
+        return any(x.name == name for x in self.styles)
 
 
 @dataclasses.dataclass

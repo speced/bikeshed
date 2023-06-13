@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import io  # pylint: disable=unused-import
+import contextlib
 import logging
 import os
 import tarfile
@@ -47,9 +47,9 @@ def publishEchidna(
         m.say("https://labs.w3.org/echidna/api/status?id=" + r.text)
     else:
         m.say("There was an error publishing your spec. Here's some information that might help?")
-        m.say(r.status_code)
+        m.say(str(r.status_code))
         m.say(r.text)
-        m.say(r.headers)
+        m.say(str(r.headers))
 
 
 def prepareTar(doc: t.SpecT, additionalDirectories: list[str] | None = None) -> bytes:
@@ -71,10 +71,8 @@ def prepareTar(doc: t.SpecT, additionalDirectories: list[str] | None = None) -> 
         else:
             inputPath = str(doc.inputSource.relative(fname[0]))
             outputPath = fname[1]
-        try:
+        with contextlib.suppress(OSError):
             tar.add(inputPath, outputPath)
-        except OSError:
-            pass
     tar.close()
     specOutput.close()
     os.remove(specOutput.name)
