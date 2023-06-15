@@ -5,11 +5,12 @@ import os
 import re
 from collections import defaultdict
 
-import tenacity
 import requests
+import tenacity
 from alive_progress import alive_it
 
-from .. import config, messages as m, t
+from .. import config, t
+from .. import messages as m
 
 if t.TYPE_CHECKING:
     AnchorsT: t.TypeAlias = defaultdict[str, list[AnchorT]]
@@ -94,7 +95,7 @@ if t.TYPE_CHECKING:
 
 
 def update(path: str, dryRun: bool = False) -> set[str] | None:
-    specs: SpecsT = dict()
+    specs: SpecsT = {}
     anchors: AnchorsT = defaultdict(list)
     headings: AllHeadingsT = {}
 
@@ -183,7 +184,7 @@ def gatherWebrefData(specs: SpecsT, anchors: AnchorsT, headings: AllHeadingsT) -
                     rawSnapshotSpec = s
                     break
             else:
-                print(f"Despite claiming to have a snapshot url, no snapshot data found for '{spec['vshortname']}'.")
+                m.warn(f"Despite claiming to have a snapshot url, no snapshot data found for '{spec['vshortname']}'.")
             if rawSnapshotSpec:
                 if "dfns" in rawSnapshotSpec:
                     snapshotAnchors = anchorsFromWebref("snapshot", rawSnapshotSpec["dfns"])
@@ -201,7 +202,8 @@ def specsFromWebref(status: t.Literal["current" | "snapshot"]) -> list[WebrefSpe
     url = ("ed" if status == "current" else "tr") + "/index.json"
     j = dataFromWebref(url)
     if j is None or j.get("results") is None:
-        raise Exception(f"No {status} specs data from WebRef. Got:\n{json.dumps(j, indent=1)}")
+        msg = f"No {status} specs data from WebRef. Got:\n{json.dumps(j, indent=1)}"
+        raise Exception(msg)
     rawSpecs = t.cast("list[WebrefSpecT]", j["results"])
     filteredSpecs: list[WebrefSpecT] = []
     for spec in rawSpecs:
@@ -215,7 +217,8 @@ def anchorsFromWebref(status: t.Literal["current" | "snapshot"], urlSuffix: str)
     url = ("ed" if status == "current" else "tr") + "/" + urlSuffix
     j = dataFromWebref(url)
     if j is None or j.get("dfns") is None:
-        raise Exception(f"No WebRef dfns data at {url}. Got:\n{json.dumps(j, indent=1)}")
+        msg = f"No WebRef dfns data at {url}. Got:\n{json.dumps(j, indent=1)}"
+        raise Exception(msg)
     return t.cast("list[WebrefAnchorT]", j["dfns"])
 
 
@@ -223,7 +226,8 @@ def headingsFromWebref(status: t.Literal["current" | "snapshot"], urlSuffix: str
     url = ("ed" if status == "current" else "tr") + "/" + urlSuffix
     j = dataFromWebref(url)
     if j is None or j.get("headings") is None:
-        raise Exception(f"No WebRef headings data at {url}. Got:\n{json.dumps(j, indent=1)}")
+        msg = f"No WebRef headings data at {url}. Got:\n{json.dumps(j, indent=1)}"
+        raise Exception(msg)
     return t.cast("list[WebrefHeadingT]", j["headings"])
 
 
@@ -231,15 +235,15 @@ def headingsFromWebref(status: t.Literal["current" | "snapshot"], urlSuffix: str
 def dataFromWebref(url: str) -> t.JSONT:
     webrefAPIUrl = "https://raw.githubusercontent.com/w3c/webref/main/"
     try:
-        response = requests.get(webrefAPIUrl + url)
+        response = requests.get(webrefAPIUrl + url, timeout=5)
     except Exception as e:
-        raise Exception(f"Couldn't download data from Webref.\n{e}") from e
+        msg = f"Couldn't download data from Webref.\n{e}"
+        raise Exception(msg) from e
     try:
         data = response.json()
     except Exception as e:
-        raise Exception(
-            f"Data retrieved from Webref wasn't valid JSON for some reason. Try downloading again?\n{e}"
-        ) from e
+        msg = f"Data retrieved from Webref wasn't valid JSON for some reason. Try downloading again?\n{e}"
+        raise Exception(msg) from e
     return t.cast("t.JSONT", data)
 
 
@@ -266,7 +270,10 @@ def canonSpecFromWebref(rawSpec: WebrefSpecT) -> SpecT:
 
 
 def addToAnchors(
-    rawAnchor: WebrefAnchorT, anchors: AnchorsT, spec: SpecT, status: t.Literal["current"] | t.Literal["snapshot"]
+    rawAnchor: WebrefAnchorT,
+    anchors: AnchorsT,
+    spec: SpecT,
+    status: t.Literal["current"] | t.Literal["snapshot"],
 ) -> None:
     baseUrl = spec["snapshot_url"] if status == "snapshot" else spec["current_url"]
     assert baseUrl is not None
@@ -314,7 +321,7 @@ def addToHeadings(
     if heading["url"].startswith(specUrl):
         truncatedUrl = heading["url"][len(specUrl) :]
     else:
-        print(f"Invalid heading - URL doesn't start with the spec's url <{specUrl}>.\n{heading}")
+        m.warn(f"Invalid heading - URL doesn't start with the spec's url <{specUrl}>.\n{heading}")
         return
     if truncatedUrl[0] == "#":
         # Either single-page spec, or link on the top page of a multi-page spec

@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from .stringEnum import StringEnum
 
 dryRun: bool = False

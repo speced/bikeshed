@@ -1,10 +1,12 @@
 from __future__ import annotations
+
 import argparse
 import json
 import os
 import sys
 
-from . import config, constants, update, messages as m, printjson
+from . import config, constants, printjson, update
+from . import messages as m
 
 
 def main() -> None:
@@ -569,11 +571,11 @@ def handleDebug(options: argparse.Namespace, extras: list[str]) -> None:
             "document": doc.mdDocument.allData if doc.mdDocument else [],
             "command-line": doc.mdCommandLine.allData,
         }
-        print(json.dumps(md, indent=2, default=printjson.getjson))
+        print(json.dumps(md, indent=2, default=printjson.getjson))  # noqa: T201
 
 
 def handleRefs(options: argparse.Namespace, extras: list[str]) -> None:
-    from . import metadata, datablocks
+    from . import datablocks, metadata
     from .refs import ReferenceManager
     from .Spec import Spec
 
@@ -641,15 +643,11 @@ def handleProfile(options: argparse.Namespace) -> None:
     leaf = f'--leaf="{options.leaf}"' if options.leaf else ""
     if options.svgFile:
         os.system(
-            "time python -m cProfile -o stat.prof -m bikeshed -f spec && gprof2dot -f pstats --skew=.0001 {root} {leaf} stat.prof | dot -Tsvg -o {svg} && rm stat.prof".format(
-                root=root, leaf=leaf, svg=options.svgFile
-            )
+            f"time python -m cProfile -o stat.prof -m bikeshed -f spec && gprof2dot -f pstats --skew=.0001 {root} {leaf} stat.prof | dot -Tsvg -o {options.svgFile} && rm stat.prof",  # noqa: S605
         )
     else:
         os.system(
-            "time python -m cProfile -o /tmp/stat.prof -m bikeshed -f spec && gprof2dot -f pstats --skew=.0001 {root} {leaf} /tmp/stat.prof | xdot &".format(
-                root=root, leaf=leaf
-            )
+            f"time python -m cProfile -o /tmp/stat.prof -m bikeshed -f spec && gprof2dot -f pstats --skew=.0001 {root} {leaf} /tmp/stat.prof | xdot &",  # noqa: S605
         )
 
 
@@ -673,7 +671,7 @@ Introduction {#intro}
 =====================
 
 Introduction here.
-"""
+""",
     )
 
 
@@ -724,5 +722,5 @@ assert_true(VALUE HERE, "TEST DESCRIPTION");
 assert_equals(ACTUAL VALUE HERE, EXPECTED VALUE HERE, "TEST DESCRIPTION");
 // lots more at http://web-platform-tests.org/writing-tests/testharness-api.html#list-of-assertions
 </script>
-"""
+""",
         )

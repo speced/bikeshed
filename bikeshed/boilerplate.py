@@ -8,7 +8,9 @@ import subprocess
 from collections import OrderedDict, defaultdict
 from datetime import datetime
 
-from . import conditional, config, dfnpanels, h, messages as m, refs as r, retrieve, t
+from . import conditional, config, dfnpanels, h, retrieve, t
+from . import messages as m
+from . import refs as r
 from .translate import _
 
 if t.TYPE_CHECKING:
@@ -46,7 +48,7 @@ def addBikeshedVersion(doc: t.SpecT) -> None:
         if "bikeshed" not in origin:
             # In a repo, but not bikeshed's;
             # probably pip-installed into an environment's repo or something.
-            raise Exception()
+            raise Exception
         # Otherwise, success, this is a -e install,
         # so we're in Bikeshed's repo.
         bikeshedVersion = (
@@ -214,9 +216,9 @@ def addAtRisk(doc: t.SpecT) -> None:
         html += "<li>" + doc.fixText(feature)
     html += (
         "</ul><p>“At-risk” is a W3C Process term-of-art, and does not necessarily imply that the feature is in danger of being dropped or delayed. "
-        "It means that the WG believes the feature may have difficulty being interoperably implemented in a timely manner, "
-        "and marking it as such allows the WG to drop the feature if necessary when transitioning to the Proposed Rec stage, "
-        "without having to publish a new Candidate Rec without the feature first."
+        + "It means that the WG believes the feature may have difficulty being interoperably implemented in a timely manner, "
+        + "and marking it as such allows the WG to drop the feature if necessary when transitioning to the Proposed Rec stage, "
+        + "without having to publish a new Candidate Rec without the feature first."
     )
     fillWith("at-risk", h.parseHTML(html), doc=doc)
 
@@ -833,7 +835,7 @@ def addTOCSection(doc: t.SpecT) -> None:
                         h.E.span({"class": "secno"}, header.get("data-level", "")),
                         " ",
                         copy.deepcopy(h.find(".content", header)),
-                    )
+                    ),
                 ),
             )
             containers[level + 1] = h.appendChild(li, h.E.ol({"class": "toc"}))
@@ -915,7 +917,7 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
                 missingInfo = True
         if missingInfo:
             m.warn(
-                f"Bikeshed doesn't have all the translation info for '{lang}'. Please add to bikeshed/spec-data/readonly/languages.json and submit a PR!"
+                f"Bikeshed doesn't have all the translation info for '{lang}'. Please add to bikeshed/spec-data/readonly/languages.json and submit a PR!",
             )
         if nativeName:
             return h.E.span(
@@ -943,7 +945,7 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
         dated = doc.refs.getLatestBiblioRef(key)
         if not dated:
             m.die(
-                f"While trying to generate a Previous Version line, couldn't find a dated biblio reference for {key}."
+                f"While trying to generate a Previous Version line, couldn't find a dated biblio reference for {key}.",
             )
             return None
         return h.E.a({"href": dated.url, "rel": "prev"}, dated.url)
@@ -971,7 +973,7 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
                     + doc.md.mailingList
                     + "?subject=%5B"
                     + mac["shortname"]
-                    + "%5D%20YOUR%20TOPIC%20HERE"
+                    + "%5D%20YOUR%20TOPIC%20HERE",
                 },
                 doc.md.mailingList,
             ),
@@ -992,7 +994,7 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
         md.setdefault("Feedback", []).append(span)
     if doc.md.implementationReport is not None:
         md.setdefault("Implementation Report", []).append(
-            h.E.a({"href": doc.md.implementationReport}, doc.md.implementationReport)
+            h.E.a({"href": doc.md.implementationReport}, doc.md.implementationReport),
         )
     if doc.md.testSuite is not None:
         md.setdefault("Test Suite", []).append(h.E.a({"href": doc.md.testSuite}, doc.md.testSuite))
@@ -1014,7 +1016,7 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
             h.E.label(
                 {"for": h.safeID(doc, "hidedel"), "id": h.safeID(doc, "hidedel-label")},
                 "Hide deleted text",
-            )
+            ),
         ]
         h.prependChild(
             doc.body,
@@ -1023,7 +1025,7 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
                     "type": "checkbox",
                     "id": h.safeID(doc, "hidedel"),
                     "style": "display:none",
-                }
+                },
             ),
         )
         doc.extraStyles.set(
@@ -1137,7 +1139,7 @@ def addReferencesSection(doc: t.SpecT) -> None:
     )
 
     normRefs = sorted(doc.normativeRefs.values(), key=lambda r: r.linkText.lower())
-    normRefKeys = set(r.linkText.lower() for r in doc.normativeRefs.values())
+    normRefKeys = {r.linkText.lower() for r in doc.normativeRefs.values()}
     if len(normRefs) > 0:
         dl = h.appendChild(
             container,

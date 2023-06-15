@@ -5,11 +5,12 @@ import glob
 import json
 import os
 import sys
-from collections import defaultdict, OrderedDict
+from collections import OrderedDict, defaultdict
 from datetime import datetime
 from functools import partial as curry
 
 from . import (
+    InputSource,
     biblio,
     boilerplate,
     caniuse,
@@ -26,22 +27,21 @@ from . import (
     idl,
     includes,
     inlineTags,
-    InputSource,
     language,
     line,
     lint,
     markdown,
     mdn,
-    messages as m,
     metadata,
     refs,
     retrieve,
     shorthands,
     stylescript,
     t,
-    unsortedJunk as u,
     wpt,
 )
+from . import messages as m
+from . import unsortedJunk as u
 
 if t.TYPE_CHECKING:
     import widlparser
@@ -56,7 +56,7 @@ class Spec:
         lineNumbers: bool = False,
         fileRequester: retrieve.DataFileRequester | None = None,
         testing: bool = False,
-    ):
+    ) -> None:
         catchArgparseBug(inputFilename)
         self.valid: bool = False
         self.lineNumbers: bool = lineNumbers
@@ -67,7 +67,7 @@ class Spec:
             inputFilename = findImplicitInputFile()
         if inputFilename is None:  # still
             m.die(
-                "No input file specified, and no *.bs or *.src.html files found in current directory.\nPlease specify an input file, or use - to pipe from STDIN."
+                "No input file specified, and no *.bs or *.src.html files found in current directory.\nPlease specify an input file, or use - to pipe from STDIN.",
             )
             return
         self.inputSource: InputSource.InputSource = InputSource.inputFromName(inputFilename, chroot=constants.chroot)
@@ -397,7 +397,7 @@ class Spec:
             socketserver.TCPServer.allow_reuse_address = True
             server = socketserver.TCPServer(("localhost" if localhost else "", port), SilentServer)
 
-            print(f"Serving at port {port}")
+            print(f"Serving at port {port}")  # noqa: T201
             thread = threading.Thread(target=server.serve_forever)
             thread.daemon = True
             thread.start()
@@ -529,7 +529,7 @@ def catchArgparseBug(string: str | None) -> bool:
 
     if isinstance(string, str) and string.startswith("--") and "=" in string:
         m.die(
-            "You're hitting a bug with Python's argparse library. Please specify both the input and output filenames manually, and move all command-line flags with spaces in their values to after those arguments.\nSee <https://speced.github.io/bikeshed/#md-issues> for details."
+            "You're hitting a bug with Python's argparse library. Please specify both the input and output filenames manually, and move all command-line flags with spaces in their values to after those arguments.\nSee <https://speced.github.io/bikeshed/#md-issues> for details.",
         )
         return False
     return True

@@ -7,10 +7,12 @@ import dataclasses
 import itertools
 import re
 
-from . import h, messages as m, t
+from . import h, t
+from . import messages as m
 
 if t.TYPE_CHECKING:
     import pygments
+
     from . import lexers
 
     T = t.TypeVar("T")
@@ -170,8 +172,8 @@ def highlightWithWebIDL(text: str, el: t.ElementT) -> t.Deque[ColoredText] | Non
     A \3 indicates a stack pop.
     All other text is colored with the attr currently on top of the stack.
     """
-    from widlparser import parser
     import widlparser
+    from widlparser import parser
 
     class IDLUI:
         def warn(self, msg: str) -> None:
@@ -184,7 +186,9 @@ def highlightWithWebIDL(text: str, el: t.ElementT) -> t.Deque[ColoredText] | Non
         # Just applies highlighting classes to IDL stuff.
 
         def markup_type_name(
-            self, text: str, construct: widlparser.constructs.Construct
+            self,
+            text: str,
+            construct: widlparser.constructs.Construct,
         ) -> tuple[str | None, str | None]:
             return ("\1n\2", "\3")
 
@@ -192,12 +196,16 @@ def highlightWithWebIDL(text: str, el: t.ElementT) -> t.Deque[ColoredText] | Non
             return ("\1g\2", "\3")
 
         def markup_keyword(
-            self, text: str, construct: widlparser.constructs.Construct
+            self,
+            text: str,
+            construct: widlparser.constructs.Construct,
         ) -> tuple[str | None, str | None]:
             return ("\1b\2", "\3")
 
         def markup_enum_value(
-            self, text: str, construct: widlparser.constructs.Construct
+            self,
+            text: str,
+            construct: widlparser.constructs.Construct,
         ) -> tuple[str | None, str | None]:
             return ("\1s\2", "\3")
 

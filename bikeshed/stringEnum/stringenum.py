@@ -12,7 +12,7 @@ class StringEnum:
     or as a dictionary (`someEnum["foo"]`).
     """
 
-    def __init__(self, *vals: str):
+    def __init__(self, *vals: str) -> None:
         self._vals = {}
         for val in vals:
             self._vals[val] = val
@@ -32,5 +32,5 @@ class StringEnum:
 
     def __getattr__(self, name: str) -> str:
         """will only get called for undefined attributes"""
-        print(f"No member '{name}' contained in StringEnum.")
-        return ""
+        msg = f"No member '{name}' contained in StringEnum."
+        raise IndexError(msg)

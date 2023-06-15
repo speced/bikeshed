@@ -10,7 +10,7 @@ from .. import messages as m
 def update(path: str, dryRun: bool = False) -> set[str] | None:
     try:
         m.say("Downloading web-platform-tests data...")
-        response = requests.get("https://wpt.fyi/api/manifest")
+        response = requests.get("https://wpt.fyi/api/manifest", timeout=5)
         sha = response.headers["x-wpt-sha"]
         jsonData = response.json()
     except Exception as e:
@@ -23,7 +23,7 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
 
     if jsonData["version"] != 8:
         m.die(
-            f"Bikeshed currently only knows how to handle WPT v8 manifest data, but got v{jsonData['version']}. Please report this to the maintainer!"
+            f"Bikeshed currently only knows how to handle WPT v8 manifest data, but got v{jsonData['version']}. Please report this to the maintainer!",
         )
         return None
 
@@ -52,7 +52,7 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
             m.die(f"Couldn't save web-platform-tests data to disk.\n{e}")
             return None
     m.say("Success!")
-    return set([filePath])
+    return {filePath}
 
 
 def collectPaths(pathListSoFar: list[str], pathTrie: dict[str, dict | str], pathPrefix: str) -> list[str]:

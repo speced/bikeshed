@@ -7,7 +7,8 @@ import glob
 import re
 import sys
 
-from . import messages as m, t
+from . import messages as m
+from . import t
 
 if t.TYPE_CHECKING:
     import io  # pylint: disable=unused-import
@@ -45,10 +46,10 @@ def printIssueList(infilename: str | None = None, outfilename: str | None = None
     else:
         for suffix in [".txt", "txt", ""]:
             try:
-                infile = open(infilename + suffix, encoding="utf-8")
+                infile = open(infilename + suffix, encoding="utf-8")  # noqa: #SIM115
                 infilename += suffix
                 break
-            except Exception:
+            except Exception:  # noqa: S110
                 pass
         else:
             m.die("Couldn't read from the infile(s)")
@@ -71,7 +72,7 @@ def printIssueList(infilename: str | None = None, outfilename: str | None = None
         outfile = sys.stdout
     else:
         try:
-            outfile = open(outfilename, "w", encoding="utf-8")
+            outfile = open(outfilename, "w", encoding="utf-8")  # noqa: SIM115
         except Exception as e:
             m.die(f"Couldn't write to outfile:\n{e}")
             return
@@ -157,7 +158,7 @@ def extractHeaderInfo(lines: t.Sequence[str], infilename: str) -> HeaderInfo | N
             date = f"{match.group(1)}-{match.group(2)}-{match.group(3)}"
     else:
         m.warn(
-            f"Autodetection of Shortname, Date, and Status failed; draft url does not match the format /status-shortname-date/. Got:\n{url}"
+            f"Autodetection of Shortname, Date, and Status failed; draft url does not match the format /status-shortname-date/. Got:\n{url}",
         )
 
     if date is None:
@@ -212,7 +213,7 @@ Verified: [url]
 Resolved: Editorial/Bugfix (for obvious fixes)/Editors' discretion/[url to minutes]
 ----
 Issue 2.
-..."""
+...""",
     )
 
 
@@ -253,7 +254,7 @@ def printHeader(outfile: t.TextIO, hi: HeaderInfo) -> None:
 <p>An issue can be closed as <code>Accepted</code>, <code>OutOfScope</code>,
 <code>Invalid</code>, <code>Rejected</code>, or <code>Retracted</code>.
 <code>Verified</code> indicates commentor's acceptance of the response.</p>
-"""
+""",
     )
 
 
@@ -335,5 +336,5 @@ def printScript(outfile: t.TextIO) -> None:
     ['a', 'd', 'fo', 'oi', 'r', 'open'].forEach(addCheckbox);
 }());
 </script>
-"""
+""",
     )

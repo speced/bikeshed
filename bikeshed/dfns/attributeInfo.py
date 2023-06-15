@@ -3,7 +3,8 @@ from __future__ import annotations
 import dataclasses
 import re
 
-from .. import config, h, messages as m, t
+from .. import config, h, t
+from .. import messages as m
 
 
 def addAttributeInfoSpans(doc: t.SpecT) -> None:
@@ -115,7 +116,7 @@ def htmlFromInfo(info: TargetInfo) -> t.NodesT:
             [
                 " of type ",
                 h.E.code({"class": "idl-code"}, info.type),
-            ]
+            ],
         )
     else:
         # Everything else
@@ -123,7 +124,7 @@ def htmlFromInfo(info: TargetInfo) -> t.NodesT:
             [
                 " of type ",
                 h.E.a({"data-link-type": "idl-name"}, info.type),
-            ]
+            ],
         )
 
     if info.readonly:

@@ -5,7 +5,8 @@ import dataclasses
 import re
 from collections import defaultdict
 
-from .. import config, constants, messages as m, retrieve, t
+from .. import config, constants, retrieve, t
+from .. import messages as m
 from . import utils, wrapper
 
 
@@ -32,7 +33,7 @@ class RefSource:
         ignored: set[str] | None = None,
         replaced: set[tuple[str, str]] | None = None,
         fileRequester: t.DataFileRequester | None = None,
-    ):
+    ) -> None:
         if fileRequester is None:
             self.dataFile = retrieve.defaultRequester
         else:
@@ -310,7 +311,8 @@ class RefSource:
             elif status in config.linkStatuses:
                 return [x for x in refs if x.status == status]
 
-            raise Exception(f"Status value of '{status}' not handled")
+            msg = f"Status value of '{status}' not handled"
+            raise Exception(msg)
 
         if status:
             refs = filterByStatus(refs, status)

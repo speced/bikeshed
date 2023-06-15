@@ -3,8 +3,8 @@ from __future__ import annotations
 import io
 import itertools
 
-from . import dom
 from .. import t
+from . import dom
 
 if t.TYPE_CHECKING:
     WriterFn: t.TypeAlias = t.Callable[[str], t.Any]
@@ -49,7 +49,7 @@ class Serializer:
             "progress",
             "math",
             "[]",
-        ]
+        ],
     )
     rawEls = frozenset(["xmp", "script", "style"])
     voidEls = frozenset(
@@ -70,7 +70,7 @@ class Serializer:
             "source",
             "track",
             "wbr",
-        ]
+        ],
     )
     omitEndTagEls = frozenset(
         [
@@ -88,10 +88,10 @@ class Serializer:
             "html",
             "head",
             "body",
-        ]
+        ],
     )
 
-    def __init__(self, opaqueElements: t.Iterable[str], blockElements: t.Iterable[str]):
+    def __init__(self, opaqueElements: t.Iterable[str], blockElements: t.Iterable[str]) -> None:
         self.opaqueEls = frozenset(opaqueElements)
         self.blockEls = frozenset(blockElements)
 
@@ -201,7 +201,8 @@ class Serializer:
         self.startTag(tag, el, write)
         for node in dom.childNodes(el):
             if self.isElement(node):
-                raise Exception(f"Somehow a CDATA element got an element child:\n{dom.outerHTML(el)}")
+                msg = f"Somehow a CDATA element got an element child:\n{dom.outerHTML(el)}"
+                raise Exception(msg)
             else:
                 assert isinstance(node, str)
                 write(node)

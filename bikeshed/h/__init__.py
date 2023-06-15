@@ -1,4 +1,6 @@
 from .dom import (
+    DuplicatedLinkText,
+    E,
     addClass,
     addDOMHelperScript,
     addOldIDs,
@@ -13,8 +15,6 @@ from .dom import (
     closestAttr,
     createElement,
     dedupIDs,
-    DuplicatedLinkText,
-    E,
     emptyText,
     escapeAttr,
     escapeCSSIdent,
@@ -76,12 +76,14 @@ from .dom import (
     uniqueID,
     wrapContents,
 )
-from .serializer import Serializer
-from .parser import test
 from .parser import (
     Comment,
     EndTag,
     Failure,
+    ParseFailure,
+    Result,
+    StartTag,
+    Stream,
     isASCII,
     isASCIIAlpha,
     isASCIIAlphanum,
@@ -99,7 +101,6 @@ from .parser import (
     parseComment,
     parseDoctype,
     parseEndTag,
-    ParseFailure,
     parseQuotedAttrValue,
     parseScriptToEnd,
     parseStartTag,
@@ -108,7 +109,6 @@ from .parser import (
     parseUnquotedAttrValue,
     parseWhitespace,
     parseXmpToEnd,
-    Result,
-    StartTag,
-    Stream,
+    test,
 )
+from .serializer import Serializer

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from .. import h, messages as m, t
+from .. import h, t
+from .. import messages as m
 
 # Heading data for a spec is a dict.
 # Each key is either an id, like "#id",
@@ -20,7 +21,7 @@ from .. import h, messages as m, t
 
 
 class SpecHeadings:
-    def __init__(self, spec: str, data: dict[str, list[str] | dict[str, dict[str, str]]]):
+    def __init__(self, spec: str, data: dict[str, list[str] | dict[str, dict[str, str]]]) -> None:
         self.spec = spec
         self.data = data
 

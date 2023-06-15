@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 from __future__ import annotations
 
 import dataclasses
@@ -6,9 +7,11 @@ import re
 import sys
 
 if __name__ == "__main__":
-    from bikeshed import config, messages as m, t
+    from bikeshed import config, t
+    from bikeshed import messages as m
 else:
-    from . import config, messages as m, t
+    from . import config, t
+    from . import messages as m
 
 if t.TYPE_CHECKING:
     Characters: t.TypeAlias = dict[str, list[str]]
@@ -74,7 +77,7 @@ class Font:
 
     """
 
-    def __init__(self, fontfilename: str = config.scriptPath("bigblocks.bsfont")):
+    def __init__(self, fontfilename: str = config.scriptPath("bigblocks.bsfont")) -> None:
         try:
             with open(fontfilename, encoding="utf-8") as fh:
                 lines = fh.readlines()
@@ -121,10 +124,10 @@ def parseMetadata(lines: list[str]) -> tuple[FontMetadata, list[str]]:
             continue
     if height is None:
         m.die("Missing 'Character Height' metadata.")
-        raise Exception("")
+        raise Exception
     if spaceWidth is None:
         m.die("Missing 'Space Width' metadata.")
-        raise Exception("")
+        raise Exception
     md = FontMetadata(height, spaceWidth)
     return md, lines[i:]
 
@@ -231,7 +234,7 @@ def main() -> None:
     options = argparser.parse_args()
     font = Font(options.fontPath)
     for line in font.write(options.text):
-        print(line, end="")
+        print(line, end="")  # noqa: T201
 
 
 if __name__ == "__main__":

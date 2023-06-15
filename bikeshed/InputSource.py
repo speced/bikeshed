@@ -14,6 +14,7 @@ import requests
 import tenacity
 
 from . import config, line, t
+from . import messages as m
 
 
 @attr.s(auto_attribs=True)
@@ -71,7 +72,8 @@ class InputSource:
 
     def directory(self) -> str:
         """Suitable for passing to subprocess(cwd=)."""
-        raise TypeError("{} instances don't have directories.".format(type(self)))
+        msg = f"{type(self)} instances don't have directories."
+        raise TypeError(msg)
 
     def relative(self, _: t.Any) -> InputSource | None:
         """Resolves relativePath relative to this InputSource.
@@ -99,12 +101,12 @@ class InputSource:
         on the subclasses that __new__ dynamically dispatches to.
         See https://stackoverflow.com/a/60731663/455535
         """
-        print(f"No member '{name}' contained in InputSource.")
+        m.warn(f"No member '{name}' contained in InputSource.")
         return ""
 
 
 class StdinInputSource(InputSource):
-    def __init__(self, sourceName: str, **kwargs: t.Any):  # pylint: disable=unused-argument
+    def __init__(self, sourceName: str, **kwargs: t.Any) -> None:  # pylint: disable=unused-argument
         assert sourceName == "-"
         self.type = "stdin"
         self.sourceName = sourceName
@@ -118,7 +120,7 @@ class StdinInputSource(InputSource):
 
 
 class UrlInputSource(InputSource):
-    def __init__(self, sourceName: str, **kwargs: t.Any):  # pylint: disable=unused-argument
+    def __init__(self, sourceName: str, **kwargs: t.Any) -> None:  # pylint: disable=unused-argument
         assert sourceName.startswith("https:")
         self.sourceName = sourceName
         self.type = "url"
@@ -155,7 +157,7 @@ class UrlInputSource(InputSource):
 
 
 class FileInputSource(InputSource):
-    def __init__(self, sourceName: str, *, chroot: bool, chrootPath: str | None = None):
+    def __init__(self, sourceName: str, *, chroot: bool, chrootPath: str | None = None) -> None:
         self.sourceName = sourceName
         self.chrootPath = chrootPath
         self.type = "file"
@@ -201,7 +203,7 @@ class FileInputSource(InputSource):
 
 
 class TarInputSource(InputSource):
-    def __init__(self, sourceName: str, *, tarMemberName: str = "index.bs", **_: t.Any):
+    def __init__(self, sourceName: str, *, tarMemberName: str = "index.bs", **_: t.Any) -> None:
         self.sourceName = sourceName
         self.tarMemberName = tarMemberName
         self.type = "tar"
@@ -221,7 +223,8 @@ class TarInputSource(InputSource):
                 taritem = tarFile.extractfile(self.tarMemberName)
                 if taritem is None:
                     raise FileNotFoundError(
-                        errno.ENOENT, f"{self.tarMemberName} is in the tar file, but isn't a file itself."
+                        errno.ENOENT,
+                        f"{self.tarMemberName} is in the tar file, but isn't a file itself.",
                     )
                 with taritem as f:
                     # Decode the `bytes` to a `str`. (extractfile can't read as text.)
@@ -235,7 +238,8 @@ class TarInputSource(InputSource):
 
     def directory(self) -> str:
         # It would be possible to produce a file listing. But not a meaningful directory path.
-        raise TypeError("{} instances don't have directories.".format(type(self)))
+        msg = f"{type(self)} instances don't have directories."
+        raise TypeError(msg)
 
     def relative(self, relativePath: str) -> TarInputSource:
         """Returns an InputSource relative to this file. Since a TarInputSource is always inside the

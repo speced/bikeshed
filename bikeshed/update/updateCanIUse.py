@@ -12,7 +12,10 @@ from .. import messages as m
 def update(path: str, dryRun: bool = False) -> set[str] | None:
     m.say("Downloading Can I Use data...")
     try:
-        response = requests.get("https://raw.githubusercontent.com/Fyrd/caniuse/master/fulldata-json/data-2.0.json")
+        response = requests.get(
+            "https://raw.githubusercontent.com/Fyrd/caniuse/master/fulldata-json/data-2.0.json",
+            timeout=5,
+        )
     except Exception as e:
         m.die(f"Couldn't download the Can I Use data.\n{e}")
         return None

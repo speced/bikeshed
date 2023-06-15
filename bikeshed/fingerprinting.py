@@ -31,7 +31,7 @@ def addTrackingVector(doc: t.SpecT) -> None:
                             "stroke-dasharray": "3,2,35,2,20,2",
                             "fill": "none",
                             "d": "M2 23Q17 -16 40 12M1 35Q17 -20 43 20M2 40Q18 -19 44 25M3 43Q19 -16 45 29M5 46Q20 -12 45 32M5 49Q11 40 15 27T27 16T45 37M5 49Q15 38 19 25T34 27T44 41M6 52Q17 40 21 28T32 29T43 44M6 52Q21 42 23 31T30 32T42 47M7 54Q23 47 24 36T28 34T41 50M8 56Q26 50 26 35Q28 48 40 53M10 58Q24 54 27 45Q30 52 38 55M27 50Q28 53 36 57M25 52Q28 56 31 57M22 55L26 57M10 58L37 57M13 60L32 60M16 62L28 63",  # pylint: disable=line-too-long
-                        }
+                        },
                     ),
                 ),
             ),
@@ -59,7 +59,11 @@ def addTrackingVector(doc: t.SpecT) -> None:
 
 
 def trackingVectorImage(
-    imageURL: str | None, imageWidth: str, imageHeight: str, altText: str, title: str
+    imageURL: str | None,
+    imageWidth: str,
+    imageHeight: str,
+    altText: str,
+    title: str,
 ) -> t.ElementT:
     if imageURL is None:
         return h.E.svg(
@@ -74,5 +78,5 @@ def trackingVectorImage(
             "src": imageURL,
             "width": imageWidth,
             "height": imageHeight,
-        }
+        },
     )

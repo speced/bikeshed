@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from . import h, messages as m, t
+from . import h, t
+from . import messages as m
 
 
 def printjson(x: t.Any, indent: str | int = 2, level: int = 0) -> str:
@@ -34,7 +35,7 @@ def printjsonobject(x: t.Any, indent: str, level: int) -> str:
     x = getjson(x)
     ret = ""
     maxKeyLength = 0
-    for k in x.keys():
+    for k in x:
         maxKeyLength = max(maxKeyLength, len(k))
     for k, v in x.items():
         ret += (
@@ -80,4 +81,5 @@ def printjsonprimitive(x: t.Any) -> str:
         return "null"
     if h.isElement(x):
         return repr(x) + ":" + h.outerHTML(x)
-    raise ValueError(f"Could not print value: {x}")
+    msg = f"Could not print value: {x}"
+    raise ValueError(msg)

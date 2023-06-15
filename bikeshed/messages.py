@@ -119,11 +119,10 @@ def failure(msg: str) -> None:
 
 
 def resetSeenMessages() -> None:
-    global messages
+    global messages  # noqa: PLW0603
     messages = set()
-    global messageCounts
+    global messageCounts  # noqa: PLW0603
     messageCounts = Counter()
-    return
 
 
 def printColor(text: str, color: str = "white", *styles: str) -> str:

@@ -4,9 +4,9 @@ import abc
 import dataclasses
 import itertools
 
-from . import dom
+from .. import messages as m
 from .. import t
-
+from . import dom
 
 # WARNING: This file isn't in use yet
 # (as evidenced by mergeTrees() logging stuff and returning nothing)
@@ -54,13 +54,13 @@ def mergeTrees(tree1: t.ElementT, tree2: t.ElementT) -> list:
         digestTree(tree1),
         digestTree(tree2),
     ):
-        print("*")
+        m.say("*")
         if isinstance(node, TagEnd):
-            print(f"</{node.item.tag}>")
+            m.say(f"</{node.item.tag}>")
         elif isinstance(node, TagStart):
-            print(dom.serializeTag(node.item))
+            m.say(dom.serializeTag(node.item))
         else:
-            print(node.item)
+            m.say(node.item)
     return []
 
 
@@ -110,7 +110,8 @@ def mergeStreams(s1: TagStream, s2: TagStream) -> TagStream:
 
     def popStack(endNode: Tag) -> bool:
         if openStack[-1].item != endNode.item:
-            raise ValueError("mergeStreams() can't merge these trees, due to overlapping elements.")
+            msg = "mergeStreams() can't merge these trees, due to overlapping elements."
+            raise ValueError(msg)
         openStack.pop()
         return True
 

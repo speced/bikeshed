@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 from collections import OrderedDict
 
-from .. import h, t, messages as m
+from .. import h, t
+from .. import messages as m
 from ..translate import _
 
 
@@ -52,7 +53,7 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
                 {
                     "refs": refsJson,
                     "title": text,
-                }
+                },
             )
         panelJson = {
             "dfnID": id,
@@ -113,13 +114,13 @@ def addExternalDfnPanel(termEl: t.ElementT, ref: t.RefWrapper, doc: t.SpecT) -> 
             refsJson.append(
                 {
                     "id": linkID,
-                }
+                },
             )
         sectionsJson.append(
             {
                 "refs": refsJson,
                 "title": text,
-            }
+            },
         )
     panelJson = {
         "dfnID": termID,

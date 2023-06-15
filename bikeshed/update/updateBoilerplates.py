@@ -10,7 +10,8 @@ import requests
 import tenacity
 from result import Err, Ok, Result
 
-from .. import messages as m, t
+from .. import messages as m
+from .. import t
 
 
 def isOk(x: t.Any) -> t.TypeGuard[Ok]:
@@ -27,7 +28,7 @@ ghPrefix = "https://raw.githubusercontent.com/speced/bikeshed-boilerplate/main/"
 def update(path: str, dryRun: bool = False) -> set[str] | None:
     try:
         m.say("Downloading boilerplates...")
-        data = requests.get(ghPrefix + "manifest.txt").text
+        data = requests.get(ghPrefix + "manifest.txt", timeout=5).text
     except Exception as e:
         m.die(f"Couldn't download boilerplates manifest.\n{e}")
         return None
@@ -45,7 +46,7 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
     else:
         phrase = f"were {len(badPaths)} errors" if len(badPaths) > 1 else "was 1 error"
         m.die(
-            f"Done, but there {phrase} (of {len(newPaths)} total) in downloading or saving. Run `bikeshed update` again to retry."
+            f"Done, but there {phrase} (of {len(newPaths)} total) in downloading or saving. Run `bikeshed update` again to retry.",
         )
         return set(goodPaths)
 

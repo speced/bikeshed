@@ -6,8 +6,7 @@ import re
 
 import lxml
 
-from .. import messages
-from .. import t
+from .. import messages, t
 
 
 def englishFromList(items: t.Iterable[str], conjunction: str = "or") -> str:
@@ -26,7 +25,8 @@ if t.TYPE_CHECKING:
 
 
 def intersperse(
-    iterable: t.Iterable[IntersperseU], delimiter: IntersperseV
+    iterable: t.Iterable[IntersperseU],
+    delimiter: IntersperseV,
 ) -> t.Generator[IntersperseU | IntersperseV, None, None]:
     first = True
     for x in iterable:
@@ -65,13 +65,17 @@ def reSubObject(pattern: re.Pattern, string: str, repl: None) -> list[str | re.M
 
 @t.overload
 def reSubObject(
-    pattern: re.Pattern, string: str, repl: t.Callable[[re.Match], ReSubObjectU]
+    pattern: re.Pattern,
+    string: str,
+    repl: t.Callable[[re.Match], ReSubObjectU],
 ) -> list[str | ReSubObjectU]:
     ...
 
 
 def reSubObject(
-    pattern: re.Pattern, string: str, repl: t.Callable[[re.Match], ReSubObjectU] | None = None
+    pattern: re.Pattern,
+    string: str,
+    repl: t.Callable[[re.Match], ReSubObjectU] | None = None,
 ) -> list[str | re.Match] | list[str | ReSubObjectU] | list[str | re.Match | ReSubObjectU]:
     """
     like re.sub, but replacements don't have to be text;
@@ -167,9 +171,9 @@ def chrootPath(rootPath: str, path: str) -> str:
     path = os.path.abspath(path)
     if not path.startswith(rootPath):
         messages.die(
-            f"Attempted to access a file ({path}) outside the source document's directory ({rootPath}). See --allow-nonlocal-files."
+            f"Attempted to access a file ({path}) outside the source document's directory ({rootPath}). See --allow-nonlocal-files.",
         )
-        raise Exception()
+        raise Exception
     else:
         return path
 

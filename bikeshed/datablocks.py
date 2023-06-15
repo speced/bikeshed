@@ -7,9 +7,9 @@ from functools import reduce
 
 import attr
 
-from . import biblio, config, h, messages as m, printjson, refs, t
+from . import biblio, config, h, printjson, refs, t
+from . import messages as m
 from .line import Line
-
 
 # When writing a new transformFoo function,
 # PAY ATTENTION TO THE INDENT OF THE FIRST LINE
@@ -23,7 +23,12 @@ if t.TYPE_CHECKING:
 
     class TransformFuncT(t.Protocol):
         def __call__(
-            self, lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT
+            self,
+            lines: list[str],
+            tagName: str,
+            firstLine: str,
+            lineNum: int | None,
+            doc: t.SpecT,
         ) -> list[str]:
             ...
 
@@ -105,7 +110,8 @@ def transformDataBlocks(doc: t.SpecT, lines: list[Line] | list[str]) -> list[Lin
             else:
                 m.die(
                     "Found {} classes on the <{}>, so can't tell which to process the block as. Please use only one.".format(
-                        config.englishFromList((f"'{x}'" for x in seenClasses), "and"), tagName
+                        config.englishFromList((f"'{x}'" for x in seenClasses), "and"),
+                        tagName,
                     ),
                     lineNum=line.i,
                 )
@@ -279,7 +285,10 @@ def transformPropdef(lines: list[str], tagName: str, firstLine: str, lineNum: in
         attrs["Name"] = None
         attrs["New values"] = None
         ret = [
-            "<table class='def propdef partial'{forHint}{lineNumAttr}>".format(forHint=forHint, lineNumAttr=lineNumAttr)
+            "<table class='def propdef partial'{forHint}{lineNumAttr}>".format(
+                forHint=forHint,
+                lineNumAttr=lineNumAttr,
+            ),
         ]
     elif "shorthand" in firstLine:
         attrs["Name"] = None
@@ -378,22 +387,25 @@ def transformDescdef(lines: list[str], tagName: str, firstLine: str, lineNum: in
         requiredKeys = ["Name", "For"]
         ret = [
             "<table class='def descdef partial' data-dfn-for='{0}'{lineNumAttr}>".format(
-                vals.get("For", ""), lineNumAttr=lineNumAttr
-            )
+                vals.get("For", ""),
+                lineNumAttr=lineNumAttr,
+            ),
         ]
     if "mq" in firstLine:
         requiredKeys = ["Name", "For", "Value"]
         ret = [
             "<table class='def descdef mq' data-dfn-for='{0}'{lineNumAttr}>".format(
-                vals.get("For", ""), lineNumAttr=lineNumAttr
-            )
+                vals.get("For", ""),
+                lineNumAttr=lineNumAttr,
+            ),
         ]
     else:
         requiredKeys = ["Name", "For", "Value", "Initial"]
         ret = [
             "<table class='def descdef' data-dfn-for='{0}'{lineNumAttr}>".format(
-                vals.get("For", ""), lineNumAttr=lineNumAttr
-            )
+                vals.get("For", ""),
+                lineNumAttr=lineNumAttr,
+            ),
         ]
     for key in requiredKeys:
         if key == "For":
@@ -434,7 +446,9 @@ def transformElementdef(lines: list[str], tagName: str, firstLine: str, lineNum:
             atts = [x.strip() for x in parsedAttrs["Attributes"].split(",")]
             for att in atts:
                 html += "<li><a element-attr for='{1}'{lineNumAttr}>{0}</a>".format(
-                    att, parsedAttrs.get("Name", ""), lineNumAttr=lineNumAttr
+                    att,
+                    parsedAttrs.get("Name", ""),
+                    lineNumAttr=lineNumAttr,
                 )
         html += "</ul>"
         parsedAttrs["Attributes"] = html
@@ -462,7 +476,7 @@ def transformElementdef(lines: list[str], tagName: str, firstLine: str, lineNum:
                     ", ".join(
                         "<dfn element{lineNumAttr}>{0}</dfn>".format(x.strip(), lineNumAttr=lineNumAttr)
                         for x in val.split(",")
-                    )
+                    ),
                 )
             elif key == "Content model":
                 ret.append(f"<tr><th>{key}:<td>")
@@ -472,7 +486,7 @@ def transformElementdef(lines: list[str], tagName: str, firstLine: str, lineNum:
                 ret.append(
                     ", ".join(
                         "<a dfn{lineNumAttr}>{0}</a>".format(x.strip(), lineNumAttr=lineNumAttr) for x in val.split(",")
-                    )
+                    ),
                 )
             elif key == "Dom interfaces":
                 ret.append("<tr><th>DOM Interfaces:<td>")
@@ -480,7 +494,7 @@ def transformElementdef(lines: list[str], tagName: str, firstLine: str, lineNum:
                     ", ".join(
                         "<a interface{lineNumAttr}>{0}</a>".format(x.strip(), lineNumAttr=lineNumAttr)
                         for x in val.split(",")
-                    )
+                    ),
                 )
             else:
                 ret.append(f"<tr><th>{key}:<td>{val}")
@@ -500,7 +514,11 @@ def transformElementdef(lines: list[str], tagName: str, firstLine: str, lineNum:
 
 
 def transformArgumentdef(
-    lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT
+    lines: list[str],
+    tagName: str,
+    firstLine: str,
+    lineNum: int | None,
+    doc: t.SpecT,
 ) -> list[str]:
     lineNumAttr = ""
     if lineNum is not None:
@@ -520,7 +538,7 @@ def transformArgumentdef(
         m.die("Argumentdef blocks need a for='' attribute specifying their method.", lineNum=lineNum)
         return []
     h.addClass(doc, el, "data")
-    rootAttrs = " ".join(f"{str(k)}='{h.escapeAttr(str(v))}'" for k, v in el.attrib.items())
+    rootAttrs = " ".join(f"{k!s}='{h.escapeAttr(str(v))}'" for k, v in el.attrib.items())
     text = (
         """
 <table {attrs}{lineNumAttr}>
@@ -533,7 +551,10 @@ def transformArgumentdef(
 <th style="text-align:center">Optional
 <th>Description
 <tbody>""".format(
-            attrs=rootAttrs, interface=interface, method=method, lineNumAttr=lineNumAttr
+            attrs=rootAttrs,
+            interface=interface,
+            method=method,
+            lineNumAttr=lineNumAttr,
         )
         + "\n".join(
             [
@@ -544,10 +565,12 @@ def transformArgumentdef(
 <td style="text-align:center">
 <td style="text-align:center">
 <td>{1}""".format(
-                    param, desc, lineNumAttr=lineNumAttr
+                    param,
+                    desc,
+                    lineNumAttr=lineNumAttr,
                 )
                 for param, desc in attrs.items()
-            ]
+            ],
         )
         + """
 </table>"""
@@ -560,7 +583,10 @@ def transformArgumentdef(
 
 
 def parseDefBlock(
-    lines: list[str], type: str, capitalizeKeys: bool = True, lineNum: int | None = None
+    lines: list[str],
+    type: str,
+    capitalizeKeys: bool = True,
+    lineNum: int | None = None,
 ) -> OrderedDict[str, str]:
     vals: OrderedDict[str, str] = OrderedDict()
     lastKey = None
@@ -693,7 +719,7 @@ def processAnchors(anchors: InfoTreeT, doc: t.SpecT, lineNum: int | None = None)
 
         if url.startswith("#"):
             m.die(
-                f"<pre class=anchors> anchor was defined with a local link '{url}'. Please use urlPrefix and/or url to define an external URL."
+                f"<pre class=anchors> anchor was defined with a local link '{url}'. Please use urlPrefix and/or url to define an external URL.",
             )
         shortname = None
         level = None
@@ -742,7 +768,7 @@ def processAnchors(anchors: InfoTreeT, doc: t.SpecT, lineNum: int | None = None)
                     "status": status,
                     "spec": spec.lower() if spec is not None else "",
                 },
-            )
+            ),
         )
         methodishStart = re.match(r"([^(]+\()[^)]", anchor["text"][0])
         if methodishStart:
@@ -750,7 +776,11 @@ def processAnchors(anchors: InfoTreeT, doc: t.SpecT, lineNum: int | None = None)
 
 
 def transformLinkDefaults(
-    lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT
+    lines: list[str],
+    tagName: str,
+    firstLine: str,
+    lineNum: int | None,
+    doc: t.SpecT,
 ) -> list[str]:
     lds = parseInfoTree(lines, doc.md.indent, lineNum)
     processLinkDefaults(lds, doc, lineNum)
@@ -789,7 +819,11 @@ def processLinkDefaults(lds: InfoTreeT, doc: t.SpecT, lineNum: int | None = None
 
 
 def transformIgnoredSpecs(
-    lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT
+    lines: list[str],
+    tagName: str,
+    firstLine: str,
+    lineNum: int | None,
+    doc: t.SpecT,
 ) -> list[str]:
     specs = parseInfoTree(lines, doc.md.indent, lineNum)
     processIgnoredSpecs(specs, doc, lineNum)
@@ -889,7 +923,11 @@ def transformInclude(lines: list[str], tagName: str, firstLine: str, lineNum: in
 
 
 def transformIncludeCode(
-    lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT
+    lines: list[str],
+    tagName: str,
+    firstLine: str,
+    lineNum: int | None,
+    doc: t.SpecT,
 ) -> list[str]:
     lineNumAttr = ""
     if lineNum is not None:
@@ -1025,7 +1063,8 @@ def parseInfoTree(lines: list[str], indent: int = 4, lineNum: int | None = 0) ->
         if wsLen % indent != 0:
             visibleWs = ws.replace("\t", "\\t").replace(" ", "\\s")
             m.die(
-                f"Line has inconsistent indentation; use tabs or {indent} spaces:\n{visibleWs + text}", lineNum=thisLine
+                f"Line has inconsistent indentation; use tabs or {indent} spaces:\n{visibleWs + text}",
+                lineNum=thisLine,
             )
             return []
         wsLen = wsLen // indent
@@ -1195,7 +1234,7 @@ def parseTag(text: str, lineNumber: int | None) -> StartTag | None:
             continue
         if state == "attribute-value-double-quoted":
             attrValue = ""
-            while not eof(i, text) and not text[i] == '"':
+            while not eof(i, text) and text[i] != '"':
                 attrValue += text[i]
                 i += 1
             tag.attrs[attrName] = attrValue
@@ -1207,7 +1246,7 @@ def parseTag(text: str, lineNumber: int | None) -> StartTag | None:
             return None
         if state == "attribute-value-single-quoted":
             attrValue = ""
-            while not eof(i, text) and not text[i] == "'":
+            while not eof(i, text) and text[i] != "'":
                 attrValue += text[i]
                 i += 1
             tag.attrs[attrName] = attrValue

@@ -3,7 +3,8 @@ from __future__ import annotations
 import dataclasses
 import re
 
-from .. import config, h, messages as m, t
+from .. import config, h, t
+from .. import messages as m
 
 
 @dataclasses.dataclass
@@ -28,16 +29,13 @@ class ScriptManager:
         for x in self.scripts:
             if x.name == name:
                 return x
-        raise KeyError()
+        raise KeyError
 
     def getAll(self) -> list[Script]:
-        return list(sorted(self.scripts, key=lambda x: x.name))
+        return sorted(self.scripts, key=lambda x: x.name)
 
     def has(self, name: str) -> bool:
-        for x in self.scripts:
-            if x.name == name:
-                return True
-        return False
+        return any(x.name == name for x in self.scripts)
 
 
 @dataclasses.dataclass
@@ -68,16 +66,13 @@ class StyleManager:
         for x in self.styles:
             if x.name == name:
                 return x
-        raise KeyError()
+        raise KeyError
 
     def getAll(self) -> list[Style]:
-        return list(sorted(self.styles, key=lambda x: x.name))
+        return sorted(self.styles, key=lambda x: x.name)
 
     def has(self, name: str) -> bool:
-        for x in self.styles:
-            if x.name == name:
-                return True
-        return False
+        return any(x.name == name for x in self.styles)
 
 
 @dataclasses.dataclass
@@ -135,7 +130,7 @@ def removeInlineDarkStyles(name: str, text: str) -> str:
     match = re.search(darkModeRe, text)
     if not match:
         m.warn(
-            f"The {name} stylesheet appears to contain darkmode styles, but they aren't being correctly detected. Please report this to the Bikeshed maintainer."
+            f"The {name} stylesheet appears to contain darkmode styles, but they aren't being correctly detected. Please report this to the Bikeshed maintainer.",
         )
         return text
     text = re.sub(darkModeRe, "", text)

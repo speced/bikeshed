@@ -1,8 +1,6 @@
 import re
 
-from pygments import token
-from pygments import style
-from pygments import formatters
+from pygments import formatters, style, token
 
 # dark
 text = "#657b83"
@@ -43,4 +41,4 @@ class PrismStyle(style.Style):
 
 css = formatters.HtmlFormatter(style=PrismStyle).get_style_defs(".c")  # pylint: disable=no-member
 css = re.sub(r"\.c \.(\w+)", r"c-[\1]", css)
-print(css)
+print(css)  # noqa: T201

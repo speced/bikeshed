@@ -13,7 +13,8 @@ import requests
 import tenacity
 from result import Err, Ok, Result
 
-from .. import messages as m, t
+from .. import messages as m
+from .. import t
 
 
 def isOk(x: t.Any) -> t.TypeGuard[Ok]:
@@ -134,7 +135,7 @@ def updateByManifest(path: str, dryRun: bool = False, force: bool = False) -> st
 
     m.say("Fetching remote manifest data...")
     try:
-        remoteManifest = requests.get(ghPrefix + "manifest.txt").text.splitlines()
+        remoteManifest = requests.get(ghPrefix + "manifest.txt", timeout=5).text.splitlines()
         remoteDt = dtFromManifest(remoteManifest)
         remoteFiles = dictFromManifest(remoteManifest)
     except Exception as e:
@@ -155,7 +156,7 @@ def updateByManifest(path: str, dryRun: bool = False, force: bool = False) -> st
     elif isinstance(localDt, datetime):
         if (remoteDt - datetime.utcnow()).days >= 2:
             m.warn(
-                f"Remote data ({remoteDt.strftime('%Y-%m-%d %H:%M:%S')}) is more than two days older than local time ({datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}); either your local time is wrong (no worries, this warning will just repeat each time) or the update process has fallen over (please report this!)."
+                f"Remote data ({remoteDt.strftime('%Y-%m-%d %H:%M:%S')}) is more than two days older than local time ({datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}); either your local time is wrong (no worries, this warning will just repeat each time) or the update process has fallen over (please report this!).",
             )
         if not force:
             if localDt == remoteDt and localDt != 0:
@@ -184,7 +185,7 @@ def updateByManifest(path: str, dryRun: bool = False, force: bool = False) -> st
                 os.remove(localizePath(path, filePath))
                 deletedPaths.append(filePath)
         if deletedPaths:
-            print("Deleted {} old data file{}.".format(len(deletedPaths), "s" if len(deletedPaths) > 1 else ""))
+            m.say("Deleted {} old data file{}.".format(len(deletedPaths), "s" if len(deletedPaths) > 1 else ""))
 
     newManifest = None
     if not dryRun:
@@ -207,7 +208,7 @@ def updateByManifest(path: str, dryRun: bool = False, force: bool = False) -> st
     else:
         phrase = f"were {len(badPaths)} errors" if len(badPaths) > 1 else "was 1 error"
         m.die(
-            f"Done, but there {phrase} (of {len(newPaths)} total) in downloading or saving. Run `bikeshed update` again to retry."
+            f"Done, but there {phrase} (of {len(newPaths)} total) in downloading or saving. Run `bikeshed update` again to retry.",
         )
         return newManifest
 

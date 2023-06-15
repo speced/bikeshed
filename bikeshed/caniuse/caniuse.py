@@ -4,7 +4,8 @@ import json
 from collections import OrderedDict
 from datetime import datetime
 
-from .. import h, messages as m, t
+from .. import h, t
+from .. import messages as m
 from ..translate import _
 
 
@@ -88,7 +89,10 @@ def canIUsePanelFor(id: str, data: t.JSONT, update: str, classFromBrowser: dict[
 
 
 def browserCompatSpan(
-    browserCodeName: str, browserFullName: str, statusCode: str, minVersion: str | None = None
+    browserCodeName: str,
+    browserFullName: str,
+    statusCode: str,
+    minVersion: str | None = None,
 ) -> t.ElementT:
     if statusCode == "n" or minVersion is None:
         minVersion = "None"
@@ -121,8 +125,8 @@ def validateCanIUseURLs(doc: t.SpecT, canIUseData: CanIUseManager, elements: lis
         if not sawTheURL and url not in doc.md.ignoreCanIUseUrlFailure:
             m.warn(
                 f"The Can I Use URL '{url}' isn't associated with any of the Can I Use features."
-                "Please check Can I Use for the correct spec url, and either correct your spec or correct Can I Use."
-                "If the URL is correct and you'd like to keep it in pre-emptively, add the URL to a 'Ignore Can I Use URL Failure' metadata."
+                + "Please check Can I Use for the correct spec url, and either correct your spec or correct Can I Use."
+                + "If the URL is correct and you'd like to keep it in pre-emptively, add the URL to a 'Ignore Can I Use URL Failure' metadata.",
             )
 
     # Second, ensure that every feature in the data corresponding to one of the listed URLs
@@ -139,12 +143,12 @@ def validateCanIUseURLs(doc: t.SpecT, canIUseData: CanIUseManager, elements: lis
     if unusedFeatures:
         featureList = "\n".join(" * {0} - https://caniuse.com/#feat={0}".format(x) for x in sorted(unusedFeatures))
         m.warn(
-            f"The following Can I Use features are associated with your URLs, but don't show up in your spec:\n{featureList}"
+            f"The following Can I Use features are associated with your URLs, but don't show up in your spec:\n{featureList}",
         )
 
 
 class CanIUseManager:
-    def __init__(self, dataFile: t.DataFileRequester):
+    def __init__(self, dataFile: t.DataFileRequester) -> None:
         self.dataFile = dataFile
         data = json.loads(
             self.dataFile.fetch("caniuse", "data.json", str=True),

@@ -1,8 +1,10 @@
 from __future__ import annotations
+
 import dataclasses
 import re
 
-from . import config, h, messages as m, t
+from . import config, h, t
+from . import messages as m
 
 # Any element can have an include-if or exclude-if attribute,
 # containing a comma-separated list of conditions (described below).
@@ -61,7 +63,7 @@ def evalConditions(doc: t.SpecT, el: t.ElementT, conditionString: str) -> t.Gene
         if cond.type == "status":
             yield config.looselyMatch(cond.value, doc.md.status)
         elif cond.type == "text macro":
-            for k in doc.macros.keys():
+            for k in doc.macros:
                 if k.upper() == cond.value:
                     yield True
                     break
@@ -71,7 +73,7 @@ def evalConditions(doc: t.SpecT, el: t.ElementT, conditionString: str) -> t.Gene
             yield (h.find(f'[boilerplate="{h.escapeCSSIdent(cond.value)}"]', doc) is not None)
         else:
             m.die(
-                f"Program error, some type of include/exclude-if condition wasn't handled: '{repr(cond)}'. Please report!",
+                f"Program error, some type of include/exclude-if condition wasn't handled: '{cond!r}'. Please report!",
                 el,
             )
             yield False

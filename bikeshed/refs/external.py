@@ -15,10 +15,7 @@ class ExternalRefsManager:
         self.specs[specName].addRef(ref, for_)
 
     def hasRefs(self) -> bool:
-        for spec in self.specs.values():
-            if spec.refs:
-                return True
-        return False
+        return any(spec.refs for spec in self.specs.values())
 
     def addBiblio(self, specName: str, biblio: t.BiblioEntry) -> None:
         if specName not in self.specs:
@@ -57,10 +54,11 @@ class ExternalRefsGroup:
         if len(self.valuesByFor) == 1:
             return list(self.valuesByFor.values())[0]
         else:
-            raise IndexError(f"There are {len(self.valuesByFor)} values, not just 1.")
+            msg = f"There are {len(self.valuesByFor)} values, not just 1."
+            raise IndexError(msg)
 
     def sorted(self) -> t.Generator[tuple[str | None, t.RefWrapper], None, None]:
         if None in self.valuesByFor:
             yield None, self.valuesByFor[None]
-        for forVal in sorted(x for x in self.valuesByFor.keys() if x is not None):
+        for forVal in sorted(x for x in self.valuesByFor if x is not None):
             yield forVal, self.valuesByFor[forVal]

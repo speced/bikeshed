@@ -5,13 +5,15 @@ from __future__ import annotations
 import io
 import os
 
-from . import config, InputSource, messages as m, t
+from . import InputSource, config, t
+from . import messages as m
 
 
 class DataFileRequester:
-    def __init__(self, fileType: str | None = None, fallback: DataFileRequester | None = None):
+    def __init__(self, fileType: str | None = None, fallback: DataFileRequester | None = None) -> None:
         if fileType not in ("readonly", "latest"):
-            raise Exception(f"Bad value for DataFileRequester.type, got '{fileType}'.")
+            msg = f"Bad value for DataFileRequester.type, got '{fileType}'."
+            raise Exception(msg)
         self.fileType: str = fileType
         # fallback is another requester, used if the main one fails.
         self.fallback = fallback
@@ -25,7 +27,11 @@ class DataFileRequester:
 
     @t.overload
     def fetch(
-        self, *segs: str, str: t.Literal[False], okayToFail: bool = False, fileType: str | None = None
+        self,
+        *segs: str,
+        str: t.Literal[False],
+        okayToFail: bool = False,
+        fileType: str | None = None,
     ) -> io.TextIOWrapper:
         ...
 
@@ -34,7 +40,11 @@ class DataFileRequester:
         ...
 
     def fetch(
-        self, *segs: str, str: bool = False, okayToFail: bool = False, fileType: str | None = None
+        self,
+        *segs: str,
+        str: bool = False,
+        okayToFail: bool = False,
+        fileType: str | None = None,
     ) -> str | io.TextIOWrapper:
         location = self._buildPath(segs=segs, fileType=fileType or self.fileType)
         try:
@@ -42,7 +52,7 @@ class DataFileRequester:
                 with open(location, encoding="utf-8") as fh:
                     return fh.read()
             else:
-                return open(location, encoding="utf-8")
+                return open(location, encoding="utf-8")  # noqa: SIM115
         except OSError:
             if self.fallback:
                 try:
@@ -87,7 +97,8 @@ class DataFileRequester:
                 return ""
             else:
                 return io.StringIO("")
-        raise OSError(f"Couldn't find file '{location}'")
+        msg = f"Couldn't find file '{location}'"
+        raise OSError(msg)
 
 
 defaultRequester = DataFileRequester(fileType="latest", fallback=DataFileRequester(fileType="readonly"))
@@ -137,7 +148,7 @@ def retrieveBoilerplateFile(
                 m.warn(
                     f"Found {f} next to the specification without a matching\n"
                     + f"Local Boilerplate: {name} yes\n"
-                    + "in the metadata. This include won't be found when building via a URL."
+                    + "in the metadata. This include won't be found when building via a URL.",
                 )
                 # We should remove this after giving specs time to react to the warning:
                 sources.append(doc.inputSource.relative(f))
@@ -163,6 +174,6 @@ def retrieveBoilerplateFile(
                 pass
     if error:
         m.die(
-            f"Couldn't find an appropriate include file for the {name} inclusion, given group='{group}' and status='{status}'."
+            f"Couldn't find an appropriate include file for the {name} inclusion, given group='{group}' and status='{status}'.",
         )
     return ""

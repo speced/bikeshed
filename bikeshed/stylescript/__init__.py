@@ -1,1 +1,1 @@
-from .manager import ScriptManager, Script, StyleManager, Style
+from .manager import Script, ScriptManager, Style, StyleManager

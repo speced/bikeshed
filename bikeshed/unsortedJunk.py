@@ -5,13 +5,16 @@ import logging
 import re
 from collections import Counter, defaultdict, namedtuple
 from urllib import parse
+
 from PIL import Image
 
-from . import biblio, config, dfnpanels, h, func, t, messages as m, idl, printjson, repository
+from . import biblio, config, dfnpanels, func, h, idl, printjson, repository, t
+from . import messages as m
 from .translate import _
 
 if t.TYPE_CHECKING:
     import widlparser  # pylint: disable=unused-import
+
     from . import refs
     from .line import Line
 
@@ -21,7 +24,7 @@ class MarkdownCodeSpans(func.Functor):
     # and contains no markdown code spans.
     # Thus, functions mapping over the text can freely make substitutions,
     # knowing they won't accidentally replace stuff in a code span.
-    def __init__(self, text: str):
+    def __init__(self, text: str) -> None:
         self.__codeSpanReplacements__ = []
         newText = ""
         mode = "text"
@@ -370,7 +373,8 @@ def fillInterDocumentReferenceFromSpecref(doc: t.SpecT, el: t.ElementT, spec: st
         return
     if bib.title is None:
         m.die(
-            f"Can't generate a cross-spec section ref for '{spec}', because the biblio entry has no spec title.", el=el
+            f"Can't generate a cross-spec section ref for '{spec}', because the biblio entry has no spec title.",
+            el=el,
         )
         return
     el.tag = "a"
@@ -528,7 +532,7 @@ def classifyDfns(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
                     "{_for}-{id}".format(
                         _for=singleFor,
                         id=parenlessID + "()",
-                    )
+                    ),
                 )
                 el.set(
                     "data-alternate-id",
@@ -873,10 +877,6 @@ def decorateAutolink(doc: t.SpecT, el: t.ElementT, linkType: str, linkText: str,
         if linkText in doc.typeExpansions:
             titleText = doc.typeExpansions[linkText]
         else:
-            if linkText == "":
-                print(h.outerHTML(el, literal=True))
-                assert linkText != ""
-
             typeRefs = doc.refs.queryAllRefs(linkFor=linkText, ignoreObsoletes=True)
             texts = sorted({ref.text for ref in typeRefs})
             if typeRefs:
@@ -942,7 +942,9 @@ def processIssuesAndExamples(doc: t.SpecT) -> None:
                 remoteIssueURL = doc.md.issueTrackerTemplate.format(remoteIssueID)
             if remoteIssueURL:
                 h.appendChild(
-                    el, " ", h.E.a({"href": remoteIssueURL}, _("[Issue #{number}]").format(number=remoteIssueID))
+                    el,
+                    " ",
+                    h.E.a({"href": remoteIssueURL}, _("[Issue #{number}]").format(number=remoteIssueID)),
                 )
     for el in h.findAll(".example:not([id])", doc):
         el.set("id", h.safeID(doc, "example-" + h.hashContents(el)))
@@ -1278,7 +1280,7 @@ def formatElementdefTables(doc: t.SpecT) -> None:
                                 {"data-link-type": "element-attr", "for": groupName},
                                 ref.text.strip(),
                             ),
-                        )
+                        ),
                     ),
                 )
 
@@ -1361,7 +1363,7 @@ def inlineRemoteIssues(doc: t.SpecT) -> None:
 
         res = None
         try:
-            res = requests.get(url, headers=headers)
+            res = requests.get(url, headers=headers, timeout=5)
         except requests.exceptions.ConnectionError:
             # Offline or something, recover if possible
             if key in responses:
@@ -1392,7 +1394,7 @@ def inlineRemoteIssues(doc: t.SpecT) -> None:
             error = res.json()
             if error["message"].startswith("API rate limit exceeded"):
                 m.die(
-                    "GitHub Issues API rate limit exceeded. Get an OAuth token from https://github.com/settings/tokens to increase your limit, or just wait an hour for your limit to refresh; Bikeshed has cached all the issues so far and will resume from where it left off."
+                    "GitHub Issues API rate limit exceeded. Get an OAuth token from https://github.com/settings/tokens to increase your limit, or just wait an hour for your limit to refresh; Bikeshed has cached all the issues so far and will resume from where it left off.",
                 )
             else:
                 m.die(

@@ -7,13 +7,14 @@ import json
 import os
 import re
 import subprocess
-from collections import OrderedDict, defaultdict, Counter
+from collections import Counter, OrderedDict, defaultdict
 from datetime import date, datetime, timedelta
 from functools import partial
 
 from isodate import Duration, parse_duration
 
-from . import config, constants, datablocks, markdown, h, messages as m, repository, t
+from . import config, constants, datablocks, h, markdown, repository, t
+from . import messages as m
 from .translate import _
 
 if t.TYPE_CHECKING:
@@ -101,7 +102,7 @@ class MetadataManager:
         self.mailingList: str | None = None
         self.mailingListArchives: str | None = None
         self.markupShorthands: config.BoolSet = config.BoolSet(
-            ["css", "dfn", "biblio", "markup", "http", "idl", "algorithm"]
+            ["css", "dfn", "biblio", "markup", "http", "idl", "algorithm"],
         )
         self.maxToCDepth: int | float | None = float("inf")
         self.metadataInclude: config.BoolSet = config.BoolSet(default=True)
@@ -214,7 +215,7 @@ class MetadataManager:
 
         if self.status in ("w3c/IG-NOTE", "w3c/WG-NOTE"):
             m.die(
-                f"Under Process2021, {self.status} is no longer a valid status. Use NOTE (or one of its variants NOTE-ED, NOTE-FPWD, NOTE-WD) instead."
+                f"Under Process2021, {self.status} is no longer a valid status. Use NOTE (or one of its variants NOTE-ED, NOTE-FPWD, NOTE-WD) instead.",
             )
 
         # { MetadataManager attr : metadata name (for printing) }
@@ -589,7 +590,7 @@ def parseLinkDefaults(key: str, val: str, lineNum: str | int | None) -> t.LinkDe
     for default in val.split(","):
         match = re.match(
             r"^([\w\d-]+)  (?:\s+\( ({}) (?:\s+(snapshot|current))? \) )  \s+(.*)$".format(
-                "|".join(config.dfnTypes.union(["dfn"]))
+                "|".join(config.dfnTypes.union(["dfn"])),
             ),
             default.strip(),
             re.X,
@@ -657,7 +658,7 @@ def parseRefStatus(key: str, val: str, lineNum: str | int | None) -> str:
 
 def parseComplainAbout(key: str, val: str, lineNum: str | int | None) -> config.BoolSet:
     validLabels = frozenset(
-        ["missing-example-ids", "broken-links", "accidental-2119", "missing-exposed", "mixed-indents"]
+        ["missing-example-ids", "broken-links", "accidental-2119", "missing-exposed", "mixed-indents"],
     )
     ret = parseBoolishList(key, val.lower(), default=False, validLabels=validLabels, lineNum=lineNum)
     return ret
@@ -730,7 +731,8 @@ def parseMarkupShorthands(key: str, val: str, lineNum: str | int | None) -> conf
         pieces = v.split()
         if len(pieces) != 2:
             m.die(
-                f"Markup Shorthand metadata pieces are a shorthand category and a boolean. Got:\n{v}", lineNum=lineNum
+                f"Markup Shorthand metadata pieces are a shorthand category and a boolean. Got:\n{v}",
+                lineNum=lineNum,
             )
             continue
         name, boolstring = pieces
@@ -1148,7 +1150,7 @@ def getSpecRepository(doc: t.SpecT) -> repository.Repository | None:
         try:
             with open(os.devnull, "wb") as fnull:
                 remotes = str(
-                    subprocess.check_output(["git", "remote", "-v"], stderr=fnull, cwd=source_dir),
+                    subprocess.check_output(["git", "remote", "-v"], stderr=fnull, cwd=source_dir),  # noqa: S603
                     encoding="utf-8",
                 )
             searches = [
@@ -1245,7 +1247,8 @@ def joinBoolSet(a: config.BoolSet, b: config.BoolSet) -> config.BoolSet:
 
 
 def joinDdList(
-    a: defaultdict[str, list[JoinA]], b: defaultdict[str, list[JoinB]]
+    a: defaultdict[str, list[JoinA]],
+    b: defaultdict[str, list[JoinB]],
 ) -> defaultdict[str, list[JoinA | JoinB]]:
     x: defaultdict[str, list[JoinA | JoinB]] = defaultdict(list)
     x.update(a)  # type: ignore[arg-type]
@@ -1290,7 +1293,10 @@ knownKeys = {
     "Deadline": Metadata("Deadline", "deadline", joinValue, parseDate),
     "Default Biblio Display": Metadata("Default Biblio Display", "defaultBiblioDisplay", joinValue, parseBiblioDisplay),
     "Default Biblio Status": Metadata(
-        "Default Biblio Status", "defaultRefStatus", joinValue, parseRefStatus
+        "Default Biblio Status",
+        "defaultRefStatus",
+        joinValue,
+        parseRefStatus,
     ),  # synonym of "Default Ref Status"
     "Default Highlight": Metadata("Default Highlight", "defaultHighlight", joinValue, parseLiteral),
     "Default Ref Status": Metadata("Default Ref Status", "defaultRefStatus", joinValue, parseRefStatus),
@@ -1305,7 +1311,10 @@ knownKeys = {
     "Group": Metadata("Group", "group", joinValue, parseLiteral),
     "H1": Metadata("H1", "h1", joinValue, parseLiteral),
     "Ignore Can I Use Url Failure": Metadata(
-        "Ignore Can I Use Url Failure", "ignoreCanIUseUrlFailure", joinList, parseLiteralList
+        "Ignore Can I Use Url Failure",
+        "ignoreCanIUseUrlFailure",
+        joinList,
+        parseLiteralList,
     ),
     "Ignore Mdn Failure": Metadata("Ignore MDN Failure", "ignoreMDNFailure", joinList, parseLiteralList),
     "Ignored Terms": Metadata("Ignored Terms", "ignoredTerms", joinList, parseCommaSeparated),
@@ -1326,7 +1335,10 @@ knownKeys = {
     "Line Numbers": Metadata("Line Numbers", "lineNumbers", joinValue, parseBoolean),
     "Link Defaults": Metadata("Link Defaults", "linkDefaults", joinDdList, parseLinkDefaults),
     "Local Boilerplate": Metadata(
-        "Local Boilerplate", "localBoilerplate", joinBoolSet, partial(parseBoolishList, default=False)
+        "Local Boilerplate",
+        "localBoilerplate",
+        joinBoolSet,
+        partial(parseBoolishList, default=False),
     ),
     "Logo": Metadata("Logo", "logo", joinValue, parseLiteral),
     "Mailing List Archives": Metadata("Mailing List Archives", "mailingListArchives", joinValue, parseLiteral),
@@ -1334,7 +1346,10 @@ knownKeys = {
     "Markup Shorthands": Metadata("Markup Shorthands", "markupShorthands", joinBoolSet, parseMarkupShorthands),
     "Max Toc Depth": Metadata("Max ToC Depth", "maxToCDepth", joinValue, parseMaxToCDepth),
     "Metadata Include": Metadata(
-        "Metadata Include", "metadataInclude", joinBoolSet, partial(parseBoolishList, default=True)
+        "Metadata Include",
+        "metadataInclude",
+        joinBoolSet,
+        partial(parseBoolishList, default=True),
     ),
     "Metadata Order": Metadata("Metadata Order", "metadataOrder", joinValue, parseMetadataOrder),
     "No Abstract": Metadata("No Abstract", "noAbstract", joinValue, parseBoolean),
@@ -1359,10 +1374,16 @@ knownKeys = {
     "Tracking Vector Class": Metadata("Tracking Vector Class", "trackingVectorClass", joinValue, parseLiteralOrNone),
     "Tracking Vector Image": Metadata("Tracking Vector Image", "trackingVectorImage", joinValue, parseLiteralOrNone),
     "Tracking Vector Image Width": Metadata(
-        "Tracking Vector Image Width", "trackingVectorImageWidth", joinValue, parseLiteral
+        "Tracking Vector Image Width",
+        "trackingVectorImageWidth",
+        joinValue,
+        parseLiteral,
     ),
     "Tracking Vector Image Height": Metadata(
-        "Tracking Vector Image Height", "trackingVectorImageHeight", joinValue, parseLiteral
+        "Tracking Vector Image Height",
+        "trackingVectorImageHeight",
+        joinValue,
+        parseLiteral,
     ),
     "Tracking Vector Alt Text": Metadata("Tracking Vector Alt Text", "trackingVectorAltText", joinValue, parseLiteral),
     "Tracking Vector Title": Metadata("Tracking Vector Title", "trackingVectorTitle", joinValue, parseLiteral),

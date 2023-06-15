@@ -3,7 +3,6 @@ from __future__ import annotations
 import collections.abc
 import hashlib
 import re
-
 from collections import OrderedDict
 
 import html5lib
@@ -186,7 +185,7 @@ def linkTextsFromElement(el: t.ElementT) -> list[str]:
 
 
 class DuplicatedLinkText(Exception):
-    def __init__(self, offendingText: str, allTexts: list[str], el: t.ElementT):
+    def __init__(self, offendingText: str, allTexts: list[str], el: t.ElementT) -> None:
         super().__init__()
         self.offendingText = offendingText
         self.allTexts = allTexts
@@ -319,7 +318,8 @@ def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: bool = False) ->
                 # doesn't get moved into the appended child or anything.
                 parent.append(child)
     if child is None and not allowEmpty:
-        raise Exception("Empty child list appended without allowEmpty=True")
+        msg = "Empty child list appended without allowEmpty=True"
+        raise Exception(msg)
     if isElement(child):
         return child
     else:
@@ -647,10 +647,7 @@ def removeAttr(el: t.ElementT, *attrNames: str) -> t.ElementT:
 
 def hasAttr(el: t.ElementT, *attrNames: str) -> bool:
     # Returns True if the element has at least one of the named attributes
-    for attrName in attrNames:
-        if attrName in el.attrib:
-            return True
-    return False
+    return any(attrName in el.attrib for attrName in attrNames)
 
 
 def hasAttrs(el: t.ElementT) -> bool:
@@ -709,10 +706,7 @@ def isNodes(nodes: t.Any) -> t.TypeGuard[t.NodesT]:
         return True
     if not isinstance(nodes, list):
         return False
-    for child in nodes:
-        if not isNodes(child):
-            return False
-    return True
+    return all(isNodes(child) for child in nodes)
 
 
 def isOddNode(node: t.Any) -> bool:
@@ -1008,7 +1002,9 @@ if t.TYPE_CHECKING:
 
     class ElementCreatorFnT(t.Protocol):
         def __call__(
-            self, attrsOrChild: t.Mapping[str, str | None] | t.NodesT | None = None, *children: t.NodesT | None
+            self,
+            attrsOrChild: t.Mapping[str, str | None] | t.NodesT | None = None,
+            *children: t.NodesT | None,
         ) -> t.ElementT:
             ...
 
@@ -1016,7 +1012,8 @@ if t.TYPE_CHECKING:
 class ElementCreationHelper:
     def __getattr__(self, name: str) -> ElementCreatorFnT:
         def _creater(
-            attrsOrChild: t.Mapping[str, str | None] | t.NodesT | None = None, *children: t.NodesT | None
+            attrsOrChild: t.Mapping[str, str | None] | t.NodesT | None = None,
+            *children: t.NodesT | None,
         ) -> t.ElementT:
             if isNodes(attrsOrChild):
                 return createElement(name, None, attrsOrChild, *children)

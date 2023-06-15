@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import re
 
-from .. import config, h, messages as m, t
+from .. import config, h, t
+from .. import messages as m
 
 
 def transformProductionPlaceholders(doc: t.SpecT) -> None:
@@ -384,7 +385,7 @@ def biblioReplacer(match: re.Match) -> t.NodeT:
     displayDirect = "direct" in modifiers
     if (displayInline + displayIndex + displayDirect) > 1:
         m.die(
-            f"Biblio shorthand {match.group(0)} contains more than one of 'inline', 'index' and 'direct', please pick one."
+            f"Biblio shorthand {match.group(0)} contains more than one of 'inline', 'index' and 'direct', please pick one.",
         )
         return t.cast(str, match.group(0))
     elif displayInline:

@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-import io  # pylint: disable=unused-import
+import contextlib
 import logging
 import os
 import tarfile
 import tempfile
 
 from . import extensions, t
+from . import messages as m
 
 
 def publishEchidna(
@@ -37,17 +38,18 @@ def publishEchidna(
         auth=(username, password),
         data=data,
         files={"tar": tarBytes},
+        timeout=3,
     )
 
     if r.status_code == 202:
-        print("Successfully pushed to Echidna!")
-        print("Check the URL in a few seconds to see if it was published successfully:")
-        print("https://labs.w3.org/echidna/api/status?id=" + r.text)
+        m.say("Successfully pushed to Echidna!")
+        m.say("Check the URL in a few seconds to see if it was published successfully:")
+        m.say("https://labs.w3.org/echidna/api/status?id=" + r.text)
     else:
-        print("There was an error publishing your spec. Here's some information that might help?")
-        print(r.status_code)
-        print(r.text)
-        print(r.headers)
+        m.say("There was an error publishing your spec. Here's some information that might help?")
+        m.say(str(r.status_code))
+        m.say(r.text)
+        m.say(str(r.headers))
 
 
 def prepareTar(doc: t.SpecT, additionalDirectories: list[str] | None = None) -> bytes:
@@ -69,10 +71,8 @@ def prepareTar(doc: t.SpecT, additionalDirectories: list[str] | None = None) -> 
         else:
             inputPath = str(doc.inputSource.relative(fname[0]))
             outputPath = fname[1]
-        try:
+        with contextlib.suppress(OSError):
             tar.add(inputPath, outputPath)
-        except OSError:
-            pass
     tar.close()
     specOutput.close()
     os.remove(specOutput.name)

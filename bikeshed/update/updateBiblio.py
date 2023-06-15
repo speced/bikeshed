@@ -7,7 +7,8 @@ from collections import defaultdict
 
 import requests
 
-from .. import biblio, messages as m, t
+from .. import biblio, t
+from .. import messages as m
 
 
 def update(path: str, dryRun: bool = False) -> set[str] | None:
@@ -92,7 +93,7 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
 
 def getSpecrefData() -> str:
     try:
-        return requests.get("https://api.specref.org/bibrefs").text
+        return requests.get("https://api.specref.org/bibrefs", timeout=5).text
     except Exception as e:
         m.die(f"Couldn't download the SpecRef biblio data.\n{e}")
         return "{}"
@@ -100,7 +101,7 @@ def getSpecrefData() -> str:
 
 def getWG21Data() -> str:
     try:
-        return requests.get("https://wg21.link/specref.json").text
+        return requests.get("https://wg21.link/specref.json", timeout=5).text
     except Exception as e:
         m.die(f"Couldn't download the WG21 biblio data.\n{e}")
         return "{}"
@@ -108,7 +109,10 @@ def getWG21Data() -> str:
 
 def getCSSWGData() -> list[str]:
     try:
-        return requests.get("https://raw.githubusercontent.com/w3c/csswg-drafts/master/biblio.ref").text.splitlines()
+        return requests.get(
+            "https://raw.githubusercontent.com/w3c/csswg-drafts/master/biblio.ref",
+            timeout=5,
+        ).text.splitlines()
     except Exception as e:
         m.die(f"Couldn't download the CSSWG biblio data.\n{e}")
         return []

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from subprocess import PIPE, Popen
 
-from .. import constants, h, messages as m, t
+from .. import constants, h, t
+from .. import messages as m
 
 
 def processTags(doc: t.SpecT) -> None:
@@ -29,7 +30,7 @@ def processTags(doc: t.SpecT) -> None:
                 return
             if p.returncode:
                 m.die(
-                    f"When trying to process {h.outerHTML(el)}, got return code {p.returncode} and the following stderr:\n{str(err)}",
+                    f"When trying to process {h.outerHTML(el)}, got return code {p.returncode} and the following stderr:\n{err!s}",
                     el=el,
                 )
                 continue

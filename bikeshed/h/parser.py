@@ -9,7 +9,8 @@ import re
 import typing
 from dataclasses import dataclass, field
 
-from .. import messages as m, t
+from .. import messages as m
+from .. import t
 from . import dom
 
 
@@ -145,7 +146,7 @@ class Stream:
     _chars: str
     _lineBreaks: list[int]
 
-    def __init__(self, chars: str):
+    def __init__(self, chars: str) -> None:
         self._chars = chars
         self._lineBreaks = []
         for i, char in enumerate(chars):
