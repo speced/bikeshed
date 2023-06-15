@@ -132,7 +132,7 @@ class ReferenceManager:
             self.foreignRefs.fors.update(json.loads(self.dataFile.fetch("fors.json", str=True)))
 
         initFors()
-        if doc and doc.inputSource and doc.inputSource.hasDirectory:
+        if doc and doc.inputSource and doc.inputSource.hasDirectory():
             ldLines = self.dataFile.fetch("link-defaults.infotree").read().split("\n")
             datablocks.transformInfo(lines=ldLines, doc=doc, firstLine=ldLines[0], tagName="pre", lineNum=None)
 
