@@ -78,8 +78,8 @@ module.exports = defineConfig({
   /* How to run your local dev server before starting the tests. */
   webServer: {
     // command: 'npm run start',
-    // command: 'bikeshed serve',
-    command: 'serve', // requires: npm install -g serve
+    command: 'bikeshed serve --port=3000',
+    // command: 'serve', // requires: npm install -g serve
     url: 'http://127.0.0.1:3000',
     reuseExistingServer: !process.env.CI,
   },
