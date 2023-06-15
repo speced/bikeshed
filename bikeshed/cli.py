@@ -75,6 +75,13 @@ def main() -> None:
         help="Determines what sorts of errors cause Bikeshed to die (quit immediately with an error status code). Default is 'fatal'; the -f flag is a shorthand for 'nothing'",
     )
     argparser.add_argument(
+        "--no-update",
+        dest="noUpdate",
+        default=False,
+        action="store_true",
+        help="Skips checking if your data files are up-to-date.",
+    )
+    argparser.add_argument(
         "--allow-nonlocal-files",
         dest="allowNonlocalFiles",
         action="store_true",
@@ -425,7 +432,7 @@ def main() -> None:
     constants.chroot = not options.allowNonlocalFiles
     constants.executeCode = options.allowExecute
 
-    update.fixupDataFiles()
+    update.fixupDataFiles(options.noUpdate)
     if options.subparserName == "update":
         handleUpdate(options)
     elif options.subparserName == "spec":
