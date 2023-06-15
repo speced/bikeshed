@@ -11,7 +11,13 @@ const { defineConfig, devices } = require('@playwright/test');
  * @see https://playwright.dev/docs/test-configuration
  */
 module.exports = defineConfig({
-  testDir: './tests/e2e',
+  // Directory where the tests are located. "." for top-level directory.
+  testDir: '.',
+  // Glob patterns or regular expressions that match test files.
+  testMatch: '*/*_pwtest.js',
+  outputDir: '{testFileDir}/test-results',
+  snapshotPathTemplate: '{testFileDir}/__screenshots__/{testFileName}/{arg}-{projectName}-{platform}{ext}',
+
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
@@ -25,7 +31,7 @@ module.exports = defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    // baseURL: 'http://127.0.0.1:3000',
+    baseURL: 'http://127.0.0.1:3000',
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
@@ -43,7 +49,7 @@ module.exports = defineConfig({
       use: { ...devices['Desktop Firefox'] },
     },
 
-    // Missing dependencies for Webkit.
+    // Webkit is not supported yet.
     // {
     //   name: 'webkit',
     //   use: { ...devices['Desktop Safari'] },
@@ -70,12 +76,12 @@ module.exports = defineConfig({
     // },
   ],
 
-  /* Run your local dev server before starting the tests */
-  // webServer: {
-  //   command: 'npm run start',
-  //   url: 'http://127.0.0.1',
-  //   timeout: 5 * 1000,
-  //   // reuseExistingServer: !process.env.CI,
-  // },
-
+  /* How to run your local dev server before starting the tests. */
+  webServer: {
+    // command: 'npm run start',
+    // command: 'bikeshed serve',
+    command: 'serve', // requires: npm install -g serve
+    url: 'http://127.0.0.1:3000',
+    reuseExistingServer: !process.env.CI,
+  },
 });
