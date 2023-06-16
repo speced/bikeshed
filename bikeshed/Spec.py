@@ -133,6 +133,9 @@ class Spec:
 
         return True
 
+    def checkValidity(self) -> bool:
+        return True
+
     def recordDependencies(self, *inputSources: InputSource.InputSource) -> None:
         self.transitiveDependencies.update(inputSources)
 

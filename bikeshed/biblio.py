@@ -34,9 +34,11 @@ class BiblioEntry(metaclass=abc.ABCMeta):
             msg = f"Invalid preferredStatus value: {self.preferredStatus}"
             raise ValueError(msg)
 
+    @abc.abstractmethod
     def toHTML(self) -> t.NodesT:
         ...
 
+    @abc.abstractmethod
     def valid(self) -> bool:
         ...
 

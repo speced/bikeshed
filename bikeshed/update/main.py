@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import os
 
 from .. import config, t
@@ -66,7 +67,7 @@ def update(
     return manifest.createManifest(path=path, dryRun=dryRun)
 
 
-def fixupDataFiles() -> None:
+def fixupDataFiles(skipUpdate: bool = False) -> None:
     """
     Checks the readonly/ version is more recent than your current mutable data files.
     This happens if I changed the datafile format and shipped updated files as a result;
@@ -84,19 +85,32 @@ def fixupDataFiles() -> None:
         m.warn(f"Couldn't check the datafile version. Bikeshed may be unstable.\n{err}")
         return
 
-    if localVersion == remoteVersion:
-        # Cool
-        return
+    if localVersion != remoteVersion:
+        # If versions don't match, either the remote versions have been updated
+        # (and we should switch you to them, because formats may have changed),
+        # or you're using a historical version of Bikeshed (ditto).
+        try:
+            for filename in os.listdir(remotePath()):
+                copyanything(remotePath(filename), localPath(filename))
+        except Exception as err:
+            m.warn(f"Couldn't update datafiles from cache. Bikeshed may be unstable.\n{err}")
+            return
 
-    # If versions don't match, either the remote versions have been updated
-    # (and we should switch you to them, because formats may have changed),
-    # or you're using a historical version of Bikeshed (ditto).
-    try:
-        for filename in os.listdir(remotePath()):
-            copyanything(remotePath(filename), localPath(filename))
-    except Exception as err:
-        m.warn(f"Couldn't update datafiles from cache. Bikeshed may be unstable.\n{err}")
+    # Now see if the local datafiles are likely out-of-date.
+    if skipUpdate:
         return
+    try:
+        with open(localPath("manifest.txt"), encoding="utf-8") as fh:
+            localDt = manifest.dtFromManifest(fh.readlines())
+    except Exception as e:
+        localDt = "error"
+        print(e)
+    if localDt == "error":
+        m.warn(f"Couldn't find local manifest file. Updating...")
+        update()
+    elif (datetime.datetime.utcnow() - localDt).days >= 7:
+        m.say(f"Bringing data files up-to-date...")
+        update()
 
 
 def updateReadonlyDataFiles() -> None:

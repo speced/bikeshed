@@ -75,6 +75,13 @@ def main() -> None:
         help="Determines what sorts of errors cause Bikeshed to die (quit immediately with an error status code). Default is 'fatal'; the -f flag is a shorthand for 'nothing'",
     )
     argparser.add_argument(
+        "--no-update",
+        dest="noUpdate",
+        default=False,
+        action="store_true",
+        help="Skips checking if your data files are up-to-date.",
+    )
+    argparser.add_argument(
         "--allow-nonlocal-files",
         dest="allowNonlocalFiles",
         action="store_true",
@@ -425,7 +432,7 @@ def main() -> None:
     constants.chroot = not options.allowNonlocalFiles
     constants.executeCode = options.allowExecute
 
-    update.fixupDataFiles()
+    update.fixupDataFiles(options.noUpdate)
     if options.subparserName == "update":
         handleUpdate(options)
     elif options.subparserName == "spec":
@@ -480,6 +487,9 @@ def handleSpec(options: argparse.Namespace, extras: list[str]) -> None:
         token=options.ghToken,
         lineNumbers=options.lineNumbers,
     )
+    if not doc.valid:
+        m.die("Spec is in an invalid state; exitting.")
+        return
     doc.mdCommandLine = metadata.fromCommandLine(extras)
     if options.byos:
         doc.mdCommandLine.addData("Group", "byos")
@@ -492,6 +502,9 @@ def handleEchidna(options: argparse.Namespace, extras: list[str]) -> None:
     from .Spec import Spec
 
     doc = Spec(inputFilename=options.infile, token=options.ghToken)
+    if not doc.valid:
+        m.die("Spec is in an invalid state; exitting.")
+        return
     doc.mdCommandLine = metadata.fromCommandLine(extras)
     doc.mdCommandLine.addData("Prepare For TR", "yes")
     doc.preprocess()
@@ -518,6 +531,9 @@ def handleWatch(options: argparse.Namespace, extras: list[str]) -> None:
     # Can't have an error killing the watcher
     constants.setErrorLevel("nothing")
     doc = Spec(inputFilename=options.infile, token=options.ghToken)
+    if not doc.valid:
+        m.die("Spec is in an invalid state; exitting.")
+        return
     doc.mdCommandLine = metadata.fromCommandLine(extras)
     if options.byos:
         doc.mdCommandLine.addData("Group", "byos")
@@ -530,6 +546,9 @@ def handleServe(options: argparse.Namespace, extras: list[str]) -> None:
 
     constants.setErrorLevel("nothing")
     doc = Spec(inputFilename=options.infile, token=options.ghToken)
+    if not doc.valid:
+        m.die("Spec is in an invalid state; exitting.")
+        return
     doc.mdCommandLine = metadata.fromCommandLine(extras)
     if options.byos:
         doc.mdCommandLine.addData("Group", "byos")
