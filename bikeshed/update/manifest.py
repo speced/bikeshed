@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import hashlib
 import os
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 import aiofiles
 import aiohttp
@@ -30,15 +31,12 @@ def isErr(x: t.Any) -> t.TypeGuard[Err]:
 knownFiles = [
     "biblio-keys.json",
     "biblio-numeric-suffixes.json",
-    "bikeshed-version.txt",
     "fors.json",
     "languages.json",
     "link-defaults.infotree",
     "mdn.json",
     "methods.json",
     "specs.json",
-    "test-suites.json",
-    "version.txt",
     "wpt-tests.txt",
 ]
 knownFolders = [
@@ -63,55 +61,15 @@ if sys.platform.startswith("win") and sys.version_info >= (3, 8):
             asyncio.set_event_loop_policy(WindowsSelectorEventLoopPolicy())
 
 
-def createManifest(path: str, dryRun: bool = False) -> str:
+def createManifest(path: str, dryRun: bool = False) -> Manifest:
     """Generates a manifest file for all the data files."""
-    manifests = []
-    for absPath, relPath in getDatafilePaths(path):
-        if relPath in knownFiles:
-            pass
-        elif relPath.partition("/")[0] in knownFolders:
-            pass
-        else:
-            continue
-        with open(absPath, encoding="utf-8") as fh:
-            manifests.append((relPath, hashFile(fh)))
-
-    manifest = str(datetime.utcnow()) + "\n"
-    for p, h in sorted(manifests, key=keyManifest):
-        manifest += f"{h} {p}\n"
-
+    manifest = Manifest.fromPath(path)
     if not dryRun:
-        with open(os.path.join(path, "manifest.txt"), "w", encoding="utf-8") as fh:
-            fh.write(manifest)
-
+        manifest.save(path)
     return manifest
 
 
-def keyManifest(manifest: tuple[str, str]) -> tuple[int, int | str, str]:
-    name = manifest[0]
-    if "/" in name:
-        dir, _, file = name.partition("/")
-        return 1, dir, file
-    else:
-        return 0, len(name), name
-
-
-def hashFile(fh: t.TextIO) -> str:
-    return hashlib.md5(fh.read().encode("ascii", "xmlcharrefreplace")).hexdigest()
-
-
-def getDatafilePaths(basePath: str) -> t.Generator[tuple[str, str], None, None]:
-    for root, dirs, files in os.walk(basePath):
-        if "readonly" in dirs:
-            continue
-        for filename in files:
-            if filename == "":
-                continue
-            filePath = os.path.join(root, filename)
-            yield filePath, os.path.relpath(filePath, basePath)
-
-
-def updateByManifest(path: str, dryRun: bool = False, force: bool = False) -> str | None:
+def updateByManifest(path: str, dryRun: bool = False, force: bool = False) -> Manifest | None:
     """
     Attempts to update only the recently updated datafiles by using a manifest file.
     Returns None if updating failed and a full update should be performed;
@@ -123,21 +81,23 @@ def updateByManifest(path: str, dryRun: bool = False, force: bool = False) -> st
     # Get the last-update time from the local manifest
     try:
         with open(os.path.join(path, "manifest.txt"), encoding="utf-8") as fh:
-            localDt = dtFromManifest(fh.readlines())
+            oldManifest = Manifest.fromString(fh.read())
     except Exception as e:
-        localDt = "error"
-        m.warn(f"Couldn't find local manifest file.\n{e}")
+        oldManifest = None
+        m.warn(f"Couldn't find manifest from previous update run:\n  {e}")
 
     # Get the actual file data by regenerating the local manifest,
     # to guard against mistakes or shenanigans
-    localManifest = createManifest(path, dryRun=True).split("\n")
-    localFiles = dictFromManifest(localManifest)
+    localManifest = Manifest.fromPath(path)
+    if oldManifest:
+        localManifest.dt = oldManifest.dt
+    else:
+        # Ensure it thinks it's old
+        localManifest.dt = dtZero()
 
     m.say("Fetching remote manifest data...")
     try:
-        remoteManifest = requests.get(ghPrefix + "manifest.txt", timeout=5).text.splitlines()
-        remoteDt = dtFromManifest(remoteManifest)
-        remoteFiles = dictFromManifest(remoteManifest)
+        remoteManifest = Manifest.fromString(requests.get(ghPrefix + "manifest.txt", timeout=5).text)
     except Exception as e:
         m.warn(
             f"Couldn't download remote manifest file, so can't update. Please report this!\n{e}",
@@ -145,44 +105,47 @@ def updateByManifest(path: str, dryRun: bool = False, force: bool = False) -> st
         m.warn("Update manually with `bikeshed update --skip-manifest`.")
         return None
 
-    if not isinstance(remoteDt, datetime):
+    if remoteManifest is None:
         m.die("Something's gone wrong with the remote data; I can't read its timestamp. Please report this!")
         return None
 
-    if localDt == "error":
+    if oldManifest and oldManifest.hasError():
         # A previous update run didn't complete successfully,
         # so I definitely need to try again.
+
         m.warn("Previous update had some download errors, so re-running...")
-    elif isinstance(localDt, datetime):
-        if (remoteDt - datetime.utcnow()).days >= 2:
+    else:
+        if remoteManifest.daysOld() > 2:
             m.warn(
-                f"Remote data ({remoteDt.strftime('%Y-%m-%d %H:%M:%S')}) is more than two days older than local time ({datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}); either your local time is wrong (no worries, this warning will just repeat each time) or the update process has fallen over (please report this!).",
+                f"Remote data ({printDt(remoteManifest.dt)}) is more than two days older than local time ({printDt(dtNow())}); either your local time is wrong (no worries, this warning will just repeat each time) or the update process has fallen over (please report this!).",
             )
         if not force:
-            if localDt == remoteDt and localDt != 0:
-                m.say(f"Local data is already up-to-date with remote ({localDt.strftime('%Y-%m-%d %H:%M:%S')})")
-                return "\n".join(localManifest)
-            elif localDt > remoteDt:
+            if localManifest.dt == remoteManifest.dt and localManifest.dt == dtZero():
+                m.say(f"Local data is already up-to-date with remote ({printDt(localManifest.dt)})")
+                return localManifest
+            elif localManifest.dt > remoteManifest.dt:
                 # No need to update, local data is more recent.
                 m.say(
-                    f"Local data is fresher ({localDt.strftime('%Y-%m-%d %H:%M:%S')}) than remote ({remoteDt.strftime('%Y-%m-%d %H:%M:%S')}), so nothing to update.",
+                    f"Local data is fresher ({printDt(localManifest.dt)}) than remote ({printDt(remoteManifest.dt)}), so nothing to update.",
                 )
-                return "\n".join(localManifest)
+                return localManifest
 
-    if len(localFiles) == 0:
+    if not oldManifest or len(oldManifest.entries) == 0:
         m.say("The local manifest is borked or missing; re-downloading everything...")
-    if len(remoteFiles) == 0:
+    if len(remoteManifest.entries) == 0:
         m.die("The remote data doesn't have any data in it. Please report this!")
         return None
     newPaths = []
-    for filePath, hash in remoteFiles.items():
-        if hash != localFiles.get(filePath):
+    for filePath, hash in remoteManifest.entries.items():
+        if hash != localManifest.entries.get(filePath):
+            # print(f"{hash} {filePath} {localManifest.entries.get(filePath)}")
             newPaths.append(filePath)
     if not dryRun:
         deletedPaths = []
-        for filePath in localFiles:
-            if filePath not in remoteFiles and os.path.exists(localizePath(path, filePath)):
-                os.remove(localizePath(path, filePath))
+        for filePath in localManifest.entries:
+            relPath = localizePath(path, filePath)
+            if filePath not in remoteManifest.entries and os.path.exists(relPath):
+                os.remove(relPath)
                 deletedPaths.append(filePath)
         if deletedPaths:
             m.say("Deleted {} old data file{}.".format(len(deletedPaths), "s" if len(deletedPaths) > 1 else ""))
@@ -191,16 +154,18 @@ def updateByManifest(path: str, dryRun: bool = False, force: bool = False) -> st
     if not dryRun:
         if newPaths:
             m.say(f"Updating {len(newPaths)} file{'s' if len(newPaths) > 1 else ''}...")
-        goodPaths, badPaths = asyncio.run(updateFiles(path, newPaths))
-        newManifest = createFinishedManifest(remoteManifest, goodPaths, badPaths)
+        _, badPaths = asyncio.run(updateFiles(path, newPaths))
+        newManifest = dataclasses.replace(remoteManifest)
+        for badPath in badPaths:
+            newManifest.entries[badPath] = None
         try:
             with open(os.path.join(path, "manifest.txt"), "w", encoding="utf-8") as fh:
-                fh.write(newManifest)
+                fh.write(str(newManifest))
         except Exception as e:
             m.warn(f"Couldn't save new manifest file.\n{e}")
             return None
     if newManifest is None:
-        newManifest = createManifest(path, dryRun=True)
+        newManifest = Manifest.fromPath(path)
 
     if not badPaths:
         m.say("Done!")
@@ -301,56 +266,129 @@ def localizePath(root: str, relPath: str) -> str:
     return os.path.join(root, *relPath.split("/"))
 
 
-def dictFromManifest(lines: list[str]) -> dict[str, str]:
-    """
-    Converts a manifest file, where each line is
-    <hash>[space]<filepath>
-    into a dict of {path:hash}.
-    First line of file is a datetime string, which we skip.
-    """
-    if len(lines) < 10:
-        # There's definitely more than 10 entries in the manifest;
-        # something borked
-        return {}
-    ret = {}
-    for line in lines[1:]:
-        if line == "":
-            continue
-        hash, _, path = line.strip().partition(" ")
-        ret[path] = hash
-    return ret
+if t.TYPE_CHECKING:
+    ManifestRelPath: t.TypeAlias = str
+    ManifestFileHash: t.TypeAlias = str | None
 
 
-def dtFromManifest(lines: list[str]) -> datetime | str | None:
-    if lines[0].strip() == "error":
-        return "error"
+@dataclasses.dataclass
+class Manifest:
+    dt: datetime = dataclasses.field(default_factory=lambda: dtNow())
+    entries: dict[ManifestRelPath, ManifestFileHash] = dataclasses.field(default_factory=dict)
+    # Bump this version manually whenever you update the datafiles
+    version: int = 1
+
+    @staticmethod
+    def fromString(text: str) -> Manifest | None:
+        lines = text.split("\n")
+        if len(lines) < 10:
+            # Something's definitely borked
+            msg = "Manifest is too short to possibly be valid."
+            raise ValueError(msg)
+        dt = parseDt(lines[0].strip())
+        if dt is None:
+            return None
+        try:
+            version = int(lines[1].strip())
+            entryLines = lines[2:]
+        except ValueError:
+            version = 0
+            entryLines = lines[1:]
+        entries: dict[str, str | None] = {}
+        for line in entryLines:
+            line = line.strip()
+            if line == "":
+                continue
+            hash, _, path = line.strip().partition(" ")
+            if hash.startswith("error"):
+                entries[path.strip()] = None
+            else:
+                entries[path.strip()] = hash
+
+        return Manifest(dt, entries, version)
+
+    @staticmethod
+    def fromPath(path: str) -> Manifest:
+        manifest = Manifest()
+        for absPath, relPath in getDatafilePaths(path):
+            if relPath in knownFiles:
+                pass
+            elif relPath.partition("/")[0] in knownFolders:
+                pass
+            else:
+                continue
+            with open(absPath, encoding="utf-8") as fh:
+                manifest.entries[relPath] = hashFile(fh)
+        return manifest
+
+    def __str__(self) -> str:
+        lines = [formatDt(self.dt), str(self.version)]
+        for p, h in sorted(self.entries.items(), key=keyManifest):
+            if h is None:
+                h = "error".ljust(32, "-")
+            lines.append(f"{h} {p}")
+        return "\n".join(lines)
+
+    def daysOld(self) -> int:
+        return (dtNow() - self.dt).days
+
+    def save(self, path: str) -> None:
+        with open(os.path.join(path, "manifest.txt"), "w", encoding="utf-8") as fh:
+            fh.write(str(self))
+
+    def hasError(self) -> bool:
+        return self.dt == dtZero() or any(x is None for x in self.entries.values())
+
+
+def keyManifest(entry: tuple[str, t.Any]) -> tuple[int, int | str, str]:
+    name = entry[0]
+    if "/" in name:
+        dir, _, file = name.partition("/")
+        return 1, dir, file
+    else:
+        return 0, len(name), name
+
+
+def hashFile(fh: t.TextIO) -> str:
+    return hashlib.md5(fh.read().encode("ascii", "xmlcharrefreplace")).hexdigest()
+
+
+def getDatafilePaths(basePath: str) -> t.Generator[tuple[str, str], None, None]:
+    for root, dirs, files in os.walk(basePath, topdown=True):
+        if "readonly" in dirs:
+            dirs.remove("readonly")
+        for filename in files:
+            if filename == "":
+                continue
+            filePath = os.path.join(root, filename)
+            yield filePath, os.path.relpath(filePath, basePath)
+
+
+def dtNow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def dtZero() -> datetime:
+    return datetime(1970, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+
+
+def printDt(dt: datetime) -> str:
+    return dt.strftime("%Y-%m-%d %H:%M")
+
+
+def formatDt(dt: datetime) -> str:
+    return datetime.strftime(dt, "%Y-%m-%d %H:%M:%S.%f")
+
+
+def parseDt(s: str) -> datetime | None:
+    dt = trystrptime(s, "%Y-%m-%d %H:%M:%S.%f")
+    if dt:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def trystrptime(s: str, format: str) -> datetime | None:
     try:
-        return datetime.strptime(lines[0].strip(), "%Y-%m-%d %H:%M:%S.%f")
-    except ValueError:
-        # Sigh, something borked
+        return datetime.strptime(s, format)
+    except:  # pylint: disable=bare-except
         return None
-
-
-def createFinishedManifest(
-    manifestLines: list[str],
-    goodPaths: list[str],  # pylint: disable=unused-argument
-    badPaths: list[str],
-) -> str:
-    if not badPaths:
-        return "\n".join(manifestLines)
-
-    # Ah, some errors.
-    # First, indicate that errors happened in the timestamp,
-    # so I won't spuriously refuse to re-update.
-
-    manifestLines[0] = "error"
-
-    # Now go thru and blank out the hashes for the bad paths,
-    # so I'll definitely try to regenerate them later.
-
-    for i, line in enumerate(manifestLines[1:], 1):
-        prefix, _, path = line.strip().rpartition(" ")
-        if path in badPaths:
-            manifestLines[i] = "error" + ("-" * (len(prefix) - len("error"))) + " " + path
-
-    return "\n".join(manifestLines)
