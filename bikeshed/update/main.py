@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import datetime
 import os
 
 from .. import config, t
@@ -32,7 +31,7 @@ def update(
     path: str | None = None,
     dryRun: bool = False,
     manifestMode: str | None = None,
-) -> str | None:
+) -> manifest.Manifest | None:
     if path is None:
         path = config.scriptPath("spec-data")
     assert path is not None
@@ -74,42 +73,38 @@ def fixupDataFiles(skipUpdate: bool = False) -> None:
     using the legacy files with the new code is quite bad!
     """
     try:
-        with open(localPath("version.txt"), encoding="utf-8") as fh:
-            localVersion = int(fh.read())
-    except OSError:
-        localVersion = None
+        with open(livePath("manifest.txt"), encoding="utf-8") as fh:
+            liveManifest = manifest.Manifest.fromString(fh.read())
+    except:  # pylint: disable=bare-except
+        liveManifest = None
     try:
-        with open(remotePath("version.txt"), encoding="utf-8") as fh:
-            remoteVersion = int(fh.read())
-    except OSError as err:
-        m.warn(f"Couldn't check the datafile version. Bikeshed may be unstable.\n{err}")
-        return
+        with open(readonlyPath("manifest.txt"), encoding="utf-8") as fh:
+            readonlyManifest = manifest.Manifest.fromString(fh.read())
+    except:  # pylint: disable=bare-except
+        readonlyManifest = None
 
-    if localVersion != remoteVersion:
-        # If versions don't match, either the remote versions have been updated
-        # (and we should switch you to them, because formats may have changed),
-        # or you're using a historical version of Bikeshed (ditto).
+    if liveManifest and readonlyManifest and readonlyManifest.version > liveManifest.version:
+        # If I've updated the readonly files more recently
+        # than whatever version you're on,
+        # I need to switch you over to the new version.
         try:
-            for filename in os.listdir(remotePath()):
-                copyanything(remotePath(filename), localPath(filename))
+            for filename in os.listdir(readonlyPath()):
+                copyanything(readonlyPath(filename), livePath(filename))
         except Exception as err:
-            m.warn(f"Couldn't update datafiles from cache. Bikeshed may be unstable.\n{err}")
+            m.warn(
+                f"Bikeshed's datafile format has changed, but I couldn't copy the new files over from cache. Bikeshed might be unstable; try running `bikeshed update`.\n  {err}",
+            )
             return
 
     # Now see if the local datafiles are likely out-of-date.
     if skipUpdate:
         return
-    try:
-        with open(localPath("manifest.txt"), encoding="utf-8") as fh:
-            localDt = manifest.dtFromManifest(fh.readlines())
-    except Exception as e:
-        localDt = "error"
-        print(e)
-    if localDt == "error":
-        m.warn(f"Couldn't find local manifest file. Updating...")
+    if liveManifest is None:
+        m.warn("Couldn't find manifest from previous update run.\nTriggering a datafiles update to be safe...")
         update()
-    elif (datetime.datetime.utcnow() - localDt).days >= 7:
-        m.say(f"Bringing data files up-to-date...")
+        return
+    if liveManifest.daysOld() >= 7:
+        m.say("Bringing data files up-to-date...")
         update()
 
 
@@ -121,10 +116,10 @@ def updateReadonlyDataFiles() -> None:
     and will not be called as part of normal operation.
     """
     try:
-        for filename in os.listdir(localPath()):
+        for filename in os.listdir(livePath()):
             if filename.startswith("readonly"):
                 continue
-            copyanything(localPath(filename), remotePath(filename))
+            copyanything(livePath(filename), readonlyPath(filename))
     except Exception as err:
         m.warn(f"Error copying over the datafiles:\n{err}")
         return
@@ -188,11 +183,11 @@ def copyanything(src: str, dst: str) -> None:
             raise
 
 
-def localPath(*segs: str) -> str:
+def livePath(*segs: str) -> str:
     return config.scriptPath("spec-data", *segs)
 
 
-def remotePath(*segs: str) -> str:
+def readonlyPath(*segs: str) -> str:
     return config.scriptPath("spec-data", "readonly", *segs)
 
 
