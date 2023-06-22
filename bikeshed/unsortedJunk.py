@@ -264,7 +264,7 @@ def checkVarHygiene(doc: t.SpecT) -> None:
 def addVarClickHighlighting(doc: t.SpecT) -> None:
     if doc.md.slimBuildArtifact:
         return
-    doc.extraStyles.setFile("style-var-click-highlighting", "var-click-highlighting.css")
+    doc.extraStyles.setFile("var-click-highlighting", "var-click-highlighting.css")
     doc.extraScripts.setFile("var-click-highlighting", "var-click-highlighting.js")
 
 

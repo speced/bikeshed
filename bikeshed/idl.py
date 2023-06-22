@@ -395,7 +395,7 @@ def markupIDL(doc: t.SpecT) -> None:
         return
     if highlightingOccurred:
         doc.extraStyles.set(
-            "style-syntax-highlighting",
+            "syntax-highlighting",
             """
             pre.idl.highlight {
                 background: var(--borderedblock-bg, var(--def-bg));

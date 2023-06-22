@@ -248,16 +248,6 @@ def w3cStylesheetInUse(doc: t.SpecT) -> bool:
     return doc.md.prepTR or doc.md.status in config.snapshotStatuses
 
 
-def keyFromStyles(kv: tuple[str, str]) -> tuple[int, str]:
-    k = kv[0]
-    if k == "style-darkmode":
-        prio = 2
-    else:
-        prio = 1
-
-    return (prio, k)
-
-
 def addBikeshedBoilerplate(doc: t.SpecT) -> None:
     for style in doc.extraStyles.getAll():
         if "style-" + style.name not in doc.md.boilerplate:
@@ -1029,7 +1019,7 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
             ),
         )
         doc.extraStyles.set(
-            "style-hidedel",
+            "hidedel",
             """
             #hidedel:checked ~ del, #hidedel:checked ~ * del { display:none; }
             #hidedel ~ #hidedel-label::before, #hidedel ~ * #hidedel-label::before { content: "☐ "; }

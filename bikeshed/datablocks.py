@@ -619,7 +619,7 @@ def transformRailroad(lines: list[str], tagName: str, firstLine: str, lineNum: i
 
     ret = ["<div class='railroad'>"]
     doc.extraStyles.set(
-        "style-railroad",
+        "railroad",
         """
     :root {
         --railroad-bg: hsl(30, 20%, 95%);
