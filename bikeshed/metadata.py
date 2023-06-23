@@ -329,7 +329,7 @@ class MetadataManager:
             macros["isodeadline"] = self.deadline.strftime("%Y-%m-%d")
         if self.status in config.snapshotStatuses:
             macros["version"] = "https://www.w3.org/TR/{year}/{status}-{vshortname}-{cdate}/".format(**macros)
-            macros["history"] = f"https://www.w3.org/standards/history/{self.displayVshortname}"
+            macros["history"] = f"https://www.w3.org/standards/history/{self.displayVshortname}/"
         elif self.ED:
             macros["version"] = self.ED
         if self.warning and len(self.warning) >= 2:
