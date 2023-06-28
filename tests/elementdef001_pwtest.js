@@ -2,7 +2,7 @@
 const { test, expect } = require('@playwright/test');
 
 test('elementdef001', async ({ page }) => {
-  await page.goto('./elementdef001.html');
+  await page.goto('tests/elementdef001.html');
 
   // Expect a title "to contain" a substring.
   // await expect(page).toHaveTitle(/Playwright/);

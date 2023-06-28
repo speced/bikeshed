@@ -75,13 +75,17 @@ so running these before submitting a PR is important.
     However, many code paths are not exercised by these,
     so a full test run/rebase is required to ensure your change is actually fine.
 
-* To run playwright visual tests and tests of client-side user interaction,
-    node and playwright must be installed first.
+* To run Playwright visual tests and tests of client-side user interaction,
+    NodeJS and Playwright must be installed first.
     `npx playwright install --with-deps`
+    If Playwright is already installed, then you can update to the latest version with:
+    `npm install -D @playwright/test@latest`
     then you can run the playwright tests with:
     `npx playwright test`
     This will run all *_pwtest.js scripts and generate ___screenshots__
     in the same directory.
+    When screenshots need to be updated run:
+    `npx playwright test --update-snapshots`
 
 Pipenv, Pipfile, and `requirements.txt`
 ---------------------------------------
