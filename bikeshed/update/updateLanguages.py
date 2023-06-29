@@ -11,7 +11,7 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
     try:
         m.say("Downloading languages...")
         data = requests.get(
-            "https://raw.githubusercontent.com/speced/bikeshed/master/bikeshed/spec-data/readonly/languages.json",
+            "https://raw.githubusercontent.com/speced/bikeshed/main/bikeshed/spec-data/readonly/languages.json",
             timeout=5,
         ).text
     except Exception as e:
