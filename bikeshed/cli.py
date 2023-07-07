@@ -372,6 +372,13 @@ def main() -> None:
         help="Skip testing the real-world files in the repo, and only run the manually-written ones.",
     )
     testParser.add_argument(
+        "--folder",
+        dest="folder",
+        default=None,
+        nargs="+",
+        help="Only work on tests whose paths contain any of these folder names.",
+    )
+    testParser.add_argument(
         "testFiles",
         default=[],
         metavar="FILE",
@@ -650,10 +657,11 @@ def handleTest(options: argparse.Namespace, extras: list[str]) -> None:
     md = metadata.fromCommandLine(extras)
     constants.setErrorLevel("nothing")
     constants.quiet = 100
+    filters = test.TestFilter.fromOptions(options)
     if options.rebase:
-        test.rebase(options.testFiles, md=md)
+        test.rebase(filters, md=md)
     else:
-        result = test.runAllTests(options.testFiles, manualOnly=options.manualOnly, md=md)
+        result = test.runAllTests(filters, md=md)
         sys.exit(0 if result else 1)
 
 
