@@ -382,7 +382,7 @@ class StartTag(ParserNode):
         for k, v in sorted(self.attrs.items()):
             if k == "bs-line-number":
                 continue
-            attrs += f' {k}="{dom.escapeAttr(v)}"'
+            attrs += f' {k}="{escapeAttr(v)}"'
         if self.classes:
             attrs += f' class="{" ".join(sorted(self.classes))}"'
         return start + attrs + ">"
@@ -433,7 +433,7 @@ class WholeElement(ParserNode):
     text: str
 
     def __str__(self) -> str:
-        return f"{self.startTag}{dom.escapeHTML(self.text)}</{self.tag}>"
+        return f"{self.startTag}{escapeHTML(self.text)}</{self.tag}>"
 
 
 #
@@ -1032,6 +1032,15 @@ def parseMetadataBlock(s: Stream, start: int) -> Result:
         endLine=s.line(i - 1),
     )
     return Result(el, i)
+
+
+def escapeHTML(text: str) -> str:
+    # Escape HTML
+    return text.replace("&", "&amp;").replace("<", "&lt;")
+
+
+def escapeAttr(text: str) -> str:
+    return text.replace("&", "&amp;").replace('"', "&quot;")
 
 
 #
