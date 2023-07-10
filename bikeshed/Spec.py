@@ -29,7 +29,6 @@ from . import (
     includes,
     inlineTags,
     language,
-    line,
     lint,
     markdown,
     mdn,
@@ -41,6 +40,7 @@ from . import (
     t,
     wpt,
 )
+from . import line as l
 from . import messages as m
 from . import unsortedJunk as u
 
@@ -82,7 +82,7 @@ class Spec:
         else:
             self.dataFile = fileRequester
 
-        self.lines: list[line.Line] = []
+        self.lines: list[l.Line] = []
         self.valid = self.initializeState()
 
     def initializeState(self) -> bool:
@@ -134,7 +134,7 @@ class Spec:
 
         return True
 
-    def earlyParse(self, inputContent: InputSource.InputContent) -> list[line.Line]:
+    def earlyParse(self, inputContent: InputSource.InputContent) -> list[l.Line]:
         _, self.mdDocument = metadata.parse(lines=inputContent.lines)
 
         # First load the metadata sources from 'local' data
@@ -571,7 +571,7 @@ def addDomintroStyles(doc: Spec) -> None:
     doc.extraStyles.setFile("domintro", "Spec-domintro.css")
 
 
-def checkForMixedIndents(lines: t.Sequence[Line], info: metadata.IndentInfo) -> None:
+def checkForMixedIndents(lines: t.Sequence[l.Line], info: metadata.IndentInfo) -> None:
     badIndentChar = " " if info.char == "\t" else "\t"
     for line in lines:
         if not line.text:

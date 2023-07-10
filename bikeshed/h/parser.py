@@ -1205,7 +1205,7 @@ def escapeAttr(text: str) -> str:
 #
 
 
-xmlishTagnames = set([
+xmlishTagnames = {
     # SVG
     "animate",
     "animateMotion",
@@ -1267,7 +1267,7 @@ xmlishTagnames = set([
     "tspan",
     "unknown",
     "use",
-    "view"
+    "view",
     # mathml
     "abs",
     "and",
@@ -1425,7 +1425,8 @@ xmlishTagnames = set([
     "variance",
     "vector",
     "vectorproduct",
-    "xor"])
+    "xor",
+}
 
 
 def isXMLishTagname(tagname: str) -> bool:
