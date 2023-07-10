@@ -193,6 +193,29 @@ def debugNodes(nodes: t.Iterable[ParserNode]) -> str:
     return "\n".join(repr(x) for x in nodes)
 
 
+def parseLines(textLines: list[str], startLine: int = 1, doc: t.SpecT | None = None) -> list[str]:
+    # Runs a list of lines thru the parser,
+    # returning another list of lines.
+
+    if len(textLines) == 0:
+        return textLines
+    endingWithNewline = textLines[0].endswith("\n")
+    if endingWithNewline:
+        text = "".join(textLines)
+    else:
+        text = "\n".join(textLines)
+    parsedLines = strFromNodes(nodesFromHtml(text, startLine=startLine, doc=doc)).split("\n")
+    if endingWithNewline:
+        parsedLines = [x + "\n" for x in parsedLines]
+
+    return parsedLines
+
+
+def parseText(text: str, startLine: int = 1, doc: t.SpecT | None = None) -> str:
+    # Just runs the text thru the parser.
+    return strFromNodes(nodesFromHtml(text, startLine=startLine, doc=doc))
+
+
 #
 #
 #
