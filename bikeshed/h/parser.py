@@ -2,18 +2,17 @@
 from __future__ import annotations
 
 import bisect
+import dataclasses
 import enum
 import io
 import os
 import re
 import typing
-import dataclasses
-from dataclasses import dataclass, field
 from abc import ABCMeta
+from dataclasses import dataclass, field
 
-
-from .. import messages as m, t
-from . import dom
+from .. import messages as m
+from .. import t
 
 
 def test() -> None:
@@ -179,19 +178,7 @@ def initialDocumentParse(text: str, startLine: int = 1, doc: t.SpecT | None = No
     # (ones that look like tags, or that contain raw text),
     # and blank out comments.
 
-    nodes: list[ParserNode] = []
-    for node in nodesFromHtml(text, startLine=startLine):
-        if isinstance(node, Comment):
-            lines = node.data.split("\n")
-            if len(lines) < 2:
-                # doesn't span lines, I can just drop it
-                continue
-            # Otherwise, replace it with the same number
-            # of blank lines
-            nodes.append(Text(node.line, node.line + len(lines) - 1, "\n".join("" for x in lines)))
-        else:
-            nodes.append(node)
-    return nodes
+    return list(nodesFromHtml(text, startLine=startLine, doc=doc))
 
 
 def strFromNodes(nodes: t.Iterable[ParserNode]) -> str:
@@ -297,7 +284,7 @@ class Stream:
     _lineBreaks: list[int]
     startLine: int
 
-    def __init__(self, chars: str, startLine: int = 1):
+    def __init__(self, chars: str, startLine: int = 1) -> None:
         self._chars = chars
         self._lineBreaks = []
         self.startLine = startLine
