@@ -210,7 +210,7 @@ class Spec:
                 checkForMixedIndents(self.lines, self.md.indentInfo)
             else:
                 m.warn(
-                    "`Complain About: mixed-indents yes` is active, but I couldn't infer the document's indentation. Be more consistent, or turn this lint off."
+                    "`Complain About: mixed-indents yes` is active, but I couldn't infer the document's indentation. Be more consistent, or turn this lint off.",
                 )
 
         # Deal with further <pre> blocks, and markdown
