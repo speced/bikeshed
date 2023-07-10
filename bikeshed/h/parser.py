@@ -24,14 +24,21 @@ def test() -> None:
         list(nodesFromHtml(vals))
 
 
-def nodesFromHtml(data: str, startLine: int = 1) -> t.Generator[ParserNode, None, None]:
+def nodesFromHtml(data: str, startLine: int = 1, doc: t.SpecT | None = None) -> t.Generator[ParserNode, None, None]:
+    if doc:
+        usesMarkdown = "markdown" in doc.md.markupShorthands
+        usesCSS = "css" in doc.md.markupShorthands
+    else:
+        usesMarkdown = True
+        usesCSS = True
+
     i = 0
     s = Stream(data, startLine=startLine)
     _, i = parseDoctype(s, i)
     text = ""
     textI = 0
     while not s.eof(i):
-        node, i = parseNode(s, i)
+        node, i = parseNode(s, i, usesMarkdown=usesMarkdown, usesCSS=usesCSS)
         if node is Failure:
             text += s[i]
             i += 1
@@ -49,7 +56,7 @@ def nodesFromHtml(data: str, startLine: int = 1) -> t.Generator[ParserNode, None
         yield Text(startLine, endLine, text)
 
 
-def parseNode(s: Stream, start: int) -> Result:
+def parseNode(s: Stream, start: int, usesMarkdown: bool = True, usesCSS: bool = True) -> Result:
     # Produces a non-Text ParserNode (not a string)
     if s.eof(start):
         return Result.fail(start)
@@ -112,9 +119,10 @@ def parseNode(s: Stream, start: int) -> Result:
         if endTag is not Failure:
             return Result(endTag, i)
 
-        el, i = parseCSSProduction(s, start)
-        if el is not Failure:
-            return Result(el, i)
+        if usesCSS:
+            el, i = parseCSSProduction(s, start)
+            if el is not Failure:
+                return Result(el, i)
     # This isn't quite correct to handle here,
     # but it'll have to wait until I munge
     # the markdown and HTML parsers together.
@@ -122,17 +130,23 @@ def parseNode(s: Stream, start: int) -> Result:
         el, i = parseFencedCodeBlock(s, start)
         if el is not Failure:
             return Result(el, i)
-    if s[start] == "`":
-        el, i = parseCodeSpan(s, start)
-        if el is not Failure:
-            return Result(el, i)
-    if s[start : start + 2] == "\\`":
-        node = Text(
-            line=s.line(start),
-            endLine=s.line(start),
-            text="`",
-        )
-        return Result(node, start + 2)
+    if usesMarkdown:
+        if s[start] == "`":
+            el, i = parseCodeSpan(s, start)
+            if el is not Failure:
+                return Result(el, i)
+        if s[start : start + 2] == "\\`":
+            node = Text(
+                line=s.line(start),
+                endLine=s.line(start),
+                text="`",
+            )
+            return Result(node, start + 2)
+    if usesCSS:
+        if s[start] == "'":
+            el, i = parseCSSMaybe(s, start)
+            if el is not Failure:
+                return Result(el, i)
 
     return Result.fail(start)
 
@@ -887,6 +901,52 @@ def parseCSSProduction(s: Stream, start: int) -> Result:
         tag=startTag.tag,
         startTag=startTag,
         text=text,
+        endLine=s.line(i - 1),
+    )
+    return Result(el, i)
+
+
+def parseCSSMaybe(s: Stream, start: int) -> Result:
+    # Maybes can cause parser issues,
+    # like ''<length>/px'',
+    # but also can contain other markup that would split the text,
+    # which used to be a problem.
+    if s[start : start + 2] != "''":
+        return Result.fail(start)
+    i = start + 2
+
+    text, i = s.skipTo(i, "''")
+    if text is Failure:
+        return Result.fail(start)
+    if "\n" in text:
+        return Result.fail(start)
+    i += 2
+
+    # A lot of maybes have <<foo>> links in them.
+    # They break in interesting ways sometimes, but
+    # also if it actually produces a link
+    # (like ''width: <<length>>'' linking to 'width')
+    # it'll be broken anyway.
+    # So we'll hack this in - << gets turned into &lt;
+    # within a maybe.
+    # No chance of a link, but won't misparse in weird ways.
+
+    if "<<" in text:
+        rawContents = text.replace("<<", "&lt;").replace(">>", "&gt;")
+    else:
+        rawContents = text
+
+    startTag = StartTag(
+        line=s.line(start),
+        endLine=s.line(start),
+        tag="fake-maybe-placeholder",
+        attrs={"bs-autolink-syntax": s[start:i], "bs-original-contents": text},
+    ).finalize()
+    el = RawElement(
+        line=startTag.line,
+        tag=startTag.tag,
+        startTag=startTag,
+        data=rawContents,
         endLine=s.line(i - 1),
     )
     return Result(el, i)
