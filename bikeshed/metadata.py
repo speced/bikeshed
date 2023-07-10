@@ -88,6 +88,7 @@ class MetadataManager:
         self.includeCanIUsePanels: bool = False
         self.includeMdnPanels: bool = False
         self.indent: int = 4
+        self.indentInfo: IndentInfo | None = None
         self.inferCSSDfns: bool = False
         self.informativeClasses: list[str] = []
         self.inlineGithubIssues: bool = False
@@ -1022,10 +1023,9 @@ def parse(lines: t.Sequence[Line]) -> tuple[list[Line], MetadataManager]:
         else:
             newlines.append(line)
     indentInfo = inferIndent(newlines)
+    md.addParsedData("Indent Info", indentInfo)
     if "Indent" not in md.manuallySetKeys and indentInfo.size:
         md.indent = indentInfo.size
-    if "mixed-indents" in md.complainAbout and indentInfo.char:
-        checkForMixedIndents(newlines, indentInfo)
     return newlines, md
 
 
@@ -1079,20 +1079,6 @@ def inferIndent(lines: t.Sequence[Line]) -> IndentInfo:
                     evenDivisions[candidateIndent] += lineCount
         info.size = evenDivisions.most_common(1)[0][0]
     return info
-
-
-def checkForMixedIndents(lines: t.Sequence[Line], info: IndentInfo) -> None:
-    badIndentChar = " " if info.char == "\t" else "\t"
-    for line in lines:
-        if not line.text:
-            continue
-        if line.text.startswith(badIndentChar):
-            if info.char == " ":
-                m.lint(f"Your document appears to use spaces to indent, but line {line.i} starts with tabs.")
-            else:
-                m.lint(f"Your document appears to use tabs to indent, but line {line.i} starts with spaces.")
-        if re.match(r"(\t+ +\t)|( +\t)", line.text):
-            m.lint(f"Line {line.i}'s indent contains tabs after spaces.")
 
 
 def fromCommandLine(overrides: list[str]) -> MetadataManager:
@@ -1324,6 +1310,7 @@ knownKeys = {
     "Include Can I Use Panels": Metadata("Include Can I Use Panels", "includeCanIUsePanels", joinValue, parseBoolean),
     "Include Mdn Panels": Metadata("Include Mdn Panels", "includeMdnPanels", joinValue, parseSoftBoolean),
     "Indent": Metadata("Indent", "indent", joinValue, parseInteger),
+    "Indent Info": Metadata("Indent Info", "indentInfo", joinValue, parseLiteral),
     "Infer Css Dfns": Metadata("Infer Css Dfns", "inferCSSDfns", joinValue, parseBoolean),
     "Informative Classes": Metadata("Informative Classes", "informativeClasses", joinList, parseCommaSeparated),
     "Inline Github Issues": Metadata("Inline Github Issues", "inlineGithubIssues", joinValue, parseInlineGithubIssues),

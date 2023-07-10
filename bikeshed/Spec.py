@@ -4,6 +4,7 @@ from __future__ import annotations
 import glob
 import json
 import os
+import re
 import sys
 from collections import OrderedDict, defaultdict
 from datetime import datetime
@@ -187,6 +188,12 @@ class Spec:
         # Initialize things
         self.refs.initializeRefs(doc=self, datablocks=datablocks)
         self.refs.initializeBiblio()
+
+        if "mixed-indents" in self.md.complainAbout:
+            if self.md.indentInfo and self.md.indentInfo.char:
+                checkForMixedIndents(self.lines, self.md.indentInfo)
+            else:
+                m.warn("`Complain About: mixed-indents yes` is active, but I couldn't infer the document's indentation. Be more consistent, or turn this lint off.")
 
         # Deal with further <pre> blocks, and markdown
         self.lines = datablocks.transformDataBlocks(self, self.lines)
@@ -552,3 +559,17 @@ def addDomintroStyles(doc: Spec) -> None:
         return
 
     doc.extraStyles.setFile("domintro", "Spec-domintro.css")
+
+
+def checkForMixedIndents(lines: t.Sequence[Line], info: metadata.IndentInfo) -> None:
+    badIndentChar = " " if info.char == "\t" else "\t"
+    for line in lines:
+        if not line.text:
+            continue
+        if line.text.startswith(badIndentChar):
+            if info.char == " ":
+                m.lint(f"Your document appears to use spaces to indent, but line {line.i} starts with tabs.")
+            else:
+                m.lint(f"Your document appears to use tabs to indent, but line {line.i} starts with spaces.")
+        if re.match(r"(\t+ +\t)|( +\t)", line.text):
+            m.lint(f"Line {line.i}'s indent contains tabs after spaces.")
