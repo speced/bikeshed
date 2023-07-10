@@ -122,7 +122,7 @@ class Spec:
 
         try:
             inputContent = self.inputSource.read()
-            self.lines = inputContent.lines
+            self.lines = self.earlyParse(inputContent)
             if inputContent.date is not None:
                 self.mdBaseline.addParsedData("Date", inputContent.date)
         except FileNotFoundError:
@@ -133,6 +133,22 @@ class Spec:
             return False
 
         return True
+
+    def earlyParse(self, inputContent: InputSource.InputContent) -> list[line.Line]:
+        _, self.mdDocument = metadata.parse(lines=inputContent.lines)
+
+        # First load the metadata sources from 'local' data
+        self.md = metadata.join(self.mdBaseline, self.mdDocument, self.mdCommandLine)
+        # Using that to determine the Group and Status, load the correct defaults.include boilerplate
+        self.mdDefaults = metadata.fromJson(
+            data=retrieve.retrieveBoilerplateFile(self, "defaults", error=True),
+            source="defaults",
+        )
+        self.md = metadata.join(self.mdBaseline, self.mdDefaults, self.mdDocument, self.mdCommandLine)
+
+        text = h.strFromNodes(h.initialDocumentParse(inputContent.content, doc=self))
+        inputContent.rawLines = [x + "\n" for x in text.split("\n")]
+        return inputContent.lines
 
     def checkValidity(self) -> bool:
         return True
@@ -453,17 +469,11 @@ class Spec:
         # Also handle markdown escapes.
         if moreMacros is None:
             moreMacros = {}
-        textFunctor: func.Functor
-        if "markdown" in self.md.markupShorthands:
-            textFunctor = u.MarkdownCodeSpans(text)
-        else:
-            textFunctor = func.Functor(text)
+        textFunctor: func.Functor = func.Functor(text)
 
         macros = dict(self.macros, **moreMacros)
         textFunctor = textFunctor.map(curry(h.replaceMacros, macros=macros))
         textFunctor = textFunctor.map(h.fixTypography)
-        if "css" in self.md.markupShorthands:
-            textFunctor = textFunctor.map(h.replaceAwkwardCSSShorthands)
 
         return t.cast(str, textFunctor.extract())
 
@@ -480,7 +490,7 @@ class Spec:
     def isOpaqueElement(self, el: t.ElementT) -> bool:
         if el.tag in self.md.opaqueElements:
             return True
-        if el.get("data-opaque") is not None:
+        if el.get("data-opaque") is not None or el.get("bs-opaque") is not None:
             return True
         return False
 

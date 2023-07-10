@@ -307,7 +307,8 @@ class MetadataManager:
         if self.TR:
             macros["latest"] = self.TR
         if self.abstract:
-            abstractLines = datablocks.transformDataBlocks(doc, self.abstract)
+            abstractLines: list[str] = h.parseLines(self.abstract, doc=doc)
+            abstractLines = datablocks.transformDataBlocks(doc, abstractLines)
             macros["abstract"] = "\n".join(markdown.parse(abstractLines, self.indent))
         elif self.noAbstract:
             macros["abstract"] = ""
