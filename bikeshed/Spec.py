@@ -209,7 +209,9 @@ class Spec:
             if self.md.indentInfo and self.md.indentInfo.char:
                 checkForMixedIndents(self.lines, self.md.indentInfo)
             else:
-                m.warn("`Complain About: mixed-indents yes` is active, but I couldn't infer the document's indentation. Be more consistent, or turn this lint off.")
+                m.warn(
+                    "`Complain About: mixed-indents yes` is active, but I couldn't infer the document's indentation. Be more consistent, or turn this lint off."
+                )
 
         # Deal with further <pre> blocks, and markdown
         self.lines = datablocks.transformDataBlocks(self, self.lines)

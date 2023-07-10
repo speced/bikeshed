@@ -586,8 +586,8 @@ def parseStartTag(s: Stream, start: int) -> Result:
             tag.endLine = s.line(i + 1)
             return Result(tag, i + 2)
         elif s[i + 1] == ">" and isXMLishTagname(tagname):
-            tag.endLine = s.line(i+1)
-            el = WholeElement(tag=tagname, startTag=tag, text="", line=tag.line, endLine = tag.endLine)
+            tag.endLine = s.line(i + 1)
+            el = WholeElement(tag=tagname, startTag=tag, text="", line=tag.line, endLine=tag.endLine)
             return Result(el, i + 2)
         else:
             m.die(f"Spurious / in <{tagname}>.", lineNum=s.loc(start))
@@ -1450,6 +1450,7 @@ xmlishTagnames = {
 
 def isXMLishTagname(tagname: str) -> bool:
     return tagname in xmlishTagnames
+
 
 def isTagnameChar(ch: str) -> bool:
     if len(ch) != 1:
