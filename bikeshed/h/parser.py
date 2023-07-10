@@ -985,10 +985,7 @@ def parseCodeSpan(s: Stream, start: int) -> Result:
     contentEnd = match.end(1)
     i = match.end(2)
 
-    text = s[contentStart:contentEnd]
-    if len(text.split("\n")) > 5:
-        # Bit of a hack to avoid a stray ` eating a ton of your document.
-        return Result.fail(start)
+    text = s[contentStart:contentEnd].replace("\n", " ")
     if text.startswith(" ") and text.endswith(" ") and text.strip() != "":
         # If you start and end with spaces, but aren't *all* spaces,
         # strip one space off.
@@ -1028,7 +1025,7 @@ def parseFencedCodeBlock(s: Stream, start: int) -> Result:
         # This isn't allowed, because it collides with inline code spans.
         return Result.fail(start)
 
-    contents = ""
+    contents = "\n"
     while True:
         # Ending fence has to use same character and be
         # at least as long, so just search for the opening
