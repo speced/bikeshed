@@ -65,6 +65,16 @@ def parseNode(s: Stream, start: int) -> Result:
                 el, endI = parseMetadataBlock(s, start)
                 if el is not Failure:
                     return Result(el, endI)
+                if isDatablockPre(startTag):
+                    text, i = parseRawPreToEnd(s, i)
+                    el = RawElement(
+                        line=startTag.line,
+                        tag="pre",
+                        startTag=startTag,
+                        data=text,
+                        endLine=s.line(i - 1),
+                    )
+                    return Result(el, i)
             if startTag.tag == "script":
                 text, i = parseScriptToEnd(s, i)
                 el = RawElement(
@@ -127,7 +137,28 @@ def parseNode(s: Stream, start: int) -> Result:
     return Result.fail(start)
 
 
-def initialDocumentParse(text: str, startLine: int = 1) -> list[ParserNode]:
+def isDatablockPre(tag: StartTag) -> bool:
+    datablockClasses = [
+        "simpledef",
+        "propdef",
+        "descdef",
+        "elementdef",
+        "argumentdef",
+        "railroad",
+        "biblio",
+        "anchors",
+        "link-defaults",
+        "ignored-specs",
+        "info",
+        "include",
+        "include-code",
+        "include-raw",
+    ]
+    tag.finalize()
+    return any(x in tag.classes for x in datablockClasses)
+
+
+def initialDocumentParse(text: str, startLine: int = 1, doc: t.SpecT | None = None) -> list[ParserNode]:
     # Just do a document parse.
     # This will add `bs-line-number` attributes,
     # normalize any difficult shorthands
@@ -812,6 +843,22 @@ def parseXmpToEnd(s: Stream, start: int) -> Result:
             m.die("Hit EOF in the middle of an <xmp>.", lineNum=s.loc(start))
             return Result.fail(start)
         if s[i : i + 6] == "</xmp>":
+            return Result(s[start:i], i + 6)
+        i += 1
+    assert False
+
+
+def parseRawPreToEnd(s: Stream, start: int) -> Result:
+    # Identical to parseScriptToEnd
+
+    i = start
+    while True:
+        while s[i] != "<" and not s.eof(i):
+            i += 1
+        if s.eof(i):
+            m.die("Hit EOF in the middle of a <pre> datablock.", lineNum=s.loc(start))
+            return Result.fail(start)
+        if s[i : i + 6] == "</pre>":
             return Result(s[start:i], i + 6)
         i += 1
     assert False
