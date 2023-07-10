@@ -61,67 +61,10 @@ def parseNode(s: Stream, start: int, usesMarkdown: bool = True, usesCSS: bool = 
         return Result.fail(start)
 
     if s[start] == "<":
-        comment, i = parseComment(s, start)
-        if comment is not Failure:
-            return Result(comment, i)
+        node, i = parseAngleStart(s, start, usesMarkdown=usesMarkdown, usesCSS=usesCSS)
+        if node is not Failure:
+            return Result(node, i)
 
-        startTag, i = parseStartTag(s, start)
-        if startTag is not Failure:
-            if startTag.tag == "pre":
-                el, endI = parseMetadataBlock(s, start)
-                if el is not Failure:
-                    return Result(el, endI)
-                if isDatablockPre(startTag):
-                    text, i = parseRawPreToEnd(s, i)
-                    el = RawElement(
-                        line=startTag.line,
-                        tag="pre",
-                        startTag=startTag,
-                        data=text,
-                        endLine=s.line(i - 1),
-                    )
-                    return Result(el, i)
-            if startTag.tag == "script":
-                text, i = parseScriptToEnd(s, i)
-                el = RawElement(
-                    line=startTag.line,
-                    tag="script",
-                    startTag=startTag,
-                    data=text,
-                    endLine=s.line(i - 1),
-                )
-                return Result(el, i)
-            elif startTag.tag == "style":
-                text, i = parseStyleToEnd(s, i)
-                el = RawElement(
-                    line=startTag.line,
-                    tag="style",
-                    startTag=startTag,
-                    data=text,
-                    endLine=s.line(i - 1),
-                )
-                return Result(el, i)
-            elif startTag.tag == "xmp":
-                text, i = parseXmpToEnd(s, i)
-                el = RawElement(
-                    line=startTag.line,
-                    tag="xmp",
-                    startTag=startTag,
-                    data=text,
-                    endLine=s.line(i - 1),
-                )
-                return Result(el, i)
-            else:
-                return Result(startTag, i)
-
-        endTag, i = parseEndTag(s, start)
-        if endTag is not Failure:
-            return Result(endTag, i)
-
-        if usesCSS:
-            el, i = parseCSSProduction(s, start)
-            if el is not Failure:
-                return Result(el, i)
     # This isn't quite correct to handle here,
     # but it'll have to wait until I munge
     # the markdown and HTML parsers together.
@@ -146,6 +89,82 @@ def parseNode(s: Stream, start: int, usesMarkdown: bool = True, usesCSS: bool = 
             el, i = parseCSSMaybe(s, start)
             if el is not Failure:
                 return Result(el, i)
+
+    return Result.fail(start)
+
+
+def parseAngleStart(s: Stream, start: int, usesMarkdown: bool = True, usesCSS: bool = True) -> Result:
+    # Assuming the stream starts with an <
+    i = start + 1
+    comment, i = parseComment(s, start)
+    if comment is not Failure:
+        return Result(comment, i)
+
+    startTag, i = parseStartTag(s, start)
+    if startTag is not Failure:
+        if startTag.tag == "pre":
+            el, endI = parseMetadataBlock(s, start)
+            if el is not Failure:
+                return Result(el, endI)
+            if isDatablockPre(startTag):
+                text, i = parseRawPreToEnd(s, i)
+                if text is Failure:
+                    return Result.fail(start)
+                el = RawElement(
+                    line=startTag.line,
+                    tag="pre",
+                    startTag=startTag,
+                    data=text,
+                    endLine=s.line(i - 1),
+                )
+                return Result(el, i)
+        if startTag.tag == "script":
+            text, i = parseScriptToEnd(s, i)
+            if text is Failure:
+                return Result.fail(start)
+            el = RawElement(
+                line=startTag.line,
+                tag="script",
+                startTag=startTag,
+                data=text,
+                endLine=s.line(i - 1),
+            )
+            return Result(el, i)
+        elif startTag.tag == "style":
+            text, i = parseStyleToEnd(s, i)
+            if text is Failure:
+                return Result.fail(start)
+            el = RawElement(
+                line=startTag.line,
+                tag="style",
+                startTag=startTag,
+                data=text,
+                endLine=s.line(i - 1),
+            )
+            return Result(el, i)
+        elif startTag.tag == "xmp":
+            text, i = parseXmpToEnd(s, i)
+            if text is Failure:
+                return Result.fail(start)
+            el = RawElement(
+                line=startTag.line,
+                tag="xmp",
+                startTag=startTag,
+                data=text,
+                endLine=s.line(i - 1),
+            )
+            return Result(el, i)
+        else:
+            return Result(startTag, i)
+
+    endTag, i = parseEndTag(s, start)
+    if endTag is not Failure:
+        return Result(endTag, i)
+
+    if usesCSS:
+        el, i = parseCSSProduction(s, start)
+        if el is not Failure:
+            return Result(el, i)
 
     return Result.fail(start)
 
