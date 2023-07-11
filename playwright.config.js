@@ -15,7 +15,7 @@ module.exports = defineConfig({
   testDir: '.',
   // Glob patterns or regular expressions that match test files.
   testMatch: '*/*_pwtest.js',
-  snapshotPathTemplate: '{testFileDir}/__screenshots__/{testFileName}/{arg}-{projectName}-{platform}{ext}',
+  snapshotPathTemplate: '{testDir}/{testFileDir}/__screenshots__/{testFileName}/{arg}-{projectName}-{platform}{ext}',
 
   /* Run tests in files in parallel */
   fullyParallel: true,
