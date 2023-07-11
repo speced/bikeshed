@@ -4,6 +4,7 @@ from __future__ import annotations
 import glob
 import json
 import os
+import re
 import sys
 from collections import OrderedDict, defaultdict
 from datetime import datetime
@@ -28,7 +29,6 @@ from . import (
     includes,
     inlineTags,
     language,
-    line,
     lint,
     markdown,
     mdn,
@@ -40,6 +40,7 @@ from . import (
     t,
     wpt,
 )
+from . import line as l
 from . import messages as m
 from . import unsortedJunk as u
 
@@ -81,7 +82,7 @@ class Spec:
         else:
             self.dataFile = fileRequester
 
-        self.lines: list[line.Line] = []
+        self.lines: list[l.Line] = []
         self.valid = self.initializeState()
 
     def initializeState(self) -> bool:
@@ -121,7 +122,7 @@ class Spec:
 
         try:
             inputContent = self.inputSource.read()
-            self.lines = inputContent.lines
+            self.lines = self.earlyParse(inputContent)
             if inputContent.date is not None:
                 self.mdBaseline.addParsedData("Date", inputContent.date)
         except FileNotFoundError:
@@ -132,6 +133,22 @@ class Spec:
             return False
 
         return True
+
+    def earlyParse(self, inputContent: InputSource.InputContent) -> list[l.Line]:
+        _, self.mdDocument = metadata.parse(lines=inputContent.lines)
+
+        # First load the metadata sources from 'local' data
+        self.md = metadata.join(self.mdBaseline, self.mdDocument, self.mdCommandLine)
+        # Using that to determine the Group and Status, load the correct defaults.include boilerplate
+        self.mdDefaults = metadata.fromJson(
+            data=retrieve.retrieveBoilerplateFile(self, "defaults", error=True),
+            source="defaults",
+        )
+        self.md = metadata.join(self.mdBaseline, self.mdDefaults, self.mdDocument, self.mdCommandLine)
+
+        text = h.strFromNodes(h.initialDocumentParse(inputContent.content, doc=self))
+        inputContent.rawLines = [x + "\n" for x in text.split("\n")]
+        return inputContent.lines
 
     def checkValidity(self) -> bool:
         return True
@@ -187,6 +204,14 @@ class Spec:
         # Initialize things
         self.refs.initializeRefs(doc=self, datablocks=datablocks)
         self.refs.initializeBiblio()
+
+        if "mixed-indents" in self.md.complainAbout:
+            if self.md.indentInfo and self.md.indentInfo.char:
+                checkForMixedIndents(self.lines, self.md.indentInfo)
+            else:
+                m.warn(
+                    "`Complain About: mixed-indents yes` is active, but I couldn't infer the document's indentation. Be more consistent, or turn this lint off.",
+                )
 
         # Deal with further <pre> blocks, and markdown
         self.lines = datablocks.transformDataBlocks(self, self.lines)
@@ -446,17 +471,11 @@ class Spec:
         # Also handle markdown escapes.
         if moreMacros is None:
             moreMacros = {}
-        textFunctor: func.Functor
-        if "markdown" in self.md.markupShorthands:
-            textFunctor = u.MarkdownCodeSpans(text)
-        else:
-            textFunctor = func.Functor(text)
+        textFunctor: func.Functor = func.Functor(text)
 
         macros = dict(self.macros, **moreMacros)
         textFunctor = textFunctor.map(curry(h.replaceMacros, macros=macros))
         textFunctor = textFunctor.map(h.fixTypography)
-        if "css" in self.md.markupShorthands:
-            textFunctor = textFunctor.map(h.replaceAwkwardCSSShorthands)
 
         return t.cast(str, textFunctor.extract())
 
@@ -473,7 +492,7 @@ class Spec:
     def isOpaqueElement(self, el: t.ElementT) -> bool:
         if el.tag in self.md.opaqueElements:
             return True
-        if el.get("data-opaque") is not None:
+        if el.get("data-opaque") is not None or el.get("bs-opaque") is not None:
             return True
         return False
 
@@ -552,3 +571,17 @@ def addDomintroStyles(doc: Spec) -> None:
         return
 
     doc.extraStyles.setFile("domintro", "Spec-domintro.css")
+
+
+def checkForMixedIndents(lines: t.Sequence[l.Line], info: metadata.IndentInfo) -> None:
+    badIndentChar = " " if info.char == "\t" else "\t"
+    for line in lines:
+        if not line.text:
+            continue
+        if line.text.startswith(badIndentChar):
+            if info.char == " ":
+                m.lint(f"Your document appears to use spaces to indent, but line {line.i} starts with tabs.")
+            else:
+                m.lint(f"Your document appears to use tabs to indent, but line {line.i} starts with spaces.")
+        if re.match(r"(\t+ +\t)|( +\t)", line.text):
+            m.lint(f"Line {line.i}'s indent contains tabs after spaces.")

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import difflib
 import glob
 import os
@@ -11,22 +12,59 @@ from . import config, metadata, retrieve, t
 from . import messages as m
 from .Spec import Spec
 
+if t.TYPE_CHECKING:
+    import argparse
+
 TEST_DIR = os.path.abspath(os.path.join(config.scriptPath(), "..", "tests"))
 TEST_FILE_EXTENSIONS = (".bs", ".tar")
 
 
-def findTestFiles(manualOnly: bool = False) -> t.Generator[str, None, None]:
+@dataclasses.dataclass
+class TestFilter:
+    globs: list[str] | None = None
+    folders: list[str] | None = None
+    manualOnly: bool = False
+
+    @staticmethod
+    def fromOptions(options: argparse.Namespace) -> TestFilter:
+        return TestFilter(globs=options.testFiles, folders=options.folder, manualOnly=options.manualOnly)
+
+
+def testPaths(filters: TestFilter) -> list[str]:
+    # if None, get all the test paths
+    # otherwise, glob the provided paths, rooted at the test dir
+    if not filters.globs:
+        return list(sortTests(findTestFiles(filters)))
+    return [
+        path
+        for pattern in filters.globs
+        for path in glob.glob(os.path.join(TEST_DIR, pattern))
+        if path.endswith(TEST_FILE_EXTENSIONS)
+    ]
+
+
+def findTestFiles(filters: TestFilter) -> t.Generator[str, None, None]:
     for root, _, filenames in os.walk(TEST_DIR):
         for filename in filenames:
             filePath = testNameForPath(os.path.join(root, filename))
-            pathSegs = splitPath(filePath)
-            if manualOnly and pathSegs[0] == "github":
+            if not allowedPath(filePath, filters):
                 continue
-            if re.search(r"\d{3}-files$", pathSegs[0]):
-                # support files for a manual test
+            if not filePath.endswith(TEST_FILE_EXTENSIONS):
                 continue
-            if filePath.endswith(TEST_FILE_EXTENSIONS):
-                yield os.path.join(root, filename)
+            yield os.path.join(root, filename)
+
+
+def allowedPath(filePath: str, filters: TestFilter) -> bool:
+    pathSegs = splitPath(filePath)
+    if filters.manualOnly and pathSegs[0] == "github":
+        return False
+    if re.search(r"\d{3}-files$", pathSegs[0]):
+        # support files for a manual test
+        return False
+    if filters.folders:
+        if not any(folder in pathSegs for folder in filters.folders):
+            return False
+    return True
 
 
 def splitPath(path: str, reverseSegs: list[str] | None = None) -> list[str]:
@@ -52,11 +90,10 @@ def sortTests(tests: t.Iterable[str]) -> t.Iterable[str]:
 
 
 def runAllTests(
-    patterns: list[str] | None = None,
-    manualOnly: bool = False,  # pylint: disable=unused-argument
+    filters: TestFilter,
     md: t.MetadataManager | None = None,
 ) -> bool:
-    paths = testPaths(patterns)
+    paths = testPaths(filters)
     if len(paths) == 0:
         m.p("No tests were found")
         return True
@@ -98,11 +135,14 @@ def processTest(
     md: metadata.MetadataManager | None = None,
     fileRequester: t.DataFileRequester = retrieve.DataFileRequester(fileType="readonly"),
 ) -> t.SpecT:
-    doc = Spec(inputFilename=path, fileRequester=fileRequester, testing=True)
-    if md is not None:
-        doc.mdCommandLine = md
-    addTestMetadata(doc)
-    doc.preprocess()
+    try:
+        doc = Spec(inputFilename=path, fileRequester=fileRequester, testing=True)
+        if md is not None:
+            doc.mdCommandLine = md
+        addTestMetadata(doc)
+        doc.preprocess()
+    except Exception as e:
+        m.p(f"Error running test {path}:\n  {e}")
     return doc
 
 
@@ -120,8 +160,11 @@ def compare(suspect: str, golden: str) -> bool:
     return False
 
 
-def rebase(patterns: list[str] | None = None, md: t.MetadataManager | None = None) -> bool:
-    paths = testPaths(patterns)
+def rebase(
+    filters: TestFilter,
+    md: t.MetadataManager | None = None,
+) -> bool:
+    paths = testPaths(filters)
     if len(paths) == 0:
         m.p("No tests were found.")
         return True
@@ -133,19 +176,6 @@ def rebase(patterns: list[str] | None = None, md: t.MetadataManager | None = Non
         doc = processTest(path, md)
         doc.finish(newline="\n")
     return True
-
-
-def testPaths(patterns: list[str] | None = None) -> list[str]:
-    # if None, get all the test paths
-    # otherwise, glob the provided paths, rooted at the test dir
-    if not patterns:
-        return list(sortTests(findTestFiles()))
-    return [
-        path
-        for pattern in patterns
-        for path in glob.glob(os.path.join(TEST_DIR, pattern))
-        if path.endswith(TEST_FILE_EXTENSIONS)
-    ]
 
 
 def addTestMetadata(doc: t.SpecT) -> None:

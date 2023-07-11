@@ -145,6 +145,10 @@ class Serializer:
         strs = []
         strs.append("<" + tag)
         for attrName, attrVal in sorted(el.items()):
+            if str(attrName).startswith("bs-"):
+                # Skip bs- prefixed attributes, as they're used
+                # for Bikeshed-internal purposes.
+                continue
             if attrVal == "":
                 strs.append(" " + self.unfuckName(str(attrName)))
             else:

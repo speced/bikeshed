@@ -252,7 +252,7 @@ def transformPre(lines: list[str], tagName: str, firstLine: str, lineNum: int | 
 
 
 def transformSimpleDef(lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT) -> list[str]:
-    rows = parseDefBlock(lines, "simpledef")
+    rows = parseDefBlock(lines, "simpledef", doc=doc)
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = f" line-number={lineNum}"
@@ -269,7 +269,7 @@ def transformSimpleDef(lines: list[str], tagName: str, firstLine: str, lineNum: 
 
 def transformPropdef(lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT) -> list[str]:
     attrs: OrderedDict[str, str | None] = OrderedDict()
-    parsedAttrs = parseDefBlock(lines, "propdef")
+    parsedAttrs = parseDefBlock(lines, "propdef", doc=doc)
     # Displays entries in the order specified in attrs,
     # then if there are any unknown parsedAttrs values,
     # they're displayed afterward in the order they were specified.
@@ -382,7 +382,7 @@ def transformDescdef(lines: list[str], tagName: str, firstLine: str, lineNum: in
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = f" line-number={lineNum}"
-    vals = parseDefBlock(lines, "descdef")
+    vals = parseDefBlock(lines, "descdef", doc=doc)
     if "partial" in firstLine or "New values" in vals:
         requiredKeys = ["Name", "For"]
         ret = [
@@ -434,7 +434,7 @@ def transformElementdef(lines: list[str], tagName: str, firstLine: str, lineNum:
     if lineNum is not None:
         lineNumAttr = f" line-number={lineNum}"
     attrs: OrderedDict[str, str | None] = OrderedDict()
-    parsedAttrs = parseDefBlock(lines, "elementdef")
+    parsedAttrs = parseDefBlock(lines, "elementdef", doc=doc)
     if "Attribute groups" in parsedAttrs or "Attributes" in parsedAttrs:
         html = "<ul>"
         if "Attribute groups" in parsedAttrs:
@@ -523,7 +523,7 @@ def transformArgumentdef(
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = f" line-number={lineNum}"
-    attrs = parseDefBlock(lines, "argumentdef", capitalizeKeys=False, lineNum=lineNum)
+    attrs = parseDefBlock(lines, "argumentdef", doc=doc, capitalizeKeys=False, lineNum=lineNum)
     el = h.parseHTML(firstLine + "</pre>")[0]
     if "for" in el.attrib:
         forValue = t.cast(str, el.get("for"))
@@ -585,6 +585,7 @@ def transformArgumentdef(
 def parseDefBlock(
     lines: list[str],
     type: str,
+    doc: t.SpecT,
     capitalizeKeys: bool = True,
     lineNum: int | None = None,
 ) -> OrderedDict[str, str]:
@@ -609,6 +610,8 @@ def parseDefBlock(
             vals[key] += "\n" + val
         else:
             vals[key] = val
+    for key, val in vals.items():
+        vals[key] = h.parseText(val)
     return vals
 
 

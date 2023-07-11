@@ -213,7 +213,7 @@ def addAtRisk(doc: t.SpecT) -> None:
         return
     html = "<p>The following features are at-risk, and may be dropped during the CR period:\n<ul>"
     for feature in doc.md.atRisk:
-        html += "<li>" + doc.fixText(feature)
+        html += "<li>" + doc.fixText(h.parseText(feature))
     html += (
         "</ul><p>“At-risk” is a W3C Process term-of-art, and does not necessarily imply that the feature is in danger of being dropped or delayed. "
         + "It means that the WG believes the feature may have difficulty being interoperably implemented in a timely manner, "
