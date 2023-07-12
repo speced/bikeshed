@@ -110,7 +110,7 @@ def getWG21Data() -> str:
 def getCSSWGData() -> list[str]:
     try:
         return requests.get(
-            "https://raw.githubusercontent.com/w3c/csswg-drafts/master/biblio.ref",
+            "https://raw.githubusercontent.com/w3c/csswg-drafts/main/biblio.ref",
             timeout=5,
         ).text.splitlines()
     except Exception as e:
