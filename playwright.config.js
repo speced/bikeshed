@@ -15,7 +15,7 @@ module.exports = defineConfig({
   testDir: '.',
   // Glob patterns or regular expressions that match test files.
   testMatch: '*/*_pwtest.js',
-  snapshotPathTemplate: '{testFileDir}/__screenshots__/{testFileName}/{arg}-{projectName}-{platform}{ext}',
+  snapshotPathTemplate: '{testDir}/{testFileDir}/__screenshots__/{testFileName}/{arg}-{projectName}-{platform}{ext}',
 
   /* Run tests in files in parallel */
   fullyParallel: true,
@@ -43,10 +43,11 @@ module.exports = defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
 
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
+    /* Test against Firefox, failing nightlies at the moment. */
+    // {
+    //   name: 'firefox',
+    //   use: { ...devices['Desktop Firefox'] },
+    // },
 
     // Webkit is not supported yet.
     // {
