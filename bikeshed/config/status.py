@@ -209,6 +209,7 @@ w3cCommunityStatuses = frozenset(["w3c/CG-DRAFT", "w3c/CG-FINAL"])
 megaGroups = {
     "w3c": frozenset(
         [
+            "ab",
             "act-framework",
             "act-rules-format",
             "audiowg",
