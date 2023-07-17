@@ -60,6 +60,7 @@ from .dom import (
     removeNode,
     replaceContents,
     replaceMacros,
+    replaceMacrosTextly,
     replaceNode,
     replaceWithContents,
     safeID,

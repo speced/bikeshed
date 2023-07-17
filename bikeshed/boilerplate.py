@@ -19,6 +19,8 @@ if t.TYPE_CHECKING:
 
 
 def boilerplateFromHtml(doc: t.SpecT, htmlString: str) -> t.NodesT:
+    htmlString = h.parseText(htmlString, doc=doc)
+    htmlString = h.replaceMacros(htmlString, doc.macros)
     htmlString = doc.fixText(htmlString)
     bp = h.E.div({}, h.parseHTML(htmlString))
     conditional.processConditionals(doc, bp)
@@ -121,7 +123,7 @@ def addHeaderFooter(doc: t.SpecT) -> None:
     header = retrieve.retrieveBoilerplateFile(doc, "header") if "header" in doc.md.boilerplate else ""
     footer = retrieve.retrieveBoilerplateFile(doc, "footer") if "footer" in doc.md.boilerplate else ""
 
-    doc.html = "\n".join([header, doc.html, footer])
+    doc.html = "\n".join([h.parseText(header, doc=doc), doc.html, h.parseText(footer, doc=doc)])
 
 
 def fillWith(tag: str, newElements: t.NodesT, doc: t.SpecT) -> None:
@@ -220,7 +222,9 @@ def addAtRisk(doc: t.SpecT) -> None:
         + "and marking it as such allows the WG to drop the feature if necessary when transitioning to the Proposed Rec stage, "
         + "without having to publish a new Candidate Rec without the feature first."
     )
-    fillWith("at-risk", h.parseHTML(html), doc=doc)
+    html = h.replaceMacros(html, doc.macros)
+    frag = h.parseHTML(html)
+    fillWith("at-risk", frag, doc=doc)
 
 
 def addStyles(doc: t.SpecT) -> None:
@@ -1031,9 +1035,17 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
     # and upgrade html-text values into real elements
     otherMd: OrderedDict[str, list[MetadataValueT]] = OrderedDict()
     for k, vs in doc.md.otherMetadata.items():
-        parsed: list[t.NodesT] = [h.parseHTML(doc.fixText(v)) if isinstance(v, str) else v for v in vs]
+        parsed: list[t.NodesT] = []
+        for v in vs:
+            if isinstance(v, str):
+                htmlText = h.parseText(v, doc=doc)
+                htmlText = h.replaceMacros(htmlText, doc.macros)
+                htmlText = doc.fixText(htmlText)
+                parsed.append(h.parseHTML(htmlText))
+            else:
+                parsed.append(v)
         if k in md:
-            md[k].extend(parsed)
+            md[k].append(parsed)
         else:
             otherMd[k] = t.cast("list[t.NodesT|None]", parsed)
 

@@ -787,6 +787,7 @@ def hasOnlyChild(el: t.ElementT, wsAllowed: bool = True) -> t.ElementT | None:
 
 def fixTypography(text: str) -> str:
     # Replace straight aposes with curly quotes for possessives and contractions.
+    return text
     text = re.sub(r"([\w])'([\w])", r"\1’\2", text)
     text = re.sub(r"(</[\w]+>)'([\w])", r"\1’\2", text)
     # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
@@ -834,6 +835,27 @@ def replaceMacros(text: str, macros: t.Mapping[str, str]) -> str:
     # Macro syntax is [FOO], where FOO is /[A-Z0-9-]+/
     # If written as [FOO?], failure to find a matching macro just replaced it with nothing;
     # otherwise, it throws a fatal error.
+
+    def macroReplacer(match: re.Match) -> str:
+        text = match.group(1).lower()
+        optional = match.group(2) == "?"
+        if text in macros:
+            # For some reason I store all the macros in lowercase,
+            # despite requiring them to be spelled with uppercase.
+            return str(macros[text])
+        # Nothing has matched, so start failing the macros.
+        if optional:
+            return ""
+        die(f"Found unmatched text macro [{match.group(1)}]. Correct the macro, or escape it somehow (leading backslash, html escape, etc).")
+        return t.cast(str, match.group(0))
+
+    return re.sub("\uebbb([^?]+?)(\\??)\uebbc", macroReplacer, text)
+
+
+def replaceMacrosTextly(text: str, macros: t.Mapping[str, str]) -> str:
+    # Same as replaceMacros(), but does the substitution
+    # directly on the text, rather than relying on the
+    # html parser to have preparsed the macro syntax
     def macroReplacer(match: re.Match) -> str:
         fullText = t.cast(str, match.group(0))
         innerText = match.group(2).lower() or ""

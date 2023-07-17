@@ -147,6 +147,7 @@ class Spec:
         self.md = metadata.join(self.mdBaseline, self.mdDefaults, self.mdDocument, self.mdCommandLine)
 
         text = h.strFromNodes(h.initialDocumentParse(inputContent.content, doc=self))
+        print(text)
         inputContent.rawLines = [x + "\n" for x in text.split("\n")]
         return inputContent.lines
 
@@ -182,7 +183,7 @@ class Spec:
         # Using all of that, load up the text macros so I can sub them into the computed-metadata file.
         self.md.fillTextMacros(self.macros, doc=self)
         jsonEscapedMacros = {k: json.dumps(v)[1:-1] for k, v in self.macros.items()}
-        computedMdText = h.replaceMacros(
+        computedMdText = h.replaceMacrosTextly(
             retrieve.retrieveBoilerplateFile(self, "computed-metadata", error=True),
             macros=jsonEscapedMacros,
         )
@@ -235,7 +236,7 @@ class Spec:
         # Convert to a single string of html now, for convenience.
         self.html = "".join(x.text for x in self.lines)
         boilerplate.addHeaderFooter(self)
-        self.html = self.fixText(self.html)
+        self.html = h.replaceMacros(self.html, self.macros)
 
         # Build the document
         self.document = h.parseDocument(self.html)
@@ -470,20 +471,9 @@ class Spec:
         except Exception as e:
             m.die(f"Something went wrong while watching the file:\n{e}")
 
-    def fixText(self, text: str, moreMacros: dict[str, str] | None = None) -> str:
-        # Do several textual replacements that need to happen *before* the document is parsed as h.
-
-        # If markdown shorthands are on, remove all `foo`s while processing,
-        # so their contents don't accidentally trigger other stuff.
-        # Also handle markdown escapes.
-        if moreMacros is None:
-            moreMacros = {}
+    def fixText(self, text: str) -> str:
         textFunctor: func.Functor = func.Functor(text)
-
-        macros = dict(self.macros, **moreMacros)
-        textFunctor = textFunctor.map(curry(h.replaceMacros, macros=macros))
         textFunctor = textFunctor.map(h.fixTypography)
-
         return t.cast(str, textFunctor.extract())
 
     def printTargets(self) -> None:

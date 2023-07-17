@@ -23,6 +23,13 @@ def test() -> None:
         list(nodesFromHtml(vals))
 
 
+@dataclass
+class ParseConfig:
+    parseMarkdown: bool = True
+    parseCSS: bool = True
+    macros: dict[str, str] = field(default_factory=dict)
+
+
 def nodesFromHtml(data: str, startLine: int = 1, doc: t.SpecT | None = None) -> t.Generator[ParserNode, None, None]:
     if doc:
         usesMarkdown = "markdown" in doc.md.markupShorthands
@@ -89,8 +96,48 @@ def parseNode(s: Stream, start: int, usesMarkdown: bool = True, usesCSS: bool = 
             el, i = parseCSSMaybe(s, start)
             if el is not Failure:
                 return Result(el, i)
+    if s[start] == "[" and s[start-1] != "[":
+        el, i = parseMacro(s, start)
+        if el is not Failure:
+            return Result(el, i)
+    if s[start:start+2] == "\\[":
+        if s[start+2].isalpha() or s[start+2].isdigit():
+            # an escaped macro, so handle it here
+            text = "["
+        else:
+            # actually an escaped biblio or autolink, so let the
+            # biblio/autolink code handle it for now.
+            # FIXME when biblio shorthands are built into
+            # this parser
+            text = "\\["
+        node = Text(
+            line=s.line(start),
+            endLine=s.line(start),
+            text=text,
+        )
+        return Result(node, start+2)
+    match, i = s.matchRe(start, curlyApostropheRe)
+    if match is not Failure:
+        node = Text(
+            line=s.line(start),
+            endLine=s.line(i-1),
+            text=s[start] + "’" + s[start+2],
+        )
+        return Result(node, i)
+    match, i = s.matchRe(start, emdashRe)
+    if match is not Failure:
+        # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
+        node = Text(
+            line=s.line(start),
+            endLine=s.line(start),
+            text="—\u200b",
+        )
+        return Result(node, i)
 
     return Result.fail(start)
+
+curlyApostropheRe = re.compile(r"\w'\w")
+emdashRe = re.compile(r"(?<!<!)(?<!-)(—|--)\n\s*(?=\S)")
 
 
 def parseAngleStart(s: Stream, start: int, usesMarkdown: bool = True, usesCSS: bool = True) -> Result:
@@ -510,6 +557,28 @@ class WholeElement(ParserNode):
         return f"{self.startTag}{escapeHTML(self.text)}</{self.tag}>"
 
 
+@dataclass
+class Macro(ParserNode):
+    name: str
+    optional: bool = False
+
+    def __str__(self) -> str:
+        # Use PUA characters to delimit the macro name
+        return Macro.encode(self.name, self.optional)
+
+    @staticmethod
+    def encode(name: str, optional: bool = False) -> str:
+        return f"\uebbb{name}{'?' if optional else ''}\uebbc"
+
+    @staticmethod
+    def parse(text: str) -> tuple[str, int]:
+        # Looks for macros in the text and converts
+        # them into the safely-encoded form.
+        return macroRe.subn("\uebbb\\1\\2\uebbc", text)
+
+
+
+
 #
 #
 #
@@ -578,6 +647,14 @@ def parseStartTag(s: Stream, start: int) -> Result:
             m.die(f"Attribute {attrName} appears twice in <{tagname}>.", lineNum=s.loc(startAttr))
             return Result.fail(start)
         tag.attrs[attrName] = attrValue
+        subbedValue, numSubs = Macro.parse(attrValue)
+        if numSubs > 0:
+            tag.attrs[attrName] = subbedValue
+            if "bs-macro-attributes" in tag.attrs:
+                tag.attrs["bs-macro-attributes"] += f",{attrName}"
+            else:
+                tag.attrs["bs-macro-attributes"] = attrName
+
 
     _, i = parseWhitespace(s, i)
 
@@ -1109,6 +1186,30 @@ def parseFencedCodeBlock(s: Stream, start: int) -> Result:
         endLine=s.line(i - 1),
     )
     return Result(el, i)
+
+
+macroRe = re.compile(r"\[([A-Z\d-]*[A-Z][A-Z\d-]*)(\??)\]")
+
+
+def parseMacro(s: Stream, start: int) -> Result:
+    # Macros all look like `[FOO]` or `[FOO?]`:
+    # uppercase ASCII, possibly with a ? suffix,
+    # tightly wrapped by square brackets.
+
+    if s[start] != "[":
+        return Result.fail(start)
+    match, i = s.matchRe(start, macroRe)
+    if match is Failure:
+        return Result.fail(start)
+    text = match.group(1).lower()
+    optional = match.group(2) == "?"
+    macro = Macro(
+        line=s.line(start),
+        endLine=s.line(start),
+        name=text.lower(),
+        optional=optional,
+    )
+    return Result(macro, i)
 
 
 metadataPreEndRe = re.compile(r"</pre>(.*)")
