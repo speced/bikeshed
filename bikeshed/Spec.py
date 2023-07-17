@@ -147,7 +147,6 @@ class Spec:
         self.md = metadata.join(self.mdBaseline, self.mdDefaults, self.mdDocument, self.mdCommandLine)
 
         text = h.strFromNodes(h.initialDocumentParse(inputContent.content, doc=self))
-        print(text)
         inputContent.rawLines = [x + "\n" for x in text.split("\n")]
         return inputContent.lines
 
