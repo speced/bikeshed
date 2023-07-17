@@ -847,7 +847,7 @@ def replaceMacros(text: str, macros: t.Mapping[str, str]) -> str:
         if optional:
             return ""
         die(f"Found unmatched text macro [{match.group(1)}]. Correct the macro, or escape it somehow (leading backslash, html escape, etc).")
-        return t.cast(str, match.group(0))
+        return t.cast(str, "[" + match.group(0)[1:-1] + "]")
 
     return re.sub("\uebbb([^?]+?)(\\??)\uebbc", macroReplacer, text)
 
