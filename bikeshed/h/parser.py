@@ -1535,7 +1535,7 @@ def isWhitespace(ch: str | int) -> bool:
         cp = ord(ch)
     else:
         cp = ch
-    return cp in (0x9, 0xA, 0xC, 0x20)
+    return cp in (0x9, 0xA, 0xC, 0xD, 0x20)
 
 
 def isControl(ch: str | int) -> bool:
