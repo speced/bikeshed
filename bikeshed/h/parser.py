@@ -686,7 +686,7 @@ def parseUnquotedAttrValue(s: Stream, start: int) -> Result:
             break
         if isWhitespace(s[i]):
             break
-        if s[i] in "\"'<=`":
+        if s[i] in "\"'<`":
             m.die(f"Character {s[i]} (at {s.loc(i)}) is invalid in unquoted attribute values.", lineNum=s.loc(start))
             return Result.fail(start)
         if s[i] == "&":
