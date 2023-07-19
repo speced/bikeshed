@@ -150,7 +150,7 @@ class UrlInputSource(InputSource):
             # Use the response's Date header, although servers don't always set
             # this according to the last change to the file.
             date = email.utils.parsedate_to_datetime(response.headers["Date"]).date()
-        return InputContent(response.text.splitlines(True), date)
+        return InputContent([x + "\n" for x in response.text.splitlines(False)], date)
 
     def relative(self, relativePath: str) -> UrlInputSource:
         return UrlInputSource(urllib.parse.urljoin(self.sourceName, relativePath))
