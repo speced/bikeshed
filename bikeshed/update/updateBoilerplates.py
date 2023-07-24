@@ -58,7 +58,7 @@ def pathsFromManifest(manifest: str) -> list[str]:
 
 async def updateFiles(localPrefix: str, newPaths: t.Sequence[str]) -> tuple[list[str], list[str]]:
     tasks = set()
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(trust_env=True) as session:
         for filePath in newPaths:
             coro = updateFile(localPrefix, filePath, session=session)
             tasks.add(coro)
