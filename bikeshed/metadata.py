@@ -72,6 +72,7 @@ class MetadataManager:
         self.defaultHighlight: str | None = None
         self.defaultBiblioDisplay: str = "index"
         self.defaultRefStatus: str | None = None
+        self.dieOn: str | None = None
         self.editors: list[dict[str, str | None]] = []
         self.editorTerm: dict[str, str] = {"singular": _("Editor"), "plural": _("Editors")}
         self.expires: date | None = None
@@ -205,6 +206,9 @@ class MetadataManager:
 
         if self.displayShortname:
             self.shortname = self.displayShortname.lower()
+
+        if self.dieOn:
+            constants.setErrorLevel(self.dieOn)
 
     def validate(self) -> bool:
         if self.group == "byos":
@@ -973,6 +977,17 @@ def parseInlineTagCommand(key: str, val: str, lineNum: str | int | None) -> dict
     return {tag: command}
 
 
+def parseDieOn(key: str, val: str, lineNum: str | int | None) -> str:
+    val = val.strip()
+    if val in ("nothing", "fatal", "link-error", "warning", "message", "everything"):
+        return val
+    m.die(
+        f"Die On metadata only accepts the values 'nothing', 'fatal', 'link-error', 'warning', 'message', or 'everything'. Got '{val}'.",
+        lineNum=lineNum,
+    )
+    return "everything"
+
+
 def parse(lines: t.Sequence[Line]) -> tuple[list[Line], MetadataManager]:
     # Given HTML document text, in the form of an array of text lines,
     # extracts all <pre class=metadata> lines and parses their contents.
@@ -1287,6 +1302,7 @@ knownKeys = {
     ),  # synonym of "Default Ref Status"
     "Default Highlight": Metadata("Default Highlight", "defaultHighlight", joinValue, parseLiteral),
     "Default Ref Status": Metadata("Default Ref Status", "defaultRefStatus", joinValue, parseRefStatus),
+    "Die On": Metadata("Die On", "dieOn", joinValue, parseDieOn),
     "ED": Metadata("ED", "ED", joinValue, parseLiteral),
     "Editor": Metadata("Editor", "editors", joinList, parseEditor),
     "Editor Term": Metadata("Editor Term", "editorTerm", joinValue, parseEditorTerm),

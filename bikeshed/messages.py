@@ -63,7 +63,7 @@ def linkerror(msg: str, el: t.ElementT | None = None, lineNum: str | int | None 
             suffix = "\n" + lxml.html.tostring(el, with_tail=False, encoding="unicode")
     formattedMsg = formatMessage("link", msg + suffix, lineNum=lineNum)
     if formattedMsg not in messages:
-        messageCounts["linkerror"] += 1
+        messageCounts["link-error"] += 1
         messages.add(formattedMsg)
         if constants.quiet < 2:
             p(formattedMsg)
@@ -123,6 +123,15 @@ def resetSeenMessages() -> None:
     messages = set()
     global messageCounts  # noqa: PLW0603
     messageCounts = Counter()
+
+
+def retroactivelyCheckErrorLevel(level: str | None = None) -> bool:
+    if level is None:
+        level = constants.getErrorLevel()
+    for levelName, msgCount in messageCounts.items():
+        if msgCount > 0 and constants.errorLevelAt(levelName):
+            errorAndExit()
+    return True
 
 
 def printColor(text: str, color: str = "white", *styles: str) -> str:
@@ -211,5 +220,5 @@ def formatMessage(type: str, text: str, lineNum: str | int | None = None) -> str
 
 
 def errorAndExit() -> None:
-    failure("Did not generate, due to fatal errors")
+    failure("Did not generate, due to errors exceeding the allowed error level.")
     sys.exit(2)

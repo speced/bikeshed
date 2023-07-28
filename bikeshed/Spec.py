@@ -199,6 +199,7 @@ class Spec:
         # And compute macros again, in case the preceding steps changed them.
         self.md.fillTextMacros(self.macros, doc=self)
         self.md.validate()
+        m.retroactivelyCheckErrorLevel()
         extensions.load(self)
 
         # Initialize things

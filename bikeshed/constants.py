@@ -31,3 +31,7 @@ def setErrorLevel(level: str | None = None) -> None:
     if level is None:
         level = "fatal"
     errorLevel[0] = level
+
+
+def getErrorLevel() -> str:
+    return errorLevel[0]
