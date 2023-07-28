@@ -656,7 +656,7 @@ def handleTest(options: argparse.Namespace, extras: list[str]) -> None:
 
     md = metadata.fromCommandLine(extras)
     constants.setErrorLevel("nothing")
-    constants.quiet = 100
+    #constants.quiet = 100
     filters = test.TestFilter.fromOptions(options)
     if options.rebase:
         test.rebase(filters, md=md)

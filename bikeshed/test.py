@@ -5,6 +5,7 @@ import difflib
 import glob
 import os
 import re
+import sys
 
 from alive_progress import alive_it
 
@@ -136,13 +137,20 @@ def processTest(
     fileRequester: t.DataFileRequester = retrieve.DataFileRequester(fileType="readonly"),
 ) -> t.SpecT:
     try:
-        doc = Spec(inputFilename=path, fileRequester=fileRequester, testing=True)
-        if md is not None:
-            doc.mdCommandLine = md
-        addTestMetadata(doc)
-        doc.preprocess()
+        messagesFilename = path[:-2] + "console.txt"
+        oldStdout = sys.stdout
+        doc = None
+        with open(messagesFilename, "w", encoding="utf-8") as fh:
+            sys.stdout = fh
+            doc = Spec(inputFilename=path, fileRequester=fileRequester, testing=True)
+            if md is not None:
+                doc.mdCommandLine = md
+            addTestMetadata(doc)
+            doc.preprocess()
+        sys.stdout = oldStdout
     except Exception as e:
         m.p(f"Error running test {path}:\n  {e}")
+    assert doc is not None
     return doc
 
 
