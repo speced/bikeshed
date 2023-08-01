@@ -23,7 +23,8 @@ COPY --from=builder /install /usr/local
 COPY --from=specdata /bikeshed-main/bikeshed/spec-data /app/bikeshed/spec-data
 
 # setup.py opens README.md, semver.txt and requirements.txt so they must be copied.
-COPY setup.py README.md semver.txt requirements.txt /app/
+COPY setup.py README.md requirements.txt /app/
+COPY bikeshed/semver.txt /app/bikeshed/
 RUN pip install --editable .
 
 COPY .git /app/.git
