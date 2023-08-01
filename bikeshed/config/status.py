@@ -301,7 +301,6 @@ w3cCgs = frozenset(
         "fedidcg",
         "immersivewebcg",
         "patcg",
-        "patcg-id",
         "privacycg",
         "processcg",
         "ricg",
