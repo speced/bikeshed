@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import difflib
 import glob
@@ -137,17 +138,12 @@ def processTest(
     fileRequester: t.DataFileRequester = retrieve.DataFileRequester(fileType="readonly"),
 ) -> t.SpecT:
     try:
-        messagesFilename = path[:-2] + "console.txt"
-        oldStdout = sys.stdout
         doc = None
-        with open(messagesFilename, "w", encoding="utf-8") as fh:
-            sys.stdout = fh
-            doc = Spec(inputFilename=path, fileRequester=fileRequester, testing=True)
-            if md is not None:
-                doc.mdCommandLine = md
-            addTestMetadata(doc)
-            doc.preprocess()
-        sys.stdout = oldStdout
+        doc = Spec(inputFilename=path, fileRequester=fileRequester, testing=True)
+        if md is not None:
+            doc.mdCommandLine = md
+        addTestMetadata(doc)
+        doc.preprocess()
     except Exception as e:
         m.p(f"Error running test {path}:\n  {e}")
     assert doc is not None
@@ -181,8 +177,11 @@ def rebase(
         name = testNameForPath(path)
         pathProgress.text(name)
         m.resetSeenMessages()
-        doc = processTest(path, md)
-        doc.finish(newline="\n")
+        with redirectStdout(replaceExtension(path, "console.txt")) as _:
+            with changePrintMode("plain") as _:
+                doc = processTest(path, md)
+        with silenceStdout() as _:
+            doc.finish(newline="\n")
     return True
 
 
@@ -196,3 +195,41 @@ def addTestMetadata(doc: t.SpecT) -> None:
         doc.mdCommandLine.addData("Date", "1970-01-01")
     if "Inline Github Issue" not in md.manuallySetKeys:
         doc.mdCommandLine.addData("Inline Github Issues", "no")
+
+@contextlib.contextmanager
+def redirectStdout(path: str) -> t.Any:
+    fh = open(path, 'w', encoding='utf-8')
+    oldStdout = sys.stdout
+    try:
+        sys.stdout = fh
+        yield fh
+    finally:
+        sys.stdout = oldStdout
+        fh.close()
+
+@contextlib.contextmanager
+def silenceStdout() -> t.Any:
+    oldStdout = sys.stdout
+    fh = open(os.devnull, 'w', encoding='utf-8')
+    try:
+        sys.stdout = fh
+        yield fh
+    finally:
+        sys.stdout = oldStdout
+        fh.close()
+
+
+@contextlib.contextmanager
+def changePrintMode(mode: str) -> None:
+    from . import constants
+    oldPrintMode = constants.printMode
+    try:
+        constants.printMode = mode
+        yield None
+    finally:
+        constants.printMode = oldPrintMode
+
+
+def replaceExtension(path: str, newExt: str) -> str:
+    trunk = os.path.splitext(path)[0]
+    return f"{trunk}.{newExt}"
