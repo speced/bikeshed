@@ -119,7 +119,7 @@ def runAllTests(
                 goldenOutput = golden.read()
             with open(replaceExtension(path, ".console.txt"), "r", encoding="utf-8") as golden:
                 goldenConsole = golden.read()
-            if compare(testOutput, goldenOutput) and compare(testConsole, goldenConsole):
+            if compare(testOutput, goldenOutput, path=path) and compare(testConsole, goldenConsole, path=path):
                 numPassed += 1
             else:
                 fails.append(testName)
@@ -155,9 +155,10 @@ def processTest(
     return doc
 
 
-def compare(suspect: str, golden: str) -> bool:
+def compare(suspect: str, golden: str, path: str) -> bool:
     if suspect == golden:
         return True
+    m.p(f"FILE: {path}")
     for line in difflib.unified_diff(golden.split("\n"), suspect.split("\n"), fromfile="golden", tofile="suspect"):
         if line[0] == "-":
             m.p(m.printColor(line, color="red"))
