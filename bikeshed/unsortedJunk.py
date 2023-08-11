@@ -609,7 +609,7 @@ def processBiblioLinks(doc: t.SpecT) -> None:
                 closeBiblios = biblio.findCloseBiblios(list(doc.refs.biblioKeys), linkText)
                 m.die(
                     f"Couldn't find '{linkText}' in bibliography data. Did you mean:\n"
-                    + "\n".join("  " + b for b in closeBiblios),
+                    + "\n".join("  " + b for b in sorted(closeBiblios)),
                     el=el,
                 )
             el.tag = "span"
@@ -1497,6 +1497,7 @@ def processIDL(doc: t.SpecT) -> None:
         localDfns.update(idl.markupIDLBlock(pre, doc))
 
     dfns = h.findAll("pre.idl:not([data-no-idl]) dfn, xmp.idl:not([data-no-idl]) dfn", doc) + list(localDfns)
+    dfns = sorted(dfns, key=lambda x:(x.get("bs-line-number") or "", h.textContent(x)))
     classifyDfns(doc, dfns)
     h.fixupIDs(doc, dfns)
     doc.refs.addLocalDfns(doc, (dfn for dfn in dfns if dfn.get("id") is not None))

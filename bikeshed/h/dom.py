@@ -226,6 +226,10 @@ def foldWhitespace(text: str) -> str:
     return re.sub(r"(\s|\xa0)+", " ", text)
 
 
+def sortElements(el: t.Iterable[t.ElementT]) -> list[t.ElementT]:
+    return list(sorted(el, key=lambda x:(x.get("bs-line-number", ""), textContent(x))))
+
+
 def parseHTML(text: str) -> list[t.ElementT]:
     doc = html5lib.parse(text, treebuilder="lxml", namespaceHTMLElements=False)
     head = doc.getroot()[0]
