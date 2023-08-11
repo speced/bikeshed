@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import contextlib
 import dataclasses
 import difflib
 import glob
+import io
 import os
 import re
 import sys
@@ -23,64 +23,64 @@ TEST_FILE_EXTENSIONS = (".bs", ".tar")
 
 @dataclasses.dataclass
 class TestFilter:
-    globs: list[str] | None = None
     folders: list[str] | None = None
+    files: list[str] | None = None
     manualOnly: bool = False
 
     @staticmethod
     def fromOptions(options: argparse.Namespace) -> TestFilter:
-        return TestFilter(globs=options.testFiles, folders=options.folder, manualOnly=options.manualOnly)
+        return TestFilter(folders=options.folders, files=options.files, manualOnly=options.manualOnly)
 
 
 def testPaths(filters: TestFilter) -> list[str]:
-    # if None, get all the test paths
-    # otherwise, glob the provided paths, rooted at the test dir
-    if not filters.globs:
-        return list(sortTests(findTestFiles(filters)))
-    return [
-        path
-        for pattern in filters.globs
-        for path in glob.glob(os.path.join(TEST_DIR, pattern))
-        if path.endswith(TEST_FILE_EXTENSIONS)
-    ]
+    return list(sortTests(findTestFiles(filters)))
 
 
 def findTestFiles(filters: TestFilter) -> t.Generator[str, None, None]:
     for root, _, filenames in os.walk(TEST_DIR):
         for filename in filenames:
-            filePath = testNameForPath(os.path.join(root, filename))
+            fullPath = os.path.join(root, filename)
+            filePath = testNameForPath(fullPath)
             if not allowedPath(filePath, filters):
                 continue
-            if not filePath.endswith(TEST_FILE_EXTENSIONS):
-                continue
-            yield os.path.join(root, filename)
+            yield fullPath
 
 
 def allowedPath(filePath: str, filters: TestFilter) -> bool:
+    extension = os.path.splitext(filePath)[1]
     pathSegs = splitPath(filePath)
-    if filters.manualOnly and pathSegs[0] == "github":
+    fileName = pathSegs[-1]
+
+    if extension not in TEST_FILE_EXTENSIONS:
         return False
+
     if re.search(r"\d{3}-files$", pathSegs[0]):
         # support files for a manual test
         return False
+
+    if filters.manualOnly and pathSegs[0] == "github":
+        return False
+
     if filters.folders:
         if not any(folder in pathSegs for folder in filters.folders):
             return False
+
+    if filters.files:
+        if not any(fileSubstring in fileName for fileSubstring in filters.files):
+            return False
+
     return True
 
 
-def splitPath(path: str, reverseSegs: list[str] | None = None) -> list[str]:
-    if reverseSegs is None:
-        reverseSegs = []
+def splitPath(path: str) -> list[str]:
     [head, tail] = os.path.split(path)
-    reverseSegs.append(tail)
     if head in ["", "/"]:
-        return list(reversed(reverseSegs))
-    return splitPath(head, reverseSegs)
+        return [tail]
+    return splitPath(head) + [tail]
 
 
-# The test name will be the path relative to the tests directory, or the path as
-# given if the test is outside of that directory.
+# The test name will be the path relative to the tests directory,
+# or the path as given if the test is outside of that directory.
 def testNameForPath(path: str) -> str:
     if path.startswith(TEST_DIR):
         return path[len(TEST_DIR) + 1 :]
@@ -108,20 +108,27 @@ def runAllTests(
             testName = testNameForPath(path)
             pathProgress.text(testName)
             total += 1
-            doc = processTest(path, md)
-            outputText = doc.serialize()
-            if outputText is None:
+            consoleFh = io.StringIO()
+            with m.messagesToFile(consoleFh) as _:
+                doc = processTest(path, md)
+                testConsole = consoleFh.getvalue()
+            testOutput = doc.serialize()
+            if testOutput is None:
                 m.p(m.printColor("Serialization failed.", color="red"))
                 fails.append(testName)
                 continue
-            with open(os.path.splitext(path)[0] + ".html", encoding="utf-8") as golden:
-                goldenText = golden.read()
-            if compare(outputText, goldenText):
+            with open(replaceExtension(path, ".html"), 'r', encoding="utf-8") as golden:
+                goldenOutput = golden.read()
+            with open(replaceExtension(path, ".console.txt"), 'r', encoding="utf-8") as golden:
+                goldenConsole = golden.read()
+            if compare(testOutput, goldenOutput) and compare(testConsole, goldenConsole):
                 numPassed += 1
             else:
+                sys.exit(0)
                 fails.append(testName)
-    except:  # pylint: disable=bare-except
+    except Exception as e:
         m.say(testName)
+        m.say(e)
     if numPassed == total:
         m.p(m.printColor("✔ All tests passed.", color="green"))
         return True
@@ -145,7 +152,8 @@ def processTest(
         addTestMetadata(doc)
         doc.preprocess()
     except Exception as e:
-        m.p(f"Error running test {path}:\n  {e}")
+        print(f"Error running test {path}:\n  {e}")
+        raise e
     assert doc is not None
     return doc
 
@@ -177,10 +185,9 @@ def rebase(
         name = testNameForPath(path)
         pathProgress.text(name)
         m.resetSeenMessages()
-        with redirectStdout(replaceExtension(path, "console.txt")) as _:
-            with changePrintMode("plain") as _:
-                doc = processTest(path, md)
-        with silenceStdout() as _:
+        with m.messagesToFile(replaceExtension(path, ".console.txt")) as _:
+            doc = processTest(path, md)
+        with m.messagesSilent() as _:
             doc.finish(newline="\n")
     return True
 
@@ -196,40 +203,8 @@ def addTestMetadata(doc: t.SpecT) -> None:
     if "Inline Github Issue" not in md.manuallySetKeys:
         doc.mdCommandLine.addData("Inline Github Issues", "no")
 
-@contextlib.contextmanager
-def redirectStdout(path: str) -> t.Any:
-    fh = open(path, 'w', encoding='utf-8')
-    oldStdout = sys.stdout
-    try:
-        sys.stdout = fh
-        yield fh
-    finally:
-        sys.stdout = oldStdout
-        fh.close()
-
-@contextlib.contextmanager
-def silenceStdout() -> t.Any:
-    oldStdout = sys.stdout
-    fh = open(os.devnull, 'w', encoding='utf-8')
-    try:
-        sys.stdout = fh
-        yield fh
-    finally:
-        sys.stdout = oldStdout
-        fh.close()
-
-
-@contextlib.contextmanager
-def changePrintMode(mode: str) -> None:
-    from . import constants
-    oldPrintMode = constants.printMode
-    try:
-        constants.printMode = mode
-        yield None
-    finally:
-        constants.printMode = oldPrintMode
-
 
 def replaceExtension(path: str, newExt: str) -> str:
+    assert newExt[0] == "."
     trunk = os.path.splitext(path)[0]
-    return f"{trunk}.{newExt}"
+    return f"{trunk}{newExt}"

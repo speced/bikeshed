@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import sys
 from collections import Counter
 
@@ -13,6 +14,8 @@ messages = set()
 messageCounts: dict[str, int]
 messageCounts = Counter()
 
+messageFh = sys.stdout
+
 
 def p(msg: str | tuple[str, str], sep: str | None = None, end: str | None = None) -> None:
     if constants.quiet == float("infinity"):
@@ -24,19 +27,19 @@ def p(msg: str | tuple[str, str], sep: str | None = None, end: str | None = None
     if constants.asciiOnly:
         msg = ascii
     try:
-        print(msg, sep=sep, end=end)
+        print(msg, sep=sep, end=end, file=messageFh)
     except UnicodeEncodeError:
         if ascii is not None:
-            print(ascii, sep=sep, end=end)
+            print(ascii, sep=sep, end=end, file=messageFh)
         else:
             warning = formatMessage(
                 "warning",
                 "Your console does not understand Unicode.\n  Messages may be slightly corrupted.",
             )
             if warning not in messages:
-                print(warning)
+                print(warning, file=messageFh)
                 messages.add(warning)
-            print(msg.encode("ascii", "xmlcharrefreplace"), sep=sep, end=end)
+            print(msg.encode("ascii", "xmlcharrefreplace"), sep=sep, end=end, file=messageFh)
 
 
 def die(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None) -> None:
@@ -222,3 +225,41 @@ def formatMessage(type: str, text: str, lineNum: str | int | None = None) -> str
 def errorAndExit() -> None:
     failure("Did not generate, due to errors exceeding the allowed error level.")
     sys.exit(2)
+
+
+@contextlib.contextmanager
+def messagesToFile(pathOrFh: str | io.TextIOWrapper, mode: str|None = None) -> t.Generator[io.TextIOWrapper, None, None]:
+    from . import constants
+    if mode is None:
+        mode = "plain"
+
+    if isinstance(pathOrFh, str):
+        fh = open(pathOrFh, 'w', encoding='utf-8')
+    else:
+        fh = pathOrFh
+    global messageFh
+    oldMessageFh = messageFh
+    oldPrintMode = constants.printMode
+    try:
+        constants.printMode = mode
+        messageFh = fh
+        yield fh
+    finally:
+        constants.printMode = oldPrintMode
+        messageFh = oldMessageFh
+        if isinstance(pathOrFh, str):
+            fh.close()
+
+
+@contextlib.contextmanager
+def messagesSilent() -> t.Generator[io.TextIOWrapper, None, None]:
+    import os
+    fh = open(os.devnull, 'w', encoding='utf-8')
+    global messageFh
+    oldMessageFh = messageFh
+    try:
+        messageFh = fh
+        yield fh
+    finally:
+        messageFh = oldMessageFh
+        fh.close()

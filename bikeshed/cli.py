@@ -365,7 +365,7 @@ def main() -> None:
         help="Rebase the specified files.",
     )
     testParser.add_argument(
-        "--manual-only",
+        "--manual",
         dest="manualOnly",
         default=False,
         action="store_true",
@@ -373,17 +373,17 @@ def main() -> None:
     )
     testParser.add_argument(
         "--folder",
-        dest="folder",
+        dest="folders",
         default=None,
         nargs="+",
-        help="Only work on tests whose paths contain any of these folder names.",
+        help="Only run tests whose paths contain any of these folder names.",
     )
     testParser.add_argument(
-        "testFiles",
-        default=[],
-        metavar="FILE",
-        nargs="*",
-        help="Run these tests. If called with no args, tests everything.",
+        "--file",
+        dest="files",
+        default=None,
+        nargs="+",
+        help="Only run tests whose filenames contain any of these strings as substrings.",
     )
 
     profileParser = subparsers.add_parser(
@@ -656,7 +656,6 @@ def handleTest(options: argparse.Namespace, extras: list[str]) -> None:
 
     md = metadata.fromCommandLine(extras)
     constants.setErrorLevel("nothing")
-    #constants.quiet = 100
     filters = test.TestFilter.fromOptions(options)
     if options.rebase:
         test.rebase(filters, md=md)
