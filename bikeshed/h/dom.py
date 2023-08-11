@@ -934,8 +934,8 @@ def dedupIDs(doc: t.SpecT) -> None:
 
 
 def approximateLineNumber(el: t.ElementT, setIntermediate: bool = True) -> str | None:
-    if el.get("line-number"):
-        return el.get("line-number")
+    if el.get("bs-line-number"):
+        return el.get("bs-line-number")
     parent = parentElement(el)
     if not isElement(parent):
         if el.tag == "html":
@@ -947,7 +947,7 @@ def approximateLineNumber(el: t.ElementT, setIntermediate: bool = True) -> str |
     if approx[0].isdigit():
         approx = "~" + approx
     if setIntermediate:
-        el.set("line-number", approx)
+        el.set("bs-line-number", approx)
     return approx
 
 

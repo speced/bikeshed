@@ -46,8 +46,8 @@ def p(msg: str | tuple[str, str], sep: str | None = None, end: str | None = None
 
 
 def die(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None) -> None:
-    if lineNum is None and el is not None and el.get("line-number"):
-        lineNum = el.get("line-number")
+    if lineNum is None and el is not None and el.get("bs-line-number"):
+        lineNum = el.get("bs-line-number")
     formattedMsg = formatMessage("fatal", msg, lineNum=lineNum)
     if formattedMsg not in messages:
         messageCounts["fatal"] += 1
@@ -59,8 +59,8 @@ def die(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None
 
 
 def linkerror(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None) -> None:
-    if lineNum is None and el is not None and el.get("line-number"):
-        lineNum = el.get("line-number")
+    if lineNum is None and el is not None and el.get("bs-line-number"):
+        lineNum = el.get("bs-line-number")
     suffix = ""
     if el is not None:
         if el.get("bs-autolink-syntax"):
@@ -78,8 +78,8 @@ def linkerror(msg: str, el: t.ElementT | None = None, lineNum: str | int | None 
 
 
 def lint(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None) -> None:
-    if lineNum is None and el is not None and el.get("line-number"):
-        lineNum = el.get("line-number")
+    if lineNum is None and el is not None and el.get("bs-line-number"):
+        lineNum = el.get("bs-line-number")
     suffix = ""
     if el is not None:
         if el.get("bs-autolink-syntax"):
@@ -97,8 +97,8 @@ def lint(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = Non
 
 
 def warn(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None) -> None:
-    if lineNum is None and el is not None and el.get("line-number"):
-        lineNum = el.get("line-number")
+    if lineNum is None and el is not None and el.get("bs-line-number"):
+        lineNum = el.get("bs-line-number")
     formattedMsg = formatMessage("warning", msg, lineNum=lineNum)
     if formattedMsg not in messages:
         messageCounts["warning"] += 1

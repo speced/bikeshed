@@ -1121,7 +1121,6 @@ def cleanupHTML(doc: t.SpecT) -> None:
             "line-numbers",
             "data-opaque",
             "data-no-self-link",
-            "line-number",
             "caniuse",
             "data-silently-dedup",
             "nocrossorigin",

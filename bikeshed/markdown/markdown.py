@@ -534,7 +534,7 @@ def parseSingleLineHeading(stream: TokenStream) -> list[l.Line]:
     lines = [
         lineFromStream(
             stream,
-            "<h{level}{idattr} line-number={i}>{text}</h{level}>\n".format(
+            "<h{level}{idattr} bs-line-number={i}>{text}</h{level}>\n".format(
                 idattr=idattr,
                 i=stream.currline().i,
                 **stream.curr(),
@@ -567,7 +567,7 @@ def parseMultiLineHeading(stream: TokenStream) -> list[l.Line]:
     lines = [
         lineFromStream(
             stream,
-            "<h{level} {idattr} line-number={i}>{htext}</h{level}>\n".format(
+            "<h{level} {idattr} bs-line-number={i}>{htext}</h{level}>\n".format(
                 idattr=idattr,
                 level=level,
                 htext=text,
@@ -599,23 +599,23 @@ def parseParagraph(stream: TokenStream) -> list[l.Line]:
             p += "<span class=marker>{note}</span>{ws}".format(note=matchNote.group(1), ws=matchNote.group(2))
     elif line.lower().startswith("issue:"):
         line = line[6:]
-        p = f"<p line-number={i} class='replace-with-issue-class'>"
+        p = f"<p bs-line-number={i} class='replace-with-issue-class'>"
     elif line.lower().startswith("assert:"):
-        p = f"<p line-number={i} class='replace-with-assertion-class'>"
+        p = f"<p bs-line-number={i} class='replace-with-assertion-class'>"
     elif line.lower().startswith("advisement:"):
         line = line[11:]
-        p = f"<p line-number={i}><strong class='replace-with-advisement-class'>"
+        p = f"<p bs-line-number={i}><strong class='replace-with-advisement-class'>"
         endTag = "</strong></p>"
     else:
         match = re.match(r"issue\(([^)]+)\):(.*)", line, re.I)
         if match:
             line = match.group(2)
-            p = "<p line-number={} data-remote-issue-id='{}' class='replace-with-issue-class'>".format(
+            p = "<p bs-line-number={} data-remote-issue-id='{}' class='replace-with-issue-class'>".format(
                 i,
                 match.group(1),
             )
         else:
-            p = f"<p line-number={i}>"
+            p = f"<p bs-line-number={i}>"
     lines = [lineFromStream(stream, f"{p}{line}\n")]
     while True:
         stream.advance()
@@ -668,9 +668,9 @@ def parseBulleted(stream: TokenStream) -> list[l.Line]:
                 stream.advance()
             yield parseItem(stream)
 
-    lines = [l.Line(-1, f"<ul data-md line-number={ul_i}>")]
+    lines = [l.Line(-1, f"<ul data-md bs-line-number={ul_i}>")]
     for li_lines, i in getItems(stream):
-        lines.append(l.Line(-1, f"<li data-md line-number={i}>"))
+        lines.append(l.Line(-1, f"<li data-md bs-line-number={i}>"))
         lines.extend(parse(li_lines, numSpacesForIndentation))
         lines.append(l.Line(-1, "</li>"))
     lines.append(l.Line(-1, "</ul>"))
@@ -721,11 +721,11 @@ def parseNumbered(stream: TokenStream, start: int = 1) -> list[l.Line]:
             yield parseItem(stream)
 
     if start == 1:
-        lines = [l.Line(-1, f"<ol data-md line-number={ol_i}>")]
+        lines = [l.Line(-1, f"<ol data-md bs-line-number={ol_i}>")]
     else:
-        lines = [l.Line(-1, f"<ol data-md start='{start}' line-number={ol_i}>")]
+        lines = [l.Line(-1, f"<ol data-md start='{start}' bs-line-number={ol_i}>")]
     for li_lines, i in getItems(stream):
-        lines.append(l.Line(-1, f"<li data-md line-number={i}>"))
+        lines.append(l.Line(-1, f"<li data-md bs-line-number={i}>"))
         lines.extend(parse(li_lines, numSpacesForIndentation))
         lines.append(l.Line(-1, "</li>"))
     lines.append(l.Line(-1, "</ol>"))
@@ -783,9 +783,9 @@ def parseDl(stream: TokenStream) -> list[l.Line]:
                 stream.advance()
             yield parseItem(stream)
 
-    lines = [l.Line(-1, f"<dl data-md line-number={dl_i}>")]
+    lines = [l.Line(-1, f"<dl data-md bs-line-number={dl_i}>")]
     for type, di_lines, i in getItems(stream):
-        lines.append(l.Line(-1, f"<{type} data-md line-number={i}>"))
+        lines.append(l.Line(-1, f"<{type} data-md bs-line-number={i}>"))
         lines.extend(parse(di_lines, numSpacesForIndentation))
         lines.append(l.Line(-1, f"</{type}>"))
     lines.append(l.Line(-1, "</dl>"))
@@ -805,7 +805,7 @@ def parseBlockquote(stream: TokenStream) -> list[l.Line]:
         else:
             break
     return (
-        [l.Line(-1, f"<blockquote line-number={i}>\n")]
+        [l.Line(-1, f"<blockquote bs-line-number={i}>\n")]
         + parse(lines, stream.numSpacesForIndentation)
         + [l.Line(-1, "</blockquote>\n")]
     )

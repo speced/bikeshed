@@ -807,8 +807,8 @@ def headerReplacer(match: re.Match) -> t.NodeT:
 
 
 def addLineNumber(el: t.ElementT) -> None:
-    if el.get("line-number"):
+    if el.get("bs-line-number"):
         return
     line = h.approximateLineNumber(el)
     if line is not None:
-        el.set("line-number", line)
+        el.set("bs-line-number", line)
