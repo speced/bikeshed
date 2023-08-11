@@ -1464,9 +1464,15 @@ def addImageSize(doc: t.SpecT) -> None:
         try:
             im = Image.open(imgPath)
             width, height = im.size
+        except FileNotFoundError:
+            m.warn(
+                f"Image doesn't exist, so I couldn't determine its width and height: '{src}'",
+                el=el,
+            )
+            continue
         except Exception as e:
             m.warn(
-                f"Couldn't determine width and height of this image: {src}\n{e}",
+                f"Couldn't determine width and height of this image: '{src}'\n{e}",
                 el=el,
             )
             continue
