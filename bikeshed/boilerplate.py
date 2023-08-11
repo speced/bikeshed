@@ -328,7 +328,7 @@ def addIndexOfLocallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> None:
     h.appendChild(container, indexHTML, allowEmpty=True)
 
 
-def disambiguator(ref: r.RefWrapper, types: set[str] | None, specs: set[str] | None) -> str:
+def disambiguator(ref: r.RefWrapper, types: set[str] | None, specs: list[str] | None) -> str:
     disambInfo = []
     if types is None or len(types) > 1:
         disambInfo.append(ref.type)

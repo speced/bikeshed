@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import dataclasses
 import difflib
-import glob
 import io
 import os
 import re
-import sys
 
 from alive_progress import alive_it
 
@@ -117,18 +115,17 @@ def runAllTests(
                 m.p(m.printColor("Serialization failed.", color="red"))
                 fails.append(testName)
                 continue
-            with open(replaceExtension(path, ".html"), 'r', encoding="utf-8") as golden:
+            with open(replaceExtension(path, ".html"), "r", encoding="utf-8") as golden:
                 goldenOutput = golden.read()
-            with open(replaceExtension(path, ".console.txt"), 'r', encoding="utf-8") as golden:
+            with open(replaceExtension(path, ".console.txt"), "r", encoding="utf-8") as golden:
                 goldenConsole = golden.read()
             if compare(testOutput, goldenOutput) and compare(testConsole, goldenConsole):
                 numPassed += 1
             else:
-                sys.exit(0)
                 fails.append(testName)
     except Exception as e:
-        m.say(testName)
-        m.say(e)
+        print(testName)  # noqa: T201
+        print(e)  # noqa: T201
     if numPassed == total:
         m.p(m.printColor("✔ All tests passed.", color="green"))
         return True
@@ -152,7 +149,7 @@ def processTest(
         addTestMetadata(doc)
         doc.preprocess()
     except Exception as e:
-        print(f"Error running test {path}:\n  {e}")
+        print(f"Error running test {path}:\n  {e}")  # noqa: T201
         raise e
     assert doc is not None
     return doc

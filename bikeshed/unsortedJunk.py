@@ -1497,7 +1497,7 @@ def processIDL(doc: t.SpecT) -> None:
         localDfns.update(idl.markupIDLBlock(pre, doc))
 
     dfns = h.findAll("pre.idl:not([data-no-idl]) dfn, xmp.idl:not([data-no-idl]) dfn", doc) + list(localDfns)
-    dfns = sorted(dfns, key=lambda x:(x.get("bs-line-number") or "", h.textContent(x)))
+    dfns = sorted(dfns, key=lambda x: (x.get("bs-line-number") or "", h.textContent(x)))
     classifyDfns(doc, dfns)
     h.fixupIDs(doc, dfns)
     doc.refs.addLocalDfns(doc, (dfn for dfn in dfns if dfn.get("id") is not None))

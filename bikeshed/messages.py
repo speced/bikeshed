@@ -8,6 +8,9 @@ import lxml.html
 
 from . import constants, t
 
+if t.TYPE_CHECKING:
+    import io
+
 messages: set[str | tuple[str, str]]
 messages = set()
 
@@ -122,9 +125,9 @@ def failure(msg: str) -> None:
 
 
 def resetSeenMessages() -> None:
-    global messages  # noqa: PLW0603
+    global messages
     messages = set()
-    global messageCounts  # noqa: PLW0603
+    global messageCounts
     messageCounts = Counter()
 
 
@@ -228,13 +231,15 @@ def errorAndExit() -> None:
 
 
 @contextlib.contextmanager
-def messagesToFile(pathOrFh: str | io.TextIOWrapper, mode: str|None = None) -> t.Generator[io.TextIOWrapper, None, None]:
-    from . import constants
+def messagesToFile(
+    pathOrFh: str | io.TextIOWrapper,
+    mode: str | None = None,
+) -> t.Generator[io.TextIOWrapper, None, None]:
     if mode is None:
         mode = "plain"
 
     if isinstance(pathOrFh, str):
-        fh = open(pathOrFh, 'w', encoding='utf-8')
+        fh = open(pathOrFh, "w", encoding="utf-8")
     else:
         fh = pathOrFh
     global messageFh
@@ -254,7 +259,8 @@ def messagesToFile(pathOrFh: str | io.TextIOWrapper, mode: str|None = None) -> t
 @contextlib.contextmanager
 def messagesSilent() -> t.Generator[io.TextIOWrapper, None, None]:
     import os
-    fh = open(os.devnull, 'w', encoding='utf-8')
+
+    fh = open(os.devnull, "w", encoding="utf-8")
     global messageFh
     oldMessageFh = messageFh
     try:

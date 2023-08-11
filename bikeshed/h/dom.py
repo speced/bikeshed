@@ -227,7 +227,7 @@ def foldWhitespace(text: str) -> str:
 
 
 def sortElements(el: t.Iterable[t.ElementT]) -> list[t.ElementT]:
-    return list(sorted(el, key=lambda x:(x.get("bs-line-number", ""), textContent(x))))
+    return sorted(el, key=lambda x: (x.get("bs-line-number", ""), textContent(x)))
 
 
 def parseHTML(text: str) -> list[t.ElementT]:
