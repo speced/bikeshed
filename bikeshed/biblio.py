@@ -423,7 +423,7 @@ def findCloseBiblios(biblioKeys: t.Sequence[str], target: str, n: int = 5) -> li
     names: list[tuple[str, int]] = []
     superStrings: list[str] = []
 
-    for name in biblioKeys:
+    for name in sorted(biblioKeys):
         if target in name:
             superStrings.append(name)
         else:
