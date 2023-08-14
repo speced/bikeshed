@@ -1,60 +1,84 @@
 from __future__ import annotations
 
 import contextlib
+import dataclasses
+import io
 import sys
 from collections import Counter
 
 import lxml.html
 
-from . import constants, t
+from . import t
 
-if t.TYPE_CHECKING:
-    import io
+@dataclasses.dataclass
+class MessagesState:
+    dieOn: str = "fatal"
+    printMode: str = "console"
+    asciiOnly: bool = False
+    quiet: float = 0
+    fh: io.TextIOWrapper = t.cast("io.TextIOWrapper", sys.stdout)
+    seenMessages: set[str | tuple[str, str]] = dataclasses.field(default_factory=set)
+    categoryCounts: Counter[str] = dataclasses.field(default_factory=Counter)
 
-messages: set[str | tuple[str, str]]
-messages = set()
+    def record(self, category: str, message: str | tuple[str, str]) -> None:
+        self.categoryCounts[category] += 1
+        self.seenMessages.add(message)
 
-messageCounts: dict[str, int]
-messageCounts = Counter()
+    def replace(self, **kwargs: t.Any) -> MessagesState:
+        return dataclasses.replace(self, seenMessages=set(), categoryCounts=Counter(), **kwargs)
 
-messageFh = sys.stdout
+    def shouldDieFrom(self, category: str) -> bool:
+        levels = {
+            "nothing": 0,
+            "fatal": 1,
+            "link-error": 2,
+            "warning": 3,
+            "lint": 4,
+            "everything": 1000,
+        }
+        currentLevel = levels[self.dieOn]
+        queriedLevel = levels[category]
+        return currentLevel >= queriedLevel
+
+
+state = MessagesState()
 
 
 def p(msg: str | tuple[str, str], sep: str | None = None, end: str | None = None) -> None:
-    if constants.quiet == float("infinity"):
+    if state.quiet == float("infinity"):
         return
     if isinstance(msg, tuple):
         msg, ascii = msg
     else:
         ascii = msg.encode("ascii", "replace").decode()
-    if constants.asciiOnly:
+    if state.asciiOnly:
         msg = ascii
     try:
-        print(msg, sep=sep, end=end, file=messageFh)
+        print(msg, sep=sep, end=end, file=state.fh)
     except UnicodeEncodeError:
         if ascii is not None:
-            print(ascii, sep=sep, end=end, file=messageFh)
+            print(ascii, sep=sep, end=end, file=state.fh)
         else:
             warning = formatMessage(
                 "warning",
                 "Your console does not understand Unicode.\n  Messages may be slightly corrupted.",
             )
-            if warning not in messages:
-                print(warning, file=messageFh)
-                messages.add(warning)
-            print(msg.encode("ascii", "xmlcharrefreplace"), sep=sep, end=end, file=messageFh)
+            if warning not in state.seenMessages:
+                print(warning, file=state.fh)
+                state.record("warning", warning)
+            print(msg.encode("ascii", "xmlcharrefreplace"), sep=sep, end=end, file=state.fh)
 
 
 def die(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None) -> None:
     if lineNum is None and el is not None and el.get("bs-line-number"):
         lineNum = el.get("bs-line-number")
     formattedMsg = formatMessage("fatal", msg, lineNum=lineNum)
-    if formattedMsg not in messages:
-        messageCounts["fatal"] += 1
-        messages.add(formattedMsg)
-        if constants.quiet < 3:
+    if formattedMsg not in state.seenMessages:
+        state.categoryCounts["fatal"] += 1
+        state.seenMessages.add(formattedMsg)
+        if state.quiet < 3:
             p(formattedMsg)
-    if constants.errorLevelAt("fatal"):
+    if state.shouldDieFrom("fatal"):
         errorAndExit()
 
 
@@ -68,12 +92,11 @@ def linkerror(msg: str, el: t.ElementT | None = None, lineNum: str | int | None 
         else:
             suffix = "\n" + lxml.html.tostring(el, with_tail=False, encoding="unicode")
     formattedMsg = formatMessage("link", msg + suffix, lineNum=lineNum)
-    if formattedMsg not in messages:
-        messageCounts["link-error"] += 1
-        messages.add(formattedMsg)
-        if constants.quiet < 2:
+    if formattedMsg not in state.seenMessages:
+        state.record("link-error", formattedMsg)
+        if state.quiet < 2:
             p(formattedMsg)
-    if constants.errorLevelAt("link-error"):
+    if state.shouldDieFrom("link-error"):
         errorAndExit()
 
 
@@ -87,12 +110,11 @@ def lint(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = Non
         else:
             suffix = "\n" + lxml.html.tostring(el, with_tail=False, encoding="unicode")
     formattedMsg = formatMessage("lint", msg + suffix, lineNum=lineNum)
-    if formattedMsg not in messages:
-        messageCounts["lint"] += 1
-        messages.add(formattedMsg)
-        if constants.quiet < 1:
+    if formattedMsg not in state.seenMessages:
+        state.record("lint", formattedMsg)
+        if state.quiet < 1:
             p(formattedMsg)
-    if constants.errorLevelAt("lint"):
+    if state.shouldDieFrom("lint"):
         errorAndExit()
 
 
@@ -100,48 +122,40 @@ def warn(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = Non
     if lineNum is None and el is not None and el.get("bs-line-number"):
         lineNum = el.get("bs-line-number")
     formattedMsg = formatMessage("warning", msg, lineNum=lineNum)
-    if formattedMsg not in messages:
-        messageCounts["warning"] += 1
-        messages.add(formattedMsg)
-        if constants.quiet < 1:
+    if formattedMsg not in state.seenMessages:
+        state.record("warning", formattedMsg)
+        if state.quiet < 1:
             p(formattedMsg)
-    if constants.errorLevelAt("warning"):
+    if state.shouldDieFrom("warning"):
         errorAndExit()
 
 
 def say(msg: str) -> None:
-    if constants.quiet < 1:
+    if state.quiet < 1:
         p(formatMessage("message", msg))
 
 
 def success(msg: str) -> None:
-    if constants.quiet < 4:
+    if state.quiet < 4:
         p(formatMessage("success", msg))
 
 
 def failure(msg: str) -> None:
-    if constants.quiet < 4:
+    if state.quiet < 4:
         p(formatMessage("failure", msg))
-
-
-def resetSeenMessages() -> None:
-    global messages
-    messages = set()
-    global messageCounts
-    messageCounts = Counter()
 
 
 def retroactivelyCheckErrorLevel(level: str | None = None) -> bool:
     if level is None:
-        level = constants.getErrorLevel()
-    for levelName, msgCount in messageCounts.items():
-        if msgCount > 0 and constants.errorLevelAt(levelName):
+        level = state.dieOn
+    for levelName, msgCount in state.categoryCounts.items():
+        if msgCount > 0 and state.shouldDieFrom(levelName):
             errorAndExit()
     return True
 
 
 def printColor(text: str, color: str = "white", *styles: str) -> str:
-    if constants.printMode == "console":
+    if state.printMode == "console":
         colorsConverter = {
             "black": 30,
             "red": 31,
@@ -180,7 +194,7 @@ def printColor(text: str, color: str = "white", *styles: str) -> str:
 
 
 def formatMessage(type: str, text: str, lineNum: str | int | None = None) -> str | tuple[str, str]:
-    if constants.printMode == "markup":
+    if state.printMode == "markup":
         text = text.replace("<", "&lt;")
         if type == "fatal":
             return f"<fatal>{text}</fatal>"
@@ -231,41 +245,36 @@ def errorAndExit() -> None:
 
 
 @contextlib.contextmanager
-def messagesToFile(
-    pathOrFh: str | io.TextIOWrapper,
-    mode: str | None = None,
+def withMessageState(
+    fh: str | io.TextIOWrapper,
+    **kwargs: t.Any,
 ) -> t.Generator[io.TextIOWrapper, None, None]:
-    if mode is None:
-        mode = "plain"
-
-    if isinstance(pathOrFh, str):
-        fh = open(pathOrFh, "w", encoding="utf-8")
+    if isinstance(fh, str):
+        fhIsTemporary = True
+        fh = open(fh, "w", encoding="utf-8")
+        assert isinstance(fh, io.TextIOWrapper)
     else:
-        fh = pathOrFh
-    global messageFh
-    oldMessageFh = messageFh
-    oldPrintMode = constants.printMode
+        fhIsTemporary = False
+    global state
+    oldState = state
+    state = oldState.replace(fh=fh, **kwargs)
     try:
-        constants.printMode = mode
-        messageFh = fh
         yield fh
     finally:
-        constants.printMode = oldPrintMode
-        messageFh = oldMessageFh
-        if isinstance(pathOrFh, str):
+        state = oldState
+        if fhIsTemporary:
             fh.close()
 
 
 @contextlib.contextmanager
 def messagesSilent() -> t.Generator[io.TextIOWrapper, None, None]:
     import os
-
     fh = open(os.devnull, "w", encoding="utf-8")
-    global messageFh
-    oldMessageFh = messageFh
+    global state
+    oldState = state
+    state = oldState.replace(fh=fh)
     try:
-        messageFh = fh
         yield fh
     finally:
-        messageFh = oldMessageFh
+        state = oldState
         fh.close()

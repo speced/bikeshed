@@ -208,7 +208,7 @@ class MetadataManager:
             self.shortname = self.displayShortname.lower()
 
         if self.dieOn:
-            constants.setErrorLevel(self.dieOn)
+            m.state.dieOn = self.dieOn
 
     def validate(self) -> bool:
         if self.group == "byos":

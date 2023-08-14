@@ -106,10 +106,9 @@ def run(
         for path in pathProgress:
             testName = testNameForPath(path)
             pathProgress.text(testName)
-            m.resetSeenMessages()
             total += 1
             consoleFh = io.StringIO()
-            with m.messagesToFile(consoleFh) as _:
+            with m.withMessageState(fh=consoleFh, printMode="plain") as _:
                 doc = processTest(path, md)
                 testConsole = consoleFh.getvalue()
             testOutput = doc.serialize()
@@ -155,8 +154,7 @@ def rebase(
         for path in pathProgress:
             testName = testNameForPath(path)
             pathProgress.text(testName)
-            m.resetSeenMessages()
-            with m.messagesToFile(replaceExtension(path, ".console.txt")) as _:
+            with m.withMessageState(fh=replaceExtension(path, ".console.txt"), printMode="plain") as _:
                 doc = processTest(path, md)
             with m.messagesSilent() as _:
                 doc.finish(newline="\n")

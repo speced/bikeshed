@@ -423,19 +423,21 @@ def main() -> None:
 
     options, extras = argparser.parse_known_args()
 
-    constants.quiet = options.quiet
     if options.silent:
-        constants.quiet = float("infinity")
-    constants.setErrorLevel(options.errorLevel)
-    constants.dryRun = options.dryRun
-    constants.asciiOnly = options.asciiOnly
+        m.state.quiet = float("infinity")
+    else:
+        m.state.quiet = options.quiet
+    if options.errorLevel is not None:
+        m.state.dieOn = options.errorLevel
+    m.state.asciiOnly = options.asciiOnly
     if options.printMode is None:
         if "NO_COLOR" in os.environ or os.environ.get("TERM") == "dumb":
-            constants.printMode = "plain"
+            m.state.printMode = "plain"
         else:
-            constants.printMode = "console"
+            m.state.printMode = "console"
     else:
-        constants.printMode = options.printMode
+        m.state.printMode = options.printMode
+    constants.dryRun = options.dryRun
     constants.chroot = not options.allowNonlocalFiles
     constants.executeCode = options.allowExecute
 
@@ -536,7 +538,7 @@ def handleWatch(options: argparse.Namespace, extras: list[str]) -> None:
     from .Spec import Spec
 
     # Can't have an error killing the watcher
-    constants.setErrorLevel("nothing")
+    m.state.dieOn = "nothing"
     doc = Spec(inputFilename=options.infile, token=options.ghToken)
     if not doc.valid:
         m.die("Spec is in an invalid state; exitting.")
@@ -551,7 +553,7 @@ def handleServe(options: argparse.Namespace, extras: list[str]) -> None:
     from . import metadata
     from .Spec import Spec
 
-    constants.setErrorLevel("nothing")
+    m.state.dieOn = "nothing"
     doc = Spec(inputFilename=options.infile, token=options.ghToken)
     if not doc.valid:
         m.die("Spec is in an invalid state; exitting.")
@@ -566,8 +568,8 @@ def handleDebug(options: argparse.Namespace, extras: list[str]) -> None:
     from . import metadata
     from .Spec import Spec
 
-    constants.setErrorLevel("nothing")
-    constants.quiet = 2
+    m.state.dieOn = "nothing"
+    m.state.quiet = 2
     if options.printExports:
         doc = Spec(inputFilename=options.infile)
         doc.mdCommandLine = metadata.fromCommandLine(extras)
@@ -584,7 +586,7 @@ def handleDebug(options: argparse.Namespace, extras: list[str]) -> None:
         doc.preprocess()
         exec(f"print({options.code})")
     elif options.refreshData:
-        constants.quiet = 0
+        m.state.quiet = 0
         update.updateReadonlyDataFiles()
         m.warn("Don't forget to bump the version number!")
     elif options.printMetadata:
@@ -605,8 +607,8 @@ def handleRefs(options: argparse.Namespace, extras: list[str]) -> None:
     from .refs import ReferenceManager
     from .Spec import Spec
 
-    constants.setErrorLevel("nothing")
-    constants.quiet = 10
+    m.state.dieOn = "nothing"
+    m.state.quiet = 1000
     doc = Spec(inputFilename=options.infile)
     if doc.valid:
         doc.mdCommandLine = metadata.fromCommandLine(extras)
@@ -626,7 +628,7 @@ def handleRefs(options: argparse.Namespace, extras: list[str]) -> None:
         latestOnly=options.latestOnly,
         exact=options.exact,
     )
-    if constants.printMode == "json":
+    if m.state.printMode == "json":
         m.p(json.dumps(refs, indent=2, default=printjson.getjson))
     else:
         m.p(printjson.printjson(refs))
@@ -655,7 +657,7 @@ def handleTest(options: argparse.Namespace, extras: list[str]) -> None:
     from . import metadata, test
 
     md = metadata.fromCommandLine(extras)
-    constants.setErrorLevel("nothing")
+    m.state.dieOn = "nothing"
     filters = test.TestFilter.fromOptions(options)
     if options.rebase:
         test.rebase(filters, md=md)
