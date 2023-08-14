@@ -125,12 +125,13 @@ def run(
                 numPassed += 1
             else:
                 fails.append(testName)
+    except UnicodeEncodeError:
+        # On Windows, the alive_it() library throws this error
+        # *sometimes*. Can't figure out wth is going on.
+        pass
     except Exception as e:
         print(f"Python threw an error when running '{testName}':\n{e}")  # noqa: T201
-        if isinstance(e, UnicodeEncodeError):
-            pass
-        else:
-            raise e
+        raise e
     if numPassed == total:
         m.p(m.printColor("✔ All tests passed.", color="green"))
         return True
