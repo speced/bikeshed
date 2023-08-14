@@ -31,7 +31,8 @@ class TestFilter:
 
 
 def testPaths(filters: TestFilter) -> list[str]:
-    return list(sortTests(findTestFiles(filters)))
+    tests = list(sortTests(findTestFiles(filters)))
+    return tests
 
 
 def findTestFiles(filters: TestFilter) -> t.Generator[str, None, None]:
@@ -89,7 +90,7 @@ def sortTests(tests: t.Iterable[str]) -> t.Iterable[str]:
     return sorted(tests, key=lambda x: ("/" in testNameForPath(x), x))
 
 
-def runAllTests(
+def run(
     filters: TestFilter,
     md: t.MetadataManager | None = None,
 ) -> bool:
@@ -105,6 +106,7 @@ def runAllTests(
         for path in pathProgress:
             testName = testNameForPath(path)
             pathProgress.text(testName)
+            m.resetSeenMessages()
             total += 1
             consoleFh = io.StringIO()
             with m.messagesToFile(consoleFh) as _:
@@ -124,8 +126,8 @@ def runAllTests(
             else:
                 fails.append(testName)
     except Exception as e:
-        print(testName)  # noqa: T201
-        print(e)  # noqa: T201
+        print(f"Python threw an error when running '{testName}':\n{e}")  # noqa: T201
+        raise e
     if numPassed == total:
         m.p(m.printColor("✔ All tests passed.", color="green"))
         return True
@@ -134,6 +136,30 @@ def runAllTests(
     for fail in fails:
         m.p("* " + fail)
     return False
+
+
+def rebase(
+    filters: TestFilter,
+    md: t.MetadataManager | None = None,
+) -> bool:
+    paths = testPaths(filters)
+    if len(paths) == 0:
+        m.p("No tests were found.")
+        return True
+    pathProgress = alive_it(paths, dual_line=True, length=20)
+    try:
+        for path in pathProgress:
+            testName = testNameForPath(path)
+            pathProgress.text(testName)
+            m.resetSeenMessages()
+            with m.messagesToFile(replaceExtension(path, ".console.txt")) as _:
+                doc = processTest(path, md)
+            with m.messagesSilent() as _:
+                doc.finish(newline="\n")
+    except Exception as e:
+        print(f"Python threw an error when running '{testName}':\n{e}")  # noqa: T201
+        raise e
+    return True
 
 
 def processTest(
@@ -168,26 +194,6 @@ def compare(suspect: str, golden: str, path: str) -> bool:
             m.p(line)
     m.p("")
     return False
-
-
-def rebase(
-    filters: TestFilter,
-    md: t.MetadataManager | None = None,
-) -> bool:
-    paths = testPaths(filters)
-    if len(paths) == 0:
-        m.p("No tests were found.")
-        return True
-    pathProgress = alive_it(paths, dual_line=True, length=20)
-    for path in pathProgress:
-        name = testNameForPath(path)
-        pathProgress.text(name)
-        m.resetSeenMessages()
-        with m.messagesToFile(replaceExtension(path, ".console.txt")) as _:
-            doc = processTest(path, md)
-        with m.messagesSilent() as _:
-            doc.finish(newline="\n")
-    return True
 
 
 def addTestMetadata(doc: t.SpecT) -> None:

@@ -660,7 +660,7 @@ def handleTest(options: argparse.Namespace, extras: list[str]) -> None:
     if options.rebase:
         test.rebase(filters, md=md)
     else:
-        result = test.runAllTests(filters, md=md)
+        result = test.run(filters, md=md)
         sys.exit(0 if result else 1)
 
 
