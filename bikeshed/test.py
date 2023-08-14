@@ -127,7 +127,10 @@ def run(
                 fails.append(testName)
     except Exception as e:
         print(f"Python threw an error when running '{testName}':\n{e}")  # noqa: T201
-        raise e
+        if isinstance(e, UnicodeEncodeError):
+            pass
+        else:
+            raise e
     if numPassed == total:
         m.p(m.printColor("✔ All tests passed.", color="green"))
         return True
