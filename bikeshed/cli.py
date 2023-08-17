@@ -64,14 +64,14 @@ def main() -> None:
     argparser.add_argument(
         "--print",
         dest="printMode",
-        action="store",
+        choices=m.PRINT_MODES,
         default=None,
-        help="Print mode. Options are 'plain' (just text), 'console' (colored with console color codes), 'markup', and 'json'. Defaults to 'console'.",
+        help="How Bikeshed formats its message output. Options are 'plain' (just text), 'console' (text with console color codes), 'markup' (XML), and 'json' (JSON stream). Defaults to 'console'.",
     )
     argparser.add_argument(
         "--die-on",
         dest="errorLevel",
-        choices=["nothing", "fatal", "link-error", "warning", "everything"],
+        choices=list(m.MESSAGE_LEVELS.keys()),
         help="Determines what sorts of errors cause Bikeshed to die (quit immediately with an error status code). Default is 'fatal'; the -f flag is a shorthand for 'nothing'",
     )
     argparser.add_argument(
@@ -424,9 +424,10 @@ def main() -> None:
     options, extras = argparser.parse_known_args()
 
     if options.silent:
-        m.state.quiet = float("infinity")
+        m.state.printOn = "nothing"
+        m.state.silent = True
     else:
-        m.state.quiet = options.quiet
+        m.state.printOn = m.MessagesState.categoryName(options.quiet)
     if options.errorLevel is not None:
         m.state.dieOn = options.errorLevel
     m.state.asciiOnly = options.asciiOnly
@@ -569,7 +570,7 @@ def handleDebug(options: argparse.Namespace, extras: list[str]) -> None:
     from .Spec import Spec
 
     m.state.dieOn = "nothing"
-    m.state.quiet = 2
+    m.state.printOn = "fatal"
     if options.printExports:
         doc = Spec(inputFilename=options.infile)
         doc.mdCommandLine = metadata.fromCommandLine(extras)
@@ -586,7 +587,7 @@ def handleDebug(options: argparse.Namespace, extras: list[str]) -> None:
         doc.preprocess()
         exec(f"print({options.code})")
     elif options.refreshData:
-        m.state.quiet = 0
+        m.state.printOn = "everything"
         update.updateReadonlyDataFiles()
         m.warn("Don't forget to bump the version number!")
     elif options.printMetadata:
@@ -608,7 +609,7 @@ def handleRefs(options: argparse.Namespace, extras: list[str]) -> None:
     from .Spec import Spec
 
     m.state.dieOn = "nothing"
-    m.state.quiet = 1000
+    m.state.printOn = "nothing"
     doc = Spec(inputFilename=options.infile)
     if doc.valid:
         doc.mdCommandLine = metadata.fromCommandLine(extras)
