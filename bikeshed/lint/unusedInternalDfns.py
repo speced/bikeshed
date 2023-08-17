@@ -26,6 +26,6 @@ def unusedInternalDfns(doc: t.SpecT) -> None:
     for el in noexportDfns:
         if el.get("id") not in localHrefs:
             m.lint(
-                f"Unexported dfn that's not referenced locally - did you mean to export it?\n{h.outerHTML(el)}",
+                f"Unexported dfn that's not referenced locally - did you mean to export it?",
                 el=el,
             )
