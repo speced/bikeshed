@@ -28,7 +28,7 @@ PRINT_MODES = [
 ]
 
 
-@dataclasses.dataclass(kw_only=True)
+@dataclasses.dataclass()
 class MessagesState:
     # What message category (or higher) to stop processing on
     dieOn: str = "fatal"
