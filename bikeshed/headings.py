@@ -47,12 +47,12 @@ def addHeadingIds(doc: t.SpecT, headings: list[t.ElementT]) -> None:
     if len(neededIds) == 0:
         pass
     elif 1 <= len(neededIds) <= 5:
-        for el in neededIds:
+        for el in h.sortElements(neededIds):
             m.warn(f"The heading '{h.textContent(el)}' needs a manually-specified ID.", el=el)
     else:
         m.warn(
             "You should manually provide IDs for your headings:\n"
-            + "\n".join("  " + h.textContent(el) for el in neededIds),
+            + "\n".join("  " + h.textContent(el) for el in h.sortElements(neededIds)),
         )
 
 

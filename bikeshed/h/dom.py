@@ -226,6 +226,10 @@ def foldWhitespace(text: str) -> str:
     return re.sub(r"(\s|\xa0)+", " ", text)
 
 
+def sortElements(el: t.Iterable[t.ElementT]) -> list[t.ElementT]:
+    return sorted(el, key=lambda x: (x.get("bs-line-number", ""), textContent(x)))
+
+
 def parseHTML(text: str) -> list[t.ElementT]:
     doc = html5lib.parse(text, treebuilder="lxml", namespaceHTMLElements=False)
     head = doc.getroot()[0]
@@ -930,8 +934,8 @@ def dedupIDs(doc: t.SpecT) -> None:
 
 
 def approximateLineNumber(el: t.ElementT, setIntermediate: bool = True) -> str | None:
-    if el.get("line-number"):
-        return el.get("line-number")
+    if el.get("bs-line-number"):
+        return el.get("bs-line-number")
     parent = parentElement(el)
     if not isElement(parent):
         if el.tag == "html":
@@ -943,7 +947,7 @@ def approximateLineNumber(el: t.ElementT, setIntermediate: bool = True) -> str |
     if approx[0].isdigit():
         approx = "~" + approx
     if setIntermediate:
-        el.set("line-number", approx)
+        el.set("bs-line-number", approx)
     return approx
 
 

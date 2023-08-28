@@ -66,6 +66,7 @@ from .dom import (
     scopingElements,
     sectionName,
     serializeTag,
+    sortElements,
     tagName,
     textContent,
     textContentIgnoringDecorative,

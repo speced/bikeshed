@@ -64,14 +64,14 @@ def main() -> None:
     argparser.add_argument(
         "--print",
         dest="printMode",
-        action="store",
+        choices=m.PRINT_MODES,
         default=None,
-        help="Print mode. Options are 'plain' (just text), 'console' (colored with console color codes), 'markup', and 'json'. Defaults to 'console'.",
+        help="How Bikeshed formats its message output. Options are 'plain' (just text), 'console' (text with console color codes), 'markup' (XML), and 'json' (JSON stream). Defaults to 'console'.",
     )
     argparser.add_argument(
         "--die-on",
         dest="errorLevel",
-        choices=["nothing", "fatal", "link-error", "warning", "everything"],
+        choices=list(m.MESSAGE_LEVELS.keys()),
         help="Determines what sorts of errors cause Bikeshed to die (quit immediately with an error status code). Default is 'fatal'; the -f flag is a shorthand for 'nothing'",
     )
     argparser.add_argument(
@@ -365,7 +365,7 @@ def main() -> None:
         help="Rebase the specified files.",
     )
     testParser.add_argument(
-        "--manual-only",
+        "--manual",
         dest="manualOnly",
         default=False,
         action="store_true",
@@ -373,17 +373,17 @@ def main() -> None:
     )
     testParser.add_argument(
         "--folder",
-        dest="folder",
+        dest="folders",
         default=None,
         nargs="+",
-        help="Only work on tests whose paths contain any of these folder names.",
+        help="Only run tests whose paths contain any of these folder names.",
     )
     testParser.add_argument(
-        "testFiles",
-        default=[],
-        metavar="FILE",
-        nargs="*",
-        help="Run these tests. If called with no args, tests everything.",
+        "--file",
+        dest="files",
+        default=None,
+        nargs="+",
+        help="Only run tests whose filenames contain any of these strings as substrings.",
     )
 
     profileParser = subparsers.add_parser(
@@ -423,19 +423,22 @@ def main() -> None:
 
     options, extras = argparser.parse_known_args()
 
-    constants.quiet = options.quiet
     if options.silent:
-        constants.quiet = float("infinity")
-    constants.setErrorLevel(options.errorLevel)
-    constants.dryRun = options.dryRun
-    constants.asciiOnly = options.asciiOnly
+        m.state.printOn = "nothing"
+        m.state.silent = True
+    else:
+        m.state.printOn = m.MessagesState.categoryName(options.quiet)
+    if options.errorLevel is not None:
+        m.state.dieOn = options.errorLevel
+    m.state.asciiOnly = options.asciiOnly
     if options.printMode is None:
         if "NO_COLOR" in os.environ or os.environ.get("TERM") == "dumb":
-            constants.printMode = "plain"
+            m.state.printMode = "plain"
         else:
-            constants.printMode = "console"
+            m.state.printMode = "console"
     else:
-        constants.printMode = options.printMode
+        m.state.printMode = options.printMode
+    constants.dryRun = options.dryRun
     constants.chroot = not options.allowNonlocalFiles
     constants.executeCode = options.allowExecute
 
@@ -536,7 +539,7 @@ def handleWatch(options: argparse.Namespace, extras: list[str]) -> None:
     from .Spec import Spec
 
     # Can't have an error killing the watcher
-    constants.setErrorLevel("nothing")
+    m.state.dieOn = "nothing"
     doc = Spec(inputFilename=options.infile, token=options.ghToken)
     if not doc.valid:
         m.die("Spec is in an invalid state; exitting.")
@@ -551,7 +554,7 @@ def handleServe(options: argparse.Namespace, extras: list[str]) -> None:
     from . import metadata
     from .Spec import Spec
 
-    constants.setErrorLevel("nothing")
+    m.state.dieOn = "nothing"
     doc = Spec(inputFilename=options.infile, token=options.ghToken)
     if not doc.valid:
         m.die("Spec is in an invalid state; exitting.")
@@ -566,8 +569,8 @@ def handleDebug(options: argparse.Namespace, extras: list[str]) -> None:
     from . import metadata
     from .Spec import Spec
 
-    constants.setErrorLevel("nothing")
-    constants.quiet = 2
+    m.state.dieOn = "nothing"
+    m.state.printOn = "fatal"
     if options.printExports:
         doc = Spec(inputFilename=options.infile)
         doc.mdCommandLine = metadata.fromCommandLine(extras)
@@ -584,7 +587,7 @@ def handleDebug(options: argparse.Namespace, extras: list[str]) -> None:
         doc.preprocess()
         exec(f"print({options.code})")
     elif options.refreshData:
-        constants.quiet = 0
+        m.state.printOn = "everything"
         update.updateReadonlyDataFiles()
         m.warn("Don't forget to bump the version number!")
     elif options.printMetadata:
@@ -605,8 +608,8 @@ def handleRefs(options: argparse.Namespace, extras: list[str]) -> None:
     from .refs import ReferenceManager
     from .Spec import Spec
 
-    constants.setErrorLevel("nothing")
-    constants.quiet = 10
+    m.state.dieOn = "nothing"
+    m.state.printOn = "nothing"
     doc = Spec(inputFilename=options.infile)
     if doc.valid:
         doc.mdCommandLine = metadata.fromCommandLine(extras)
@@ -626,7 +629,7 @@ def handleRefs(options: argparse.Namespace, extras: list[str]) -> None:
         latestOnly=options.latestOnly,
         exact=options.exact,
     )
-    if constants.printMode == "json":
+    if m.state.printMode == "json":
         m.p(json.dumps(refs, indent=2, default=printjson.getjson))
     else:
         m.p(printjson.printjson(refs))
@@ -655,13 +658,12 @@ def handleTest(options: argparse.Namespace, extras: list[str]) -> None:
     from . import metadata, test
 
     md = metadata.fromCommandLine(extras)
-    constants.setErrorLevel("nothing")
-    constants.quiet = 100
+    m.state.dieOn = "nothing"
     filters = test.TestFilter.fromOptions(options)
     if options.rebase:
         test.rebase(filters, md=md)
     else:
-        result = test.runAllTests(filters, md=md)
+        result = test.run(filters, md=md)
         sys.exit(0 if result else 1)
 
 

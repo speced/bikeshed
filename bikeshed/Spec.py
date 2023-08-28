@@ -209,10 +209,14 @@ class Spec:
         if "mixed-indents" in self.md.complainAbout:
             if self.md.indentInfo and self.md.indentInfo.char:
                 checkForMixedIndents(self.lines, self.md.indentInfo)
-            else:
+            elif len(self.lines) > 50:
+                # Only complain about a failed inference if it's long
+                # enough that I could reasonably infer something.
                 m.warn(
                     "`Complain About: mixed-indents yes` is active, but I couldn't infer the document's indentation. Be more consistent, or turn this lint off.",
                 )
+            else:
+                pass
 
         # Deal with further <pre> blocks, and markdown
         self.lines = datablocks.transformDataBlocks(self, self.lines)
@@ -387,9 +391,9 @@ class Spec:
 
     def printResultMessage(self) -> None:
         # If I reach this point, I've succeeded, but maybe with reservations.
-        fatals = m.messageCounts["fatal"]
-        links = m.messageCounts["linkerror"]
-        warnings = m.messageCounts["warning"]
+        fatals = m.state.categoryCounts["fatal"]
+        links = m.state.categoryCounts["linkerror"]
+        warnings = m.state.categoryCounts["warning"]
         if self.lineNumbers:
             m.warn("Because --line-numbers was used, no output was saved.")
         if fatals:
@@ -446,7 +450,7 @@ class Spec:
                     # stops existing, and it's fine to rebuild if an mtime
                     # somehow gets older.
                     if any(input.mtime() != lastModified for input, lastModified in lastInputModified.items()):
-                        m.resetSeenMessages()
+                        m.state = m.state.replace()
                         m.p("\nSource file modified. Rebuilding...")
                         self.initializeState()
                         self.mdCommandLine = mdCommandLine
@@ -501,7 +505,7 @@ class Spec:
 def printDone() -> None:
     contents = f"Finished at {datetime.now().strftime('%H:%M:%S %b-%d-%Y')}"
     contentLen = len(contents) + 2
-    if not constants.asciiOnly:
+    if not m.state.asciiOnly:
         m.p(f"╭{'─'*contentLen}╮")
         m.p(f"│ {contents} │")
         m.p(f"╰{'─'*contentLen}╯")

@@ -1,60 +1,124 @@
 from __future__ import annotations
 
+import contextlib
+import dataclasses
+import io
 import sys
 from collections import Counter
 
 import lxml.html
 
-from . import constants, t
+from . import t
 
-messages: set[str | tuple[str, str]]
-messages = set()
+MESSAGE_LEVELS = {
+    "everything": 0,
+    "message": 1,
+    "lint": 2,
+    "warning": 3,
+    "link-error": 4,
+    "fatal": 5,
+    "nothing": 6,
+}
 
-messageCounts: dict[str, int]
-messageCounts = Counter()
+PRINT_MODES = [
+    "plain",
+    "console",
+    "markup",
+    "json",
+]
+
+
+@dataclasses.dataclass()
+class MessagesState:
+    # What message category (or higher) to stop processing on
+    dieOn: str = "fatal"
+    # What message category (or higher) to print
+    printOn: str = "everything"
+    # Suppress *all* categories, *plus* the final success/fail message
+    silent: bool = False
+    #
+    printMode: str = "console"
+    asciiOnly: bool = False
+    fh: io.TextIOWrapper = t.cast("io.TextIOWrapper", sys.stdout)  # noqa: RUF009
+    seenMessages: set[str | tuple[str, str]] = dataclasses.field(default_factory=set)
+    categoryCounts: Counter[str] = dataclasses.field(default_factory=Counter)
+
+    def record(self, category: str, message: str | tuple[str, str]) -> None:
+        self.categoryCounts[category] += 1
+        self.seenMessages.add(message)
+
+    def replace(self, **kwargs: t.Any) -> MessagesState:
+        return dataclasses.replace(self, seenMessages=set(), categoryCounts=Counter(), **kwargs)
+
+    def shouldDie(self, category: str) -> bool:
+        deathLevel = MESSAGE_LEVELS[self.dieOn]
+        queriedLevel = MESSAGE_LEVELS[category]
+        return queriedLevel >= deathLevel
+
+    def shouldPrint(self, category: str) -> bool:
+        if self.silent:
+            return False
+        if category in ("success", "failure"):
+            return True
+        printLevel = MESSAGE_LEVELS[self.printOn]
+        queriedLevel = MESSAGE_LEVELS[category]
+        return queriedLevel >= printLevel
+
+    @staticmethod
+    def categoryName(categoryNum: int) -> str:
+        assert categoryNum >= 0
+        if categoryNum >= len(MESSAGE_LEVELS):
+            return "nothing"
+        return list(MESSAGE_LEVELS.keys())[categoryNum]
+
+
+state = MessagesState()
 
 
 def p(msg: str | tuple[str, str], sep: str | None = None, end: str | None = None) -> None:
-    if constants.quiet == float("infinity"):
-        return
     if isinstance(msg, tuple):
         msg, ascii = msg
     else:
         ascii = msg.encode("ascii", "replace").decode()
-    if constants.asciiOnly:
+    if state.asciiOnly:
         msg = ascii
     try:
-        print(msg, sep=sep, end=end)
+        print(msg, sep=sep, end=end, file=state.fh)
     except UnicodeEncodeError:
         if ascii is not None:
-            print(ascii, sep=sep, end=end)
+            print(ascii, sep=sep, end=end, file=state.fh)
         else:
             warning = formatMessage(
                 "warning",
                 "Your console does not understand Unicode.\n  Messages may be slightly corrupted.",
             )
-            if warning not in messages:
-                print(warning)
-                messages.add(warning)
-            print(msg.encode("ascii", "xmlcharrefreplace"), sep=sep, end=end)
+            if warning not in state.seenMessages:
+                print(warning, file=state.fh)
+                state.record("warning", warning)
+            print(msg.encode("ascii", "xmlcharrefreplace"), sep=sep, end=end, file=state.fh)
+
+
+def getLineNum(lineNum: str | int | None = None, el: t.ElementT | None = None) -> str | int | None:
+    if lineNum is not None:
+        return lineNum
+    if el is not None and el.get("bs-line-number"):
+        return el.get("bs-line-number", "")
+    return None
 
 
 def die(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None) -> None:
-    if lineNum is None and el is not None and el.get("line-number"):
-        lineNum = el.get("line-number")
+    lineNum = getLineNum(lineNum, el)
     formattedMsg = formatMessage("fatal", msg, lineNum=lineNum)
-    if formattedMsg not in messages:
-        messageCounts["fatal"] += 1
-        messages.add(formattedMsg)
-        if constants.quiet < 3:
+    if formattedMsg not in state.seenMessages:
+        state.record("fatal", formattedMsg)
+        if state.shouldPrint("fatal"):
             p(formattedMsg)
-    if constants.errorLevelAt("fatal"):
+    if state.shouldDie("fatal"):
         errorAndExit()
 
 
 def linkerror(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None) -> None:
-    if lineNum is None and el is not None and el.get("line-number"):
-        lineNum = el.get("line-number")
+    lineNum = getLineNum(lineNum, el)
     suffix = ""
     if el is not None:
         if el.get("bs-autolink-syntax"):
@@ -62,18 +126,16 @@ def linkerror(msg: str, el: t.ElementT | None = None, lineNum: str | int | None 
         else:
             suffix = "\n" + lxml.html.tostring(el, with_tail=False, encoding="unicode")
     formattedMsg = formatMessage("link", msg + suffix, lineNum=lineNum)
-    if formattedMsg not in messages:
-        messageCounts["link-error"] += 1
-        messages.add(formattedMsg)
-        if constants.quiet < 2:
+    if formattedMsg not in state.seenMessages:
+        state.record("link-error", formattedMsg)
+        if state.shouldPrint("link-error"):
             p(formattedMsg)
-    if constants.errorLevelAt("link-error"):
+    if state.shouldDie("link-error"):
         errorAndExit()
 
 
 def lint(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None) -> None:
-    if lineNum is None and el is not None and el.get("line-number"):
-        lineNum = el.get("line-number")
+    lineNum = getLineNum(lineNum, el)
     suffix = ""
     if el is not None:
         if el.get("bs-autolink-syntax"):
@@ -81,61 +143,52 @@ def lint(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = Non
         else:
             suffix = "\n" + lxml.html.tostring(el, with_tail=False, encoding="unicode")
     formattedMsg = formatMessage("lint", msg + suffix, lineNum=lineNum)
-    if formattedMsg not in messages:
-        messageCounts["lint"] += 1
-        messages.add(formattedMsg)
-        if constants.quiet < 1:
+    if formattedMsg not in state.seenMessages:
+        state.record("lint", formattedMsg)
+        if state.shouldPrint("lint"):
             p(formattedMsg)
-    if constants.errorLevelAt("lint"):
+    if state.shouldDie("lint"):
         errorAndExit()
 
 
 def warn(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None) -> None:
-    if lineNum is None and el is not None and el.get("line-number"):
-        lineNum = el.get("line-number")
+    if lineNum is None and el is not None and el.get("bs-line-number"):
+        lineNum = el.get("bs-line-number")
     formattedMsg = formatMessage("warning", msg, lineNum=lineNum)
-    if formattedMsg not in messages:
-        messageCounts["warning"] += 1
-        messages.add(formattedMsg)
-        if constants.quiet < 1:
+    if formattedMsg not in state.seenMessages:
+        state.record("warning", formattedMsg)
+        if state.shouldPrint("warning"):
             p(formattedMsg)
-    if constants.errorLevelAt("warning"):
+    if state.shouldDie("warning"):
         errorAndExit()
 
 
 def say(msg: str) -> None:
-    if constants.quiet < 1:
+    if state.shouldPrint("message"):
         p(formatMessage("message", msg))
 
 
 def success(msg: str) -> None:
-    if constants.quiet < 4:
+    if state.shouldPrint("success"):
         p(formatMessage("success", msg))
 
 
 def failure(msg: str) -> None:
-    if constants.quiet < 4:
+    if state.shouldPrint("failure"):
         p(formatMessage("failure", msg))
-
-
-def resetSeenMessages() -> None:
-    global messages  # noqa: PLW0603
-    messages = set()
-    global messageCounts  # noqa: PLW0603
-    messageCounts = Counter()
 
 
 def retroactivelyCheckErrorLevel(level: str | None = None) -> bool:
     if level is None:
-        level = constants.getErrorLevel()
-    for levelName, msgCount in messageCounts.items():
-        if msgCount > 0 and constants.errorLevelAt(levelName):
+        level = state.dieOn
+    for levelName, msgCount in state.categoryCounts.items():
+        if msgCount > 0 and state.shouldDie(levelName):
             errorAndExit()
     return True
 
 
 def printColor(text: str, color: str = "white", *styles: str) -> str:
-    if constants.printMode == "console":
+    if state.printMode == "console":
         colorsConverter = {
             "black": 30,
             "red": 31,
@@ -174,7 +227,7 @@ def printColor(text: str, color: str = "white", *styles: str) -> str:
 
 
 def formatMessage(type: str, text: str, lineNum: str | int | None = None) -> str | tuple[str, str]:
-    if constants.printMode == "markup":
+    if state.printMode == "markup":
         text = text.replace("<", "&lt;")
         if type == "fatal":
             return f"<fatal>{text}</fatal>"
@@ -222,3 +275,40 @@ def formatMessage(type: str, text: str, lineNum: str | int | None = None) -> str
 def errorAndExit() -> None:
     failure("Did not generate, due to errors exceeding the allowed error level.")
     sys.exit(2)
+
+
+@contextlib.contextmanager
+def withMessageState(
+    fh: str | io.TextIOWrapper,
+    **kwargs: t.Any,
+) -> t.Generator[io.TextIOWrapper, None, None]:
+    if isinstance(fh, str):
+        fhIsTemporary = True
+        fh = open(fh, "w", encoding="utf-8")
+        assert isinstance(fh, io.TextIOWrapper)
+    else:
+        fhIsTemporary = False
+    global state
+    oldState = state
+    state = oldState.replace(fh=fh, **kwargs)
+    try:
+        yield fh
+    finally:
+        state = oldState
+        if fhIsTemporary:
+            fh.close()
+
+
+@contextlib.contextmanager
+def messagesSilent() -> t.Generator[io.TextIOWrapper, None, None]:
+    import os
+
+    fh = open(os.devnull, "w", encoding="utf-8")
+    global state
+    oldState = state
+    state = oldState.replace(fh=fh)
+    try:
+        yield fh
+    finally:
+        state = oldState
+        fh.close()

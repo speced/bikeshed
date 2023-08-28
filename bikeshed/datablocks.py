@@ -255,7 +255,7 @@ def transformSimpleDef(lines: list[str], tagName: str, firstLine: str, lineNum: 
     rows = parseDefBlock(lines, "simpledef", doc=doc)
     lineNumAttr = ""
     if lineNum is not None:
-        lineNumAttr = f" line-number={lineNum}"
+        lineNumAttr = f" bs-line-number={lineNum}"
     ret = [f"<table class='def'{lineNumAttr}>"]
     for key, val in rows.items():
         ret.append(f"<tr><th>{key}<td>{val}")
@@ -280,7 +280,7 @@ def transformPropdef(lines: list[str], tagName: str, firstLine: str, lineNum: in
         forHint = " data-link-for-hint='{}'".format(parsedAttrs["Name"].split(",")[0].strip())
     lineNumAttr = ""
     if lineNum is not None:
-        lineNumAttr = f" line-number={lineNum}"
+        lineNumAttr = f" bs-line-number={lineNum}"
     if "partial" in firstLine or "New values" in parsedAttrs:
         attrs["Name"] = None
         attrs["New values"] = None
@@ -381,7 +381,7 @@ def transformPropdef(lines: list[str], tagName: str, firstLine: str, lineNum: in
 def transformDescdef(lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT) -> list[str]:
     lineNumAttr = ""
     if lineNum is not None:
-        lineNumAttr = f" line-number={lineNum}"
+        lineNumAttr = f" bs-line-number={lineNum}"
     vals = parseDefBlock(lines, "descdef", doc=doc)
     if "partial" in firstLine or "New values" in vals:
         requiredKeys = ["Name", "For"]
@@ -432,7 +432,7 @@ def transformDescdef(lines: list[str], tagName: str, firstLine: str, lineNum: in
 def transformElementdef(lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT) -> list[str]:
     lineNumAttr = ""
     if lineNum is not None:
-        lineNumAttr = f" line-number={lineNum}"
+        lineNumAttr = f" bs-line-number={lineNum}"
     attrs: OrderedDict[str, str | None] = OrderedDict()
     parsedAttrs = parseDefBlock(lines, "elementdef", doc=doc)
     if "Attribute groups" in parsedAttrs or "Attributes" in parsedAttrs:
@@ -522,7 +522,7 @@ def transformArgumentdef(
 ) -> list[str]:
     lineNumAttr = ""
     if lineNum is not None:
-        lineNumAttr = f" line-number={lineNum}"
+        lineNumAttr = f" bs-line-number={lineNum}"
     attrs = parseDefBlock(lines, "argumentdef", doc=doc, capitalizeKeys=False, lineNum=lineNum)
     el = h.parseHTML(firstLine + "</pre>")[0]
     if "for" in el.attrib:
@@ -891,7 +891,7 @@ def processInfo(infos: InfoTreeT, doc: t.SpecT, lineNum: int | None = None) -> N
 def transformInclude(lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT) -> list[str]:
     lineNumAttr = ""
     if lineNum is not None:
-        lineNumAttr = f" line-number={lineNum}"
+        lineNumAttr = f" bs-line-number={lineNum}"
     infos = parseInfoTree(lines, doc.md.indent, lineNum)
     path = None
     macros = {}
@@ -934,7 +934,7 @@ def transformIncludeCode(
 ) -> list[str]:
     lineNumAttr = ""
     if lineNum is not None:
-        lineNumAttr = f" line-number={lineNum}"
+        lineNumAttr = f" bs-line-number={lineNum}"
     infos = parseInfoTree(lines, doc.md.indent, lineNum)
     path = None
     highlight = None
@@ -998,7 +998,7 @@ def transformIncludeCode(
 def transformIncludeRaw(lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT) -> list[str]:
     lineNumAttr = ""
     if lineNum is not None:
-        lineNumAttr = f" line-number={lineNum}"
+        lineNumAttr = f" bs-line-number={lineNum}"
     infos = parseInfoTree(lines, doc.md.indent, lineNum)
     path = None
     for info in infos:

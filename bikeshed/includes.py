@@ -46,6 +46,10 @@ def handleBikeshedInclude(el: t.ElementT, doc: t.SpecT) -> None:
         doc.recordDependencies(includedInputSource)
         try:
             lines = includedInputSource.read().rawLines
+        except FileNotFoundError:
+            m.die(f"Couldn't find include file '{path}'.", el=el)
+            h.removeNode(el)
+            return
         except Exception as err:
             m.die(f"Couldn't find include file '{path}'. Error was:\n{err}", el=el)
             h.removeNode(el)
@@ -107,6 +111,10 @@ def handleCodeInclude(el: t.ElementT, doc: t.SpecT) -> None:
     doc.recordDependencies(includedInputSource)
     try:
         lines = includedInputSource.read().rawLines
+    except FileNotFoundError:
+        m.die(f"Couldn't find include-code file '{path}'.", el=el)
+        h.removeNode(el)
+        return
     except Exception as err:
         m.die(f"Couldn't find include-code file '{path}'. Error was:\n{err}", el=el)
         h.removeNode(el)
@@ -150,6 +158,10 @@ def handleRawInclude(el: t.ElementT, doc: t.SpecT) -> None:
     doc.recordDependencies(includedInputSource)
     try:
         content = includedInputSource.read().content
+    except FileNotFoundError:
+        m.die(f"Couldn't find include-raw file '{path}'.", el=el)
+        h.removeNode(el)
+        return
     except Exception as err:
         m.die(f"Couldn't find include-raw file '{path}'. Error was:\n{err}", el=el)
         h.removeNode(el)

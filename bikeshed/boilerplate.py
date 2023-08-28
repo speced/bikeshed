@@ -328,7 +328,7 @@ def addIndexOfLocallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> None:
     h.appendChild(container, indexHTML, allowEmpty=True)
 
 
-def disambiguator(ref: r.RefWrapper, types: set[str] | None, specs: set[str] | None) -> str:
+def disambiguator(ref: r.RefWrapper, types: set[str] | None, specs: list[str] | None) -> str:
     disambInfo = []
     if types is None or len(types) > 1:
         disambInfo.append(ref.type)
@@ -365,7 +365,7 @@ def addExplicitIndexes(doc: t.SpecT) -> None:
 
         if el.get("data-link-spec"):
             # Yes, this is dumb. Accidental over-firing of a shortcut attribute. >_<
-            specs = {x.strip() for x in el.get("data-link-spec", "").split(",")}
+            specs = sorted({x.strip() for x in el.get("data-link-spec", "").split(",")})
             for s in list(specs):
                 if s not in doc.refs.specs:
                     m.die(f"Unknown spec name '{s}' on {h.outerHTML(el)}", el=el)
