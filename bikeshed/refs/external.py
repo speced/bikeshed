@@ -52,7 +52,7 @@ class ExternalRefsGroup:
 
     def single(self) -> t.RefWrapper:
         if len(self.valuesByFor) == 1:
-            return list(self.valuesByFor.values())[0]
+            return next(iter(self.valuesByFor.values()))
         else:
             msg = f"There are {len(self.valuesByFor)} values, not just 1."
             raise IndexError(msg)

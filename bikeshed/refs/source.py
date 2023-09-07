@@ -9,6 +9,8 @@ from .. import config, constants, retrieve, t
 from .. import messages as m
 from . import utils, wrapper
 
+LAZY_LOADED_SOURCES: list[str] = ["foreign"]
+
 
 class RefSource:
     __slots__ = [
@@ -24,7 +26,6 @@ class RefSource:
     ]
 
     # Which sources use lazy-loading; other sources always have all their refs loaded immediately.
-    lazyLoadedSources: list[str] = ["foreign"]
 
     def __init__(
         self,
@@ -62,7 +63,7 @@ class RefSource:
         if key in self.refs:
             return self.refs[key]
 
-        if self.source not in self.lazyLoadedSources:
+        if self.source not in LAZY_LOADED_SOURCES:
             return []
 
         group = config.groupFromKey(key)
@@ -78,7 +79,7 @@ class RefSource:
     def fetchAllRefs(self) -> list[tuple[str, list[t.RefWrapper]]]:
         """Nuts to lazy-loading, just load everything at once."""
 
-        if self.source not in self.lazyLoadedSources:
+        if self.source not in LAZY_LOADED_SOURCES:
             return list(self.refs.items())
 
         for file in self.dataFile.walkFiles("anchors"):

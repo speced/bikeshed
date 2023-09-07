@@ -406,7 +406,7 @@ def coloredTextFromRawTokens(text: str) -> t.Deque[ColoredText]:
             continue
         tokenName, _, tokenTextRepr = line.partition("\t")
         color = colorFromName.get(tokenName, None)
-        text = eval(tokenTextRepr)
+        text = eval(tokenTextRepr)  # noqa: S307
         if not text:
             continue
         if not currentCT:

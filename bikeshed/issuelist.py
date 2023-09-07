@@ -46,7 +46,7 @@ def printIssueList(infilename: str | None = None, outfilename: str | None = None
     else:
         for suffix in [".txt", "txt", ""]:
             try:
-                infile = open(infilename + suffix, encoding="utf-8")  # noqa: #SIM115
+                infile = open(infilename + suffix, encoding="utf-8")  # noqa: SIM115
                 infilename += suffix
                 break
             except Exception:  # noqa: S110
