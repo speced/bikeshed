@@ -252,7 +252,7 @@ def transformPre(lines: list[str], tagName: str, firstLine: str, lineNum: int | 
 
 
 def transformSimpleDef(lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT) -> list[str]:
-    rows = parseDefBlock(lines, "simpledef", doc=doc)
+    rows = parseDefBlock(lines, "simpledef", capitalizeKeys=False, doc=doc)
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = f" bs-line-number={lineNum}"
