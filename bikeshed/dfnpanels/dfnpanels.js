@@ -2,7 +2,11 @@
 {
     const dfnsJson = window.dfnsJson || {};
 
-    const wrapperSyntax = {
+    // Functions, divided by link type, that wrap an autolink's
+    // contents with the appropriate outer syntax.
+    // Alternately, a string naming another type they format
+    // the same as.
+    const typeFormatters = {
         'dfn': (text) => `[=${text}=]`,
         'abstract-op': (text) => `[\$${text}\$]`,
         'value': (text) => `''${text}''`,
@@ -27,67 +31,149 @@
         'maplike': 'idl',
         'setlike': 'idl',
         'extended-attribute': 'idl',
-        'event': 'idl',  // Not in bikeshed doc
+        'event': 'idl',
         'element': (element) => `<{${element}}>`,
         'element-state': 'element',
         'element-attr': 'element',
         'attr-value': 'element',
         'scheme': 'dfn',
         'permission': 'dfn',
-        'grammar': (text) => `grammar? '${text}'`,
-        'type': 'dfn',
-        'css': (text) => `'${text}'`, // property or descriptor
-        'css?': (text) => `''${text}''`, // anything else 'value'
-        'production': (text) => `<<${text}>>`,
-        'property': (text) => `<<'${text}'>>`, // property or descriptor
+        'grammar': (text) => `${text} (within a <pre class=prod>)`,
+        'type': (text)=> `<<${text}>>`,
+        'property': (text) => `'${text}'`,
         'descriptor': 'property',
-        'function': (text) => `<<${text}()>>`,
-        'at-rule': (text) => `<<@${text}>>`,
-        'selector': 'css',
+        'function': 'value',
+        'at-rule': 'value',
+        'selector': 'value',
+    };
+    const typesUsingFor = new Set(
+        [
+            "descriptor",
+            "value",
+            "element-attr",
+            "attr-value",
+            "element-state",
+            "method",
+            "constructor",
+            "argument",
+            "attribute",
+            "const",
+            "dict-member",
+            "event",
+            "enum-value",
+            "stringifier",
+            "serializer",
+            "iterator",
+            "maplike",
+            "setlike",
+            "state",
+            "mode",
+            "context",
+            "facet",
+        ],
+    )
+    const typesNotUsingFor = new Set(
+        [
+            "property",
+            "element",
+            "interface",
+            "namespace",
+            "callback",
+            "dictionary",
+            "enum",
+            "exception",
+            "typedef",
+            "http-header",
+            "permission",
+        ],
+    )
+    function linkFormatterFromType(type) {
+        const fnOrType = typeFormatters[type];
+        if(typeof fnOrType === 'string') {
+            // follow the alias
+            return linkFormatterFromType(fnOrType);
+        }
+        return fnOrType;
     };
 
-    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        const type = dfn.getAttribute('data-dfn-type') || 'dfn';
+    function genLinkingSyntaxes(dfn) {
+        if(dfn.tagName != "DFN") return;
+
+        const type = dfn.getAttribute('data-dfn-type');
+        if(!type) {
+            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+            return [];
+        }
 
         // Return a function that wraps link text based on the type
-        const wsLookup = (type) => {
-            const fnOrType = wrapperSyntax[type];
-            if (typeof fnOrType === 'string') {
-                return wsLookup(fnOrType);
+        const linkFormatter = linkFormatterFromType(type);
+        if(!linkFormatter) {
+            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+            return [];
+        }
+
+        let ltAlts;
+        if(dfn.hasAttribute('data-lt')) {
+            ltAlts = dfn.getAttribute('data-lt')
+                .split("|")
+                .map(x=>x.trim());
+        } else {
+            ltAlts = [dfn.textContent.trim()];
+        }
+        if(type == "type") {
+            // lt of "<foo>", but "foo" is the interior;
+            // <<foo/bar>> is how you write it with a for,
+            // not <foo/<bar>> or whatever.
+            for(var i = 0; i < ltAlts.length; i++) {
+                const lt = ltAlts[i];
+                const match = /<(.*)>/.exec(lt);
+                if(match) { ltAlts[i] = match[1]; }
             }
-            return fnOrType ||
-                ((text) => `unexpected type "${type}" for ${text}`);
-        };
-        const autoLinkingFn = wsLookup(type);
+        }
 
-        const ltAttr = dfn.getAttribute('data-lt');
-        const ltAlts = ltAttr ? ltAttr.split(/\s*\|\s*/) : [dfn.textContent];
-
-        const dfAttr = dfn.getAttribute('data-dfn-for');
-        // '',  Should the empty case be included always?
-        const dfAlts = [...(dfAttr ? dfAttr.split(/\s*,\s*/) : [''])];
+        let forAlts;
+        if(dfn.hasAttribute('data-dfn-for')) {
+            forAlts = dfn.getAttribute('data-dfn-for')
+                .split(",")
+                .map(x=>x.trim());
+        } else {
+            forAlts = [''];
+        }
 
         let linkingSyntaxes = [];
-        if (autoLinkingFn && (ltAlts.length + dfAlts.length) > 1) {
-            linkingSyntaxes = [
-                mk.b({}, 'Possible linking syntax(es):'),
-                mk.ul({}, ...ltAlts.map(lt => dfAlts.map((f) => {
-                    const link = autoLinkingFn(f ? `${f}/${lt}` : lt);
+        if(!typesUsingFor.has(type)) {
+            for(const lt of ltAlts) {
+                linkingSyntaxes.push(linkFormatter(lt));
+            }
+        }
+        if(!typesNotUsingFor.has(type)) {
+            for(const f of forAlts) {
+                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+            }
+        }
+        return [
+            mk.b({}, 'Possible linking syntaxes:'),
+            mk.ul({},
+                ...linkingSyntaxes.map(link => {
                     const copyLink = async () =>
                         await navigator.clipboard.writeText(link);
                     return mk.li({},
-                        mk.div({ class: 'link-item', _onclick: copyLink },
+                        mk.div({ class: 'link-item' },
                             mk.button({
                                 class: 'copy-icon', title: 'Copy',
                                 type: 'button',
-
+                                _onclick: copyLink,
+                                tabindex: 0,
                             }, mk.span({ class: 'icon' }) ),
                             mk.span({}, link)
-                        ));
-                })))
-            ];
-        }
+                        )
+                    );
+                })
+            )
+        ];
+    }
 
+    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
         return mk.aside({
             class: "dfn-panel",
             id: `infopanel-for-${dfnID}`,
@@ -114,7 +200,7 @@
                     ),
                 ),
             ),
-            ...linkingSyntaxes,
+            genLinkingSyntaxes(dfn),
         );
     }
 
@@ -226,7 +312,6 @@
                 pinDfnPanel(dfnPanel);
             }
             event.stopPropagation();
-            event.preventDefault();
         });
 
         dfnPanel.addEventListener('keydown', (event) => {
