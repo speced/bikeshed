@@ -212,8 +212,6 @@
                 console.log(`Can't find dfn#${dfnID}.`, panelData);
             } else {
                 const panel = genDfnPanel({ ...panelData, dfn });
-                // dfn.setAttribute('popovertarget', panel.id);
-                // panel.setAttribute('popover', 'auto');
                 append(document.body, panel);
                 insertDfnPopupAction(dfn, panel)
             }
@@ -246,7 +244,6 @@
         dfnPanel.style.left = "5px";
         dfnPanel.style.top = "0px";
         const panelRect = dfnPanel.getBoundingClientRect();
-        // const panelWidth = panelRect.right - panelRect.left;
         if (panelRect.right > document.body.scrollWidth) {
             // Panel's overflowing the screen.
             // Just drop it below the dfn and flip it rightward instead.
