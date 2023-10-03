@@ -55,10 +55,8 @@
             if (typeof fnOrType === 'string') {
                 return wsLookup(fnOrType);
             }
-            if (!fnOrType) {
-                throw new Error(`unexpected type "${type}"`);
-            }
-            return fnOrType;
+            return fnOrType ||
+                ((text) => `unexpected type "${type}" for ${text}`);
         };
         const autoLinkingFn = wsLookup(type);
 
@@ -162,7 +160,7 @@
         dfnPanel.style.left = "5px";
         dfnPanel.style.top = "0px";
         const panelRect = dfnPanel.getBoundingClientRect();
-        const panelWidth = panelRect.right - panelRect.left;
+        // const panelWidth = panelRect.right - panelRect.left;
         if (panelRect.right > document.body.scrollWidth) {
             // Panel's overflowing the screen.
             // Just drop it below the dfn and flip it rightward instead.
