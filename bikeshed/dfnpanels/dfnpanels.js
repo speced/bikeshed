@@ -2,7 +2,94 @@
 {
     const dfnsJson = window.dfnsJson || {};
 
-    function genDfnPanel({dfnID, url, dfnText, refSections, external}) {
+    const wrapperSyntax = {
+        'dfn': (text) => `[=${text}=]`,
+        'abstract-op': (text) => `[\$${text}\$]`,
+        'value': (text) => `''${text}''`,
+        'http-header': (text) => `[:${text}:]`,
+        'idl': (text) => `{{${text}}}`,
+        'interface': 'idl',
+        'constructor': 'idl',
+        'method': 'idl',
+        'argument': 'idl',
+        'attribute': 'idl',
+        'callback': 'idl',
+        'dictionary': 'idl',
+        'dict-member': 'idl',
+        'enum': 'idl',
+        'enum-value': 'idl',
+        'exception': 'idl',
+        'const': 'idl',
+        'typedef': 'idl',
+        'stringifier': 'idl',
+        'serializer': 'idl',
+        'iterator': 'idl',
+        'maplike': 'idl',
+        'setlike': 'idl',
+        'extended-attribute': 'idl',
+        'event': 'idl',  // Not in bikeshed doc
+        'element': (element) => `<{${element}}>`,
+        'element-state': 'element',
+        'element-attr': 'element',
+        'attr-value': 'element',
+        'scheme': 'dfn',
+        'permission': 'dfn',
+        'grammar': (text) => `grammar? '${text}'`,
+        'type': 'dfn',
+        'css': (text) => `'${text}'`, // property or descriptor
+        'css?': (text) => `''${text}''`, // anything else 'value'
+        'production': (text) => `<<${text}>>`,
+        'property': (text) => `<<'${text}'>>`, // property or descriptor
+        'descriptor': 'property',
+        'function': (text) => `<<${text}()>>`,
+        'at-rule': (text) => `<<@${text}>>`,
+        'selector': 'css',
+    };
+
+    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
+        const type = dfn.getAttribute('data-dfn-type') || 'dfn';
+
+        // Return a function that wraps link text based on the type
+        const wsLookup = (type) => {
+            const fnOrType = wrapperSyntax[type];
+            if (typeof fnOrType === 'string') {
+                return wsLookup(fnOrType);
+            }
+            if (!fnOrType) {
+                throw new Error(`unexpected type "${type}"`);
+            }
+            return fnOrType;
+        };
+        const autoLinkingFn = wsLookup(type);
+
+        const ltAttr = dfn.getAttribute('data-lt');
+        const ltAlts = ltAttr ? ltAttr.split(/\s*\|\s*/) : [dfn.textContent];
+
+        const dfAttr = dfn.getAttribute('data-dfn-for');
+        // '',  Should the empty case be included always?
+        const dfAlts = [...(dfAttr ? dfAttr.split(/\s*,\s*/) : [''])];
+
+        let linkingSyntaxes = [];
+        if (autoLinkingFn && (ltAlts.length + dfAlts.length) > 1) {
+            linkingSyntaxes = [
+                mk.b({}, 'Possible linking syntax(es):'),
+                mk.ul({}, ...ltAlts.map(lt => dfAlts.map((f) => {
+                    const link = autoLinkingFn(f ? `${f}/${lt}` : lt);
+                    const copyLink = async () =>
+                        await navigator.clipboard.writeText(link);
+                    return mk.li({},
+                        mk.div({ class: 'link-item', _onclick: copyLink },
+                            mk.button({
+                                class: 'copy-icon', title: 'Copy',
+                                type: 'button',
+
+                            }, mk.span({ class: 'icon' }) ),
+                            mk.span({}, link)
+                        ));
+                })))
+            ];
+        }
+
         return mk.aside({
             class: "dfn-panel",
             id: `infopanel-for-${dfnID}`,
@@ -29,6 +116,7 @@
                     ),
                 ),
             ),
+            ...linkingSyntaxes,
         );
     }
 
@@ -39,7 +127,9 @@
             if(!dfn) {
                 console.log(`Can't find dfn#${dfnID}.`, panelData);
             } else {
-                const panel = genDfnPanel(panelData);
+                const panel = genDfnPanel({ ...panelData, dfn });
+                // dfn.setAttribute('popovertarget', panel.id);
+                // panel.setAttribute('popover', 'auto');
                 append(document.body, panel);
                 insertDfnPopupAction(dfn, panel)
             }
@@ -138,6 +228,7 @@
                 pinDfnPanel(dfnPanel);
             }
             event.stopPropagation();
+            event.preventDefault();
         });
 
         dfnPanel.addEventListener('keydown', (event) => {
