@@ -380,8 +380,8 @@ figcaption:not(.no-marker)::before {
 .dfn-panel > b + b { margin-top: 0.25em; }
 .dfn-panel ul { padding: 0 0 0 1em; list-style: none; }
 .dfn-panel li a {
-    white-space: pre;
-    display: inline-block;
+    /* white-space: pre; /* Do we need this? */
+    /* display: inline-block; /* This forces multiple refs to wrap */
     max-width: calc(300px - 1.5em - 1em);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -397,7 +397,55 @@ figcaption:not(.no-marker)::before {
     max-height: 30vh;
 }
 
-.dfn-paneled[role="button"] { cursor: pointer; }
+.dfn-panel .link-item:hover {
+    text-decoration: underline;
+}
+.dfn-panel .link-item .copy-icon {
+    opacity: 0;
+}
+.dfn-panel .link-item:hover .copy-icon,
+.dfn-panel .link-item .copy-icon:focus {
+    opacity: 1;
+}
+
+.dfn-panel .copy-icon {
+    display: inline-block;
+    margin-right: 0.5em;
+    width: 0.85em;
+    height: 1em;
+    border-radius: 3;
+    background-color: #ccc;
+    cursor: pointer;
+}
+
+.dfn-panel .copy-icon .icon {
+    width: 100%;
+    height: 100%;
+    background-color: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+}
+
+.dfn-panel .copy-icon .icon::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: 1px solid black;
+    background-color: #ccc;
+    opacity: 0.25;
+    transform: translate(3px, -3px);
+}
+
+.dfn-panel .copy-icon:active .icon::before {
+    opacity: 1;
+}
+
+.dfn-paneled[role="button"] { cursor: help; }
 </style>
 <style>/* Boilerplate: style-dfn-panel */
 :root {
@@ -433,8 +481,8 @@ figcaption:not(.no-marker)::before {
 .dfn-panel > b + b { margin-top: 0.25em; }
 .dfn-panel ul { padding: 0 0 0 1em; list-style: none; }
 .dfn-panel li a {
-    white-space: pre;
-    display: inline-block;
+    /* white-space: pre; /* Do we need this? */
+    /* display: inline-block; /* This forces multiple refs to wrap */
     max-width: calc(300px - 1.5em - 1em);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -450,7 +498,55 @@ figcaption:not(.no-marker)::before {
     max-height: 30vh;
 }
 
-.dfn-paneled[role="button"] { cursor: pointer; }
+.dfn-panel .link-item:hover {
+    text-decoration: underline;
+}
+.dfn-panel .link-item .copy-icon {
+    opacity: 0;
+}
+.dfn-panel .link-item:hover .copy-icon,
+.dfn-panel .link-item .copy-icon:focus {
+    opacity: 1;
+}
+
+.dfn-panel .copy-icon {
+    display: inline-block;
+    margin-right: 0.5em;
+    width: 0.85em;
+    height: 1em;
+    border-radius: 3;
+    background-color: #ccc;
+    cursor: pointer;
+}
+
+.dfn-panel .copy-icon .icon {
+    width: 100%;
+    height: 100%;
+    background-color: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+}
+
+.dfn-panel .copy-icon .icon::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: 1px solid black;
+    background-color: #ccc;
+    opacity: 0.25;
+    transform: translate(3px, -3px);
+}
+
+.dfn-panel .copy-icon:active .icon::before {
+    opacity: 1;
+}
+
+.dfn-paneled[role="button"] { cursor: help; }
 </style>
 <style>/* Boilerplate: style-issues */
 a[href].issue-return {
@@ -1761,7 +1857,178 @@ elem<c- p>.</c->getAnimations<c- p>()[</c-><c- mf>0</c-><c- p>].</c->transitionP
 {
     const dfnsJson = window.dfnsJson || {};
 
-    function genDfnPanel({dfnID, url, dfnText, refSections, external}) {
+    // Functions, divided by link type, that wrap an autolink's
+    // contents with the appropriate outer syntax.
+    // Alternately, a string naming another type they format
+    // the same as.
+    const typeFormatters = {
+        'dfn': (text) => `[=${text}=]`,
+        'abstract-op': (text) => `[\$${text}\$]`,
+        'value': (text) => `''${text}''`,
+        'http-header': (text) => `[:${text}:]`,
+        'idl': (text) => `{{${text}}}`,
+        'interface': 'idl',
+        'constructor': 'idl',
+        'method': 'idl',
+        'argument': 'idl',
+        'attribute': 'idl',
+        'callback': 'idl',
+        'dictionary': 'idl',
+        'dict-member': 'idl',
+        'enum': 'idl',
+        'enum-value': 'idl',
+        'exception': 'idl',
+        'const': 'idl',
+        'typedef': 'idl',
+        'stringifier': 'idl',
+        'serializer': 'idl',
+        'iterator': 'idl',
+        'maplike': 'idl',
+        'setlike': 'idl',
+        'extended-attribute': 'idl',
+        'event': 'idl',
+        'element': (element) => `<{${element}}>`,
+        'element-state': 'element',
+        'element-attr': 'element',
+        'attr-value': 'element',
+        'scheme': 'dfn',
+        'permission': 'dfn',
+        'grammar': (text) => `${text} (within a <pre class=prod>)`,
+        'type': (text)=> `<<${text}>>`,
+        'property': (text) => `'${text}'`,
+        'descriptor': 'property',
+        'function': 'value',
+        'at-rule': 'value',
+        'selector': 'value',
+    };
+    const typesUsingFor = new Set(
+        [
+            "descriptor",
+            "value",
+            "element-attr",
+            "attr-value",
+            "element-state",
+            "method",
+            "constructor",
+            "argument",
+            "attribute",
+            "const",
+            "dict-member",
+            "event",
+            "enum-value",
+            "stringifier",
+            "serializer",
+            "iterator",
+            "maplike",
+            "setlike",
+            "state",
+            "mode",
+            "context",
+            "facet",
+        ],
+    )
+    const typesNotUsingFor = new Set(
+        [
+            "property",
+            "element",
+            "interface",
+            "namespace",
+            "callback",
+            "dictionary",
+            "enum",
+            "exception",
+            "typedef",
+            "http-header",
+            "permission",
+        ],
+    )
+    function linkFormatterFromType(type) {
+        const fnOrType = typeFormatters[type];
+        if(typeof fnOrType === 'string') {
+            // follow the alias
+            return linkFormatterFromType(fnOrType);
+        }
+        return fnOrType;
+    };
+
+    function genLinkingSyntaxes(dfn) {
+        if(dfn.tagName != "DFN") return;
+
+        const type = dfn.getAttribute('data-dfn-type');
+        if(!type) {
+            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+            return [];
+        }
+
+        // Return a function that wraps link text based on the type
+        const linkFormatter = linkFormatterFromType(type);
+        if(!linkFormatter) {
+            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+            return [];
+        }
+
+        let ltAlts;
+        if(dfn.hasAttribute('data-lt')) {
+            ltAlts = dfn.getAttribute('data-lt')
+                .split("|")
+                .map(x=>x.trim());
+        } else {
+            ltAlts = [dfn.textContent.trim()];
+        }
+        if(type == "type") {
+            // lt of "<foo>", but "foo" is the interior;
+            // <<foo/bar>> is how you write it with a for,
+            // not <foo/<bar>> or whatever.
+            for(var i = 0; i < ltAlts.length; i++) {
+                const lt = ltAlts[i];
+                const match = /<(.*)>/.exec(lt);
+                if(match) { ltAlts[i] = match[1]; }
+            }
+        }
+
+        let forAlts;
+        if(dfn.hasAttribute('data-dfn-for')) {
+            forAlts = dfn.getAttribute('data-dfn-for')
+                .split(",")
+                .map(x=>x.trim());
+        } else {
+            forAlts = [''];
+        }
+
+        let linkingSyntaxes = [];
+        if(!typesUsingFor.has(type)) {
+            for(const lt of ltAlts) {
+                linkingSyntaxes.push(linkFormatter(lt));
+            }
+        }
+        if(!typesNotUsingFor.has(type)) {
+            for(const f of forAlts) {
+                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+            }
+        }
+        return [
+            mk.b({}, 'Possible linking syntaxes:'),
+            mk.ul({},
+                ...linkingSyntaxes.map(link => {
+                    const copyLink = async () =>
+                        await navigator.clipboard.writeText(link);
+                    return mk.li({},
+                        mk.div({ class: 'link-item' },
+                            mk.button({
+                                class: 'copy-icon', title: 'Copy',
+                                type: 'button',
+                                _onclick: copyLink,
+                                tabindex: 0,
+                            }, mk.span({ class: 'icon' }) ),
+                            mk.span({}, link)
+                        )
+                    );
+                })
+            )
+        ];
+    }
+
+    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
         return mk.aside({
             class: "dfn-panel",
             id: `infopanel-for-${dfnID}`,
@@ -1788,6 +2055,7 @@ elem<c- p>.</c->getAnimations<c- p>()[</c-><c- mf>0</c-><c- p>].</c->transitionP
                     ),
                 ),
             ),
+            genLinkingSyntaxes(dfn),
         );
     }
 
@@ -1798,7 +2066,7 @@ elem<c- p>.</c->getAnimations<c- p>()[</c-><c- mf>0</c-><c- p>].</c->transitionP
             if(!dfn) {
                 console.log(`Can't find dfn#${dfnID}.`, panelData);
             } else {
-                const panel = genDfnPanel(panelData);
+                const panel = genDfnPanel({ ...panelData, dfn });
                 append(document.body, panel);
                 insertDfnPopupAction(dfn, panel)
             }
@@ -1831,7 +2099,6 @@ elem<c- p>.</c->getAnimations<c- p>()[</c-><c- mf>0</c-><c- p>].</c->transitionP
         dfnPanel.style.left = "5px";
         dfnPanel.style.top = "0px";
         const panelRect = dfnPanel.getBoundingClientRect();
-        const panelWidth = panelRect.right - panelRect.left;
         if (panelRect.right > document.body.scrollWidth) {
             // Panel's overflowing the screen.
             // Just drop it below the dfn and flip it rightward instead.
@@ -1914,7 +2181,178 @@ elem<c- p>.</c->getAnimations<c- p>()[</c-><c- mf>0</c-><c- p>].</c->transitionP
 {
     const dfnsJson = window.dfnsJson || {};
 
-    function genDfnPanel({dfnID, url, dfnText, refSections, external}) {
+    // Functions, divided by link type, that wrap an autolink's
+    // contents with the appropriate outer syntax.
+    // Alternately, a string naming another type they format
+    // the same as.
+    const typeFormatters = {
+        'dfn': (text) => `[=${text}=]`,
+        'abstract-op': (text) => `[\$${text}\$]`,
+        'value': (text) => `''${text}''`,
+        'http-header': (text) => `[:${text}:]`,
+        'idl': (text) => `{{${text}}}`,
+        'interface': 'idl',
+        'constructor': 'idl',
+        'method': 'idl',
+        'argument': 'idl',
+        'attribute': 'idl',
+        'callback': 'idl',
+        'dictionary': 'idl',
+        'dict-member': 'idl',
+        'enum': 'idl',
+        'enum-value': 'idl',
+        'exception': 'idl',
+        'const': 'idl',
+        'typedef': 'idl',
+        'stringifier': 'idl',
+        'serializer': 'idl',
+        'iterator': 'idl',
+        'maplike': 'idl',
+        'setlike': 'idl',
+        'extended-attribute': 'idl',
+        'event': 'idl',
+        'element': (element) => `<{${element}}>`,
+        'element-state': 'element',
+        'element-attr': 'element',
+        'attr-value': 'element',
+        'scheme': 'dfn',
+        'permission': 'dfn',
+        'grammar': (text) => `${text} (within a <pre class=prod>)`,
+        'type': (text)=> `<<${text}>>`,
+        'property': (text) => `'${text}'`,
+        'descriptor': 'property',
+        'function': 'value',
+        'at-rule': 'value',
+        'selector': 'value',
+    };
+    const typesUsingFor = new Set(
+        [
+            "descriptor",
+            "value",
+            "element-attr",
+            "attr-value",
+            "element-state",
+            "method",
+            "constructor",
+            "argument",
+            "attribute",
+            "const",
+            "dict-member",
+            "event",
+            "enum-value",
+            "stringifier",
+            "serializer",
+            "iterator",
+            "maplike",
+            "setlike",
+            "state",
+            "mode",
+            "context",
+            "facet",
+        ],
+    )
+    const typesNotUsingFor = new Set(
+        [
+            "property",
+            "element",
+            "interface",
+            "namespace",
+            "callback",
+            "dictionary",
+            "enum",
+            "exception",
+            "typedef",
+            "http-header",
+            "permission",
+        ],
+    )
+    function linkFormatterFromType(type) {
+        const fnOrType = typeFormatters[type];
+        if(typeof fnOrType === 'string') {
+            // follow the alias
+            return linkFormatterFromType(fnOrType);
+        }
+        return fnOrType;
+    };
+
+    function genLinkingSyntaxes(dfn) {
+        if(dfn.tagName != "DFN") return;
+
+        const type = dfn.getAttribute('data-dfn-type');
+        if(!type) {
+            console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+            return [];
+        }
+
+        // Return a function that wraps link text based on the type
+        const linkFormatter = linkFormatterFromType(type);
+        if(!linkFormatter) {
+            console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+            return [];
+        }
+
+        let ltAlts;
+        if(dfn.hasAttribute('data-lt')) {
+            ltAlts = dfn.getAttribute('data-lt')
+                .split("|")
+                .map(x=>x.trim());
+        } else {
+            ltAlts = [dfn.textContent.trim()];
+        }
+        if(type == "type") {
+            // lt of "<foo>", but "foo" is the interior;
+            // <<foo/bar>> is how you write it with a for,
+            // not <foo/<bar>> or whatever.
+            for(var i = 0; i < ltAlts.length; i++) {
+                const lt = ltAlts[i];
+                const match = /<(.*)>/.exec(lt);
+                if(match) { ltAlts[i] = match[1]; }
+            }
+        }
+
+        let forAlts;
+        if(dfn.hasAttribute('data-dfn-for')) {
+            forAlts = dfn.getAttribute('data-dfn-for')
+                .split(",")
+                .map(x=>x.trim());
+        } else {
+            forAlts = [''];
+        }
+
+        let linkingSyntaxes = [];
+        if(!typesUsingFor.has(type)) {
+            for(const lt of ltAlts) {
+                linkingSyntaxes.push(linkFormatter(lt));
+            }
+        }
+        if(!typesNotUsingFor.has(type)) {
+            for(const f of forAlts) {
+                linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+            }
+        }
+        return [
+            mk.b({}, 'Possible linking syntaxes:'),
+            mk.ul({},
+                ...linkingSyntaxes.map(link => {
+                    const copyLink = async () =>
+                        await navigator.clipboard.writeText(link);
+                    return mk.li({},
+                        mk.div({ class: 'link-item' },
+                            mk.button({
+                                class: 'copy-icon', title: 'Copy',
+                                type: 'button',
+                                _onclick: copyLink,
+                                tabindex: 0,
+                            }, mk.span({ class: 'icon' }) ),
+                            mk.span({}, link)
+                        )
+                    );
+                })
+            )
+        ];
+    }
+
+    function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
         return mk.aside({
             class: "dfn-panel",
             id: `infopanel-for-${dfnID}`,
@@ -1941,6 +2379,7 @@ elem<c- p>.</c->getAnimations<c- p>()[</c-><c- mf>0</c-><c- p>].</c->transitionP
                     ),
                 ),
             ),
+            genLinkingSyntaxes(dfn),
         );
     }
 
@@ -1951,7 +2390,7 @@ elem<c- p>.</c->getAnimations<c- p>()[</c-><c- mf>0</c-><c- p>].</c->transitionP
             if(!dfn) {
                 console.log(`Can't find dfn#${dfnID}.`, panelData);
             } else {
-                const panel = genDfnPanel(panelData);
+                const panel = genDfnPanel({ ...panelData, dfn });
                 append(document.body, panel);
                 insertDfnPopupAction(dfn, panel)
             }
@@ -1984,7 +2423,6 @@ elem<c- p>.</c->getAnimations<c- p>()[</c-><c- mf>0</c-><c- p>].</c->transitionP
         dfnPanel.style.left = "5px";
         dfnPanel.style.top = "0px";
         const panelRect = dfnPanel.getBoundingClientRect();
-        const panelWidth = panelRect.right - panelRect.left;
         if (panelRect.right > document.body.scrollWidth) {
             // Panel's overflowing the screen.
             // Just drop it below the dfn and flip it rightward instead.
