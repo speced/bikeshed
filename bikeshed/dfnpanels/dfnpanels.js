@@ -210,20 +210,16 @@
             const dfn = document.getElementById(dfnID);
             if(!dfn) {
                 console.log(`Can't find dfn#${dfnID}.`, panelData);
-            } else {
-                const panel = genDfnPanel({ ...panelData, dfn });
-                append(document.body, panel);
-                insertDfnPopupAction(dfn, panel)
+                continue;
             }
+            const panel = genDfnPanel({ ...panelData, dfn });
+            append(document.body, panel);
+            insertDfnPopupAction(dfn, panel)
         }
     }
 
     document.addEventListener("DOMContentLoaded", ()=>{
         genAllDfnPanels();
-
-        // Add popup behavior to all dfns to show the corresponding dfn-panel.
-        var dfns = queryAll('.dfn-paneled');
-        for(let dfn of dfns) { ; }
 
         document.body.addEventListener("click", (e) => {
             // If not handled already, just hide all dfn panels.
