@@ -182,7 +182,7 @@
             },
             mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
                 `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url}, url),
+            mk.a({href:url, class:"dfn-link"}, url),
             mk.b({}, "Referenced in:"),
             mk.ul({},
                 ...refSections.map(section=>
@@ -305,8 +305,13 @@
         });
 
         dfnPanel.addEventListener('click', (event) => {
-            if (event.target.nodeName == 'A') {
-                pinDfnPanel(dfnPanel);
+            const node = event.target;
+            if (node.nodeName == 'A') {
+                if(node.classList.contains("dfn-link")) {
+                    // do nothing
+                } else {
+                    pinDfnPanel(dfnPanel);
+                }
             }
             event.stopPropagation();
         });
