@@ -12,6 +12,10 @@ class ScriptManager:
     scripts: list[Script] = dataclasses.field(default_factory=list)
 
     def set(self, name: str, text: str) -> None:
+        for sc in self.scripts:
+            if sc.name == name:
+                sc.text = text
+                return
         self.scripts.append(Script(name, text))
 
     def setFile(self, name: str, localPath: str) -> None:
@@ -43,6 +47,11 @@ class StyleManager:
     styles: list[Style] = dataclasses.field(default_factory=list)
 
     def set(self, name: str, text: str, dark: str | None = None) -> None:
+        for st in self.styles:
+            if st.name == name:
+                st.text = text
+                st.dark = dark
+                return
         self.styles.append(Style(name, text, dark))
 
     def setFile(self, name: str, localPath: str, darkPath: str | None = None) -> None:
