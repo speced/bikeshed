@@ -359,11 +359,11 @@
         };
     }
 
-    function notScrolledIntoView(element) {
+    function scrolledIntoView(element) {
         const rect = element.getBoundingClientRect();
         return (
-            rect.top > window.innerHeight ||
-            rect.bottom < 0
+            rect.top > 0 &&
+            rect.bottom < window.innerHeight
         );
     }
 
@@ -375,7 +375,7 @@
             console.info('dest', dest);
             if (dest) {
                 // If event.target is scrolled into view, prevent default scroll.
-                if (notScrolledIntoView(dest)) {
+                if (scrolledIntoView(dest)) {
                     event.preventDefault();
                 }
                 // Always highlight destination.
