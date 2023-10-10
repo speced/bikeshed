@@ -182,7 +182,7 @@
             },
             mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
                 `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class: 'dfn-link'}, url),
+            mk.a({href:url, class:"dfn-link"}, url),
             mk.b({}, "Referenced in:"),
             mk.ul({},
                 ...refSections.map(section=>
@@ -210,11 +210,11 @@
             const dfn = document.getElementById(dfnID);
             if(!dfn) {
                 console.log(`Can't find dfn#${dfnID}.`, panelData);
-            } else {
-                const panel = genDfnPanel({ ...panelData, dfn });
-                append(document.body, panel);
-                insertDfnPopupAction(dfn, panel)
+                continue;
             }
+            const panel = genDfnPanel({ ...panelData, dfn });
+            append(document.body, panel);
+            insertDfnPopupAction(dfn, panel)
         }
     }
 
@@ -259,9 +259,8 @@
             dfnPanel.style.right = "0px";
         }
 
-        // Now determine its root-level fixed position.
+        // Now determine its root-level fixed position, and move it there.
         const fixedPos = getRootLevelFixedPosition(dfnPanel);
-        // Now move panel to the document level at fixed position.
         document.body.appendChild(dfnPanel);
         dfnPanel.style.position = "fixed";
         dfnPanel.style.top = fixedPos.top + "px";
