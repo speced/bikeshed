@@ -849,7 +849,7 @@ dfn > a.self-link::before      { content: "#"; }
             },
             mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
                 `Info about the '${dfnText}' ${external?"external":""} reference.`),
-            mk.a({href:url, class:"dfn-link"}, url),
+            mk.a({href:url, class: 'dfn-link'}, url),
             mk.b({}, "Referenced in:"),
             mk.ul({},
                 ...refSections.map(section=>
@@ -877,16 +877,20 @@ dfn > a.self-link::before      { content: "#"; }
             const dfn = document.getElementById(dfnID);
             if(!dfn) {
                 console.log(`Can't find dfn#${dfnID}.`, panelData);
-                continue;
+            } else {
+                const panel = genDfnPanel({ ...panelData, dfn });
+                append(document.body, panel);
+                insertDfnPopupAction(dfn, panel)
             }
-            const panel = genDfnPanel({ ...panelData, dfn });
-            append(document.body, panel);
-            insertDfnPopupAction(dfn, panel)
         }
     }
 
     document.addEventListener("DOMContentLoaded", ()=>{
         genAllDfnPanels();
+
+        // Add popup behavior to all dfns to show the corresponding dfn-panel.
+        var dfns = queryAll('.dfn-paneled');
+        for(let dfn of dfns) { ; }
 
         document.body.addEventListener("click", (e) => {
             // If not handled already, just hide all dfn panels.
@@ -915,6 +919,15 @@ dfn > a.self-link::before      { content: "#"; }
             dfnPanel.style.top = "1.5em";
             dfnPanel.style.left = "auto";
             dfnPanel.style.right = "0px";
+        }
+
+        if (confirm('make it fixed?')) {
+            // Now determine its top-level fixed position,
+            // and change position to fixed.
+            const fixedPos = getRootLevelFixedPosition(dfnPanel);
+            dfnPanel.style.position = "fixed";
+            dfnPanel.style.top = fixedPos.top + "px";
+            dfnPanel.style.left = fixedPos.left + "px";
         }
     }
 
@@ -968,13 +981,13 @@ dfn > a.self-link::before      { content: "#"; }
         });
 
         dfnPanel.addEventListener('click', (event) => {
-            const node = event.target;
-            if (node.nodeName == 'A') {
-                if(node.classList.contains("dfn-link")) {
-                    // do nothing
-                } else {
-                    pinDfnPanel(dfnPanel);
+            if (event.target.nodeName == 'A') {
+                if (event.target.classList.contains('dfn-link') &&
+                    !dfnPanel.classList.contains("on")) {
+                    // Don't scroll to dfn in this case.
+                    event.preventDefault();
                 }
+                pinDfnPanel(dfnPanel);
             }
             event.stopPropagation();
         });
@@ -987,6 +1000,48 @@ dfn > a.self-link::before      { content: "#"; }
             }
         })
     }
+
+        /**
+         Calculates the equivalent of a root-level fixed position for an arbitrarily nested element.
+         This simply climbs up the ancestor tree accumulting possibly scrolled offsets until the document body is reached.
+
+        Args:
+          el: The element whose root-level fixed position is to be calculated.
+
+        Returns:
+          {
+            top: The distance from the top of the document to the top of the element.
+            left: The distance from the left of the document to the left of the element.
+          }
+        */
+        function getRootLevelFixedPosition(el) {
+
+            var xPos = 0;
+            var yPos = 0;
+
+            while (element) {
+              if (el.tagName == "BODY") {
+                // deal with browser quirks with body/window/document and page scroll
+                var xScroll = el.scrollLeft || document.documentElement.scrollLeft;
+                var yScroll = el.scrollTop || document.documentElement.scrollTop;
+
+                xPos += (el.offsetLeft - xScroll + el.clientLeft);
+                yPos += (el.offsetTop - yScroll + el.clientTop);
+              } else {
+                // for all other non-BODY elements
+                xPos += (el.offsetLeft - el.scrollLeft + el.clientLeft);
+                yPos += (el.offsetTop - el.scrollTop + el.clientTop);
+              }
+
+              el = el.offsetParent;
+            }
+            return {
+              left: xPos,
+              top: yPos
+            };
+          }
+
+      }
 }
 </script>
 <script>/* Boilerplate: script-dfn-panel-json */
