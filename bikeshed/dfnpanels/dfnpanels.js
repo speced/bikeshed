@@ -221,10 +221,6 @@
     document.addEventListener("DOMContentLoaded", ()=>{
         genAllDfnPanels();
 
-        // Add popup behavior to all dfns to show the corresponding dfn-panel.
-        var dfns = queryAll('.dfn-paneled');
-        for(let dfn of dfns) { ; }
-
         document.body.addEventListener("click", (e) => {
             // If not handled already, just hide all dfn panels.
             hideAllDfnPanels();
@@ -334,23 +330,12 @@
         })
     }
 
-    /**
-        Calculates the root-level fixed position for an arbitrarily nested element.
-        This simply climbs up the possitioned ancestor tree accumulting
-        possibly scrolled offsets until the document body is reached.
-        Maybe use el.getBoundingClientRect()?
-
-    Args:
-        el: The element whose root-level fixed position is to be calculated.
-
-    Returns:
-        {
-            top: The distance from the top of the viewport.
-            left: The distance from the left of the viewport.
-        }
-    */
+    // Calculates the root-level fixed position for an arbitrarily nested element.
+    // This simply climbs up the possitioned ancestor tree accumulting
+    // possibly scrolled offsets until the document body is reached.
+    // Returns: { top: <from the viewport>, left: <from the viewport> }
+    // Maybe use el.getBoundingClientRect()?
     function getRootLevelFixedPosition(el) {
-
         let xPos = 0;
         let yPos = 0;
 
@@ -374,31 +359,24 @@
         };
     }
 
-    function scrolledIntoView(element) {
+    function notScrolledIntoView(element) {
         const rect = element.getBoundingClientRect();
         return (
-            rect.bottom > window.innerHeight ||
-            rect.top < 0
+            rect.top > window.innerHeight ||
+            rect.bottom < 0
         );
     }
 
     function scrollAndHighlightTarget(event) {
         let hash = event.target.hash;
         if (hash) {
-            // Remove leading '#' character.
             hash = decodeURIComponent(hash.substring(1));
             const dest = document.getElementById(hash);
             console.info('dest', dest);
             if (dest) {
                 // If event.target is scrolled into view, prevent default scroll.
-                if (!scrolledIntoView(dest)) {
+                if (notScrolledIntoView(dest)) {
                     event.preventDefault();
-                } else {
-                    // dest.scrollIntoView({
-                    //     behavior: "smooth",
-                    //     block: "start",
-                    //     inline: "nearest"
-                    // });
                 }
                 // Always highlight destination.
                 dest.classList.add('highlighted');
