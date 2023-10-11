@@ -254,17 +254,18 @@
             dfnPanel.style.right = "0px";
         }
 
-        // Compute the root-level fixed position, and move it there.
-        const fixedPos = getRootLevelFixedPosition(dfnPanel);
+        // Compute the root-level absolute position, and move it there.
+        const absPos = getRootLevelAbsolutePosition(dfnPanel);
         document.body.appendChild(dfnPanel);
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.top = fixedPos.top + "px";
-        dfnPanel.style.left = fixedPos.left + "px";
+        dfnPanel.style.position = "absolute";
+        dfnPanel.style.top = absPos.top + "px";
+        dfnPanel.style.left = absPos.left + "px";
     }
 
     function pinDfnPanel(dfnPanel) {
         // Switch it to "activated" state, which pins it.
         dfnPanel.classList.add("activated");
+        dfnPanel.style.position = "fixed";
         dfnPanel.style.left = null;
         dfnPanel.style.top = null;
     }
@@ -328,9 +329,18 @@
         })
     }
 
-    // Returns the root-level fixed position {left and top} for element.
+    // Returns the root-level fixed position {left and top} of element.
     // Maybe use el.getBoundingClientRect()?
     function getRootLevelFixedPosition(el) {
+        let { left, top } = getRootLevelAbsolutePosition(el);
+        // Deal with browser quirks involving page scroll.
+        left -= document.documentElement.scrollLeft;
+        top -= document.documentElement.scrollTop;
+        return { left, top };
+    }
+
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
         let xPos = 0;
         let yPos = 0;
 
@@ -338,10 +348,10 @@
             let xScroll = el.scrollLeft;
             let yScroll = el.scrollTop;
 
-            if (el.tagName == "BODY") {
-                // Deal with browser quirks involving page scroll.
-                xScroll ||= document.documentElement.scrollLeft;
-                yScroll ||= document.documentElement.scrollTop;
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
             }
             xPos += (el.offsetLeft - xScroll + el.clientLeft);
             yPos += (el.offsetTop - yScroll + el.clientTop);

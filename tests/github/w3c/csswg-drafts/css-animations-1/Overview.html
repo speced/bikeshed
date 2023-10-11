@@ -5,10 +5,10 @@
   <title>CSS Animations Level 1</title>
   <meta content="ED" name="w3c-status">
   <link href="https://www.w3.org/StyleSheets/TR/2021/W3C-ED" rel="stylesheet">
-  <meta content="Bikeshed version 069404bff, updated Tue Oct 10 22:51:40 2023 +0000" name="generator">
+  <meta content="Bikeshed version 4b35f7edc, updated Wed Oct 11 17:53:12 2023 +0000" name="generator">
   <link href="https://www.w3.org/TR/css-animations-1/" rel="canonical">
   <link href="https://drafts.csswg.org/csslogo.ico" rel="icon">
-  <meta content="069404bffe4df110e929aa5f90616f248d09696e" name="document-revision">
+  <meta content="4b35f7edc2588944ed6fa6e37d94a17a7e59b1db" name="document-revision">
 <style type="text/css">
   table.event-handlers {
     border-collapse: collapse;
@@ -3473,7 +3473,6 @@ objects</a>.</p>
         });
     })
 
-
     function hideAllDfnPanels() {
         // Turn off any currently "on" or "activated" panels.
         queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
@@ -3483,7 +3482,7 @@ objects</a>.</p>
         hideAllDfnPanels(); // Only display one at this time.
         dfn.setAttribute("aria-expanded", "true");
 
-        // Get span following dfn and reinsert panel into the span.
+        // Reinsert panel into the span following the dfn.
         const dfnSpan = dfn.nextElementSibling;
         dfnSpan.appendChild(dfnPanel);
 
@@ -3501,17 +3500,18 @@ objects</a>.</p>
             dfnPanel.style.right = "0px";
         }
 
-        // Now determine its root-level fixed position, and move it there.
-        const fixedPos = getRootLevelFixedPosition(dfnPanel);
+        // Compute the root-level absolute position, and move it there.
+        const absPos = getRootLevelAbsolutePosition(dfnPanel);
         document.body.appendChild(dfnPanel);
-        dfnPanel.style.position = "fixed";
-        dfnPanel.style.top = fixedPos.top + "px";
-        dfnPanel.style.left = fixedPos.left + "px";
+        dfnPanel.style.position = "absolute";
+        dfnPanel.style.top = absPos.top + "px";
+        dfnPanel.style.left = absPos.left + "px";
     }
 
     function pinDfnPanel(dfnPanel) {
         // Switch it to "activated" state, which pins it.
         dfnPanel.classList.add("activated");
+        dfnPanel.style.position = "fixed";
         dfnPanel.style.left = null;
         dfnPanel.style.top = null;
     }
@@ -3535,7 +3535,6 @@ objects</a>.</p>
     }
 
     function insertDfnPopupAction(dfn, dfnPanel) {
-        // Find dfn panel
         const panelWrapper = document.createElement('span');
         panelWrapper.appendChild(dfnPanel);
         panelWrapper.style.position = "relative";
@@ -3576,12 +3575,18 @@ objects</a>.</p>
         })
     }
 
-    // Calculates the root-level fixed position for an arbitrarily nested element.
-    // This simply climbs up the possitioned ancestor tree accumulting
-    // possibly scrolled offsets until the document body is reached.
-    // Returns: { top: <from the viewport>, left: <from the viewport> }
+    // Returns the root-level fixed position {left and top} of element.
     // Maybe use el.getBoundingClientRect()?
     function getRootLevelFixedPosition(el) {
+        let { left, top } = getRootLevelAbsolutePosition(el);
+        // Deal with browser quirks involving page scroll.
+        left -= document.documentElement.scrollLeft;
+        top -= document.documentElement.scrollTop;
+        return { left, top };
+    }
+
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
         let xPos = 0;
         let yPos = 0;
 
@@ -3589,10 +3594,10 @@ objects</a>.</p>
             let xScroll = el.scrollLeft;
             let yScroll = el.scrollTop;
 
-            if (el.tagName == "BODY") {
-                // Deal with browser quirks with body/window/document and page scroll
-                xScroll ||= document.documentElement.scrollLeft;
-                yScroll ||= document.documentElement.scrollTop;
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
             }
             xPos += (el.offsetLeft - xScroll + el.clientLeft);
             yPos += (el.offsetTop - yScroll + el.clientTop);
@@ -3618,13 +3623,11 @@ objects</a>.</p>
         if (hash) {
             hash = decodeURIComponent(hash.substring(1));
             const dest = document.getElementById(hash);
-            console.info('dest', dest);
             if (dest) {
-                // If event.target is scrolled into view, prevent default scroll.
+                // Maybe prevent default scroll.
                 if (scrolledIntoView(dest)) {
                     event.preventDefault();
                 }
-                // Always highlight destination.
                 dest.classList.add('highlighted');
                 setTimeout(() => dest.classList.remove('highlighted'), 1000);
             }
