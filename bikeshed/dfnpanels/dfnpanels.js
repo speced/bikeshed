@@ -326,6 +326,7 @@
                 pinDfnPanel(dfnPanel);
             }
             event.stopPropagation();
+            refocusOnTarget(event);
         });
 
         dfnPanel.addEventListener('keydown', (event) => {
@@ -337,15 +338,14 @@
         })
     }
 
-    // // Returns the root-level fixed position {left and top} of element.
-    // // Maybe use el.getBoundingClientRect()?
-    // function getRootLevelFixedPosition(el) {
-    //     let { left, top } = getRootLevelAbsolutePosition(el);
-    //     // Deal with browser quirks involving page scroll.
-    //     left -= document.documentElement.scrollLeft;
-    //     top -= document.documentElement.scrollTop;
-    //     return { left, top };
-    // }
+    function refocusOnTarget(event) {
+        const target = event.target;
+        setTimeout(() => {
+            // Refocus on the event.target element.
+            // This is needed after browser scrolls to the destination.
+            target.focus();
+        });
+    }
 
     // Returns the root-level absolute position {left and top} of element.
     function getRootLevelAbsolutePosition(el) {
