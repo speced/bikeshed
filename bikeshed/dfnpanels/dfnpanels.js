@@ -237,7 +237,7 @@
         hideAllDfnPanels(); // Only display one at this time.
         dfn.setAttribute("aria-expanded", "true");
 
-        // Get span following dfn and reinsert panel into the span.
+        // Reinsert panel into the span following the dfn.
         const dfnSpan = dfn.nextElementSibling;
         dfnSpan.appendChild(dfnPanel);
 
@@ -255,7 +255,7 @@
             dfnPanel.style.right = "0px";
         }
 
-        // Now determine its root-level fixed position, and move it there.
+        // Compute the root-level fixed position, and move it there.
         const fixedPos = getRootLevelFixedPosition(dfnPanel);
         document.body.appendChild(dfnPanel);
         dfnPanel.style.position = "fixed";
@@ -289,7 +289,6 @@
     }
 
     function insertDfnPopupAction(dfn, dfnPanel) {
-        // Find dfn panel
         const panelWrapper = document.createElement('span');
         panelWrapper.appendChild(dfnPanel);
         panelWrapper.style.position = "relative";
@@ -344,7 +343,7 @@
             let yScroll = el.scrollTop;
 
             if (el.tagName == "BODY") {
-                // Deal with browser quirks with body/window/document and page scroll
+                // Deal with browser quirks involving page scroll
                 xScroll ||= document.documentElement.scrollLeft;
                 yScroll ||= document.documentElement.scrollTop;
             }
@@ -374,11 +373,10 @@
             const dest = document.getElementById(hash);
             console.info('dest', dest);
             if (dest) {
-                // If event.target is scrolled into view, prevent default scroll.
+                // Maybe prevent default scroll.
                 if (scrolledIntoView(dest)) {
                     event.preventDefault();
                 }
-                // Always highlight destination.
                 dest.classList.add('highlighted');
                 setTimeout(() => dest.classList.remove('highlighted'), 1000);
             }
