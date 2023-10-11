@@ -227,7 +227,6 @@
         });
     })
 
-
     function hideAllDfnPanels() {
         // Turn off any currently "on" or "activated" panels.
         queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
@@ -329,10 +328,7 @@
         })
     }
 
-    // Calculates the root-level fixed position for an arbitrarily nested element.
-    // This simply climbs up the possitioned ancestor tree accumulting
-    // possibly scrolled offsets until the document body is reached.
-    // Returns: { top: <from the viewport>, left: <from the viewport> }
+    // Returns the root-level fixed position {left and top} for element.
     // Maybe use el.getBoundingClientRect()?
     function getRootLevelFixedPosition(el) {
         let xPos = 0;
@@ -343,7 +339,7 @@
             let yScroll = el.scrollTop;
 
             if (el.tagName == "BODY") {
-                // Deal with browser quirks involving page scroll
+                // Deal with browser quirks involving page scroll.
                 xScroll ||= document.documentElement.scrollLeft;
                 yScroll ||= document.documentElement.scrollTop;
             }
@@ -371,7 +367,6 @@
         if (hash) {
             hash = decodeURIComponent(hash.substring(1));
             const dest = document.getElementById(hash);
-            console.info('dest', dest);
             if (dest) {
                 // Maybe prevent default scroll.
                 if (scrolledIntoView(dest)) {
