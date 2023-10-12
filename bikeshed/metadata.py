@@ -73,6 +73,7 @@ class MetadataManager:
         self.defaultBiblioDisplay: str = "index"
         self.defaultRefStatus: str | None = None
         self.dieOn: str | None = None
+        self.dieWhen: str | None = None
         self.editors: list[dict[str, str | None]] = []
         self.editorTerm: dict[str, str] = {"singular": _("Editor"), "plural": _("Editors")}
         self.expires: date | None = None
@@ -988,6 +989,17 @@ def parseDieOn(key: str, val: str, lineNum: str | int | None) -> str:
     return "everything"
 
 
+def parseDieWhen(key: str, val: str, lineNum: str | int | None) -> str:
+    val = val.strip()
+    if val in ("early", "late"):
+        return val
+    m.die(
+        f"Die When metadata only accepts the values 'early' or 'late'. Got '{val}'.",
+        lineNum=lineNum,
+    )
+    return "late"
+
+
 def parse(lines: t.Sequence[Line]) -> tuple[list[Line], MetadataManager]:
     # Given HTML document text, in the form of an array of text lines,
     # extracts all <pre class=metadata> lines and parses their contents.
@@ -1303,6 +1315,7 @@ knownKeys = {
     "Default Highlight": Metadata("Default Highlight", "defaultHighlight", joinValue, parseLiteral),
     "Default Ref Status": Metadata("Default Ref Status", "defaultRefStatus", joinValue, parseRefStatus),
     "Die On": Metadata("Die On", "dieOn", joinValue, parseDieOn),
+    "Die When": Metadata("Die When", "dieWhen", joinValue, parseDieWhen),
     "ED": Metadata("ED", "ED", joinValue, parseLiteral),
     "Editor": Metadata("Editor", "editors", joinList, parseEditor),
     "Editor Term": Metadata("Editor Term", "editorTerm", joinValue, parseEditorTerm),
