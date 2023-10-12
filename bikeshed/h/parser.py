@@ -130,7 +130,7 @@ def parseNode(s: Stream, start: int, usesMarkdown: bool = True, usesCSS: bool = 
         node = Text(
             line=s.line(start),
             endLine=s.line(start),
-            text="—\u200b",
+            text="—",
         )
         return Result(node, i)
 
