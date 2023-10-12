@@ -375,6 +375,8 @@ class Spec:
         return outputFilename
 
     def finish(self, outputFilename: str | None = None, newline: str | None = None) -> None:
+        # Check the errors one more time.
+        m.retroactivelyCheckErrorLevel(timing="late")
         catchArgparseBug(outputFilename)
         self.printResultMessage()
         outputFilename = self.fixMissingOutputFilename(outputFilename)

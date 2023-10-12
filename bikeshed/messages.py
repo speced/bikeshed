@@ -20,6 +20,11 @@ MESSAGE_LEVELS = {
     "nothing": 6,
 }
 
+DEATH_TIMING = [
+    "early",  # die as soon as the first disallowed error occurs
+    "late",  # die at the end of processing
+]
+
 PRINT_MODES = [
     "plain",
     "console",
@@ -32,6 +37,8 @@ PRINT_MODES = [
 class MessagesState:
     # What message category (or higher) to stop processing on
     dieOn: str = "fatal"
+    # When to stop processing when an error that trips failure happens
+    dieWhen: str = "late"
     # What message category (or higher) to print
     printOn: str = "everything"
     # Suppress *all* categories, *plus* the final success/fail message
@@ -50,7 +57,9 @@ class MessagesState:
     def replace(self, **kwargs: t.Any) -> MessagesState:
         return dataclasses.replace(self, seenMessages=set(), categoryCounts=Counter(), **kwargs)
 
-    def shouldDie(self, category: str) -> bool:
+    def shouldDie(self, category: str, timing: str = "early") -> bool:
+        if self.dieWhen == "late" and timing == "early":
+            return False
         deathLevel = MESSAGE_LEVELS[self.dieOn]
         queriedLevel = MESSAGE_LEVELS[category]
         return queriedLevel >= deathLevel
@@ -178,11 +187,11 @@ def failure(msg: str) -> None:
         p(formatMessage("failure", msg))
 
 
-def retroactivelyCheckErrorLevel(level: str | None = None) -> bool:
+def retroactivelyCheckErrorLevel(level: str | None = None, timing: str = "early") -> bool:
     if level is None:
         level = state.dieOn
     for levelName, msgCount in state.categoryCounts.items():
-        if msgCount > 0 and state.shouldDie(levelName):
+        if msgCount > 0 and state.shouldDie(levelName, timing):
             errorAndExit()
     return True
 

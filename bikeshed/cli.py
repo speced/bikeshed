@@ -72,7 +72,14 @@ def main() -> None:
         "--die-on",
         dest="errorLevel",
         choices=list(m.MESSAGE_LEVELS.keys()),
-        help="Determines what sorts of errors cause Bikeshed to die (quit immediately with an error status code). Default is 'fatal'; the -f flag is a shorthand for 'nothing'",
+        help="Determines what sorts of errors cause Bikeshed to die (refuse to generate an output document). Default is 'fatal'; the -f flag is a shorthand for 'nothing'",
+    )
+    argparser.add_argument(
+        "--die-when",
+        dest="errorTiming",
+        choices=m.DEATH_TIMING,
+        default="late",
+        help="When a disallowed error should force Bikeshed to stop. 'early' causes it to stop immediately so you can deal with the first error; 'late' makes it process the entire document first and only stop at the end so you can see all the errors.",
     )
     argparser.add_argument(
         "--no-update",
@@ -430,6 +437,7 @@ def main() -> None:
         m.state.printOn = m.MessagesState.categoryName(options.quiet)
     if options.errorLevel is not None:
         m.state.dieOn = options.errorLevel
+    m.state.dieWhen = options.errorTiming
     m.state.asciiOnly = options.asciiOnly
     if options.printMode is None:
         if "NO_COLOR" in os.environ or os.environ.get("TERM") == "dumb":
