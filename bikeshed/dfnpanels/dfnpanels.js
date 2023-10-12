@@ -395,4 +395,9 @@
             }
         }
     }
+
+    window.addEventListener("resize", () => {
+        // Pin any visible dfn panel
+        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>pinDfnPanel(el));
+    });
 }
