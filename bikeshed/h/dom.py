@@ -837,8 +837,12 @@ def replaceMacros(text: str, macros: t.Mapping[str, str]) -> str:
     # otherwise, it throws a fatal error.
 
     def macroReplacer(match: re.Match) -> str:
-        text = match.group(1).lower()
-        optional = match.group(2) == "?"
+        text = match.group(1).lower().strip()
+        if text.endswith("?"):
+            text = text[:-1].strip()
+            optional = True
+        else:
+            optional = False
         if text in macros:
             # For some reason I store all the macros in lowercase,
             # despite requiring them to be spelled with uppercase.
@@ -849,7 +853,11 @@ def replaceMacros(text: str, macros: t.Mapping[str, str]) -> str:
         die(f"Found unmatched text macro [{match.group(1)}]. Correct the macro, or escape it somehow (leading backslash, html escape, etc).")
         return t.cast(str, "[" + match.group(0)[1:-1] + "]")
 
-    return re.sub("\uebbb([^?]+?)(\\??)\uebbc", macroReplacer, text)
+    while "\uebbb" in text:
+        # Loop, as macros might expand to more macros
+        # (which hopefully were HTML-parsed).
+        text = re.sub("\uebbb(.+?)\uebbc", macroReplacer, text)
+    return text
 
 
 def replaceMacrosTextly(text: str, macros: t.Mapping[str, str]) -> str:

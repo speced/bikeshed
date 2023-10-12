@@ -560,7 +560,7 @@ class WholeElement(ParserNode):
 @dataclass
 class Macro(ParserNode):
     name: str
-    optional: bool = False
+    optional: bool
 
     def __str__(self) -> str:
         # Use PUA characters to delimit the macro name
@@ -1201,12 +1201,11 @@ def parseMacro(s: Stream, start: int) -> Result:
     match, i = s.matchRe(start, macroRe)
     if match is Failure:
         return Result.fail(start)
-    text = match.group(1).lower()
     optional = match.group(2) == "?"
     macro = Macro(
         line=s.line(start),
         endLine=s.line(start),
-        name=text.lower(),
+        name=match.group(1),
         optional=optional,
     )
     return Result(macro, i)
