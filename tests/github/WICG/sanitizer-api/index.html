@@ -330,11 +330,15 @@ figcaption:not(.no-marker)::before {
 :root {
     --dfnpanel-bg: #ddd;
     --dfnpanel-text: var(--text);
+    --dfnpanel-target-bg: #ffc;
+    --dfnpanel-target-outline: orange;
 }
 @media (prefers-color-scheme: dark) {
     :root {
         --dfnpanel-bg: #222;
         --dfnpanel-text: var(--text);
+        --dfnpanel-target-bg: #333;
+        --dfnpanel-target-outline: silver;
     }
 }
 .dfn-panel {
@@ -357,11 +361,13 @@ figcaption:not(.no-marker)::before {
 .dfn-panel > b { display: block; }
 .dfn-panel a { color: var(--dfnpanel-text); }
 .dfn-panel a:not(:hover) { text-decoration: none !important; border-bottom: none !important; }
+.dfn-panel a:focus {
+    outline: 5px auto Highlight;
+    outline: 5px auto -webkit-focus-ring-color;
+}
 .dfn-panel > b + b { margin-top: 0.25em; }
 .dfn-panel ul { padding: 0 0 0 1em; list-style: none; }
 .dfn-panel li a {
-    /* white-space: pre; /* Do we need this? */
-    /* display: inline-block; /* This forces multiple refs to wrap */
     max-width: calc(300px - 1.5em - 1em);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -370,11 +376,12 @@ figcaption:not(.no-marker)::before {
 .dfn-panel.activated {
     display: inline-block;
     position: fixed;
-    left: .5em;
+    left: 8px;
     bottom: 2em;
     margin: 0 auto;
     max-width: calc(100vw - 1.5em - .4em - .5em);
     max-height: 30vh;
+    transition: left 1s ease-out, bottom 1s ease-out;
 }
 
 .dfn-panel .link-item:hover {
@@ -426,6 +433,22 @@ figcaption:not(.no-marker)::before {
 }
 
 .dfn-paneled[role="button"] { cursor: help; }
+
+.highlighted {
+    animation: target-fade 3s;
+}
+
+@keyframes target-fade {
+    from {
+        background-color: var(--dfnpanel-target-bg);
+        outline: 5px solid var(--dfnpanel-target-outline);
+    }
+    to {
+        color: var(--a-normal-text);
+        background-color: transparent;
+        outline: transparent;
+    }
+}
 </style>
 <style>/* Boilerplate: style-issues */
 a[href].issue-return {
@@ -1637,7 +1660,7 @@ describes, as is Internet Explorer’s <code class="idl"><a data-link-type="idl"
     }
 
     function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        return mk.aside({
+        const dfnPanel = mk.aside({
             class: "dfn-panel",
             id: `infopanel-for-${dfnID}`,
             "data-for": dfnID,
@@ -1652,9 +1675,7 @@ describes, as is Internet Explorer’s <code class="idl"><a data-link-type="idl"
                     mk.li({},
                         ...section.refs.map((ref, refI)=>
                             [
-                                mk.a({
-                                    href: `#${ref.id}`
-                                    },
+                                mk.a({ href: `#${ref.id}` },
                                     (refI == 0) ? section.title : `(${refI + 1})`
                                 ),
                                 " ",
@@ -1665,6 +1686,9 @@ describes, as is Internet Explorer’s <code class="idl"><a data-link-type="idl"
             ),
             genLinkingSyntaxes(dfn),
         );
+        dfnPanel.forDfn = dfn;
+        if(!dfn) { console.log(dfnPanel); }
+        return dfnPanel;
     }
 
     function genAllDfnPanels() {
@@ -1677,7 +1701,7 @@ describes, as is Internet Explorer’s <code class="idl"><a data-link-type="idl"
             }
             const panel = genDfnPanel({ ...panelData, dfn });
             append(document.body, panel);
-            insertDfnPopupAction(dfn, panel)
+            insertDfnPopupAction(panel)
         }
     }
 
@@ -1690,89 +1714,97 @@ describes, as is Internet Explorer’s <code class="idl"><a data-link-type="idl"
         });
     })
 
-
     function hideAllDfnPanels() {
         // Turn off any currently "on" or "activated" panels.
         queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
     }
 
-    function showDfnPanel(dfnPanel, dfn) {
+    function showDfnPanel(dfnPanel) {
         hideAllDfnPanels(); // Only display one at this time.
+
+        const dfn = dfnPanel.forDfn;
         dfn.setAttribute("aria-expanded", "true");
+
         dfnPanel.classList.add("on");
-        dfnPanel.style.left = "5px";
-        dfnPanel.style.top = "0px";
-        const panelRect = dfnPanel.getBoundingClientRect();
-        if (panelRect.right > document.body.scrollWidth) {
-            // Panel's overflowing the screen.
-            // Just drop it below the dfn and flip it rightward instead.
-            // This still wont' fix things if the screen is *really* wide,
-            // but fixing that's a lot harder without 'anchor()'.
-            dfnPanel.style.top = "1.5em";
-            dfnPanel.style.left = "auto";
-            dfnPanel.style.right = "0px";
+        positionDfnPanel(dfnPanel);
+
+        let tabIndex = 100;
+        dfn.tabIndex = tabIndex++;
+        // Increment tabindex for each anchor and button tags in panel
+        const tabbable = dfnPanel.querySelectorAll(":is(a, button)");
+        for (const el of tabbable) {
+            el.tabIndex = tabIndex++;
         }
+
     }
+
+    function positionDfnPanel(dfnPanel) {
+        const dfn = dfnPanel.forDfn;
+        const dfnPos = getRootLevelAbsolutePosition(dfn);
+        dfnPanel.style.top = dfnPos.bottom + "px";
+        dfnPanel.style.left = dfnPos.left + "px";
+
+        const panelPos = dfnPanel.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+            dfnPanel.style.left = newLeft + "px";
+        }}
 
     function pinDfnPanel(dfnPanel) {
         // Switch it to "activated" state, which pins it.
         dfnPanel.classList.add("activated");
+        dfnPanel.style.position = "fixed";
         dfnPanel.style.left = null;
         dfnPanel.style.top = null;
     }
 
-    function hideDfnPanel(dfnPanel, dfn) {
-        if(!dfn) {
-            dfn = document.getElementById(dfnPanel.getAttribute("data-for"));
-        }
-        dfn.setAttribute("aria-expanded", "false")
+    function hideDfnPanel(dfnPanel) {
+        const dfn = dfnPanel.forDfn;
+        dfn.setAttribute("aria-expanded", "false");
+        dfn.tabIndex = undefined;
+        dfnPanel.style.position = "absolute"; // unfix it
         dfnPanel.classList.remove("on");
         dfnPanel.classList.remove("activated");
     }
 
-    function toggleDfnPanel(dfnPanel, dfn) {
+    function toggleDfnPanel(dfnPanel) {
         if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel, dfn);
+            hideDfnPanel(dfnPanel);
         } else {
-            showDfnPanel(dfnPanel, dfn);
+            showDfnPanel(dfnPanel);
         }
     }
 
-    function insertDfnPopupAction(dfn, dfnPanel) {
-        // Find dfn panel
-        const panelWrapper = document.createElement('span');
-        panelWrapper.appendChild(dfnPanel);
-        panelWrapper.style.position = "relative";
-        panelWrapper.style.height = "0px";
-        dfn.insertAdjacentElement("afterend", panelWrapper);
+    function insertDfnPopupAction(dfnPanel) {
+        const dfn = dfnPanel.forDfn;
         dfn.setAttribute('role', 'button');
         dfn.setAttribute('aria-expanded', 'false')
         dfn.tabIndex = 0;
         dfn.classList.add('has-dfn-panel');
         dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel, dfn);
+            showDfnPanel(dfnPanel);
             event.stopPropagation();
         });
         dfn.addEventListener('keypress', (event) => {
             const kc = event.keyCode;
             // 32->Space, 13->Enter
             if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel, dfn);
+                toggleDfnPanel(dfnPanel);
                 event.stopPropagation();
                 event.preventDefault();
             }
         });
 
         dfnPanel.addEventListener('click', (event) => {
-            const node = event.target;
-            if (node.nodeName == 'A') {
-                if(node.classList.contains("dfn-link")) {
-                    // do nothing
-                } else {
-                    pinDfnPanel(dfnPanel);
-                }
+            if (event.target.nodeName == 'A') {
+                scrollToTargetAndHighlight(event);
+                pinDfnPanel(dfnPanel);
             }
             event.stopPropagation();
+            refocusOnTarget(event);
         });
 
         dfnPanel.addEventListener('keydown', (event) => {
@@ -1783,6 +1815,72 @@ describes, as is Internet Explorer’s <code class="idl"><a data-link-type="idl"
             }
         })
     }
+
+    function refocusOnTarget(event) {
+        const target = event.target;
+        setTimeout(() => {
+            // Refocus on the event.target element.
+            // This is needed after browser scrolls to the destination.
+            target.focus();
+        });
+    }
+
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function scrolledIntoView(element) {
+        const rect = element.getBoundingClientRect();
+        return (
+            rect.top > 0 &&
+            rect.bottom < window.innerHeight
+        );
+    }
+
+    function scrollToTargetAndHighlight(event) {
+        let hash = event.target.hash;
+        if (hash) {
+            hash = decodeURIComponent(hash.substring(1));
+            const dest = document.getElementById(hash);
+            if (dest) {
+                // Maybe prevent default scroll.
+                if (scrolledIntoView(dest)) {
+                    event.preventDefault();
+                }
+                dest.classList.add('highlighted');
+                setTimeout(() => dest.classList.remove('highlighted'), 1000);
+            }
+        }
+    }
+
+    window.addEventListener("resize", () => {
+        // Pin any visible dfn panel
+        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
+    });
 }
 </script>
 <script>/* Boilerplate: script-dfn-panel-json */
