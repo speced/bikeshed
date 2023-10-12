@@ -174,7 +174,7 @@
     }
 
     function genDfnPanel({ dfn, dfnID, url, dfnText, refSections, external }) {
-        return mk.aside({
+        const dfnPanel = mk.aside({
             class: "dfn-panel",
             id: `infopanel-for-${dfnID}`,
             "data-for": dfnID,
@@ -200,6 +200,9 @@
             ),
             genLinkingSyntaxes(dfn),
         );
+        dfnPanel.forDfn = dfn;
+        if(!dfn) { console.log(dfnPanel); }
+        return dfnPanel;
     }
 
     function genAllDfnPanels() {
@@ -212,7 +215,7 @@
             }
             const panel = genDfnPanel({ ...panelData, dfn });
             append(document.body, panel);
-            insertDfnPopupAction(dfn, panel)
+            insertDfnPopupAction(panel)
         }
     }
 
@@ -230,34 +233,14 @@
         queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>hideDfnPanel(el));
     }
 
-    function showDfnPanel(dfnPanel, dfn) {
+    function showDfnPanel(dfnPanel) {
         hideAllDfnPanels(); // Only display one at this time.
+
+        const dfn = dfnPanel.forDfn;
         dfn.setAttribute("aria-expanded", "true");
 
-        // Reinsert panel into the span following the dfn.
-        const dfnSpan = dfn.nextElementSibling;
-        dfnSpan.appendChild(dfnPanel);
-
         dfnPanel.classList.add("on");
-        dfnPanel.style.left = "5px";
-        dfnPanel.style.top = "0px";
-        const panelRect = dfnPanel.getBoundingClientRect();
-        if (panelRect.right > document.body.scrollWidth) {
-            // Panel's overflowing the screen.
-            // Just drop it below the dfn and flip it rightward instead.
-            // This still wont' fix things if the screen is *really* wide,
-            // but fixing that's a lot harder without 'anchor()'.
-            dfnPanel.style.top = "1.5em";
-            dfnPanel.style.left = "auto";
-            dfnPanel.style.right = "0px";
-        }
-
-        // Compute the root-level absolute position, and move it there.
-        const absPos = getRootLevelAbsolutePosition(dfnPanel);
-        document.body.appendChild(dfnPanel);
-        dfnPanel.style.position = "absolute";
-        dfnPanel.style.top = absPos.top + "px";
-        dfnPanel.style.left = absPos.left + "px";
+        positionDfnPanel(dfnPanel);
 
         let tabIndex = 100;
         dfn.tabIndex = tabIndex++;
@@ -269,6 +252,21 @@
 
     }
 
+    function positionDfnPanel(dfnPanel) {
+        const dfn = dfnPanel.forDfn;
+        const dfnPos = getRootLevelAbsolutePosition(dfn);
+        dfnPanel.style.top = dfnPos.bottom + "px";
+        dfnPanel.style.left = dfnPos.left + "px";
+
+        const panelPos = dfnPanel.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, dfnPos.left - overflowAmount);
+            dfnPanel.style.left = newLeft + "px";
+        }}
+
     function pinDfnPanel(dfnPanel) {
         // Switch it to "activated" state, which pins it.
         dfnPanel.classList.add("activated");
@@ -277,10 +275,8 @@
         dfnPanel.style.top = null;
     }
 
-    function hideDfnPanel(dfnPanel, dfn) {
-        if(!dfn) {
-            dfn = document.getElementById(dfnPanel.getAttribute("data-for"));
-        }
+    function hideDfnPanel(dfnPanel) {
+        const dfn = dfnPanel.forDfn;
         dfn.setAttribute("aria-expanded", "false");
         dfn.tabIndex = undefined;
         dfnPanel.style.position = "absolute"; // unfix it
@@ -288,33 +284,29 @@
         dfnPanel.classList.remove("activated");
     }
 
-    function toggleDfnPanel(dfnPanel, dfn) {
+    function toggleDfnPanel(dfnPanel) {
         if(dfnPanel.classList.contains("on")) {
-            hideDfnPanel(dfnPanel, dfn);
+            hideDfnPanel(dfnPanel);
         } else {
-            showDfnPanel(dfnPanel, dfn);
+            showDfnPanel(dfnPanel);
         }
     }
 
-    function insertDfnPopupAction(dfn, dfnPanel) {
-        const panelWrapper = document.createElement('span');
-        panelWrapper.appendChild(dfnPanel);
-        panelWrapper.style.position = "relative";
-        panelWrapper.style.height = "0px";
-        dfn.insertAdjacentElement("afterend", panelWrapper);
+    function insertDfnPopupAction(dfnPanel) {
+        const dfn = dfnPanel.forDfn;
         dfn.setAttribute('role', 'button');
         dfn.setAttribute('aria-expanded', 'false')
         dfn.tabIndex = 0;
         dfn.classList.add('has-dfn-panel');
         dfn.addEventListener('click', (event) => {
-            showDfnPanel(dfnPanel, dfn);
+            showDfnPanel(dfnPanel);
             event.stopPropagation();
         });
         dfn.addEventListener('keypress', (event) => {
             const kc = event.keyCode;
             // 32->Space, 13->Enter
             if(kc == 32 || kc == 13) {
-                toggleDfnPanel(dfnPanel, dfn);
+                toggleDfnPanel(dfnPanel);
                 event.stopPropagation();
                 event.preventDefault();
             }
@@ -349,6 +341,7 @@
 
     // Returns the root-level absolute position {left and top} of element.
     function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
         let xPos = 0;
         let yPos = 0;
 
@@ -368,7 +361,9 @@
         }
         return {
             left: xPos,
-            top: yPos
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
         };
     }
 
@@ -398,6 +393,6 @@
 
     window.addEventListener("resize", () => {
         // Pin any visible dfn panel
-        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>pinDfnPanel(el));
+        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(el=>positionDfnPanel(el));
     });
 }
