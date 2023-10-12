@@ -137,7 +137,7 @@ def parseNode(s: Stream, start: int, usesMarkdown: bool = True, usesCSS: bool = 
     return Result.fail(start)
 
 curlyApostropheRe = re.compile(r"\w'\w")
-emdashRe = re.compile(r"(?(?<!-)(—|--)\n\s*(?=\S)")
+emdashRe = re.compile(r"(?:(?<!-)(—|--))\n\s*(?=\S)")
 
 
 def parseAngleStart(s: Stream, start: int, usesMarkdown: bool = True, usesCSS: bool = True) -> Result:
