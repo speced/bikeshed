@@ -300,6 +300,13 @@ def parseText(text: str, startLine: int = 1, doc: t.SpecT | None = None) -> str:
     return strFromNodes(nodesFromHtml(text, startLine=startLine, doc=doc))
 
 
+def parseTitle(text: str, startLine: int = 1, doc: t.SpecT | None = None) -> str:
+    # Parses the text, but removes any tags from the content,
+    # as they'll just show up as literal text in <title>.
+    nodes = nodesFromHtml(text, startLine=startLine, doc=doc)
+    return strFromNodes(n for n in nodes if isinstance(n, (Text, Macro)))
+
+
 #
 #
 #

@@ -155,6 +155,24 @@ def outerHTML(el: t.NodesT | None, literal: bool = False, with_tail: bool = Fals
     return t.cast(str, tostring(el, with_tail=with_tail, encoding="unicode"))
 
 
+def printNodeTree(node: t.NodeT | str) -> str:
+    # Debugging tool
+    if isinstance(node, str):
+        return "#text: " + repr(node)
+    s = f"{serializeTag(node)}"
+    linesPerChild = [printNodeTree(child).split("\n") for child in childNodes(node)]
+    if linesPerChild:
+        for childLines in linesPerChild[:-1]:
+            childLines[0] = " ├" + childLines[0]
+            childLines[1:] = [" │" + line for line in childLines[1:]]
+            s += "\n" + "\n".join(childLines)
+        childLines = linesPerChild[-1]
+        childLines[0] = " ╰" + childLines[0]
+        childLines[1:] = ["  " + line for line in childLines[1:]]
+        s += "\n" + "\n".join(childLines)
+    return s
+
+
 def linkTextsFromElement(el: t.ElementT) -> list[str]:
     if el.get("data-lt") == "":
         return []

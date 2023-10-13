@@ -278,10 +278,11 @@ class MetadataManager:
     def fillTextMacros(self, macros: t.DefaultDict[str, str], doc: t.SpecT) -> None:
         # Fills up a set of text macros based on metadata.
         if self.title:
-            macros["title"] = self.title
-            macros["spectitle"] = self.title
+            macros["title"] = h.parseTitle(self.title, doc=doc)
         if self.h1:
-            macros["spectitle"] = self.h1
+            macros["spectitle"] = h.parseText(self.h1, doc=doc)
+        elif self.title:
+            macros["spectitle"] = h.parseText(self.title, doc=doc)
         if self.displayShortname:
             macros["shortname"] = self.displayShortname
         if self.statusText:
@@ -382,7 +383,7 @@ class MetadataManager:
             macros["customwarningtitle"] = h.parseText(self.customWarningTitle, doc=doc)
         # Custom macros
         for name, text in self.customTextMacros:
-            macros[name.lower()] = text
+            macros[name.lower()] = h.parseText(text, doc=doc)
 
 
 def parsedTextFromRawLines(lines: list[str], doc: t.SpecT, indent: int) -> str:
