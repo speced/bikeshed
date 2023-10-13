@@ -233,7 +233,7 @@ class Spec:
 
         # Convert to a single string of html now, for convenience.
         self.html = "".join(x.text for x in self.lines)
-        #boilerplate.addHeaderFooter(self)
+        boilerplate.addHeaderFooter(self)
         self.html = h.replaceMacros(self.html, self.macros)
 
         # Build the document
