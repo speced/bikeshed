@@ -159,7 +159,10 @@ def printNodeTree(node: t.NodeT | str) -> str:
     # Debugging tool
     if isinstance(node, str):
         return "#text: " + repr(node)
-    s = f"{serializeTag(node)}"
+    if isinstance(node, list):
+        s = "[]"
+    else:
+        s = f"{serializeTag(node)}"
     linesPerChild = [printNodeTree(child).split("\n") for child in childNodes(node)]
     if linesPerChild:
         for childLines in linesPerChild[:-1]:
