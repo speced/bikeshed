@@ -237,11 +237,9 @@ class Spec:
         self.html = h.replaceMacros(self.html, self.macros)
 
         # Build the document
-        print(self.html)
         self.document = h.parseDocument(self.html)
         headEl = h.find("head", self)
         bodyEl = h.find("body", self)
-        print(h.printNodeTree(bodyEl))
         assert headEl is not None
         assert bodyEl is not None
         self.head = headEl

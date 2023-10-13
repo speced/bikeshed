@@ -40,7 +40,9 @@ def nodesFromHtml(data: str, startLine: int = 1, doc: t.SpecT | None = None) -> 
 
     i = 0
     s = Stream(data, startLine=startLine)
-    _, i = parseDoctype(s, i)
+    dt, i = parseDoctype(s, i)
+    if dt is not Failure:
+        yield dt
     text = ""
     textI = 0
     node: ParserNode | None = None
@@ -517,6 +519,13 @@ class Text(ParserNode):
 
 
 @dataclass
+class Doctype(ParserNode):
+    data: str
+
+    def __str__(self) -> str:
+        return self.data
+
+@dataclass
 class StartTag(ParserNode):
     tag: str
     attrs: dict[str, str] = field(default_factory=dict)
@@ -941,7 +950,8 @@ def parseDoctype(s: Stream, start: int) -> Result:
     if s[start + 9 : start + 15].lower() != " html>":
         m.die("Unnecessarily complex doctype - use <!doctype html>.", lineNum=s.loc(start))
         return Result.fail(start)
-    return Result(True, start + 15)
+    node = Doctype(line=s.line(start), endLine=s.line(start+15), data=s[start:start+15])
+    return Result(node, start + 15)
 
 
 def parseScriptToEnd(s: Stream, start: int) -> Result:
