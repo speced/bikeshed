@@ -43,8 +43,9 @@ def nodesFromHtml(data: str, startLine: int = 1, doc: t.SpecT | None = None) -> 
     _, i = parseDoctype(s, i)
     text = ""
     textI = 0
+    node: ParserNode | None = None
     while not s.eof(i):
-        node, i = parseNode(s, i, usesMarkdown=usesMarkdown, usesCSS=usesCSS)
+        node, i = parseNode(s, i, usesMarkdown=usesMarkdown, usesCSS=usesCSS, lastNode=node)
         if node is Failure:
             text += s[i]
             i += 1
@@ -62,7 +63,7 @@ def nodesFromHtml(data: str, startLine: int = 1, doc: t.SpecT | None = None) -> 
         yield Text(startLine, endLine, text)
 
 
-def parseNode(s: Stream, start: int, usesMarkdown: bool = True, usesCSS: bool = True) -> Result:
+def parseNode(s: Stream, start: int, usesMarkdown: bool = True, usesCSS: bool = True, lastNode: ParserNode | None = None ) -> Result:
     # Produces a non-Text ParserNode (not a string)
     if s.eof(start):
         return Result.fail(start)
@@ -124,6 +125,15 @@ def parseNode(s: Stream, start: int, usesMarkdown: bool = True, usesCSS: bool = 
             text=s[start] + "’" + s[start+2],
         )
         return Result(node, i)
+    if isinstance(lastNode, (EndTag, RawElement, WholeElement)):
+        match, i = s.matchRe(start, curlyAposAfterElement)
+        if match is not Failure:
+            node = Text(
+                line=s.line(start),
+                endLine=s.line(i-1),
+                text="’" + s[start+1],
+            )
+            return Result(node, i)
     match, i = s.matchRe(start, emdashRe)
     if match is not Failure:
         # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
@@ -137,6 +147,7 @@ def parseNode(s: Stream, start: int, usesMarkdown: bool = True, usesCSS: bool = 
     return Result.fail(start)
 
 curlyApostropheRe = re.compile(r"\w'\w")
+curlyAposAfterElement = re.compile(r"'\w")
 emdashRe = re.compile(r"(?:(?<!-)(—|--))\n\s*(?=\S)")
 
 
