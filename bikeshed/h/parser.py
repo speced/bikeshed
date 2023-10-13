@@ -55,7 +55,7 @@ def nodesFromHtml(data: str, startLine: int = 1, doc: t.SpecT | None = None) -> 
                 endLine = startLine + len(text.split("\n")) - 1
                 yield Text(startLine, endLine, text)
                 text = ""
-            yield node
+            yield t.cast("ParserNode", node)
             textI = i
     if text:
         startLine = s.line(textI)
@@ -63,7 +63,13 @@ def nodesFromHtml(data: str, startLine: int = 1, doc: t.SpecT | None = None) -> 
         yield Text(startLine, endLine, text)
 
 
-def parseNode(s: Stream, start: int, usesMarkdown: bool = True, usesCSS: bool = True, lastNode: ParserNode | None = None ) -> Result:
+def parseNode(
+    s: Stream,
+    start: int,
+    usesMarkdown: bool = True,
+    usesCSS: bool = True,
+    lastNode: ParserNode | None = None,
+) -> Result:
     # Produces a non-Text ParserNode (not a string)
     if s.eof(start):
         return Result.fail(start)
@@ -97,12 +103,12 @@ def parseNode(s: Stream, start: int, usesMarkdown: bool = True, usesCSS: bool = 
             el, i = parseCSSMaybe(s, start)
             if el is not Failure:
                 return Result(el, i)
-    if s[start] == "[" and s[start-1] != "[":
+    if s[start] == "[" and s[start - 1] != "[":
         el, i = parseMacro(s, start)
         if el is not Failure:
             return Result(el, i)
-    if s[start:start+2] == "\\[":
-        if s[start+2].isalpha() or s[start+2].isdigit():
+    if s[start : start + 2] == "\\[":
+        if s[start + 2].isalpha() or s[start + 2].isdigit():
             # an escaped macro, so handle it here
             text = "["
         else:
@@ -116,13 +122,13 @@ def parseNode(s: Stream, start: int, usesMarkdown: bool = True, usesCSS: bool = 
             endLine=s.line(start),
             text=text,
         )
-        return Result(node, start+2)
+        return Result(node, start + 2)
     match, i = s.matchRe(start, curlyApostropheRe)
     if match is not Failure:
         node = Text(
             line=s.line(start),
-            endLine=s.line(i-1),
-            text=s[start] + "’" + s[start+2],
+            endLine=s.line(i - 1),
+            text=s[start] + "’" + s[start + 2],
         )
         return Result(node, i)
     if isinstance(lastNode, (EndTag, RawElement, WholeElement)):
@@ -130,8 +136,8 @@ def parseNode(s: Stream, start: int, usesMarkdown: bool = True, usesCSS: bool = 
         if match is not Failure:
             node = Text(
                 line=s.line(start),
-                endLine=s.line(i-1),
-                text="’" + s[start+1],
+                endLine=s.line(i - 1),
+                text="’" + s[start + 1],
             )
             return Result(node, i)
     match, i = s.matchRe(start, emdashRe)
@@ -145,6 +151,7 @@ def parseNode(s: Stream, start: int, usesMarkdown: bool = True, usesCSS: bool = 
         return Result(node, i)
 
     return Result.fail(start)
+
 
 curlyApostropheRe = re.compile(r"\w'\w")
 curlyAposAfterElement = re.compile(r"'\w")
@@ -588,8 +595,6 @@ class Macro(ParserNode):
         return macroRe.subn("\uebbb\\1\\2\uebbc", text)
 
 
-
-
 #
 #
 #
@@ -665,7 +670,6 @@ def parseStartTag(s: Stream, start: int) -> Result:
                 tag.attrs["bs-macro-attributes"] += f",{attrName}"
             else:
                 tag.attrs["bs-macro-attributes"] = attrName
-
 
     _, i = parseWhitespace(s, i)
 

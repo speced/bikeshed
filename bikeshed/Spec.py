@@ -8,7 +8,6 @@ import re
 import sys
 from collections import OrderedDict, defaultdict
 from datetime import datetime
-from functools import partial as curry
 
 from . import (
     InputSource,

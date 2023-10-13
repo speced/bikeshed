@@ -788,11 +788,6 @@ def hasOnlyChild(el: t.ElementT, wsAllowed: bool = True) -> t.ElementT | None:
 def fixTypography(text: str) -> str:
     # Replace straight aposes with curly quotes for possessives and contractions.
     return text
-    text = re.sub(r"([\w])'([\w])", r"\1’\2", text)
-    text = re.sub(r"(</[\w]+>)'([\w])", r"\1’\2", text)
-    # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
-    text = re.sub(r"([^<][^!])(—|--)\r?\n\s*(\S)", r"\1—<wbr>\3", text)
-    return text
 
 
 def fixSurroundingTypography(el: t.ElementT) -> t.ElementT:
@@ -850,7 +845,9 @@ def replaceMacros(text: str, macros: t.Mapping[str, str]) -> str:
         # Nothing has matched, so start failing the macros.
         if optional:
             return ""
-        die(f"Found unmatched text macro [{match.group(1)}]. Correct the macro, or escape it somehow (leading backslash, html escape, etc).")
+        die(
+            f"Found unmatched text macro [{match.group(1)}]. Correct the macro, or escape it somehow (leading backslash, html escape, etc).",
+        )
         return t.cast(str, "[" + match.group(0)[1:-1] + "]")
 
     while "\uebbb" in text:
