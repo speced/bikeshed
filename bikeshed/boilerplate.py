@@ -1045,7 +1045,7 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
             else:
                 parsed.append(v)
         if k in md:
-            md[k].append(parsed)
+            md[k].extend(parsed)
         else:
             otherMd[k] = t.cast("list[t.NodesT|None]", parsed)
 
@@ -1087,7 +1087,7 @@ def createMdEntry(key: str, dirtyVals: t.Sequence[MetadataValueT], doc: t.SpecT)
         ret = [h.E.dt(displayKey, ":")]
     # Add all the values, wrapping in a <dd> if necessary.
     for val in vals:
-        if h.isElement(val) and val.tag == "dd":
+        if h.isElement(val) and h.tagName(val) == "dd":
             ret.append(val)
         else:
             ret.append(h.E.dd({}, val))
