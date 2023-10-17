@@ -24,7 +24,23 @@ class InputContent:
 
     @property
     def lines(self) -> list[line.Line]:
-        return [line.Line(lineNo, text) for lineNo, text in enumerate(self.rawLines, 1)]
+        ret = []
+        offset = 0
+        for i,text in enumerate(self.rawLines, 1):
+            ret.append(line.Line(i + offset, text))
+            # FIXME:
+            # Right now, the Markdown parser runs after the early HTML parser,
+            # and the em-dash handling is the one spot where the number of
+            # newlines changes in the source.
+            # (I join the two lines so there's no space around the dash.)
+            # So, correct the remaining line numbers whenever I see an
+            # em-dash+ZWS, which is almost certainly created by Bikeshed.
+            # This code can be removed when Markdow parsing is done on the
+            # raw string, without having to re-encode the token stream
+            # back into strings first.
+            if "—\u200b" in text:
+                offset += text.count("—\u200b")
+        return ret
 
     @property
     def content(self) -> str:

@@ -148,7 +148,7 @@ def parseNode(
         node = Text(
             line=s.line(start),
             endLine=s.line(start),
-            text="—",
+            text="—\u200b", # em-dash and ZWS
         )
         return Result(node, i)
 
