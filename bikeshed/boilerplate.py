@@ -114,7 +114,7 @@ def addSpecVersion(doc: t.SpecT) -> None:
         except subprocess.CalledProcessError:
             pass
     if revision:
-        h.appendChild(doc.head, h.E.meta({"name": "document-revision", "content": revision}))
+        h.appendChild(doc.head, h.E.meta({"name": "revision", "content": revision}))
 
 
 def addHeaderFooter(doc: t.SpecT) -> None:
