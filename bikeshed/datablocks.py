@@ -611,7 +611,7 @@ def parseDefBlock(
         else:
             vals[key] = val
     for key, val in vals.items():
-        vals[key] = h.parseText(val)
+        vals[key] = h.parseText(val, h.ParseConfig.fromSpec(doc))
     return vals
 
 

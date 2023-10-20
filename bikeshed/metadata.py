@@ -278,11 +278,11 @@ class MetadataManager:
     def fillTextMacros(self, macros: t.DefaultDict[str, str], doc: t.SpecT) -> None:
         # Fills up a set of text macros based on metadata.
         if self.title:
-            macros["title"] = h.parseTitle(self.title, doc=doc)
+            macros["title"] = h.parseTitle(self.title, h.ParseConfig.fromSpec(doc))
         if self.h1:
-            macros["spectitle"] = h.parseText(self.h1, doc=doc)
+            macros["spectitle"] = h.parseText(self.h1, h.ParseConfig.fromSpec(doc))
         elif self.title:
-            macros["spectitle"] = h.parseText(self.title, doc=doc)
+            macros["spectitle"] = h.parseText(self.title, h.ParseConfig.fromSpec(doc))
         if self.displayShortname:
             macros["shortname"] = self.displayShortname
         if self.statusText:
@@ -380,14 +380,14 @@ class MetadataManager:
         if self.customWarningText is not None:
             macros["customwarningtext"] = parsedTextFromRawLines(self.customWarningText, doc=doc, indent=self.indent)
         if self.customWarningTitle is not None:
-            macros["customwarningtitle"] = h.parseText(self.customWarningTitle, doc=doc)
+            macros["customwarningtitle"] = h.parseText(self.customWarningTitle, h.ParseConfig.fromSpec(doc))
         # Custom macros
         for name, text in self.customTextMacros:
-            macros[name.lower()] = h.parseText(text, doc=doc)
+            macros[name.lower()] = h.parseText(text, h.ParseConfig.fromSpec(doc))
 
 
 def parsedTextFromRawLines(lines: list[str], doc: t.SpecT, indent: int) -> str:
-    lines = h.parseLines(lines, doc=doc)
+    lines = h.parseLines(lines, h.ParseConfig.fromSpec(doc))
     lines = datablocks.transformDataBlocks(doc, lines)
     return "\n".join(markdown.parse(lines, indent))
 

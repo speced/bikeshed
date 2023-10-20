@@ -20,24 +20,25 @@ def test() -> None:
 
     with io.open(os.path.abspath("test.txt"), "r") as fh:
         vals = "\n".join(x for x in json.load(fh).values())
-        list(nodesFromHtml(vals))
+        list(nodesFromHtml(vals, ParseConfig()))
 
 
 @dataclass
 class ParseConfig:
-    parseMarkdown: bool = True
-    parseCSS: bool = True
+    markdown: bool = False
+    css: bool = False
     macros: dict[str, str] = field(default_factory=dict)
 
+    @staticmethod
+    def fromSpec(doc: t.SpecT) -> ParseConfig:
+        return ParseConfig(
+            markdown="markdown" in doc.md.markupShorthands,
+            css="css" in doc.md.markupShorthands,
+            macros=doc.macros,
+        )
 
-def nodesFromHtml(data: str, startLine: int = 1, doc: t.SpecT | None = None) -> t.Generator[ParserNode, None, None]:
-    if doc:
-        usesMarkdown = "markdown" in doc.md.markupShorthands
-        usesCSS = "css" in doc.md.markupShorthands
-    else:
-        usesMarkdown = True
-        usesCSS = True
 
+def nodesFromHtml(data: str, config: ParseConfig, startLine: int = 1) -> t.Generator[ParserNode, None, None]:
     i = 0
     s = Stream(data, startLine=startLine)
     dt, i = parseDoctype(s, i)
@@ -47,7 +48,7 @@ def nodesFromHtml(data: str, startLine: int = 1, doc: t.SpecT | None = None) -> 
     textI = 0
     node: ParserNode | None = None
     while not s.eof(i):
-        node, i = parseNode(s, i, usesMarkdown=usesMarkdown, usesCSS=usesCSS, lastNode=node)
+        node, i = parseNode(s, i, config, lastNode=node)
         if node is Failure:
             text += s[i]
             i += 1
@@ -68,8 +69,7 @@ def nodesFromHtml(data: str, startLine: int = 1, doc: t.SpecT | None = None) -> 
 def parseNode(
     s: Stream,
     start: int,
-    usesMarkdown: bool = True,
-    usesCSS: bool = True,
+    config: ParseConfig,
     lastNode: ParserNode | None = None,
 ) -> Result:
     # Produces a non-Text ParserNode (not a string)
@@ -77,7 +77,7 @@ def parseNode(
         return Result.fail(start)
 
     if s[start] == "<":
-        node, i = parseAngleStart(s, start, usesMarkdown=usesMarkdown, usesCSS=usesCSS)
+        node, i = parseAngleStart(s, start, config)
         if node is not Failure:
             return Result(node, i)
 
@@ -88,7 +88,7 @@ def parseNode(
         el, i = parseFencedCodeBlock(s, start)
         if el is not Failure:
             return Result(el, i)
-    if usesMarkdown:
+    if config.markdown:
         if s[start] == "`":
             el, i = parseCodeSpan(s, start)
             if el is not Failure:
@@ -100,7 +100,7 @@ def parseNode(
                 text="`",
             )
             return Result(node, start + 2)
-    if usesCSS:
+    if config.css:
         if s[start] == "'":
             el, i = parseCSSMaybe(s, start)
             if el is not Failure:
@@ -160,7 +160,7 @@ curlyAposAfterElement = re.compile(r"'\w")
 emdashRe = re.compile(r"(?:(?<!-)(—|--))\n\s*(?=\S)")
 
 
-def parseAngleStart(s: Stream, start: int, usesMarkdown: bool = True, usesCSS: bool = True) -> Result:
+def parseAngleStart(s: Stream, start: int, config: ParseConfig) -> Result:
     # Assuming the stream starts with an <
     i = start + 1
     comment, i = parseComment(s, start)
@@ -228,7 +228,7 @@ def parseAngleStart(s: Stream, start: int, usesMarkdown: bool = True, usesCSS: b
     if endTag is not Failure:
         return Result(endTag, i)
 
-    if usesCSS:
+    if config.css:
         el, i = parseCSSProduction(s, start)
         if el is not Failure:
             return Result(el, i)
@@ -257,14 +257,14 @@ def isDatablockPre(tag: StartTag) -> bool:
     return any(x in tag.classes for x in datablockClasses)
 
 
-def initialDocumentParse(text: str, startLine: int = 1, doc: t.SpecT | None = None) -> list[ParserNode]:
+def initialDocumentParse(text: str, config: ParseConfig, startLine: int = 1) -> list[ParserNode]:
     # Just do a document parse.
     # This will add `bs-line-number` attributes,
     # normalize any difficult shorthands
     # (ones that look like tags, or that contain raw text),
     # and blank out comments.
 
-    return list(nodesFromHtml(text, startLine=startLine, doc=doc))
+    return list(nodesFromHtml(text, config, startLine=startLine))
 
 
 def strFromNodes(nodes: t.Iterable[ParserNode]) -> str:
@@ -279,7 +279,7 @@ def debugNodes(nodes: t.Iterable[ParserNode]) -> str:
     return "\n".join(repr(x) for x in nodes)
 
 
-def parseLines(textLines: list[str], startLine: int = 1, doc: t.SpecT | None = None) -> list[str]:
+def parseLines(textLines: list[str], config: ParseConfig, startLine: int = 1) -> list[str]:
     # Runs a list of lines thru the parser,
     # returning another list of lines.
 
@@ -290,22 +290,22 @@ def parseLines(textLines: list[str], startLine: int = 1, doc: t.SpecT | None = N
         text = "".join(textLines)
     else:
         text = "\n".join(textLines)
-    parsedLines = strFromNodes(nodesFromHtml(text, startLine=startLine, doc=doc)).split("\n")
+    parsedLines = strFromNodes(nodesFromHtml(text, config, startLine=startLine)).split("\n")
     if endingWithNewline:
         parsedLines = [x + "\n" for x in parsedLines]
 
     return parsedLines
 
 
-def parseText(text: str, startLine: int = 1, doc: t.SpecT | None = None) -> str:
+def parseText(text: str, config: ParseConfig, startLine: int = 1) -> str:
     # Just runs the text thru the parser.
-    return strFromNodes(nodesFromHtml(text, startLine=startLine, doc=doc))
+    return strFromNodes(nodesFromHtml(text, config, startLine=startLine))
 
 
-def parseTitle(text: str, startLine: int = 1, doc: t.SpecT | None = None) -> str:
+def parseTitle(text: str, config: ParseConfig, startLine: int = 1) -> str:
     # Parses the text, but removes any tags from the content,
     # as they'll just show up as literal text in <title>.
-    nodes = nodesFromHtml(text, startLine=startLine, doc=doc)
+    nodes = nodesFromHtml(text, config, startLine=startLine)
     return strFromNodes(n for n in nodes if isinstance(n, (Text, Macro)))
 
 
@@ -524,6 +524,7 @@ class Doctype(ParserNode):
 
     def __str__(self) -> str:
         return self.data
+
 
 @dataclass
 class StartTag(ParserNode):
@@ -950,7 +951,7 @@ def parseDoctype(s: Stream, start: int) -> Result:
     if s[start + 9 : start + 15].lower() != " html>":
         m.die("Unnecessarily complex doctype - use <!doctype html>.", lineNum=s.loc(start))
         return Result.fail(start)
-    node = Doctype(line=s.line(start), endLine=s.line(start+15), data=s[start:start+15])
+    node = Doctype(line=s.line(start), endLine=s.line(start + 15), data=s[start : start + 15])
     return Result(node, start + 15)
 
 

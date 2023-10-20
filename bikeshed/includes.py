@@ -75,7 +75,7 @@ def handleBikeshedInclude(el: t.ElementT, doc: t.SpecT) -> None:
             m.die("Nesting depth > 100, literally wtf are you doing.", el=el)
             h.removeNode(el)
             return
-        lines = h.parseLines(lines, doc=doc)
+        lines = h.parseLines(lines, h.ParseConfig.fromSpec(doc))
         lines = datablocks.transformDataBlocks(doc, lines)
         lines = markdown.parse(lines, doc.md.indent, opaqueElements=doc.md.opaqueElements)
         text = "".join(lines)

@@ -19,7 +19,7 @@ if t.TYPE_CHECKING:
 
 
 def boilerplateFromHtml(doc: t.SpecT, htmlString: str) -> t.NodesT:
-    htmlString = h.parseText(htmlString, doc=doc)
+    htmlString = h.parseText(htmlString, h.ParseConfig.fromSpec(doc))
     htmlString = h.replaceMacros(htmlString, doc.macros)
     htmlString = doc.fixText(htmlString)
     bp = h.E.div({}, h.parseHTML(htmlString))
@@ -123,7 +123,9 @@ def addHeaderFooter(doc: t.SpecT) -> None:
     header = retrieve.retrieveBoilerplateFile(doc, "header") if "header" in doc.md.boilerplate else ""
     footer = retrieve.retrieveBoilerplateFile(doc, "footer") if "footer" in doc.md.boilerplate else ""
 
-    doc.html = "\n".join([h.parseText(header, doc=doc), doc.html, h.parseText(footer, doc=doc)])
+    doc.html = "\n".join(
+        [h.parseText(header, h.ParseConfig.fromSpec(doc)), doc.html, h.parseText(footer, h.ParseConfig.fromSpec(doc))],
+    )
 
 
 def fillWith(tag: str, newElements: t.NodesT, doc: t.SpecT) -> None:
@@ -215,7 +217,7 @@ def addAtRisk(doc: t.SpecT) -> None:
         return
     html = "<p>The following features are at-risk, and may be dropped during the CR period:\n<ul>"
     for feature in doc.md.atRisk:
-        html += "<li>" + doc.fixText(h.parseText(feature))
+        html += "<li>" + doc.fixText(h.parseText(feature, h.ParseConfig.fromSpec(doc)))
     html += (
         "</ul><p>“At-risk” is a W3C Process term-of-art, and does not necessarily imply that the feature is in danger of being dropped or delayed. "
         + "It means that the WG believes the feature may have difficulty being interoperably implemented in a timely manner, "
@@ -1038,7 +1040,7 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
         parsed: list[t.NodesT] = []
         for v in vs:
             if isinstance(v, str):
-                htmlText = h.parseText(v, doc=doc)
+                htmlText = h.parseText(v, h.ParseConfig.fromSpec(doc))
                 htmlText = h.replaceMacros(htmlText, doc.macros)
                 htmlText = doc.fixText(htmlText)
                 parsed.append(h.parseHTML(htmlText))

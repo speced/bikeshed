@@ -82,6 +82,7 @@ from .parser import (
     Comment,
     EndTag,
     Failure,
+    ParseConfig,
     ParseFailure,
     Result,
     StartTag,
