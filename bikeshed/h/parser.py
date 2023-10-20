@@ -147,8 +147,8 @@ def parseNode(
         # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
         node = Text(
             line=s.line(start),
-            endLine=s.line(start),
-            text="—\u200b" + constants.incrementLineCountChar,
+            endLine=s.line(i),
+            text="—\u200b",
         )
         return Result(node, i)
 
@@ -272,8 +272,11 @@ def strFromNodes(nodes: t.Iterable[ParserNode], withIlcc=False) -> str:
     ilcc = constants.incrementLineCountChar
     for node in nodes:
         s = str(node)
-        if not withIlcc and ilcc in s:
-            s = s.replace(ilcc, "")
+        if withIlcc:
+            numLines = s.count("\n")
+            diffLineNo = node.endLine - node.line
+            if diffLineNo > numLines:
+                s += ilcc * (diffLineNo - numLines)
         strs.append(s)
     return "".join(strs)
 
@@ -548,16 +551,6 @@ class StartTag(ParserNode):
         if self.classes:
             s += f' class="{" ".join(sorted(self.classes))}"'
         s += ">"
-
-        # FIXME:
-        # Since I normalize whitespace inside a tag now,
-        # linebreaks are lost.
-        # This makes Markdown lose track of what line things are on.
-        # Emit a special marker for adding extra increments to the line
-        # so InputContent.lines can correct this spot, too.
-        if self.endLine > self.line:
-            diff = self.endLine - self.line
-            s += constants.incrementLineCountChar * diff
         return s
 
     def printEndTag(self) -> str:
