@@ -592,7 +592,7 @@ def parseParagraph(stream: TokenStream) -> list[l.Line]:
     initialPrefixLen = stream.currprefixlen()
     endTag = "</p>"
     if re.match(r"note[:,]\s*", line, re.I):
-        p = "<p class='replace-with-note-class'>"
+        p = f"<p bs-line-number={i} class='replace-with-note-class'>"
         matchNote = re.match(r"(note[:,])(\s*)(.*)", line, re.I)
         if matchNote:
             line = matchNote.group(3)
