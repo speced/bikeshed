@@ -11,8 +11,8 @@ import typing
 from abc import ABCMeta
 from dataclasses import dataclass, field
 
+from .. import constants, t
 from .. import messages as m
-from .. import t
 
 
 def test() -> None:
@@ -148,7 +148,7 @@ def parseNode(
         node = Text(
             line=s.line(start),
             endLine=s.line(start),
-            text="—\u200b", # em-dash and ZWS
+            text="—\u200b" + constants.incrementLineCountChar,
         )
         return Result(node, i)
 
@@ -267,8 +267,15 @@ def initialDocumentParse(text: str, config: ParseConfig, startLine: int = 1) -> 
     return list(nodesFromHtml(text, config, startLine=startLine))
 
 
-def strFromNodes(nodes: t.Iterable[ParserNode]) -> str:
-    return "".join(str(x) for x in nodes)
+def strFromNodes(nodes: t.Iterable[ParserNode], withIlcc=False) -> str:
+    strs = []
+    ilcc = constants.incrementLineCountChar
+    for node in nodes:
+        s = str(node)
+        if not withIlcc and ilcc in s:
+            s = s.replace(ilcc, "")
+        strs.append(s)
+    return "".join(strs)
 
 
 def linesFromNodes(nodes: t.Iterable[ParserNode]) -> list[str]:
@@ -533,15 +540,25 @@ class StartTag(ParserNode):
     classes: set[str] = field(default_factory=set)
 
     def __str__(self) -> str:
-        start = f"<{self.tag} bs-line-number={self.line}"
-        attrs = ""
+        s = f"<{self.tag} bs-line-number={self.line}"
         for k, v in sorted(self.attrs.items()):
             if k == "bs-line-number":
                 continue
-            attrs += f' {k}="{escapeAttr(v)}"'
+            s += f' {k}="{escapeAttr(v)}"'
         if self.classes:
-            attrs += f' class="{" ".join(sorted(self.classes))}"'
-        return start + attrs + ">"
+            s += f' class="{" ".join(sorted(self.classes))}"'
+        s += ">"
+
+        # FIXME:
+        # Since I normalize whitespace inside a tag now,
+        # linebreaks are lost.
+        # This makes Markdown lose track of what line things are on.
+        # Emit a special marker for adding extra increments to the line
+        # so InputContent.lines can correct this spot, too.
+        if self.endLine > self.line:
+            diff = self.endLine - self.line
+            s += constants.incrementLineCountChar * diff
+        return s
 
     def printEndTag(self) -> str:
         return f"</{self.tag}>"
@@ -603,13 +620,17 @@ class Macro(ParserNode):
 
     @staticmethod
     def encode(name: str, optional: bool = False) -> str:
-        return f"\uebbb{name}{'?' if optional else ''}\uebbc"
+        ms = constants.macroStartChar
+        me = constants.macroEndChar
+        return f"{ms}{name}{'?' if optional else ''}{me}"
 
     @staticmethod
     def parse(text: str) -> tuple[str, int]:
         # Looks for macros in the text and converts
         # them into the safely-encoded form.
-        return macroRe.subn("\uebbb\\1\\2\uebbc", text)
+        ms = constants.macroStartChar
+        me = constants.macroEndChar
+        return macroRe.subn(f"{ms}\\1\\2{me}", text)
 
 
 #

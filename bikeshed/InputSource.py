@@ -13,7 +13,7 @@ import attr
 import requests
 import tenacity
 
-from . import config, line, t
+from . import config, constants, line, t
 from . import messages as m
 
 
@@ -26,20 +26,24 @@ class InputContent:
     def lines(self) -> list[line.Line]:
         ret = []
         offset = 0
-        for i,text in enumerate(self.rawLines, 1):
-            ret.append(line.Line(i + offset, text))
-            # FIXME:
-            # Right now, the Markdown parser runs after the early HTML parser,
-            # and the em-dash handling is the one spot where the number of
-            # newlines changes in the source.
-            # (I join the two lines so there's no space around the dash.)
-            # So, correct the remaining line numbers whenever I see an
-            # em-dash+ZWS, which is almost certainly created by Bikeshed.
-            # This code can be removed when Markdow parsing is done on the
-            # raw string, without having to re-encode the token stream
-            # back into strings first.
-            if "—\u200b" in text:
-                offset += text.count("—\u200b")
+        for i, text in enumerate(self.rawLines, 1):
+            lineNo = i + offset
+            # The early HTML parser runs before Markdown,
+            # and in some cases removes linebreaks that were present
+            # in the source. When properly invoked, it inserts
+            # a special PUA char for each of these omitted linebreaks,
+            # so I can remove them here and properly increment the
+            # line number.
+            # Current known causes of this:
+            # * line-ending -- turned into em dashes
+            # * multi-line start tags
+            ilcc = constants.incrementLineCountChar
+            if ilcc in text:
+                offset += text.count(ilcc)
+                text = text.replace(ilcc, "")
+
+            ret.append(line.Line(lineNo, text))
+
         return ret
 
     @property

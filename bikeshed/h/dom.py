@@ -10,7 +10,7 @@ from lxml import etree
 from lxml.cssselect import CSSSelector
 from lxml.html import tostring
 
-from .. import t
+from .. import constants, t
 from ..messages import die, warn
 
 if t.TYPE_CHECKING:
@@ -874,7 +874,9 @@ def replaceMacros(text: str, macros: t.Mapping[str, str]) -> str:
     while "\uebbb" in text:
         # Loop, as macros might expand to more macros
         # (which hopefully were HTML-parsed).
-        text = re.sub("\uebbb(.+?)\uebbc", macroReplacer, text)
+        ms = constants.macroStartChar
+        me = constants.macroEndChar
+        text = re.sub(f"{ms}(.+?){me}", macroReplacer, text)
     return text
 
 
