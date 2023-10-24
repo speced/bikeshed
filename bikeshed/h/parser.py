@@ -72,14 +72,13 @@ def parseNode(
     config: ParseConfig,
     lastNode: ParserNode | None = None,
 ) -> Result:
-    # Produces a non-Text ParserNode (not a string)
     if s.eof(start):
         return Result.fail(start)
 
     if s[start] == "&":
         ch, i = parseCharRef(s, start)
         if ch is not Failure:
-            node = Text(text=ch,
+            node = Text(text=f"&#{ord(ch)};",
                 line=s.line(start),
                 endLine=s.line(i-1))
             return Result(node, i)
@@ -540,7 +539,7 @@ class Text(ParserNode):
     text: str
 
     def __str__(self) -> str:
-        return escapeHTML(self.text)
+        return self.text
 
 
 @dataclass
