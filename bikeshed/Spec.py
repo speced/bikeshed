@@ -166,7 +166,6 @@ class Spec:
         u.stripBOM(self)
         if self.lineNumbers:
             self.lines = u.hackyLineNumbers(self.lines)
-        self.lines = markdown.stripComments(self.lines)
         self.recordDependencies(self.inputSource)
         # Extract and process metadata
         self.lines, self.mdDocument = metadata.parse(lines=self.lines)

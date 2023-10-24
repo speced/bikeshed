@@ -279,6 +279,13 @@ def strFromNodes(nodes: t.Iterable[ParserNode], withIlcc=False) -> str:
     strs = []
     ilcc = constants.incrementLineCountChar
     for node in nodes:
+        if isinstance(node, Comment):
+            # Serialize comments as a standardized, recognizable sequence
+            # so Markdown processing can ignore them better.
+            strs.append(constants.bsComment)
+            if withIlcc:
+                strs.append(ilcc * node.data.count("\n"))
+            continue
         s = str(node)
         if withIlcc:
             numLines = s.count("\n")
@@ -587,7 +594,7 @@ class Comment(ParserNode):
     data: str
 
     def __str__(self) -> str:
-        return f"<!--{self.data}-->"
+        return f"<!--{escapeHTML(self.data)}-->"
 
 
 @dataclass

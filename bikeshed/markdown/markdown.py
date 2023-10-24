@@ -3,7 +3,7 @@ from __future__ import annotations
 import functools
 import re
 
-from .. import h, t
+from .. import constants, h, t
 from .. import line as l
 from .. import messages as m
 
@@ -158,6 +158,11 @@ def tokenizeLines(
     rawElements = "|".join(re.escape(x) for x in opaqueElements)
 
     for i, line in enumerate(lines):
+
+        # Skip lines that are entirely a censored comment.
+        if line.text.strip() == constants.bsComment:
+            continue
+
         # Three kinds of "raw" elements, which prevent markdown processing inside of them.
         # 1. <pre> and manual opaque elements, which can contain markup and so can nest.
         # 2. <xmp>, <script>, and <style>, which contain raw text, can't nest.
@@ -315,56 +320,6 @@ def tokenizeLines(
             )
 
     return tokens
-
-
-def stripComments(lines: list[l.Line]) -> list[l.Line]:
-    """
-    Eagerly strip comments, because the serializer can't output them right now anyway,
-    and they trigger some funky errors.
-    """
-    output = []
-    inComment = False
-    for line in lines:
-        text, inComment = stripCommentsFromLine(line.text, inComment)
-        if (line.text != text and text.strip() == "") or (line.text.strip() == "" and inComment):
-            # First covers the entire line being stripped away by comment-removal.
-            # Second covers an empty line that was fully inside a comment.
-            # (If a comment started or ended on that line, it wouldn't start out empty.)
-            # By removing these entirely, we avoid breaking Markdown constructs with their middles commented out or something.
-            # (Rather than leaving them in as blank lines.)
-            continue
-        else:
-            # Otherwise, just process whatever's left as normal.
-            if line.text.endswith("\n") and not text.endswith("\n"):
-                # Put back the newline, in case it got swallowed by an unclosed comment.
-                text += "\n"
-            line.text = text
-            output.append(line)
-    return output
-
-
-def stripCommentsFromLine(line: str, inComment: bool = False) -> tuple[str, bool]:
-    # Removes HTML comments from the line.
-    # Returns true if the comment wasn't closed by the end of the line
-    if inComment:
-        # The line starts out in a comment.
-        pre, sep, post = line.partition("-->")
-        if sep == "":
-            # The entire line is a comment
-            return "", True
-        else:
-            # Drop the comment part, see if there are any more
-            return stripCommentsFromLine(post)
-    else:
-        # The line starts out as non-comment content.
-        pre, sep, post = line.partition("<!--")
-        if sep == "":
-            # No comments in the line
-            return pre, False
-        else:
-            # Keep the non-comment part, see if there's any more to do
-            res, inComment = stripCommentsFromLine(post, inComment=True)
-            return pre + res, inComment
 
 
 def prefixCount(text: str, numSpacesForIndentation: int) -> int:
