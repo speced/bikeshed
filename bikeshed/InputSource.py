@@ -13,7 +13,7 @@ import attr
 import requests
 import tenacity
 
-from . import config, line, t
+from . import config, constants, line, t
 from . import messages as m
 
 
@@ -24,7 +24,27 @@ class InputContent:
 
     @property
     def lines(self) -> list[line.Line]:
-        return [line.Line(lineNo, text) for lineNo, text in enumerate(self.rawLines, 1)]
+        ret = []
+        offset = 0
+        for i, text in enumerate(self.rawLines, 1):
+            lineNo = i + offset
+            # The early HTML parser runs before Markdown,
+            # and in some cases removes linebreaks that were present
+            # in the source. When properly invoked, it inserts
+            # a special PUA char for each of these omitted linebreaks,
+            # so I can remove them here and properly increment the
+            # line number.
+            # Current known causes of this:
+            # * line-ending -- turned into em dashes
+            # * multi-line start tags
+            ilcc = constants.incrementLineCountChar
+            if ilcc in text:
+                offset += text.count(ilcc)
+                text = text.replace(ilcc, "")
+
+            ret.append(line.Line(lineNo, text))
+
+        return ret
 
     @property
     def content(self) -> str:

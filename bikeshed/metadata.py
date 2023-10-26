@@ -278,14 +278,15 @@ class MetadataManager:
     def fillTextMacros(self, macros: t.DefaultDict[str, str], doc: t.SpecT) -> None:
         # Fills up a set of text macros based on metadata.
         if self.title:
-            macros["title"] = self.title
-            macros["spectitle"] = self.title
+            macros["title"] = h.parseTitle(self.title, h.ParseConfig.fromSpec(doc))
         if self.h1:
-            macros["spectitle"] = self.h1
+            macros["spectitle"] = h.parseText(self.h1, h.ParseConfig.fromSpec(doc))
+        elif self.title:
+            macros["spectitle"] = h.parseText(self.title, h.ParseConfig.fromSpec(doc))
         if self.displayShortname:
             macros["shortname"] = self.displayShortname
         if self.statusText:
-            macros["statustext"] = "\n".join(markdown.parse(self.statusText, self.indent))
+            macros["statustext"] = parsedTextFromRawLines(self.statusText, doc=doc, indent=self.indent)
         else:
             macros["statustext"] = ""
         macros["level"] = str(self.level)
@@ -312,9 +313,7 @@ class MetadataManager:
         if self.TR:
             macros["latest"] = self.TR
         if self.abstract:
-            abstractLines: list[str] = h.parseLines(self.abstract, doc=doc)
-            abstractLines = datablocks.transformDataBlocks(doc, abstractLines)
-            macros["abstract"] = "\n".join(markdown.parse(abstractLines, self.indent))
+            macros["abstract"] = parsedTextFromRawLines(self.abstract, doc=doc, indent=self.indent)
         elif self.noAbstract:
             macros["abstract"] = ""
         macros["year"] = str(self.date.year)
@@ -379,12 +378,18 @@ class MetadataManager:
             macros["w3c-stylesheet-url"] = f"https://www.w3.org/StyleSheets/TR/2021/W3C-{shortStatus}"
             macros["w3c-status-url"] = f"https://www.w3.org/standards/types#{shortStatus}"
         if self.customWarningText is not None:
-            macros["customwarningtext"] = "\n".join(markdown.parse(self.customWarningText, self.indent))
+            macros["customwarningtext"] = parsedTextFromRawLines(self.customWarningText, doc=doc, indent=self.indent)
         if self.customWarningTitle is not None:
-            macros["customwarningtitle"] = self.customWarningTitle
+            macros["customwarningtitle"] = h.parseText(self.customWarningTitle, h.ParseConfig.fromSpec(doc))
         # Custom macros
         for name, text in self.customTextMacros:
-            macros[name.lower()] = text
+            macros[name.lower()] = h.parseText(text, h.ParseConfig.fromSpec(doc))
+
+
+def parsedTextFromRawLines(lines: list[str], doc: t.SpecT, indent: int) -> str:
+    lines = h.parseLines(lines, h.ParseConfig.fromSpec(doc))
+    lines = datablocks.transformDataBlocks(doc, lines)
+    return "\n".join(markdown.parse(lines, indent))
 
 
 if t.TYPE_CHECKING:

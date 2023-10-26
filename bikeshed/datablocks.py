@@ -7,7 +7,7 @@ from functools import reduce
 
 import attr
 
-from . import biblio, config, h, printjson, refs, t
+from . import biblio, config, constants, h, printjson, refs, t
 from . import messages as m
 from .line import Line
 
@@ -91,6 +91,8 @@ def transformDataBlocks(doc: t.SpecT, lines: list[Line] | list[str]) -> list[Lin
     blockLines: list[Line] = []
     newLines: list[Line] = []
     for line in _lines:
+        if line.text.strip() == constants.bsComment:
+            continue
         # Look for the start of a block.
         match = re.match(r"\s*<(pre|xmp)[\s>]", line.text, re.I)
         # Note that, by design, I don't pay attention to anything on the same line as the start tag,
@@ -611,7 +613,7 @@ def parseDefBlock(
         else:
             vals[key] = val
     for key, val in vals.items():
-        vals[key] = h.parseText(val)
+        vals[key] = h.parseText(val, h.ParseConfig.fromSpec(doc))
     return vals
 
 
@@ -1058,6 +1060,10 @@ def parseInfoTree(lines: list[str], indent: int = 4, lineNum: int | None = 0) ->
         else:
             thisLine = None
         if line.strip() == "":
+            continue
+        if re.match(r"^\s*<!--.*-->\s*$", line):
+            # HTML comment filling the whole line,
+            # go ahead and strip it
             continue
         ws, text = t.cast("re.Match", re.match(r"(\s*)(.*)", line)).groups()
         if text.startswith("#"):  # comment

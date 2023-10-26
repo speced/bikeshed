@@ -10,7 +10,7 @@ from lxml import etree
 from lxml.cssselect import CSSSelector
 from lxml.html import tostring
 
-from .. import t
+from .. import constants, t
 from ..messages import die, warn
 
 if t.TYPE_CHECKING:
@@ -153,6 +153,27 @@ def outerHTML(el: t.NodesT | None, literal: bool = False, with_tail: bool = Fals
     if el.get("bs-autolink-syntax") is not None and not literal:
         return el.get("bs-autolink-syntax") or ""
     return t.cast(str, tostring(el, with_tail=with_tail, encoding="unicode"))
+
+
+def printNodeTree(node: t.NodeT | str) -> str:
+    # Debugging tool
+    if isinstance(node, str):
+        return "#text: " + repr(node)
+    if isinstance(node, list):
+        s = "[]"
+    else:
+        s = f"{serializeTag(node)}"
+    linesPerChild = [printNodeTree(child).split("\n") for child in childNodes(node)]
+    if linesPerChild:
+        for childLines in linesPerChild[:-1]:
+            childLines[0] = " ├" + childLines[0]
+            childLines[1:] = [" │" + line for line in childLines[1:]]
+            s += "\n" + "\n".join(childLines)
+        childLines = linesPerChild[-1]
+        childLines[0] = " ╰" + childLines[0]
+        childLines[1:] = ["  " + line for line in childLines[1:]]
+        s += "\n" + "\n".join(childLines)
+    return s
 
 
 def linkTextsFromElement(el: t.ElementT) -> list[str]:
@@ -787,10 +808,6 @@ def hasOnlyChild(el: t.ElementT, wsAllowed: bool = True) -> t.ElementT | None:
 
 def fixTypography(text: str) -> str:
     # Replace straight aposes with curly quotes for possessives and contractions.
-    text = re.sub(r"([\w])'([\w])", r"\1’\2", text)
-    text = re.sub(r"(</[\w]+>)'([\w])", r"\1’\2", text)
-    # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
-    text = re.sub(r"([^<][^!])(—|--)\r?\n\s*(\S)", r"\1—<wbr>\3", text)
     return text
 
 
@@ -834,6 +851,39 @@ def replaceMacros(text: str, macros: t.Mapping[str, str]) -> str:
     # Macro syntax is [FOO], where FOO is /[A-Z0-9-]+/
     # If written as [FOO?], failure to find a matching macro just replaced it with nothing;
     # otherwise, it throws a fatal error.
+
+    def macroReplacer(match: re.Match) -> str:
+        text = match.group(1).lower().strip()
+        if text.endswith("?"):
+            text = text[:-1].strip()
+            optional = True
+        else:
+            optional = False
+        if text in macros:
+            # For some reason I store all the macros in lowercase,
+            # despite requiring them to be spelled with uppercase.
+            return str(macros[text])
+        # Nothing has matched, so start failing the macros.
+        if optional:
+            return ""
+        die(
+            f"Found unmatched text macro [{match.group(1)}]. Correct the macro, or escape it somehow (leading backslash, html escape, etc).",
+        )
+        return t.cast(str, "[" + match.group(0)[1:-1] + "]")
+
+    while "\uebbb" in text:
+        # Loop, as macros might expand to more macros
+        # (which hopefully were HTML-parsed).
+        ms = constants.macroStartChar
+        me = constants.macroEndChar
+        text = re.sub(f"{ms}(.+?){me}", macroReplacer, text)
+    return text
+
+
+def replaceMacrosTextly(text: str, macros: t.Mapping[str, str]) -> str:
+    # Same as replaceMacros(), but does the substitution
+    # directly on the text, rather than relying on the
+    # html parser to have preparsed the macro syntax
     def macroReplacer(match: re.Match) -> str:
         fullText = t.cast(str, match.group(0))
         innerText = match.group(2).lower() or ""

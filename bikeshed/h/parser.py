@@ -11,8 +11,8 @@ import typing
 from abc import ABCMeta
 from dataclasses import dataclass, field
 
+from .. import constants, t
 from .. import messages as m
-from .. import t
 
 
 def test() -> None:
@@ -20,24 +20,35 @@ def test() -> None:
 
     with io.open(os.path.abspath("test.txt"), "r") as fh:
         vals = "\n".join(x for x in json.load(fh).values())
-        list(nodesFromHtml(vals))
+        list(nodesFromHtml(vals, ParseConfig()))
 
 
-def nodesFromHtml(data: str, startLine: int = 1, doc: t.SpecT | None = None) -> t.Generator[ParserNode, None, None]:
-    if doc:
-        usesMarkdown = "markdown" in doc.md.markupShorthands
-        usesCSS = "css" in doc.md.markupShorthands
-    else:
-        usesMarkdown = True
-        usesCSS = True
+@dataclass
+class ParseConfig:
+    markdown: bool = False
+    css: bool = False
+    macros: dict[str, str] = field(default_factory=dict)
 
+    @staticmethod
+    def fromSpec(doc: t.SpecT) -> ParseConfig:
+        return ParseConfig(
+            markdown="markdown" in doc.md.markupShorthands,
+            css="css" in doc.md.markupShorthands,
+            macros=doc.macros,
+        )
+
+
+def nodesFromHtml(data: str, config: ParseConfig, startLine: int = 1) -> t.Generator[ParserNode, None, None]:
     i = 0
     s = Stream(data, startLine=startLine)
-    _, i = parseDoctype(s, i)
+    dt, i = parseDoctype(s, i)
+    if dt is not Failure:
+        yield dt
     text = ""
     textI = 0
+    node: ParserNode | None = None
     while not s.eof(i):
-        node, i = parseNode(s, i, usesMarkdown=usesMarkdown, usesCSS=usesCSS)
+        node, i = parseNode(s, i, config, lastNode=node)
         if node is Failure:
             text += s[i]
             i += 1
@@ -47,7 +58,7 @@ def nodesFromHtml(data: str, startLine: int = 1, doc: t.SpecT | None = None) -> 
                 endLine = startLine + len(text.split("\n")) - 1
                 yield Text(startLine, endLine, text)
                 text = ""
-            yield node
+            yield t.cast("ParserNode", node)
             textI = i
     if text:
         startLine = s.line(textI)
@@ -55,13 +66,23 @@ def nodesFromHtml(data: str, startLine: int = 1, doc: t.SpecT | None = None) -> 
         yield Text(startLine, endLine, text)
 
 
-def parseNode(s: Stream, start: int, usesMarkdown: bool = True, usesCSS: bool = True) -> Result:
-    # Produces a non-Text ParserNode (not a string)
+def parseNode(
+    s: Stream,
+    start: int,
+    config: ParseConfig,
+    lastNode: ParserNode | None = None,
+) -> Result:
     if s.eof(start):
         return Result.fail(start)
 
+    if s[start] == "&":
+        ch, i = parseCharRef(s, start)
+        if ch is not Failure:
+            node = Text(text=f"&#{ord(ch)};", line=s.line(start), endLine=s.line(i - 1))
+            return Result(node, i)
+
     if s[start] == "<":
-        node, i = parseAngleStart(s, start, usesMarkdown=usesMarkdown, usesCSS=usesCSS)
+        node, i = parseAngleStart(s, start, config)
         if node is not Failure:
             return Result(node, i)
 
@@ -72,7 +93,7 @@ def parseNode(s: Stream, start: int, usesMarkdown: bool = True, usesCSS: bool = 
         el, i = parseFencedCodeBlock(s, start)
         if el is not Failure:
             return Result(el, i)
-    if usesMarkdown:
+    if config.markdown:
         if s[start] == "`":
             el, i = parseCodeSpan(s, start)
             if el is not Failure:
@@ -84,16 +105,67 @@ def parseNode(s: Stream, start: int, usesMarkdown: bool = True, usesCSS: bool = 
                 text="`",
             )
             return Result(node, start + 2)
-    if usesCSS:
+    if config.css:
         if s[start] == "'":
             el, i = parseCSSMaybe(s, start)
             if el is not Failure:
                 return Result(el, i)
+    if s[start] == "[" and s[start - 1] != "[":
+        el, i = parseMacro(s, start)
+        if el is not Failure:
+            return Result(el, i)
+    if s[start : start + 2] == "\\[":
+        if s[start + 2].isalpha() or s[start + 2].isdigit():
+            # an escaped macro, so handle it here
+            text = "["
+        else:
+            # actually an escaped biblio or autolink, so let the
+            # biblio/autolink code handle it for now.
+            # FIXME when biblio shorthands are built into
+            # this parser
+            text = "\\["
+        node = Text(
+            line=s.line(start),
+            endLine=s.line(start),
+            text=text,
+        )
+        return Result(node, start + 2)
+    match, i = s.matchRe(start, curlyApostropheRe)
+    if match is not Failure:
+        node = Text(
+            line=s.line(start),
+            endLine=s.line(i - 1),
+            text=s[start] + "’" + s[start + 2],
+        )
+        return Result(node, i)
+    if isinstance(lastNode, (EndTag, RawElement, WholeElement)):
+        match, i = s.matchRe(start, curlyAposAfterElement)
+        if match is not Failure:
+            node = Text(
+                line=s.line(start),
+                endLine=s.line(i - 1),
+                text="’" + s[start + 1],
+            )
+            return Result(node, i)
+    match, i = s.matchRe(start, emdashRe)
+    if match is not Failure:
+        # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
+        node = Text(
+            line=s.line(start),
+            endLine=s.line(i),
+            text="—\u200b",
+        )
+        return Result(node, i)
 
     return Result.fail(start)
 
 
-def parseAngleStart(s: Stream, start: int, usesMarkdown: bool = True, usesCSS: bool = True) -> Result:
+curlyApostropheRe = re.compile(r"\w'\w")
+curlyAposAfterElement = re.compile(r"'\w")
+emdashRe = re.compile(r"(?:(?<!-)(—|--))\n\s*(?=\S)")
+
+
+def parseAngleStart(s: Stream, start: int, config: ParseConfig) -> Result:
     # Assuming the stream starts with an <
     i = start + 1
     comment, i = parseComment(s, start)
@@ -161,7 +233,7 @@ def parseAngleStart(s: Stream, start: int, usesMarkdown: bool = True, usesCSS: b
     if endTag is not Failure:
         return Result(endTag, i)
 
-    if usesCSS:
+    if config.css:
         el, i = parseCSSProduction(s, start)
         if el is not Failure:
             return Result(el, i)
@@ -190,18 +262,35 @@ def isDatablockPre(tag: StartTag) -> bool:
     return any(x in tag.classes for x in datablockClasses)
 
 
-def initialDocumentParse(text: str, startLine: int = 1, doc: t.SpecT | None = None) -> list[ParserNode]:
+def initialDocumentParse(text: str, config: ParseConfig, startLine: int = 1) -> list[ParserNode]:
     # Just do a document parse.
     # This will add `bs-line-number` attributes,
     # normalize any difficult shorthands
     # (ones that look like tags, or that contain raw text),
     # and blank out comments.
 
-    return list(nodesFromHtml(text, startLine=startLine, doc=doc))
+    return list(nodesFromHtml(text, config, startLine=startLine))
 
 
-def strFromNodes(nodes: t.Iterable[ParserNode]) -> str:
-    return "".join(str(x) for x in nodes)
+def strFromNodes(nodes: t.Iterable[ParserNode], withIlcc: bool = False) -> str:
+    strs = []
+    ilcc = constants.incrementLineCountChar
+    for node in nodes:
+        if isinstance(node, Comment):
+            # Serialize comments as a standardized, recognizable sequence
+            # so Markdown processing can ignore them better.
+            strs.append(constants.bsComment)
+            if withIlcc:
+                strs.append(ilcc * node.data.count("\n"))
+            continue
+        s = str(node)
+        if withIlcc:
+            numLines = s.count("\n")
+            diffLineNo = node.endLine - node.line
+            if diffLineNo > numLines:
+                s += ilcc * (diffLineNo - numLines)
+        strs.append(s)
+    return "".join(strs)
 
 
 def linesFromNodes(nodes: t.Iterable[ParserNode]) -> list[str]:
@@ -212,7 +301,7 @@ def debugNodes(nodes: t.Iterable[ParserNode]) -> str:
     return "\n".join(repr(x) for x in nodes)
 
 
-def parseLines(textLines: list[str], startLine: int = 1, doc: t.SpecT | None = None) -> list[str]:
+def parseLines(textLines: list[str], config: ParseConfig, startLine: int = 1) -> list[str]:
     # Runs a list of lines thru the parser,
     # returning another list of lines.
 
@@ -223,16 +312,23 @@ def parseLines(textLines: list[str], startLine: int = 1, doc: t.SpecT | None = N
         text = "".join(textLines)
     else:
         text = "\n".join(textLines)
-    parsedLines = strFromNodes(nodesFromHtml(text, startLine=startLine, doc=doc)).split("\n")
+    parsedLines = strFromNodes(nodesFromHtml(text, config, startLine=startLine)).split("\n")
     if endingWithNewline:
         parsedLines = [x + "\n" for x in parsedLines]
 
     return parsedLines
 
 
-def parseText(text: str, startLine: int = 1, doc: t.SpecT | None = None) -> str:
+def parseText(text: str, config: ParseConfig, startLine: int = 1) -> str:
     # Just runs the text thru the parser.
-    return strFromNodes(nodesFromHtml(text, startLine=startLine, doc=doc))
+    return strFromNodes(nodesFromHtml(text, config, startLine=startLine))
+
+
+def parseTitle(text: str, config: ParseConfig, startLine: int = 1) -> str:
+    # Parses the text, but removes any tags from the content,
+    # as they'll just show up as literal text in <title>.
+    nodes = nodesFromHtml(text, config, startLine=startLine)
+    return strFromNodes(n for n in nodes if isinstance(n, (Text, Macro)))
 
 
 #
@@ -445,21 +541,29 @@ class Text(ParserNode):
 
 
 @dataclass
+class Doctype(ParserNode):
+    data: str
+
+    def __str__(self) -> str:
+        return self.data
+
+
+@dataclass
 class StartTag(ParserNode):
     tag: str
     attrs: dict[str, str] = field(default_factory=dict)
     classes: set[str] = field(default_factory=set)
 
     def __str__(self) -> str:
-        start = f"<{self.tag} bs-line-number={self.line}"
-        attrs = ""
+        s = f"<{self.tag} bs-line-number={self.line}"
         for k, v in sorted(self.attrs.items()):
             if k == "bs-line-number":
                 continue
-            attrs += f' {k}="{escapeAttr(v)}"'
+            s += f' {k}="{escapeAttr(v)}"'
         if self.classes:
-            attrs += f' class="{" ".join(sorted(self.classes))}"'
-        return start + attrs + ">"
+            s += f' class="{" ".join(sorted(self.classes))}"'
+        s += ">"
+        return s
 
     def printEndTag(self) -> str:
         return f"</{self.tag}>"
@@ -487,7 +591,7 @@ class Comment(ParserNode):
     data: str
 
     def __str__(self) -> str:
-        return f"<!--{self.data}-->"
+        return f"<!--{escapeHTML(self.data)}-->"
 
 
 @dataclass
@@ -508,6 +612,30 @@ class WholeElement(ParserNode):
 
     def __str__(self) -> str:
         return f"{self.startTag}{escapeHTML(self.text)}</{self.tag}>"
+
+
+@dataclass
+class Macro(ParserNode):
+    name: str
+    optional: bool
+
+    def __str__(self) -> str:
+        # Use PUA characters to delimit the macro name
+        return Macro.encode(self.name, self.optional)
+
+    @staticmethod
+    def encode(name: str, optional: bool = False) -> str:
+        ms = constants.macroStartChar
+        me = constants.macroEndChar
+        return f"{ms}{name}{'?' if optional else ''}{me}"
+
+    @staticmethod
+    def parse(text: str) -> tuple[str, int]:
+        # Looks for macros in the text and converts
+        # them into the safely-encoded form.
+        ms = constants.macroStartChar
+        me = constants.macroEndChar
+        return macroRe.subn(f"{ms}\\1\\2{me}", text)
 
 
 #
@@ -578,6 +706,13 @@ def parseStartTag(s: Stream, start: int) -> Result:
             m.die(f"Attribute {attrName} appears twice in <{tagname}>.", lineNum=s.loc(startAttr))
             return Result.fail(start)
         tag.attrs[attrName] = attrValue
+        subbedValue, numSubs = Macro.parse(attrValue)
+        if numSubs > 0:
+            tag.attrs[attrName] = subbedValue
+            if "bs-macro-attributes" in tag.attrs:
+                tag.attrs["bs-macro-attributes"] += f",{attrName}"
+            else:
+                tag.attrs["bs-macro-attributes"] = attrName
 
     _, i = parseWhitespace(s, i)
 
@@ -842,7 +977,8 @@ def parseDoctype(s: Stream, start: int) -> Result:
     if s[start + 9 : start + 15].lower() != " html>":
         m.die("Unnecessarily complex doctype - use <!doctype html>.", lineNum=s.loc(start))
         return Result.fail(start)
-    return Result(True, start + 15)
+    node = Doctype(line=s.line(start), endLine=s.line(start + 15), data=s[start : start + 15])
+    return Result(node, start + 15)
 
 
 def parseScriptToEnd(s: Stream, start: int) -> Result:
@@ -1109,6 +1245,29 @@ def parseFencedCodeBlock(s: Stream, start: int) -> Result:
         endLine=s.line(i - 1),
     )
     return Result(el, i)
+
+
+macroRe = re.compile(r"\[([A-Z\d-]*[A-Z][A-Z\d-]*)(\??)\]")
+
+
+def parseMacro(s: Stream, start: int) -> Result:
+    # Macros all look like `[FOO]` or `[FOO?]`:
+    # uppercase ASCII, possibly with a ? suffix,
+    # tightly wrapped by square brackets.
+
+    if s[start] != "[":
+        return Result.fail(start)
+    match, i = s.matchRe(start, macroRe)
+    if match is Failure:
+        return Result.fail(start)
+    optional = match.group(2) == "?"
+    macro = Macro(
+        line=s.line(start),
+        endLine=s.line(start),
+        name=match.group(1),
+        optional=optional,
+    )
+    return Result(macro, i)
 
 
 metadataPreEndRe = re.compile(r"</pre>(.*)")
