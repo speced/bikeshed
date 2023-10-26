@@ -31,7 +31,9 @@ your contributions might fail just due to violating the linting rules.
 
 To lint everything, first install `ruff`, `pylint`, `mypy`, and `black` from `pypi`.
 (You can automatically get the versions that the project currently uses by running `pip install -r requirements-dev.txt` from the project root.)
-Then, from the root directory of the project, run `ruff check bikeshed`, `pylint bikeshed`, `black .`, and `mypy`.
+
+Then, from the root directory of the project, run the `lint` script,
+which'll invoke all of these in the correct way for you.
 Fix anything that any of these are complaining about;
 if they are all happy, you're good.
 
@@ -47,7 +49,8 @@ so running these before submitting a PR is important.
 * `bikeshed test` will run all of the tests,
  giving you diffs where there's failures.
 * `bikeshed test --rebase` will rebase all of the tests,
-    replacing the `.html` files with their new forms.
+    replacing the `.html` files with their new forms,
+    and the `.console.txt` files with the console output.
     This can be useful as a general testing strategy;
     git's diff can be easier to read than the simple one `bikeshed test` uses,
     and you might be even an even better diff pager than the default.
@@ -60,27 +63,28 @@ so running these before submitting a PR is important.
     and `bikeshed test --rebase` ensures these are all set up correctly.
 
 * Both of these commands default to running all of the tests,
-    but you can run *particular* tests
-    by passing them as additional command-line positional args
-    (full path, starting below the `/tests/` directory,
-    so running the manual tests just requires giving their name, etc).
+    but you can run *particular* tests in several ways:
 
-    Alternately, the `--manual-only` flag
-    will run only the manually-written tests,
-    which are small and very fast,
-    skipping all the real-spec tests.
-    This can be worthwhile for a quick check,
-    as it takes less than 20s to run them,
-    versus several minutes for the full suite.
-    However, many code paths are not exercised by these,
-    so a full test run/rebase is required to ensure your change is actually fine.
+    * passing `--manual` will only run the manually-written tests,
+        which are small and very fast,
+        skipping all the real-world document tests.
+
+    * passing `--folder FOLDER FOLDER ...` will run any tests
+        for which one of the FOLDER values is the name of a folder in their path.
+        (exact matches required).
+
+    * passing `--file FILE FILE ...` will run any tests
+        for which one fo the FILE values
+        is a substring of their filename.
+        (That is, exact matches not required.)
 
 * To run Playwright visual tests and tests of client-side user interaction,
     * NodeJS and docker must be installed first.
-    * Then, to run all `*_pwtest.js` scripts and compare with existing  ___screenshots__ in the same directory, run the following.
+    * Then, to run all `*_pwtest.js` scripts and compare with existing  __screenshots__ in the same directory, run the following.
         * `npm run pwtests`
     * To update the screenshots after you make changes that should affect the screenshots, run this instead:
         * `npm run pwtests-update`
+
 
 Pipenv, Pipfile, and `requirements.txt`
 ---------------------------------------
