@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 
 import aiofiles
 import aiohttp
+import kdl
 import requests
 import tenacity
 from result import Err, Ok, Result
@@ -280,6 +281,16 @@ class Manifest:
 
     @staticmethod
     def fromString(text: str) -> Manifest | None:
+        try:
+            doc = kdl.parse(text)
+        except:
+            return Manifest.legacyFromString(text)
+        manifest = doc["manifest"]
+        entries = {file.props["path"]:file.props["hash"] for file in manifest.getAll("file")}
+        return Manifest(dt=manifest.props["updated"], version=manifest.props["version"], entries=entries)
+
+    @staticmethod
+    def legacyFromString(text: str) -> Manifest | None:
         lines = text.split("\n")
         if len(lines) < 10:
             # Something's definitely borked
@@ -322,12 +333,18 @@ class Manifest:
         return manifest
 
     def __str__(self) -> str:
-        lines = [formatDt(self.dt), str(self.version)]
+        doc = kdl.Document(nodes=[
+            kdl.Node("manifest", None,
+                props={"updated": self.dt, "version":self.version}
+            ),
+        ])
+        manifestNode = doc["manifest"]
         for p, h in sorted(self.entries.items(), key=keyManifest):
+            node = kdl.Node("file", None, props={"hash":h, "path":p})
             if h is None:
-                h = "error".ljust(32, "-")
-            lines.append(f"{h} {p}")
-        return "\n".join(lines)
+                node.props["error"] = True
+            manifestNode.nodes.append(node)
+        return doc.print()
 
     def daysOld(self) -> int:
         return (dtNow() - self.dt).days
