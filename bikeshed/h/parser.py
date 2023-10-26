@@ -78,9 +78,7 @@ def parseNode(
     if s[start] == "&":
         ch, i = parseCharRef(s, start)
         if ch is not Failure:
-            node = Text(text=f"&#{ord(ch)};",
-                line=s.line(start),
-                endLine=s.line(i-1))
+            node = Text(text=f"&#{ord(ch)};", line=s.line(start), endLine=s.line(i - 1))
             return Result(node, i)
 
     if s[start] == "<":
@@ -274,7 +272,7 @@ def initialDocumentParse(text: str, config: ParseConfig, startLine: int = 1) -> 
     return list(nodesFromHtml(text, config, startLine=startLine))
 
 
-def strFromNodes(nodes: t.Iterable[ParserNode], withIlcc=False) -> str:
+def strFromNodes(nodes: t.Iterable[ParserNode], withIlcc: bool = False) -> str:
     strs = []
     ilcc = constants.incrementLineCountChar
     for node in nodes:

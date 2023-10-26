@@ -158,7 +158,6 @@ def tokenizeLines(
     rawElements = "|".join(re.escape(x) for x in opaqueElements)
 
     for i, line in enumerate(lines):
-
         # Skip lines that are entirely a censored comment.
         if line.text.strip() == constants.bsComment:
             continue
