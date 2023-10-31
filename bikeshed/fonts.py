@@ -159,13 +159,27 @@ def parseCharacters(md: FontMetadata, lines: list[str]) -> Characters:
 def replaceComments(font: Font, inputFilename: str | None = None, outputFilename: str | None = None) -> None:
     lines, inputFilename = getInputLines(inputFilename)
     replacements: list[tuple[int, list[str]]] = []
-    for i, line in enumerate(lines):
-        match = re.match(r"\s*<!--\s*Big Text:\s*(\S.*)-->", line)
-        if match:
-            newtext = ["<!--\n"] + font.write(match.group(1).strip()) + ["-->\n"]
-            replacements.append((i, newtext))
-    for r in reversed(replacements):
-        lines[r[0] : r[0] + 1] = r[1]
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        match = re.match(r"\s*<!--\s*Big Text:\s*((?:(?!-->).)*)", line)
+        if not match:
+            i += 1
+            continue
+        endLineI = i
+        while "-->" not in lines[endLineI]:
+            endLineI += 1
+        afterComment = lines[endLineI].split("-->", maxsplit=1)[1]
+        if afterComment.strip() != "":
+            m.die("Big Text comments must be the only thing on their line(s).", lineNum=endLineI)
+            i = endLine + 1
+            continue
+        textToEmbiggen = match.group(1).strip()
+        newtext = [match.group(0) + "\n", "\n"] + font.write(textToEmbiggen) + ["-->\n"]
+        replacements.append((i, endLineI, newtext))
+        i = endLineI + 1
+    for i, endI, newLines in reversed(replacements):
+        lines[i : endI + 1] = newLines
     writeOutputLines(outputFilename, inputFilename, lines)
 
 
