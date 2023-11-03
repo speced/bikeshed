@@ -658,7 +658,7 @@ def handleSource(options: argparse.Namespace) -> None:
     if options.bigText:
         from . import fonts
 
-        font = fonts.Font()
+        font = fonts.Font.fromPath()
         fonts.replaceComments(font=font, inputFilename=options.infile, outputFilename=options.outfile)
 
 

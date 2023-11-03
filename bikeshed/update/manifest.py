@@ -286,7 +286,7 @@ class Manifest:
         except:
             return Manifest.legacyFromString(text)
         manifest = doc["manifest"]
-        entries = {file.props["path"]:file.props["hash"] for file in manifest.getAll("file")}
+        entries = {file.props["path"]: file.props["hash"] for file in manifest.getAll("file")}
         return Manifest(dt=manifest.props["updated"], version=manifest.props["version"], entries=entries)
 
     @staticmethod
@@ -333,14 +333,18 @@ class Manifest:
         return manifest
 
     def __str__(self) -> str:
-        doc = kdl.Document(nodes=[
-            kdl.Node("manifest", None,
-                props={"updated": self.dt, "version":self.version}
-            ),
-        ])
+        doc = kdl.Document(
+            nodes=[
+                kdl.Node(
+                    "manifest",
+                    None,
+                    props={"updated": self.dt, "version": self.version},
+                ),
+            ],
+        )
         manifestNode = doc["manifest"]
         for p, h in sorted(self.entries.items(), key=keyManifest):
-            node = kdl.Node("file", None, props={"hash":h, "path":p})
+            node = kdl.Node("file", None, props={"hash": h, "path": p})
             if h is None:
                 node.props["error"] = True
             manifestNode.nodes.append(node)
