@@ -1,7 +1,5 @@
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -249,7 +247,6 @@
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
