@@ -1,6 +1,15 @@
 "use strict";
 {
     function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
         const forList = ref.for_;
         const forListElements = forList.length === 0 ? '' : mk.li({},
             mk.b({}, "For: "),
@@ -21,6 +30,7 @@
             "aria-labelled-by": `ref-hint-for-${safeUrl}`,
         },
             mk.ul({},
+                dfnTextElements,
                 mk.li({},
                     mk.b({}, "URL: "),
                     mk.a({ href: url, class: "ref" }, url),
