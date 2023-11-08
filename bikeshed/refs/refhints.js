@@ -21,7 +21,7 @@
                 ),
             ),
         );
-        const url = link.href;
+        const url = ref.url;
         const safeUrl = encodeURIComponent(url);
         const hintPanel = mk.aside({
             class: "ref-hint",
@@ -52,14 +52,17 @@
     function genAllRefHints() {
         for(const refData of Object.values(window.refsData)) {
             const refUrl = refData.url;
-            const link = document.querySelector(`a[href="${refUrl}"]`);
-            if(!link) {
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
                 console.log(`Can't find link href="${refUrl}".`, refData);
                 continue;
             }
-            const hint = genRefHint(link, refData);
-            append(document.body, hint);
-            insertLinkPopupAction(hint)
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
         }
     }
 
