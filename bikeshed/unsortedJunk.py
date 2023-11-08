@@ -679,6 +679,9 @@ def verifyUsageOfAllLocalBiblios(doc: t.SpecT) -> None:
 def processAutolinks(doc: t.SpecT) -> None:
     scriptLines = []
     atLeastOneRef = False
+    # Dictionary for refs already added to scriptLines
+    refsAdded = {}
+
     # An <a> without an href is an autolink.
     # <i> is a legacy syntax for term autolinks. If it links up, we change it into an <a>.
     # We exclude bibliographical links, as those are processed in `processBiblioLinks`.
@@ -766,9 +769,11 @@ def processAutolinks(doc: t.SpecT) -> None:
                 el.text = replacementText
             decorateAutolink(doc, el, linkType=linkType, linkText=linkText, ref=ref)
 
-            refJson = ref.__json__()
-            scriptLines.append(
-                f"window.refsData['{ref.url}'] = {json.dumps(refJson)};\n")
+            if ref.url not in refsAdded:
+                refsAdded[ref.url] = True
+                refJson = ref.__json__()
+                scriptLines.append(
+                    f"window.refsData['{ref.url}'] = {json.dumps(refJson)};\n")
         else:
             if linkType == "maybe":
                 el.tag = "css"
