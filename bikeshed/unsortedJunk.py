@@ -678,8 +678,6 @@ def verifyUsageOfAllLocalBiblios(doc: t.SpecT) -> None:
 
 def processAutolinks(doc: t.SpecT) -> None:
     scriptLines = []
-    atLeastOneRef = False
-    # Dictionary for refs already added to scriptLines
     refsAdded = {}
 
     # An <a> without an href is an autolink.
@@ -726,7 +724,6 @@ def processAutolinks(doc: t.SpecT) -> None:
         okayToFail = el.get("data-okay-to-fail") is not None
         ignorable = linkText.lower() in doc.md.ignoredTerms
 
-        atLeastOneRef = True
         ref = doc.refs.getRef(
             linkType,
             linkText,
@@ -784,9 +781,9 @@ def processAutolinks(doc: t.SpecT) -> None:
 
     if len(scriptLines) > 0:
         jsonBlock = doc.extraScripts.setDefault(
-            "ref-hints-json", "window.refsData = {};\n")
+            "ref-hints-json", "window.refsData = {};")
         jsonBlock.text += "\n".join(scriptLines)
-    if atLeastOneRef:
+
         doc.extraScripts.setFile("ref-hints", "refs/refhints.js")
         doc.extraStyles.setFile("ref-hints", "refs/refhints.css")
         h.addDOMHelperScript(doc)
