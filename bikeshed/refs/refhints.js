@@ -64,15 +64,6 @@
         refHint.classList.remove("on");
     }
 
-    document.addEventListener("DOMContentLoaded", ()=>{
-        genAllRefHints();
-
-        document.body.addEventListener("click", (e) => {
-            // If not handled already, just hide all link panels.
-            hideAllRefHints();
-        });
-    })
-
     function showRefHint(refHint) {
         hideAllRefHints(); // Only display one at this time.
 
@@ -138,8 +129,17 @@
         });
     }
 
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
     window.addEventListener("resize", () => {
         // Hide any open ref hint.
         hideAllRefHints();
-    })
+    });
 }
