@@ -112,15 +112,23 @@
         };
         link.addEventListener("mouseleave", startHidingRefHint);
         link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
         refHint.addEventListener("mouseleave", startHidingRefHint);
         refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
 
         refHint.addAttribute('data-teardown-event-listeners', () => {
             // remove event listeners
             link.removeEventListener("mouseleave", startHidingRefHint);
             link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
             refHint.removeEventListener("mouseleave", startHidingRefHint);
             refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
         });
     }
 
@@ -176,8 +184,10 @@
         link.classList.add('has-ref-hint');
         link.addEventListener('mouseover', (event) => {
             showRefHint(refHint);
-            event.stopPropagation();
         });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
     }
 
     document.addEventListener("DOMContentLoaded", () => {
