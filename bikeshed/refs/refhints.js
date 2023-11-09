@@ -107,7 +107,7 @@
             }, 1000);
         }
         const resetHidingRefHint = (event) => {
-            clearTimeout(timeout);
+            if (timeout) clearTimeout(timeout);
             timeout = null;
         };
         link.addEventListener("mouseleave", startHidingRefHint);
