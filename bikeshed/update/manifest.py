@@ -283,7 +283,7 @@ class Manifest:
     def fromString(text: str) -> Manifest | None:
         try:
             doc = kdl.parse(text)
-        except:
+        except kdl.errors.ParseError:
             return Manifest.legacyFromString(text)
         manifest = doc["manifest"]
         entries = {file.props["path"]: file.props["hash"] for file in manifest.getAll("file")}
@@ -340,7 +340,7 @@ class Manifest:
                     None,
                     props={"updated": self.dt, "version": self.version},
                 ),
-            ]
+            ],
         )
         manifestNode = doc["manifest"]
         for p, h in sorted(self.entries.items(), key=keyManifest):
