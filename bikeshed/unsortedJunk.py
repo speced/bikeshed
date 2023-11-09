@@ -769,8 +769,7 @@ def processAutolinks(doc: t.SpecT) -> None:
             if ref.url not in refsAdded:
                 refsAdded[ref.url] = True
                 refJson = ref.__json__()
-                scriptLines.append(
-                    f"window.refsData['{ref.url}'] = {json.dumps(refJson)};")
+                scriptLines.append(f"window.refsData['{ref.url}'] = {json.dumps(refJson)};")
         else:
             if linkType == "maybe":
                 el.tag = "css"
@@ -780,8 +779,7 @@ def processAutolinks(doc: t.SpecT) -> None:
                     del el.attrib["data-lt"]
 
     if len(scriptLines) > 0:
-        jsonBlock = doc.extraScripts.setDefault(
-            "ref-hints-json", "window.refsData = {};\n")
+        jsonBlock = doc.extraScripts.setDefault("ref-hints-json", "window.refsData = {};\n")
         jsonBlock.text += "\n".join(scriptLines)
 
         doc.extraScripts.setFile("ref-hints", "refs/refhints.js")
