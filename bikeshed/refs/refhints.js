@@ -75,6 +75,11 @@
         link.setAttribute("aria-expanded", "false");
         refHint.style.position = "absolute"; // unfix it
         refHint.classList.remove("on");
+        const teardown = refHint.getAttribute('data-teardown-event-listeners');
+        if (teardown) {
+            refHint.removeAttribute('data-teardown-event-listeners');
+            teardown();
+        }
     }
 
     function showRefHint(refHint) {
@@ -84,6 +89,39 @@
         link.setAttribute("aria-expanded", "true");
         refHint.classList.add("on");
         positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.getAttribute('data-teardown-event-listeners')) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+
+        refHint.addAttribute('data-teardown-event-listeners', () => {
+            // remove event listeners
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        });
     }
 
     function positionRefHint(refHint) {

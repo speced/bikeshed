@@ -5,10 +5,10 @@
   <title>CSS Box Alignment Module Level 3</title>
   <meta content="ED" name="w3c-status">
   <link href="https://www.w3.org/StyleSheets/TR/2021/W3C-ED" rel="stylesheet">
-  <meta content="Bikeshed version 53ba7a338, updated Wed Nov 8 18:37:28 2023 +0000" name="generator">
+  <meta content="Bikeshed version bba09196e, updated Wed Nov 8 19:23:07 2023 +0000" name="generator">
   <link href="https://www.w3.org/TR/css-align-3/" rel="canonical">
   <link href="https://drafts.csswg.org/csslogo.ico" rel="icon">
-  <meta content="53ba7a3382424569752862a8c14b017575003a00" name="document-revision">
+  <meta content="bba09196ec74a2d925797ab77847dd340ad0515e" name="document-revision">
 <style>
 .issue th:first-child { text-align: left !important; }
 [rowspan] > img { float: right; }
@@ -1001,7 +1001,7 @@ dd:not(:last-child) > .wpt-tests-block:not([open]):last-child {
     </div>
    </details>
    <div data-fill-with="warning"></div>
-   <p class="copyright" data-fill-with="copyright"><a href="https://www.w3.org/Consortium/Legal/ipr-notice#Copyright">Copyright</a> © 2023 <a href="https://www.w3.org/">World Wide Web Consortium</a>. <abbr title="World Wide Web Consortium">W3C</abbr><sup>®</sup> <a href="https://www.w3.org/Consortium/Legal/ipr-notice#Legal_Disclaimer">liability</a>, <a href="https://www.w3.org/Consortium/Legal/ipr-notice#W3C_Trademarks">trademark</a> and <a href="https://www.w3.org/Consortium/Legal/copyright-software" rel="license" title="W3C Software and Document License">permissive document license</a> rules apply. </p>
+   <p class="copyright" data-fill-with="copyright"><a href="https://www.w3.org/policies/#copyright">Copyright</a> © 2023 <a href="https://www.w3.org/">World Wide Web Consortium</a>. <abbr title="World Wide Web Consortium">W3C</abbr><sup>®</sup> <a href="https://www.w3.org/policies/#Legal_Disclaimer">liability</a>, <a href="https://www.w3.org/policies/#W3C_Trademarks">trademark</a> and <a href="https://www.w3.org/copyright/software-license/" rel="license" title="W3C Software and Document License">permissive document license</a> rules apply. </p>
    <hr title="Separator for header">
   </div>
   <div class="p-summary" data-fill-with="abstract">
@@ -1023,7 +1023,7 @@ on screen, on paper, etc.
 	“[css-align] <i>…summary of comment…</i>”.
 	All issues and comments are <a href="https://lists.w3.org/Archives/Public/public-css-archive/">archived</a>.
 	Alternately, feedback can be sent to the (<a href="https://lists.w3.org/Archives/Public/www-style/">archived</a>) public mailing list <a href="mailto:www-style@w3.org?Subject=%5Bcss-align%5D%20PUT%20SUBJECT%20HERE">www-style@w3.org</a>. </p>
-   <p>This document is governed by the <a href="https://www.w3.org/2023/Process-20230612/" id="w3c_process_revision">12 June 2023 W3C Process Document</a>. </p>
+   <p>This document is governed by the <a href="https://www.w3.org/2023/Process-20231103/" id="w3c_process_revision">03 November 2023 W3C Process Document</a>. </p>
    <p></p>
   </div>
   <div data-fill-with="at-risk">
@@ -4706,6 +4706,11 @@ window.addEventListener("resize", repositionAnnoPanels);
         link.setAttribute("aria-expanded", "false");
         refHint.style.position = "absolute"; // unfix it
         refHint.classList.remove("on");
+        const teardown = refHint.getAttribute('data-teardown-event-listeners');
+        if (teardown) {
+            refHint.removeAttribute('data-teardown-event-listeners');
+            teardown();
+        }
     }
 
     function showRefHint(refHint) {
@@ -4715,6 +4720,39 @@ window.addEventListener("resize", repositionAnnoPanels);
         link.setAttribute("aria-expanded", "true");
         refHint.classList.add("on");
         positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.getAttribute('data-teardown-event-listeners')) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+
+        refHint.addAttribute('data-teardown-event-listeners', () => {
+            // remove event listeners
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        });
     }
 
     function positionRefHint(refHint) {
