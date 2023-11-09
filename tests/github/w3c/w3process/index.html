@@ -512,6 +512,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -4536,8 +4573,6 @@ dfn > a.self-link::before      { content: "#"; }
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -4785,7 +4820,6 @@ dfn > a.self-link::before      { content: "#"; }
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -5237,4 +5271,313 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#RecsW3C'] = {"text": "w3c recommendation", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#RecsW3C", "export": true, "normative": true, "for_": []};
+window.refsData['#team'] = {"text": "team", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#team", "export": true, "normative": true, "for_": []};
+window.refsData['#Member-only'] = {"text": "member-only", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#Member-only", "export": true, "normative": true, "for_": []};
+window.refsData['#advisory-committee-representative'] = {"text": "advisory committee representative", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#advisory-committee-representative", "export": true, "normative": true, "for_": []};
+window.refsData['#fdn-member-consortium'] = {"text": "member consortium", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#fdn-member-consortium", "export": true, "normative": true, "for_": []};
+window.refsData['#subsidiary'] = {"text": "subsidiary", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#subsidiary", "export": true, "normative": true, "for_": []};
+window.refsData['#related-member'] = {"text": "related member", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#related-member", "export": true, "normative": true, "for_": []};
+window.refsData['#advisory-committee'] = {"text": "advisory committee", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#advisory-committee", "export": true, "normative": true, "for_": []};
+window.refsData['#def-Director'] = {"text": "director", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#def-Director", "export": true, "normative": true, "for_": []};
+window.refsData['#ceo'] = {"text": "ceo", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#ceo", "export": true, "normative": true, "for_": []};
+window.refsData['#wg-decision-appeal'] = {"text": "group decision appeal", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#wg-decision-appeal", "export": true, "normative": true, "for_": []};
+window.refsData['#hosts'] = {"text": "host institutions", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#hosts", "export": true, "normative": true, "for_": []};
+window.refsData['#advisory-board'] = {"text": "advisory board", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#advisory-board", "export": true, "normative": true, "for_": []};
+window.refsData['#technical-architecture-group'] = {"text": "tag", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#technical-architecture-group", "export": true, "normative": true, "for_": []};
+window.refsData['#primary-affiliation'] = {"text": "primary affiliation", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#primary-affiliation", "export": true, "normative": true, "for_": []};
+window.refsData['#GeneralChairs'] = {"text": "chair", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#GeneralChairs", "export": true, "normative": true, "for_": []};
+window.refsData['#w3c-group'] = {"text": "w3c group", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#w3c-group", "export": true, "normative": true, "for_": []};
+window.refsData['#participant'] = {"text": "participant", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#participant", "export": true, "normative": true, "for_": []};
+window.refsData['#minutes'] = {"text": "minutes", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#minutes", "export": true, "normative": true, "for_": []};
+window.refsData['#group-decision'] = {"text": "group decision", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#group-decision", "export": true, "normative": true, "for_": []};
+window.refsData['#def-Consensus'] = {"text": "consensus", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#def-Consensus", "export": true, "normative": true, "for_": []};
+window.refsData['#def-Unanimity'] = {"text": "unanimity", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#def-Unanimity", "export": true, "normative": true, "for_": []};
+window.refsData['#def-Dissent'] = {"text": "dissent", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#def-Dissent", "export": true, "normative": true, "for_": []};
+window.refsData['#FormalObjection'] = {"text": "formal objection", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#FormalObjection", "export": true, "normative": true, "for_": []};
+window.refsData['#chair-decisions'] = {"text": "chair decisions", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#chair-decisions", "export": true, "normative": true, "for_": []};
+window.refsData['#GroupsWG'] = {"text": "working groups", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#GroupsWG", "export": true, "normative": true, "for_": []};
+window.refsData['#GroupsIG'] = {"text": "interest groups", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#GroupsIG", "export": true, "normative": true, "for_": []};
+window.refsData['#EventsW'] = {"text": "workshops", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#EventsW", "export": true, "normative": true, "for_": []};
+window.refsData['#Team-only'] = {"text": "team-only", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#Team-only", "export": true, "normative": true, "for_": []};
+window.refsData['#TeamContact'] = {"text": "team contact", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#TeamContact", "export": true, "normative": true, "for_": []};
+window.refsData['#member-representative-in-an-interest-group'] = {"text": "member representative in an interest group", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#member-representative-in-an-interest-group", "export": true, "normative": true, "for_": []};
+window.refsData['#invited-expert-in-a-working-group'] = {"text": "invited expert in a working group", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#invited-expert-in-a-working-group", "export": true, "normative": true, "for_": []};
+window.refsData['#advisory-committee-review'] = {"text": "advisory committee review", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#advisory-committee-review", "export": true, "normative": true, "for_": []};
+window.refsData['#charter'] = {"text": "charter", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#charter", "export": true, "normative": true, "for_": []};
+window.refsData['#technical-report'] = {"text": "technical report", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#technical-report", "export": true, "normative": true, "for_": []};
+window.refsData['#fpwd'] = {"text": "first public working draft", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#fpwd", "export": true, "normative": true, "for_": []};
+window.refsData['#RecsWD'] = {"text": "working draft", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#RecsWD", "export": true, "normative": true, "for_": []};
+window.refsData['#adopted-draft'] = {"text": "adopted draft", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#adopted-draft", "export": true, "normative": true, "for_": []};
+window.refsData['#exclusion-draft'] = {"text": "exclusion draft", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#exclusion-draft", "export": true, "normative": true, "for_": []};
+window.refsData['#publishing'] = {"text": "publish", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#publishing", "export": true, "normative": true, "for_": []};
+window.refsData['#WGNote'] = {"text": "note", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#WGNote", "export": true, "normative": true, "for_": []};
+window.refsData['#registry-report'] = {"text": "registry report", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#registry-report", "export": true, "normative": true, "for_": []};
+window.refsData['#w3c-recommendation-track'] = {"text": "w3c recommendation track", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#w3c-recommendation-track", "export": true, "normative": true, "for_": []};
+window.refsData['#dfn-wide-review'] = {"text": "wide review", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#dfn-wide-review", "export": true, "normative": true, "for_": []};
+window.refsData['#adequate-implementation'] = {"text": "adequate implementation experience", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#adequate-implementation", "export": true, "normative": true, "for_": []};
+window.refsData['#registry'] = {"text": "registry", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#registry", "export": true, "normative": true, "for_": []};
+window.refsData['#registry-section'] = {"text": "registry section", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#registry-section", "export": true, "normative": true, "for_": []};
+window.refsData['#registry-definition'] = {"text": "registry definition", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#registry-definition", "export": true, "normative": true, "for_": []};
+window.refsData['#formally-addressed'] = {"text": "formally addressed", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#formally-addressed", "export": true, "normative": true, "for_": []};
+window.refsData['#substantive-change'] = {"text": "substantive change", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#substantive-change", "export": true, "normative": true, "for_": []};
+window.refsData['#RecsCR'] = {"text": "candidate recommendation", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#RecsCR", "export": true, "normative": true, "for_": []};
+window.refsData['#registry-table'] = {"text": "registry table", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#registry-table", "export": true, "normative": true, "for_": []};
+window.refsData['#registry-entry'] = {"text": "registry entry", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#registry-entry", "export": true, "normative": true, "for_": []};
+window.refsData['#erratum'] = {"text": "erratum", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#erratum", "export": true, "normative": true, "for_": []};
+window.refsData['#candidate-correction'] = {"text": "candidate correction", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#candidate-correction", "export": true, "normative": true, "for_": []};
+window.refsData['#candidate-amendment'] = {"text": "candidate amendment", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#candidate-amendment", "export": true, "normative": true, "for_": []};
+window.refsData['#team-correction'] = {"text": "team correction", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#team-correction", "export": true, "normative": true, "for_": []};
+window.refsData['#candidate-addition'] = {"text": "candidate addition", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#candidate-addition", "export": true, "normative": true, "for_": []};
+window.refsData['#RecsPR'] = {"text": "proposed recommendation", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#RecsPR", "export": true, "normative": true, "for_": []};
+window.refsData['#patent-review-drafts'] = {"text": "patent review drafts", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#patent-review-drafts", "export": true, "normative": true, "for_": []};
+window.refsData['#candidate-recommendation-snapshot'] = {"text": "candidate recommendation snapshot", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#candidate-recommendation-snapshot", "export": true, "normative": true, "for_": []};
+window.refsData['#trans-req'] = {"text": "transition requests", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#trans-req", "export": true, "normative": true, "for_": []};
+window.refsData['#update-requests'] = {"text": "update requests", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#update-requests", "export": true, "normative": true, "for_": []};
+window.refsData['#candidate-recommendation-draft'] = {"text": "candidate recommendation draft", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#candidate-recommendation-draft", "export": true, "normative": true, "for_": []};
+window.refsData['#rescinded-candidate-recommendation'] = {"text": "rescinded candidate recommendation", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#rescinded-candidate-recommendation", "export": true, "normative": true, "for_": []};
+window.refsData['#RecsObs'] = {"text": "obsolete recommendation", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#RecsObs", "export": true, "normative": true, "for_": []};
+window.refsData['#RescindedRec'] = {"text": "rescinded recommendation", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#RescindedRec", "export": true, "normative": true, "for_": []};
+window.refsData['#editors-draft'] = {"text": "editor's draft", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#editors-draft", "export": true, "normative": true, "for_": []};
+window.refsData['#editorial-change'] = {"text": "editorial change", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#editorial-change", "export": true, "normative": true, "for_": []};
+window.refsData['#proposed-corrections'] = {"text": "proposed corrections", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#proposed-corrections", "export": true, "normative": true, "for_": []};
+window.refsData['#last-call-for-review-of-proposed-corrections'] = {"text": "last call for review of proposed corrections", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#last-call-for-review-of-proposed-corrections", "export": true, "normative": true, "for_": []};
+window.refsData['#allow-new-features'] = {"text": "allow new features", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#allow-new-features", "export": true, "normative": true, "for_": []};
+window.refsData['#proposed-additions'] = {"text": "proposed additions", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#proposed-additions", "export": true, "normative": true, "for_": []};
+window.refsData['#last-call-for-review-of-proposed-additions'] = {"text": "last call for review of proposed additions", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#last-call-for-review-of-proposed-additions", "export": true, "normative": true, "for_": []};
+window.refsData['#at-risk'] = {"text": "at risk", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#at-risk", "export": true, "normative": true, "for_": []};
+window.refsData['#advisory-committee-appeal'] = {"text": "advisory committee appeal", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#advisory-committee-appeal", "export": true, "normative": true, "for_": []};
+window.refsData['#def-w3c-decision'] = {"text": "w3c decision", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#def-w3c-decision", "export": true, "normative": true, "for_": []};
+window.refsData['#last-call-review'] = {"text": "last call for review of proposed amendments", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#last-call-review", "export": true, "normative": true, "for_": []};
+window.refsData['#proposed-amendments'] = {"text": "proposed amendments", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#proposed-amendments", "export": true, "normative": true, "for_": []};
+window.refsData['#last-call-for-review-of-proposed-corrections-and-additions'] = {"text": "last call for review of proposed corrections and additions", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#last-call-for-review-of-proposed-corrections-and-additions", "export": true, "normative": true, "for_": []};
+window.refsData['#discontinuedREC'] = {"text": "discontinued draft", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#discontinuedREC", "export": true, "normative": true, "for_": []};
+window.refsData['#RecsSup'] = {"text": "superseded recommendation", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#RecsSup", "export": true, "normative": true, "for_": []};
+window.refsData['#draft-note'] = {"text": "draft note", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#draft-note", "export": true, "normative": true, "for_": []};
+window.refsData['#statement'] = {"text": "w3c statement", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#statement", "export": true, "normative": true, "for_": []};
+window.refsData['#custodian'] = {"text": "custodian", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#custodian", "export": true, "normative": true, "for_": []};
+window.refsData['#registry-change'] = {"text": "registry change", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#registry-change", "export": true, "normative": true, "for_": []};
+window.refsData['#registry-track'] = {"text": "registry track", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#registry-track", "export": true, "normative": true, "for_": []};
+window.refsData['#registry-data'] = {"text": "registry data", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#registry-data", "export": true, "normative": true, "for_": []};
+window.refsData['#registry-data-report'] = {"text": "registry data report", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#registry-data-report", "export": true, "normative": true, "for_": []};
+window.refsData['#candidate-registry-snapshot'] = {"text": "candidate registry snapshot", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#candidate-registry-snapshot", "export": true, "normative": true, "for_": []};
+window.refsData['#w3c-registry'] = {"text": "w3c registry", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#w3c-registry", "export": true, "normative": true, "for_": []};
+window.refsData['#reviewform'] = {"text": "call for review", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#reviewform", "export": true, "normative": true, "for_": []};
+window.refsData['#dfn-charter-extension'] = {"text": "charter extension", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#dfn-charter-extension", "export": true, "normative": true, "for_": []};
+window.refsData['#mou'] = {"text": "memoranda of understanding", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#mou", "export": true, "normative": true, "for_": []};
+window.refsData['#submitter'] = {"text": "submitter", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#submitter", "export": true, "normative": true, "for_": []};
+window.refsData['#MemberSubmission'] = {"text": "member submission", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#MemberSubmission", "export": true, "normative": true, "for_": []};
+window.refsData['#validation-notice'] = {"text": "validation notice", "type": "dfn", "spec": "w3process", "shortname": "w3process", "level": "", "status": "local", "url": "#validation-notice", "export": true, "normative": true, "for_": []};
 </script>

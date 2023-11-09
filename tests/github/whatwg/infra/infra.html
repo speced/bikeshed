@@ -26,6 +26,43 @@ a[href].issue-return {
     text-decoration: none;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
  <body class="h-entry status-LS">
   <div class="head">
     <a class="logo" href="https://whatwg.org/"> <img alt="WHATWG" crossorigin height="100" src="https://resources.whatwg.org/logo-infra.svg"> </a> 
@@ -1707,8 +1744,6 @@ if ("serviceWorker" in navigator) {
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -1956,7 +1991,6 @@ if ("serviceWorker" in navigator) {
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -2420,4 +2454,334 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#willful-violation'] = {"text": "willful violation", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#willful-violation", "export": true, "normative": true, "for_": []};
+window.refsData['#user-agent'] = {"text": "implementation", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#user-agent", "export": true, "normative": true, "for_": []};
+window.refsData['#implementation-defined'] = {"text": "implementation-defined", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#implementation-defined", "export": true, "normative": true, "for_": []};
+window.refsData['#byte-sequence'] = {"text": "byte sequence", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#byte-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['#string'] = {"text": "string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#string", "export": true, "normative": true, "for_": []};
+window.refsData['#ascii-uppercase'] = {"text": "ascii uppercase", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ascii-uppercase", "export": true, "normative": true, "for_": []};
+window.refsData['#isomorphic-decode'] = {"text": "isomorphic decode", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#isomorphic-decode", "export": true, "normative": true, "for_": []};
+window.refsData['#boolean'] = {"text": "boolean", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#boolean", "export": true, "normative": true, "for_": []};
+window.refsData['#struct'] = {"text": "struct", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#struct", "export": true, "normative": true, "for_": []};
+window.refsData['#list'] = {"text": "list", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#list", "export": true, "normative": true, "for_": []};
+window.refsData['https://encoding.spec.whatwg.org/#utf-8-decode'] = {"text": "utf-8 decode", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "1", "status": "current", "url": "https://encoding.spec.whatwg.org/#utf-8-decode", "export": true, "normative": true, "for_": []};
+window.refsData['#assert'] = {"text": "assert", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#assert", "export": true, "normative": true, "for_": []};
+window.refsData['#abort-when'] = {"text": "abort when", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#abort-when", "export": true, "normative": true, "for_": []};
+window.refsData['#list-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#list-append", "export": true, "normative": true, "for_": ["list"]};
+window.refsData['#if-aborted'] = {"text": "if aborted", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#if-aborted", "export": true, "normative": true, "for_": []};
+window.refsData['#list-iterate'] = {"text": "for each", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#list-iterate", "export": true, "normative": true, "for_": ["list", "set"]};
+window.refsData['#map-iterate'] = {"text": "for each", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#map-iterate", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['#iteration-continue'] = {"text": "continue", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#iteration-continue", "export": true, "normative": true, "for_": ["iteration"]};
+window.refsData['#iteration-break'] = {"text": "break", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#iteration-break", "export": true, "normative": true, "for_": ["iteration"]};
+window.refsData['#ascii-upper-hex-digit'] = {"text": "ascii upper hex digit", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ascii-upper-hex-digit", "export": true, "normative": true, "for_": []};
+window.refsData['#byte'] = {"text": "byte", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#byte", "export": true, "normative": true, "for_": []};
+window.refsData['#byte-value'] = {"text": "value", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#byte-value", "export": true, "normative": true, "for_": ["byte"]};
+window.refsData['#ascii-byte'] = {"text": "ascii byte", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ascii-byte", "export": true, "normative": true, "for_": []};
+window.refsData['#code-point'] = {"text": "code point", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#code-point", "export": true, "normative": true, "for_": []};
+window.refsData['https://encoding.spec.whatwg.org/#utf-8-encode'] = {"text": "utf-8 encode", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "1", "status": "current", "url": "https://encoding.spec.whatwg.org/#utf-8-encode", "export": true, "normative": true, "for_": []};
+window.refsData['#isomorphic-encode'] = {"text": "isomorphic encode", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#isomorphic-encode", "export": true, "normative": true, "for_": []};
+window.refsData['#byte-lowercase'] = {"text": "byte-lowercase", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#byte-lowercase", "export": true, "normative": true, "for_": []};
+window.refsData['#iteration-while'] = {"text": "while", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#iteration-while", "export": true, "normative": true, "for_": ["iteration"]};
+window.refsData['#byte-sequence-length'] = {"text": "length", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#byte-sequence-length", "export": true, "normative": true, "for_": ["byte sequence"]};
+window.refsData['#byte-sequence-prefix'] = {"text": "prefix", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#byte-sequence-prefix", "export": true, "normative": true, "for_": ["byte sequence"]};
+window.refsData['#string-code-point-length'] = {"text": "code point length", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#string-code-point-length", "export": true, "normative": true, "for_": ["JavaScript string", "scalar value string", "string"]};
+window.refsData['#code-point-value'] = {"text": "value", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#code-point-value", "export": true, "normative": true, "for_": ["code point"]};
+window.refsData['#surrogate'] = {"text": "surrogate", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#surrogate", "export": true, "normative": true, "for_": []};
+window.refsData['#c0-control'] = {"text": "c0 control", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#c0-control", "export": true, "normative": true, "for_": []};
+window.refsData['#ascii-digit'] = {"text": "ascii digit", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ascii-digit", "export": true, "normative": true, "for_": []};
+window.refsData['#ascii-lower-hex-digit'] = {"text": "ascii lower hex digit", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ascii-lower-hex-digit", "export": true, "normative": true, "for_": []};
+window.refsData['#ascii-upper-alpha'] = {"text": "ascii upper alpha", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ascii-upper-alpha", "export": true, "normative": true, "for_": []};
+window.refsData['#ascii-lower-alpha'] = {"text": "ascii lower alpha", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ascii-lower-alpha", "export": true, "normative": true, "for_": []};
+window.refsData['#ascii-alpha'] = {"text": "ascii alpha", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ascii-alpha", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-ecmascript-language-types-string-type'] = {"text": "the string type", "type": "dfn", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-ecmascript-language-types-string-type", "export": true, "normative": true, "for_": []};
+window.refsData['#scalar-value'] = {"text": "scalar value", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#scalar-value", "export": true, "normative": true, "for_": []};
+window.refsData['#code-unit'] = {"text": "code unit", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#code-unit", "export": true, "normative": true, "for_": []};
+window.refsData['#scalar-value-string'] = {"text": "scalar value string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#scalar-value-string", "export": true, "normative": true, "for_": []};
+window.refsData['#javascript-string-convert'] = {"text": "convert", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#javascript-string-convert", "export": true, "normative": true, "for_": ["JavaScript string", "string"]};
+window.refsData['#string-is'] = {"text": "identical to", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#string-is", "export": true, "normative": true, "for_": ["string"]};
+window.refsData['#string-length'] = {"text": "length", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#string-length", "export": true, "normative": true, "for_": ["JavaScript string", "scalar value string", "string"]};
+window.refsData['#code-unit-prefix'] = {"text": "code unit prefix", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#code-unit-prefix", "export": true, "normative": true, "for_": []};
+window.refsData['#string-starts-with'] = {"text": "starts with", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#string-starts-with", "export": true, "normative": true, "for_": ["string"]};
+window.refsData['https://tc39.github.io/ecma262/#sec-array.prototype.sort'] = {"text": "sort()", "type": "method", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-array.prototype.sort", "export": true, "normative": true, "for_": ["Array"]};
+window.refsData['#ascii-code-point'] = {"text": "ascii code point", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ascii-code-point", "export": true, "normative": true, "for_": []};
+window.refsData['#ascii-lowercase'] = {"text": "ascii lowercase", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ascii-lowercase", "export": true, "normative": true, "for_": []};
+window.refsData['#ascii-string'] = {"text": "ascii string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ascii-string", "export": true, "normative": true, "for_": []};
+window.refsData['#ascii-whitespace'] = {"text": "ascii whitespace", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ascii-whitespace", "export": true, "normative": true, "for_": []};
+window.refsData['#string-position-variable'] = {"text": "position variable", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#string-position-variable", "export": true, "normative": true, "for_": ["string"]};
+window.refsData['#collect-a-sequence-of-code-points'] = {"text": "collect a sequence of code points", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#collect-a-sequence-of-code-points", "export": true, "normative": true, "for_": []};
+window.refsData['#split-on-ascii-whitespace'] = {"text": "split on ascii whitespace", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#split-on-ascii-whitespace", "export": true, "normative": true, "for_": []};
+window.refsData['#split-on-commas'] = {"text": "split on commas", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#split-on-commas", "export": true, "normative": true, "for_": []};
+window.refsData['#skip-ascii-whitespace'] = {"text": "skip ascii whitespace", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#skip-ascii-whitespace", "export": true, "normative": true, "for_": []};
+window.refsData['#strip-leading-and-trailing-ascii-whitespace'] = {"text": "strip leading and trailing ascii whitespace", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#strip-leading-and-trailing-ascii-whitespace", "export": true, "normative": true, "for_": []};
+window.refsData['#list-is-empty'] = {"text": "is empty", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#list-is-empty", "export": true, "normative": true, "for_": ["list", "queue", "set", "stack"]};
+window.refsData['#list-item'] = {"text": "item", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#list-item", "export": true, "normative": true, "for_": ["list", "queue", "set", "stack"]};
+window.refsData['#string-concatenate'] = {"text": "concatenation", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#string-concatenate", "export": true, "normative": true, "for_": ["string"]};
+window.refsData['#set-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#set-append", "export": true, "normative": true, "for_": ["set"]};
+window.refsData['#ordered-set'] = {"text": "ordered set", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ordered-set", "export": true, "normative": true, "for_": []};
+window.refsData['#list-contain'] = {"text": "contain", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#list-contain", "export": true, "normative": true, "for_": ["list", "queue", "set", "stack"]};
+window.refsData['#ordered-map'] = {"text": "ordered map", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ordered-map", "export": true, "normative": true, "for_": []};
+window.refsData['#list-extend'] = {"text": "extend", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#list-extend", "export": true, "normative": true, "for_": ["list"]};
+window.refsData['#list-size'] = {"text": "size", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#list-size", "export": true, "normative": true, "for_": ["list", "queue", "set", "stack"]};
+window.refsData['#set-prepend'] = {"text": "prepend", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#set-prepend", "export": true, "normative": true, "for_": ["set"]};
+window.refsData['#set-replace'] = {"text": "replace", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#set-replace", "export": true, "normative": true, "for_": ["set"]};
+window.refsData['#list-prepend'] = {"text": "prepend", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#list-prepend", "export": true, "normative": true, "for_": ["list"]};
+window.refsData['#list-remove'] = {"text": "remove", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#list-remove", "export": true, "normative": true, "for_": ["list", "set"]};
+window.refsData['#list-clone'] = {"text": "clone", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#list-clone", "export": true, "normative": true, "for_": ["list", "queue", "set", "stack"]};
+window.refsData['#list-sort-in-ascending-order'] = {"text": "sorting", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#list-sort-in-ascending-order", "export": true, "normative": true, "for_": ["list", "queue", "set", "stack"]};
+window.refsData['#struct-item'] = {"text": "item", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#struct-item", "export": true, "normative": true, "for_": ["pair", "struct", "tuple"]};
+window.refsData['#code-unit-less-than'] = {"text": "code unit less than", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#code-unit-less-than", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-list-and-record-specification-type'] = {"text": "list", "type": "dfn", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-list-and-record-specification-type", "export": true, "normative": true, "for_": []};
+window.refsData['#stack'] = {"text": "stack", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#stack", "export": true, "normative": true, "for_": []};
+window.refsData['#stack-pop'] = {"text": "pop", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#stack-pop", "export": true, "normative": true, "for_": ["stack"]};
+window.refsData['#queue'] = {"text": "queue", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#queue", "export": true, "normative": true, "for_": []};
+window.refsData['#queue-dequeue'] = {"text": "dequeue", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#queue-dequeue", "export": true, "normative": true, "for_": ["queue"]};
+window.refsData['#set-subset'] = {"text": "subset", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#set-subset", "export": true, "normative": true, "for_": ["set"]};
+window.refsData['#set-superset'] = {"text": "superset", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#set-superset", "export": true, "normative": true, "for_": ["set"]};
+window.refsData['#the-range'] = {"text": "the range", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#the-range", "export": true, "normative": true, "for_": []};
+window.refsData['#map-entry'] = {"text": "entry", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#map-entry", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['#map-key'] = {"text": "key", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#map-key", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['#map-exists'] = {"text": "contain", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#map-exists", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['#map-value'] = {"text": "value", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#map-value", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['#map-get'] = {"text": "get", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#map-get", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['#map-set'] = {"text": "set", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#map-set", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['#map-remove'] = {"text": "remove", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#map-remove", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['#map-getting-the-keys'] = {"text": "get the keys", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#map-getting-the-keys", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['#map-size'] = {"text": "size", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#map-size", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['#tuple'] = {"text": "tuple", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#tuple", "export": true, "normative": true, "for_": []};
+window.refsData['#struct-name'] = {"text": "name", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#struct-name", "export": true, "normative": true, "for_": ["pair", "struct", "tuple"]};
+window.refsData['#pair'] = {"text": "pair", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#pair", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-call'] = {"text": "Call", "type": "abstract-op", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-call", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-json.parse'] = {"text": "%json.parse%", "type": "dfn", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-json.parse", "export": true, "normative": true, "for_": []};
+window.refsData['#parse-a-json-string-to-a-javascript-value'] = {"text": "parsing a json string to a javascript value", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#parse-a-json-string-to-a-javascript-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-json.stringify'] = {"text": "%json.stringify%", "type": "dfn", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-json.stringify", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#exceptiondef-typeerror'] = {"text": "TypeError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#exceptiondef-typeerror", "export": true, "normative": true, "for_": []};
+window.refsData['#serialize-a-javascript-value-to-a-json-string'] = {"text": "serializing a javascript value to a json string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#serialize-a-javascript-value-to-a-json-string", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#realm'] = {"text": "realm", "type": "dfn", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#realm", "export": true, "normative": true, "for_": []};
+window.refsData['#convert-a-json-derived-javascript-value-to-an-infra-value'] = {"text": "converting a json-derived javascript value to an infra value", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#convert-a-json-derived-javascript-value-to-an-infra-value", "export": true, "normative": true, "for_": []};
+window.refsData['#parse-a-json-string-to-an-infra-value'] = {"text": "parsing a json string to an infra value", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#parse-a-json-string-to-an-infra-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-ecmascript-data-types-and-values'] = {"text": "Type", "type": "abstract-op", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-ecmascript-data-types-and-values", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-isarray'] = {"text": "IsArray", "type": "abstract-op", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-isarray", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-tolength'] = {"text": "ToLength", "type": "abstract-op", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-tolength", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-get-o-p'] = {"text": "Get", "type": "abstract-op", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-get-o-p", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-tostring'] = {"text": "ToString", "type": "abstract-op", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-tostring", "export": true, "normative": true, "for_": []};
+window.refsData['#convert-an-infra-value-to-a-json-compatible-javascript-value'] = {"text": "converting an infra value to a json-compatible javascript value", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#convert-an-infra-value-to-a-json-compatible-javascript-value", "export": true, "normative": true, "for_": []};
+window.refsData['#serialize-an-infra-value-to-a-json-string'] = {"text": "serializing an infra value to a json string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#serialize-an-infra-value-to-a-json-string", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-arraycreate'] = {"text": "ArrayCreate", "type": "abstract-op", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-arraycreate", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-createdatapropertyorthrow'] = {"text": "CreateDataPropertyOrThrow", "type": "abstract-op", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-createdatapropertyorthrow", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-ordinaryobjectcreate'] = {"text": "OrdinaryObjectCreate", "type": "abstract-op", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-ordinaryobjectcreate", "export": true, "normative": true, "for_": []};
+window.refsData['#forgiving-base64-encode'] = {"text": "forgiving-base64 encode", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#forgiving-base64-encode", "export": true, "normative": true, "for_": []};
+window.refsData['#forgiving-base64-decode'] = {"text": "forgiving-base64 decode", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#forgiving-base64-decode", "export": true, "normative": true, "for_": []};
+window.refsData['#ascii-alphanumeric'] = {"text": "ascii alphanumeric", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "local", "url": "#ascii-alphanumeric", "export": true, "normative": true, "for_": []};
 </script>

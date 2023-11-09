@@ -692,6 +692,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -1990,8 +2027,6 @@ grid-template-columns: <c- m>150</c-><c- k>px</c-> <c- m>100</c-><c- k>px</c-> <
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -2239,7 +2274,6 @@ grid-template-columns: <c- m>150</c-><c- k>px</c-> <c- m>100</c-><c- k>px</c-> <
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -2690,4 +2724,279 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-grid-2/#grid-container'] = {"text": "grid container", "type": "dfn", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#grid-container", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-grid-2/#propdef-grid-template-columns'] = {"text": "grid-template-columns", "type": "property", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#propdef-grid-template-columns", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-grid-2/#propdef-grid-template-rows'] = {"text": "grid-template-rows", "type": "property", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#propdef-grid-template-rows", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-grid-2/#valdef-grid-template-rows-none'] = {"text": "none", "type": "value", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#valdef-grid-template-rows-none", "export": true, "normative": true, "for_": ["grid-template-rows", "grid-template-columns"]};
+window.refsData['#grid-axis'] = {"text": "grid axis", "type": "dfn", "spec": "css-grid-3", "shortname": "css-grid", "level": "3", "status": "local", "url": "#grid-axis", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-grid-2/#grid-item'] = {"text": "grid item", "type": "dfn", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#grid-item", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-grid-2/#propdef-grid-column'] = {"text": "grid-column", "type": "property", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#propdef-grid-column", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-grid-2/#propdef-grid-row'] = {"text": "grid-row", "type": "property", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#propdef-grid-row", "export": true, "normative": true, "for_": []};
+window.refsData['#masonry-axis'] = {"text": "masonry axis", "type": "dfn", "spec": "css-grid-3", "shortname": "css-grid", "level": "3", "status": "local", "url": "#masonry-axis", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#blockify'] = {"text": "blockify", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#blockify", "export": true, "normative": true, "for_": []};
+window.refsData['#running-position'] = {"text": "running position", "type": "dfn", "spec": "css-grid-3", "shortname": "css-grid", "level": "3", "status": "local", "url": "#running-position", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-masonry-auto-flow'] = {"text": "masonry-auto-flow", "type": "property", "spec": "css-grid-3", "shortname": "css-grid", "level": "3", "status": "local", "url": "#propdef-masonry-auto-flow", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-any'] = {"text": "||", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-any", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#containing-block'] = {"text": "containing block", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#containing-block", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-grid-2/#grid-area'] = {"text": "grid area", "type": "dfn", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#grid-area", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-grid-2/#implicit-grid'] = {"text": "implicit grid", "type": "dfn", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#implicit-grid", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-grid-2/#valdef-grid-auto-flow-dense'] = {"text": "dense", "type": "value", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#valdef-grid-auto-flow-dense", "export": true, "normative": true, "for_": ["grid-auto-flow"]};
+window.refsData['https://drafts.csswg.org/css-writing-modes-3/#propdef-direction'] = {"text": "direction", "type": "property", "spec": "css-writing-modes-3", "shortname": "css-writing-modes", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-3/#propdef-direction", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#max-content'] = {"text": "max-content size", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#max-content", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#min-content'] = {"text": "min-content size", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#min-content", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#max-content-constraint'] = {"text": "max-content constraint", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#max-content-constraint", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#min-content-constraint'] = {"text": "min-content constraint", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#min-content-constraint", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-align-3/#alignment-subject'] = {"text": "alignment subject", "type": "dfn", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#alignment-subject", "export": true, "normative": true, "for_": []};
+window.refsData['#masonry-box'] = {"text": "masonry box", "type": "dfn", "spec": "css-grid-3", "shortname": "css-grid", "level": "3", "status": "local", "url": "#masonry-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-align-3/#propdef-align-content'] = {"text": "align-content", "type": "property", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#propdef-align-content", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-align-3/#propdef-justify-content'] = {"text": "justify-content", "type": "property", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#propdef-justify-content", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-align-3/#valdef-self-position-start'] = {"text": "start", "type": "value", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#valdef-self-position-start", "export": true, "normative": true, "for_": ["<self-position>", "<content-position>", "justify-self", "align-self", "justify-content", "align-content"]};
+window.refsData['https://drafts.csswg.org/css-align-3/#valdef-self-position-center'] = {"text": "center", "type": "value", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#valdef-self-position-center", "export": true, "normative": true, "for_": ["<self-position>", "<content-position>", "justify-self", "align-self", "justify-content", "align-content"]};
+window.refsData['https://drafts.csswg.org/css-align-3/#valdef-self-position-end'] = {"text": "end", "type": "value", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#valdef-self-position-end", "export": true, "normative": true, "for_": ["<self-position>", "<content-position>", "justify-self", "align-self", "justify-content", "align-content"]};
+window.refsData['https://drafts.csswg.org/css-align-3/#valdef-align-content-stretch'] = {"text": "stretch", "type": "value", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#valdef-align-content-stretch", "export": true, "normative": true, "for_": ["align-content", "justify-content", "<content-distribution>"]};
+window.refsData['https://drafts.csswg.org/css-align-3/#baseline-alignment'] = {"text": "baseline alignment", "type": "dfn", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#baseline-alignment", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-align-3/#valdef-justify-content-normal'] = {"text": "normal", "type": "value", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#valdef-justify-content-normal", "export": true, "normative": true, "for_": ["justify-content", "align-content"]};
+window.refsData['https://drafts.csswg.org/css-align-3/#valdef-align-self-normal'] = {"text": "normal", "type": "value", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#valdef-align-self-normal", "export": true, "normative": true, "for_": ["align-self"]};
+window.refsData['https://drafts.csswg.org/css-align-3/#typedef-baseline-position'] = {"text": "<baseline-position>", "type": "type", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#typedef-baseline-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-align-3/#typedef-content-distribution'] = {"text": "<content-distribution>", "type": "type", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#typedef-content-distribution", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-align-3/#typedef-overflow-position'] = {"text": "<overflow-position>", "type": "type", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#typedef-overflow-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-opt'] = {"text": "?", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-align-3/#typedef-content-position'] = {"text": "<content-position>", "type": "type", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#typedef-content-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-comma'] = {"text": "#", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-comma", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-align-tracks'] = {"text": "align-tracks", "type": "property", "spec": "css-grid-3", "shortname": "css-grid", "level": "3", "status": "local", "url": "#propdef-align-tracks", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-align-3/#valdef-align-self-stretch'] = {"text": "stretch", "type": "value", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#valdef-align-self-stretch", "export": true, "normative": true, "for_": ["align-self"]};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#indefinite'] = {"text": "indefinite size", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#indefinite", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#max-width'] = {"text": "max size", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#max-width", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#definite'] = {"text": "definite size", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#definite", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#valdef-width-auto'] = {"text": "auto", "type": "value", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#valdef-width-auto", "export": true, "normative": true, "for_": ["width", "height", "min-width", "min-height"]};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-max-height'] = {"text": "max-height", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-max-height", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-align-3/#propdef-align-self'] = {"text": "align-self", "type": "property", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#propdef-align-self", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-logical-1/#propdef-margin-block'] = {"text": "margin-block", "type": "property", "spec": "css-logical-1", "shortname": "css-logical", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-logical-1/#propdef-margin-block", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#propdef-margin-top'] = {"text": "margin-top", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#propdef-margin-top", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-justify-tracks'] = {"text": "justify-tracks", "type": "property", "spec": "css-grid-3", "shortname": "css-grid", "level": "3", "status": "local", "url": "#propdef-justify-tracks", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-align-3/#baseline-sharing-group'] = {"text": "baseline-sharing group", "type": "dfn", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#baseline-sharing-group", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-align-3/#first-baseline-set'] = {"text": "first baseline set", "type": "dfn", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#first-baseline-set", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-align-3/#last-baseline-set'] = {"text": "last baseline set", "type": "dfn", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#last-baseline-set", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-break-4/#forced-break'] = {"text": "forced break", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-break-4/#forced-break", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-break-4/#fragmentainer'] = {"text": "fragmentainer", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-break-4/#fragmentainer", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-grid-2/#subgrid'] = {"text": "subgrid", "type": "dfn", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#subgrid", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-grid-2/#propdef-grid'] = {"text": "grid", "type": "property", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#propdef-grid", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-grid-2/#grid-position'] = {"text": "grid position", "type": "dfn", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#grid-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-grid-2/#propdef-grid-template'] = {"text": "grid-template", "type": "property", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#propdef-grid-template", "export": true, "normative": true, "for_": []};window.refsData['#propdef-align-tracks'] = {"text": "align-tracks", "type": "property", "spec": "css-grid-3", "shortname": "css-grid", "level": "3", "status": "local", "url": "#propdef-align-tracks", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-justify-tracks'] = {"text": "justify-tracks", "type": "property", "spec": "css-grid-3", "shortname": "css-grid", "level": "3", "status": "local", "url": "#propdef-justify-tracks", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-masonry-auto-flow'] = {"text": "masonry-auto-flow", "type": "property", "spec": "css-grid-3", "shortname": "css-grid", "level": "3", "status": "local", "url": "#propdef-masonry-auto-flow", "export": true, "normative": true, "for_": []};
 </script>

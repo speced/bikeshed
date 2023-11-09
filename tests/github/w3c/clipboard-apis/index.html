@@ -691,6 +691,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -3037,8 +3074,6 @@ required, and because it’s hard to test in a cross-platform way. <a class="iss
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -3286,7 +3321,6 @@ required, and because it’s hard to test in a cross-platform way. <a class="iss
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -3768,6 +3802,310 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://w3c.github.io/permissions/#dfn-powerful-feature'] = {"text": "powerful feature", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-powerful-feature", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-clipboard-write'] = {"text": "write(data)", "type": "method", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#dom-clipboard-write", "export": true, "normative": true, "for_": ["Clipboard"]};
+window.refsData['#clipboardchange'] = {"text": "clipboardchange", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#clipboardchange", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-clipboard-read'] = {"text": "read()", "type": "method", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#dom-clipboard-read", "export": true, "normative": true, "for_": ["Clipboard"]};
+window.refsData['http://w3c.github.io/editing/contentEditable.html#dfn-editing-host'] = {"text": "editing host", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "http://w3c.github.io/editing/contentEditable.html#dfn-editing-host", "export": true, "normative": true, "for_": []};
+window.refsData['#system-clipboard'] = {"text": "system clipboard", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#system-clipboard", "export": true, "normative": true, "for_": []};
+window.refsData['#system-clipboard-data'] = {"text": "system clipboard data", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#system-clipboard-data", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/dnd.html#datatransfer'] = {"text": "DataTransfer", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dnd.html#datatransfer", "export": true, "normative": true, "for_": []};
+window.refsData['#clipboarditem'] = {"text": "ClipboardItem", "type": "interface", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#clipboarditem", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#event'] = {"text": "Event", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#event", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dictdef-eventinit'] = {"text": "EventInit", "type": "dictionary", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dictdef-eventinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-clipboardeventinit'] = {"text": "ClipboardEventInit", "type": "dictionary", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#dictdef-clipboardeventinit", "export": true, "normative": true, "for_": []};
+window.refsData['#mandatory-data-types'] = {"text": "mandatory data types", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#mandatory-data-types", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-items'] = {"text": "items", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-items", "export": true, "normative": true, "for_": ["DataTransfer"]};
+window.refsData['https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-files'] = {"text": "files", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-files", "export": true, "normative": true, "for_": ["DataTransfer"]};
+window.refsData['https://dom.spec.whatwg.org/#constructing-events'] = {"text": "constructing events", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "https://dom.spec.whatwg.org/#constructing-events", "export": true, "normative": true, "for_": []};
+window.refsData['#cut'] = {"text": "cut", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#cut", "export": true, "normative": true, "for_": []};
+window.refsData['#copy'] = {"text": "copy", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#copy", "export": true, "normative": true, "for_": []};
+window.refsData['#fire-a-clipboard-event'] = {"text": "fire a clipboard event", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#fire-a-clipboard-event", "export": true, "normative": true, "for_": []};
+window.refsData['#editable-context'] = {"text": "editable context", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#editable-context", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-clipboardevent-clipboarddata'] = {"text": "clipboardData", "type": "attribute", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#dom-clipboardevent-clipboarddata", "export": true, "normative": true, "for_": ["ClipboardEvent"]};
+window.refsData['#paste'] = {"text": "paste", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#paste", "export": true, "normative": true, "for_": []};
+window.refsData['http://www.w3.org/TR/html5/browsers.html#allowed-to-show-a-popup'] = {"text": "allowed to show a popup", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "http://www.w3.org/TR/html5/browsers.html#allowed-to-show-a-popup", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#focusable-area'] = {"text": "focusable area", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#focusable-area", "export": true, "normative": true, "for_": []};
+window.refsData['#clipboardevent'] = {"text": "ClipboardEvent", "type": "interface", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#clipboardevent", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dom-event-preventdefault'] = {"text": "preventDefault()", "type": "method", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-event-preventdefault", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#drag-data-store-mode'] = {"text": "drag data store mode", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#drag-data-store-mode", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-ro'] = {"text": "concept dnd ro", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-ro", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-setdata'] = {"text": "setData(format, data)", "type": "method", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-setdata", "export": true, "normative": true, "for_": ["DataTransfer"]};
+window.refsData['https://html.spec.whatwg.org/multipage/dnd.html#datatransferitemlist'] = {"text": "DataTransferItemList", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dnd.html#datatransferitemlist", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/system-state.html#navigator'] = {"text": "Navigator", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/system-state.html#navigator", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#SecureContext'] = {"text": "SecureContext", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SecureContext", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
+window.refsData['#clipboard'] = {"text": "Clipboard", "type": "interface", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#clipboard", "export": true, "normative": true, "for_": []};
+window.refsData['#navigator-clipboard'] = {"text": "clipboard", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#navigator-clipboard", "export": true, "normative": true, "for_": ["Navigator"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#eventtarget'] = {"text": "EventTarget", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#eventtarget", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-promise'] = {"text": "Promise", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-promise", "export": true, "normative": true, "for_": []};
+window.refsData['#typedefdef-clipboarditems'] = {"text": "ClipboardItems", "type": "typedef", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#typedefdef-clipboarditems", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-clipboard-readtext'] = {"text": "readText()", "type": "method", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#dom-clipboard-readtext", "export": true, "normative": true, "for_": ["Clipboard"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-clipboard-writetext'] = {"text": "writeText(data)", "type": "method", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#dom-clipboard-writetext", "export": true, "normative": true, "for_": ["Clipboard"]};
+window.refsData['https://w3c.github.io/FileAPI/#dfn-Blob'] = {"text": "Blob", "type": "interface", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-Blob", "export": true, "normative": true, "for_": []};
+window.refsData['#typedefdef-clipboarditemdatatype'] = {"text": "ClipboardItemDataType", "type": "typedef", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#typedefdef-clipboarditemdatatype", "export": true, "normative": true, "for_": []};
+window.refsData['#typedefdef-clipboarditemdata'] = {"text": "ClipboardItemData", "type": "typedef", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#typedefdef-clipboarditemdata", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-record'] = {"text": "record", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-record", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-clipboarditemoptions'] = {"text": "ClipboardItemOptions", "type": "dictionary", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#dictdef-clipboarditemoptions", "export": true, "normative": true, "for_": []};
+window.refsData['#callbackdef-clipboarditemdelayedcallback'] = {"text": "ClipboardItemDelayedCallback", "type": "callback", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#callbackdef-clipboarditemdelayedcallback", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-presentationstyle'] = {"text": "PresentationStyle", "type": "enum", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#enumdef-presentationstyle", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-long-long'] = {"text": "long long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-long-long", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-frozen-array'] = {"text": "FrozenArray", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "export": true, "normative": true, "for_": []};
+window.refsData['http://tc39.github.io/ecma262/#sec-promise-objects'] = {"text": "promise", "type": "dfn", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "http://tc39.github.io/ecma262/#sec-promise-objects", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel'] = {"text": "in parallel", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel", "export": true, "normative": true, "for_": []};
+window.refsData['#check-clipboard-read-permission'] = {"text": "check clipboard read permission", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#check-clipboard-read-permission", "export": true, "normative": true, "for_": []};
+window.refsData['#check-clipboard-write-permission'] = {"text": "check clipboard write permission", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#check-clipboard-write-permission", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/FileAPI/#dfn-type'] = {"text": "type", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/FileAPI/#dfn-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/FileAPI/#dfn-blobparts'] = {"text": "blobparts", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/FileAPI/#dfn-blobparts", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-cd-data'] = {"text": "data", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-cd-data", "export": true, "normative": true, "for_": ["CharacterData"]};
+window.refsData['#script-triggered'] = {"text": "script-triggered", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#script-triggered", "export": true, "normative": true, "for_": []};
+window.refsData['#script-may-access-clipboard'] = {"text": "script-may-access-clipboard", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#script-may-access-clipboard", "export": true, "normative": true, "for_": []};
+window.refsData['#allowed-to-modify-the-clipboard'] = {"text": "allowed to modify the clipboard", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#allowed-to-modify-the-clipboard", "export": true, "normative": true, "for_": []};
+window.refsData['#allowed-to-read-from-clipboard'] = {"text": "allowed to read from clipboard", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#allowed-to-read-from-clipboard", "export": true, "normative": true, "for_": []};
+window.refsData['#write-content-to-the-clipboard'] = {"text": "write content to the clipboard", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#write-content-to-the-clipboard", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dfn-permission-descriptor-type'] = {"text": "permission descriptor type", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-permission-descriptor-type", "export": true, "normative": true, "for_": ["powerful feature"]};
+window.refsData['https://w3c.github.io/permissions/#dom-permissiondescriptor'] = {"text": "PermissionDescriptor", "type": "dictionary", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dom-permissiondescriptor", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-clipboardpermissiondescriptor'] = {"text": "ClipboardPermissionDescriptor", "type": "dictionary", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#dictdef-clipboardpermissiondescriptor", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dom-permissionstate-denied'] = {"text": "denied", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/permissions/#dom-permissionstate-denied", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global'] = {"text": "relevant global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#this'] = {"text": "this", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#this", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#transient-activation'] = {"text": "transient activation", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/interaction.html#transient-activation", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dfn-permission-state'] = {"text": "permission state", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-permission-state", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dom-permissionstate-granted'] = {"text": "granted", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/permissions/#dom-permissionstate-granted", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dfn-request-permission-to-use'] = {"text": "request permission to use", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-request-permission-to-use", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/dom.html#the-body-element-2'] = {"text": "the body element", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/dom.html#the-body-element-2", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/dnd.html#datatransferitem'] = {"text": "DataTransferItem", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dnd.html#datatransferitem", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#drag-data-item-kind'] = {"text": "drag data item kind", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#drag-data-item-kind", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#drag-data-item-type-string'] = {"text": "drag data item type string", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#drag-data-item-type-string", "export": true, "normative": true, "for_": []};
+window.refsData['#process-an-html-paste-event'] = {"text": "process an html paste event", "type": "dfn", "spec": "clipboard-apis", "shortname": "clipboard-apis", "level": "", "status": "local", "url": "#process-an-html-paste-event", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-types'] = {"text": "types", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-types", "export": true, "normative": true, "for_": ["DataTransfer"]};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-rw'] = {"text": "concept dnd rw", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-rw", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dom-event-istrusted'] = {"text": "isTrusted", "type": "attribute", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-event-istrusted", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['https://dom.spec.whatwg.org/#dom-event-composed'] = {"text": "composed", "type": "attribute", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-event-composed", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-cleardata'] = {"text": "clearData(format)", "type": "method", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-cleardata", "export": true, "normative": true, "for_": ["DataTransfer"]};
+window.refsData['https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransferitemlist-clear'] = {"text": "clear()", "type": "method", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransferitemlist-clear", "export": true, "normative": true, "for_": ["DataTransferItemList"]};
+window.refsData['https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-getdata'] = {"text": "getData(format)", "type": "method", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-getdata", "export": true, "normative": true, "for_": ["DataTransfer"]};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-p'] = {"text": "concept dnd p", "type": "dfn", "spec": "", "shortname": "clipboard-apis", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-p", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/FileAPI/#dfn-file'] = {"text": "File", "type": "interface", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-file", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/FileAPI/#dfn-name'] = {"text": "name", "type": "attribute", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-name", "export": true, "normative": true, "for_": ["File"]};
+window.refsData['https://w3c.github.io/FileAPI/#dfn-lastModified'] = {"text": "lastModified", "type": "attribute", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-lastModified", "export": true, "normative": true, "for_": ["File"]};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

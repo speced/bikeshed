@@ -469,6 +469,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -3106,8 +3143,6 @@ them to. <a href="https://github.com/whatwg/fetch/issues/730">[Issue #whatwg/fet
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -3355,7 +3390,6 @@ them to. <a href="https://github.com/whatwg/fetch/issues/730">[Issue #whatwg/fet
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -3965,6 +3999,479 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://mimesniff.spec.whatwg.org/#mime-type'] = {"text": "mime type", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "1", "status": "current", "url": "https://mimesniff.spec.whatwg.org/#mime-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#dom-serviceworkerregistration-navigationpreload'] = {"text": "navigationPreload", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#dom-serviceworkerregistration-navigationpreload", "export": true, "normative": true, "for_": ["ServiceWorkerRegistration"]};
+window.refsData['https://w3c.github.io/ServiceWorker/#fetchevent'] = {"text": "FetchEvent", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#fetchevent", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#dom-fetchevent-preloadresponse'] = {"text": "preloadResponse", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#dom-fetchevent-preloadresponse", "export": true, "normative": true, "for_": ["FetchEvent"]};
+window.refsData['https://fetch.spec.whatwg.org/#dom-request-clone'] = {"text": "clone()", "type": "method", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#dom-request-clone", "export": true, "normative": true, "for_": ["Request"]};
+window.refsData['https://w3c.github.io/ServiceWorker/#dom-fetchevent-request'] = {"text": "request", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#dom-fetchevent-request", "export": true, "normative": true, "for_": ["FetchEvent"]};
+window.refsData['https://fetch.spec.whatwg.org/#dom-request-cache'] = {"text": "cache", "type": "attribute", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#dom-request-cache", "export": true, "normative": true, "for_": ["Request"]};
+window.refsData['https://fetch.spec.whatwg.org/#dom-requestcache-only-if-cached'] = {"text": "\"only-if-cached\"", "type": "enum-value", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#dom-requestcache-only-if-cached", "export": true, "normative": true, "for_": ["RequestCache"]};
+window.refsData['https://fetch.spec.whatwg.org/#dom-global-fetch'] = {"text": "fetch(input)", "type": "method", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#dom-global-fetch", "export": true, "normative": true, "for_": ["WindowOrWorkerGlobalScope"]};
+window.refsData['https://fetch.spec.whatwg.org/#request'] = {"text": "Request", "type": "interface", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#request", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#dom-request-url'] = {"text": "url", "type": "attribute", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#dom-request-url", "export": true, "normative": true, "for_": ["Request"]};
+window.refsData['#exchange-signature-expiration-time'] = {"text": "expiration time", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#exchange-signature-expiration-time", "export": true, "normative": true, "for_": ["exchange signature"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request'] = {"text": "request", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request", "export": true, "normative": true, "for_": []};
+window.refsData['#exchange'] = {"text": "exchange", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#exchange", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-clone'] = {"text": "clone", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-clone", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-body'] = {"text": "body", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-body", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['#request-stashed-exchange'] = {"text": "stashed exchange", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#request-stashed-exchange", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-body-clone'] = {"text": "clone", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-body-clone", "export": true, "normative": true, "for_": ["body"]};
+window.refsData['#exchange-request-url'] = {"text": "request url", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#exchange-request-url", "export": true, "normative": true, "for_": ["exchange"]};
+window.refsData['#exchange-response'] = {"text": "response", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#exchange-response", "export": true, "normative": true, "for_": ["exchange"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response-clone'] = {"text": "clone", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response-clone", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response'] = {"text": "response", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-header-list'] = {"text": "header list", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-header-list", "export": true, "normative": true, "for_": []};
+window.refsData['#response-came-from-a-signed-exchange'] = {"text": "came from a signed exchange", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#response-came-from-a-signed-exchange", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['https://infra.spec.whatwg.org/#byte-sequence'] = {"text": "byte sequence", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#byte-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['http://csrc.nist.gov/publications/fips/fips180-4/fips-180-4.pdf#'] = {"text": "sha-256", "type": "dfn", "spec": "sha2", "shortname": "sha2", "level": "", "status": "anchor-block", "url": "http://csrc.nist.gov/publications/fips/fips180-4/fips-180-4.pdf#", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response-header-list'] = {"text": "header list", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response-header-list", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['#response-header-integrity-value'] = {"text": "header integrity value", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#response-header-integrity-value", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['https://fetch.spec.whatwg.org/#extract-header-list-values'] = {"text": "extracting header list values", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#extract-header-list-values", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc7231#section-7.1.1.2'] = {"text": "date", "type": "http-header", "spec": "rfc7231", "shortname": "rfc7231", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc7231#section-7.1.1.2", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-http-fetch'] = {"text": "http fetch", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-http-fetch", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response-status'] = {"text": "status", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response-status", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['https://fetch.spec.whatwg.org/#redirect-status'] = {"text": "redirect status", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#redirect-status", "export": true, "normative": true, "for_": []};
+window.refsData['#signed-exchange-version'] = {"text": "signed exchange version", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#signed-exchange-version", "export": true, "normative": true, "for_": []};
+window.refsData['#create-a-new-signed-exchange-report'] = {"text": "create a new signed exchange report", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#create-a-new-signed-exchange-report", "export": true, "normative": true, "for_": []};
+window.refsData['#parsing-a-signed-exchange'] = {"text": "parsing a signed exchange", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#parsing-a-signed-exchange", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-client'] = {"text": "client", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-client", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['#queue-a-signed-exchange-report'] = {"text": "queue a signed exchange report", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#queue-a-signed-exchange-report", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-network-error'] = {"text": "network error", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-network-error", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel'] = {"text": "in parallel", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel", "export": true, "normative": true, "for_": []};
+window.refsData['#wait-and-queue-a-report-for'] = {"text": "wait and queue a report for", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#wait-and-queue-a-report-for", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-status'] = {"text": "status", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-status", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-header-list-set'] = {"text": "set", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-header-list-set", "export": true, "normative": true, "for_": ["header list"]};
+window.refsData['https://infra.spec.whatwg.org/#ascii-encode'] = {"text": "ascii encode", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-encode", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-url-serializer'] = {"text": "url serializer", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-serializer", "export": true, "normative": true, "for_": []};
+window.refsData['#extracting-the-fallback-url'] = {"text": "extracting the fallback url", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#extracting-the-fallback-url", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-http-network-or-cache-fetch'] = {"text": "http-network-or-cache fetch", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-http-network-or-cache-fetch", "export": false, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-cache-mode'] = {"text": "cache mode", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-cache-mode", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['#matches-the-stored-exchange'] = {"text": "matches the stored exchange", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#matches-the-stored-exchange", "export": true, "normative": true, "for_": []};
+window.refsData['#response-date'] = {"text": "date", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#response-date", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-initiator'] = {"text": "initiator", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-initiator", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://tools.ietf.org/html/rfc8288#section-3'] = {"text": "link", "type": "http-header", "spec": "rfc8288", "shortname": "rfc8288", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc8288#section-3", "export": true, "normative": true, "for_": []};
+window.refsData['#attr-valuedef-link-rel-allowed-alt-sxg'] = {"text": "allowed-alt-sxg", "type": "attr-value", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#attr-valuedef-link-rel-allowed-alt-sxg", "export": true, "normative": true, "for_": ["link/rel"]};
+window.refsData['https://tools.ietf.org/html/rfc8288#section-3.1'] = {"text": "link target", "type": "dfn", "spec": "rfc8288", "shortname": "rfc8288", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc8288#section-3.1", "export": true, "normative": true, "for_": []};
+window.refsData['#element-attrdef-link-header-integrity'] = {"text": "header-integrity", "type": "element-attr", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#element-attrdef-link-header-integrity", "export": true, "normative": true, "for_": ["link"]};
+window.refsData['#alternate-signed-exchange'] = {"text": "alternate signed exchange", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#alternate-signed-exchange", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webappsec-csp/#grammardef-hash-source'] = {"text": "hash-source", "type": "grammar", "spec": "csp3", "shortname": "csp", "level": "3", "status": "current", "url": "https://w3c.github.io/webappsec-csp/#grammardef-hash-source", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/links.html#rel-alternate'] = {"text": "alternate", "type": "attr-value", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/links.html#rel-alternate", "export": true, "normative": true, "for_": ["link/rel"]};
+window.refsData['https://tools.ietf.org/html/rfc8288#section-3.2'] = {"text": "link context", "type": "dfn", "spec": "rfc8288", "shortname": "rfc8288", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc8288#section-3.2", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/links.html#link-type-preload'] = {"text": "preload", "type": "attr-value", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/links.html#link-type-preload", "export": true, "normative": true, "for_": ["link/rel"]};
+window.refsData['#alternate-signed-exchange-link'] = {"text": "alternate signed exchange link", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#alternate-signed-exchange-link", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc8288#section-3.4'] = {"text": "serialisation-defined target attribute", "type": "dfn", "spec": "rfc8288", "shortname": "rfc8288", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc8288#section-3.4", "export": true, "normative": true, "for_": []};
+window.refsData['https://httpwg.org/http-extensions/draft-ietf-httpbis-variants.html#variants'] = {"text": "variants", "type": "http-header", "spec": "draft-ietf-httpbis-variants", "shortname": "draft-ietf-httpbis-variants", "level": "", "status": "anchor-block", "url": "https://httpwg.org/http-extensions/draft-ietf-httpbis-variants.html#variants", "export": true, "normative": true, "for_": []};
+window.refsData['#element-attrdef-link-variants'] = {"text": "variants", "type": "element-attr", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#element-attrdef-link-variants", "export": true, "normative": true, "for_": ["link"]};
+window.refsData['https://tools.ietf.org/html/rfc7230#section-3.2.6'] = {"text": "token", "type": "grammar", "spec": "7230", "shortname": "7230", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc7230#section-3.2.6", "export": true, "normative": true, "for_": []};
+window.refsData['https://httpwg.org/http-extensions/draft-ietf-httpbis-variants.html#variant-key'] = {"text": "variant-key", "type": "http-header", "spec": "draft-ietf-httpbis-variants", "shortname": "draft-ietf-httpbis-variants", "level": "", "status": "anchor-block", "url": "https://httpwg.org/http-extensions/draft-ietf-httpbis-variants.html#variant-key", "export": true, "normative": true, "for_": []};
+window.refsData['#element-attrdef-link-variant-key'] = {"text": "variant-key", "type": "element-attr", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#element-attrdef-link-variant-key", "export": true, "normative": true, "for_": ["link"]};
+window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ordered-map'] = {"text": "map", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-map", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-url'] = {"text": "url", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/links.html#link-type-prefetch'] = {"text": "prefetch", "type": "attr-value", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/links.html#link-type-prefetch", "export": true, "normative": true, "for_": ["link/rel"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsing-the-web.html#navigation-params'] = {"text": "navigation params", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsing-the-web.html#navigation-params", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/semantics.html#process-the-linked-resource'] = {"text": "process the linked resource", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/semantics.html#process-the-linked-resource", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-event-fire'] = {"text": "fire an event", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-event-fire", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/indices.html#event-load'] = {"text": "load", "type": "event", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/indices.html#event-load", "export": true, "normative": true, "for_": ["Window", "HTMLElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/indices.html#event-error'] = {"text": "error", "type": "event", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/indices.html#event-error", "export": true, "normative": true, "for_": ["Window", "WorkerGlobalScope", "HTMLElement", "EventSource", "Worker", "SharedWorker", "AbstractWorker"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response-url-list'] = {"text": "url list", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response-url-list", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-node-document'] = {"text": "node document", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-node-document", "export": true, "normative": true, "for_": ["Node"]};
+window.refsData['#document-prefetched-signed-exchanges-for-navigation'] = {"text": "prefetched signed exchanges for navigation", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#document-prefetched-signed-exchanges-for-navigation", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['https://infra.spec.whatwg.org/#map-set'] = {"text": "set", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-set", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-header-list-get'] = {"text": "get", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-header-list-get", "export": true, "normative": true, "for_": ["header list"]};
+window.refsData['#response-signed-exchange-outer-header-list'] = {"text": "signed exchange outer header list", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#response-signed-exchange-outer-header-list", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['https://tools.ietf.org/html/rfc8288#appendix-B.2'] = {"text": "parsing a link field value", "type": "dfn", "spec": "rfc8288", "shortname": "rfc8288", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc8288#appendix-B.2", "export": true, "normative": true, "for_": []};
+window.refsData['#getting-alternate-signed-exchange-link-info'] = {"text": "getting alternate signed exchange link info", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#getting-alternate-signed-exchange-link-info", "export": true, "normative": true, "for_": []};
+window.refsData['#getting-allowed-signed-exchange-link-info'] = {"text": "getting allowed signed exchange link info", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#getting-allowed-signed-exchange-link-info", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc8288#section-3.3'] = {"text": "relation type", "type": "dfn", "spec": "rfc8288", "shortname": "rfc8288", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc8288#section-3.3", "export": true, "normative": true, "for_": []};
+window.refsData['#target-attribute-named'] = {"text": "target attribute named", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#target-attribute-named", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-potential-destination'] = {"text": "potential destination", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-potential-destination", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/semantics.html#the-link-element'] = {"text": "link", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/semantics.html#the-link-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/semantics.html#attr-link-href'] = {"text": "href", "type": "element-attr", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/semantics.html#attr-link-href", "export": true, "normative": true, "for_": ["link"]};
+window.refsData['https://html.spec.whatwg.org/multipage/semantics.html#attr-link-imagesrcset'] = {"text": "imagesrcset", "type": "element-attr", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/semantics.html#attr-link-imagesrcset", "export": true, "normative": true, "for_": ["link"]};
+window.refsData['https://html.spec.whatwg.org/multipage/semantics.html#attr-link-imagesizes'] = {"text": "imagesizes", "type": "element-attr", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/semantics.html#attr-link-imagesizes", "export": true, "normative": true, "for_": ["link"]};
+window.refsData['https://html.spec.whatwg.org/multipage/images.html#select-an-image-source'] = {"text": "selecting an image source", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/images.html#select-an-image-source", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-url-parser'] = {"text": "url parser", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-parser", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response-url'] = {"text": "url", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response-url", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['#allowed-signed-exchange-link-info-target'] = {"text": "target", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#allowed-signed-exchange-link-info-target", "export": true, "normative": true, "for_": ["allowed signed exchange link info"]};
+window.refsData['#allowed-signed-exchange-link-info-variants'] = {"text": "variants", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#allowed-signed-exchange-link-info-variants", "export": true, "normative": true, "for_": ["allowed signed exchange link info"]};
+window.refsData['#allowed-signed-exchange-link-info-variant-key'] = {"text": "variant key", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#allowed-signed-exchange-link-info-variant-key", "export": true, "normative": true, "for_": ["allowed signed exchange link info"]};
+window.refsData['https://html.spec.whatwg.org/multipage/urls-and-fetching.html#create-a-potential-cors-request'] = {"text": "creating a potential-cors request", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/urls-and-fetching.html#create-a-potential-cors-request", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-potential-destination-translate'] = {"text": "translate", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-potential-destination-translate", "export": true, "normative": true, "for_": ["destination"]};
+window.refsData['https://html.spec.whatwg.org/multipage/urls-and-fetching.html#attr-crossorigin-none'] = {"text": "no cors", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/urls-and-fetching.html#attr-crossorigin-none", "export": true, "normative": true, "for_": []};
+window.refsData['#alternate-signed-exchange-link-info-target'] = {"text": "target", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#alternate-signed-exchange-link-info-target", "export": true, "normative": true, "for_": ["alternate signed exchange link info"]};
+window.refsData['#alternate-signed-exchange-link-info'] = {"text": "alternate signed exchange link info", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#alternate-signed-exchange-link-info", "export": true, "normative": true, "for_": []};
+window.refsData['#alternate-signed-exchange-link-info-variants'] = {"text": "variants", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#alternate-signed-exchange-link-info-variants", "export": true, "normative": true, "for_": ["alternate signed exchange link info"]};
+window.refsData['https://infra.spec.whatwg.org/#string-is'] = {"text": "identical to", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#string-is", "export": true, "normative": true, "for_": ["string"]};
+window.refsData['#alternate-signed-exchange-link-info-variant-key'] = {"text": "variant key", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#alternate-signed-exchange-link-info-variant-key", "export": true, "normative": true, "for_": ["alternate signed exchange link info"]};
+window.refsData['#alternate-signed-exchange-link-info-context'] = {"text": "context", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#alternate-signed-exchange-link-info-context", "export": true, "normative": true, "for_": ["alternate signed exchange link info"]};
+window.refsData['https://url.spec.whatwg.org/#concept-url-equals'] = {"text": "equal", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-equals", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-fetch'] = {"text": "fetch", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-fetch", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task'] = {"text": "queue a task", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#networking-task-source'] = {"text": "networking task source", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#networking-task-source", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#set-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#set-append", "export": true, "normative": true, "for_": ["set"]};
+window.refsData['#document-prefetched-subresource-signed-exchanges'] = {"text": "prefetched subresource signed exchanges", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#document-prefetched-subresource-signed-exchanges", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['https://infra.spec.whatwg.org/#map-exists'] = {"text": "contain", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-exists", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-url'] = {"text": "url", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-url", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['#navigation-params-prefetched-subresource-signed-exchanges'] = {"text": "prefetched subresource signed exchanges", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#navigation-params-prefetched-subresource-signed-exchanges", "export": true, "normative": true, "for_": ["navigation params"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsing-the-web.html#read-html'] = {"text": "page load processing model for html files", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsing-the-web.html#read-html", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css2/#viewport'] = {"text": "viewport", "type": "dfn", "spec": "css2", "shortname": "css2", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/css2/#viewport", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsing-the-web.html#navigation-params-response'] = {"text": "response", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsing-the-web.html#navigation-params-response", "export": true, "normative": true, "for_": ["navigation params"]};
+window.refsData['https://infra.spec.whatwg.org/#list'] = {"text": "list", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list", "export": true, "normative": true, "for_": []};
+window.refsData['#allowed-signed-exchange-link-info-header-integrity'] = {"text": "header integrity", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#allowed-signed-exchange-link-info-header-integrity", "export": true, "normative": true, "for_": ["allowed signed exchange link info"]};
+window.refsData['https://infra.spec.whatwg.org/#list-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-append", "export": true, "normative": true, "for_": ["list"]};
+window.refsData['#alternate-signed-exchange-preload-info'] = {"text": "alternate signed exchange preload info", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#alternate-signed-exchange-preload-info", "export": true, "normative": true, "for_": []};
+window.refsData['#alternate-signed-exchange-preload-info-link'] = {"text": "link", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#alternate-signed-exchange-preload-info-link", "export": true, "normative": true, "for_": ["alternate signed exchange preload info"]};
+window.refsData['https://html.spec.whatwg.org/multipage/urls-and-fetching.html#cors-settings-attribute'] = {"text": "cors settings attribute", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/urls-and-fetching.html#cors-settings-attribute", "export": true, "normative": true, "for_": []};
+window.refsData['#alternate-signed-exchange-preload-info-target'] = {"text": "target", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#alternate-signed-exchange-preload-info-target", "export": true, "normative": true, "for_": ["alternate signed exchange preload info"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-nonce-metadata'] = {"text": "cryptographic nonce metadata", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-nonce-metadata", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-integrity-metadata'] = {"text": "integrity metadata", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-integrity-metadata", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-referrer-policy'] = {"text": "referrer policy", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-referrer-policy", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://html.spec.whatwg.org/multipage/urls-and-fetching.html#referrer-policy-attribute'] = {"text": "referrer policy attribute", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/urls-and-fetching.html#referrer-policy-attribute", "export": true, "normative": true, "for_": []};
+window.refsData['#alternate-signed-exchange-preload-info-prefetched-alternate-exchange'] = {"text": "prefetched alternate exchange", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#alternate-signed-exchange-preload-info-prefetched-alternate-exchange", "export": true, "normative": true, "for_": ["alternate signed exchange preload info"]};
+window.refsData['https://infra.spec.whatwg.org/#struct'] = {"text": "struct", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#struct", "export": true, "normative": true, "for_": []};
+window.refsData['https://streams.spec.whatwg.org/#readablestream'] = {"text": "ReadableStream", "type": "interface", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#readablestream", "export": true, "normative": true, "for_": []};
+window.refsData['https://streams.spec.whatwg.org/#readablestreamdefaultreader'] = {"text": "ReadableStreamDefaultReader", "type": "interface", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#readablestreamdefaultreader", "export": true, "normative": true, "for_": []};
+window.refsData['#read-buffer-stream'] = {"text": "stream", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#read-buffer-stream", "export": true, "normative": true, "for_": ["read buffer"]};
+window.refsData['https://infra.spec.whatwg.org/#tuple'] = {"text": "tuple", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#tuple", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc6960#section-4.2.1'] = {"text": "ocspresponse", "type": "dfn", "spec": "rfc6960", "shortname": "rfc6960", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc6960#section-4.2.1", "export": true, "normative": true, "for_": []};
+window.refsData['#augmented-certificate-certificate'] = {"text": "certificate", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#augmented-certificate-certificate", "export": true, "normative": true, "for_": ["augmented certificate"]};
+window.refsData['https://tools.ietf.org/html/rfc6962#section-3.3'] = {"text": "signedcertificatetimestamplist", "type": "dfn", "spec": "rfc6962", "shortname": "rfc6962", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc6962#section-3.3", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc5280#section-4.1.2.7'] = {"text": "subject public key info", "type": "dfn", "spec": "rfc5280", "shortname": "rfc5280", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc5280#section-4.1.2.7", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc5280#section-4.1.1.2'] = {"text": "algorithmidentifier", "type": "dfn", "spec": "rfc5280", "shortname": "rfc5280", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc5280#section-4.1.1.2", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc5280#section-4.2'] = {"text": "certificate extensions", "type": "dfn", "spec": "rfc5280", "shortname": "rfc5280", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc5280#section-4.2", "export": true, "normative": true, "for_": []};
+window.refsData['#augmented-certificate'] = {"text": "augmented certificate", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#augmented-certificate", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-item'] = {"text": "item", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-item", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['#signed-exchange-report-cert-url-list'] = {"text": "cert url list", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#signed-exchange-report-cert-url-list", "export": true, "normative": true, "for_": ["signed exchange report"]};
+window.refsData['#certificate-chain'] = {"text": "certificate chain", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#certificate-chain", "export": true, "normative": true, "for_": []};
+window.refsData['#certificate-chain-leaf'] = {"text": "leaf", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#certificate-chain-leaf", "export": true, "normative": true, "for_": ["certificate chain"]};
+window.refsData['#certificate-public-key'] = {"text": "public key", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#certificate-public-key", "export": true, "normative": true, "for_": ["certificate"]};
+window.refsData['#exchange-signature-signature'] = {"text": "signature", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#exchange-signature-signature", "export": true, "normative": true, "for_": ["exchange signature"]};
+window.refsData['#exchange-signature-certificate-chain'] = {"text": "certificate chain", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#exchange-signature-certificate-chain", "export": true, "normative": true, "for_": ["exchange signature"]};
+window.refsData['https://infra.spec.whatwg.org/#ascii-string'] = {"text": "ascii string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-string", "export": true, "normative": true, "for_": []};
+window.refsData['#exchange-signature-validityurl'] = {"text": "validityurl", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#exchange-signature-validityurl", "export": true, "normative": true, "for_": ["exchange signature"]};
+window.refsData['https://infra.spec.whatwg.org/#string'] = {"text": "string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#string", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc8288#section-2.2'] = {"text": "target attribute", "type": "dfn", "spec": "rfc8288", "shortname": "rfc8288", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc8288#section-2.2", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#determine-nosniff'] = {"text": "determine nosniff", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#determine-nosniff", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-header-extract-mime-type'] = {"text": "extracting a mime type", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-header-extract-mime-type", "export": true, "normative": true, "for_": ["header list"]};
+window.refsData['https://mimesniff.spec.whatwg.org/#mime-type-essence'] = {"text": "essence", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "1", "status": "current", "url": "https://mimesniff.spec.whatwg.org/#mime-type-essence", "export": true, "normative": true, "for_": ["MIME type"]};
+window.refsData['https://mimesniff.spec.whatwg.org/#parameters'] = {"text": "parameters", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "1", "status": "current", "url": "https://mimesniff.spec.whatwg.org/#parameters", "export": true, "normative": true, "for_": ["MIME type"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response-body'] = {"text": "body", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-response-body", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-body-stream'] = {"text": "stream", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-body-stream", "export": true, "normative": true, "for_": ["body"]};
+window.refsData['#new-read-buffer'] = {"text": "new read buffer", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#new-read-buffer", "export": true, "normative": true, "for_": []};
+window.refsData['#parsing-the-invariant-prefix'] = {"text": "parsing the invariant prefix", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#parsing-the-invariant-prefix", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object'] = {"text": "environment settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['#signed-exchange-report'] = {"text": "signed exchange report", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#signed-exchange-report", "export": true, "normative": true, "for_": []};
+window.refsData['#signed-exchange-report-result'] = {"text": "result", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#signed-exchange-report-result", "export": true, "normative": true, "for_": ["signed exchange report"]};
+window.refsData['https://url.spec.whatwg.org/#concept-url-origin'] = {"text": "origin", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-origin", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['https://w3c.github.io/webappsec-secure-contexts/#potentially-trustworthy-origin'] = {"text": "potentially trustworthy origin", "type": "dfn", "spec": "secure-contexts", "shortname": "secure-contexts", "level": "1", "status": "current", "url": "https://w3c.github.io/webappsec-secure-contexts/#potentially-trustworthy-origin", "export": true, "normative": true, "for_": []};
+window.refsData['#signed-exchange-report-non_secure_distributor'] = {"text": "non_secure_distributor", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#signed-exchange-report-non_secure_distributor", "export": true, "normative": true, "for_": ["signed exchange report"]};
+window.refsData['#signed-exchange-report-parse_error'] = {"text": "parse_error", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#signed-exchange-report-parse_error", "export": true, "normative": true, "for_": ["signed exchange report"]};
+window.refsData['#signed-exchange-report-inner-url'] = {"text": "inner url", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#signed-exchange-report-inner-url", "export": true, "normative": true, "for_": ["signed exchange report"]};
+window.refsData['#read-buffer-read'] = {"text": "read", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#read-buffer-read", "export": true, "normative": true, "for_": ["read buffer"]};
+window.refsData['#parsing-the-signature-header-field'] = {"text": "parsing the signature header field", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#parsing-the-signature-header-field", "export": true, "normative": true, "for_": []};
+window.refsData['#exchange-signature'] = {"text": "exchange signature", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#exchange-signature", "export": true, "normative": true, "for_": []};
+window.refsData['#exchange-signature-is-valid'] = {"text": "is not valid", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#exchange-signature-is-valid", "export": true, "normative": true, "for_": ["exchange signature"]};
+window.refsData['#signed-exchange-report-signature_verification_error'] = {"text": "signature_verification_error", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#signed-exchange-report-signature_verification_error", "export": true, "normative": true, "for_": ["signed exchange report"]};
+window.refsData['#parsing-b2-cbor-headers'] = {"text": "parsing b2 cbor headers", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#parsing-b2-cbor-headers", "export": true, "normative": true, "for_": []};
+window.refsData['#parsing-b3-cbor-headers'] = {"text": "parsing b3 cbor headers", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#parsing-b3-cbor-headers", "export": true, "normative": true, "for_": []};
+window.refsData['#exchange-signature-establishes-cross-origin-trust'] = {"text": "does not establish cross-origin trust", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#exchange-signature-establishes-cross-origin-trust", "export": true, "normative": true, "for_": ["exchange signature"]};
+window.refsData['#signed-exchange-report-cert_verification_error'] = {"text": "cert_verification_error", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#signed-exchange-report-cert_verification_error", "export": true, "normative": true, "for_": ["signed exchange report"]};
+window.refsData['#reading-a-body'] = {"text": "read a body", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#reading-a-body", "export": true, "normative": true, "for_": []};
+window.refsData['#read-buffer'] = {"text": "read buffer", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#read-buffer", "export": true, "normative": true, "for_": []};
+window.refsData['https://encoding.spec.whatwg.org/#utf-8-decode-without-bom-or-fail'] = {"text": "utf-8 decode without bom or fail", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "1", "status": "current", "url": "https://encoding.spec.whatwg.org/#utf-8-decode-without-bom-or-fail", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-url-fragment'] = {"text": "fragment", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-fragment", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['https://url.spec.whatwg.org/#concept-url-scheme'] = {"text": "scheme", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-scheme", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['https://infra.spec.whatwg.org/#ascii-byte'] = {"text": "ascii byte", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-byte", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/draft-ietf-httpbis-header-structure-07#section-4.2'] = {"text": "parsing http1 header fields into structured headers", "type": "dfn", "spec": "draft-ietf-httpbis-header-structure", "shortname": "draft-ietf-httpbis-header-structure", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/draft-ietf-httpbis-header-structure-07#section-4.2", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ascii-decode'] = {"text": "ascii decode", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-decode", "export": true, "normative": true, "for_": []};
+window.refsData['#exchange-signature-integrity-header'] = {"text": "integrity header", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#exchange-signature-integrity-header", "export": true, "normative": true, "for_": ["exchange signature"]};
+window.refsData['https://infra.spec.whatwg.org/#strictly-split'] = {"text": "strictly split", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#strictly-split", "export": true, "normative": true, "for_": []};
+window.refsData['#exchange-signature-certsha256'] = {"text": "certsha256", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#exchange-signature-certsha256", "export": true, "normative": true, "for_": ["exchange signature"]};
+window.refsData['#exchange-signature-validityurlbytes'] = {"text": "validityurlbytes", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#exchange-signature-validityurlbytes", "export": true, "normative": true, "for_": ["exchange signature"]};
+window.refsData['#exchange-signature-date'] = {"text": "date", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#exchange-signature-date", "export": true, "normative": true, "for_": ["exchange signature"]};
+window.refsData['#handling-the-certificate-reference'] = {"text": "handling the certificate reference", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#handling-the-certificate-reference", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-header-list'] = {"text": "header list", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-header-list", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#request-service-workers-mode'] = {"text": "service-workers mode", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#request-service-workers-mode", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-mode'] = {"text": "mode", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-mode", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['#signed-exchange-report-cert-server-ip-list'] = {"text": "cert server ip list", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#signed-exchange-report-cert-server-ip-list", "export": true, "normative": true, "for_": ["signed exchange report"]};
+window.refsData['#signed-exchange-report-cert_fetch_error'] = {"text": "cert_fetch_error", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#signed-exchange-report-cert_fetch_error", "export": true, "normative": true, "for_": ["signed exchange report"]};
+window.refsData['#signed-exchange-report-cert_parse_error'] = {"text": "cert_parse_error", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#signed-exchange-report-cert_parse_error", "export": true, "normative": true, "for_": ["signed exchange report"]};
+window.refsData['https://streams.spec.whatwg.org/#readablestream-get-a-reader'] = {"text": "getting a reader", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#readablestream-get-a-reader", "export": true, "normative": true, "for_": ["ReadableStream"]};
+window.refsData['https://streams.spec.whatwg.org/#readablestreamdefaultreader-read-all-bytes'] = {"text": "reading all bytes", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#readablestreamdefaultreader-read-all-bytes", "export": true, "normative": true, "for_": ["ReadableStreamDefaultReader"]};
+window.refsData['https://tools.ietf.org/html/draft-yasskin-httpbis-origin-signed-exchanges-impl-02#section-3.3'] = {"text": "cert-chain cddl", "type": "dfn", "spec": "draft-yasskin-httpbis-origin-signed-exchanges-impl-02", "shortname": "draft-yasskin-httpbis-origin-signed-exchanges-impl", "level": "02", "status": "anchor-block", "url": "https://tools.ietf.org/html/draft-yasskin-httpbis-origin-signed-exchanges-impl-02#section-3.3", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/draft-yasskin-httpbis-origin-signed-exchanges-impl-02#section-3.4'] = {"text": "canonically-encoded cbor", "type": "dfn", "spec": "draft-yasskin-httpbis-origin-signed-exchanges-impl-02", "shortname": "draft-yasskin-httpbis-origin-signed-exchanges-impl", "level": "02", "status": "anchor-block", "url": "https://tools.ietf.org/html/draft-yasskin-httpbis-origin-signed-exchanges-impl-02#section-3.4", "export": true, "normative": true, "for_": []};
+window.refsData['#signed-message'] = {"text": "signed message", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#signed-message", "export": true, "normative": true, "for_": []};
+window.refsData['#public-key-algorithm'] = {"text": "algorithm", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#public-key-algorithm", "export": true, "normative": true, "for_": ["public key"]};
+window.refsData['https://tools.ietf.org/html/rfc5480#section-2.1.1'] = {"text": "id-ecpublickey", "type": "dfn", "spec": "rfc5480", "shortname": "rfc5480", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc5480#section-2.1.1", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc5480#section-2.1.1.1'] = {"text": "secp256r1", "type": "dfn", "spec": "rfc5480", "shortname": "rfc5480", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc5480#section-2.1.1.1", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/draft-ietf-tls-tls13-28#section-4.2.3'] = {"text": "ecdsa_secp256r1_sha256", "type": "dfn", "spec": "rfc8446", "shortname": "rfc8446", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/draft-ietf-tls-tls13-28#section-4.2.3", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#same-origin'] = {"text": "same origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#same-origin", "export": true, "normative": true, "for_": []};
+window.refsData['https://wicg.github.io/webpackage/draft-yasskin-http-origin-signed-responses.html#uncached-headers'] = {"text": "uncached response header", "type": "dfn", "spec": "draft-yasskin-http-origin-signed-responses", "shortname": "draft-yasskin-http-origin-signed-responses", "level": "", "status": "anchor-block", "url": "https://wicg.github.io/webpackage/draft-yasskin-http-origin-signed-responses.html#uncached-headers", "export": true, "normative": true, "for_": []};
+window.refsData['#certificate-chain-has-a-trusted-leaf'] = {"text": "does not have a trusted leaf", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#certificate-chain-has-a-trusted-leaf", "export": true, "normative": true, "for_": ["certificate chain"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#concept-origin'] = {"text": "origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-origin", "export": true, "normative": true, "for_": []};
+window.refsData['#augmented-certificate-ocsp-response'] = {"text": "ocsp response", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#augmented-certificate-ocsp-response", "export": true, "normative": true, "for_": ["augmented certificate"]};
+window.refsData['#augmented-certificate-sct'] = {"text": "sct", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#augmented-certificate-sct", "export": true, "normative": true, "for_": ["augmented certificate"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#concept-origin-host'] = {"text": "host", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-origin-host", "export": true, "normative": true, "for_": ["origin"]};
+window.refsData['#certificate-extensions'] = {"text": "extensions", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#certificate-extensions", "export": true, "normative": true, "for_": ["certificate"]};
+window.refsData['https://tools.ietf.org/html/draft-yasskin-httpbis-origin-signed-exchanges-impl-02#section-4.2'] = {"text": "cansignhttpexchanges", "type": "dfn", "spec": "draft-yasskin-httpbis-origin-signed-exchanges-impl-02", "shortname": "draft-yasskin-httpbis-origin-signed-exchanges-impl", "level": "02", "status": "anchor-block", "url": "https://tools.ietf.org/html/draft-yasskin-httpbis-origin-signed-exchanges-impl-02#section-4.2", "export": true, "normative": true, "for_": []};
+window.refsData['https://wicg.github.io/webpackage/draft-yasskin-wpack-bundled-exchanges.html#parse-known-length'] = {"text": "parsing a cbor item", "type": "dfn", "spec": "draft-yasskin-wpack-bundled-exchanges", "shortname": "draft-yasskin-wpack-bundled-exchanges", "level": "", "status": "anchor-block", "url": "https://wicg.github.io/webpackage/draft-yasskin-wpack-bundled-exchanges.html#parse-known-length", "export": true, "normative": true, "for_": []};
+window.refsData['#creating-a-header-list-from-the-cbor-map'] = {"text": "creating a header list from the cbor map", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#creating-a-header-list-from-the-cbor-map", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#header-list-contains'] = {"text": "does not contain", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#header-list-contains", "export": true, "normative": true, "for_": ["header list"]};
+window.refsData['https://infra.spec.whatwg.org/#isomorphic-decode'] = {"text": "isomorphic decode", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#isomorphic-decode", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ascii-upper-alpha'] = {"text": "ascii upper alpha", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-upper-alpha", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-header-name'] = {"text": "name", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-header-name", "export": true, "normative": true, "for_": ["header"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-header-value'] = {"text": "value", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-header-value", "export": true, "normative": true, "for_": ["header"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-header-list-append'] = {"text": "append", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-header-list-append", "export": true, "normative": true, "for_": ["header list"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-header-list-get-decode-split'] = {"text": "getting, decoding, and splitting", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-header-list-get-decode-split", "export": true, "normative": true, "for_": ["header list"]};
+window.refsData['https://www.iana.org/assignments/http-dig-alg/http-dig-alg.xhtml#http-dig-alg-1'] = {"text": "digest algorithm", "type": "dfn", "spec": "http-dig-alg", "shortname": "http-dig-alg", "level": "", "status": "anchor-block", "url": "https://www.iana.org/assignments/http-dig-alg/http-dig-alg.xhtml#http-dig-alg-1", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc3230#section-4.3.2'] = {"text": "digest", "type": "http-header", "spec": "rfc3230", "shortname": "rfc3230", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc3230#section-4.3.2", "export": true, "normative": true, "for_": []};
+window.refsData['#signed-exchange-report-invalid_integrity_header'] = {"text": "invalid_integrity_header", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#signed-exchange-report-invalid_integrity_header", "export": true, "normative": true, "for_": ["signed exchange report"]};
+window.refsData['https://fetch.spec.whatwg.org/#handle-content-codings'] = {"text": "handle content codings", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#handle-content-codings", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/draft-thomson-http-mice-03#section-2.2'] = {"text": "integrity proof for the first record", "type": "dfn", "spec": "draft-thomson-http-mice", "shortname": "draft-thomson-http-mice", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/draft-thomson-http-mice-03#section-2.2", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-body'] = {"text": "body", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-body", "export": true, "normative": true, "for_": []};
+window.refsData['https://streams.spec.whatwg.org/#readablestream-cancel'] = {"text": "cancel", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#readablestream-cancel", "export": true, "normative": true, "for_": ["ReadableStream"]};
+window.refsData['#read-buffer-dump'] = {"text": "dump", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#read-buffer-dump", "export": true, "normative": true, "for_": ["read buffer"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-method'] = {"text": "method", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-method", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://httpwg.org/http-extensions/draft-ietf-httpbis-variants.html#cache'] = {"text": "variants cache behavior", "type": "dfn", "spec": "draft-ietf-httpbis-variants", "shortname": "draft-ietf-httpbis-variants", "level": "", "status": "anchor-block", "url": "https://httpwg.org/http-extensions/draft-ietf-httpbis-variants.html#cache", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#set-intersection'] = {"text": "intersection", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#set-intersection", "export": true, "normative": true, "for_": ["set"]};
+window.refsData['https://infra.spec.whatwg.org/#list-empty'] = {"text": "empty", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-empty", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['#signed-exchange-report-outer-request'] = {"text": "outer request", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#signed-exchange-report-outer-request", "export": true, "normative": true, "for_": ["signed exchange report"]};
+window.refsData['#signed-exchange-report-outer-response'] = {"text": "outer response", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#signed-exchange-report-outer-response", "export": true, "normative": true, "for_": ["signed exchange report"]};
+window.refsData['#signed-exchange-report-server-ip'] = {"text": "server ip", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#signed-exchange-report-server-ip", "export": true, "normative": true, "for_": ["signed exchange report"]};
+window.refsData['https://streams.spec.whatwg.org/#readablestream-closed'] = {"text": "closed", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#readablestream-closed", "export": true, "normative": true, "for_": ["ReadableStream"]};
+window.refsData['https://streams.spec.whatwg.org/#readablestream-errored'] = {"text": "errored", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#readablestream-errored", "export": true, "normative": true, "for_": ["ReadableStream"]};
+window.refsData['#signed-exchange-report-ok'] = {"text": "ok", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#signed-exchange-report-ok", "export": true, "normative": true, "for_": ["signed exchange report"]};
+window.refsData['#signed-exchange-report-mi_error'] = {"text": "mi_error", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#signed-exchange-report-mi_error", "export": true, "normative": true, "for_": ["signed exchange report"]};
+window.refsData['https://webidl.spec.whatwg.org/#sequence-type'] = {"text": "sequence type", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#sequence-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/network-error-logging/#dfn-nel-policies'] = {"text": "nel policy", "type": "dfn", "spec": "network-error-logging-1", "shortname": "network-error-logging", "level": "1", "status": "current", "url": "https://w3c.github.io/network-error-logging/#dfn-nel-policies", "export": true, "normative": true, "for_": []};
+window.refsData['#read-buffer-reader'] = {"text": "reader", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#read-buffer-reader", "export": true, "normative": true, "for_": ["read buffer"]};
+window.refsData['#read-buffer-bytes'] = {"text": "bytes", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#read-buffer-bytes", "export": true, "normative": true, "for_": ["read buffer"]};
+window.refsData['https://streams.spec.whatwg.org/#readablestreamdefaultreader-read-a-chunk'] = {"text": "read a chunk", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#readablestreamdefaultreader-read-a-chunk", "export": true, "normative": true, "for_": ["ReadableStreamDefaultReader"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-Uint8Array'] = {"text": "Uint8Array", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-Uint8Array", "export": true, "normative": true, "for_": []};
+window.refsData['#read-buffer-reading-up-to'] = {"text": "reading up to", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#read-buffer-reading-up-to", "export": true, "normative": true, "for_": ["read buffer"]};
+window.refsData['https://streams.spec.whatwg.org/#readablestream-enqueue'] = {"text": "enqueue", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#readablestream-enqueue", "export": true, "normative": true, "for_": ["ReadableStream"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-ArrayBuffer'] = {"text": "ArrayBuffer", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-ArrayBuffer", "export": true, "normative": true, "for_": []};
+window.refsData['https://streams.spec.whatwg.org/#readablestream-readable'] = {"text": "readable", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#readablestream-readable", "export": true, "normative": true, "for_": ["ReadableStream"]};
+window.refsData['https://streams.spec.whatwg.org/#readablestream-need-more-data'] = {"text": "need more data", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#readablestream-need-more-data", "export": true, "normative": true, "for_": ["ReadableStream"]};
+window.refsData['https://streams.spec.whatwg.org/#readablestream-close'] = {"text": "close", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#readablestream-close", "export": true, "normative": true, "for_": ["ReadableStream"]};
+window.refsData['https://streams.spec.whatwg.org/#readablestream-error'] = {"text": "error", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#readablestream-error", "export": true, "normative": true, "for_": ["ReadableStream"]};
+window.refsData['#allowed-signed-exchange-link-info'] = {"text": "allowed signed exchange link info", "type": "dfn", "spec": "web-package-loading", "shortname": "web-package-loading", "level": "", "status": "local", "url": "#allowed-signed-exchange-link-info", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-contain'] = {"text": "contain", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-contain", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://wicg.github.io/webpackage/draft-yasskin-http-origin-signed-responses.html#seccons-off-path'] = {"text": "off-path attackers", "type": "dfn", "spec": "draft-yasskin-http-origin-signed-responses", "shortname": "draft-yasskin-http-origin-signed-responses", "level": "", "status": "anchor-block", "url": "https://wicg.github.io/webpackage/draft-yasskin-http-origin-signed-responses.html#seccons-off-path", "export": true, "normative": true, "for_": []};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

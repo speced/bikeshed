@@ -471,6 +471,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -1549,8 +1586,6 @@ directive-value   = ['area-threshold=' num-val]
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -1798,7 +1833,6 @@ directive-value   = ['area-threshold=' num-val]
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -2210,4 +2244,282 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['#visibilityobserverentry'] = {"text": "VisibilityObserverEntry", "type": "interface", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#visibilityobserverentry", "export": true, "normative": true, "for_": []};
+window.refsData['#visibilityobserver'] = {"text": "VisibilityObserver", "type": "interface", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#visibilityobserver", "export": true, "normative": true, "for_": []};
+window.refsData['#callbackdef-visibilityobservercallback'] = {"text": "VisibilityObserverCallback", "type": "callback", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#callbackdef-visibilityobservercallback", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-visibilityobserverentryinit'] = {"text": "VisibilityObserverEntryInit", "type": "dictionary", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dictdef-visibilityobserverentryinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/geometry-1/#domrectreadonly'] = {"text": "DOMRectReadOnly", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "snapshot", "url": "https://www.w3.org/TR/geometry-1/#domrectreadonly", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-visibilityobserverentry-globalvisiblebounds'] = {"text": "globalVisibleBounds", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserverentry-globalvisiblebounds", "export": true, "normative": true, "for_": ["VisibilityObserverEntry"]};
+window.refsData['#dom-visibilityobserverentry-visiblebounds'] = {"text": "visibleBounds", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserverentry-visiblebounds", "export": true, "normative": true, "for_": ["VisibilityObserverEntry"]};
+window.refsData['http://www.w3.org/TR/hr-time/#domhighrestimestamp'] = {"text": "DOMHighResTimeStamp", "type": "typedef", "spec": "", "shortname": "ui security", "level": "1", "status": "anchor-block", "url": "http://www.w3.org/TR/hr-time/#domhighrestimestamp", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-visibilityobserverentry-time'] = {"text": "time", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserverentry-time", "export": true, "normative": true, "for_": ["VisibilityObserverEntry"]};
+window.refsData['https://www.w3.org/TR/geometry-1/#dictdef-domrectinit'] = {"text": "DOMRectInit", "type": "dictionary", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "snapshot", "url": "https://www.w3.org/TR/geometry-1/#dictdef-domrectinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/geometry-1/#domrect'] = {"text": "DOMRect", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "snapshot", "url": "https://www.w3.org/TR/geometry-1/#domrect", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-visibilityobserver-observe'] = {"text": "observe()", "type": "method", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserver-observe", "export": true, "normative": true, "for_": ["VisibilityObserver"]};
+window.refsData['#dom-visibilityobserver-unobserve'] = {"text": "unobserve()", "type": "method", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserver-unobserve", "export": true, "normative": true, "for_": ["VisibilityObserver"]};
+window.refsData['#dom-visibilityobserver-takerecords'] = {"text": "takeRecords()", "type": "method", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserver-takerecords", "export": true, "normative": true, "for_": ["VisibilityObserver"]};
+window.refsData['#dom-visibilityobserver-callback-slot'] = {"text": "[[callback]]", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserver-callback-slot", "export": true, "normative": true, "for_": ["VisibilityObserver"]};
+window.refsData['#dom-document-registeredvisibilityobservers-slot'] = {"text": "[[RegisteredVisibilityObservers]]", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-document-registeredvisibilityobservers-slot", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['#dom-visibilityobserver-queuedentries-slot'] = {"text": "[[QueuedEntries]]", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserver-queuedentries-slot", "export": true, "normative": true, "for_": ["VisibilityObserver"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-double'] = {"text": "double", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-double", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-visibilityobserverinit-areathreshold'] = {"text": "areaThreshold", "type": "dict-member", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserverinit-areathreshold", "export": true, "normative": true, "for_": ["VisibilityObserverInit"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-visibilityobserverinit-displacementaware'] = {"text": "displacementAware", "type": "dict-member", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserverinit-displacementaware", "export": true, "normative": true, "for_": ["VisibilityObserverInit"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-visibilityobserverinit-visiblemargin'] = {"text": "visibleMargin", "type": "dict-member", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserverinit-visiblemargin", "export": true, "normative": true, "for_": ["VisibilityObserverInit"]};
+window.refsData['https://dom.spec.whatwg.org/#element'] = {"text": "Element", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#element", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-visibilityobserverinit-observedelement'] = {"text": "observedElement", "type": "dict-member", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserverinit-observedelement", "export": true, "normative": true, "for_": ["VisibilityObserverInit"]};
+window.refsData['https://www.w3.org/TR/cssom-view-1/#dom-element-getboundingclientrect'] = {"text": "getBoundingClientRect()", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "snapshot", "url": "https://www.w3.org/TR/cssom-view-1/#dom-element-getboundingclientrect", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['#dom-visibilityobserver-observedelement-slot'] = {"text": "[[observedElement]]", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserver-observedelement-slot", "export": true, "normative": true, "for_": ["VisibilityObserver"]};
+window.refsData['https://www.w3.org/TR/css-box-4/#propdef-margin'] = {"text": "margin", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "snapshot", "url": "https://www.w3.org/TR/css-box-4/#propdef-margin", "export": true, "normative": true, "for_": []};
+window.refsData['#protected-element'] = {"text": "protected-element", "type": "dfn", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#protected-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
+window.refsData['#visible-margin'] = {"text": "visible-margin", "type": "dfn", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#visible-margin", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dom-nonelementparentnode-getelementbyid'] = {"text": "getElementById(elementId)", "type": "method", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-nonelementparentnode-getelementbyid", "export": true, "normative": true, "for_": ["NonElementParentNode"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#unit-of-related-similar-origin-browsing-contexts'] = {"text": "unit of related similar-origin browsing contexts", "type": "dfn", "spec": "", "shortname": "ui security", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#unit-of-related-similar-origin-browsing-contexts", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-visibilityobserver-visibilityobserver'] = {"text": "VisibilityObserver(callback, options)", "type": "constructor", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserver-visibilityobserver", "export": true, "normative": true, "for_": ["VisibilityObserver"]};
+window.refsData['#dictdef-visibilityobserverinit'] = {"text": "VisibilityObserverInit", "type": "dictionary", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dictdef-visibilityobserverinit", "export": true, "normative": true, "for_": []};
+window.refsData['#input-protection-directive'] = {"text": "input-protection directive", "type": "dfn", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#input-protection-directive", "export": true, "normative": true, "for_": []};
+window.refsData['#browsing-context-visibilityobservertaskqueued'] = {"text": "visibilityobservertaskqueued", "type": "dfn", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#browsing-context-visibilityobservertaskqueued", "export": true, "normative": true, "for_": ["browsing context"]};
+window.refsData['#notify-visibility-observers'] = {"text": "notify visibility observers", "type": "dfn", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#notify-visibility-observers", "export": true, "normative": true, "for_": []};
+window.refsData['http://w3c.github.io/requestidlecallback/#dfn-list-of-idle-request-callbacks'] = {"text": "list of idle request callbacks", "type": "dfn", "spec": "", "shortname": "ui security", "level": "1", "status": "anchor-block", "url": "http://w3c.github.io/requestidlecallback/#dfn-list-of-idle-request-callbacks", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#dfn-callback-this-value'] = {"text": "callback this value", "type": "dfn", "spec": "", "shortname": "ui security", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#dfn-callback-this-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#report-the-exception'] = {"text": "report the exception", "type": "dfn", "spec": "", "shortname": "ui security", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#report-the-exception", "export": true, "normative": true, "for_": []};
+window.refsData['#queue-a-visibility-observer-task'] = {"text": "queue a visibility observer task", "type": "dfn", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#queue-a-visibility-observer-task", "export": true, "normative": true, "for_": []};
+window.refsData['#graphicslayer'] = {"text": "graphicslayer", "type": "dfn", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#graphicslayer", "export": true, "normative": true, "for_": []};
+window.refsData['#promote-observed-graphicslayers'] = {"text": "promote observed graphicslayers", "type": "dfn", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#promote-observed-graphicslayers", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#parent-browsing-context'] = {"text": "parent browsing context", "type": "dfn", "spec": "", "shortname": "ui security", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#parent-browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-visibilityobserver-visiblemargin-slot'] = {"text": "[[visibleMargin]]", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserver-visiblemargin-slot", "export": true, "normative": true, "for_": ["VisibilityObserver"]};
+window.refsData['#dom-visibilityobserver-areathreshold-slot'] = {"text": "[[areaThreshold]]", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserver-areathreshold-slot", "export": true, "normative": true, "for_": ["VisibilityObserver"]};
+window.refsData['#dom-visibilityobserver-previousvisibleratio-slot'] = {"text": "[[previousVisibleRatio]]", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserver-previousvisibleratio-slot", "export": true, "normative": true, "for_": ["VisibilityObserver"]};
+window.refsData['#dom-visibilityobserver-previousglobalviewportposition-slot'] = {"text": "[[previousGlobalViewportPosition]]", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserver-previousglobalviewportposition-slot", "export": true, "normative": true, "for_": ["VisibilityObserver"]};
+window.refsData['#dom-visibilityobserver-displacementaware-slot'] = {"text": "[[displacementAware]]", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserver-displacementaware-slot", "export": true, "normative": true, "for_": ["VisibilityObserver"]};
+window.refsData['#queue-a-visibilityobserverentry'] = {"text": "queue a visibilityobserverentry", "type": "dfn", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#queue-a-visibilityobserverentry", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-document-inputprotectionrequested-slot'] = {"text": "[[InputProtectionRequested]]", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-document-inputprotectionrequested-slot", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['#area-threshold'] = {"text": "area-threshold", "type": "dfn", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#area-threshold", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-visibilityobserver-timethreshold-slot'] = {"text": "[[timeThreshold]]", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserver-timethreshold-slot", "export": true, "normative": true, "for_": ["VisibilityObserver"]};
+window.refsData['#time-threshold'] = {"text": "time-threshold", "type": "dfn", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#time-threshold", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-visibilityobserver-associatedcontentsecuritypolicy-slot'] = {"text": "[[associatedContentSecurityPolicy]]", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-visibilityobserver-associatedcontentsecuritypolicy-slot", "export": true, "normative": true, "for_": ["VisibilityObserver"]};
+window.refsData['https://dom.spec.whatwg.org/#dispatching-events'] = {"text": "dispatching events", "type": "dfn", "spec": "", "shortname": "ui security", "level": "1", "status": "anchor-block", "url": "https://dom.spec.whatwg.org/#dispatching-events", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#event'] = {"text": "Event", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#event", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-element-inputprotectionobservers-slot'] = {"text": "[[InputProtectionObservers]]", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-element-inputprotectionobservers-slot", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['#handle-a-violation'] = {"text": "handle a violation", "type": "dfn", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#handle-a-violation", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#cancelled-flag'] = {"text": "cancelled flag", "type": "dfn", "spec": "", "shortname": "ui security", "level": "1", "status": "anchor-block", "url": "https://dom.spec.whatwg.org/#cancelled-flag", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#stop-propagation-flag'] = {"text": "stop propagation flag", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#stop-propagation-flag", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['#dom-event-isunsafe'] = {"text": "isUnsafe", "type": "attribute", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#dom-event-isunsafe", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['#enforce-an-input-protection-directive'] = {"text": "enforce an input-protection directive", "type": "dfn", "spec": "ui security-1", "shortname": "ui security", "level": "1", "status": "local", "url": "#enforce-an-input-protection-directive", "export": true, "normative": true, "for_": []};
 </script>

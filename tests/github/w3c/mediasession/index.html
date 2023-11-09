@@ -492,6 +492,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -1855,8 +1892,6 @@ support in making this specification happen.</p>
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -2104,7 +2139,6 @@ support in making this specification happen.</p>
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -2559,4 +2593,325 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://w3c.github.io/i18n-glossary/#def_case_sensitive'] = {"text": "case-sensitive", "type": "dfn", "spec": "i18n-glossary", "shortname": "i18n-glossary", "level": "1", "status": "current", "url": "https://w3c.github.io/i18n-glossary/#def_case_sensitive", "export": true, "normative": false, "for_": []};
+window.refsData['#mediametadata'] = {"text": "MediaMetadata", "type": "interface", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#mediametadata", "export": true, "normative": true, "for_": []};
+window.refsData['#media-session-action'] = {"text": "media session action", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#media-session-action", "export": true, "normative": true, "for_": []};
+window.refsData['#active-media-session'] = {"text": "active media session", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#active-media-session", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediasessionaction-play'] = {"text": "play", "type": "enum-value", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediasessionaction-play", "export": true, "normative": true, "for_": ["MediaSessionAction"]};
+window.refsData['#dom-mediasessionaction-pause'] = {"text": "pause", "type": "enum-value", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediasessionaction-pause", "export": true, "normative": true, "for_": ["MediaSessionAction"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#browsing-context'] = {"text": "browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['#guessed-playback-state'] = {"text": "guessed playback state", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#guessed-playback-state", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediasessionplaybackstate-playing'] = {"text": "playing", "type": "enum-value", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediasessionplaybackstate-playing", "export": true, "normative": true, "for_": ["MediaSessionPlaybackState"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#potentially-playing'] = {"text": "potentially playing", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/media.html#potentially-playing", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#concept-media-muted'] = {"text": "muted", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/media.html#concept-media-muted", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediasessionplaybackstate-paused'] = {"text": "paused", "type": "enum-value", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediasessionplaybackstate-paused", "export": true, "normative": true, "for_": ["MediaSessionPlaybackState"]};
+window.refsData['#dom-mediasession-playbackstate'] = {"text": "playbackState", "type": "attribute", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediasession-playbackstate", "export": true, "normative": true, "for_": ["MediaSession"]};
+window.refsData['#declared-playback-state'] = {"text": "declared playback state", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#declared-playback-state", "export": true, "normative": true, "for_": []};
+window.refsData['#actual-playback-state'] = {"text": "actual playback state", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#actual-playback-state", "export": true, "normative": true, "for_": []};
+window.refsData['#media-session-actions-update-algorithm'] = {"text": "media session actions update algorithm", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#media-session-actions-update-algorithm", "export": true, "normative": true, "for_": []};
+window.refsData['#mediasession'] = {"text": "MediaSession", "type": "interface", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#mediasession", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context'] = {"text": "top-level browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['#audio-focus'] = {"text": "audio focus", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#audio-focus", "export": true, "normative": true, "for_": []};
+window.refsData['#update-metadata-algorithm'] = {"text": "update metadata algorithm", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#update-metadata-algorithm", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediasession-metadata'] = {"text": "metadata", "type": "attribute", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediasession-metadata", "export": true, "normative": true, "for_": ["MediaSession"]};
+window.refsData['#empty-metadata'] = {"text": "empty metadata", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#empty-metadata", "export": true, "normative": true, "for_": []};
+window.refsData['#mediametadata-artwork-images'] = {"text": "artwork images", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#mediametadata-artwork-images", "export": true, "normative": true, "for_": ["MediaMetadata"]};
+window.refsData['#fetch-image-algorithm'] = {"text": "fetch image algorithm", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#fetch-image-algorithm", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediametadata-artwork'] = {"text": "artwork", "type": "attribute", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediametadata-artwork", "export": true, "normative": true, "for_": ["MediaMetadata"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-fetch'] = {"text": "fetch", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-fetch", "export": true, "normative": true, "for_": []};
+window.refsData['#preferred-artwork-image'] = {"text": "preferred artwork image", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#preferred-artwork-image", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediaimage-src'] = {"text": "src", "type": "dict-member", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediaimage-src", "export": true, "normative": true, "for_": ["MediaImage"]};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel'] = {"text": "in parallel", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response'] = {"text": "response", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-response", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-internal-response'] = {"text": "internal response", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-internal-response", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response-type'] = {"text": "response type", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-response-type", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-mediasessionaction'] = {"text": "MediaSessionAction", "type": "enum", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#enumdef-mediasessionaction", "export": true, "normative": true, "for_": []};
+window.refsData['#callbackdef-mediasessionactionhandler'] = {"text": "MediaSessionActionHandler", "type": "callback", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#callbackdef-mediasessionactionhandler", "export": true, "normative": true, "for_": []};
+window.refsData['#supported-media-session-actions'] = {"text": "supported media session actions", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#supported-media-session-actions", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task'] = {"text": "queue a task", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task", "export": true, "normative": true, "for_": []};
+window.refsData['#media-session-action-source'] = {"text": "media session action source", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#media-session-action-source", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-mediasessionactiondetails'] = {"text": "MediaSessionActionDetails", "type": "dictionary", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dictdef-mediasessionactiondetails", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#activation-notification'] = {"text": "activation notification", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#activation-notification", "export": true, "normative": true, "for_": []};
+window.refsData['#handle-media-session-action'] = {"text": "handle media session action", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#handle-media-session-action", "export": true, "normative": true, "for_": []};
+window.refsData['#current-playback-position'] = {"text": "current playback position", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#current-playback-position", "export": true, "normative": true, "for_": []};
+window.refsData['#duration'] = {"text": "duration", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#duration", "export": true, "normative": true, "for_": []};
+window.refsData['#position-state①'] = {"text": "position state", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#position-state\u2460", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-mediapositionstate'] = {"text": "MediaPositionState", "type": "dictionary", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dictdef-mediapositionstate", "export": true, "normative": true, "for_": []};
+window.refsData['#playback-rate'] = {"text": "playback rate", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#playback-rate", "export": true, "normative": true, "for_": []};
+window.refsData['#last-position-updated-time'] = {"text": "last position updated time", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#last-position-updated-time", "export": true, "normative": true, "for_": []};
+window.refsData['#actual-playback-rate'] = {"text": "actual playback rate", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#actual-playback-rate", "export": true, "normative": true, "for_": []};
+window.refsData['#last-reported-playback-position'] = {"text": "last reported playback position", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#last-reported-playback-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/system-state.html#navigator'] = {"text": "Navigator", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/system-state.html#navigator", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-navigator-mediasession'] = {"text": "mediaSession", "type": "attribute", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-navigator-mediasession", "export": true, "normative": true, "for_": ["Navigator"]};
+window.refsData['#dom-mediasessionplaybackstate-none'] = {"text": "\"none\"", "type": "enum-value", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediasessionplaybackstate-none", "export": true, "normative": true, "for_": ["MediaSessionPlaybackState"]};
+window.refsData['#dom-mediasessionaction-seekbackward'] = {"text": "\"seekbackward\"", "type": "enum-value", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediasessionaction-seekbackward", "export": true, "normative": true, "for_": ["MediaSessionAction"]};
+window.refsData['#dom-mediasessionaction-seekforward'] = {"text": "\"seekforward\"", "type": "enum-value", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediasessionaction-seekforward", "export": true, "normative": true, "for_": ["MediaSessionAction"]};
+window.refsData['#dom-mediasessionaction-previoustrack'] = {"text": "\"previoustrack\"", "type": "enum-value", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediasessionaction-previoustrack", "export": true, "normative": true, "for_": ["MediaSessionAction"]};
+window.refsData['#dom-mediasessionaction-nexttrack'] = {"text": "\"nexttrack\"", "type": "enum-value", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediasessionaction-nexttrack", "export": true, "normative": true, "for_": ["MediaSessionAction"]};
+window.refsData['#dom-mediasessionaction-skipad'] = {"text": "\"skipad\"", "type": "enum-value", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediasessionaction-skipad", "export": true, "normative": true, "for_": ["MediaSessionAction"]};
+window.refsData['#dom-mediasessionaction-stop'] = {"text": "\"stop\"", "type": "enum-value", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediasessionaction-stop", "export": true, "normative": true, "for_": ["MediaSessionAction"]};
+window.refsData['#dom-mediasessionaction-seekto'] = {"text": "\"seekto\"", "type": "enum-value", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediasessionaction-seekto", "export": true, "normative": true, "for_": ["MediaSessionAction"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-mediasessionplaybackstate'] = {"text": "MediaSessionPlaybackState", "type": "enum", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#enumdef-mediasessionplaybackstate", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediasession-setactionhandler'] = {"text": "setActionHandler(action, handler)", "type": "method", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediasession-setactionhandler", "export": true, "normative": true, "for_": ["MediaSession"]};
+window.refsData['#dom-mediasession-setpositionstate'] = {"text": "setPositionState(state)", "type": "method", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediasession-setpositionstate", "export": true, "normative": true, "for_": ["MediaSession"]};
+window.refsData['#mediasession-metadata'] = {"text": "metadata", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#mediasession-metadata", "export": true, "normative": true, "for_": ["MediaSession"]};
+window.refsData['#mediametadata-media-session'] = {"text": "media session", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#mediametadata-media-session", "export": true, "normative": true, "for_": ["MediaMetadata"]};
+window.refsData['#update-action-handler-algorithm'] = {"text": "update action handler algorithm", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#update-action-handler-algorithm", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediapositionstate-duration'] = {"text": "duration", "type": "dict-member", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediapositionstate-duration", "export": true, "normative": true, "for_": ["MediaPositionState"]};
+window.refsData['https://webidl.spec.whatwg.org/#exceptiondef-typeerror'] = {"text": "TypeError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#exceptiondef-typeerror", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediapositionstate-position'] = {"text": "position", "type": "dict-member", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediapositionstate-position", "export": true, "normative": true, "for_": ["MediaPositionState"]};
+window.refsData['#dom-mediapositionstate-playbackrate'] = {"text": "playbackRate", "type": "dict-member", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediapositionstate-playbackrate", "export": true, "normative": true, "for_": ["MediaPositionState"]};
+window.refsData['#dom-mediametadata-mediametadata'] = {"text": "MediaMetadata(init)", "type": "constructor", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediametadata-mediametadata", "export": true, "normative": true, "for_": ["MediaMetadata"]};
+window.refsData['#dictdef-mediametadatainit'] = {"text": "MediaMetadataInit", "type": "dictionary", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dictdef-mediametadatainit", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediametadata-title'] = {"text": "title", "type": "attribute", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediametadata-title", "export": true, "normative": true, "for_": ["MediaMetadata"]};
+window.refsData['#dom-mediametadata-artist'] = {"text": "artist", "type": "attribute", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediametadata-artist", "export": true, "normative": true, "for_": ["MediaMetadata"]};
+window.refsData['#dom-mediametadata-album'] = {"text": "album", "type": "attribute", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediametadata-album", "export": true, "normative": true, "for_": ["MediaMetadata"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-frozen-array'] = {"text": "FrozenArray", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-mediaimage'] = {"text": "MediaImage", "type": "dictionary", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dictdef-mediaimage", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['#mediametadata-title'] = {"text": "title", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#mediametadata-title", "export": true, "normative": true, "for_": ["MediaMetadata"]};
+window.refsData['#mediametadata-artist'] = {"text": "artist", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#mediametadata-artist", "export": true, "normative": true, "for_": ["MediaMetadata"]};
+window.refsData['#mediametadata-album'] = {"text": "album", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#mediametadata-album", "export": true, "normative": true, "for_": ["MediaMetadata"]};
+window.refsData['#dom-mediametadatainit-title'] = {"text": "title", "type": "dict-member", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediametadatainit-title", "export": true, "normative": true, "for_": ["MediaMetadataInit"]};
+window.refsData['#dom-mediametadatainit-artist'] = {"text": "artist", "type": "dict-member", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediametadatainit-artist", "export": true, "normative": true, "for_": ["MediaMetadataInit"]};
+window.refsData['#dom-mediametadatainit-album'] = {"text": "album", "type": "dict-member", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediametadatainit-album", "export": true, "normative": true, "for_": ["MediaMetadataInit"]};
+window.refsData['#convert-artwork-algorithm'] = {"text": "convert artwork algorithm", "type": "dfn", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#convert-artwork-algorithm", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediametadatainit-artwork'] = {"text": "artwork", "type": "dict-member", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediametadatainit-artwork", "export": true, "normative": true, "for_": ["MediaMetadataInit"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#entry-settings-object'] = {"text": "entry settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#entry-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-url-parser'] = {"text": "url parser", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-parser", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediaimage-sizes'] = {"text": "sizes", "type": "dict-member", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediaimage-sizes", "export": true, "normative": true, "for_": ["MediaImage"]};
+window.refsData['#dom-mediaimage-type'] = {"text": "type", "type": "dict-member", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediaimage-type", "export": true, "normative": true, "for_": ["MediaImage"]};
+window.refsData['https://tc39.es/ecma262/#sec-object.freeze'] = {"text": "freeze", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "", "status": "anchor-block", "url": "https://tc39.es/ecma262/#sec-object.freeze", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-create-frozen-array'] = {"text": "create a frozen array", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-create-frozen-array", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-USVString'] = {"text": "USVString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-USVString", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/appmanifest/#dom-imageresource'] = {"text": "imageresource", "type": "dfn", "spec": "appmanifest", "shortname": "appmanifest", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/appmanifest/#dom-imageresource", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-dictionary-member'] = {"text": "dictionary members", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-dictionary-member", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/semantics.html#dom-link-sizes'] = {"text": "sizes", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/semantics.html#dom-link-sizes", "export": true, "normative": true, "for_": ["HTMLLinkElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/semantics.html#the-link-element'] = {"text": "link", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/semantics.html#the-link-element", "export": true, "normative": true, "for_": ["HTMLLinkElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/common-microsyntaxes.html#unordered-set-of-unique-space-separated-tokens'] = {"text": "unordered set of unique space-separated tokens", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/common-microsyntaxes.html#unordered-set-of-unique-space-separated-tokens", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ascii-case-insensitive'] = {"text": "ascii case-insensitive", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-case-insensitive", "export": true, "normative": true, "for_": []};
+window.refsData['https://mimesniff.spec.whatwg.org/#mime-type'] = {"text": "mime type", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "1", "status": "current", "url": "https://mimesniff.spec.whatwg.org/#mime-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-double'] = {"text": "double", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-double", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediasessionactiondetails-action'] = {"text": "action", "type": "dict-member", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediasessionactiondetails-action", "export": true, "normative": true, "for_": ["MediaSessionActionDetails"]};
+window.refsData['#dom-mediasessionactiondetails-seekoffset'] = {"text": "seekOffset", "type": "dict-member", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediasessionactiondetails-seekoffset", "export": true, "normative": true, "for_": ["MediaSessionActionDetails"]};
+window.refsData['#dom-mediasessionactiondetails-seektime'] = {"text": "seekTime", "type": "dict-member", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediasessionactiondetails-seektime", "export": true, "normative": true, "for_": ["MediaSessionActionDetails"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-mediasessionactiondetails-fastseek'] = {"text": "fastSeek", "type": "dict-member", "spec": "mediasession-1", "shortname": "mediasession", "level": "1", "status": "local", "url": "#dom-mediasessionactiondetails-fastseek", "export": true, "normative": true, "for_": ["MediaSessionActionDetails"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#media-element'] = {"text": "media element", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/media.html#media-element", "export": true, "normative": true, "for_": []};
 </script>

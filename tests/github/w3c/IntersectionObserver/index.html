@@ -691,6 +691,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -2213,8 +2250,6 @@ specification.</p>
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -2462,7 +2497,6 @@ specification.</p>
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -2957,4 +2991,320 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://drafts.csswg.org/css2/visuren.html#viewport'] = {"text": "viewport", "type": "dfn", "spec": "", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/css2/visuren.html#viewport", "export": true, "normative": true, "for_": []};
+window.refsData['#intersectionobserver-intersection-root'] = {"text": "intersection root", "type": "dfn", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#intersectionobserver-intersection-root", "export": true, "normative": true, "for_": ["IntersectionObserver"]};
+window.refsData['https://heycam.github.io/webidl/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://heycam.github.io/webidl/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['#intersectionobserverentry'] = {"text": "IntersectionObserverEntry", "type": "interface", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#intersectionobserverentry", "export": true, "normative": true, "for_": []};
+window.refsData['#intersectionobserver'] = {"text": "IntersectionObserver", "type": "interface", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#intersectionobserver", "export": true, "normative": true, "for_": []};
+window.refsData['#intersection-observer-processing-model'] = {"text": "processing model", "type": "dfn", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#intersection-observer-processing-model", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#element'] = {"text": "Element", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#element", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-intersectionobserver-root'] = {"text": "root", "type": "attribute", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#dom-intersectionobserver-root", "export": true, "normative": true, "for_": ["IntersectionObserver"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#top-level-browsing-context'] = {"text": "top-level browsing context", "type": "dfn", "spec": "", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#top-level-browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-document-2'] = {"text": "document", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-document-2", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['https://drafts.csswg.org/css-display/#containing-block-chain'] = {"text": "containing block chain", "type": "dfn", "spec": "", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/css-display/#containing-block-chain", "export": true, "normative": true, "for_": []};
+window.refsData['#intersectionobserver-implicit-root-observer'] = {"text": "implicit root observer", "type": "dfn", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#intersectionobserver-implicit-root-observer", "export": true, "normative": true, "for_": ["IntersectionObserver"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#nested-browsing-context'] = {"text": "nested browsing context", "type": "dfn", "spec": "", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#nested-browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#list-of-the-descendant-browsing-contexts'] = {"text": "list of the descendant browsing contexts", "type": "dfn", "spec": "", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#list-of-the-descendant-browsing-contexts", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object'] = {"text": "relevant settings object", "type": "dfn", "spec": "", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/origin.html#origin'] = {"text": "origin", "type": "dfn", "spec": "", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/origin.html#origin", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#same-origin-domain'] = {"text": "same origin-domain", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#same-origin-domain", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-environment-top-level-origin'] = {"text": "top-level origin", "type": "dfn", "spec": "", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-environment-top-level-origin", "export": true, "normative": true, "for_": []};
+window.refsData['#intersectionobserver-explicit-root-observer'] = {"text": "explicit root observer", "type": "dfn", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#intersectionobserver-explicit-root-observer", "export": true, "normative": true, "for_": ["IntersectionObserver"]};
+window.refsData['#intersectionobserver-same-origin-domain-target'] = {"text": "same-origin-domain target", "type": "dfn", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#intersectionobserver-same-origin-domain-target", "export": true, "normative": true, "for_": ["IntersectionObserver"]};
+window.refsData['https://html.spec.whatwg.org/multipage/dom.html#document'] = {"text": "document", "type": "dfn", "spec": "", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/dom.html#document", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#mutationobserver'] = {"text": "MutationObserver", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#mutationobserver", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dictdef-mutationobserverinit'] = {"text": "MutationObserverInit", "type": "dictionary", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dictdef-mutationobserverinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dom-mutationobserver-observe'] = {"text": "observe(target)", "type": "method", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-mutationobserver-observe", "export": true, "normative": true, "for_": ["MutationObserver"]};
+window.refsData['https://dom.spec.whatwg.org/#node'] = {"text": "Node", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#node", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-intersectionobserverinit-rootmargin'] = {"text": "rootMargin", "type": "dict-member", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#dom-intersectionobserverinit-rootmargin", "export": true, "normative": true, "for_": ["IntersectionObserverInit"]};
+window.refsData['#dom-intersectionobserverinit-threshold'] = {"text": "threshold", "type": "dict-member", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#dom-intersectionobserverinit-threshold", "export": true, "normative": true, "for_": ["IntersectionObserverInit"]};
+window.refsData['#dom-intersectionobserver-observe'] = {"text": "observe(target)", "type": "method", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#dom-intersectionobserver-observe", "export": true, "normative": true, "for_": ["IntersectionObserver"]};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-intersectionobserver-intersectionobserver'] = {"text": "IntersectionObserver(callback, options)", "type": "constructor", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#dom-intersectionobserver-intersectionobserver", "export": true, "normative": true, "for_": ["IntersectionObserver"]};
+window.refsData['#callbackdef-intersectionobservercallback'] = {"text": "IntersectionObserverCallback", "type": "callback", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#callbackdef-intersectionobservercallback", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-intersectionobserverinit'] = {"text": "IntersectionObserverInit", "type": "dictionary", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#dictdef-intersectionobserverinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-intersectionobserver-rootmargin'] = {"text": "rootMargin", "type": "attribute", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#dom-intersectionobserver-rootmargin", "export": true, "normative": true, "for_": ["IntersectionObserver"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-frozen-array'] = {"text": "FrozenArray", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "export": true, "normative": true, "for_": []};
+window.refsData['https://heycam.github.io/webidl/#idl-double'] = {"text": "double", "type": "interface", "spec": "", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://heycam.github.io/webidl/#idl-double", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-intersectionobserver-thresholds'] = {"text": "thresholds", "type": "attribute", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#dom-intersectionobserver-thresholds", "export": true, "normative": true, "for_": ["IntersectionObserver"]};
+window.refsData['#dom-intersectionobserver-unobserve'] = {"text": "unobserve(target)", "type": "method", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#dom-intersectionobserver-unobserve", "export": true, "normative": true, "for_": ["IntersectionObserver"]};
+window.refsData['#dom-intersectionobserver-disconnect'] = {"text": "disconnect()", "type": "method", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#dom-intersectionobserver-disconnect", "export": true, "normative": true, "for_": ["IntersectionObserver"]};
+window.refsData['#dom-intersectionobserver-takerecords'] = {"text": "takeRecords()", "type": "method", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#dom-intersectionobserver-takerecords", "export": true, "normative": true, "for_": ["IntersectionObserver"]};
+window.refsData['#initialize-a-new-intersectionobserver'] = {"text": "initialize a new intersectionobserver", "type": "dfn", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#initialize-a-new-intersectionobserver", "export": true, "normative": true, "for_": []};
+window.refsData['#observe-a-target-element'] = {"text": "observe a target element", "type": "dfn", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#observe-a-target-element", "export": true, "normative": true, "for_": []};
+window.refsData['#unobserve-a-target-element'] = {"text": "unobserve a target element", "type": "dfn", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#unobserve-a-target-element", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-intersectionobserver-observationtargets-slot'] = {"text": "[[ObservationTargets]]", "type": "attribute", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#dom-intersectionobserver-observationtargets-slot", "export": true, "normative": true, "for_": ["IntersectionObserver"]};
+window.refsData['#intersectionobserverregistration'] = {"text": "IntersectionObserverRegistration", "type": "interface", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#intersectionobserverregistration", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-intersectionobserverregistration-observer'] = {"text": "observer", "type": "attribute", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#dom-intersectionobserverregistration-observer", "export": true, "normative": true, "for_": ["IntersectionObserverRegistration"]};
+window.refsData['#dom-element-registeredintersectionobservers-slot'] = {"text": "[[RegisteredIntersectionObservers]]", "type": "attribute", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#dom-element-registeredintersectionobservers-slot", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['#dom-intersectionobserver-queuedentries-slot'] = {"text": "[[QueuedEntries]]", "type": "attribute", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#dom-intersectionobserver-queuedentries-slot", "export": true, "normative": true, "for_": ["IntersectionObserver"]};
+window.refsData['#dom-intersectionobserverinit-root'] = {"text": "root", "type": "dict-member", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#dom-intersectionobserverinit-root", "export": true, "normative": true, "for_": ["IntersectionObserverInit"]};
+window.refsData['#intersectionobserver-root-intersection-rectangle'] = {"text": "root intersection rectangle", "type": "dfn", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#intersectionobserver-root-intersection-rectangle", "export": true, "normative": true, "for_": ["IntersectionObserver"]};
+window.refsData['#intersectionobserver-cross-origin-domain-target'] = {"text": "cross-origin-domain target", "type": "dfn", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#intersectionobserver-cross-origin-domain-target", "export": true, "normative": true, "for_": ["IntersectionObserver"]};
+window.refsData['#dom-intersectionobserver-rootmargin-slot'] = {"text": "[[rootMargin]]", "type": "attribute", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#dom-intersectionobserver-rootmargin-slot", "export": true, "normative": true, "for_": ["IntersectionObserver"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#fully-active'] = {"text": "fully active", "type": "dfn", "spec": "", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#fully-active", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box/#content-area'] = {"text": "content area", "type": "dfn", "spec": "", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/css-box/#content-area", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-view-1/#dom-element-getboundingclientrect'] = {"text": "getBoundingClientRect()", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-view-1/#dom-element-getboundingclientrect", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['https://drafts.csswg.org/css-box-4/#propdef-margin'] = {"text": "margin", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#propdef-margin", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-view-1/#pinch-zoom'] = {"text": "pinch zoom", "type": "dfn", "spec": "", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/cssom-view-1/#pinch-zoom", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#parse-a-list-of-component-values'] = {"text": "parse a list of component values", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#parse-a-list-of-component-values", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-3/#absolute-length'] = {"text": "absolute length", "type": "dfn", "spec": "css-values-3", "shortname": "css-values", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-values-3/#absolute-length", "export": false, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-3/#dimension'] = {"text": "dimension", "type": "dfn", "spec": "css-values-3", "shortname": "css-values", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-values-3/#dimension", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#percentage-value'] = {"text": "<percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#percentage-value", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-intersectionobserverentryinit'] = {"text": "IntersectionObserverEntryInit", "type": "dictionary", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#dictdef-intersectionobserverentryinit", "export": true, "normative": true, "for_": []};
+window.refsData['http://www.w3.org/TR/hr-time/#domhighrestimestamp'] = {"text": "DOMHighResTimeStamp", "type": "typedef", "spec": "", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "http://www.w3.org/TR/hr-time/#domhighrestimestamp", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-intersectionobserverentry-time'] = {"text": "time", "type": "attribute", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#dom-intersectionobserverentry-time", "export": true, "normative": true, "for_": ["IntersectionObserverEntry"]};
+window.refsData['https://drafts.fxtf.org/geometry-1/#domrectreadonly'] = {"text": "DOMRectReadOnly", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/geometry-1/#domrectreadonly", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-intersectionobserverentry-rootbounds'] = {"text": "rootBounds", "type": "attribute", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#dom-intersectionobserverentry-rootbounds", "export": true, "normative": true, "for_": ["IntersectionObserverEntry"]};
+window.refsData['#dom-intersectionobserverentry-boundingclientrect'] = {"text": "boundingClientRect", "type": "attribute", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#dom-intersectionobserverentry-boundingclientrect", "export": true, "normative": true, "for_": ["IntersectionObserverEntry"]};
+window.refsData['#dom-intersectionobserverentry-intersectionrect'] = {"text": "intersectionRect", "type": "attribute", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#dom-intersectionobserverentry-intersectionrect", "export": true, "normative": true, "for_": ["IntersectionObserverEntry"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-intersectionobserverentry-isintersecting'] = {"text": "isIntersecting", "type": "attribute", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#dom-intersectionobserverentry-isintersecting", "export": true, "normative": true, "for_": ["IntersectionObserverEntry"]};
+window.refsData['#dom-intersectionobserverentry-intersectionratio'] = {"text": "intersectionRatio", "type": "attribute", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#dom-intersectionobserverentry-intersectionratio", "export": true, "normative": true, "for_": ["IntersectionObserverEntry"]};
+window.refsData['#dom-intersectionobserverentry-target'] = {"text": "target", "type": "attribute", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#dom-intersectionobserverentry-target", "export": true, "normative": true, "for_": ["IntersectionObserverEntry"]};
+window.refsData['https://drafts.fxtf.org/geometry-1/#dictdef-domrectinit'] = {"text": "DOMRectInit", "type": "dictionary", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/geometry-1/#dictdef-domrectinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#browsing-context'] = {"text": "browsing context", "type": "dfn", "spec": "", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['http://www.w3.org/TR/hr-time/#time-origin'] = {"text": "time origin", "type": "dfn", "spec": "", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "http://www.w3.org/TR/hr-time/#time-origin", "export": true, "normative": true, "for_": []};
+window.refsData['#intersectionobserver-implicit-root'] = {"text": "implicit root", "type": "dfn", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#intersectionobserver-implicit-root", "export": true, "normative": true, "for_": ["IntersectionObserver"]};
+window.refsData['#intersection-observer'] = {"text": "intersection observer", "type": "dfn", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#intersection-observer", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-intersectionobserver-callback-slot'] = {"text": "[[callback]]", "type": "attribute", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#dom-intersectionobserver-callback-slot", "export": true, "normative": true, "for_": ["IntersectionObserver"]};
+window.refsData['#parse-a-root-margin'] = {"text": "parse a root margin", "type": "dfn", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#parse-a-root-margin", "export": true, "normative": true, "for_": []};
+window.refsData['https://heycam.github.io/webidl/#dfn-throw'] = {"text": "throw", "type": "dfn", "spec": "", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://heycam.github.io/webidl/#dfn-throw", "export": true, "normative": true, "for_": []};
+window.refsData['https://heycam.github.io/webidl/#dfn-simple-exception'] = {"text": "SyntaxError", "type": "exception", "spec": "", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://heycam.github.io/webidl/#dfn-simple-exception", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-intersectionobserverregistration-previousthresholdindex'] = {"text": "previousThresholdIndex", "type": "attribute", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#dom-intersectionobserverregistration-previousthresholdindex", "export": true, "normative": true, "for_": ["IntersectionObserverRegistration"]};
+window.refsData['#dom-intersectionobserverregistration-previousisintersecting'] = {"text": "previousIsIntersecting", "type": "attribute", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#dom-intersectionobserverregistration-previousisintersecting", "export": true, "normative": true, "for_": ["IntersectionObserverRegistration"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#task-source'] = {"text": "task source", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#task-source", "export": true, "normative": true, "for_": []};
+window.refsData['#document-intersectionobservertaskqueued'] = {"text": "intersectionobservertaskqueued", "type": "dfn", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#document-intersectionobservertaskqueued", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task'] = {"text": "queue a task", "type": "dfn", "spec": "", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task", "export": true, "normative": true, "for_": []};
+window.refsData['#intersectionobserver-task-source'] = {"text": "intersectionobserver task source", "type": "dfn", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#intersectionobserver-task-source", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-loop'] = {"text": "event loop", "type": "dfn", "spec": "", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-loop", "export": true, "normative": true, "for_": []};
+window.refsData['#notify-intersection-observers'] = {"text": "notify intersection observers", "type": "dfn", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#notify-intersection-observers", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#dfn-callback-this-value'] = {"text": "callback this value", "type": "dfn", "spec": "", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#dfn-callback-this-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#report-the-exception'] = {"text": "report the exception", "type": "dfn", "spec": "", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#report-the-exception", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.fxtf.org/geometry-1/#domrect'] = {"text": "DOMRect", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/geometry-1/#domrect", "export": true, "normative": true, "for_": []};
+window.refsData['#queue-an-intersection-observer-task'] = {"text": "queue an intersection observer task", "type": "dfn", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#queue-an-intersection-observer-task", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box/#containing-block'] = {"text": "containing block", "type": "dfn", "spec": "", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/css-box/#containing-block", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#browsing-context-container'] = {"text": "browsing context container", "type": "dfn", "spec": "", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#browsing-context-container", "export": true, "normative": true, "for_": []};
+window.refsData['http://www.w3.org/TR/css-masking-1/#propdef-clip-path'] = {"text": "clip-path", "type": "dfn", "spec": "", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "http://www.w3.org/TR/css-masking-1/#propdef-clip-path", "export": true, "normative": true, "for_": []};
+window.refsData['#compute-the-intersection'] = {"text": "compute the intersection", "type": "dfn", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#compute-the-intersection", "export": true, "normative": true, "for_": []};
+window.refsData['#queue-an-intersectionobserverentry'] = {"text": "queue an intersectionobserverentry", "type": "dfn", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#queue-an-intersectionobserverentry", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#run-the-animation-frame-callbacks'] = {"text": "run the animation frame callbacks", "type": "dfn", "spec": "", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#run-the-animation-frame-callbacks", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-loop-processing-model'] = {"text": "html processing model", "type": "dfn", "spec": "", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-loop-processing-model", "export": true, "normative": true, "for_": []};
+window.refsData['#run-the-update-intersection-observations-steps'] = {"text": "run the update intersection observations steps", "type": "dfn", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#run-the-update-intersection-observations-steps", "export": true, "normative": true, "for_": []};
+window.refsData['#pending-initial-intersectionobserver-targets'] = {"text": "pending initial intersectionobserver targets", "type": "dfn", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "local", "url": "#pending-initial-intersectionobserver-targets", "export": true, "normative": true, "for_": []};
 </script>

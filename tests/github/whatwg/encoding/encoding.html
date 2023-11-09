@@ -21,6 +21,43 @@ a[href].issue-return {
     text-decoration: none;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
  <body class="h-entry status-LS">
   <div class="head">
     <a class="logo" href="https://whatwg.org/"> <img alt="WHATWG" crossorigin height="100" src="https://resources.whatwg.org/logo-encoding.svg"> </a> 
@@ -3822,8 +3859,6 @@ if ("serviceWorker" in navigator) {
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -4071,7 +4106,6 @@ if ("serviceWorker" in navigator) {
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -4709,4 +4743,448 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#shift_jis'] = {"text": "shift_jis", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#shift_jis", "export": true, "normative": true, "for_": []};
+window.refsData['#gb18030-decoder'] = {"text": "gb18030 decoder", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#gb18030-decoder", "export": true, "normative": true, "for_": []};
+window.refsData['#end-of-stream'] = {"text": "end-of-queue", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#end-of-stream", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ascii-byte'] = {"text": "ascii byte", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-byte", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ascii-code-point'] = {"text": "ascii code point", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-code-point", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-2022-jp'] = {"text": "iso-2022-jp", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-2022-jp", "export": true, "normative": true, "for_": []};
+window.refsData['#utf-16be-le'] = {"text": "utf-16be/le", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#utf-16be-le", "export": true, "normative": true, "for_": []};
+window.refsData['#replacement'] = {"text": "replacement", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#replacement", "export": true, "normative": true, "for_": []};
+window.refsData['#windows-1252'] = {"text": "windows-1252", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#windows-1252", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list'] = {"text": "list", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-item'] = {"text": "item", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-item", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://infra.spec.whatwg.org/#byte'] = {"text": "byte", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#byte", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#scalar-value'] = {"text": "scalar value", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#scalar-value", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-stream'] = {"text": "i/o queue", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#concept-stream", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-stream-read'] = {"text": "read", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#concept-stream-read", "export": true, "normative": true, "for_": ["I/O queue"]};
+window.refsData['#concept-stream-push'] = {"text": "push", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#concept-stream-push", "export": true, "normative": true, "for_": ["I/O queue"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-loop'] = {"text": "event loop", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-loop", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel'] = {"text": "in parallel", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-empty'] = {"text": "empty", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-empty", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://infra.spec.whatwg.org/#list-size'] = {"text": "size", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-size", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://infra.spec.whatwg.org/#list-remove'] = {"text": "remove", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-remove", "export": true, "normative": true, "for_": ["list", "set"]};
+window.refsData['https://infra.spec.whatwg.org/#list-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-append", "export": true, "normative": true, "for_": ["list"]};
+window.refsData['https://infra.spec.whatwg.org/#list-contain'] = {"text": "contain", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-contain", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://infra.spec.whatwg.org/#list-iterate'] = {"text": "for each", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-iterate", "export": true, "normative": true, "for_": ["list", "set"]};
+window.refsData['https://infra.spec.whatwg.org/#the-range'] = {"text": "the range", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#the-range", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#iteration-break'] = {"text": "break", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#iteration-break", "export": true, "normative": true, "for_": ["iteration"]};
+window.refsData['https://infra.spec.whatwg.org/#list-insert'] = {"text": "insert", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-insert", "export": true, "normative": true, "for_": ["list", "set"]};
+window.refsData['https://infra.spec.whatwg.org/#list-prepend'] = {"text": "prepend", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-prepend", "export": true, "normative": true, "for_": ["list"]};
+window.refsData['https://infra.spec.whatwg.org/#string'] = {"text": "string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#string", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#byte-sequence'] = {"text": "byte sequence", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#byte-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#queue'] = {"text": "queue", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#queue", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-stream-prepend'] = {"text": "prepend", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#concept-stream-prepend", "export": true, "normative": true, "for_": ["I/O queue"]};
+window.refsData['#encoding'] = {"text": "encoding", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#encoding", "export": true, "normative": true, "for_": []};
+window.refsData['#utf-8'] = {"text": "utf-8", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#utf-8", "export": true, "normative": true, "for_": []};
+window.refsData['#utf-16le'] = {"text": "utf-16le", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#utf-16le", "export": true, "normative": true, "for_": []};
+window.refsData['#utf-16be'] = {"text": "utf-16be", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#utf-16be", "export": true, "normative": true, "for_": []};
+window.refsData['#utf-8-decode'] = {"text": "utf-8 decode", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#utf-8-decode", "export": true, "normative": true, "for_": []};
+window.refsData['#decoder'] = {"text": "decoder", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#decoder", "export": true, "normative": true, "for_": []};
+window.refsData['#encoder'] = {"text": "encoder", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#encoder", "export": true, "normative": true, "for_": []};
+window.refsData['#handler'] = {"text": "handler", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#handler", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#code-point'] = {"text": "code point", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#code-point", "export": true, "normative": true, "for_": []};
+window.refsData['#error-mode'] = {"text": "error mode", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#error-mode", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-encoding-process'] = {"text": "processing an item", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#concept-encoding-process", "export": true, "normative": true, "for_": []};
+window.refsData['#continue'] = {"text": "continue", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#continue", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#surrogate'] = {"text": "surrogate", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#surrogate", "export": true, "normative": true, "for_": []};
+window.refsData['#finished'] = {"text": "finished", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#finished", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/i18n-glossary/#dfn-surrogate'] = {"text": "surrogates", "type": "dfn", "spec": "i18n-glossary", "shortname": "i18n-glossary", "level": "1", "status": "current", "url": "https://w3c.github.io/i18n-glossary/#dfn-surrogate", "export": true, "normative": false, "for_": []};
+window.refsData['#error'] = {"text": "error", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#error", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#code-point-value'] = {"text": "value", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#code-point-value", "export": true, "normative": true, "for_": ["code point"]};
+window.refsData['https://infra.spec.whatwg.org/#ascii-lowercase'] = {"text": "ascii lowercase", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-lowercase", "export": true, "normative": true, "for_": []};
+window.refsData['#name'] = {"text": "name", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#name", "export": true, "normative": true, "for_": ["encoding"]};
+window.refsData['#label'] = {"text": "label", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#label", "export": true, "normative": true, "for_": ["encoding"]};
+window.refsData['https://infra.spec.whatwg.org/#ascii-case-insensitive'] = {"text": "ascii case-insensitive", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-case-insensitive", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ascii-whitespace'] = {"text": "ascii whitespace", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-whitespace", "export": true, "normative": true, "for_": []};
+window.refsData['#ibm866'] = {"text": "ibm866", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#ibm866", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-8859-2'] = {"text": "iso-8859-2", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-8859-2", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-8859-3'] = {"text": "iso-8859-3", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-8859-3", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-8859-4'] = {"text": "iso-8859-4", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-8859-4", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-8859-5'] = {"text": "iso-8859-5", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-8859-5", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-8859-6'] = {"text": "iso-8859-6", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-8859-6", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-8859-7'] = {"text": "iso-8859-7", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-8859-7", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-8859-8'] = {"text": "iso-8859-8", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-8859-8", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-8859-8-i'] = {"text": "iso-8859-8-i", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-8859-8-i", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-8859-10'] = {"text": "iso-8859-10", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-8859-10", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-8859-13'] = {"text": "iso-8859-13", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-8859-13", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-8859-14'] = {"text": "iso-8859-14", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-8859-14", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-8859-15'] = {"text": "iso-8859-15", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-8859-15", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-8859-16'] = {"text": "iso-8859-16", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-8859-16", "export": true, "normative": true, "for_": []};
+window.refsData['#koi8-r'] = {"text": "koi8-r", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#koi8-r", "export": true, "normative": true, "for_": []};
+window.refsData['#koi8-u'] = {"text": "koi8-u", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#koi8-u", "export": true, "normative": true, "for_": []};
+window.refsData['#macintosh'] = {"text": "macintosh", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#macintosh", "export": true, "normative": true, "for_": []};
+window.refsData['#windows-874'] = {"text": "windows-874", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#windows-874", "export": true, "normative": true, "for_": []};
+window.refsData['#windows-1250'] = {"text": "windows-1250", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#windows-1250", "export": true, "normative": true, "for_": []};
+window.refsData['#windows-1251'] = {"text": "windows-1251", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#windows-1251", "export": true, "normative": true, "for_": []};
+window.refsData['#windows-1253'] = {"text": "windows-1253", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#windows-1253", "export": true, "normative": true, "for_": []};
+window.refsData['#windows-1254'] = {"text": "windows-1254", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#windows-1254", "export": true, "normative": true, "for_": []};
+window.refsData['#windows-1255'] = {"text": "windows-1255", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#windows-1255", "export": true, "normative": true, "for_": []};
+window.refsData['#windows-1256'] = {"text": "windows-1256", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#windows-1256", "export": true, "normative": true, "for_": []};
+window.refsData['#windows-1257'] = {"text": "windows-1257", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#windows-1257", "export": true, "normative": true, "for_": []};
+window.refsData['#windows-1258'] = {"text": "windows-1258", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#windows-1258", "export": true, "normative": true, "for_": []};
+window.refsData['#x-mac-cyrillic'] = {"text": "x-mac-cyrillic", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#x-mac-cyrillic", "export": true, "normative": true, "for_": []};
+window.refsData['#gbk'] = {"text": "gbk", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#gbk", "export": true, "normative": true, "for_": []};
+window.refsData['#gb18030'] = {"text": "gb18030", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#gb18030", "export": true, "normative": true, "for_": []};
+window.refsData['#big5'] = {"text": "big5", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#big5", "export": true, "normative": true, "for_": []};
+window.refsData['#euc-jp'] = {"text": "euc-jp", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#euc-jp", "export": true, "normative": true, "for_": []};
+window.refsData['#euc-kr'] = {"text": "euc-kr", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#euc-kr", "export": true, "normative": true, "for_": []};
+window.refsData['#x-user-defined'] = {"text": "x-user-defined", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#x-user-defined", "export": true, "normative": true, "for_": []};
+window.refsData['#single-byte-encoding'] = {"text": "single-byte encoding", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#single-byte-encoding", "export": true, "normative": true, "for_": []};
+window.refsData['#get-an-output-encoding'] = {"text": "get an output encoding", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#get-an-output-encoding", "export": true, "normative": true, "for_": []};
+window.refsData['#index'] = {"text": "index", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#index", "export": true, "normative": true, "for_": []};
+window.refsData['#index-gb18030-ranges'] = {"text": "index gb18030 ranges", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#index-gb18030-ranges", "export": true, "normative": true, "for_": []};
+window.refsData['#index-iso-2022-jp-katakana'] = {"text": "index iso-2022-jp katakana", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#index-iso-2022-jp-katakana", "export": true, "normative": true, "for_": []};
+window.refsData['#index-jis0208'] = {"text": "index jis0208", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#index-jis0208", "export": true, "normative": true, "for_": []};
+window.refsData['#index-single-byte'] = {"text": "index single-byte", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#index-single-byte", "export": true, "normative": true, "for_": []};
+window.refsData['#index-gb18030-ranges-code-point'] = {"text": "index gb18030 ranges code point", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#index-gb18030-ranges-code-point", "export": true, "normative": true, "for_": []};
+window.refsData['#index-gb18030-ranges-pointer'] = {"text": "index gb18030 ranges pointer", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#index-gb18030-ranges-pointer", "export": true, "normative": true, "for_": []};
+window.refsData['#euc-jp-decoder'] = {"text": "euc-jp decoder", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#euc-jp-decoder", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-2022-jp-encoder'] = {"text": "iso-2022-jp encoder", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-2022-jp-encoder", "export": true, "normative": true, "for_": []};
+window.refsData['#index-pointer'] = {"text": "index pointer", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#index-pointer", "export": true, "normative": true, "for_": []};
+window.refsData['#index-big5'] = {"text": "index big5", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#index-big5", "export": true, "normative": true, "for_": []};
+window.refsData['#utf-8-decode-without-bom'] = {"text": "utf-8 decode without bom", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#utf-8-decode-without-bom", "export": true, "normative": true, "for_": []};
+window.refsData['#utf-8-decode-without-bom-or-fail'] = {"text": "utf-8 decode without bom or fail", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#utf-8-decode-without-bom-or-fail", "export": true, "normative": true, "for_": []};
+window.refsData['#utf-8-encode'] = {"text": "utf-8 encode", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#utf-8-encode", "export": true, "normative": true, "for_": []};
+window.refsData['#encode'] = {"text": "encode", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#encode", "export": true, "normative": true, "for_": []};
+window.refsData['#decode'] = {"text": "decode", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#decode", "export": true, "normative": true, "for_": []};
+window.refsData['#i-o-queue-peek'] = {"text": "peek", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#i-o-queue-peek", "export": true, "normative": true, "for_": ["I/O queue"]};
+window.refsData['#concept-encoding-run'] = {"text": "process a queue", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#concept-encoding-run", "export": true, "normative": true, "for_": []};
+window.refsData['#bom-sniff'] = {"text": "bom sniff", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#bom-sniff", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-encoding-get'] = {"text": "get an encoding", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#concept-encoding-get", "export": true, "normative": true, "for_": []};
+window.refsData['#get-an-encoder'] = {"text": "get an encoder", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#get-an-encoder", "export": true, "normative": true, "for_": []};
+window.refsData['#encode-or-fail'] = {"text": "encode or fail", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#encode-or-fail", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#byte-sequence-starts-with'] = {"text": "starts with", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#byte-sequence-starts-with", "export": true, "normative": true, "for_": ["byte sequence"]};
+window.refsData['#iso-2022-jp-decoder-roman'] = {"text": "iso-2022-jp decoder roman", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-2022-jp-decoder-roman", "export": true, "normative": true, "for_": []};
+window.refsData['#textencoder'] = {"text": "TextEncoder", "type": "interface", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#textencoder", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-ArrayBuffer'] = {"text": "ArrayBuffer", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-ArrayBuffer", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-Uint8Array'] = {"text": "Uint8Array", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-Uint8Array", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-Uint32Array'] = {"text": "Uint32Array", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-Uint32Array", "export": true, "normative": true, "for_": []};
+window.refsData['#textdecodercommon'] = {"text": "TextDecoderCommon", "type": "interface", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#textdecodercommon", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-textdecoder-encoding'] = {"text": "encoding", "type": "attribute", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#dom-textdecoder-encoding", "export": true, "normative": true, "for_": ["TextDecoderCommon"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-textdecoder-fatal'] = {"text": "fatal", "type": "attribute", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#dom-textdecoder-fatal", "export": true, "normative": true, "for_": ["TextDecoderCommon"]};
+window.refsData['#dom-textdecoder-ignorebom'] = {"text": "ignoreBOM", "type": "attribute", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#dom-textdecoder-ignorebom", "export": true, "normative": true, "for_": ["TextDecoderCommon"]};
+window.refsData['#textdecoder'] = {"text": "TextDecoder", "type": "interface", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#textdecoder", "export": true, "normative": true, "for_": []};
+window.refsData['#textdecoderstream'] = {"text": "TextDecoderStream", "type": "interface", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#textdecoderstream", "export": true, "normative": true, "for_": []};
+window.refsData['#textdecoder-encoding'] = {"text": "encoding", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#textdecoder-encoding", "export": true, "normative": true, "for_": ["TextDecoderCommon"]};
+window.refsData['#textdecoder-ignore-bom-flag'] = {"text": "ignore bom", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#textdecoder-ignore-bom-flag", "export": true, "normative": true, "for_": ["TextDecoderCommon"]};
+window.refsData['#textdecoder-bom-seen-flag'] = {"text": "bom seen", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#textdecoder-bom-seen-flag", "export": true, "normative": true, "for_": ["TextDecoderCommon"]};
+window.refsData['https://infra.spec.whatwg.org/#iteration-continue'] = {"text": "continue", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#iteration-continue", "export": true, "normative": true, "for_": ["iteration"]};
+window.refsData['https://webidl.spec.whatwg.org/#this'] = {"text": "this", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#this", "export": true, "normative": true, "for_": []};
+window.refsData['#textdecoder-error-mode'] = {"text": "error mode", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#textdecoder-error-mode", "export": true, "normative": true, "for_": ["TextDecoderCommon"]};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-textdecoder'] = {"text": "TextDecoder(label, options)", "type": "constructor", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#dom-textdecoder", "export": true, "normative": true, "for_": ["TextDecoder"]};
+window.refsData['#textdecoderoptions'] = {"text": "TextDecoderOptions", "type": "dictionary", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#textdecoderoptions", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-USVString'] = {"text": "USVString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-USVString", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-textdecoder-decode'] = {"text": "decode(input, options)", "type": "method", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#dom-textdecoder-decode", "export": true, "normative": true, "for_": ["TextDecoder"]};
+window.refsData['https://webidl.spec.whatwg.org/#AllowShared'] = {"text": "AllowShared", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#AllowShared", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#BufferSource'] = {"text": "BufferSource", "type": "typedef", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#BufferSource", "export": true, "normative": true, "for_": []};
+window.refsData['#textdecodeoptions'] = {"text": "TextDecodeOptions", "type": "dictionary", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#textdecodeoptions", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-throw'] = {"text": "throw", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-throw", "export": true, "normative": true, "for_": ["exception"]};
+window.refsData['https://webidl.spec.whatwg.org/#exceptiondef-rangeerror'] = {"text": "RangeError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#exceptiondef-rangeerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#exceptiondef-typeerror'] = {"text": "TypeError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#exceptiondef-typeerror", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-textdecoderoptions-fatal'] = {"text": "fatal", "type": "dict-member", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#dom-textdecoderoptions-fatal", "export": true, "normative": true, "for_": ["TextDecoderOptions"]};
+window.refsData['#dom-textdecoderoptions-ignorebom'] = {"text": "ignoreBOM", "type": "dict-member", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#dom-textdecoderoptions-ignorebom", "export": true, "normative": true, "for_": ["TextDecoderOptions"]};
+window.refsData['#textdecoder-do-not-flush-flag'] = {"text": "do not flush", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#textdecoder-do-not-flush-flag", "export": true, "normative": true, "for_": ["TextDecoder"]};
+window.refsData['#textdecodercommon-decoder'] = {"text": "decoder", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#textdecodercommon-decoder", "export": true, "normative": true, "for_": ["TextDecoderCommon"]};
+window.refsData['#textdecodercommon-i-o-queue'] = {"text": "i/o queue", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#textdecodercommon-i-o-queue", "export": true, "normative": true, "for_": ["TextDecoderCommon"]};
+window.refsData['#dom-textdecodeoptions-stream'] = {"text": "stream", "type": "dict-member", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#dom-textdecodeoptions-stream", "export": true, "normative": true, "for_": ["TextDecodeOptions"]};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-get-buffer-source-copy'] = {"text": "get a copy of the buffer source", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-get-buffer-source-copy", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-td-serialize'] = {"text": "serialize i/o queue", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#concept-td-serialize", "export": true, "normative": true, "for_": []};
+window.refsData['#textencodercommon'] = {"text": "TextEncoderCommon", "type": "interface", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#textencodercommon", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-textencoder-encoding'] = {"text": "encoding", "type": "attribute", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#dom-textencoder-encoding", "export": true, "normative": true, "for_": ["TextEncoderCommon"]};
+window.refsData['#textencoderstream'] = {"text": "TextEncoderStream", "type": "interface", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#textencoderstream", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-long-long'] = {"text": "unsigned long long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long-long", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-textencoder'] = {"text": "TextEncoder()", "type": "constructor", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#dom-textencoder", "export": true, "normative": true, "for_": ["TextEncoder"]};
+window.refsData['https://webidl.spec.whatwg.org/#NewObject'] = {"text": "NewObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#NewObject", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-textencoder-encode'] = {"text": "encode(input)", "type": "method", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#dom-textencoder-encode", "export": true, "normative": true, "for_": ["TextEncoder"]};
+window.refsData['#dictdef-textencoderencodeintoresult'] = {"text": "TextEncoderEncodeIntoResult", "type": "dictionary", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#dictdef-textencoderencodeintoresult", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-textencoder-encodeinto'] = {"text": "encodeInto(source, destination)", "type": "method", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#dom-textencoder-encodeinto", "export": true, "normative": true, "for_": ["TextEncoder"]};
+window.refsData['#utf-8-encoder'] = {"text": "utf-8 encoder", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#utf-8-encoder", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-textencoderencodeintoresult-read'] = {"text": "read", "type": "dict-member", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#dom-textencoderencodeintoresult-read", "export": true, "normative": true, "for_": ["TextEncoderEncodeIntoResult"]};
+window.refsData['https://w3c.github.io/i18n-glossary/#def_code_unit'] = {"text": "code units", "type": "dfn", "spec": "i18n-glossary", "shortname": "i18n-glossary", "level": "1", "status": "current", "url": "https://w3c.github.io/i18n-glossary/#def_code_unit", "export": true, "normative": false, "for_": []};
+window.refsData['#dom-textencoderencodeintoresult-written'] = {"text": "written", "type": "dict-member", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#dom-textencoderencodeintoresult-written", "export": true, "normative": true, "for_": ["TextEncoderEncodeIntoResult"]};
+window.refsData['#to-i-o-queue-convert'] = {"text": "convert", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#to-i-o-queue-convert", "export": true, "normative": true, "for_": ["to I/O queue"]};
+window.refsData['#from-i-o-queue-convert'] = {"text": "convert", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#from-i-o-queue-convert", "export": true, "normative": true, "for_": ["from I/O queue"]};
+window.refsData['https://infra.spec.whatwg.org/#byte-sequence-length'] = {"text": "length", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#byte-sequence-length", "export": true, "normative": true, "for_": ["byte sequence"]};
+window.refsData['#dom-textdecoderstream'] = {"text": "TextDecoderStream(label, options)", "type": "constructor", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#dom-textdecoderstream", "export": true, "normative": true, "for_": ["TextDecoderStream"]};
+window.refsData['https://streams.spec.whatwg.org/#generictransformstream'] = {"text": "GenericTransformStream", "type": "interface", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#generictransformstream", "export": true, "normative": true, "for_": []};
+window.refsData['https://streams.spec.whatwg.org/#dom-generictransformstream-readable'] = {"text": "readable", "type": "attribute", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#dom-generictransformstream-readable", "export": true, "normative": true, "for_": ["GenericTransformStream"]};
+window.refsData['https://streams.spec.whatwg.org/#readable-stream'] = {"text": "readable stream", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#readable-stream", "export": true, "normative": true, "for_": []};
+window.refsData['https://streams.spec.whatwg.org/#chunk'] = {"text": "chunk", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#chunk", "export": true, "normative": true, "for_": []};
+window.refsData['https://streams.spec.whatwg.org/#dom-generictransformstream-writable'] = {"text": "writable", "type": "attribute", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#dom-generictransformstream-writable", "export": true, "normative": true, "for_": ["GenericTransformStream"]};
+window.refsData['https://streams.spec.whatwg.org/#writable-stream'] = {"text": "writable stream", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#writable-stream", "export": true, "normative": true, "for_": []};
+window.refsData['https://streams.spec.whatwg.org/#rs-pipe-through'] = {"text": "pipeThrough(transform)", "type": "method", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#rs-pipe-through", "export": true, "normative": true, "for_": ["ReadableStream"]};
+window.refsData['https://streams.spec.whatwg.org/#readablestream'] = {"text": "ReadableStream", "type": "interface", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#readablestream", "export": true, "normative": true, "for_": []};
+window.refsData['#decode-and-enqueue-a-chunk'] = {"text": "decode and enqueue a chunk", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#decode-and-enqueue-a-chunk", "export": true, "normative": true, "for_": []};
+window.refsData['#flush-and-enqueue'] = {"text": "flush and enqueue", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#flush-and-enqueue", "export": true, "normative": true, "for_": []};
+window.refsData['https://streams.spec.whatwg.org/#generictransformstream-transform'] = {"text": "transform", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#generictransformstream-transform", "export": true, "normative": true, "for_": ["GenericTransformStream"]};
+window.refsData['https://streams.spec.whatwg.org/#transformstream'] = {"text": "TransformStream", "type": "interface", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#transformstream", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-convert-ecmascript-to-idl-value'] = {"text": "converted to an idl value", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-convert-ecmascript-to-idl-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://streams.spec.whatwg.org/#transformstream-enqueue'] = {"text": "enqueue", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#transformstream-enqueue", "export": true, "normative": true, "for_": ["TransformStream"]};
+window.refsData['#dom-textencoderstream'] = {"text": "TextEncoderStream()", "type": "constructor", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#dom-textencoderstream", "export": true, "normative": true, "for_": ["TextEncoderStream"]};
+window.refsData['#textencoderstream-encoder'] = {"text": "encoder", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#textencoderstream-encoder", "export": true, "normative": true, "for_": ["TextEncoderStream"]};
+window.refsData['#encode-and-enqueue-a-chunk'] = {"text": "encode and enqueue a chunk", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#encode-and-enqueue-a-chunk", "export": true, "normative": true, "for_": []};
+window.refsData['#encode-and-flush'] = {"text": "encode and flush", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#encode-and-flush", "export": true, "normative": true, "for_": []};
+window.refsData['#convert-code-unit-to-scalar-value'] = {"text": "convert code unit to scalar value", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#convert-code-unit-to-scalar-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#code-unit'] = {"text": "code unit", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#code-unit", "export": true, "normative": true, "for_": []};
+window.refsData['#textencoderstream-pending-high-surrogate'] = {"text": "pending high surrogate", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#textencoderstream-pending-high-surrogate", "export": true, "normative": true, "for_": ["TextEncoderStream"]};
+window.refsData['https://infra.spec.whatwg.org/#javascript-string-convert'] = {"text": "convert", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#javascript-string-convert", "export": true, "normative": true, "for_": ["string", "JavaScript string"]};
+window.refsData['https://infra.spec.whatwg.org/#scalar-value-string'] = {"text": "scalar value string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#scalar-value-string", "export": true, "normative": true, "for_": []};
+window.refsData['#utf-8-decoder'] = {"text": "utf-8 decoder", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#utf-8-decoder", "export": true, "normative": true, "for_": []};
+window.refsData['#utf-8-bytes-needed'] = {"text": "utf-8 bytes needed", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#utf-8-bytes-needed", "export": true, "normative": true, "for_": []};
+window.refsData['#utf-8-code-point'] = {"text": "utf-8 code point", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#utf-8-code-point", "export": true, "normative": true, "for_": []};
+window.refsData['#utf-8-lower-boundary'] = {"text": "utf-8 lower boundary", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#utf-8-lower-boundary", "export": true, "normative": true, "for_": []};
+window.refsData['#utf-8-upper-boundary'] = {"text": "utf-8 upper boundary", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#utf-8-upper-boundary", "export": true, "normative": true, "for_": []};
+window.refsData['#utf-8-bytes-seen'] = {"text": "utf-8 bytes seen", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#utf-8-bytes-seen", "export": true, "normative": true, "for_": []};
+window.refsData['#single-byte-decoder'] = {"text": "single-byte decoder", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#single-byte-decoder", "export": true, "normative": true, "for_": []};
+window.refsData['#single-byte-encoder'] = {"text": "single-byte encoder", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#single-byte-encoder", "export": true, "normative": true, "for_": []};
+window.refsData['#index-code-point'] = {"text": "index code point", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#index-code-point", "export": true, "normative": true, "for_": []};
+window.refsData['#gbk-flag'] = {"text": "is gbk", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#gbk-flag", "export": true, "normative": true, "for_": []};
+window.refsData['#gb18030-first'] = {"text": "gb18030 first", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#gb18030-first", "export": true, "normative": true, "for_": []};
+window.refsData['#gb18030-second'] = {"text": "gb18030 second", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#gb18030-second", "export": true, "normative": true, "for_": []};
+window.refsData['#gb18030-third'] = {"text": "gb18030 third", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#gb18030-third", "export": true, "normative": true, "for_": []};
+window.refsData['#index-gb18030'] = {"text": "index gb18030", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#index-gb18030", "export": true, "normative": true, "for_": []};
+window.refsData['#big5-lead'] = {"text": "big5 lead", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#big5-lead", "export": true, "normative": true, "for_": []};
+window.refsData['#index-big5-pointer'] = {"text": "index big5 pointer", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#index-big5-pointer", "export": true, "normative": true, "for_": []};
+window.refsData['#euc-jp-lead'] = {"text": "euc-jp lead", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#euc-jp-lead", "export": true, "normative": true, "for_": []};
+window.refsData['#euc-jp-jis0212-flag'] = {"text": "euc-jp jis0212", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#euc-jp-jis0212-flag", "export": true, "normative": true, "for_": []};
+window.refsData['#index-jis0212'] = {"text": "index jis0212", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#index-jis0212", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-2022-jp-decoder-ascii'] = {"text": "iso-2022-jp decoder ascii", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-2022-jp-decoder-ascii", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-2022-jp-decoder-state'] = {"text": "iso-2022-jp decoder state", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-2022-jp-decoder-state", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-2022-jp-decoder-escape-start'] = {"text": "iso-2022-jp decoder escape start", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-2022-jp-decoder-escape-start", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-2022-jp-output-flag'] = {"text": "iso-2022-jp output", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-2022-jp-output-flag", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-2022-jp-lead'] = {"text": "iso-2022-jp lead", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-2022-jp-lead", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-2022-jp-decoder-trail-byte'] = {"text": "iso-2022-jp decoder trail byte", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-2022-jp-decoder-trail-byte", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-2022-jp-decoder-lead-byte'] = {"text": "iso-2022-jp decoder lead byte", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-2022-jp-decoder-lead-byte", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-2022-jp-decoder-escape'] = {"text": "iso-2022-jp decoder escape", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-2022-jp-decoder-escape", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-2022-jp-decoder-output-state'] = {"text": "iso-2022-jp decoder output state", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-2022-jp-decoder-output-state", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-2022-jp-decoder-katakana'] = {"text": "iso-2022-jp decoder katakana", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-2022-jp-decoder-katakana", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-2022-jp-encoder-ascii'] = {"text": "iso-2022-jp encoder ascii", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-2022-jp-encoder-ascii", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-2022-jp-encoder-state'] = {"text": "iso-2022-jp encoder state", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-2022-jp-encoder-state", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-2022-jp-encoder-roman'] = {"text": "iso-2022-jp encoder roman", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-2022-jp-encoder-roman", "export": true, "normative": true, "for_": []};
+window.refsData['#iso-2022-jp-encoder-jis0208'] = {"text": "iso-2022-jp encoder jis0208", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#iso-2022-jp-encoder-jis0208", "export": true, "normative": true, "for_": []};
+window.refsData['#shift_jis-lead'] = {"text": "shift_jis lead", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#shift_jis-lead", "export": true, "normative": true, "for_": []};
+window.refsData['#index-shift_jis-pointer'] = {"text": "index shift_jis pointer", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#index-shift_jis-pointer", "export": true, "normative": true, "for_": []};
+window.refsData['#euc-kr-lead'] = {"text": "euc-kr lead", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#euc-kr-lead", "export": true, "normative": true, "for_": []};
+window.refsData['#index-euc-kr'] = {"text": "index euc-kr", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#index-euc-kr", "export": true, "normative": true, "for_": []};
+window.refsData['#replacement-error-returned-flag'] = {"text": "replacement error returned", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#replacement-error-returned-flag", "export": true, "normative": true, "for_": []};
+window.refsData['#shared-utf-16-decoder'] = {"text": "shared utf-16 decoder", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#shared-utf-16-decoder", "export": true, "normative": true, "for_": []};
+window.refsData['#utf-16-lead-byte'] = {"text": "utf-16 lead byte", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#utf-16-lead-byte", "export": true, "normative": true, "for_": []};
+window.refsData['#utf-16-lead-surrogate'] = {"text": "utf-16 lead surrogate", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#utf-16-lead-surrogate", "export": true, "normative": true, "for_": []};
+window.refsData['#utf-16be-decoder-flag'] = {"text": "is utf-16be decoder", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "local", "url": "#utf-16be-decoder-flag", "export": true, "normative": true, "for_": []};
 </script>

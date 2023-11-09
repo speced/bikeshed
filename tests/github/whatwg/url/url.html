@@ -20,6 +20,43 @@ a[href].issue-return {
     text-decoration: none;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
  <body class="h-entry status-LS">
   <div class="head">
     <a class="logo" href="https://whatwg.org/"> <img alt="WHATWG" crossorigin height="100" src="https://resources.whatwg.org/logo-url.svg"> </a> 
@@ -3635,8 +3672,6 @@ if ("serviceWorker" in navigator) {
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -3884,7 +3919,6 @@ if ("serviceWorker" in navigator) {
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -4511,4 +4545,453 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#url'] = {"text": "URL", "type": "interface", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#url", "export": true, "normative": true, "for_": []};
+window.refsData['#validation-error'] = {"text": "validation error", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#validation-error", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#string'] = {"text": "string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#string", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#code-point'] = {"text": "code point", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#code-point", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#string-code-point-length'] = {"text": "code point length", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#string-code-point-length", "export": true, "normative": true, "for_": ["string", "JavaScript string", "scalar value string"]};
+window.refsData['#eof-code-point'] = {"text": "eof code point", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#eof-code-point", "export": true, "normative": true, "for_": []};
+window.refsData['#pointer'] = {"text": "pointer", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#pointer", "export": true, "normative": true, "for_": []};
+window.refsData['#c'] = {"text": "c", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#c", "export": true, "normative": true, "for_": []};
+window.refsData['#remaining'] = {"text": "remaining", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#remaining", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ascii-hex-digit'] = {"text": "ascii hex digit", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-hex-digit", "export": true, "normative": true, "for_": []};
+window.refsData['#percent-encoded-byte'] = {"text": "percent-encoded byte", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#percent-encoded-byte", "export": true, "normative": true, "for_": []};
+window.refsData['#string-percent-decode'] = {"text": "percent-decode", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#string-percent-decode", "export": true, "normative": true, "for_": ["string"]};
+window.refsData['https://encoding.spec.whatwg.org/#utf-8-decode-without-bom-or-fail'] = {"text": "utf-8 decode without bom or fail", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "1", "status": "current", "url": "https://encoding.spec.whatwg.org/#utf-8-decode-without-bom-or-fail", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#byte'] = {"text": "byte", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#byte", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ascii-upper-hex-digit'] = {"text": "ascii upper hex digit", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-upper-hex-digit", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#byte-sequence'] = {"text": "byte sequence", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#byte-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['https://encoding.spec.whatwg.org/#utf-8-decode-without-bom'] = {"text": "utf-8 decode without bom", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "1", "status": "current", "url": "https://encoding.spec.whatwg.org/#utf-8-decode-without-bom", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ascii-byte'] = {"text": "ascii byte", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-byte", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#isomorphic-decode'] = {"text": "isomorphic decode", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#isomorphic-decode", "export": true, "normative": true, "for_": []};
+window.refsData['https://encoding.spec.whatwg.org/#utf-8-encode'] = {"text": "utf-8 encode", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "1", "status": "current", "url": "https://encoding.spec.whatwg.org/#utf-8-encode", "export": true, "normative": true, "for_": []};
+window.refsData['#percent-decode'] = {"text": "percent-decode", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#percent-decode", "export": true, "normative": true, "for_": ["byte sequence"]};
+window.refsData['https://infra.spec.whatwg.org/#c0-control'] = {"text": "c0 control", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#c0-control", "export": true, "normative": true, "for_": []};
+window.refsData['#c0-control-percent-encode-set'] = {"text": "c0 control percent-encode set", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#c0-control-percent-encode-set", "export": true, "normative": true, "for_": []};
+window.refsData['#query-percent-encode-set'] = {"text": "query percent-encode set", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#query-percent-encode-set", "export": true, "normative": true, "for_": []};
+window.refsData['#fragment-percent-encode-set'] = {"text": "fragment percent-encode set", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#fragment-percent-encode-set", "export": true, "normative": true, "for_": []};
+window.refsData['#path-percent-encode-set'] = {"text": "path percent-encode set", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#path-percent-encode-set", "export": true, "normative": true, "for_": []};
+window.refsData['#userinfo-percent-encode-set'] = {"text": "userinfo percent-encode set", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#userinfo-percent-encode-set", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/system-state.html#dom-navigator-registerprotocolhandler'] = {"text": "registerProtocolHandler(scheme, url)", "type": "method", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/system-state.html#dom-navigator-registerprotocolhandler", "export": true, "normative": true, "for_": ["NavigatorContentUtils"]};
+window.refsData['#concept-url'] = {"text": "url", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-url", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-url-path'] = {"text": "path", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-url-path", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['#concept-url-query'] = {"text": "query", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-url-query", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['#concept-url-fragment'] = {"text": "fragment", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-url-fragment", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['#opaque-host'] = {"text": "opaque host", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#opaque-host", "export": true, "normative": true, "for_": []};
+window.refsData['#string-utf-8-percent-encode'] = {"text": "utf-8 percent-encode", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#string-utf-8-percent-encode", "export": true, "normative": true, "for_": ["string"]};
+window.refsData['https://tc39.es/ecma262/#sec-encodeuricomponent-uricomponent'] = {"text": "\"encodeURIComponent() [sic]\"", "type": "method", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.es/ecma262/#sec-encodeuricomponent-uricomponent", "export": true, "normative": true, "for_": []};
+window.refsData['#component-percent-encode-set'] = {"text": "component percent-encode set", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#component-percent-encode-set", "export": true, "normative": true, "for_": []};
+window.refsData['#application-x-www-form-urlencoded-percent-encode-set'] = {"text": "application/x-www-form-urlencoded percent-encode set", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#application-x-www-form-urlencoded-percent-encode-set", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ascii-alphanumeric'] = {"text": "ascii alphanumeric", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-alphanumeric", "export": true, "normative": true, "for_": []};
+window.refsData['https://encoding.spec.whatwg.org/#encoding'] = {"text": "encoding", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "1", "status": "current", "url": "https://encoding.spec.whatwg.org/#encoding", "export": true, "normative": true, "for_": []};
+window.refsData['https://encoding.spec.whatwg.org/#get-an-encoder'] = {"text": "getting an encoder", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "1", "status": "current", "url": "https://encoding.spec.whatwg.org/#get-an-encoder", "export": true, "normative": true, "for_": []};
+window.refsData['https://encoding.spec.whatwg.org/#concept-stream'] = {"text": "i/o queue", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "1", "status": "current", "url": "https://encoding.spec.whatwg.org/#concept-stream", "export": true, "normative": true, "for_": []};
+window.refsData['https://encoding.spec.whatwg.org/#encode-or-fail'] = {"text": "encode or fail", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "1", "status": "current", "url": "https://encoding.spec.whatwg.org/#encode-or-fail", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#iteration-continue'] = {"text": "continue", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#iteration-continue", "export": true, "normative": true, "for_": ["iteration"]};
+window.refsData['https://infra.spec.whatwg.org/#code-point-value'] = {"text": "value", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#code-point-value", "export": true, "normative": true, "for_": ["code point"]};
+window.refsData['https://infra.spec.whatwg.org/#byte-value'] = {"text": "value", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#byte-value", "export": true, "normative": true, "for_": ["byte"]};
+window.refsData['https://infra.spec.whatwg.org/#ascii-code-point'] = {"text": "ascii code point", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-code-point", "export": true, "normative": true, "for_": []};
+window.refsData['#percent-encode'] = {"text": "percent-encode", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#percent-encode", "export": true, "normative": true, "for_": ["byte"]};
+window.refsData['https://infra.spec.whatwg.org/#ascii-digit'] = {"text": "ascii digit", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-digit", "export": true, "normative": true, "for_": []};
+window.refsData['https://encoding.spec.whatwg.org/#utf-8'] = {"text": "utf-8", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "1", "status": "current", "url": "https://encoding.spec.whatwg.org/#utf-8", "export": true, "normative": true, "for_": []};
+window.refsData['#string-percent-encode-after-encoding'] = {"text": "percent-encode after encoding", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#string-percent-encode-after-encoding", "export": true, "normative": true, "for_": ["string"]};
+window.refsData['https://encoding.spec.whatwg.org/#shift_jis'] = {"text": "shift_jis", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "1", "status": "current", "url": "https://encoding.spec.whatwg.org/#shift_jis", "export": true, "normative": true, "for_": []};
+window.refsData['https://encoding.spec.whatwg.org/#iso-2022-jp'] = {"text": "iso-2022-jp", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "1", "status": "current", "url": "https://encoding.spec.whatwg.org/#iso-2022-jp", "export": true, "normative": true, "for_": []};
+window.refsData['#utf-8-percent-encode'] = {"text": "utf-8 percent-encode", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#utf-8-percent-encode", "export": true, "normative": true, "for_": ["code point"]};
+window.refsData['#concept-host'] = {"text": "host", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-host", "export": true, "normative": true, "for_": []};
+window.refsData['#valid-host-string'] = {"text": "valid host string", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#valid-host-string", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-host-parser'] = {"text": "host parser", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-host-parser", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-host-serializer'] = {"text": "host serializer", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-host-serializer", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-host-equals'] = {"text": "equal", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-host-equals", "export": true, "normative": true, "for_": ["host"]};
+window.refsData['#concept-domain'] = {"text": "domain", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-domain", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-ipv4'] = {"text": "ipv4 address", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-ipv4", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-ipv6'] = {"text": "ipv6 address", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-ipv6", "export": true, "normative": true, "for_": []};
+window.refsData['#empty-host'] = {"text": "empty host", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#empty-host", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ascii-string'] = {"text": "ascii string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-string", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list'] = {"text": "list", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list", "export": true, "normative": true, "for_": []};
+window.refsData['#host-public-suffix'] = {"text": "public suffix", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#host-public-suffix", "export": true, "normative": true, "for_": ["host"]};
+window.refsData['#host-registrable-domain'] = {"text": "registrable domain", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#host-registrable-domain", "export": true, "normative": true, "for_": ["host"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#concept-origin'] = {"text": "origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-origin", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#concept-site-same-site'] = {"text": "same site", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-site-same-site", "export": true, "normative": true, "for_": ["site"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#schemelessly-same-site'] = {"text": "schemelessly same site", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#schemelessly-same-site", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.unicode.org/reports/tr46/#ToASCII'] = {"text": "ToASCII", "type": "abstract-op", "spec": "uts46", "shortname": "uts46", "level": "", "status": "anchor-block", "url": "https://www.unicode.org/reports/tr46/#ToASCII", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.unicode.org/reports/tr46/#ToUnicode'] = {"text": "ToUnicode", "type": "abstract-op", "spec": "uts46", "shortname": "uts46", "level": "", "status": "anchor-block", "url": "https://www.unicode.org/reports/tr46/#ToUnicode", "export": true, "normative": true, "for_": []};
+window.refsData['#valid-domain-string'] = {"text": "valid domain string", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#valid-domain-string", "export": true, "normative": true, "for_": []};
+window.refsData['#valid-ipv4-address-string'] = {"text": "valid ipv4-address string", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#valid-ipv4-address-string", "export": true, "normative": true, "for_": []};
+window.refsData['#valid-ipv6-address-string'] = {"text": "valid ipv6-address string", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#valid-ipv6-address-string", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-domain-to-ascii'] = {"text": "domain to ascii", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-domain-to-ascii", "export": true, "normative": true, "for_": []};
+window.refsData['#valid-domain'] = {"text": "valid domain", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#valid-domain", "export": true, "normative": true, "for_": []};
+window.refsData['#url-units'] = {"text": "url units", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#url-units", "export": true, "normative": true, "for_": []};
+window.refsData['#forbidden-host-code-point'] = {"text": "forbidden host code point", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#forbidden-host-code-point", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-ipv6-parser'] = {"text": "ipv6 parser", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-ipv6-parser", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-opaque-host-parser'] = {"text": "opaque-host parser", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-opaque-host-parser", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-ipv4-parser'] = {"text": "ipv4 parser", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-ipv4-parser", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#strictly-split'] = {"text": "strictly split", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#strictly-split", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-item'] = {"text": "item", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-item", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://infra.spec.whatwg.org/#list-size'] = {"text": "size", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-size", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://infra.spec.whatwg.org/#list-remove'] = {"text": "remove", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-remove", "export": true, "normative": true, "for_": ["list", "set"]};
+window.refsData['https://infra.spec.whatwg.org/#list-iterate'] = {"text": "for each", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-iterate", "export": true, "normative": true, "for_": ["list", "set"]};
+window.refsData['#ipv4-number-parser'] = {"text": "ipv4 number parser", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#ipv4-number-parser", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-append", "export": true, "normative": true, "for_": ["list"]};
+window.refsData['#concept-ipv6-piece'] = {"text": "ipv6 piece", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-ipv6-piece", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#iteration-break'] = {"text": "break", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#iteration-break", "export": true, "normative": true, "for_": ["iteration"]};
+window.refsData['#url-code-points'] = {"text": "url code point", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#url-code-points", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-ipv4-serializer'] = {"text": "ipv4 serializer", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-ipv4-serializer", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-ipv6-serializer'] = {"text": "ipv6 serializer", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-ipv6-serializer", "export": true, "normative": true, "for_": []};
+window.refsData['#serialize-an-integer'] = {"text": "serialize an integer", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#serialize-an-integer", "export": true, "normative": true, "for_": []};
+window.refsData['#valid-url-string'] = {"text": "valid url string", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#valid-url-string", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-url-parser'] = {"text": "url parser", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-url-parser", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-url-serializer'] = {"text": "url serializer", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-url-serializer", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-url-equals'] = {"text": "equal", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-url-equals", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['#concept-url-scheme'] = {"text": "scheme", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-url-scheme", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['#concept-url-host'] = {"text": "host", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-url-host", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['#special-scheme'] = {"text": "special scheme", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#special-scheme", "export": true, "normative": true, "for_": []};
+window.refsData['#is-special'] = {"text": "is special", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#is-special", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-is-empty'] = {"text": "is empty", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-is-empty", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://w3c.github.io/FileAPI/#blob-url-entry'] = {"text": "blob url entry", "type": "dfn", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#blob-url-entry", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/FileAPI/#BlobURLStore'] = {"text": "blob url store", "type": "dfn", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#BlobURLStore", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-url-username'] = {"text": "username", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-url-username", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['#concept-url-password'] = {"text": "password", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-url-password", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['#concept-url-blob-entry'] = {"text": "blob url entry", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-url-blob-entry", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['#concept-url-port'] = {"text": "port", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-url-port", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['#url-cannot-be-a-base-url-flag'] = {"text": "cannot-be-a-base-url", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#url-cannot-be-a-base-url-flag", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['#concept-base-url'] = {"text": "base url", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-base-url", "export": true, "normative": true, "for_": []};
+window.refsData['#relative-url-string'] = {"text": "relative-url string", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#relative-url-string", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ascii-alpha'] = {"text": "ascii alpha", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-alpha", "export": true, "normative": true, "for_": []};
+window.refsData['#windows-drive-letter'] = {"text": "windows drive letter", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#windows-drive-letter", "export": true, "normative": true, "for_": []};
+window.refsData['#normalized-windows-drive-letter'] = {"text": "normalized windows drive letter", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#normalized-windows-drive-letter", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#string-length'] = {"text": "length", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#string-length", "export": true, "normative": true, "for_": ["string", "JavaScript string", "scalar value string"]};
+window.refsData['#relative-url-with-fragment-string'] = {"text": "relative-url-with-fragment string", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#relative-url-with-fragment-string", "export": true, "normative": true, "for_": []};
+window.refsData['#absolute-url-with-fragment-string'] = {"text": "absolute-url-with-fragment string", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#absolute-url-with-fragment-string", "export": true, "normative": true, "for_": []};
+window.refsData['#absolute-url-string'] = {"text": "absolute-url string", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#absolute-url-string", "export": true, "normative": true, "for_": []};
+window.refsData['#url-fragment-string'] = {"text": "url-fragment string", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#url-fragment-string", "export": true, "normative": true, "for_": []};
+window.refsData['#url-scheme-string'] = {"text": "url-scheme string", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#url-scheme-string", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ascii-case-insensitive'] = {"text": "ascii case-insensitive", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-case-insensitive", "export": true, "normative": true, "for_": []};
+window.refsData['#scheme-relative-special-url-string'] = {"text": "scheme-relative-special-url string", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#scheme-relative-special-url-string", "export": true, "normative": true, "for_": []};
+window.refsData['#scheme-relative-file-url-string'] = {"text": "scheme-relative-file-url string", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#scheme-relative-file-url-string", "export": true, "normative": true, "for_": []};
+window.refsData['#url-query-string'] = {"text": "url-query string", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#url-query-string", "export": true, "normative": true, "for_": []};
+window.refsData['#path-absolute-url-string'] = {"text": "path-absolute-url string", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#path-absolute-url-string", "export": true, "normative": true, "for_": []};
+window.refsData['#path-relative-scheme-less-url-string'] = {"text": "path-relative-scheme-less-url string", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#path-relative-scheme-less-url-string", "export": true, "normative": true, "for_": []};
+window.refsData['#path-absolute-non-windows-file-url-string'] = {"text": "path-absolute-non-windows-file-url string", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#path-absolute-non-windows-file-url-string", "export": true, "normative": true, "for_": []};
+window.refsData['#scheme-relative-url-string'] = {"text": "scheme-relative-url string", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#scheme-relative-url-string", "export": true, "normative": true, "for_": []};
+window.refsData['#url-port-string'] = {"text": "url-port string", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#url-port-string", "export": true, "normative": true, "for_": []};
+window.refsData['#opaque-host-and-port-string'] = {"text": "opaque-host-and-port string", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#opaque-host-and-port-string", "export": true, "normative": true, "for_": []};
+window.refsData['#valid-opaque-host-string'] = {"text": "valid opaque-host string", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#valid-opaque-host-string", "export": true, "normative": true, "for_": []};
+window.refsData['#path-relative-url-string'] = {"text": "path-relative-url string", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#path-relative-url-string", "export": true, "normative": true, "for_": []};
+window.refsData['#url-path-segment-string'] = {"text": "url-path-segment string", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#url-path-segment-string", "export": true, "normative": true, "for_": []};
+window.refsData['#single-dot-path-segment'] = {"text": "single-dot path segment", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#single-dot-path-segment", "export": true, "normative": true, "for_": []};
+window.refsData['#double-dot-path-segment'] = {"text": "double-dot path segment", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#double-dot-path-segment", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/i18n-glossary/#dfn-surrogate'] = {"text": "surrogates", "type": "dfn", "spec": "i18n-glossary", "shortname": "i18n-glossary", "level": "1", "status": "current", "url": "https://w3c.github.io/i18n-glossary/#dfn-surrogate", "export": true, "normative": false, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#noncharacter'] = {"text": "noncharacter", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#noncharacter", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-basic-url-parser'] = {"text": "basic url parser", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-basic-url-parser", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#c0-control-or-space'] = {"text": "c0 control or space", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#c0-control-or-space", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ascii-tab-or-newline'] = {"text": "ascii tab or newline", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-tab-or-newline", "export": true, "normative": true, "for_": []};
+window.refsData['#scheme-start-state'] = {"text": "scheme start state", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#scheme-start-state", "export": true, "normative": true, "for_": []};
+window.refsData['https://encoding.spec.whatwg.org/#get-an-output-encoding'] = {"text": "get an output encoding", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "1", "status": "current", "url": "https://encoding.spec.whatwg.org/#get-an-output-encoding", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ascii-lowercase'] = {"text": "ascii lowercase", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-lowercase", "export": true, "normative": true, "for_": []};
+window.refsData['#scheme-state'] = {"text": "scheme state", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#scheme-state", "export": true, "normative": true, "for_": []};
+window.refsData['#no-scheme-state'] = {"text": "no scheme state", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#no-scheme-state", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#location'] = {"text": "Location", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#location", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-location-protocol'] = {"text": "protocol", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-location-protocol", "export": true, "normative": true, "for_": ["Location"]};
+window.refsData['#include-credentials'] = {"text": "includes credentials", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#include-credentials", "export": true, "normative": true, "for_": []};
+window.refsData['#default-port'] = {"text": "default port", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#default-port", "export": true, "normative": true, "for_": []};
+window.refsData['#file-state'] = {"text": "file state", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#file-state", "export": true, "normative": true, "for_": []};
+window.refsData['#special-relative-or-authority-state'] = {"text": "special relative or authority state", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#special-relative-or-authority-state", "export": true, "normative": true, "for_": []};
+window.refsData['#special-authority-slashes-state'] = {"text": "special authority slashes state", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#special-authority-slashes-state", "export": true, "normative": true, "for_": []};
+window.refsData['#path-or-authority-state'] = {"text": "path or authority state", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#path-or-authority-state", "export": true, "normative": true, "for_": []};
+window.refsData['#cannot-be-a-base-url-path-state'] = {"text": "cannot-be-a-base-url path state", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#cannot-be-a-base-url-path-state", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-clone'] = {"text": "clone", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-clone", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['#fragment-state'] = {"text": "fragment state", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#fragment-state", "export": true, "normative": true, "for_": []};
+window.refsData['#relative-state'] = {"text": "relative state", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#relative-state", "export": true, "normative": true, "for_": []};
+window.refsData['#special-authority-ignore-slashes-state'] = {"text": "special authority ignore slashes state", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#special-authority-ignore-slashes-state", "export": true, "normative": true, "for_": []};
+window.refsData['#authority-state'] = {"text": "authority state", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#authority-state", "export": true, "normative": true, "for_": []};
+window.refsData['#path-state'] = {"text": "path state", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#path-state", "export": true, "normative": true, "for_": []};
+window.refsData['#relative-slash-state'] = {"text": "relative slash state", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#relative-slash-state", "export": true, "normative": true, "for_": []};
+window.refsData['#query-state'] = {"text": "query state", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#query-state", "export": true, "normative": true, "for_": []};
+window.refsData['#host-state'] = {"text": "host state", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#host-state", "export": true, "normative": true, "for_": []};
+window.refsData['#file-host-state'] = {"text": "file host state", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#file-host-state", "export": true, "normative": true, "for_": []};
+window.refsData['#is-not-special'] = {"text": "is not special", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#is-not-special", "export": true, "normative": true, "for_": []};
+window.refsData['#port-state'] = {"text": "port state", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#port-state", "export": true, "normative": true, "for_": []};
+window.refsData['#hostname-state'] = {"text": "hostname state", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#hostname-state", "export": true, "normative": true, "for_": []};
+window.refsData['#path-start-state'] = {"text": "path start state", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#path-start-state", "export": true, "normative": true, "for_": []};
+window.refsData['#file-slash-state'] = {"text": "file slash state", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#file-slash-state", "export": true, "normative": true, "for_": []};
+window.refsData['#start-with-a-windows-drive-letter'] = {"text": "start with a windows drive letter", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#start-with-a-windows-drive-letter", "export": true, "normative": true, "for_": []};
+window.refsData['#shorten-a-urls-path'] = {"text": "shorten", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#shorten-a-urls-path", "export": true, "normative": true, "for_": []};
+window.refsData['#special-query-percent-encode-set'] = {"text": "special-query percent-encode set", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#special-query-percent-encode-set", "export": true, "normative": true, "for_": []};
+window.refsData['https://encoding.spec.whatwg.org/#iso-2022-jp-encoder'] = {"text": "iso-2022-jp encoder", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "1", "status": "current", "url": "https://encoding.spec.whatwg.org/#iso-2022-jp-encoder", "export": true, "normative": true, "for_": []};
+window.refsData['#url-serializer-exclude-fragment'] = {"text": "exclude fragment", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#url-serializer-exclude-fragment", "export": true, "normative": true, "for_": ["URL serializer"]};
+window.refsData['https://w3c.github.io/FileAPI/#blob-url-entry-environment'] = {"text": "environment", "type": "dfn", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#blob-url-entry-environment", "export": true, "normative": true, "for_": ["blob URL entry"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin'] = {"text": "origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin", "export": true, "normative": true, "for_": ["environment settings object"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#concept-origin-opaque'] = {"text": "opaque origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-origin-opaque", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-url-origin'] = {"text": "origin", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-url-origin", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#same-origin'] = {"text": "same origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#same-origin", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-domain-to-unicode'] = {"text": "domain to unicode", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-domain-to-unicode", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-urlencoded-parser'] = {"text": "urlencoded parser", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-urlencoded-parser", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#LegacyWindowAlias'] = {"text": "LegacyWindowAlias", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#LegacyWindowAlias", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-url-url'] = {"text": "URL(url, base)", "type": "constructor", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#dom-url-url", "export": true, "normative": true, "for_": ["URL"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-USVString'] = {"text": "USVString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-USVString", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-url-href'] = {"text": "href", "type": "attribute", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#dom-url-href", "export": true, "normative": true, "for_": ["URL"]};
+window.refsData['#dom-url-origin'] = {"text": "origin", "type": "attribute", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#dom-url-origin", "export": true, "normative": true, "for_": ["URL"]};
+window.refsData['#dom-url-protocol'] = {"text": "protocol", "type": "attribute", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#dom-url-protocol", "export": true, "normative": true, "for_": ["URL"]};
+window.refsData['#dom-url-username'] = {"text": "username", "type": "attribute", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#dom-url-username", "export": true, "normative": true, "for_": ["URL"]};
+window.refsData['#dom-url-password'] = {"text": "password", "type": "attribute", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#dom-url-password", "export": true, "normative": true, "for_": ["URL"]};
+window.refsData['#dom-url-host'] = {"text": "host", "type": "attribute", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#dom-url-host", "export": true, "normative": true, "for_": ["URL"]};
+window.refsData['#dom-url-hostname'] = {"text": "hostname", "type": "attribute", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#dom-url-hostname", "export": true, "normative": true, "for_": ["URL"]};
+window.refsData['#dom-url-port'] = {"text": "port", "type": "attribute", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#dom-url-port", "export": true, "normative": true, "for_": ["URL"]};
+window.refsData['#dom-url-pathname'] = {"text": "pathname", "type": "attribute", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#dom-url-pathname", "export": true, "normative": true, "for_": ["URL"]};
+window.refsData['#dom-url-search'] = {"text": "search", "type": "attribute", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#dom-url-search", "export": true, "normative": true, "for_": ["URL"]};
+window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
+window.refsData['#urlsearchparams'] = {"text": "URLSearchParams", "type": "interface", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#urlsearchparams", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-url-searchparams'] = {"text": "searchParams", "type": "attribute", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#dom-url-searchparams", "export": true, "normative": true, "for_": ["URL"]};
+window.refsData['#dom-url-hash'] = {"text": "hash", "type": "attribute", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#dom-url-hash", "export": true, "normative": true, "for_": ["URL"]};
+window.refsData['#dom-url-tojson'] = {"text": "toJSON()", "type": "method", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#dom-url-tojson", "export": true, "normative": true, "for_": ["URL"]};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-throw'] = {"text": "throw", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-throw", "export": true, "normative": true, "for_": ["exception"]};
+window.refsData['https://webidl.spec.whatwg.org/#exceptiondef-typeerror'] = {"text": "TypeError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#exceptiondef-typeerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#this'] = {"text": "this", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#this", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-url-url'] = {"text": "url", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-url-url", "export": true, "normative": true, "for_": ["URL"]};
+window.refsData['#concept-url-query-object'] = {"text": "query object", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-url-query-object", "export": true, "normative": true, "for_": ["URL"]};
+window.refsData['#urlsearchparams-initialize'] = {"text": "initialize", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#urlsearchparams-initialize", "export": true, "normative": true, "for_": ["URLSearchParams"]};
+window.refsData['#concept-urlsearchparams-url-object'] = {"text": "url object", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-urlsearchparams-url-object", "export": true, "normative": true, "for_": ["URLSearchParams"]};
+window.refsData['#concept-urlsearchparams-list'] = {"text": "list", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-urlsearchparams-list", "export": true, "normative": true, "for_": ["URLSearchParams"]};
+window.refsData['#concept-urlencoded-string-parser'] = {"text": "urlencoded string parser", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-urlencoded-string-parser", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#ascii-serialisation-of-an-origin'] = {"text": "serialization of an origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#ascii-serialisation-of-an-origin", "export": true, "normative": true, "for_": []};
+window.refsData['#basic-url-parser-url'] = {"text": "url", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#basic-url-parser-url", "export": true, "normative": true, "for_": ["basic URL parser"]};
+window.refsData['#basic-url-parser-state-override'] = {"text": "state override", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#basic-url-parser-state-override", "export": true, "normative": true, "for_": ["basic URL parser"]};
+window.refsData['#cannot-have-a-username-password-port'] = {"text": "cannot have a username/password/port", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#cannot-have-a-username-password-port", "export": true, "normative": true, "for_": []};
+window.refsData['#set-the-username'] = {"text": "set the username", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#set-the-username", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['#set-the-password'] = {"text": "set the password", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#set-the-password", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['#dom-urlsearchparams-urlsearchparams'] = {"text": "URLSearchParams(init)", "type": "constructor", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#dom-urlsearchparams-urlsearchparams", "export": true, "normative": true, "for_": ["URLSearchParams"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-record'] = {"text": "record", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-record", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-urlsearchparams-append'] = {"text": "append(name, value)", "type": "method", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#dom-urlsearchparams-append", "export": true, "normative": true, "for_": ["URLSearchParams"]};
+window.refsData['#dom-urlsearchparams-delete'] = {"text": "delete(name)", "type": "method", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#dom-urlsearchparams-delete", "export": true, "normative": true, "for_": ["URLSearchParams"]};
+window.refsData['#dom-urlsearchparams-get'] = {"text": "get(name)", "type": "method", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#dom-urlsearchparams-get", "export": true, "normative": true, "for_": ["URLSearchParams"]};
+window.refsData['#dom-urlsearchparams-getall'] = {"text": "getAll(name)", "type": "method", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#dom-urlsearchparams-getall", "export": true, "normative": true, "for_": ["URLSearchParams"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-urlsearchparams-has'] = {"text": "has(name)", "type": "method", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#dom-urlsearchparams-has", "export": true, "normative": true, "for_": ["URLSearchParams"]};
+window.refsData['#dom-urlsearchparams-set'] = {"text": "set(name, value)", "type": "method", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#dom-urlsearchparams-set", "export": true, "normative": true, "for_": ["URLSearchParams"]};
+window.refsData['#dom-urlsearchparams-sort'] = {"text": "sort()", "type": "method", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#dom-urlsearchparams-sort", "export": true, "normative": true, "for_": ["URLSearchParams"]};
+window.refsData['#urlsearchparams-stringification-behavior'] = {"text": "stringification behavior", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#urlsearchparams-stringification-behavior", "export": true, "normative": true, "for_": ["URLSearchParams"]};
+window.refsData['#concept-urlencoded'] = {"text": "application/x-www-form-urlencoded", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-urlencoded", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#map-iterate'] = {"text": "for each", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-iterate", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['#concept-urlencoded-serializer'] = {"text": "urlencoded serializer", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-urlencoded-serializer", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-urlsearchparams-update'] = {"text": "update", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "local", "url": "#concept-urlsearchparams-update", "export": true, "normative": true, "for_": ["URLSearchParams"]};
+window.refsData['https://infra.spec.whatwg.org/#list-contain'] = {"text": "contain", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-contain", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-value-pairs-to-iterate-over'] = {"text": "value pairs to iterate over", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-value-pairs-to-iterate-over", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/server-sent-events.html#eventsource'] = {"text": "EventSource", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/server-sent-events.html#eventsource", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#hashchangeevent'] = {"text": "HashChangeEvent", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#hashchangeevent", "export": true, "normative": true, "for_": []};
 </script>

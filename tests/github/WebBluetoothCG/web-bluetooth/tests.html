@@ -476,6 +476,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -1094,8 +1131,6 @@ implementation begins development. <a class="issue-return" href="#issue-4d7cfd5e
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -1343,7 +1378,6 @@ implementation begins development. <a class="issue-return" href="#issue-4d7cfd5e
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -1730,4 +1764,257 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#window'] = {"text": "Window", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window", "export": true, "normative": true, "for_": []};
+window.refsData['#testrunner'] = {"text": "TestRunner", "type": "interface", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#testrunner", "export": true, "normative": true, "for_": []};
+window.refsData['#eventsender'] = {"text": "EventSender", "type": "interface", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#eventsender", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-testrunner-setbluetoothmockdataset'] = {"text": "setBluetoothMockDataSet(dataSetName)", "type": "method", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#dom-testrunner-setbluetoothmockdataset", "export": true, "normative": true, "for_": ["TestRunner"]};
+window.refsData['#dom-testrunner-setbluetoothmanualchooser'] = {"text": "setBluetoothManualChooser()", "type": "method", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#dom-testrunner-setbluetoothmanualchooser", "export": true, "normative": true, "for_": ["TestRunner"]};
+window.refsData['#dom-testrunner-getbluetoothmanualchooserevents'] = {"text": "getBluetoothManualChooserEvents(callback)", "type": "method", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#dom-testrunner-getbluetoothmanualchooserevents", "export": true, "normative": true, "for_": ["TestRunner"]};
+window.refsData['#callbackdef-bluetoothmanualchoosereventscallback'] = {"text": "BluetoothManualChooserEventsCallback", "type": "callback", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#callbackdef-bluetoothmanualchoosereventscallback", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-testrunner-sendbluetoothmanualchooserevent'] = {"text": "sendBluetoothManualChooserEvent(event, argument)", "type": "method", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#dom-testrunner-sendbluetoothmanualchooserevent", "export": true, "normative": true, "for_": ["TestRunner"]};
+window.refsData['https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetooth-requestdevice'] = {"text": "requestDevice()", "type": "method", "spec": "web-bluetooth", "shortname": "web-bluetooth", "level": "1", "status": "current", "url": "https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetooth-requestdevice", "export": true, "normative": true, "for_": ["Bluetooth"]};
+window.refsData['#dom-testrunner-setbluetoothmockdataset-datasetname-datasetname'] = {"text": "dataSetName", "type": "argument", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#dom-testrunner-setbluetoothmockdataset-datasetname-datasetname", "export": true, "normative": true, "for_": ["TestRunner/setBluetoothMockDataSet(dataSetName)"]};
+window.refsData['https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.glucose.xml#'] = {"text": "org.bluetooth.service.glucose", "type": "enum", "spec": "bluetooth-assigned", "shortname": "bluetooth-assigned", "level": "", "status": "anchor-block", "url": "https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.glucose.xml#", "export": true, "normative": true, "for_": []};
+window.refsData['https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.heart_rate.xml#'] = {"text": "org.bluetooth.service.heart_rate", "type": "enum", "spec": "bluetooth-assigned", "shortname": "bluetooth-assigned", "level": "", "status": "anchor-block", "url": "https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.heart_rate.xml#", "export": true, "normative": true, "for_": []};
+window.refsData['https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.battery_service.xml#'] = {"text": "org.bluetooth.service.battery_service", "type": "enum", "spec": "bluetooth-assigned", "shortname": "bluetooth-assigned", "level": "", "status": "anchor-block", "url": "https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.battery_service.xml#", "export": true, "normative": true, "for_": []};
+window.refsData['#batterydevice'] = {"text": "batterydevice", "type": "dfn", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#batterydevice", "export": true, "normative": true, "for_": []};
+window.refsData['#heartratedevice'] = {"text": "heartratedevice", "type": "dfn", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#heartratedevice", "export": true, "normative": true, "for_": []};
+window.refsData['#glucosedevice'] = {"text": "glucosedevice", "type": "dfn", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#glucosedevice", "export": true, "normative": true, "for_": []};
+window.refsData['#missingservicegenericaccessdevice'] = {"text": "missingservicegenericaccessdevice", "type": "dfn", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#missingservicegenericaccessdevice", "export": true, "normative": true, "for_": []};
+window.refsData['#missingcharacteristicgenericaccessdevice'] = {"text": "missingcharacteristicgenericaccessdevice", "type": "dfn", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#missingcharacteristicgenericaccessdevice", "export": true, "normative": true, "for_": []};
+window.refsData['#missingdescriptorgenericaccessdevice'] = {"text": "missingdescriptorgenericaccessdevice", "type": "dfn", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#missingdescriptorgenericaccessdevice", "export": true, "normative": true, "for_": []};
+window.refsData['#genericaccessdevice'] = {"text": "genericaccessdevice", "type": "dfn", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#genericaccessdevice", "export": true, "normative": true, "for_": []};
+window.refsData['#failinggattoperationsdevice'] = {"text": "failinggattoperationsdevice", "type": "dfn", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#failinggattoperationsdevice", "export": true, "normative": true, "for_": []};
+window.refsData['https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.generic_access.xml#'] = {"text": "org.bluetooth.service.generic_access", "type": "enum", "spec": "bluetooth-assigned", "shortname": "bluetooth-assigned", "level": "", "status": "anchor-block", "url": "https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.generic_access.xml#", "export": true, "normative": true, "for_": []};
+window.refsData['https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.gap.device_name.xml#'] = {"text": "org.bluetooth.characteristic.gap.device_name", "type": "enum", "spec": "bluetooth-assigned", "shortname": "bluetooth-assigned", "level": "", "status": "anchor-block", "url": "https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.gap.device_name.xml#", "export": true, "normative": true, "for_": []};
+window.refsData['https://developer.bluetooth.org/gatt/descriptors/Pages/DescriptorViewer.aspx?u=org.bluetooth.descriptor.gatt.characteristic_extended_properties.xml#'] = {"text": "org.bluetooth.descriptor.gatt.characteristic_extended_properties", "type": "enum", "spec": "bluetooth-assigned", "shortname": "bluetooth-assigned", "level": "", "status": "anchor-block", "url": "https://developer.bluetooth.org/gatt/descriptors/Pages/DescriptorViewer.aspx?u=org.bluetooth.descriptor.gatt.characteristic_extended_properties.xml#", "export": true, "normative": true, "for_": []};
+window.refsData['https://developer.bluetooth.org/gatt/descriptors/Pages/DescriptorViewer.aspx?u=org.bluetooth.descriptor.gatt.characteristic_user_description.xml#'] = {"text": "org.bluetooth.descriptor.gatt.characteristic_user_description", "type": "enum", "spec": "bluetooth-assigned", "shortname": "bluetooth-assigned", "level": "", "status": "anchor-block", "url": "https://developer.bluetooth.org/gatt/descriptors/Pages/DescriptorViewer.aspx?u=org.bluetooth.descriptor.gatt.characteristic_user_description.xml#", "export": true, "normative": true, "for_": []};
+window.refsData['https://webbluetoothcg.github.io/web-bluetooth/#valid-uuid'] = {"text": "valid uuid", "type": "dfn", "spec": "web-bluetooth", "shortname": "web-bluetooth", "level": "1", "status": "current", "url": "https://webbluetoothcg.github.io/web-bluetooth/#valid-uuid", "export": false, "normative": true, "for_": []};
+window.refsData['#abstract-opdef-erroruuid'] = {"text": "errorUUID", "type": "abstract-op", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#abstract-opdef-erroruuid", "export": true, "normative": true, "for_": []};
+window.refsData['#manual-chooser'] = {"text": "manual chooser", "type": "dfn", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#manual-chooser", "export": true, "normative": true, "for_": []};
+window.refsData['https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetoothdevice-id'] = {"text": "id", "type": "attribute", "spec": "web-bluetooth", "shortname": "web-bluetooth", "level": "1", "status": "current", "url": "https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetoothdevice-id", "export": true, "normative": false, "for_": ["BluetoothDevice"]};
+window.refsData['https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetoothdevice-name'] = {"text": "name", "type": "attribute", "spec": "web-bluetooth", "shortname": "web-bluetooth", "level": "1", "status": "current", "url": "https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetoothdevice-name", "export": true, "normative": false, "for_": ["BluetoothDevice"]};
+window.refsData['#dom-testrunner-sendbluetoothmanualchooserevent-event-argument-event'] = {"text": "event", "type": "argument", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#dom-testrunner-sendbluetoothmanualchooserevent-event-argument-event", "export": true, "normative": true, "for_": ["TestRunner/sendBluetoothManualChooserEvent(event, argument)"]};
+window.refsData['#dom-testrunner-sendbluetoothmanualchooserevent-event-argument-argument'] = {"text": "argument", "type": "argument", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#dom-testrunner-sendbluetoothmanualchooserevent-event-argument-argument", "export": true, "normative": true, "for_": ["TestRunner/sendBluetoothManualChooserEvent(event, argument)"]};
+window.refsData['#dom-eventsender-keydown'] = {"text": "keyDown(code)", "type": "method", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#dom-eventsender-keydown", "export": true, "normative": true, "for_": ["EventSender"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-event-fire'] = {"text": "fire an event", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-event-fire", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/uievents/#event-type-keypress'] = {"text": "keypress", "type": "event", "spec": "ui-events", "shortname": "ui-events", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/uievents/#event-type-keypress", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/dom.html#the-body-element-2'] = {"text": "the body element", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dom.html#the-body-element-2", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/uievents/#widl-KeyboardEvent-key'] = {"text": "key", "type": "attribute", "spec": "ui-events", "shortname": "ui-events", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/uievents/#widl-KeyboardEvent-key", "export": true, "normative": true, "for_": ["KeyboardEvent"]};
+window.refsData['#dom-eventsender-keydown-code-code'] = {"text": "code", "type": "argument", "spec": "testing-web-bluetooth-1", "shortname": "testing-web-bluetooth", "level": "1", "status": "local", "url": "#dom-eventsender-keydown-code-code", "export": true, "normative": true, "for_": ["EventSender/keyDown(code)"]};
 </script>

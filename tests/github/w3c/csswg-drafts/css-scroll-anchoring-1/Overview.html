@@ -692,6 +692,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -1574,8 +1611,6 @@ introduces no new privacy or security considerations.</p>
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -1823,7 +1858,6 @@ introduces no new privacy or security considerations.</p>
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -2270,6 +2304,275 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://drafts.csswg.org/cssom-view-1/#scrolling-box'] = {"text": "scrolling box", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-view-1/#scrolling-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-scroll-snap-1/#scroll-snap'] = {"text": "scroll snap", "type": "dfn", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-scroll-snap-1/#scroll-snap", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-scroll-snap-1/#re-snap'] = {"text": "re-snap", "type": "dfn", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-scroll-snap-1/#re-snap", "export": true, "normative": true, "for_": []};
+window.refsData['#scroll-anchoring-anchor-node'] = {"text": "anchor node", "type": "dfn", "spec": "css-scroll-anchoring-1", "shortname": "css-scroll-anchoring", "level": "1", "status": "local", "url": "#scroll-anchoring-anchor-node", "export": true, "normative": true, "for_": ["scroll-anchoring"]};
+window.refsData['https://drafts.csswg.org/css-scroll-snap-1/#optimal-viewing-region'] = {"text": "optimal viewing region", "type": "dfn", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-scroll-snap-1/#optimal-viewing-region", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-scroll-snap-1/#propdef-scroll-padding'] = {"text": "scroll-padding", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-scroll-snap-1/#propdef-scroll-padding", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#content-area'] = {"text": "content area", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#content-area", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#box'] = {"text": "box", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#box", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://drafts.csswg.org/css-display-4/#atomic-inline'] = {"text": "atomic inline", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#atomic-inline", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-tree-descendant'] = {"text": "descendant", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-tree-descendant", "export": true, "normative": true, "for_": ["tree"]};
+window.refsData['#partially-visible'] = {"text": "partially visible", "type": "dfn", "spec": "css-scroll-anchoring-1", "shortname": "css-scroll-anchoring", "level": "1", "status": "local", "url": "#partially-visible", "export": true, "normative": true, "for_": []};
+window.refsData['#fully-visible'] = {"text": "fully visible", "type": "dfn", "spec": "css-scroll-anchoring-1", "shortname": "css-scroll-anchoring", "level": "1", "status": "local", "url": "#fully-visible", "export": true, "normative": true, "for_": []};
+window.refsData['#excluded-subtree'] = {"text": "excluded subtree", "type": "dfn", "spec": "css-scroll-anchoring-1", "shortname": "css-scroll-anchoring", "level": "1", "status": "local", "url": "#excluded-subtree", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#dom-anchor'] = {"text": "dom anchor", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#dom-anchor", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#focused-area-of-the-document'] = {"text": "focused area of the document", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#focused-area-of-the-document", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/editing/docs/execCommand/index.html#editable'] = {"text": "editable", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/editing/docs/execCommand/index.html#editable", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#editing-host'] = {"text": "editing host", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/interaction.html#editing-host", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#concept-fe-mutable'] = {"text": "mutable", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#concept-fe-mutable", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/form-elements.html#the-textarea-element'] = {"text": "textarea", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/form-elements.html#the-textarea-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/input.html#the-input-element'] = {"text": "input", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/input.html#the-input-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#fip-active-match'] = {"text": "active match", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#fip-active-match", "export": true, "normative": true, "for_": []};
+window.refsData['#anchor-priority-candidates'] = {"text": "priority candidates", "type": "dfn", "spec": "css-scroll-anchoring-1", "shortname": "css-scroll-anchoring", "level": "1", "status": "local", "url": "#anchor-priority-candidates", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-overflow-anchor'] = {"text": "overflow-anchor", "type": "property", "spec": "css-scroll-anchoring-1", "shortname": "css-scroll-anchoring", "level": "1", "status": "local", "url": "#propdef-overflow-anchor", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-overflow-anchor-none'] = {"text": "none", "type": "value", "spec": "css-scroll-anchoring-1", "shortname": "css-scroll-anchoring", "level": "1", "status": "local", "url": "#valdef-overflow-anchor-none", "export": true, "normative": true, "for_": ["overflow-anchor"]};
+window.refsData['#anchor-viable-candidate'] = {"text": "viable candidate", "type": "dfn", "spec": "css-scroll-anchoring-1", "shortname": "css-scroll-anchoring", "level": "1", "status": "local", "url": "#anchor-viable-candidate", "export": true, "normative": true, "for_": []};
+window.refsData['#candidate-examination'] = {"text": "candidate examination algorithm", "type": "dfn", "spec": "css-scroll-anchoring-1", "shortname": "css-scroll-anchoring", "level": "1", "status": "local", "url": "#candidate-examination", "export": true, "normative": true, "for_": []};
+window.refsData['#fully-clipped'] = {"text": "fully clipped", "type": "dfn", "spec": "css-scroll-anchoring-1", "shortname": "css-scroll-anchoring", "level": "1", "status": "local", "url": "#fully-clipped", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#containing-block'] = {"text": "containing block", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#containing-block", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#propdef-display'] = {"text": "display", "type": "property", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#propdef-display", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#valdef-display-none'] = {"text": "none", "type": "value", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#valdef-display-none", "export": true, "normative": true, "for_": ["display", "<display-box>"]};
+window.refsData['https://drafts.csswg.org/css-position-3/#propdef-position'] = {"text": "position", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#valdef-position-fixed'] = {"text": "fixed", "type": "value", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#valdef-position-fixed", "export": true, "normative": true, "for_": ["position"]};
+window.refsData['https://drafts.csswg.org/css-position-3/#valdef-position-absolute'] = {"text": "absolute", "type": "value", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#valdef-position-absolute", "export": true, "normative": true, "for_": ["position"]};
+window.refsData['#scroll-anchoring-bounding-rect'] = {"text": "scroll anchoring bounding rect", "type": "dfn", "spec": "css-scroll-anchoring-1", "shortname": "css-scroll-anchoring", "level": "1", "status": "local", "url": "#scroll-anchoring-bounding-rect", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#scrollable-overflow-rectangle'] = {"text": "scrollable overflow rectangle", "type": "dfn", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#scrollable-overflow-rectangle", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#block-flow-direction'] = {"text": "block flow direction", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-flow-direction", "export": true, "normative": true, "for_": []};
+window.refsData['#suppression-window'] = {"text": "suppression window", "type": "dfn", "spec": "css-scroll-anchoring-1", "shortname": "css-scroll-anchoring", "level": "1", "status": "local", "url": "#suppression-window", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-view-1/#eventdef-document-scroll'] = {"text": "scroll", "type": "event", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-view-1/#eventdef-document-scroll", "export": true, "normative": true, "for_": ["Document", "Element", "VisualViewport"]};
+window.refsData['https://drafts.csswg.org/cssom-view-1/#dom-element-getboundingclientrect'] = {"text": "getBoundingClientRect()", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-view-1/#dom-element-getboundingclientrect", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['#suppression-trigger'] = {"text": "suppression trigger", "type": "dfn", "spec": "css-scroll-anchoring-1", "shortname": "css-scroll-anchoring", "level": "1", "status": "local", "url": "#suppression-trigger", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#propdef-top'] = {"text": "top", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-top", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#propdef-left'] = {"text": "left", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-left", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#propdef-right'] = {"text": "right", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-right", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#propdef-bottom'] = {"text": "bottom", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-bottom", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#propdef-margin'] = {"text": "margin", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#propdef-margin", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#propdef-padding'] = {"text": "padding", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#propdef-padding", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-width'] = {"text": "width", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-width", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-height'] = {"text": "height", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-height", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-min-width'] = {"text": "min-width", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-min-width", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-max-width'] = {"text": "max-width", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-max-width", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-min-height'] = {"text": "min-height", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-min-height", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-max-height'] = {"text": "max-height", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-max-height", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-transforms-1/#propdef-transform'] = {"text": "transform", "type": "property", "spec": "css-transforms-1", "shortname": "css-transforms", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transforms-1/#propdef-transform", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
+window.refsData['#anchoring-algorithm'] = {"text": "anchor node selection algorithm", "type": "dfn", "spec": "css-scroll-anchoring-1", "shortname": "css-scroll-anchoring", "level": "1", "status": "local", "url": "#anchoring-algorithm", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#scroll-container'] = {"text": "scroll container", "type": "dfn", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#scroll-container", "export": true, "normative": true, "for_": []};window.refsData['#propdef-overflow-anchor'] = {"text": "overflow-anchor", "type": "property", "spec": "css-scroll-anchoring-1", "shortname": "css-scroll-anchoring", "level": "1", "status": "local", "url": "#propdef-overflow-anchor", "export": true, "normative": true, "for_": []};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

@@ -473,6 +473,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -2512,8 +2549,6 @@ instead of document’s scrolling Element for <code>auto</code>. <a href="https:
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -2761,7 +2796,6 @@ instead of document’s scrolling Element for <code>auto</code>. <a href="https:
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -3213,4 +3247,326 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://w3c.github.io/web-animations/#concept-animation'] = {"text": "animation", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/web-animations/#concept-animation", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/web-animations/#timeline'] = {"text": "timeline", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/web-animations/#timeline", "export": true, "normative": true, "for_": []};
+window.refsData['#scroll-timeline'] = {"text": "scroll timeline", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#scroll-timeline", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-animations-1/#propdef-animation'] = {"text": "animation", "type": "property", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#propdef-animation", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-animations-2/#propdef-animation-timeline'] = {"text": "animation-timeline", "type": "property", "spec": "css-animations-2", "shortname": "css-animations", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-animations-2/#propdef-animation-timeline", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-scrolldirection'] = {"text": "ScrollDirection", "type": "enum", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#enumdef-scrolldirection", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#block-axis'] = {"text": "block axis", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-axis", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#inline-axis'] = {"text": "inline axis", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-axis", "export": true, "normative": true, "for_": []};
+window.refsData['#scrolltimeline'] = {"text": "ScrollTimeline", "type": "interface", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#scrolltimeline", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.css-houdini.org/css-typed-om-1/#cssnumericvalue'] = {"text": "CSSNumericValue", "type": "interface", "spec": "css-typed-om-1", "shortname": "css-typed-om", "level": "1", "status": "current", "url": "https://drafts.css-houdini.org/css-typed-om-1/#cssnumericvalue", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.css-houdini.org/css-typed-om-1/#typedefdef-csskeywordish'] = {"text": "CSSKeywordish", "type": "typedef", "spec": "css-typed-om-1", "shortname": "css-typed-om", "level": "1", "status": "current", "url": "https://drafts.css-houdini.org/css-typed-om-1/#typedefdef-csskeywordish", "export": true, "normative": true, "for_": []};
+window.refsData['#typedefdef-containerbasedoffset'] = {"text": "ContainerBasedOffset", "type": "typedef", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#typedefdef-containerbasedoffset", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-elementbasedoffset'] = {"text": "ElementBasedOffset", "type": "dictionary", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dictdef-elementbasedoffset", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#element'] = {"text": "Element", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#element", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['#typedefdef-scrolltimelineoffset'] = {"text": "ScrollTimelineOffset", "type": "typedef", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#typedefdef-scrolltimelineoffset", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-double'] = {"text": "double", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-double", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-scrolltimelineautokeyword'] = {"text": "ScrollTimelineAutoKeyword", "type": "enum", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#enumdef-scrolltimelineautokeyword", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#animationtimeline'] = {"text": "AnimationTimeline", "type": "interface", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#animationtimeline", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-scrolltimeline-scrolltimeline'] = {"text": "ScrollTimeline(options)", "type": "constructor", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-scrolltimeline-scrolltimeline", "export": true, "normative": true, "for_": ["ScrollTimeline"]};
+window.refsData['#dictdef-scrolltimelineoptions'] = {"text": "ScrollTimelineOptions", "type": "dictionary", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dictdef-scrolltimelineoptions", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-scrolltimeline-source'] = {"text": "source", "type": "attribute", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-scrolltimeline-source", "export": true, "normative": true, "for_": ["ScrollTimeline"]};
+window.refsData['#dom-scrolltimeline-orientation'] = {"text": "orientation", "type": "attribute", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-scrolltimeline-orientation", "export": true, "normative": true, "for_": ["ScrollTimeline"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-frozen-array'] = {"text": "FrozenArray", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-scrolltimeline-scrolloffsets'] = {"text": "scrollOffsets", "type": "attribute", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-scrolltimeline-scrolloffsets", "export": true, "normative": true, "for_": ["ScrollTimeline"]};
+window.refsData['#dom-scrolltimeline-timerange'] = {"text": "timeRange", "type": "attribute", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-scrolltimeline-timerange", "export": true, "normative": true, "for_": ["ScrollTimeline"]};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#scroll-container'] = {"text": "scroll container", "type": "dfn", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#scroll-container", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-view-1/#dom-document-scrollingelement'] = {"text": "scrollingElement", "type": "attribute", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-view-1/#dom-document-scrollingelement", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#concept-document-window'] = {"text": "document associated with a window", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-document-window", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#window'] = {"text": "Window", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object'] = {"text": "current global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object", "export": true, "normative": true, "for_": []};
+window.refsData['#scroll-timeline-offset'] = {"text": "scroll timeline offset", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#scroll-timeline-offset", "export": true, "normative": true, "for_": []};
+window.refsData['#effective-scroll-offset'] = {"text": "effective scroll offset", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#effective-scroll-offset", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.css-houdini.org/css-typed-om-1/#rectify-a-keywordish-value'] = {"text": "rectify a keywordish value", "type": "dfn", "spec": "css-typed-om-1", "shortname": "css-typed-om", "level": "1", "status": "current", "url": "https://drafts.css-houdini.org/css-typed-om-1/#rectify-a-keywordish-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.css-houdini.org/css-typed-om-1/#csskeywordvalue'] = {"text": "CSSKeywordValue", "type": "interface", "spec": "css-typed-om-1", "shortname": "css-typed-om", "level": "1", "status": "current", "url": "https://drafts.css-houdini.org/css-typed-om-1/#csskeywordvalue", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.css-houdini.org/css-typed-om-1/#cssstylevalue-match-a-grammar'] = {"text": "match the grammar", "type": "dfn", "spec": "css-typed-om-1", "shortname": "css-typed-om", "level": "1", "status": "current", "url": "https://drafts.css-houdini.org/css-typed-om-1/#cssstylevalue-match-a-grammar", "export": true, "normative": true, "for_": ["CSSStyleValue"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#typedef-length-percentage'] = {"text": "<length-percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#typedef-length-percentage", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMException'] = {"text": "DOMException", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMException", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#syntaxerror'] = {"text": "SyntaxError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#syntaxerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/web-animations/#duration'] = {"text": "duration", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/web-animations/#duration", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/web-animations/#start-delay'] = {"text": "start delay", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/web-animations/#start-delay", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-edge-start'] = {"text": "\"start\"", "type": "enum-value", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-edge-start", "export": true, "normative": true, "for_": ["Edge"]};
+window.refsData['#dom-edge-end'] = {"text": "\"end\"", "type": "enum-value", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-edge-end", "export": true, "normative": true, "for_": ["Edge"]};
+window.refsData['#effective-time-range'] = {"text": "effective time range", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#effective-time-range", "export": true, "normative": true, "for_": []};
+window.refsData['#container-based-offset'] = {"text": "container-based offset", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#container-based-offset", "export": true, "normative": true, "for_": []};
+window.refsData['#element-based-offset'] = {"text": "element-based offset", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#element-based-offset", "export": true, "normative": true, "for_": []};
+window.refsData['#resolve-a-container-based-offset'] = {"text": "resolve a container-based offset", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#resolve-a-container-based-offset", "export": true, "normative": true, "for_": []};
+window.refsData['#resolve-an-element-based-offset'] = {"text": "resolve an element-based offset", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#resolve-an-element-based-offset", "export": true, "normative": true, "for_": []};
+window.refsData['#effective-scroll-offsets'] = {"text": "effective scroll offsets", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#effective-scroll-offsets", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-view/#css-layout-box'] = {"text": "css layout box", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/cssom-view/#css-layout-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#funcdef-calc'] = {"text": "calc()", "type": "function", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#funcdef-calc", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#length-value'] = {"text": "<length>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#length-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-view-1/#scrolling-box'] = {"text": "scrolling box", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-view-1/#scrolling-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#padding-box'] = {"text": "padding box", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#padding-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-view/#overflow-directions'] = {"text": "overflow direction", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/cssom-view/#overflow-directions", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-elementbasedoffset-target'] = {"text": "target", "type": "dict-member", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-elementbasedoffset-target", "export": true, "normative": true, "for_": ["ElementBasedOffset"]};
+window.refsData['#enumdef-edge'] = {"text": "Edge", "type": "enum", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#enumdef-edge", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-elementbasedoffset-edge'] = {"text": "edge", "type": "dict-member", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-elementbasedoffset-edge", "export": true, "normative": true, "for_": ["ElementBasedOffset"]};
+window.refsData['#dom-elementbasedoffset-threshold'] = {"text": "threshold", "type": "dict-member", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-elementbasedoffset-threshold", "export": true, "normative": true, "for_": ["ElementBasedOffset"]};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#scrollport'] = {"text": "scrollport", "type": "dfn", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#scrollport", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/web-animations/#target-effect-end'] = {"text": "target effect end", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/web-animations/#target-effect-end", "export": true, "normative": true, "for_": []};
+window.refsData['#resolve-a-scroll-timeline-offset'] = {"text": "resolve a scroll timeline offset", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#resolve-a-scroll-timeline-offset", "export": true, "normative": true, "for_": []};
+window.refsData['#resolve-scroll-timeline-offsets'] = {"text": "resolve scroll timeline offsets", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#resolve-scroll-timeline-offsets", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/web-animations/#current-time'] = {"text": "current time", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/web-animations/#current-time", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-animations-1/#interface-csskeyframesrule-findrule'] = {"text": "findrule", "type": "dfn", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/css-animations-1/#interface-csskeyframesrule-findrule", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-animations-1/#csskeyframerule'] = {"text": "csskeyframerule", "type": "dfn", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "anchor-block", "url": "https://drafts.csswg.org/css-animations-1/#csskeyframerule", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/web-animations/#timeline-phase'] = {"text": "phase", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/web-animations/#timeline-phase", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/web-animations/#timeline-inactive-phase'] = {"text": "inactive phase", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/web-animations/#timeline-inactive-phase", "export": true, "normative": true, "for_": []};
+window.refsData['#effective-start-offset'] = {"text": "effective start offset", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#effective-start-offset", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/web-animations/#timeline-before-phase'] = {"text": "before phase", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/web-animations/#timeline-before-phase", "export": true, "normative": true, "for_": []};
+window.refsData['#effective-end-offset'] = {"text": "effective end offset", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#effective-end-offset", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/web-animations/#timeline-after-phase'] = {"text": "after phase", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/web-animations/#timeline-after-phase", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/web-animations/#timeline-active-phase'] = {"text": "active phase", "type": "dfn", "spec": "web-animations", "shortname": "web-animations", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/web-animations/#timeline-active-phase", "export": true, "normative": true, "for_": []};
+window.refsData['#calculate-scroll-timeline-progress'] = {"text": "calculate scroll timeline progress", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#calculate-scroll-timeline-progress", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#typedef-declaration-list'] = {"text": "<declaration-list>", "type": "type", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#typedef-declaration-list", "export": true, "normative": true, "for_": []};
+window.refsData['#at-ruledef-scroll-timeline'] = {"text": "@scroll-timeline", "type": "at-rule", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#at-ruledef-scroll-timeline", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#identifier-value'] = {"text": "<custom-ident>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#identifier-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#string-value'] = {"text": "<string>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#string-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-shadow-tree'] = {"text": "shadow tree", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-shadow-tree", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/selectors-4/#typedef-id-selector'] = {"text": "<id-selector>", "type": "type", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#typedef-id-selector", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-scroll-timeline-offset'] = {"text": "<scroll-timeline-offset>", "type": "type", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#typedef-scroll-timeline-offset", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-comma'] = {"text": "#", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-comma", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-element-offset'] = {"text": "<element-offset>", "type": "type", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#typedef-element-offset", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-element-offset-edge'] = {"text": "<element-offset-edge>", "type": "type", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#typedef-element-offset-edge", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#number-value'] = {"text": "<number>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#number-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#time-value'] = {"text": "<time>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#time-value", "export": true, "normative": true, "for_": []};
+window.refsData['#cssscrolltimelinerule'] = {"text": "CSSScrollTimelineRule", "type": "interface", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#cssscrolltimelinerule", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#cssrule'] = {"text": "CSSRule", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssrule", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#cssomstring'] = {"text": "CSSOMString", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssomstring", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cssscrolltimelinerule-name'] = {"text": "name", "type": "attribute", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-cssscrolltimelinerule-name", "export": true, "normative": true, "for_": ["CSSScrollTimelineRule"]};
+window.refsData['#dom-cssscrolltimelinerule-source'] = {"text": "source", "type": "attribute", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-cssscrolltimelinerule-source", "export": true, "normative": true, "for_": ["CSSScrollTimelineRule"]};
+window.refsData['#dom-cssscrolltimelinerule-orientation'] = {"text": "orientation", "type": "attribute", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-cssscrolltimelinerule-orientation", "export": true, "normative": true, "for_": ["CSSScrollTimelineRule"]};
+window.refsData['#dom-cssscrolltimelinerule-scrolloffsets'] = {"text": "scrollOffsets", "type": "attribute", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-cssscrolltimelinerule-scrolloffsets", "export": true, "normative": true, "for_": ["CSSScrollTimelineRule"]};
+window.refsData['#dom-cssscrolltimelinerule-timerange'] = {"text": "timeRange", "type": "attribute", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#dom-cssscrolltimelinerule-timerange", "export": true, "normative": true, "for_": ["CSSScrollTimelineRule"]};
+window.refsData['https://drafts.csswg.org/cssom-1/#serialize-an-identifier'] = {"text": "serialize an identifier", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#serialize-an-identifier", "export": true, "normative": true, "for_": []};
+window.refsData['#serialize-a-selector-function'] = {"text": "serialize a selector() function", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#serialize-a-selector-function", "export": true, "normative": true, "for_": []};
+window.refsData['#serialize-a-scroll-timeline-offset'] = {"text": "serialize a scroll timeline offset", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#serialize-a-scroll-timeline-offset", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#serialize-a-css-component-value'] = {"text": "serialize a css component value", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#serialize-a-css-component-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#serialize-a-selector'] = {"text": "serialize a selector", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#serialize-a-selector", "export": true, "normative": true, "for_": []};
+window.refsData['#layout-cycles'] = {"text": "layout cycles", "type": "dfn", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#layout-cycles", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html#dom-animationframeprovider-requestanimationframe'] = {"text": "requestAnimationFrame(callback)", "type": "method", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html#dom-animationframeprovider-requestanimationframe", "export": true, "normative": true, "for_": ["AnimationFrameProvider"]};window.refsData['#at-ruledef-scroll-timeline'] = {"text": "@scroll-timeline", "type": "at-rule", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#at-ruledef-scroll-timeline", "export": true, "normative": true, "for_": []};
+window.refsData['#descdef-scroll-timeline-orientation'] = {"text": "orientation", "type": "descriptor", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#descdef-scroll-timeline-orientation", "export": true, "normative": true, "for_": ["@scroll-timeline"]};
+window.refsData['#descdef-scroll-timeline-scroll-offsets'] = {"text": "scroll-offsets", "type": "descriptor", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#descdef-scroll-timeline-scroll-offsets", "export": true, "normative": true, "for_": ["@scroll-timeline"]};
+window.refsData['#descdef-scroll-timeline-source'] = {"text": "source", "type": "descriptor", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#descdef-scroll-timeline-source", "export": true, "normative": true, "for_": ["@scroll-timeline"]};
+window.refsData['#descdef-scroll-timeline-time-range'] = {"text": "time-range", "type": "descriptor", "spec": "scroll-animations-1-1", "shortname": "scroll-animations-1", "level": "1", "status": "local", "url": "#descdef-scroll-timeline-time-range", "export": true, "normative": true, "for_": ["@scroll-timeline"]};
 </script>

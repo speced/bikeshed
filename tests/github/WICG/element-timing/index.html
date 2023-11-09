@@ -689,6 +689,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -1762,8 +1799,6 @@ This would unintentionally leak some of the display timing of the image.</p>
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -2011,7 +2046,6 @@ This would unintentionally leak some of the display timing of the image.</p>
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -2479,6 +2513,296 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element'] = {"text": "img", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/embedded.html#elementdef-image'] = {"text": "image", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/embedded.html#elementdef-image", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/struct.html#elementdef-svg'] = {"text": "svg", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/struct.html#elementdef-svg", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#video'] = {"text": "video", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#video", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3#propdef-background-image'] = {"text": "background-image", "type": "dfn", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "anchor-block", "url": "https://drafts.csswg.org/css-backgrounds-3#propdef-background-image", "export": true, "normative": true, "for_": []};
+window.refsData['#report-image-element-timing'] = {"text": "report image element timing", "type": "dfn", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#report-image-element-timing", "export": true, "normative": true, "for_": []};
+window.refsData['#report-text-element-timing'] = {"text": "report text element timing", "type": "dfn", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#report-text-element-timing", "export": true, "normative": true, "for_": []};
+window.refsData['#performanceelementtiming'] = {"text": "PerformanceElementTiming", "type": "interface", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#performanceelementtiming", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/performance-timeline/#the-performanceentry-interface'] = {"text": "PerformanceEntry", "type": "interface", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/performance-timeline/#the-performanceentry-interface", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/hr-time#dom-domhighrestimestamp'] = {"text": "DOMHighResTimeStamp", "type": "interface", "spec": "hr-time", "shortname": "hr-time", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/hr-time#dom-domhighrestimestamp", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.fxtf.org/geometry-1/#domrectreadonly'] = {"text": "DOMRectReadOnly", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/geometry-1/#domrectreadonly", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-long'] = {"text": "unsigned long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#element'] = {"text": "Element", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#element", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Default'] = {"text": "Default", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Default", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-object'] = {"text": "object", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/performance-timeline/#dom-performanceentry-entrytype'] = {"text": "entryType", "type": "attribute", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/performance-timeline/#dom-performanceentry-entrytype", "export": true, "normative": true, "for_": ["PerformanceEntry"]};
+window.refsData['https://w3c.github.io/performance-timeline/#dom-performanceentry-name'] = {"text": "name", "type": "attribute", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/performance-timeline/#dom-performanceentry-name", "export": true, "normative": true, "for_": ["PerformanceEntry"]};
+window.refsData['https://w3c.github.io/performance-timeline/#dom-performanceentry-starttime'] = {"text": "startTime", "type": "attribute", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/performance-timeline/#dom-performanceentry-starttime", "export": true, "normative": true, "for_": ["PerformanceEntry"]};
+window.refsData['#dom-performanceelementtiming-rendertime'] = {"text": "renderTime", "type": "attribute", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#dom-performanceelementtiming-rendertime", "export": true, "normative": true, "for_": ["PerformanceElementTiming"]};
+window.refsData['#dom-performanceelementtiming-loadtime'] = {"text": "loadTime", "type": "attribute", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#dom-performanceelementtiming-loadtime", "export": true, "normative": true, "for_": ["PerformanceElementTiming"]};
+window.refsData['https://w3c.github.io/performance-timeline/#dom-performanceentry-duration'] = {"text": "duration", "type": "attribute", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/performance-timeline/#dom-performanceentry-duration", "export": true, "normative": true, "for_": ["PerformanceEntry"]};
+window.refsData['#dom-performanceelementtiming-intersectionrect'] = {"text": "intersectionRect", "type": "attribute", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#dom-performanceelementtiming-intersectionrect", "export": true, "normative": true, "for_": ["PerformanceElementTiming"]};
+window.refsData['#dom-performanceelementtiming-identifier'] = {"text": "identifier", "type": "attribute", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#dom-performanceelementtiming-identifier", "export": true, "normative": true, "for_": ["PerformanceElementTiming"]};
+window.refsData['#dom-performanceelementtiming-naturalwidth'] = {"text": "naturalWidth", "type": "attribute", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#dom-performanceelementtiming-naturalwidth", "export": true, "normative": true, "for_": ["PerformanceElementTiming"]};
+window.refsData['#dom-performanceelementtiming-naturalheight'] = {"text": "naturalHeight", "type": "attribute", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#dom-performanceelementtiming-naturalheight", "export": true, "normative": true, "for_": ["PerformanceElementTiming"]};
+window.refsData['#dom-performanceelementtiming-id'] = {"text": "id", "type": "attribute", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#dom-performanceelementtiming-id", "export": true, "normative": true, "for_": ["PerformanceElementTiming"]};
+window.refsData['#dom-performanceelementtiming-element'] = {"text": "element", "type": "attribute", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#dom-performanceelementtiming-element", "export": true, "normative": true, "for_": ["PerformanceElementTiming"]};
+window.refsData['#get-an-element'] = {"text": "get an element", "type": "dfn", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#get-an-element", "export": true, "normative": true, "for_": []};
+window.refsData['#element'] = {"text": "element", "type": "dfn", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#element", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-tree-descendant'] = {"text": "descendant", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-tree-descendant", "export": true, "normative": true, "for_": ["tree"]};
+window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-performanceelementtiming-url'] = {"text": "url", "type": "attribute", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#dom-performanceelementtiming-url", "export": true, "normative": true, "for_": ["PerformanceElementTiming"]};
+window.refsData['#request'] = {"text": "request", "type": "dfn", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#request", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/urls-and-fetching.html#resolve-a-url'] = {"text": "resolved url", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/urls-and-fetching.html#resolve-a-url", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-url-scheme'] = {"text": "scheme", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-scheme", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['https://w3c.github.io/performance-timeline/#supportedentrytypes-attribute'] = {"text": "supportedEntryTypes", "type": "attribute", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/performance-timeline/#supportedentrytypes-attribute", "export": true, "normative": true, "for_": ["PerformanceObserver"]};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#window'] = {"text": "Window", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/custom-elements.html#cereactions'] = {"text": "CEReactions", "type": "extended-attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/custom-elements.html#cereactions", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-element-elementtiming'] = {"text": "elementTiming", "type": "attribute", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#dom-element-elementtiming", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#htmlimageelement'] = {"text": "HTMLImageElement", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#htmlimageelement", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/embedded.html#InterfaceSVGImageElement'] = {"text": "SVGImageElement", "type": "interface", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/embedded.html#InterfaceSVGImageElement", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#htmlvideoelement'] = {"text": "HTMLVideoElement", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#htmlvideoelement", "export": true, "normative": true, "for_": []};
+window.refsData['#associated-image-request'] = {"text": "associated image request", "type": "dfn", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#associated-image-request", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage#image-request'] = {"text": "image request", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage#image-request", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipageimages.html#list-of-available-images'] = {"text": "list of available images", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipageimages.html#list-of-available-images", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ordered-set'] = {"text": "ordered set", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-set", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/images.html#img-all'] = {"text": "completely available", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/images.html#img-all", "export": true, "normative": true, "for_": []};
+window.refsData['#process-an-image-that-finished-loading'] = {"text": "process an image that finished loading", "type": "dfn", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#process-an-image-that-finished-loading", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css2/zindex.html#painting-order'] = {"text": "painting order", "type": "dfn", "spec": "css", "shortname": "css", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/css2/zindex.html#painting-order", "export": true, "normative": true, "for_": []};
+window.refsData['#set-of-owned-text-nodes'] = {"text": "set of owned text nodes", "type": "dfn", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#set-of-owned-text-nodes", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#text'] = {"text": "Text", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#text", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#font-block-period'] = {"text": "font block period", "type": "dfn", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#font-block-period", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#set-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#set-append", "export": true, "normative": true, "for_": ["set"]};
+window.refsData['https://drafts.csswg.org/css-display-4/#containing-block'] = {"text": "containing block", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#containing-block", "export": true, "normative": true, "for_": []};
+window.refsData['#associated-background-image-requests'] = {"text": "associated background image requests", "type": "dfn", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#associated-background-image-requests", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/grouping-content.html#the-div-element'] = {"text": "div", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/grouping-content.html#the-div-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#update-the-rendering'] = {"text": "update the rendering", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#update-the-rendering", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#fully-active'] = {"text": "fully active", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#fully-active", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['#element-timing-processing'] = {"text": "element timing processing", "type": "dfn", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#element-timing-processing", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-tree-root'] = {"text": "root", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-tree-root", "export": true, "normative": true, "for_": ["tree"]};
+window.refsData['https://w3c.github.io/hr-time#dfn-current-high-resolution-time'] = {"text": "current high resolution time", "type": "dfn", "spec": "hr-time", "shortname": "hr-time", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/hr-time#dfn-current-high-resolution-time", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global'] = {"text": "relevant global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/resource-timing#dfn-timing-allow-check'] = {"text": "timing allow check", "type": "dfn", "spec": "resource-timing", "shortname": "resource-timing", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/resource-timing#dfn-timing-allow-check", "export": true, "normative": true, "for_": []};
+window.refsData['#images-pending-rendering'] = {"text": "images pending rendering", "type": "dfn", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#images-pending-rendering", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/IntersectionObserver#calculate-intersection-rect-algo'] = {"text": "intersection rect algorithm", "type": "dfn", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/IntersectionObserver#calculate-intersection-rect-algo", "export": true, "normative": true, "for_": []};
+window.refsData['https://wicg.github.io/largest-contentful-paint/#potentially-add-a-largestcontentfulpaint-entry'] = {"text": "potentially add a largestcontentfulpaint entry", "type": "dfn", "spec": "largest-contentful-paint", "shortname": "largest-contentful-paint", "level": "", "status": "anchor-block", "url": "https://wicg.github.io/largest-contentful-paint/#potentially-add-a-largestcontentfulpaint-entry", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage#dom-img-naturalwidth'] = {"text": "naturalWidth", "type": "attribute", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage#dom-img-naturalwidth", "export": true, "normative": true, "for_": ["img"]};
+window.refsData['https://html.spec.whatwg.org/multipage#dom-img-naturalheight'] = {"text": "naturalHeight", "type": "attribute", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage#dom-img-naturalheight", "export": true, "normative": true, "for_": ["img"]};
+window.refsData['https://w3c.github.io/performance-timeline/#dfn-queue-a-performanceentry'] = {"text": "queue the performanceentry", "type": "dfn", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/performance-timeline/#dfn-queue-a-performanceentry", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#boundary-point-node'] = {"text": "node", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#boundary-point-node", "export": true, "normative": true, "for_": ["boundary point"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm'] = {"text": "relevant realm", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm", "export": true, "normative": true, "for_": []};
+window.refsData['#set-of-elements-with-rendered-text'] = {"text": "set of elements with rendered text", "type": "dfn", "spec": "element-timing-1", "shortname": "element-timing", "level": "1", "status": "local", "url": "#set-of-elements-with-rendered-text", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#connected'] = {"text": "connected", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "", "status": "anchor-block", "url": "https://dom.spec.whatwg.org/#connected", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object'] = {"text": "relevant settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/IntersectionObserver#intersectionobserver'] = {"text": "IntersectionObserver", "type": "interface", "spec": "intersection-observer", "shortname": "intersection-observer", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/IntersectionObserver#intersectionobserver", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/performance-timeline/#the-performanceobserver-interface'] = {"text": "PerformanceObserver", "type": "interface", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/performance-timeline/#the-performanceobserver-interface", "export": true, "normative": true, "for_": []};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

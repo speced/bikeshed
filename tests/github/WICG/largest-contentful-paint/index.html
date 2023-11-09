@@ -689,6 +689,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -1532,8 +1569,6 @@ This allows developers to detect support for the API.</p>
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -1781,7 +1816,6 @@ This allows developers to detect support for the API.</p>
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -2230,6 +2264,277 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://wicg.github.io/element-timing/#sec-elements-exposed'] = {"text": "exposed", "type": "dfn", "spec": "element-timing", "shortname": "element-timing", "level": "", "status": "anchor-block", "url": "https://wicg.github.io/element-timing/#sec-elements-exposed", "export": true, "normative": true, "for_": []};
+window.refsData['#largestcontentfulpaint'] = {"text": "LargestContentfulPaint", "type": "interface", "spec": "largest-contentful-paint-1", "shortname": "largest-contentful-paint", "level": "1", "status": "local", "url": "#largestcontentfulpaint", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/performance-timeline/#the-performanceentry-interface'] = {"text": "PerformanceEntry", "type": "interface", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/performance-timeline/#the-performanceentry-interface", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/hr-time#dom-domhighrestimestamp'] = {"text": "DOMHighResTimeStamp", "type": "interface", "spec": "hr-time", "shortname": "hr-time", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/hr-time#dom-domhighrestimestamp", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-long'] = {"text": "unsigned long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#element'] = {"text": "Element", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#element", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Default'] = {"text": "Default", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Default", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-object'] = {"text": "object", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/performance-timeline/#dom-performanceentry-entrytype'] = {"text": "entryType", "type": "attribute", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/performance-timeline/#dom-performanceentry-entrytype", "export": true, "normative": true, "for_": ["PerformanceEntry"]};
+window.refsData['https://w3c.github.io/performance-timeline/#dom-performanceentry-name'] = {"text": "name", "type": "attribute", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/performance-timeline/#dom-performanceentry-name", "export": true, "normative": true, "for_": ["PerformanceEntry"]};
+window.refsData['https://w3c.github.io/performance-timeline/#dom-performanceentry-starttime'] = {"text": "startTime", "type": "attribute", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/performance-timeline/#dom-performanceentry-starttime", "export": true, "normative": true, "for_": ["PerformanceEntry"]};
+window.refsData['#rendertime'] = {"text": "rendertime", "type": "dfn", "spec": "largest-contentful-paint-1", "shortname": "largest-contentful-paint", "level": "1", "status": "local", "url": "#rendertime", "export": true, "normative": true, "for_": []};
+window.refsData['#loadtime'] = {"text": "loadtime", "type": "dfn", "spec": "largest-contentful-paint-1", "shortname": "largest-contentful-paint", "level": "1", "status": "local", "url": "#loadtime", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/performance-timeline/#dom-performanceentry-duration'] = {"text": "duration", "type": "attribute", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/performance-timeline/#dom-performanceentry-duration", "export": true, "normative": true, "for_": ["PerformanceEntry"]};
+window.refsData['#dom-largestcontentfulpaint-rendertime'] = {"text": "renderTime", "type": "attribute", "spec": "largest-contentful-paint-1", "shortname": "largest-contentful-paint", "level": "1", "status": "local", "url": "#dom-largestcontentfulpaint-rendertime", "export": true, "normative": true, "for_": ["LargestContentfulPaint"]};
+window.refsData['#dom-largestcontentfulpaint-loadtime'] = {"text": "loadTime", "type": "attribute", "spec": "largest-contentful-paint-1", "shortname": "largest-contentful-paint", "level": "1", "status": "local", "url": "#dom-largestcontentfulpaint-loadtime", "export": true, "normative": true, "for_": ["LargestContentfulPaint"]};
+window.refsData['#dom-largestcontentfulpaint-size'] = {"text": "size", "type": "attribute", "spec": "largest-contentful-paint-1", "shortname": "largest-contentful-paint", "level": "1", "status": "local", "url": "#dom-largestcontentfulpaint-size", "export": true, "normative": true, "for_": ["LargestContentfulPaint"]};
+window.refsData['#size'] = {"text": "size", "type": "dfn", "spec": "largest-contentful-paint-1", "shortname": "largest-contentful-paint", "level": "1", "status": "local", "url": "#size", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-largestcontentfulpaint-id'] = {"text": "id", "type": "attribute", "spec": "largest-contentful-paint-1", "shortname": "largest-contentful-paint", "level": "1", "status": "local", "url": "#dom-largestcontentfulpaint-id", "export": true, "normative": true, "for_": ["LargestContentfulPaint"]};
+window.refsData['#id'] = {"text": "id", "type": "dfn", "spec": "largest-contentful-paint-1", "shortname": "largest-contentful-paint", "level": "1", "status": "local", "url": "#id", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-largestcontentfulpaint-url'] = {"text": "url", "type": "attribute", "spec": "largest-contentful-paint-1", "shortname": "largest-contentful-paint", "level": "1", "status": "local", "url": "#dom-largestcontentfulpaint-url", "export": true, "normative": true, "for_": ["LargestContentfulPaint"]};
+window.refsData['#url'] = {"text": "url", "type": "dfn", "spec": "largest-contentful-paint-1", "shortname": "largest-contentful-paint", "level": "1", "status": "local", "url": "#url", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-largestcontentfulpaint-element'] = {"text": "element", "type": "attribute", "spec": "largest-contentful-paint-1", "shortname": "largest-contentful-paint", "level": "1", "status": "local", "url": "#dom-largestcontentfulpaint-element", "export": true, "normative": true, "for_": ["LargestContentfulPaint"]};
+window.refsData['https://wicg.github.io/element-timing/#get-an-element'] = {"text": "get an element", "type": "dfn", "spec": "element-timing", "shortname": "element-timing", "level": "", "status": "anchor-block", "url": "https://wicg.github.io/element-timing/#get-an-element", "export": true, "normative": true, "for_": []};
+window.refsData['#element'] = {"text": "element", "type": "dfn", "spec": "largest-contentful-paint-1", "shortname": "largest-contentful-paint", "level": "1", "status": "local", "url": "#element", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-tree-descendant'] = {"text": "descendant", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-tree-descendant", "export": true, "normative": true, "for_": ["tree"]};
+window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ordered-set'] = {"text": "set", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-set", "export": true, "normative": true, "for_": []};
+window.refsData['#content-set'] = {"text": "content set", "type": "dfn", "spec": "largest-contentful-paint-1", "shortname": "largest-contentful-paint", "level": "1", "status": "local", "url": "#content-set", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#request'] = {"text": "Request", "type": "interface", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#request", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/performance-timeline/#supportedentrytypes-attribute'] = {"text": "supportedEntryTypes", "type": "attribute", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/performance-timeline/#supportedentrytypes-attribute", "export": true, "normative": true, "for_": ["PerformanceObserver"]};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#window'] = {"text": "Window", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.fxtf.org/geometry-1/#domrectreadonly'] = {"text": "DOMRectReadOnly", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/geometry-1/#domrectreadonly", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org#concept-document'] = {"text": "document", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "", "status": "anchor-block", "url": "https://dom.spec.whatwg.org#concept-document", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-contain'] = {"text": "contain", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-contain", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://infra.spec.whatwg.org/#set-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#set-append", "export": true, "normative": true, "for_": ["set"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global'] = {"text": "relevant global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global", "export": true, "normative": true, "for_": []};
+window.refsData['#has-dispatched-scroll-event'] = {"text": "has dispatched scroll event", "type": "dfn", "spec": "largest-contentful-paint-1", "shortname": "largest-contentful-paint", "level": "1", "status": "local", "url": "#has-dispatched-scroll-event", "export": true, "normative": true, "for_": []};
+window.refsData['https://wicg.github.io/event-timing#has-dispatched-input-event'] = {"text": "has dispatched input event", "type": "dfn", "spec": "event-timing", "shortname": "event-timing", "level": "", "status": "anchor-block", "url": "https://wicg.github.io/event-timing#has-dispatched-input-event", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#dom-request-url'] = {"text": "request url", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#dom-request-url", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org#dom-element-id'] = {"text": "element id", "type": "attribute", "spec": "dom", "shortname": "dom", "level": "", "status": "anchor-block", "url": "https://dom.spec.whatwg.org#dom-element-id", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['https://drafts.fxtf.org/geometry-1/#dom-domrectreadonly-width'] = {"text": "width", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/geometry-1/#dom-domrectreadonly-width", "export": true, "normative": true, "for_": ["DOMRectReadOnly"]};
+window.refsData['https://drafts.fxtf.org/geometry-1/#dom-domrectreadonly-height'] = {"text": "height", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "current", "url": "https://drafts.fxtf.org/geometry-1/#dom-domrectreadonly-height", "export": true, "normative": true, "for_": ["DOMRectReadOnly"]};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element'] = {"text": "img", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#dom-img-naturalwidth'] = {"text": "naturalWidth", "type": "attribute", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#dom-img-naturalwidth", "export": true, "normative": true, "for_": ["img"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#dom-img-naturalheight'] = {"text": "naturalHeight", "type": "attribute", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#dom-img-naturalheight", "export": true, "normative": true, "for_": ["img"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#dom-img-width'] = {"text": "width", "type": "attribute", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#dom-img-width", "export": true, "normative": true, "for_": ["img"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#dom-img-height'] = {"text": "height", "type": "attribute", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#dom-img-height", "export": true, "normative": true, "for_": ["img"]};
+window.refsData['#largest-contentful-paint-size'] = {"text": "largest contentful paint size", "type": "dfn", "spec": "largest-contentful-paint-1", "shortname": "largest-contentful-paint", "level": "1", "status": "local", "url": "#largest-contentful-paint-size", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ordered-map'] = {"text": "map", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-map", "export": true, "normative": true, "for_": []};
+window.refsData['#create-a-largestcontentfulpaint-entry'] = {"text": "create a largestcontentfulpaint entry", "type": "dfn", "spec": "largest-contentful-paint-1", "shortname": "largest-contentful-paint", "level": "1", "status": "local", "url": "#create-a-largestcontentfulpaint-entry", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm'] = {"text": "relevant realm", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/performance-timeline/#dfn-queue-a-performanceentry'] = {"text": "queue the performanceentry", "type": "dfn", "spec": "performance-timeline-2", "shortname": "performance-timeline", "level": "2", "status": "anchor-block", "url": "https://w3c.github.io/performance-timeline/#dfn-queue-a-performanceentry", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org#concept-event-dispatch'] = {"text": "event dispatch algorithm", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "", "status": "anchor-block", "url": "https://dom.spec.whatwg.org#concept-event-dispatch", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dom-event-type'] = {"text": "type", "type": "attribute", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-event-type", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['https://drafts.csswg.org/cssom-view-1/#eventdef-document-scroll'] = {"text": "scroll", "type": "event", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-view-1/#eventdef-document-scroll", "export": true, "normative": true, "for_": ["Document", "Element", "VisualViewport"]};
+window.refsData['https://dom.spec.whatwg.org/#dom-event-istrusted'] = {"text": "isTrusted", "type": "attribute", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-event-istrusted", "export": true, "normative": true, "for_": ["Event"]};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

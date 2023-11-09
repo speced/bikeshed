@@ -697,6 +697,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -5629,8 +5666,6 @@ as selectors do not provide any ability not already possible by walking the DOM 
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -5878,7 +5913,6 @@ as selectors do not provide any ability not already possible by walking the DOM 
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -6467,6 +6501,416 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#selector'] = {"text": "selector", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#selector", "export": true, "normative": true, "for_": []};
+window.refsData['#read-write-pseudo'] = {"text": ":read-write", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#read-write-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#has-pseudo'] = {"text": ":has()", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#has-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#compound'] = {"text": "compound selector", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#compound", "export": true, "normative": true, "for_": []};
+window.refsData['#relative-selector'] = {"text": "relative selector", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#relative-selector", "export": true, "normative": true, "for_": []};
+window.refsData['#scope-element'] = {"text": ":scope element", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#scope-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#string-is'] = {"text": "identical to", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#string-is", "export": true, "normative": true, "for_": ["string"]};
+window.refsData['#current-pseudo'] = {"text": ":current", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#current-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#simple'] = {"text": "simple selector", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#simple", "export": true, "normative": true, "for_": []};
+window.refsData['#complex'] = {"text": "complex selector", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#complex", "export": true, "normative": true, "for_": []};
+window.refsData['#selector-list'] = {"text": "selector list", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#selector-list", "export": true, "normative": true, "for_": []};
+window.refsData['#type-selector'] = {"text": "type selector", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#type-selector", "export": true, "normative": true, "for_": []};
+window.refsData['#universal-selector'] = {"text": "universal selector", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#universal-selector", "export": true, "normative": true, "for_": []};
+window.refsData['#attribute-selector'] = {"text": "attribute selector", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#attribute-selector", "export": true, "normative": true, "for_": []};
+window.refsData['#class-selector'] = {"text": "class selector", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#class-selector", "export": true, "normative": true, "for_": []};
+window.refsData['#id-selector'] = {"text": "id selector", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#id-selector", "export": true, "normative": true, "for_": []};
+window.refsData['#pseudo-class'] = {"text": "pseudo-class", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#pseudo-class", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-simple-selector'] = {"text": "<simple-selector>", "type": "type", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#typedef-simple-selector", "export": true, "normative": true, "for_": []};
+window.refsData['#match'] = {"text": "match", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#match", "export": true, "normative": true, "for_": []};
+window.refsData['#document-language'] = {"text": "document language", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#document-language", "export": true, "normative": true, "for_": []};
+window.refsData['#selector-combinator'] = {"text": "combinator", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#selector-combinator", "export": true, "normative": true, "for_": ["selector"]};
+window.refsData['#typedef-compound-selector'] = {"text": "<compound-selector>", "type": "type", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#typedef-compound-selector", "export": true, "normative": true, "for_": []};
+window.refsData['#descendant-combinator'] = {"text": "descendant combinator", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#descendant-combinator", "export": true, "normative": true, "for_": []};
+window.refsData['#child-combinator'] = {"text": "child combinator", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#child-combinator", "export": true, "normative": true, "for_": []};
+window.refsData['#next-sibling-combinator'] = {"text": "next-sibling combinator", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#next-sibling-combinator", "export": true, "normative": true, "for_": []};
+window.refsData['#subsequent-sibling-combinator'] = {"text": "subsequent-sibling combinator", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#subsequent-sibling-combinator", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-complex-selector'] = {"text": "<complex-selector>", "type": "type", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#typedef-complex-selector", "export": true, "normative": true, "for_": []};
+window.refsData['#selector-subject'] = {"text": "subject", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#selector-subject", "export": true, "normative": true, "for_": ["selector"]};
+window.refsData['#list-of-simple-selectors'] = {"text": "list of complex selectors", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#list-of-simple-selectors", "export": true, "normative": true, "for_": []};
+window.refsData['#featureless'] = {"text": "featureless", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#featureless", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#element-shadow-host'] = {"text": "shadow host", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#element-shadow-host", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-shadow-tree'] = {"text": "shadow tree", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-shadow-tree", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-scoping-1/#selectordef-host'] = {"text": ":host", "type": "selector", "spec": "css-scoping-1", "shortname": "css-scoping", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-scoping-1/#selectordef-host", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-scoping-1/#selectordef-host-context'] = {"text": ":host-context()", "type": "selector", "spec": "css-scoping-1", "shortname": "css-scoping", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-scoping-1/#selectordef-host-context", "export": true, "normative": true, "for_": []};
+window.refsData['#lang-pseudo'] = {"text": ":lang()", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#lang-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-first-line'] = {"text": "::first-line", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-first-line", "export": true, "normative": true, "for_": []};
+window.refsData['#host-language'] = {"text": "host language", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#host-language", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#documentfragment'] = {"text": "DocumentFragment", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#documentfragment", "export": true, "normative": true, "for_": []};
+window.refsData['#scoped-selector'] = {"text": "scope", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#scoped-selector", "export": true, "normative": true, "for_": []};
+window.refsData['#scoping-root'] = {"text": "scoping root", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#scoping-root", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-a-element'] = {"text": "a", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-a-element", "export": true, "normative": true, "for_": []};
+window.refsData['#scope-pseudo'] = {"text": ":scope", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#scope-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-relative-selector'] = {"text": "<relative-selector>", "type": "type", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#typedef-relative-selector", "export": true, "normative": true, "for_": []};
+window.refsData['#virtual-scoping-root'] = {"text": "virtual scoping root", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#virtual-scoping-root", "export": true, "normative": true, "for_": []};
+window.refsData['#valid-pseudo'] = {"text": ":valid", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#valid-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#functional-pseudo-class'] = {"text": "functional pseudo-class", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#functional-pseudo-class", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ascii-case-insensitive'] = {"text": "ascii case-insensitive", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-case-insensitive", "export": true, "normative": true, "for_": []};
+window.refsData['#whitespace'] = {"text": "white space", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#whitespace", "export": true, "normative": true, "for_": []};
+window.refsData['#pseudo-element'] = {"text": "pseudo-element", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#pseudo-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-first-letter'] = {"text": "::first-letter", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-first-letter", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-before'] = {"text": "::before", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-before", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-after'] = {"text": "::after", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-after", "export": true, "normative": true, "for_": []};
+window.refsData['#structural-pseudo-classes'] = {"text": "structural pseudo-classes", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#structural-pseudo-classes", "export": true, "normative": true, "for_": []};
+window.refsData['#originating-element'] = {"text": "originating element", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#originating-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/selectors-3/#x'] = {"text": "*", "type": "selector", "spec": "selectors-3", "shortname": "selectors", "level": "3", "status": "current", "url": "https://drafts.csswg.org/selectors-3/#x", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-color-5/#valdef-lab-a'] = {"text": "a", "type": "value", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-color-5/#valdef-lab-a", "export": true, "normative": true, "for_": ["lab()"]};
+window.refsData['#negation-pseudo'] = {"text": ":not()", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#negation-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#matches-pseudo'] = {"text": ":is()", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#matches-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#hover-pseudo'] = {"text": ":hover", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#hover-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#focus-pseudo'] = {"text": ":focus", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#focus-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-scoping-1/#selectordef-shadow'] = {"text": "::shadow", "type": "selector", "spec": "css-scoping-1", "shortname": "css-scoping", "level": "1", "status": "snapshot", "url": "https://www.w3.org/TR/css-scoping-1/#selectordef-shadow", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#box-tree'] = {"text": "box tree", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#box-tree", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://www.w3.org/TR/css-scoping-1/#selectordef-content'] = {"text": "::content", "type": "selector", "spec": "css-scoping-1", "shortname": "css-scoping", "level": "1", "status": "snapshot", "url": "https://www.w3.org/TR/css-scoping-1/#selectordef-content", "export": true, "normative": true, "for_": []};
+window.refsData['#language-range'] = {"text": "language range", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#language-range", "export": true, "normative": true, "for_": []};
+window.refsData['#invalid-selector'] = {"text": "invalid", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#invalid-selector", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-forgiving-selector-list'] = {"text": "<forgiving-selector-list>", "type": "type", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#typedef-forgiving-selector-list", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/grouping-content.html#the-ol-element'] = {"text": "ol", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/grouping-content.html#the-ol-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/form-elements.html#the-button-element'] = {"text": "button", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/form-elements.html#the-button-element", "export": true, "normative": true, "for_": []};
+window.refsData['#where-pseudo'] = {"text": ":where()", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#where-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-forgiving-relative-selector-list'] = {"text": "<forgiving-relative-selector-list>", "type": "type", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#typedef-forgiving-relative-selector-list", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/sections.html#the-h1-element'] = {"text": "h1", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/sections.html#the-h1-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-namespaces-3/#css-qualified-name'] = {"text": "css qualified name", "type": "dfn", "spec": "css-namespaces-3", "shortname": "css-namespaces", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-namespaces-3/#css-qualified-name", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-namespaces-3/#default-namespace'] = {"text": "default namespace", "type": "dfn", "spec": "css-namespaces-3", "shortname": "css-namespaces", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-namespaces-3/#default-namespace", "export": true, "normative": true, "for_": []};
+window.refsData['#defined-pseudo'] = {"text": ":defined", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#defined-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/custom-elements.html#custom-element'] = {"text": "custom element", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/custom-elements.html#custom-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/custom-elements.html#element-definition'] = {"text": "element definition", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/custom-elements.html#element-definition", "export": false, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#typedef-ident-token'] = {"text": "<ident-token>", "type": "type", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#typedef-ident-token", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#typedef-string-token'] = {"text": "<string-token>", "type": "type", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#typedef-string-token", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-span-element'] = {"text": "span", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-span-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-object-element'] = {"text": "object", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-object-element", "export": true, "normative": true, "for_": []};
+window.refsData['#nsdecl'] = {"text": "declared", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#nsdecl", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/grouping-content.html#the-p-element'] = {"text": "p", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/grouping-content.html#the-p-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/grouping-content.html#the-div-element'] = {"text": "div", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/grouping-content.html#the-div-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-document-quirks'] = {"text": "quirks mode", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document-quirks", "export": true, "normative": true, "for_": []};
+window.refsData['#dir-pseudo'] = {"text": ":dir()", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#dir-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-3/#propdef-direction'] = {"text": "direction", "type": "property", "spec": "css-writing-modes-3", "shortname": "css-writing-modes", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-3/#propdef-direction", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-4/#content-language'] = {"text": "content language", "type": "dfn", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#content-language", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#typedef-ident'] = {"text": "<ident>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#typedef-ident", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#string-value'] = {"text": "<string>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#string-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/semantics.html#meta'] = {"text": "meta", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/semantics.html#meta", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-q-element'] = {"text": "q", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-q-element", "export": true, "normative": true, "for_": []};
+window.refsData['#any-link-pseudo'] = {"text": ":any-link", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#any-link-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/image-maps.html#the-area-element'] = {"text": "area", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/image-maps.html#the-area-element", "export": true, "normative": true, "for_": []};
+window.refsData['#link-pseudo'] = {"text": ":link", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#link-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#visited-pseudo'] = {"text": ":visited", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#visited-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#local-link-pseudo'] = {"text": ":local-link", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#local-link-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#target-pseudo'] = {"text": ":target", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#target-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#target-within-pseudo'] = {"text": ":target-within", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#target-within-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-url-fragment'] = {"text": "fragment", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-fragment", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['https://drafts.csswg.org/css-scoping-1/#flat-tree'] = {"text": "flat tree", "type": "dfn", "spec": "css-scoping-1", "shortname": "css-scoping", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-scoping-1/#flat-tree", "export": true, "normative": true, "for_": []};
+window.refsData['#root-pseudo'] = {"text": ":root", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#root-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/forms.html#the-label-element'] = {"text": "label", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/forms.html#the-label-element", "export": true, "normative": true, "for_": []};
+window.refsData['#active-pseudo'] = {"text": ":active", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#active-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#focus-within-pseudo'] = {"text": ":focus-within", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#focus-within-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#focus-visible-pseudo'] = {"text": ":focus-visible", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#focus-visible-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#indicate-focus'] = {"text": "indicate focus", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#indicate-focus", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/input.html#the-input-element'] = {"text": "input", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/input.html#the-input-element", "export": true, "normative": true, "for_": []};
+window.refsData['#past-pseudo'] = {"text": ":past", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#past-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#future-pseudo'] = {"text": ":future", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#future-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#selectordef-playing'] = {"text": ":playing", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#selectordef-playing", "export": true, "normative": true, "for_": []};
+window.refsData['#selectordef-paused'] = {"text": ":paused", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#selectordef-paused", "export": true, "normative": true, "for_": []};
+window.refsData['#enabled-pseudo'] = {"text": ":enabled", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#enabled-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#disabled-pseudo'] = {"text": ":disabled", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#disabled-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-3/#propdef-display'] = {"text": "display", "type": "property", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-display-3/#propdef-display", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#propdef-visibility'] = {"text": "visibility", "type": "property", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#propdef-visibility", "export": true, "normative": true, "for_": []};
+window.refsData['#read-only-pseudo'] = {"text": ":read-only", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#read-only-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#placeholder-shown-pseudo'] = {"text": ":placeholder-shown", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#placeholder-shown-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/input.html#attr-input-placeholder'] = {"text": "placeholder", "type": "element-attr", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/input.html#attr-input-placeholder", "export": true, "normative": true, "for_": ["input"]};
+window.refsData['https://html.spec.whatwg.org/multipage/form-elements.html#the-option-element'] = {"text": "option", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/form-elements.html#the-option-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/form-elements.html#the-select-element'] = {"text": "select", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/form-elements.html#the-select-element", "export": true, "normative": true, "for_": []};
+window.refsData['#default-pseudo'] = {"text": ":default", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#default-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#checked-pseudo'] = {"text": ":checked", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#checked-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#indeterminate-pseudo'] = {"text": ":indeterminate", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#indeterminate-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#blank-pseudo'] = {"text": ":blank", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#blank-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/form-elements.html#the-textarea-element'] = {"text": "textarea", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/form-elements.html#the-textarea-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/input.html#attr-input-value'] = {"text": "value", "type": "element-attr", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/input.html#attr-input-value", "export": true, "normative": true, "for_": ["input"]};
+window.refsData['#invalid-pseudo'] = {"text": ":invalid", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#invalid-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#in-range-pseudo'] = {"text": ":in-range", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#in-range-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#out-of-range-pseudo'] = {"text": ":out-of-range", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#out-of-range-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#required-pseudo'] = {"text": ":required", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#required-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#optional-pseudo'] = {"text": ":optional", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#optional-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#user-valid-pseudo'] = {"text": ":user-valid", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#user-valid-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#user-invalid-pseudo'] = {"text": ":user-invalid", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#user-invalid-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/semantics.html#the-html-element'] = {"text": "html", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/semantics.html#the-html-element", "export": true, "normative": true, "for_": []};
+window.refsData['#empty-pseudo'] = {"text": ":empty", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#empty-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-4/#white-space'] = {"text": "document white space characters", "type": "dfn", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#white-space", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-tree-inclusive-sibling'] = {"text": "inclusive sibling", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-tree-inclusive-sibling", "export": true, "normative": true, "for_": ["tree"]};
+window.refsData['#nth-child-pseudo'] = {"text": ":nth-child()", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#nth-child-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#nth-last-child-pseudo'] = {"text": ":nth-last-child()", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#nth-last-child-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#first-child-pseudo'] = {"text": ":first-child", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#first-child-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#last-child-pseudo'] = {"text": ":last-child", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#last-child-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#only-child-pseudo'] = {"text": ":only-child", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#only-child-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#nth-of-type-pseudo'] = {"text": ":nth-of-type()", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#nth-of-type-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element'] = {"text": "img", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element", "export": true, "normative": true, "for_": []};
+window.refsData['#nth-last-of-type-pseudo'] = {"text": ":nth-last-of-type()", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#nth-last-of-type-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#first-of-type-pseudo'] = {"text": ":first-of-type", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#first-of-type-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#last-of-type-pseudo'] = {"text": ":last-of-type", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#last-of-type-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#only-of-type-pseudo'] = {"text": ":only-of-type", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#only-of-type-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-em-element'] = {"text": "em", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-em-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/grouping-content.html#the-li-element'] = {"text": "li", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/grouping-content.html#the-li-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/mathml-core/#dfn-math'] = {"text": "math", "type": "element", "spec": "mathml-core", "shortname": "mathml-core", "level": "1", "status": "current", "url": "https://w3c.github.io/mathml-core/#dfn-math", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/grouping-content.html#the-pre-element'] = {"text": "pre", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/grouping-content.html#the-pre-element", "export": true, "normative": true, "for_": []};
+window.refsData['#column-combinator'] = {"text": "column combinator", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#column-combinator", "export": true, "normative": true, "for_": []};
+window.refsData['#nth-col-pseudo'] = {"text": ":nth-col()", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#nth-col-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['#nth-last-col-pseudo'] = {"text": ":nth-last-col()", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#nth-last-col-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#css-parse-something-according-to-a-css-grammar'] = {"text": "parse", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#css-parse-something-according-to-a-css-grammar", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['#typedef-complex-selector-list'] = {"text": "<complex-selector-list>", "type": "type", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#typedef-complex-selector-list", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-comma'] = {"text": "#", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-comma", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-combinator'] = {"text": "<combinator>", "type": "type", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#typedef-combinator", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-opt'] = {"text": "?", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-zero-plus'] = {"text": "*", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-zero-plus", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-type-selector'] = {"text": "<type-selector>", "type": "type", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#typedef-type-selector", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-subclass-selector'] = {"text": "<subclass-selector>", "type": "type", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#typedef-subclass-selector", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-pseudo-element-selector'] = {"text": "<pseudo-element-selector>", "type": "type", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#typedef-pseudo-element-selector", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-pseudo-class-selector'] = {"text": "<pseudo-class-selector>", "type": "type", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#typedef-pseudo-class-selector", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-req'] = {"text": "!", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-req", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-wq-name'] = {"text": "<wq-name>", "type": "type", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#typedef-wq-name", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-ns-prefix'] = {"text": "<ns-prefix>", "type": "type", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#typedef-ns-prefix", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-id-selector'] = {"text": "<id-selector>", "type": "type", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#typedef-id-selector", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-class-selector'] = {"text": "<class-selector>", "type": "type", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#typedef-class-selector", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-attribute-selector'] = {"text": "<attribute-selector>", "type": "type", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#typedef-attribute-selector", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#typedef-hash-token'] = {"text": "<hash-token>", "type": "type", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#typedef-hash-token", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-attr-matcher'] = {"text": "<attr-matcher>", "type": "type", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#typedef-attr-matcher", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-attr-modifier'] = {"text": "<attr-modifier>", "type": "type", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#typedef-attr-modifier", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#typedef-function-token'] = {"text": "<function-token>", "type": "type", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#typedef-function-token", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#typedef-any-value'] = {"text": "<any-value>", "type": "type", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#typedef-any-value", "export": true, "normative": true, "for_": []};
+window.refsData['#user-action-pseudo-class'] = {"text": "user action pseudo-class", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#user-action-pseudo-class", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#tree-abiding'] = {"text": "tree-abiding pseudo-element", "type": "dfn", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#tree-abiding", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-scoping-1/#selectordef-slotted'] = {"text": "::slotted()", "type": "selector", "spec": "css-scoping-1", "shortname": "css-scoping", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-scoping-1/#selectordef-slotted", "export": true, "normative": true, "for_": []};
+window.refsData['#parse-as-a-forgiving-selector-list'] = {"text": "parsed as a forgiving selector list", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#parse-as-a-forgiving-selector-list", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#css-parse-a-comma-separated-list-according-to-a-css-grammar'] = {"text": "parse a list", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#css-parse-a-comma-separated-list-according-to-a-css-grammar", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['#typedef-selector-list'] = {"text": "<selector-list>", "type": "type", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#typedef-selector-list", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-relative-selector-list'] = {"text": "<relative-selector-list>", "type": "type", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#typedef-relative-selector-list", "export": true, "normative": true, "for_": []};
+window.refsData['#absolutize-list'] = {"text": "absolutize a relative selector list", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#absolutize-list", "export": true, "normative": true, "for_": []};
+window.refsData['#match-a-selector-against-an-element'] = {"text": "match a selector against an element", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#match-a-selector-against-an-element", "export": true, "normative": true, "for_": []};
+window.refsData['#match-a-complex-selector-against-an-element'] = {"text": "match a complex selector against an element", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#match-a-complex-selector-against-an-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-tree'] = {"text": "tree", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-tree", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-tree-root'] = {"text": "root", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-tree-root", "export": true, "normative": true, "for_": ["tree"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-shadow-including-tree-order'] = {"text": "shadow-including tree order", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-shadow-including-tree-order", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-tree-descendant'] = {"text": "descendant", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-tree-descendant", "export": true, "normative": true, "for_": ["tree"]};
+window.refsData['#match-a-selector-against-a-pseudo-element'] = {"text": "match a selector against a pseudo-element", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#match-a-selector-against-a-pseudo-element", "export": true, "normative": true, "for_": []};
+window.refsData['#unknown--webkit--pseudo-elements'] = {"text": "unknown -webkit- pseudo-elements", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#unknown--webkit--pseudo-elements", "export": true, "normative": true, "for_": []};
+window.refsData['#selectordef-matches'] = {"text": ":matches()", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#selectordef-matches", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#anb-production'] = {"text": "<an+b>", "type": "type", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#anb-production", "export": true, "normative": true, "for_": []};
+window.refsData['#match-a-selector-against-a-tree'] = {"text": "match a selector against a tree", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#match-a-selector-against-a-tree", "export": true, "normative": true, "for_": []};
+window.refsData['#specificity'] = {"text": "specificity", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "local", "url": "#specificity", "export": true, "normative": true, "for_": []};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

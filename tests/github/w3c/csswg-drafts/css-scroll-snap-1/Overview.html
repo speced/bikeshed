@@ -692,6 +692,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -3375,8 +3412,6 @@ interact as defined in <a data-link-type="biblio" href="#biblio-css-logical-1" t
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -3624,7 +3659,6 @@ interact as defined in <a data-link-type="biblio" href="#biblio-css-logical-1" t
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -4087,4 +4121,311 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#propdef-scroll-snap-stop'] = {"text": "scroll-snap-stop", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-snap-stop", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-snap-type'] = {"text": "scroll-snap-type", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-snap-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#scroll-container'] = {"text": "scroll container", "type": "dfn", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#scroll-container", "export": true, "normative": true, "for_": []};
+window.refsData['#captures-snap-positions'] = {"text": "captures snap positions", "type": "dfn", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#captures-snap-positions", "export": true, "normative": true, "for_": []};
+window.refsData['#scroll-snap-position'] = {"text": "scroll snap position", "type": "dfn", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#scroll-snap-position", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-padding'] = {"text": "scroll-padding", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-padding", "export": true, "normative": true, "for_": []};
+window.refsData['#optimal-viewing-region'] = {"text": "optimal viewing region", "type": "dfn", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#optimal-viewing-region", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-margin'] = {"text": "scroll-margin", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-margin", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-first-line'] = {"text": "::first-line", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-first-line", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-first-letter'] = {"text": "::first-letter", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-first-letter", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-view-1/#dom-window-scrollto'] = {"text": "scrollTo()", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-view-1/#dom-window-scrollto", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#propdef-scroll-snap-align'] = {"text": "scroll-snap-align", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-snap-align", "export": true, "normative": true, "for_": []};
+window.refsData['#scroll-snap-area'] = {"text": "scroll snap area", "type": "dfn", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#scroll-snap-area", "export": true, "normative": true, "for_": []};
+window.refsData['#scroll-snapport'] = {"text": "snapport", "type": "dfn", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#scroll-snapport", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-align-3/#alignment-subject'] = {"text": "alignment subject", "type": "dfn", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#alignment-subject", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-align-3/#alignment-container'] = {"text": "alignment container", "type": "dfn", "spec": "css-align-3", "shortname": "css-align", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-align-3/#alignment-container", "export": true, "normative": true, "for_": []};
+window.refsData['#scroll-snap'] = {"text": "snap", "type": "dfn", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#scroll-snap", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#containing-block-chain'] = {"text": "containing block chain", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#containing-block-chain", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-opt'] = {"text": "?", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "export": true, "normative": true, "for_": []};
+window.refsData['#scroll-snap-container'] = {"text": "scroll snap container", "type": "dfn", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#scroll-snap-container", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-scroll-snap-type-proximity'] = {"text": "proximity", "type": "value", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#valdef-scroll-snap-type-proximity", "export": true, "normative": true, "for_": ["scroll-snap-type"]};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#block-axis'] = {"text": "block axis", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#block-axis", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#propdef-overflow'] = {"text": "overflow", "type": "property", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#propdef-overflow", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/sections.html#the-body-element'] = {"text": "body", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/sections.html#the-body-element", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-scroll-snap-type-x'] = {"text": "x", "type": "value", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#valdef-scroll-snap-type-x", "export": true, "normative": true, "for_": ["scroll-snap-type"]};
+window.refsData['#valdef-scroll-snap-type-y'] = {"text": "y", "type": "value", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#valdef-scroll-snap-type-y", "export": true, "normative": true, "for_": ["scroll-snap-type"]};
+window.refsData['#valdef-scroll-snap-type-block'] = {"text": "block", "type": "value", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#valdef-scroll-snap-type-block", "export": true, "normative": true, "for_": ["scroll-snap-type"]};
+window.refsData['#valdef-scroll-snap-type-inline'] = {"text": "inline", "type": "value", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#valdef-scroll-snap-type-inline", "export": true, "normative": true, "for_": ["scroll-snap-type"]};
+window.refsData['#valdef-scroll-snap-type-both'] = {"text": "both", "type": "value", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#valdef-scroll-snap-type-both", "export": true, "normative": true, "for_": ["scroll-snap-type"]};
+window.refsData['#valdef-scroll-snap-type-none'] = {"text": "none", "type": "value", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#valdef-scroll-snap-type-none", "export": true, "normative": true, "for_": ["scroll-snap-type"]};
+window.refsData['#valdef-scroll-snap-type-mandatory'] = {"text": "mandatory", "type": "value", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#valdef-scroll-snap-type-mandatory", "export": true, "normative": true, "for_": ["scroll-snap-type"]};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#propdef-scroll-behavior'] = {"text": "scroll-behavior", "type": "property", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#propdef-scroll-behavior", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-after'] = {"text": "::after", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-after", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#typedef-length-percentage'] = {"text": "<length-percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#typedef-length-percentage", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-num-range'] = {"text": "{a,b}", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-num-range", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-scroll-padding-auto'] = {"text": "auto", "type": "value", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#valdef-scroll-padding-auto", "export": true, "normative": true, "for_": ["scroll-padding", "scroll-padding-block", "scroll-padding-block-end", "scroll-padding-block-start", "scroll-padding-inline", "scroll-padding-inline-end", "scroll-padding-inline-start"]};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#scrollport'] = {"text": "scrollport", "type": "dfn", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#scrollport", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#shorthand-property'] = {"text": "shorthand property", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#shorthand-property", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#propdef-padding'] = {"text": "padding", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#propdef-padding", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-logical-1/#inset-properties'] = {"text": "inset properties", "type": "dfn", "spec": "css-logical-1", "shortname": "css-logical", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-logical-1/#inset-properties", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#fixed-position'] = {"text": "fixed-positioned box", "type": "dfn", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#fixed-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#length-value'] = {"text": "<length>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#length-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#propdef-margin'] = {"text": "margin", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#propdef-margin", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/selectors-4/#target-pseudo'] = {"text": ":target", "type": "selector", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#target-pseudo", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-view-1/#dom-element-scrollintoview'] = {"text": "scrollIntoView()", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-view-1/#dom-element-scrollintoview", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#scrollable-overflow-region'] = {"text": "scrollable overflow area", "type": "dfn", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#scrollable-overflow-region", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#inline-axis'] = {"text": "inline axis", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-axis", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#writing-mode'] = {"text": "writing mode", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#writing-mode", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-scroll-snap-align-start'] = {"text": "start", "type": "value", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#valdef-scroll-snap-align-start", "export": true, "normative": true, "for_": ["scroll-snap-align"]};
+window.refsData['https://html.spec.whatwg.org/multipage/sections.html#the-section-element'] = {"text": "section", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/sections.html#the-section-element", "export": true, "normative": true, "for_": []};
+window.refsData['#intended-end-position'] = {"text": "intended end position", "type": "dfn", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#intended-end-position", "export": true, "normative": true, "for_": []};
+window.refsData['#intended-direction-and-end-position'] = {"text": "intended direction and end position", "type": "dfn", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#intended-direction-and-end-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-view-1/#dom-window-scrollby'] = {"text": "scrollBy()", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-view-1/#dom-window-scrollby", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#intended-direction'] = {"text": "intended direction", "type": "dfn", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#intended-direction", "export": true, "normative": true, "for_": []};
+window.refsData['#axis-lock'] = {"text": "axis-lock", "type": "dfn", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#axis-lock", "export": true, "normative": true, "for_": []};
+window.refsData['#natural-end-point'] = {"text": "natural end-point", "type": "dfn", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#natural-end-point", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#longhand'] = {"text": "longhand", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#longhand", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-padding-block-start'] = {"text": "scroll-padding-block-start", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-padding-block-start", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-padding-block-end'] = {"text": "scroll-padding-block-end", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-padding-block-end", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-padding-inline-start'] = {"text": "scroll-padding-inline-start", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-padding-inline-start", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-padding-inline-end'] = {"text": "scroll-padding-inline-end", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-padding-inline-end", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-margin-block-start'] = {"text": "scroll-margin-block-start", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-margin-block-start", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-margin-block-end'] = {"text": "scroll-margin-block-end", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-margin-block-end", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-margin-inline-start'] = {"text": "scroll-margin-inline-start", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-margin-inline-start", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-margin-inline-end'] = {"text": "scroll-margin-inline-end", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-margin-inline-end", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#propdef-inset'] = {"text": "inset", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-inset", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-padding-inline'] = {"text": "scroll-padding-inline", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-padding-inline", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-padding-block'] = {"text": "scroll-padding-block", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-padding-block", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#percentage-value'] = {"text": "<percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#percentage-value", "export": true, "normative": true, "for_": []};window.refsData['#propdef-scroll-margin'] = {"text": "scroll-margin", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-margin", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-margin-block'] = {"text": "scroll-margin-block", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-margin-block", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-margin-block-end'] = {"text": "scroll-margin-block-end", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-margin-block-end", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-margin-block-start'] = {"text": "scroll-margin-block-start", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-margin-block-start", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-margin-bottom'] = {"text": "scroll-margin-bottom", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-margin-bottom", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-margin-inline'] = {"text": "scroll-margin-inline", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-margin-inline", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-margin-inline-end'] = {"text": "scroll-margin-inline-end", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-margin-inline-end", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-margin-inline-start'] = {"text": "scroll-margin-inline-start", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-margin-inline-start", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-margin-left'] = {"text": "scroll-margin-left", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-margin-left", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-margin-right'] = {"text": "scroll-margin-right", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-margin-right", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-margin-top'] = {"text": "scroll-margin-top", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-margin-top", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-padding'] = {"text": "scroll-padding", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-padding", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-padding-block'] = {"text": "scroll-padding-block", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-padding-block", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-padding-block-end'] = {"text": "scroll-padding-block-end", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-padding-block-end", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-padding-block-start'] = {"text": "scroll-padding-block-start", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-padding-block-start", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-padding-bottom'] = {"text": "scroll-padding-bottom", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-padding-bottom", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-padding-inline'] = {"text": "scroll-padding-inline", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-padding-inline", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-padding-inline-end'] = {"text": "scroll-padding-inline-end", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-padding-inline-end", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-padding-inline-start'] = {"text": "scroll-padding-inline-start", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-padding-inline-start", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-padding-left'] = {"text": "scroll-padding-left", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-padding-left", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-padding-right'] = {"text": "scroll-padding-right", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-padding-right", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-padding-top'] = {"text": "scroll-padding-top", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-padding-top", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-snap-align'] = {"text": "scroll-snap-align", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-snap-align", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-snap-stop'] = {"text": "scroll-snap-stop", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-snap-stop", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-scroll-snap-type'] = {"text": "scroll-snap-type", "type": "property", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "local", "url": "#propdef-scroll-snap-type", "export": true, "normative": true, "for_": []};
 </script>

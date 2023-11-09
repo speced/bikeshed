@@ -692,6 +692,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -5205,8 +5242,6 @@ so we can consider reverting this change. <a class="issue-return" href="#issue-2
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -5454,7 +5489,6 @@ so we can consider reverting this change. <a class="issue-return" href="#issue-2
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -6203,4 +6237,571 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://drafts.csswg.org/css-variables-1/#custom-property'] = {"text": "custom property", "type": "dfn", "spec": "css-variables-1", "shortname": "css-variables", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-variables-1/#custom-property", "export": true, "normative": true, "for_": []};
+window.refsData['#supported-css-property'] = {"text": "supported css property", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#supported-css-property", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/selectors-3/#sel-before'] = {"text": "::before", "type": "selector", "spec": "selectors-3", "shortname": "selectors", "level": "3", "status": "current", "url": "https://drafts.csswg.org/selectors-3/#sel-before", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/selectors-3/#sel-after'] = {"text": "::after", "type": "selector", "spec": "selectors-3", "shortname": "selectors", "level": "3", "status": "current", "url": "https://drafts.csswg.org/selectors-3/#sel-after", "export": true, "normative": true, "for_": []};
+window.refsData['#escape-a-character-as-code-point'] = {"text": "escaped as code point", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#escape-a-character-as-code-point", "export": true, "normative": true, "for_": []};
+window.refsData['#escape-a-character'] = {"text": "escape a character", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#escape-a-character", "export": true, "normative": true, "for_": []};
+window.refsData['#serialize-a-string'] = {"text": "serialize a string", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#serialize-a-string", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-USVString'] = {"text": "USVString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-USVString", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#surrogate'] = {"text": "surrogate", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#surrogate", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/i18n-glossary/#def_code_unit'] = {"text": "code units", "type": "dfn", "spec": "i18n-glossary", "shortname": "i18n-glossary", "level": "1", "status": "current", "url": "https://w3c.github.io/i18n-glossary/#def_code_unit", "export": true, "normative": false, "for_": []};
+window.refsData['https://drafts.csswg.org/mediaqueries-5/#media-query'] = {"text": "media query", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#media-query", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/mediaqueries-5/#media-query-list'] = {"text": "media query list", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#media-query-list", "export": true, "normative": true, "for_": []};
+window.refsData['#parse-a-media-query-list'] = {"text": "parse a media query list", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#parse-a-media-query-list", "export": true, "normative": true, "for_": []};
+window.refsData['#serialize-a-media-query'] = {"text": "serialize a media query", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#serialize-a-media-query", "export": true, "normative": true, "for_": []};
+window.refsData['#serialize-a-comma-separated-list'] = {"text": "serialize a comma-separated list", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#serialize-a-comma-separated-list", "export": true, "normative": true, "for_": []};
+window.refsData['#serialize-an-identifier'] = {"text": "serialize an identifier", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#serialize-an-identifier", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/mediaqueries-5/#media-type'] = {"text": "media type", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#media-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ascii-lowercase'] = {"text": "ascii lowercase", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-lowercase", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/mediaqueries-5/#media-feature'] = {"text": "media feature", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#media-feature", "export": true, "normative": true, "for_": []};
+window.refsData['#serialize-a-media-feature-value'] = {"text": "serialize a media feature value", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#serialize-a-media-feature-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/mediaqueries-4/#valdef-media-orientation-portrait'] = {"text": "portrait", "type": "value", "spec": "mediaqueries-4", "shortname": "mediaqueries", "level": "4", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-4/#valdef-media-orientation-portrait", "export": true, "normative": true, "for_": ["@media/orientation"]};
+window.refsData['https://drafts.csswg.org/mediaqueries-4/#valdef-media-orientation-landscape'] = {"text": "landscape", "type": "value", "spec": "mediaqueries-4", "shortname": "mediaqueries", "level": "4", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-4/#valdef-media-orientation-landscape", "export": true, "normative": true, "for_": ["@media/orientation"]};
+window.refsData['https://drafts.csswg.org/mediaqueries-4/#descdef-media-color'] = {"text": "color", "type": "descriptor", "spec": "mediaqueries-4", "shortname": "mediaqueries", "level": "4", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-4/#descdef-media-color", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['https://drafts.csswg.org/mediaqueries-4/#valdef-media-scan-progressive'] = {"text": "progressive", "type": "value", "spec": "mediaqueries-4", "shortname": "mediaqueries", "level": "4", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-4/#valdef-media-scan-progressive", "export": true, "normative": true, "for_": ["@media/scan"]};
+window.refsData['https://drafts.csswg.org/mediaqueries-4/#valdef-media-scan-interlace'] = {"text": "interlace", "type": "value", "spec": "mediaqueries-4", "shortname": "mediaqueries", "level": "4", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-4/#valdef-media-scan-interlace", "export": true, "normative": true, "for_": ["@media/scan"]};
+window.refsData['#medialist'] = {"text": "MediaList", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#medialist", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#LegacyNullToEmptyString'] = {"text": "LegacyNullToEmptyString", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#LegacyNullToEmptyString", "export": true, "normative": true, "for_": []};
+window.refsData['#cssomstring'] = {"text": "CSSOMString", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#cssomstring", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-medialist-mediatext'] = {"text": "mediaText", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-medialist-mediatext", "export": true, "normative": true, "for_": ["MediaList"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-long'] = {"text": "unsigned long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-medialist-length'] = {"text": "length", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-medialist-length", "export": true, "normative": true, "for_": ["MediaList"]};
+window.refsData['#dom-medialist-item'] = {"text": "item(index)", "type": "method", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-medialist-item", "export": true, "normative": true, "for_": ["MediaList"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-medialist-appendmedium'] = {"text": "appendMedium(medium)", "type": "method", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-medialist-appendmedium", "export": true, "normative": true, "for_": ["MediaList"]};
+window.refsData['#dom-medialist-deletemedium'] = {"text": "deleteMedium(medium)", "type": "method", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-medialist-deletemedium", "export": true, "normative": true, "for_": ["MediaList"]};
+window.refsData['http://heycam.github.io/webidl/#dfn-supported-property-indices'] = {"text": "supported property indices", "type": "dfn", "spec": "", "shortname": "cssom", "level": "1", "status": "anchor-block", "url": "http://heycam.github.io/webidl/#dfn-supported-property-indices", "export": true, "normative": true, "for_": []};
+window.refsData['#medialist-collection-of-media-queries'] = {"text": "collection of media queries", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#medialist-collection-of-media-queries", "export": true, "normative": true, "for_": ["MediaList"]};
+window.refsData['#serialize-a-media-query-list'] = {"text": "serialize a media query list", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#serialize-a-media-query-list", "export": true, "normative": true, "for_": []};
+window.refsData['#parse-a-media-query'] = {"text": "parse a media query", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#parse-a-media-query", "export": true, "normative": true, "for_": []};
+window.refsData['#compare-media-queries'] = {"text": "compare media queries", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#compare-media-queries", "export": true, "normative": true, "for_": []};
+window.refsData['http://heycam.github.io/webidl/#dfn-throw'] = {"text": "throw", "type": "dfn", "spec": "", "shortname": "cssom", "level": "1", "status": "anchor-block", "url": "http://heycam.github.io/webidl/#dfn-throw", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#notfounderror'] = {"text": "NotFoundError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#notfounderror", "export": true, "normative": true, "for_": []};
+window.refsData['#serialize-a-selector'] = {"text": "serialize a selector", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#serialize-a-selector", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/selectors-4/#simple'] = {"text": "simple selector", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#simple", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/selectors-4/#compound'] = {"text": "compound selector", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#compound", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/selectors-4/#universal-selector'] = {"text": "universal selector", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#universal-selector", "export": true, "normative": true, "for_": []};
+window.refsData['#serialize-a-simple-selector'] = {"text": "serialize a simple selector", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#serialize-a-simple-selector", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-namespaces-3/#namespace-prefix'] = {"text": "namespace prefix", "type": "dfn", "spec": "css-namespaces-3", "shortname": "css-namespaces", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-namespaces-3/#namespace-prefix", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-namespaces-3/#default-namespace'] = {"text": "default namespace", "type": "dfn", "spec": "css-namespaces-3", "shortname": "css-namespaces", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-namespaces-3/#default-namespace", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#serialize-an-anb-value'] = {"text": "serialize an <an+b> value", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#serialize-an-anb-value", "export": true, "normative": true, "for_": []};
+window.refsData['#serialize-a-group-of-selectors'] = {"text": "serialize a group of selectors", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#serialize-a-group-of-selectors", "export": true, "normative": true, "for_": []};
+window.refsData['#css-style-sheet'] = {"text": "css style sheet", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#css-style-sheet", "export": true, "normative": true, "for_": []};
+window.refsData['#cssstylesheet'] = {"text": "CSSStyleSheet", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#cssstylesheet", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#absolute-url-string'] = {"text": "absolute-url string", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#absolute-url-string", "export": true, "normative": true, "for_": []};
+window.refsData['#css-rule'] = {"text": "css rule", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#css-rule", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-css-style-sheet-parent-css-style-sheet'] = {"text": "parent css style sheet", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#concept-css-style-sheet-parent-css-style-sheet", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['#concept-css-style-sheet-media'] = {"text": "media", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#concept-css-style-sheet-media", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['#create-a-medialist-object'] = {"text": "create a medialist object", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#create-a-medialist-object", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-css-style-sheet-owner-node'] = {"text": "owner node", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#concept-css-style-sheet-owner-node", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['#associated-css-style-sheet'] = {"text": "associated css style sheet", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#associated-css-style-sheet", "export": true, "normative": true, "for_": []};
+window.refsData['#add-a-css-style-sheet'] = {"text": "add a css style sheet", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#add-a-css-style-sheet", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-css-style-sheet-title'] = {"text": "title", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#concept-css-style-sheet-title", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['https://dom.spec.whatwg.org/#in-a-document-tree'] = {"text": "in a document tree", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#in-a-document-tree", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-css-style-sheet-alternate-flag'] = {"text": "alternate flag", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#concept-css-style-sheet-alternate-flag", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['#concept-css-style-sheet-css-rules'] = {"text": "css rules", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#concept-css-style-sheet-css-rules", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['#stylesheet'] = {"text": "StyleSheet", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#stylesheet", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-stylesheet-type'] = {"text": "type", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-stylesheet-type", "export": true, "normative": true, "for_": ["StyleSheet"]};
+window.refsData['#dom-stylesheet-href'] = {"text": "href", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-stylesheet-href", "export": true, "normative": true, "for_": ["StyleSheet"]};
+window.refsData['https://dom.spec.whatwg.org/#element'] = {"text": "Element", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#element", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#processinginstruction'] = {"text": "ProcessingInstruction", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#processinginstruction", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-stylesheet-ownernode'] = {"text": "ownerNode", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-stylesheet-ownernode", "export": true, "normative": true, "for_": ["StyleSheet"]};
+window.refsData['#dom-stylesheet-parentstylesheet'] = {"text": "parentStyleSheet", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-stylesheet-parentstylesheet", "export": true, "normative": true, "for_": ["StyleSheet"]};
+window.refsData['#dom-stylesheet-title'] = {"text": "title", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-stylesheet-title", "export": true, "normative": true, "for_": ["StyleSheet"]};
+window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#PutForwards'] = {"text": "PutForwards", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#PutForwards", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-stylesheet-media'] = {"text": "media", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-stylesheet-media", "export": true, "normative": true, "for_": ["StyleSheet"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-stylesheet-disabled'] = {"text": "disabled", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-stylesheet-disabled", "export": true, "normative": true, "for_": ["StyleSheet"]};
+window.refsData['#concept-css-style-sheet-type'] = {"text": "type", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#concept-css-style-sheet-type", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['#concept-css-style-sheet-location'] = {"text": "location", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#concept-css-style-sheet-location", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['#concept-css-style-sheet-disabled-flag'] = {"text": "disabled flag", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#concept-css-style-sheet-disabled-flag", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['#cssrule'] = {"text": "CSSRule", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#cssrule", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cssstylesheet-ownerrule'] = {"text": "ownerRule", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssstylesheet-ownerrule", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['#cssrulelist'] = {"text": "CSSRuleList", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#cssrulelist", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cssstylesheet-cssrules'] = {"text": "cssRules", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssstylesheet-cssrules", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['#dom-cssstylesheet-insertrule'] = {"text": "insertRule(rule, index)", "type": "method", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssstylesheet-insertrule", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['#dom-cssstylesheet-deleterule'] = {"text": "deleteRule(index)", "type": "method", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssstylesheet-deleterule", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['#concept-css-style-sheet-owner-css-rule'] = {"text": "owner css rule", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#concept-css-style-sheet-owner-css-rule", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['#concept-css-style-sheet-origin-clean-flag'] = {"text": "origin-clean flag", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#concept-css-style-sheet-origin-clean-flag", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['https://webidl.spec.whatwg.org/#securityerror'] = {"text": "SecurityError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#securityerror", "export": true, "normative": true, "for_": []};
+window.refsData['#insert-a-css-rule'] = {"text": "insert a css rule", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#insert-a-css-rule", "export": true, "normative": true, "for_": []};
+window.refsData['#remove-a-css-rule'] = {"text": "remove a css rule", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#remove-a-css-rule", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cssstylesheet-rules'] = {"text": "rules", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssstylesheet-rules", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['http://heycam.github.io/webidl/#idl-long'] = {"text": "long", "type": "interface", "spec": "", "shortname": "cssom", "level": "1", "status": "anchor-block", "url": "http://heycam.github.io/webidl/#idl-long", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cssstylesheet-addrule'] = {"text": "addRule()", "type": "method", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssstylesheet-addrule", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['#dom-cssstylesheet-removerule'] = {"text": "removeRule(index)", "type": "method", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssstylesheet-removerule", "export": true, "normative": true, "for_": ["CSSStyleSheet"]};
+window.refsData['#cssgroupingrule'] = {"text": "CSSGroupingRule", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#cssgroupingrule", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#documentorshadowroot'] = {"text": "DocumentOrShadowRoot", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#documentorshadowroot", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#tree-order'] = {"text": "tree order", "type": "dfn", "spec": "", "shortname": "cssom", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#tree-order", "export": true, "normative": true, "for_": []};
+window.refsData['#documentorshadowroot-document-or-shadow-root-css-style-sheets'] = {"text": "document or shadow root css style sheets", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#documentorshadowroot-document-or-shadow-root-css-style-sheets", "export": true, "normative": true, "for_": ["DocumentOrShadowRoot"]};
+window.refsData['#preferred-css-style-sheet-set-name'] = {"text": "preferred css style sheet set name", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#preferred-css-style-sheet-set-name", "export": true, "normative": true, "for_": []};
+window.refsData['#change-the-preferred-css-style-sheet-set-name'] = {"text": "change the preferred css style sheet set name", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#change-the-preferred-css-style-sheet-set-name", "export": true, "normative": true, "for_": []};
+window.refsData['#last-css-style-sheet-set-name'] = {"text": "last css style sheet set name", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#last-css-style-sheet-set-name", "export": true, "normative": true, "for_": []};
+window.refsData['#css-style-sheet-set'] = {"text": "css style sheet set", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#css-style-sheet-set", "export": true, "normative": true, "for_": []};
+window.refsData['#css-style-sheet-set-name'] = {"text": "css style sheet set name", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#css-style-sheet-set-name", "export": true, "normative": true, "for_": []};
+window.refsData['#enable-a-css-style-sheet-set'] = {"text": "enable a css style sheet set", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#enable-a-css-style-sheet-set", "export": true, "normative": true, "for_": []};
+window.refsData['#select-a-css-style-sheet-set'] = {"text": "select a css style sheet set", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#select-a-css-style-sheet-set", "export": true, "normative": true, "for_": []};
+window.refsData['#http-default-style'] = {"text": "http-default-style", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#http-default-style", "export": true, "normative": true, "for_": []};
+window.refsData['#enabled-css-style-sheet-set'] = {"text": "enabled css style sheet set", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#enabled-css-style-sheet-set", "export": true, "normative": true, "for_": []};
+window.refsData['#stylesheetlist'] = {"text": "StyleSheetList", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#stylesheetlist", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-stylesheetlist-item'] = {"text": "item(index)", "type": "method", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-stylesheetlist-item", "export": true, "normative": true, "for_": ["StyleSheetList"]};
+window.refsData['#dom-stylesheetlist-length'] = {"text": "length", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-stylesheetlist-length", "export": true, "normative": true, "for_": ["StyleSheetList"]};
+window.refsData['#dom-documentorshadowroot-stylesheets'] = {"text": "styleSheets", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-documentorshadowroot-stylesheets", "export": true, "normative": true, "for_": ["DocumentOrShadowRoot"]};
+window.refsData['https://www.w3.org/TR/xml-stylesheet/#dt-xml-stylesheet-processing-instruction'] = {"text": "xml-stylesheet processing instruction", "type": "dfn", "spec": "", "shortname": "cssom", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/xml-stylesheet/#dt-xml-stylesheet-processing-instruction", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request'] = {"text": "request", "type": "dfn", "spec": "", "shortname": "cssom", "level": "1", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-request", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#concept-origin'] = {"text": "origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-origin", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-url'] = {"text": "url", "type": "dfn", "spec": "", "shortname": "cssom", "level": "1", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-request-url", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-origin'] = {"text": "origin", "type": "dfn", "spec": "", "shortname": "cssom", "level": "1", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-request-origin", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-referrer'] = {"text": "referrer", "type": "dfn", "spec": "", "shortname": "cssom", "level": "1", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-request-referrer", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-fetch'] = {"text": "fetch", "type": "dfn", "spec": "", "shortname": "cssom", "level": "1", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-fetch", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-network-error'] = {"text": "network error", "type": "dfn", "spec": "", "shortname": "cssom", "level": "1", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-network-error", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-document-quirks'] = {"text": "quirks mode", "type": "dfn", "spec": "", "shortname": "cssom", "level": "1", "status": "anchor-block", "url": "https://dom.spec.whatwg.org/#concept-document-quirks", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/urls-and-fetching.html#cors-same-origin'] = {"text": "cors-same-origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/urls-and-fetching.html#cors-same-origin", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#content-type'] = {"text": "content-type metadata", "type": "dfn", "spec": "", "shortname": "cssom", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#content-type", "export": true, "normative": true, "for_": []};
+window.refsData['#supported-styling-language'] = {"text": "supported styling language", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#supported-styling-language", "export": true, "normative": true, "for_": []};
+window.refsData['#linkstyle'] = {"text": "LinkStyle", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#linkstyle", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-linkstyle-sheet'] = {"text": "sheet", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-linkstyle-sheet", "export": true, "normative": true, "for_": ["LinkStyle"]};
+window.refsData['https://html.spec.whatwg.org/multipage/semantics.html#the-style-element'] = {"text": "style", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/semantics.html#the-style-element", "export": true, "normative": true, "for_": []};
+window.refsData['#create-a-css-style-sheet'] = {"text": "create a css style sheet", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#create-a-css-style-sheet", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-node'] = {"text": "nodes", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-node", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-document'] = {"text": "document", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-tree-following'] = {"text": "following", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-tree-following", "export": true, "normative": true, "for_": ["tree"]};
+window.refsData['https://dom.spec.whatwg.org/#boundary-point-node'] = {"text": "node", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#boundary-point-node", "export": true, "normative": true, "for_": ["boundary point"]};
+window.refsData['#prolog'] = {"text": "prolog", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#prolog", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-cd-data'] = {"text": "data", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-cd-data", "export": true, "normative": true, "for_": ["CharacterData"]};
+window.refsData['#remove-a-css-style-sheet'] = {"text": "remove a css style sheet", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#remove-a-css-style-sheet", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/xml-stylesheet/#dt-pseudo-attribute'] = {"text": "pseudo-attribute", "type": "dfn", "spec": "", "shortname": "cssom", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/xml-stylesheet/#dt-pseudo-attribute", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-node-document'] = {"text": "node document", "type": "dfn", "spec": "", "shortname": "cssom", "level": "1", "status": "anchor-block", "url": "https://dom.spec.whatwg.org/#concept-node-document", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#document-base-url'] = {"text": "document base url", "type": "dfn", "spec": "", "shortname": "cssom", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#document-base-url", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-document-url'] = {"text": "document url", "type": "dfn", "spec": "", "shortname": "cssom", "level": "1", "status": "anchor-block", "url": "https://dom.spec.whatwg.org/#concept-document-url", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-url-parser'] = {"text": "url parser", "type": "dfn", "spec": "", "shortname": "cssom", "level": "1", "status": "anchor-block", "url": "https://url.spec.whatwg.org/#concept-url-parser", "export": true, "normative": true, "for_": []};
+window.refsData['#fetch-a-css-style-sheet'] = {"text": "fetch a css style sheet", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#fetch-a-css-style-sheet", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-url-serializer'] = {"text": "url serializer", "type": "dfn", "spec": "", "shortname": "cssom", "level": "1", "status": "anchor-block", "url": "https://url.spec.whatwg.org/#concept-url-serializer", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#environment-encoding'] = {"text": "environment encoding", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#environment-encoding", "export": true, "normative": true, "for_": []};
+window.refsData['https://encoding.spec.whatwg.org/#concept-encoding-get'] = {"text": "get an encoding", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "", "status": "anchor-block", "url": "https://encoding.spec.whatwg.org/#concept-encoding-get", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-document-encoding'] = {"text": "encoding", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document-encoding", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/xhtml.html#xml-parser'] = {"text": "xml parser", "type": "dfn", "spec": "", "shortname": "cssom", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/xhtml.html#xml-parser", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/semantics.html#a-style-sheet-that-is-blocking-scripts'] = {"text": "a style sheet that is blocking scripts", "type": "dfn", "spec": "", "shortname": "cssom", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/semantics.html#a-style-sheet-that-is-blocking-scripts", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/semantics.html#style-sheet-ready'] = {"text": "style sheet ready", "type": "dfn", "spec": "", "shortname": "cssom", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/semantics.html#style-sheet-ready", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-loop'] = {"text": "event loop", "type": "dfn", "spec": "", "shortname": "cssom", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-loop", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-css-rule-type'] = {"text": "type", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#concept-css-rule-type", "export": true, "normative": true, "for_": ["CSSRule"]};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#parse-a-rule'] = {"text": "parse a rule", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#parse-a-rule", "export": true, "normative": true, "for_": []};
+window.refsData['#cssstylerule'] = {"text": "CSSStyleRule", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#cssstylerule", "export": true, "normative": true, "for_": []};
+window.refsData['#serialize-a-css-declaration-block'] = {"text": "serialize a css declaration block", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#serialize-a-css-declaration-block", "export": true, "normative": true, "for_": []};
+window.refsData['#cssimportrule'] = {"text": "CSSImportRule", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#cssimportrule", "export": true, "normative": true, "for_": []};
+window.refsData['#serialize-a-url'] = {"text": "serialize a url", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#serialize-a-url", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-conditional-3/#cssmediarule'] = {"text": "CSSMediaRule", "type": "interface", "spec": "css-conditional-3", "shortname": "css-conditional", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-conditional-3/#cssmediarule", "export": true, "normative": true, "for_": []};
+window.refsData['#serialize-a-css-rule'] = {"text": "serialize a css rule", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#serialize-a-css-rule", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cssgroupingrule-cssrules'] = {"text": "cssRules", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssgroupingrule-cssrules", "export": true, "normative": true, "for_": ["CSSGroupingRule"]};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#cssfontfacerule'] = {"text": "CSSFontFaceRule", "type": "interface", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#cssfontfacerule", "export": true, "normative": true, "for_": []};
+window.refsData['#serialize-a-local'] = {"text": "serialize a local", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#serialize-a-local", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font-variant'] = {"text": "font-variant", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-variant", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font-feature-settings'] = {"text": "font-feature-settings", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-feature-settings", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font-stretch'] = {"text": "font-stretch", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-stretch", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font-weight'] = {"text": "font-weight", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-weight", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font-style'] = {"text": "font-style", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-style", "export": true, "normative": true, "for_": []};
+window.refsData['#csspagerule'] = {"text": "CSSPageRule", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#csspagerule", "export": true, "normative": true, "for_": []};
+window.refsData['#cssnamespacerule'] = {"text": "CSSNamespaceRule", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#cssnamespacerule", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cssnamespacerule-prefix'] = {"text": "prefix", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssnamespacerule-prefix", "export": true, "normative": true, "for_": ["CSSNamespaceRule"]};
+window.refsData['#dom-cssnamespacerule-namespaceuri'] = {"text": "namespaceURI", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssnamespacerule-namespaceuri", "export": true, "normative": true, "for_": ["CSSNamespaceRule"]};
+window.refsData['https://drafts.csswg.org/css-animations-1/#csskeyframesrule'] = {"text": "CSSKeyframesRule", "type": "interface", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#csskeyframesrule", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-animations-1/#dom-csskeyframesrule-name'] = {"text": "name", "type": "attribute", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#dom-csskeyframesrule-name", "export": true, "normative": true, "for_": ["CSSKeyframesRule"]};
+window.refsData['https://drafts.csswg.org/css-animations-1/#dom-csskeyframesrule-cssrules'] = {"text": "cssRules", "type": "attribute", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#dom-csskeyframesrule-cssrules", "export": true, "normative": true, "for_": ["CSSKeyframesRule"]};
+window.refsData['https://drafts.csswg.org/css-animations-1/#csskeyframerule'] = {"text": "CSSKeyframeRule", "type": "interface", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#csskeyframerule", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-animations-1/#dom-csskeyframerule-keytext'] = {"text": "keyText", "type": "attribute", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#dom-csskeyframerule-keytext", "export": true, "normative": true, "for_": ["CSSKeyframeRule"]};
+window.refsData['https://webidl.spec.whatwg.org/#indexsizeerror'] = {"text": "IndexSizeError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#indexsizeerror", "export": true, "normative": true, "for_": []};
+window.refsData['#parse-a-css-rule'] = {"text": "parse a css rule", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#parse-a-css-rule", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#syntaxerror'] = {"text": "SyntaxError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#syntaxerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#hierarchyrequesterror'] = {"text": "HierarchyRequestError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#hierarchyrequesterror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#invalidstateerror'] = {"text": "InvalidStateError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidstateerror", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-css-rule-parent-css-rule'] = {"text": "parent css rule", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#concept-css-rule-parent-css-rule", "export": true, "normative": true, "for_": ["CSSRule"]};
+window.refsData['#concept-css-rule-parent-css-style-sheet'] = {"text": "parent css style sheet", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#concept-css-rule-parent-css-style-sheet", "export": true, "normative": true, "for_": ["CSSRule"]};
+window.refsData['#dom-cssrulelist-item'] = {"text": "item(index)", "type": "method", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssrulelist-item", "export": true, "normative": true, "for_": ["CSSRuleList"]};
+window.refsData['#dom-cssrulelist-length'] = {"text": "length", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssrulelist-length", "export": true, "normative": true, "for_": ["CSSRuleList"]};
+window.refsData['#dom-cssrule-csstext'] = {"text": "cssText", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssrule-csstext", "export": true, "normative": true, "for_": ["CSSRule"]};
+window.refsData['#dom-cssrule-parentrule'] = {"text": "parentRule", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssrule-parentrule", "export": true, "normative": true, "for_": ["CSSRule"]};
+window.refsData['#dom-cssrule-parentstylesheet'] = {"text": "parentStyleSheet", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssrule-parentstylesheet", "export": true, "normative": true, "for_": ["CSSRule"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-short'] = {"text": "unsigned short", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-short", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cssrule-type'] = {"text": "type", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssrule-type", "export": true, "normative": true, "for_": ["CSSRule"]};
+window.refsData['#cssmarginrule'] = {"text": "CSSMarginRule", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#cssmarginrule", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-counter-styles-3/#csscounterstylerule'] = {"text": "CSSCounterStyleRule", "type": "interface", "spec": "css-counter-styles-3", "shortname": "css-counter-styles", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-counter-styles-3/#csscounterstylerule", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-conditional-3/#csssupportsrule'] = {"text": "CSSSupportsRule", "type": "interface", "spec": "css-conditional-3", "shortname": "css-conditional", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-conditional-3/#csssupportsrule", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#cssfontfeaturevaluesrule'] = {"text": "CSSFontFeatureValuesRule", "type": "interface", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#cssfontfeaturevaluesrule", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cssstylerule-selectortext'] = {"text": "selectorText", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssstylerule-selectortext", "export": true, "normative": true, "for_": ["CSSStyleRule"]};
+window.refsData['#dom-cssstyledeclaration-csstext'] = {"text": "cssText", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssstyledeclaration-csstext", "export": true, "normative": true, "for_": ["CSSStyleDeclaration"]};
+window.refsData['#cssstyledeclaration'] = {"text": "CSSStyleDeclaration", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#cssstyledeclaration", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cssstylerule-style'] = {"text": "style", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssstylerule-style", "export": true, "normative": true, "for_": ["CSSStyleRule"]};
+window.refsData['#parse-a-group-of-selectors'] = {"text": "parse a group of selectors", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#parse-a-group-of-selectors", "export": true, "normative": true, "for_": []};
+window.refsData['#cssstyledeclaration-computed-flag'] = {"text": "computed flag", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#cssstyledeclaration-computed-flag", "export": true, "normative": true, "for_": ["CSSStyleDeclaration"]};
+window.refsData['#cssstyledeclaration-declarations'] = {"text": "declarations", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#cssstyledeclaration-declarations", "export": true, "normative": true, "for_": ["CSSStyleDeclaration"]};
+window.refsData['#concept-declarations-specified-order'] = {"text": "specified order", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#concept-declarations-specified-order", "export": true, "normative": true, "for_": []};
+window.refsData['#cssstyledeclaration-parent-css-rule'] = {"text": "parent css rule", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#cssstyledeclaration-parent-css-rule", "export": true, "normative": true, "for_": ["CSSStyleDeclaration"]};
+window.refsData['#cssstyledeclaration-owner-node'] = {"text": "owner node", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#cssstyledeclaration-owner-node", "export": true, "normative": true, "for_": ["CSSStyleDeclaration"]};
+window.refsData['#dom-cssimportrule-href'] = {"text": "href", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssimportrule-href", "export": true, "normative": true, "for_": ["CSSImportRule"]};
+window.refsData['#dom-cssimportrule-media'] = {"text": "media", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssimportrule-media", "export": true, "normative": true, "for_": ["CSSImportRule"]};
+window.refsData['#dom-cssimportrule-stylesheet'] = {"text": "styleSheet", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssimportrule-stylesheet", "export": true, "normative": true, "for_": ["CSSImportRule"]};
+window.refsData['https://url.spec.whatwg.org/#concept-url'] = {"text": "url", "type": "dfn", "spec": "", "shortname": "cssom", "level": "1", "status": "anchor-block", "url": "https://url.spec.whatwg.org/#concept-url", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cssgroupingrule-insertrule'] = {"text": "insertRule(rule, index)", "type": "method", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssgroupingrule-insertrule", "export": true, "normative": true, "for_": ["CSSGroupingRule"]};
+window.refsData['#dom-cssgroupingrule-deleterule'] = {"text": "deleteRule(index)", "type": "method", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssgroupingrule-deleterule", "export": true, "normative": true, "for_": ["CSSGroupingRule"]};
+window.refsData['#concept-css-rule-child-css-rules'] = {"text": "child css rules", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#concept-css-rule-child-css-rules", "export": true, "normative": true, "for_": ["CSSRule"]};
+window.refsData['#serialize-a-list-of-css-page-selectors'] = {"text": "serialize a list of css page selectors", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#serialize-a-list-of-css-page-selectors", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-csspagerule-selectortext'] = {"text": "selectorText", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-csspagerule-selectortext", "export": true, "normative": true, "for_": ["CSSPageRule"]};
+window.refsData['#parse-a-list-of-css-page-selectors'] = {"text": "parse a list of css page selectors", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#parse-a-list-of-css-page-selectors", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cssmarginrule-name'] = {"text": "name", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssmarginrule-name", "export": true, "normative": true, "for_": ["CSSMarginRule"]};
+window.refsData['#dom-cssmarginrule-style'] = {"text": "style", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssmarginrule-style", "export": true, "normative": true, "for_": ["CSSMarginRule"]};
+window.refsData['#css-declaration'] = {"text": "css declaration", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#css-declaration", "export": true, "normative": true, "for_": []};
+window.refsData['#css-declaration-property-name'] = {"text": "property name", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#css-declaration-property-name", "export": true, "normative": true, "for_": ["CSS declaration"]};
+window.refsData['#css-declaration-block'] = {"text": "css declaration block", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#css-declaration-block", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#parse-a-list-of-declarations'] = {"text": "parse a list of declarations", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#parse-a-list-of-declarations", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-shorthands-preferred-order'] = {"text": "preferred order", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#concept-shorthands-preferred-order", "export": true, "normative": true, "for_": []};
+window.refsData['#css-declaration-important-flag'] = {"text": "important flag", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#css-declaration-important-flag", "export": true, "normative": true, "for_": ["CSS declaration"]};
+window.refsData['https://drafts.csswg.org/css-logical-1/#logical-property-group'] = {"text": "logical property group", "type": "dfn", "spec": "css-logical-1", "shortname": "css-logical", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-logical-1/#logical-property-group", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-logical-1/#mapping-logic'] = {"text": "mapping logic", "type": "dfn", "spec": "css-logical-1", "shortname": "css-logical", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-logical-1/#mapping-logic", "export": true, "normative": true, "for_": []};
+window.refsData['#serialize-a-css-value'] = {"text": "serialize a css value", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#serialize-a-css-value", "export": true, "normative": true, "for_": []};
+window.refsData['#serialize-a-css-declaration'] = {"text": "serialize a css declaration", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#serialize-a-css-declaration", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-element-attributes-change-ext'] = {"text": "attribute change steps", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-element-attributes-change-ext", "export": true, "normative": true, "for_": []};
+window.refsData['#cssstyledeclaration-updating-flag'] = {"text": "updating flag", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#cssstyledeclaration-updating-flag", "export": true, "normative": true, "for_": ["CSSStyleDeclaration"]};
+window.refsData['#parse-a-css-declaration-block'] = {"text": "parse a css declaration block", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#parse-a-css-declaration-block", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-element-attributes-get-by-namespace'] = {"text": "get an attribute by namespace and local name", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-element-attributes-get-by-namespace", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-element-attributes-set-value'] = {"text": "set an attribute value", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-element-attributes-set-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/custom-elements.html#cereactions'] = {"text": "CEReactions", "type": "extended-attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/custom-elements.html#cereactions", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cssstyledeclaration-length'] = {"text": "length", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssstyledeclaration-length", "export": true, "normative": true, "for_": ["CSSStyleDeclaration"]};
+window.refsData['#dom-cssstyledeclaration-item'] = {"text": "item(index)", "type": "method", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssstyledeclaration-item", "export": true, "normative": true, "for_": ["CSSStyleDeclaration"]};
+window.refsData['#dom-cssstyledeclaration-getpropertyvalue'] = {"text": "getPropertyValue(property)", "type": "method", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssstyledeclaration-getpropertyvalue", "export": true, "normative": true, "for_": ["CSSStyleDeclaration"]};
+window.refsData['#dom-cssstyledeclaration-getpropertypriority'] = {"text": "getPropertyPriority(property)", "type": "method", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssstyledeclaration-getpropertypriority", "export": true, "normative": true, "for_": ["CSSStyleDeclaration"]};
+window.refsData['#dom-cssstyledeclaration-setproperty'] = {"text": "setProperty(property, value, priority)", "type": "method", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssstyledeclaration-setproperty", "export": true, "normative": true, "for_": ["CSSStyleDeclaration"]};
+window.refsData['#dom-cssstyledeclaration-removeproperty'] = {"text": "removeProperty(property)", "type": "method", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssstyledeclaration-removeproperty", "export": true, "normative": true, "for_": ["CSSStyleDeclaration"]};
+window.refsData['#dom-cssstyledeclaration-parentrule'] = {"text": "parentRule", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssstyledeclaration-parentrule", "export": true, "normative": true, "for_": ["CSSStyleDeclaration"]};
+window.refsData['#dom-cssstyledeclaration-cssfloat'] = {"text": "cssFloat", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssstyledeclaration-cssfloat", "export": true, "normative": true, "for_": ["CSSStyleDeclaration"]};
+window.refsData['https://webidl.spec.whatwg.org/#nomodificationallowederror'] = {"text": "NoModificationAllowedError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#nomodificationallowederror", "export": true, "normative": true, "for_": []};
+window.refsData['#update-style-attribute-for'] = {"text": "update style attribute for", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#update-style-attribute-for", "export": true, "normative": true, "for_": []};
+window.refsData['#parse-a-css-value'] = {"text": "parse a css value", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#parse-a-css-value", "export": true, "normative": true, "for_": []};
+window.refsData['#set-a-css-declaration'] = {"text": "set a css declaration", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#set-a-css-declaration", "export": true, "normative": true, "for_": []};
+window.refsData['#set'] = {"text": "set", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#set", "export": true, "normative": true, "for_": []};
+window.refsData['#unset'] = {"text": "unset", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#unset", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-iterate'] = {"text": "for each", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-iterate", "export": true, "normative": true, "for_": ["list", "set"]};
+window.refsData['https://infra.spec.whatwg.org/#iteration-continue'] = {"text": "continue", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#iteration-continue", "export": true, "normative": true, "for_": ["iteration"]};
+window.refsData['https://infra.spec.whatwg.org/#iteration-break'] = {"text": "break", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#iteration-break", "export": true, "normative": true, "for_": ["iteration"]};
+window.refsData['#css-declaration-value'] = {"text": "value", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#css-declaration-value", "export": true, "normative": true, "for_": ["CSS declaration"]};
+window.refsData['#css-property-to-idl-attribute'] = {"text": "css property to idl attribute", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#css-property-to-idl-attribute", "export": true, "normative": true, "for_": []};
+window.refsData['#idl-attribute-to-css-property'] = {"text": "idl attribute to css property", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#idl-attribute-to-css-property", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cssstyledeclaration-camel-cased-attribute'] = {"text": "camel-cased attribute", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssstyledeclaration-camel-cased-attribute", "export": true, "normative": true, "for_": ["CSSStyleDeclaration"]};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font-size'] = {"text": "font-size", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-size", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cssstyledeclaration-webkit-cased-attribute'] = {"text": "webkit-cased attribute", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssstyledeclaration-webkit-cased-attribute", "export": true, "normative": true, "for_": ["CSSStyleDeclaration"]};
+window.refsData['https://compat.spec.whatwg.org/#propdef--webkit-transform'] = {"text": "-webkit-transform", "type": "property", "spec": "compat", "shortname": "compat", "level": "1", "status": "current", "url": "https://compat.spec.whatwg.org/#propdef--webkit-transform", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cssstyledeclaration-dashed-attribute'] = {"text": "dashed attribute", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-cssstyledeclaration-dashed-attribute", "export": true, "normative": true, "for_": ["CSSStyleDeclaration"]};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#html-elements'] = {"text": "html elements", "type": "dfn", "spec": "", "shortname": "cssom", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#html-elements", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ascii-uppercase'] = {"text": "ascii uppercase", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-uppercase", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#parse-a-list-of-component-values'] = {"text": "parse a list of component values", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#parse-a-list-of-component-values", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list'] = {"text": "list", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#css-parse-something-according-to-a-css-grammar'] = {"text": "parse", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#css-parse-something-according-to-a-css-grammar", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-any'] = {"text": "||", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-any", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#typedef-whitespace-token'] = {"text": "<whitespace-token>", "type": "type", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#typedef-whitespace-token", "export": true, "normative": true, "for_": []};
+window.refsData['#serialize-a-css-component-value'] = {"text": "serialize a css component value", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#serialize-a-css-component-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#angle-value'] = {"text": "<angle>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#angle-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-color-5/#typedef-color'] = {"text": "<color>", "type": "type", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-color-5/#typedef-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-lists-3/#typedef-counter'] = {"text": "<counter>", "type": "type", "spec": "css-lists-3", "shortname": "css-lists", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-lists-3/#typedef-counter", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#frequency-value'] = {"text": "<frequency>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#frequency-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css2/#value-def-identifier'] = {"text": "<identifier>", "type": "type", "spec": "css22", "shortname": "css", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css2/#value-def-identifier", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#integer-value'] = {"text": "<integer>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#integer-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#length-value'] = {"text": "<length>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#length-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#number-value'] = {"text": "<number>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#number-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#percentage-value'] = {"text": "<percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#percentage-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#resolution-value'] = {"text": "<resolution>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#resolution-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#px'] = {"text": "px", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#px", "export": true, "normative": true, "for_": ["<length>"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#ratio-value'] = {"text": "<ratio>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#ratio-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css2/#value-def-shape'] = {"text": "<shape>", "type": "type", "spec": "css22", "shortname": "css", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css2/#value-def-shape", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#string-value'] = {"text": "<string>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#string-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#family-name-value'] = {"text": "<family-name>", "type": "type", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#family-name-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#time-value'] = {"text": "<time>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#time-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#url-value'] = {"text": "<url>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#url-value", "export": true, "normative": true, "for_": []};
+window.refsData['#elementcssinlinestyle'] = {"text": "ElementCSSInlineStyle", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#elementcssinlinestyle", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-elementcssinlinestyle-style'] = {"text": "style", "type": "attribute", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-elementcssinlinestyle-style", "export": true, "normative": true, "for_": ["ElementCSSInlineStyle"]};
+window.refsData['https://html.spec.whatwg.org/multipage/dom.html#htmlelement'] = {"text": "HTMLElement", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dom.html#htmlelement", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/types.html#InterfaceSVGElement'] = {"text": "SVGElement", "type": "interface", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/types.html#InterfaceSVGElement", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/mathml-core/#dom-mathmlelement'] = {"text": "MathMLElement", "type": "interface", "spec": "mathml-core", "shortname": "mathml-core", "level": "1", "status": "current", "url": "https://w3c.github.io/mathml-core/#dom-mathmlelement", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#window'] = {"text": "Window", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#NewObject'] = {"text": "NewObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#NewObject", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-window-getcomputedstyle'] = {"text": "getComputedStyle(elt, pseudoElt)", "type": "method", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-window-getcomputedstyle", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['https://drafts.csswg.org/selectors-4/#typedef-pseudo-element-selector'] = {"text": "<pseudo-element-selector>", "type": "type", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#typedef-pseudo-element-selector", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-scoping-1/#selectordef-slotted'] = {"text": "::slotted()", "type": "selector", "spec": "css-scoping-1", "shortname": "css-scoping", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-scoping-1/#selectordef-slotted", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-shadow-parts-1/#selectordef-part'] = {"text": "::part()", "type": "selector", "spec": "css-shadow-parts-1", "shortname": "css-shadow-parts", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-shadow-parts-1/#selectordef-part", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#exceptiondef-typeerror'] = {"text": "TypeError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#exceptiondef-typeerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#connected'] = {"text": "connected", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#connected", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-scoping-1/#flat-tree'] = {"text": "flat tree", "type": "dfn", "spec": "css-scoping-1", "shortname": "css-scoping", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-scoping-1/#flat-tree", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-shadow-including-root'] = {"text": "shadow-including root", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-shadow-including-root", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#browsing-context'] = {"text": "browsing context", "type": "dfn", "spec": "", "shortname": "cssom", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/rendering.html#being-rendered'] = {"text": "being rendered", "type": "dfn", "spec": "", "shortname": "cssom", "level": "1", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/rendering.html#being-rendered", "export": true, "normative": true, "for_": []};
+window.refsData['#resolved-value'] = {"text": "resolved value", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#resolved-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#computed-value'] = {"text": "computed value", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#computed-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-variables-2/#guaranteed-invalid-value'] = {"text": "guaranteed-invalid value", "type": "dfn", "spec": "css-variables-2", "shortname": "css-variables", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-variables-2/#guaranteed-invalid-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#propdef-overflow'] = {"text": "overflow", "type": "property", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#propdef-overflow", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-css-escape'] = {"text": "escape(ident)", "type": "method", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#dom-css-escape", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['#namespacedef-css'] = {"text": "CSS", "type": "namespace", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "local", "url": "#namespacedef-css", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object'] = {"text": "current global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#concept-document-window'] = {"text": "associated document", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#concept-document-window", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background-color'] = {"text": "background-color", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-logical-1/#propdef-border-block-end-color'] = {"text": "border-block-end-color", "type": "property", "spec": "css-logical-1", "shortname": "css-logical", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-logical-1/#propdef-border-block-end-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-logical-1/#propdef-border-block-start-color'] = {"text": "border-block-start-color", "type": "property", "spec": "css-logical-1", "shortname": "css-logical", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-logical-1/#propdef-border-block-start-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border-bottom-color'] = {"text": "border-bottom-color", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-bottom-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-logical-1/#propdef-border-inline-end-color'] = {"text": "border-inline-end-color", "type": "property", "spec": "css-logical-1", "shortname": "css-logical", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-logical-1/#propdef-border-inline-end-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-logical-1/#propdef-border-inline-start-color'] = {"text": "border-inline-start-color", "type": "property", "spec": "css-logical-1", "shortname": "css-logical", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-logical-1/#propdef-border-inline-start-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border-left-color'] = {"text": "border-left-color", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-left-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border-right-color'] = {"text": "border-right-color", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-right-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border-top-color'] = {"text": "border-top-color", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-top-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-box-shadow'] = {"text": "box-shadow", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-box-shadow", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-ui-4/#propdef-caret-color'] = {"text": "caret-color", "type": "property", "spec": "css-ui-4", "shortname": "css-ui", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-ui-4/#propdef-caret-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-color-4/#propdef-color'] = {"text": "color", "type": "property", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#propdef-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-ui-4/#propdef-outline-color'] = {"text": "outline-color", "type": "property", "spec": "css-ui-4", "shortname": "css-ui", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-ui-4/#propdef-outline-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#used-value'] = {"text": "used value", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#used-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css2/#propdef-line-height'] = {"text": "line-height", "type": "property", "spec": "css22", "shortname": "css", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css2/#propdef-line-height", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-logical-1/#propdef-block-size'] = {"text": "block-size", "type": "property", "spec": "css-logical-1", "shortname": "css-logical", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-logical-1/#propdef-block-size", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-height'] = {"text": "height", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-height", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-logical-1/#propdef-inline-size'] = {"text": "inline-size", "type": "property", "spec": "css-logical-1", "shortname": "css-logical", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-logical-1/#propdef-inline-size", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-logical-1/#propdef-margin-block-end'] = {"text": "margin-block-end", "type": "property", "spec": "css-logical-1", "shortname": "css-logical", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-logical-1/#propdef-margin-block-end", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-logical-1/#propdef-margin-block-start'] = {"text": "margin-block-start", "type": "property", "spec": "css-logical-1", "shortname": "css-logical", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-logical-1/#propdef-margin-block-start", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#propdef-margin-bottom'] = {"text": "margin-bottom", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#propdef-margin-bottom", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-logical-1/#propdef-margin-inline-end'] = {"text": "margin-inline-end", "type": "property", "spec": "css-logical-1", "shortname": "css-logical", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-logical-1/#propdef-margin-inline-end", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-logical-1/#propdef-margin-inline-start'] = {"text": "margin-inline-start", "type": "property", "spec": "css-logical-1", "shortname": "css-logical", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-logical-1/#propdef-margin-inline-start", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#propdef-margin-left'] = {"text": "margin-left", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#propdef-margin-left", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#propdef-margin-right'] = {"text": "margin-right", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#propdef-margin-right", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#propdef-margin-top'] = {"text": "margin-top", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#propdef-margin-top", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-logical-1/#propdef-padding-block-end'] = {"text": "padding-block-end", "type": "property", "spec": "css-logical-1", "shortname": "css-logical", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-logical-1/#propdef-padding-block-end", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-logical-1/#propdef-padding-block-start'] = {"text": "padding-block-start", "type": "property", "spec": "css-logical-1", "shortname": "css-logical", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-logical-1/#propdef-padding-block-start", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#propdef-padding-bottom'] = {"text": "padding-bottom", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#propdef-padding-bottom", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-logical-1/#propdef-padding-inline-end'] = {"text": "padding-inline-end", "type": "property", "spec": "css-logical-1", "shortname": "css-logical", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-logical-1/#propdef-padding-inline-end", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-logical-1/#propdef-padding-inline-start'] = {"text": "padding-inline-start", "type": "property", "spec": "css-logical-1", "shortname": "css-logical", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-logical-1/#propdef-padding-inline-start", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#propdef-padding-left'] = {"text": "padding-left", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#propdef-padding-left", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#propdef-padding-right'] = {"text": "padding-right", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#propdef-padding-right", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#propdef-padding-top'] = {"text": "padding-top", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#propdef-padding-top", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-width'] = {"text": "width", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-width", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#propdef-display'] = {"text": "display", "type": "property", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#propdef-display", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#valdef-display-none'] = {"text": "none", "type": "value", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#valdef-display-none", "export": true, "normative": true, "for_": ["display", "<display-box>"]};
+window.refsData['https://drafts.csswg.org/css-display-4/#valdef-display-contents'] = {"text": "contents", "type": "value", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#valdef-display-contents", "export": true, "normative": true, "for_": ["display", "<display-box>"]};
+window.refsData['https://drafts.csswg.org/css-position-3/#propdef-bottom'] = {"text": "bottom", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-bottom", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#propdef-left'] = {"text": "left", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-left", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#propdef-inset-block-end'] = {"text": "inset-block-end", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-inset-block-end", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#propdef-inset-block-start'] = {"text": "inset-block-start", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-inset-block-start", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#propdef-inset-inline-end'] = {"text": "inset-inline-end", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-inset-inline-end", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#propdef-inset-inline-start'] = {"text": "inset-inline-start", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-inset-inline-start", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#propdef-right'] = {"text": "right", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-right", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#propdef-top'] = {"text": "top", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-top", "export": true, "normative": true, "for_": []};
 </script>

@@ -891,6 +891,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -4740,8 +4777,6 @@ for their careful reviews, comments, and corrections.</p>
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -4989,7 +5024,6 @@ for their careful reviews, comments, and corrections.</p>
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -5612,6 +5646,451 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#svgpoint'] = {"text": "SVGPoint", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#svgpoint", "export": true, "normative": true, "for_": []};
+window.refsData['#svgrect'] = {"text": "SVGRect", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#svgrect", "export": true, "normative": true, "for_": []};
+window.refsData['#svgmatrix'] = {"text": "SVGMatrix", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#svgmatrix", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/structured-data.html#serializable'] = {"text": "Serializable", "type": "extended-attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/structured-data.html#serializable", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-dompointreadonly-dompointreadonly'] = {"text": "DOMPointReadOnly(x, y, z, w)", "type": "constructor", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dompointreadonly-dompointreadonly", "export": true, "normative": true, "for_": ["DOMPointReadOnly"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unrestricted-double'] = {"text": "unrestricted double", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unrestricted-double", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#NewObject'] = {"text": "NewObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#NewObject", "export": true, "normative": true, "for_": []};
+window.refsData['#dompointreadonly'] = {"text": "DOMPointReadOnly", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dompointreadonly", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-dompointreadonly-frompoint'] = {"text": "fromPoint(other)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dompointreadonly-frompoint", "export": true, "normative": true, "for_": ["DOMPointReadOnly"]};
+window.refsData['#dictdef-dompointinit'] = {"text": "DOMPointInit", "type": "dictionary", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dictdef-dompointinit", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-dompointreadonly-x'] = {"text": "x", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dompointreadonly-x", "export": true, "normative": true, "for_": ["DOMPoint", "DOMPointReadOnly"]};
+window.refsData['#dom-dompointreadonly-y'] = {"text": "y", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dompointreadonly-y", "export": true, "normative": true, "for_": ["DOMPoint", "DOMPointReadOnly"]};
+window.refsData['#dom-dompointreadonly-z'] = {"text": "z", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dompointreadonly-z", "export": true, "normative": true, "for_": ["DOMPoint", "DOMPointReadOnly"]};
+window.refsData['#dom-dompointreadonly-w'] = {"text": "w", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dompointreadonly-w", "export": true, "normative": true, "for_": ["DOMPoint", "DOMPointReadOnly"]};
+window.refsData['#dompoint'] = {"text": "DOMPoint", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dompoint", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-dompointreadonly-matrixtransform'] = {"text": "matrixTransform(matrix)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dompointreadonly-matrixtransform", "export": true, "normative": true, "for_": ["DOMPointReadOnly"]};
+window.refsData['#dictdef-dommatrixinit'] = {"text": "DOMMatrixInit", "type": "dictionary", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dictdef-dommatrixinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Default'] = {"text": "Default", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Default", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-object'] = {"text": "object", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#LegacyWindowAlias'] = {"text": "LegacyWindowAlias", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#LegacyWindowAlias", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-dompoint-dompoint'] = {"text": "DOMPoint(x, y, z, w)", "type": "constructor", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dompoint-dompoint", "export": true, "normative": true, "for_": ["DOMPoint"]};
+window.refsData['#dom-dompoint-frompoint'] = {"text": "fromPoint(other)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dompoint-frompoint", "export": true, "normative": true, "for_": ["DOMPoint"]};
+window.refsData['#point-x-coordinate'] = {"text": "x coordinate", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#point-x-coordinate", "export": true, "normative": true, "for_": ["point"]};
+window.refsData['#point-y-coordinate'] = {"text": "y coordinate", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#point-y-coordinate", "export": true, "normative": true, "for_": ["point"]};
+window.refsData['#point-z-coordinate'] = {"text": "z coordinate", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#point-z-coordinate", "export": true, "normative": true, "for_": ["point"]};
+window.refsData['#point-w-perspective'] = {"text": "w perspective", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#point-w-perspective", "export": true, "normative": true, "for_": ["point"]};
+window.refsData['#create-a-dompointreadonly-from-the-dictionary'] = {"text": "create a dompointreadonly from the dictionary", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#create-a-dompointreadonly-from-the-dictionary", "export": true, "normative": true, "for_": []};
+window.refsData['#create-a-dompoint-from-the-dictionary'] = {"text": "create a dompoint from the dictionary", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#create-a-dompoint-from-the-dictionary", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-dompointinit-x'] = {"text": "x", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dompointinit-x", "export": true, "normative": true, "for_": ["DOMPointInit"]};
+window.refsData['#dom-dompointinit-y'] = {"text": "y", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dompointinit-y", "export": true, "normative": true, "for_": ["DOMPointInit"]};
+window.refsData['#dom-dompointinit-z'] = {"text": "z", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dompointinit-z", "export": true, "normative": true, "for_": ["DOMPointInit"]};
+window.refsData['#dom-dompointinit-w'] = {"text": "w", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dompointinit-w", "export": true, "normative": true, "for_": ["DOMPointInit"]};
+window.refsData['#create-a-dommatrix-from-the-dictionary'] = {"text": "create a dommatrix from the dictionary", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#create-a-dommatrix-from-the-dictionary", "export": true, "normative": true, "for_": []};
+window.refsData['#transform-a-point-with-a-matrix'] = {"text": "transform a point with a matrix", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#transform-a-point-with-a-matrix", "export": true, "normative": true, "for_": []};
+window.refsData['#dommatrix'] = {"text": "DOMMatrix", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dommatrix", "export": true, "normative": true, "for_": []};
+window.refsData['#point'] = {"text": "point", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#point", "export": true, "normative": true, "for_": []};
+window.refsData['#matrix'] = {"text": "matrix", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#matrix", "export": true, "normative": true, "for_": []};
+window.refsData['#pre-multiply'] = {"text": "pre-multiply", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#pre-multiply", "export": true, "normative": true, "for_": []};
+window.refsData['#matrix-is-2d'] = {"text": "is 2d", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#matrix-is-2d", "export": true, "normative": true, "for_": ["matrix"]};
+window.refsData['#domrectreadonly'] = {"text": "DOMRectReadOnly", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#domrectreadonly", "export": true, "normative": true, "for_": []};
+window.refsData['#rectangle'] = {"text": "rectangle", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#rectangle", "export": true, "normative": true, "for_": []};
+window.refsData['#rectangle-width-dimension'] = {"text": "width dimension", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#rectangle-width-dimension", "export": true, "normative": true, "for_": ["rectangle"]};
+window.refsData['#rectangle-height-dimension'] = {"text": "height dimension", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#rectangle-height-dimension", "export": true, "normative": true, "for_": ["rectangle"]};
+window.refsData['#rectangle-origin'] = {"text": "origin", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#rectangle-origin", "export": true, "normative": true, "for_": ["rectangle"]};
+window.refsData['#dom-domrectreadonly-domrectreadonly'] = {"text": "DOMRectReadOnly(x, y, width, height)", "type": "constructor", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-domrectreadonly-domrectreadonly", "export": true, "normative": true, "for_": ["DOMRectReadOnly"]};
+window.refsData['#dom-domrectreadonly-fromrect'] = {"text": "fromRect()", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-domrectreadonly-fromrect", "export": true, "normative": true, "for_": ["DOMRectReadOnly"]};
+window.refsData['#dictdef-domrectinit'] = {"text": "DOMRectInit", "type": "dictionary", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dictdef-domrectinit", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-domrect-domrect'] = {"text": "DOMRect(x, y, width, height)", "type": "constructor", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-domrect-domrect", "export": true, "normative": true, "for_": ["DOMRect"]};
+window.refsData['#domrect'] = {"text": "DOMRect", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#domrect", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-domrect-fromrect'] = {"text": "fromRect()", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-domrect-fromrect", "export": true, "normative": true, "for_": ["DOMRect"]};
+window.refsData['#rectangle-x-coordinate'] = {"text": "x coordinate", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#rectangle-x-coordinate", "export": true, "normative": true, "for_": ["rectangle"]};
+window.refsData['#rectangle-y-coordinate'] = {"text": "y coordinate", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#rectangle-y-coordinate", "export": true, "normative": true, "for_": ["rectangle"]};
+window.refsData['#create-a-domrectreadonly-from-the-dictionary'] = {"text": "create a domrectreadonly from the dictionary", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#create-a-domrectreadonly-from-the-dictionary", "export": true, "normative": true, "for_": []};
+window.refsData['#create-a-domrect-from-the-dictionary'] = {"text": "create a domrect from the dictionary", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#create-a-domrect-from-the-dictionary", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-domrectinit-x'] = {"text": "x", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-domrectinit-x", "export": true, "normative": true, "for_": ["DOMRectInit"]};
+window.refsData['#dom-domrectinit-y'] = {"text": "y", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-domrectinit-y", "export": true, "normative": true, "for_": ["DOMRectInit"]};
+window.refsData['#dom-domrectinit-width'] = {"text": "width", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-domrectinit-width", "export": true, "normative": true, "for_": ["DOMRectInit"]};
+window.refsData['#dom-domrectinit-height'] = {"text": "height", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-domrectinit-height", "export": true, "normative": true, "for_": ["DOMRectInit"]};
+window.refsData['#dom-domrect-x'] = {"text": "x", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-domrect-x", "export": true, "normative": true, "for_": ["DOMRect"]};
+window.refsData['#dom-domrect-y'] = {"text": "y", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-domrect-y", "export": true, "normative": true, "for_": ["DOMRect"]};
+window.refsData['#dom-domrect-width'] = {"text": "width", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-domrect-width", "export": true, "normative": true, "for_": ["DOMRect"]};
+window.refsData['#dom-domrect-height'] = {"text": "height", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-domrect-height", "export": true, "normative": true, "for_": ["DOMRect"]};
+window.refsData['#nan-safe-minimum'] = {"text": "nan-safe minimum", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#nan-safe-minimum", "export": true, "normative": true, "for_": []};
+window.refsData['#nan-safe-maximum'] = {"text": "nan-safe maximum", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#nan-safe-maximum", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-long'] = {"text": "unsigned long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-domrectlist-length'] = {"text": "length", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-domrectlist-length", "export": true, "normative": true, "for_": ["DOMRectList"]};
+window.refsData['#dom-domrectlist-item'] = {"text": "item(index)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-domrectlist-item", "export": true, "normative": true, "for_": ["DOMRectList"]};
+window.refsData['#domrectlist'] = {"text": "DOMRectList", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#domrectlist", "export": true, "normative": true, "for_": []};
+window.refsData['#domquad'] = {"text": "DOMQuad", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#domquad", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-domquad-domquad'] = {"text": "DOMQuad(p1, p2, p3, p4)", "type": "constructor", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-domquad-domquad", "export": true, "normative": true, "for_": ["DOMQuad"]};
+window.refsData['#dom-domquad-fromrect'] = {"text": "fromRect()", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-domquad-fromrect", "export": true, "normative": true, "for_": ["DOMQuad"]};
+window.refsData['#dom-domquad-fromquad'] = {"text": "fromQuad()", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-domquad-fromquad", "export": true, "normative": true, "for_": ["DOMQuad"]};
+window.refsData['#dictdef-domquadinit'] = {"text": "DOMQuadInit", "type": "dictionary", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dictdef-domquadinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-domquad-p1'] = {"text": "p1", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-domquad-p1", "export": true, "normative": true, "for_": ["DOMQuad"]};
+window.refsData['#dom-domquad-p2'] = {"text": "p2", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-domquad-p2", "export": true, "normative": true, "for_": ["DOMQuad"]};
+window.refsData['#dom-domquad-p3'] = {"text": "p3", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-domquad-p3", "export": true, "normative": true, "for_": ["DOMQuad"]};
+window.refsData['#dom-domquad-p4'] = {"text": "p4", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-domquad-p4", "export": true, "normative": true, "for_": ["DOMQuad"]};
+window.refsData['#dom-domquad-getbounds'] = {"text": "getBounds()", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-domquad-getbounds", "export": true, "normative": true, "for_": ["DOMQuad"]};
+window.refsData['#quadrilateral-point-1'] = {"text": "point 1", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#quadrilateral-point-1", "export": true, "normative": true, "for_": ["quadrilateral"]};
+window.refsData['#quadrilateral-point-2'] = {"text": "point 2", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#quadrilateral-point-2", "export": true, "normative": true, "for_": ["quadrilateral"]};
+window.refsData['#quadrilateral-point-3'] = {"text": "point 3", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#quadrilateral-point-3", "export": true, "normative": true, "for_": ["quadrilateral"]};
+window.refsData['#quadrilateral-point-4'] = {"text": "point 4", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#quadrilateral-point-4", "export": true, "normative": true, "for_": ["quadrilateral"]};
+window.refsData['#create-a-domquad-from-the-domrectinit-dictionary'] = {"text": "create a domquad from the domrectinit dictionary", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#create-a-domquad-from-the-domrectinit-dictionary", "export": true, "normative": true, "for_": []};
+window.refsData['#create-a-domquad-from-the-domquadinit-dictionary'] = {"text": "create a domquad from the domquadinit dictionary", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#create-a-domquad-from-the-domquadinit-dictionary", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-domquadinit-p1'] = {"text": "p1", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-domquadinit-p1", "export": true, "normative": true, "for_": ["DOMQuadInit"]};
+window.refsData['#dom-domquadinit-p2'] = {"text": "p2", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-domquadinit-p2", "export": true, "normative": true, "for_": ["DOMQuadInit"]};
+window.refsData['#dom-domquadinit-p3'] = {"text": "p3", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-domquadinit-p3", "export": true, "normative": true, "for_": ["DOMQuadInit"]};
+window.refsData['#dom-domquadinit-p4'] = {"text": "p4", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-domquadinit-p4", "export": true, "normative": true, "for_": ["DOMQuadInit"]};
+window.refsData['#dommatrixreadonly'] = {"text": "DOMMatrixReadOnly", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dommatrixreadonly", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-dommatrixreadonly-dommatrixreadonly'] = {"text": "DOMMatrixReadOnly(init)", "type": "constructor", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-dommatrixreadonly", "export": true, "normative": true, "for_": ["DOMMatrixReadOnly"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-dommatrixreadonly-frommatrix'] = {"text": "fromMatrix()", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-frommatrix", "export": true, "normative": true, "for_": ["DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-fromfloat32array'] = {"text": "fromFloat32Array(array32)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-fromfloat32array", "export": true, "normative": true, "for_": ["DOMMatrixReadOnly"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-Float32Array'] = {"text": "Float32Array", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-Float32Array", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-dommatrixreadonly-fromfloat64array'] = {"text": "fromFloat64Array(array64)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-fromfloat64array", "export": true, "normative": true, "for_": ["DOMMatrixReadOnly"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-Float64Array'] = {"text": "Float64Array", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-Float64Array", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-dommatrixreadonly-a'] = {"text": "a", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-a", "export": true, "normative": true, "for_": ["DOMMatrix", "DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-b'] = {"text": "b", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-b", "export": true, "normative": true, "for_": ["DOMMatrix", "DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-c'] = {"text": "c", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-c", "export": true, "normative": true, "for_": ["DOMMatrix", "DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-d'] = {"text": "d", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-d", "export": true, "normative": true, "for_": ["DOMMatrix", "DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-e'] = {"text": "e", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-e", "export": true, "normative": true, "for_": ["DOMMatrix", "DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-f'] = {"text": "f", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-f", "export": true, "normative": true, "for_": ["DOMMatrix", "DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-m11'] = {"text": "m11", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-m11", "export": true, "normative": true, "for_": ["DOMMatrix", "DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-m12'] = {"text": "m12", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-m12", "export": true, "normative": true, "for_": ["DOMMatrix", "DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-m13'] = {"text": "m13", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-m13", "export": true, "normative": true, "for_": ["DOMMatrix", "DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-m14'] = {"text": "m14", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-m14", "export": true, "normative": true, "for_": ["DOMMatrix", "DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-m21'] = {"text": "m21", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-m21", "export": true, "normative": true, "for_": ["DOMMatrix", "DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-m22'] = {"text": "m22", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-m22", "export": true, "normative": true, "for_": ["DOMMatrix", "DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-m23'] = {"text": "m23", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-m23", "export": true, "normative": true, "for_": ["DOMMatrix", "DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-m24'] = {"text": "m24", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-m24", "export": true, "normative": true, "for_": ["DOMMatrix", "DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-m31'] = {"text": "m31", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-m31", "export": true, "normative": true, "for_": ["DOMMatrix", "DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-m32'] = {"text": "m32", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-m32", "export": true, "normative": true, "for_": ["DOMMatrix", "DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-m33'] = {"text": "m33", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-m33", "export": true, "normative": true, "for_": ["DOMMatrix", "DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-m34'] = {"text": "m34", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-m34", "export": true, "normative": true, "for_": ["DOMMatrix", "DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-m41'] = {"text": "m41", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-m41", "export": true, "normative": true, "for_": ["DOMMatrix", "DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-m42'] = {"text": "m42", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-m42", "export": true, "normative": true, "for_": ["DOMMatrix", "DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-m43'] = {"text": "m43", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-m43", "export": true, "normative": true, "for_": ["DOMMatrix", "DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-m44'] = {"text": "m44", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-m44", "export": true, "normative": true, "for_": ["DOMMatrix", "DOMMatrixReadOnly"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-dommatrixreadonly-is2d'] = {"text": "is2D", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-is2d", "export": true, "normative": true, "for_": ["DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-isidentity'] = {"text": "isIdentity", "type": "attribute", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-isidentity", "export": true, "normative": true, "for_": ["DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-translate'] = {"text": "translate(tx, ty, tz)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-translate", "export": true, "normative": true, "for_": ["DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-scale'] = {"text": "scale(scaleX, scaleY, scaleZ, originX, originY, originZ)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-scale", "export": true, "normative": true, "for_": ["DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-scalenonuniform'] = {"text": "scaleNonUniform(scaleX, scaleY)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-scalenonuniform", "export": true, "normative": true, "for_": ["DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-scale3d'] = {"text": "scale3d(scale, originX, originY, originZ)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-scale3d", "export": true, "normative": true, "for_": ["DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-rotate'] = {"text": "rotate(rotX, rotY, rotZ)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-rotate", "export": true, "normative": true, "for_": ["DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-rotatefromvector'] = {"text": "rotateFromVector(x, y)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-rotatefromvector", "export": true, "normative": true, "for_": ["DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-rotateaxisangle'] = {"text": "rotateAxisAngle(x, y, z, angle)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-rotateaxisangle", "export": true, "normative": true, "for_": ["DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-skewx'] = {"text": "skewX(sx)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-skewx", "export": true, "normative": true, "for_": ["DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-skewy'] = {"text": "skewY(sy)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-skewy", "export": true, "normative": true, "for_": ["DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-multiply'] = {"text": "multiply(other)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-multiply", "export": true, "normative": true, "for_": ["DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-flipx'] = {"text": "flipX()", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-flipx", "export": true, "normative": true, "for_": ["DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-flipy'] = {"text": "flipY()", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-flipy", "export": true, "normative": true, "for_": ["DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-inverse'] = {"text": "inverse()", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-inverse", "export": true, "normative": true, "for_": ["DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-transformpoint'] = {"text": "transformPoint(point)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-transformpoint", "export": true, "normative": true, "for_": ["DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-tofloat32array'] = {"text": "toFloat32Array()", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-tofloat32array", "export": true, "normative": true, "for_": ["DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrixreadonly-tofloat64array'] = {"text": "toFloat64Array()", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixreadonly-tofloat64array", "export": true, "normative": true, "for_": ["DOMMatrixReadOnly"]};
+window.refsData['#dommatrixreadonly-stringification-behavior'] = {"text": "stringification behavior", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dommatrixreadonly-stringification-behavior", "export": true, "normative": true, "for_": ["DOMMatrixReadOnly"]};
+window.refsData['#dom-dommatrix-dommatrix'] = {"text": "DOMMatrix(init)", "type": "constructor", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrix-dommatrix", "export": true, "normative": true, "for_": ["DOMMatrix"]};
+window.refsData['#dom-dommatrix-frommatrix'] = {"text": "fromMatrix()", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrix-frommatrix", "export": true, "normative": true, "for_": ["DOMMatrix"]};
+window.refsData['#dom-dommatrix-fromfloat32array'] = {"text": "fromFloat32Array(array32)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrix-fromfloat32array", "export": true, "normative": true, "for_": ["DOMMatrix"]};
+window.refsData['#dom-dommatrix-fromfloat64array'] = {"text": "fromFloat64Array(array64)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrix-fromfloat64array", "export": true, "normative": true, "for_": ["DOMMatrix"]};
+window.refsData['#dom-dommatrix-multiplyself'] = {"text": "multiplySelf(other)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrix-multiplyself", "export": true, "normative": true, "for_": ["DOMMatrix"]};
+window.refsData['#dom-dommatrix-premultiplyself'] = {"text": "preMultiplySelf(other)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrix-premultiplyself", "export": true, "normative": true, "for_": ["DOMMatrix"]};
+window.refsData['#dom-dommatrix-translateself'] = {"text": "translateSelf(tx, ty, tz)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrix-translateself", "export": true, "normative": true, "for_": ["DOMMatrix"]};
+window.refsData['#dom-dommatrix-scaleself'] = {"text": "scaleSelf(scaleX, scaleY, scaleZ, originX, originY, originZ)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrix-scaleself", "export": true, "normative": true, "for_": ["DOMMatrix"]};
+window.refsData['#dom-dommatrix-scale3dself'] = {"text": "scale3dSelf(scale, originX, originY, originZ)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrix-scale3dself", "export": true, "normative": true, "for_": ["DOMMatrix"]};
+window.refsData['#dom-dommatrix-rotateself'] = {"text": "rotateSelf(rotX, rotY, rotZ)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrix-rotateself", "export": true, "normative": true, "for_": ["DOMMatrix"]};
+window.refsData['#dom-dommatrix-rotatefromvectorself'] = {"text": "rotateFromVectorSelf(x, y)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrix-rotatefromvectorself", "export": true, "normative": true, "for_": ["DOMMatrix"]};
+window.refsData['#dom-dommatrix-rotateaxisangleself'] = {"text": "rotateAxisAngleSelf(x, y, z, angle)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrix-rotateaxisangleself", "export": true, "normative": true, "for_": ["DOMMatrix"]};
+window.refsData['#dom-dommatrix-skewxself'] = {"text": "skewXSelf(sx)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrix-skewxself", "export": true, "normative": true, "for_": ["DOMMatrix"]};
+window.refsData['#dom-dommatrix-skewyself'] = {"text": "skewYSelf(sy)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrix-skewyself", "export": true, "normative": true, "for_": ["DOMMatrix"]};
+window.refsData['#dom-dommatrix-invertself'] = {"text": "invertSelf()", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrix-invertself", "export": true, "normative": true, "for_": ["DOMMatrix"]};
+window.refsData['#dom-dommatrix-setmatrixvalue'] = {"text": "setMatrixValue(transformList)", "type": "method", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrix-setmatrixvalue", "export": true, "normative": true, "for_": ["DOMMatrix"]};
+window.refsData['#dictdef-dommatrix2dinit'] = {"text": "DOMMatrix2DInit", "type": "dictionary", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dictdef-dommatrix2dinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#exceptiondef-typeerror'] = {"text": "TypeError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#exceptiondef-typeerror", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-dommatrix2dinit-a'] = {"text": "a", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrix2dinit-a", "export": true, "normative": true, "for_": ["DOMMatrix2DInit"]};
+window.refsData['#dom-dommatrix2dinit-m11'] = {"text": "m11", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrix2dinit-m11", "export": true, "normative": true, "for_": ["DOMMatrix2DInit"]};
+window.refsData['https://tc39.github.io/ecma262/#sec-samevaluezero'] = {"text": "samevaluezero", "type": "dfn", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-samevaluezero", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-dommatrix2dinit-b'] = {"text": "b", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrix2dinit-b", "export": true, "normative": true, "for_": ["DOMMatrix2DInit"]};
+window.refsData['#dom-dommatrix2dinit-m12'] = {"text": "m12", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrix2dinit-m12", "export": true, "normative": true, "for_": ["DOMMatrix2DInit"]};
+window.refsData['#dom-dommatrix2dinit-c'] = {"text": "c", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrix2dinit-c", "export": true, "normative": true, "for_": ["DOMMatrix2DInit"]};
+window.refsData['#dom-dommatrix2dinit-m21'] = {"text": "m21", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrix2dinit-m21", "export": true, "normative": true, "for_": ["DOMMatrix2DInit"]};
+window.refsData['#dom-dommatrix2dinit-d'] = {"text": "d", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrix2dinit-d", "export": true, "normative": true, "for_": ["DOMMatrix2DInit"]};
+window.refsData['#dom-dommatrix2dinit-m22'] = {"text": "m22", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrix2dinit-m22", "export": true, "normative": true, "for_": ["DOMMatrix2DInit"]};
+window.refsData['#dom-dommatrix2dinit-e'] = {"text": "e", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrix2dinit-e", "export": true, "normative": true, "for_": ["DOMMatrix2DInit"]};
+window.refsData['#dom-dommatrix2dinit-m41'] = {"text": "m41", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrix2dinit-m41", "export": true, "normative": true, "for_": ["DOMMatrix2DInit"]};
+window.refsData['#dom-dommatrix2dinit-f'] = {"text": "f", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrix2dinit-f", "export": true, "normative": true, "for_": ["DOMMatrix2DInit"]};
+window.refsData['#dom-dommatrix2dinit-m42'] = {"text": "m42", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrix2dinit-m42", "export": true, "normative": true, "for_": ["DOMMatrix2DInit"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#valdef-calc-nan'] = {"text": "nan", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#valdef-calc-nan", "export": true, "normative": true, "for_": ["calc()"]};
+window.refsData['#matrix-validate-and-fixup-2d'] = {"text": "validate and fixup (2d)", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#matrix-validate-and-fixup-2d", "export": true, "normative": true, "for_": ["matrix"]};
+window.refsData['#dom-dommatrixinit-is2d'] = {"text": "is2D", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixinit-is2d", "export": true, "normative": true, "for_": ["DOMMatrixInit"]};
+window.refsData['#dom-dommatrixinit-m13'] = {"text": "m13", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixinit-m13", "export": true, "normative": true, "for_": ["DOMMatrixInit"]};
+window.refsData['#dom-dommatrixinit-m14'] = {"text": "m14", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixinit-m14", "export": true, "normative": true, "for_": ["DOMMatrixInit"]};
+window.refsData['#dom-dommatrixinit-m23'] = {"text": "m23", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixinit-m23", "export": true, "normative": true, "for_": ["DOMMatrixInit"]};
+window.refsData['#dom-dommatrixinit-m24'] = {"text": "m24", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixinit-m24", "export": true, "normative": true, "for_": ["DOMMatrixInit"]};
+window.refsData['#dom-dommatrixinit-m31'] = {"text": "m31", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixinit-m31", "export": true, "normative": true, "for_": ["DOMMatrixInit"]};
+window.refsData['#dom-dommatrixinit-m32'] = {"text": "m32", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixinit-m32", "export": true, "normative": true, "for_": ["DOMMatrixInit"]};
+window.refsData['#dom-dommatrixinit-m34'] = {"text": "m34", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixinit-m34", "export": true, "normative": true, "for_": ["DOMMatrixInit"]};
+window.refsData['#dom-dommatrixinit-m43'] = {"text": "m43", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixinit-m43", "export": true, "normative": true, "for_": ["DOMMatrixInit"]};
+window.refsData['#dom-dommatrixinit-m33'] = {"text": "m33", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixinit-m33", "export": true, "normative": true, "for_": ["DOMMatrixInit"]};
+window.refsData['#dom-dommatrixinit-m44'] = {"text": "m44", "type": "dict-member", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#dom-dommatrixinit-m44", "export": true, "normative": true, "for_": ["DOMMatrixInit"]};
+window.refsData['#4x4-abstract-matrix'] = {"text": "4x4 abstract matrix", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#4x4-abstract-matrix", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#css-parse-something-according-to-a-css-grammar'] = {"text": "parse", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#css-parse-something-according-to-a-css-grammar", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://drafts.csswg.org/css-transforms-1/#propdef-transform'] = {"text": "transform", "type": "property", "spec": "css-transforms-1", "shortname": "css-transforms", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transforms-1/#propdef-transform", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-transforms-1/#typedef-transform-list'] = {"text": "<transform-list>", "type": "type", "spec": "css-transforms-1", "shortname": "css-transforms", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transforms-1/#typedef-transform-list", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-transforms-2/#typedef-transform-function'] = {"text": "<transform-function>", "type": "type", "spec": "css-transforms-2", "shortname": "css-transforms", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-transforms-2/#typedef-transform-function", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#length-value'] = {"text": "<length>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#length-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#absolute-length'] = {"text": "absolute length", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#absolute-length", "export": false, "normative": true, "for_": []};
+window.refsData['#post-multiply'] = {"text": "post-multiply", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#post-multiply", "export": true, "normative": true, "for_": []};
+window.refsData['#matrix-m11-element'] = {"text": "m11 element", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#matrix-m11-element", "export": true, "normative": true, "for_": ["matrix"]};
+window.refsData['#matrix-m12-element'] = {"text": "m12 element", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#matrix-m12-element", "export": true, "normative": true, "for_": ["matrix"]};
+window.refsData['#matrix-m21-element'] = {"text": "m21 element", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#matrix-m21-element", "export": true, "normative": true, "for_": ["matrix"]};
+window.refsData['#matrix-m22-element'] = {"text": "m22 element", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#matrix-m22-element", "export": true, "normative": true, "for_": ["matrix"]};
+window.refsData['#matrix-m41-element'] = {"text": "m41 element", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#matrix-m41-element", "export": true, "normative": true, "for_": ["matrix"]};
+window.refsData['#matrix-m42-element'] = {"text": "m42 element", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#matrix-m42-element", "export": true, "normative": true, "for_": ["matrix"]};
+window.refsData['#matrix-m13-element'] = {"text": "m13 element", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#matrix-m13-element", "export": true, "normative": true, "for_": ["matrix"]};
+window.refsData['#matrix-m14-element'] = {"text": "m14 element", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#matrix-m14-element", "export": true, "normative": true, "for_": ["matrix"]};
+window.refsData['#matrix-m23-element'] = {"text": "m23 element", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#matrix-m23-element", "export": true, "normative": true, "for_": ["matrix"]};
+window.refsData['#matrix-m24-element'] = {"text": "m24 element", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#matrix-m24-element", "export": true, "normative": true, "for_": ["matrix"]};
+window.refsData['#matrix-m31-element'] = {"text": "m31 element", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#matrix-m31-element", "export": true, "normative": true, "for_": ["matrix"]};
+window.refsData['#matrix-m32-element'] = {"text": "m32 element", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#matrix-m32-element", "export": true, "normative": true, "for_": ["matrix"]};
+window.refsData['#matrix-m34-element'] = {"text": "m34 element", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#matrix-m34-element", "export": true, "normative": true, "for_": ["matrix"]};
+window.refsData['#matrix-m43-element'] = {"text": "m43 element", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#matrix-m43-element", "export": true, "normative": true, "for_": ["matrix"]};
+window.refsData['#matrix-m33-element'] = {"text": "m33 element", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#matrix-m33-element", "export": true, "normative": true, "for_": ["matrix"]};
+window.refsData['#matrix-m44-element'] = {"text": "m44 element", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#matrix-m44-element", "export": true, "normative": true, "for_": ["matrix"]};
+window.refsData['#create-a-2d-matrix'] = {"text": "create a 2d matrix", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#create-a-2d-matrix", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object'] = {"text": "current global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#current-global-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#window'] = {"text": "Window", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window", "export": true, "normative": true, "for_": []};
+window.refsData['#parse-a-string-into-an-abstract-matrix'] = {"text": "parse a string into an abstract matrix", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#parse-a-string-into-an-abstract-matrix", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#syntaxerror'] = {"text": "SyntaxError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#syntaxerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMException'] = {"text": "DOMException", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMException", "export": true, "normative": true, "for_": []};
+window.refsData['#create-a-3d-matrix'] = {"text": "create a 3d matrix", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#create-a-3d-matrix", "export": true, "normative": true, "for_": []};
+window.refsData['#create-a-dommatrixreadonly-from-the-dictionary'] = {"text": "create a dommatrixreadonly from the dictionary", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#create-a-dommatrixreadonly-from-the-dictionary", "export": true, "normative": true, "for_": []};
+window.refsData['#matrix-validate-and-fixup'] = {"text": "validate and fixup", "type": "dfn", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#matrix-validate-and-fixup", "export": true, "normative": true, "for_": ["matrix"]};
+window.refsData['https://webidl.spec.whatwg.org/#invalidstateerror'] = {"text": "InvalidStateError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidstateerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#valdef-calc-infinity'] = {"text": "infinity", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#valdef-calc-infinity", "export": true, "normative": true, "for_": ["calc()"]};
+window.refsData['https://tc39.github.io/ecma262/#sec-algorithm-conventions'] = {"text": "!", "type": "dfn", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-algorithm-conventions", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-tostring'] = {"text": "tostring", "type": "dfn", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-tostring", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-transforms-1/#funcdef-transform-matrix'] = {"text": "matrix()", "type": "function", "spec": "css-transforms-1", "shortname": "css-transforms", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transforms-1/#funcdef-transform-matrix", "export": true, "normative": true, "for_": ["transform"]};
+window.refsData['https://drafts.csswg.org/css-transforms-2/#funcdef-matrix3d'] = {"text": "matrix3d()", "type": "function", "spec": "css-transforms-2", "shortname": "css-transforms", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-transforms-2/#funcdef-matrix3d", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/structured-data.html#serializable-objects'] = {"text": "serializable object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/structured-data.html#serializable-objects", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/structured-data.html#serialization-steps'] = {"text": "serialization steps", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/structured-data.html#serialization-steps", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/structured-data.html#deserialization-steps'] = {"text": "deserialization steps", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/structured-data.html#deserialization-steps", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/structured-data.html#sub-serialization'] = {"text": "sub-serialization", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/structured-data.html#sub-serialization", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/structured-data.html#sub-deserialization'] = {"text": "sub-deserialization", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/structured-data.html#sub-deserialization", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-view-1/#dom-element-getboundingclientrect'] = {"text": "getBoundingClientRect()", "type": "method", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-view-1/#dom-element-getboundingclientrect", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['#webkitcssmatrix'] = {"text": "WebKitCSSMatrix", "type": "interface", "spec": "geometry-1", "shortname": "geometry", "level": "1", "status": "local", "url": "#webkitcssmatrix", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#worker'] = {"text": "Worker", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/workers.html#worker", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#indexsizeerror'] = {"text": "IndexSizeError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#indexsizeerror", "export": true, "normative": true, "for_": []};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

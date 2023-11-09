@@ -471,6 +471,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -3249,8 +3286,6 @@ to express as a patch to the specification since it requires changing multiple p
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -3498,7 +3533,6 @@ to express as a patch to the specification since it requires changing multiple p
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -4027,6 +4061,401 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://w3c.github.io/webdriver/#dfn-local-ends'] = {"text": "local end", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-local-ends", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/#dfn-remote-ends'] = {"text": "remote end", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-remote-ends", "export": true, "normative": true, "for_": []};
+window.refsData['#remote-end-definition'] = {"text": "remote end definition", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#remote-end-definition", "export": true, "normative": true, "for_": []};
+window.refsData['#local-end-definition'] = {"text": "local end definition", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#local-end-definition", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/#dfn-sessions'] = {"text": "session", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-sessions", "export": true, "normative": true, "for_": []};
+window.refsData['#command'] = {"text": "command", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#command", "export": true, "normative": true, "for_": []};
+window.refsData['#event'] = {"text": "event", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#event", "export": true, "normative": true, "for_": []};
+window.refsData['#command-command-name'] = {"text": "command name", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#command-command-name", "export": true, "normative": true, "for_": ["command"]};
+window.refsData['#event-event-name'] = {"text": "event name", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#event-event-name", "export": true, "normative": true, "for_": ["event"]};
+window.refsData['#module-name'] = {"text": "module name", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#module-name", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/#dfn-remote-end-steps'] = {"text": "remote end steps", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-remote-end-steps", "export": true, "normative": true, "for_": []};
+window.refsData['#command-command-parameters'] = {"text": "command parameters", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#command-command-parameters", "export": true, "normative": true, "for_": ["command"]};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-return-type'] = {"text": "return type", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-return-type", "export": true, "normative": true, "for_": []};
+window.refsData['#extension-modules'] = {"text": "extension modules", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#extension-modules", "export": true, "normative": true, "for_": []};
+window.refsData['#event-event-type'] = {"text": "event type", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#event-event-type", "export": true, "normative": true, "for_": ["event"]};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context'] = {"text": "top-level browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['#event-browsing-context-event-map'] = {"text": "browsing context event map", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#event-browsing-context-event-map", "export": true, "normative": true, "for_": ["event"]};
+window.refsData['https://fetch.spec.whatwg.org/#header-list-contains'] = {"text": "contains", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#header-list-contains", "export": true, "normative": true, "for_": ["header list"]};
+window.refsData['#event-global-event-set'] = {"text": "global event set", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#event-global-event-set", "export": true, "normative": true, "for_": ["event"]};
+window.refsData['https://w3c.github.io/webdriver/#dfn-success'] = {"text": "success", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-success", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/#dfn-errors'] = {"text": "error", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-errors", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/#dfn-error-code'] = {"text": "error code", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-error-code", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/#dfn-invalid-argument'] = {"text": "invalid argument", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-invalid-argument", "export": true, "normative": true, "for_": []};
+window.refsData['#websocket-listener'] = {"text": "websocket listener", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#websocket-listener", "export": true, "normative": true, "for_": []};
+window.refsData['#listener-host'] = {"text": "host", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#listener-host", "export": true, "normative": true, "for_": ["listener"]};
+window.refsData['#listener-port'] = {"text": "port", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#listener-port", "export": true, "normative": true, "for_": ["listener"]};
+window.refsData['#listener-secure-flag'] = {"text": "secure flag", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#listener-secure-flag", "export": true, "normative": true, "for_": ["listener"]};
+window.refsData['https://infra.spec.whatwg.org/#ordered-set'] = {"text": "set", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-set", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc6455#section-4.1'] = {"text": "establishes a websocket connection", "type": "dfn", "spec": "rfc6455", "shortname": "rfc6455", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc6455#section-4.1", "export": true, "normative": true, "for_": []};
+window.refsData['#active-listeners'] = {"text": "active listeners", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#active-listeners", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc6455#section-4.2'] = {"text": "server-side requirements", "type": "dfn", "spec": "rfc6455", "shortname": "rfc6455", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc6455#section-4.2", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc6455#section-4.2.1'] = {"text": "reading the client's opening handshake", "type": "dfn", "spec": "rfc6455", "shortname": "rfc6455", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc6455#section-4.2.1", "export": true, "normative": true, "for_": []};
+window.refsData['#list-of-websocket-resources'] = {"text": "list of websocket resources", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#list-of-websocket-resources", "export": true, "normative": true, "for_": []};
+window.refsData['#get-a-session-id-for-a-websocket-resource'] = {"text": "get a session id for a websocket resource", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#get-a-session-id-for-a-websocket-resource", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/#dfn-active-session'] = {"text": "active sessions", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-active-session", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/#dfn-session-id'] = {"text": "session id", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-session-id", "export": true, "normative": true, "for_": []};
+window.refsData['#websocket-connection'] = {"text": "websocket connection", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#websocket-connection", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc6455#section-6.2'] = {"text": "a websocket message has been received", "type": "dfn", "spec": "rfc6455", "shortname": "rfc6455", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc6455#section-6.2", "export": true, "normative": true, "for_": []};
+window.refsData['#handle-an-incoming-message'] = {"text": "handle an incoming message", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#handle-an-incoming-message", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc6455#section-7.1.3'] = {"text": "the websocket closing handshake is started", "type": "dfn", "spec": "rfc6455", "shortname": "rfc6455", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc6455#section-7.1.3", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc6455#section-7.1.4'] = {"text": "the websocket connection is closed", "type": "dfn", "spec": "rfc6455", "shortname": "rfc6455", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc6455#section-7.1.4", "export": true, "normative": true, "for_": []};
+window.refsData['#handle-a-connection-closing'] = {"text": "handle a connection closing", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#handle-a-connection-closing", "export": true, "normative": true, "for_": []};
+window.refsData['#construct-a-websocket-resource-name'] = {"text": "constructing a websocket resource name", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#construct-a-websocket-resource-name", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc6455#section-3'] = {"text": "websocket uri", "type": "dfn", "spec": "rfc6455", "shortname": "rfc6455", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc6455#section-3", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#implementation-defined'] = {"text": "implementation-defined", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#implementation-defined", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#set-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#set-append", "export": true, "normative": true, "for_": ["set"]};
+window.refsData['https://w3c.github.io/webdriver/#dfn-intermediary-node'] = {"text": "intermediary node", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-intermediary-node", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/#dfn-endpoint-node'] = {"text": "endpoint node", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-endpoint-node", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc6455#section-5.2'] = {"text": "%x1 denotes a text frame", "type": "dfn", "spec": "rfc6455", "shortname": "rfc6455", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc6455#section-5.2", "export": true, "normative": true, "for_": []};
+window.refsData['#respond-with-an-error'] = {"text": "respond with an error", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#respond-with-an-error", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#assert'] = {"text": "assert", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#assert", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#scalar-value-string'] = {"text": "scalar value string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#scalar-value-string", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc6455#section-8.1'] = {"text": "handling errors in utf-8-encoded data", "type": "dfn", "spec": "rfc6455", "shortname": "rfc6455", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc6455#section-8.1", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc6455#section-7.1.7'] = {"text": "fail the websocket connection", "type": "dfn", "spec": "rfc6455", "shortname": "rfc6455", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc6455#section-7.1.7", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc6455#section-7.4'] = {"text": "status codes", "type": "dfn", "spec": "rfc6455", "shortname": "rfc6455", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc6455#section-7.4", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#parse-a-json-string-to-an-infra-value'] = {"text": "parse json into infra values", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#parse-a-json-string-to-an-infra-value", "export": true, "normative": true, "for_": []};
+window.refsData['#command-result-type'] = {"text": "result type", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#command-result-type", "export": true, "normative": true, "for_": ["command"]};
+window.refsData['https://infra.spec.whatwg.org/#serialize-an-infra-value-to-json-bytes'] = {"text": "serialize an infra value to json bytes", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#serialize-an-infra-value-to-json-bytes", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc6455#section-6.1'] = {"text": "send a websocket message", "type": "dfn", "spec": "rfc6455", "shortname": "rfc6455", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc6455#section-6.1", "export": true, "normative": true, "for_": []};
+window.refsData['#command-set-of-all-command-names'] = {"text": "set of all command names", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#command-set-of-all-command-names", "export": true, "normative": true, "for_": ["command"]};
+window.refsData['https://w3c.github.io/webdriver/#dfn-unknown-command'] = {"text": "unknown command", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-unknown-command", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#settings-object'] = {"text": "settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#settings-object", "export": true, "normative": true, "for_": ["script"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-document'] = {"text": "document", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#concept-document-bc'] = {"text": "browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#concept-document-bc", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#workerglobalscope'] = {"text": "WorkerGlobalScope", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/workers.html#workerglobalscope", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#concept-WorkerGlobalScope-owner-set'] = {"text": "owner set", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/workers.html#concept-WorkerGlobalScope-owner-set", "export": true, "normative": true, "for_": ["WorkerGlobalScope"]};
+window.refsData['https://infra.spec.whatwg.org/#map-size'] = {"text": "size", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-size", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['https://w3c.github.io/webdriver/#dfn-current-session'] = {"text": "current session", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-current-session", "export": true, "normative": true, "for_": []};
+window.refsData['#event-is-enabled'] = {"text": "event is enabled", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#event-is-enabled", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-connection'] = {"text": "connection", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-connection", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/#dfn-additional-webdriver-capability'] = {"text": "additional webdriver capability", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-additional-webdriver-capability", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/#dfn-capability-name'] = {"text": "capability name", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-capability-name", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/#dfn-additional-capability-deserialization-algorithm'] = {"text": "additional capability deserialization algorithm", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-additional-capability-deserialization-algorithm", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/#dfn-matched-capability-serialization-algorithm'] = {"text": "matched capability serialization algorithm", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-matched-capability-serialization-algorithm", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/#dfn-webdriver-new-session-algorithm'] = {"text": "webdriver new session algorithm", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-webdriver-new-session-algorithm", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/#dfn-get-a-property'] = {"text": "getting a property", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-get-a-property", "export": true, "normative": true, "for_": []};
+window.refsData['#start-listening-for-a-websocket-connection'] = {"text": "start listening for a websocket connection", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#start-listening-for-a-websocket-connection", "export": true, "normative": true, "for_": []};
+window.refsData['#construct-a-websocket-url'] = {"text": "constructing a websocket url", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#construct-a-websocket-url", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/#dfn-set-a-property'] = {"text": "set a property", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-set-a-property", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-node'] = {"text": "nodes", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-node", "export": true, "normative": true, "for_": []};
+window.refsData['#object-id-map'] = {"text": "object id map", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#object-id-map", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-element'] = {"text": "element", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/#dfn-web-element-reference'] = {"text": "web element reference", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-web-element-reference", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#windowproxy'] = {"text": "WindowProxy", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#windowproxy", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/#dfn-window-handle'] = {"text": "window handle", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-window-handle", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.es/ecma262/#sec-ecmascript-data-types-and-values'] = {"text": "type", "type": "dfn", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.es/ecma262/#sec-ecmascript-data-types-and-values", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.es/ecma262/#sec-tostring'] = {"text": "tostring", "type": "dfn", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.es/ecma262/#sec-tostring", "export": true, "normative": true, "for_": []};
+window.refsData['#object-id-for-an-object'] = {"text": "object id for an object", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#object-id-for-an-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.es/ecma262/#sec-isarray'] = {"text": "isarray", "type": "dfn", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.es/ecma262/#sec-isarray", "export": true, "normative": true, "for_": []};
+window.refsData['#serialize-as-a-list'] = {"text": "serialize as a list", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#serialize-as-a-list", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.es/ecma262/#sec-createarrayiterator'] = {"text": "createarrayiterator", "type": "dfn", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.es/ecma262/#sec-createarrayiterator", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.es/ecma262/#sec-isregexp'] = {"text": "isregexp", "type": "dfn", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.es/ecma262/#sec-isregexp", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.es/ecma262/#sec-get'] = {"text": "get", "type": "dfn", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.es/ecma262/#sec-get", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.es/ecma262/#sec-object-internal-methods-and-internal-slots'] = {"text": "internal slot", "type": "dfn", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.es/ecma262/#sec-object-internal-methods-and-internal-slots", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.es/ecma262/#sec-todatestring'] = {"text": "todatestring", "type": "dfn", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.es/ecma262/#sec-todatestring", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.es/ecma262/#thistimevalue'] = {"text": "thistimevalue", "type": "dfn", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.es/ecma262/#thistimevalue", "export": true, "normative": true, "for_": []};
+window.refsData['#serialize-as-a-mapping'] = {"text": "serialize as a mapping", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#serialize-as-a-mapping", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.es/ecma262/#sec-createmapiterator'] = {"text": "createmapiterator", "type": "dfn", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.es/ecma262/#sec-createmapiterator", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.es/ecma262/#sec-createsetiterator'] = {"text": "createsetiterator", "type": "dfn", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.es/ecma262/#sec-createsetiterator", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.es/ecma262/#sec-ispromise'] = {"text": "ispromise", "type": "dfn", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.es/ecma262/#sec-ispromise", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-platform-object'] = {"text": "platform object", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-platform-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#boundary-point-node'] = {"text": "node", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#boundary-point-node", "export": true, "normative": true, "for_": ["boundary point"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-attribute'] = {"text": "attribute", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-attribute", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-size'] = {"text": "size", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-size", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-tree-child'] = {"text": "children", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-tree-child", "export": true, "normative": true, "for_": ["tree"]};
+window.refsData['#serialize-as-a-remote-value'] = {"text": "serialize as a remote value", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#serialize-as-a-remote-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-element-attribute'] = {"text": "attribute list", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-element-attribute", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-attribute-qualified-name'] = {"text": "qualified name", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-attribute-qualified-name", "export": true, "normative": true, "for_": ["Attr"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-attribute-value'] = {"text": "value", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-attribute-value", "export": true, "normative": true, "for_": ["Attr"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-element-shadow-root'] = {"text": "shadow root", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-element-shadow-root", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['https://tc39.es/ecma262/#sec-iscallable'] = {"text": "iscallable", "type": "dfn", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.es/ecma262/#sec-iscallable", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.es/ecma262/#sec-enumerableownpropertynames'] = {"text": "enumerableownpropertynames", "type": "dfn", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.es/ecma262/#sec-enumerableownpropertynames", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.es/ecma262/#sec-createlistfromarraylike'] = {"text": "createlistfromarraylike", "type": "dfn", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.es/ecma262/#sec-createlistfromarraylike", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-clone'] = {"text": "clone", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-clone", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://w3c.github.io/webdriver/#dfn-try'] = {"text": "try", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-try", "export": true, "normative": true, "for_": []};
+window.refsData['#obtain-a-set-of-event-names'] = {"text": "obtain a set of event names", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#obtain-a-set-of-event-names", "export": true, "normative": true, "for_": []};
+window.refsData['#event-enabled-browsing-contexts'] = {"text": "event enabled browsing contexts", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#event-enabled-browsing-contexts", "export": true, "normative": true, "for_": []};
+window.refsData['#get-a-browsing-context'] = {"text": "get a browsing context", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#get-a-browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ordered-map'] = {"text": "map", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-map", "export": true, "normative": true, "for_": []};
+window.refsData['#update-the-event-map'] = {"text": "update the event map", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#update-the-event-map", "export": true, "normative": true, "for_": []};
+window.refsData['#remote-end-subscribe-steps'] = {"text": "remote end subscribe steps", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#remote-end-subscribe-steps", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#map-sort-in-ascending-order'] = {"text": "sort in ascending order", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-sort-in-ascending-order", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['#subscribe-priority'] = {"text": "subscribe priority", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#subscribe-priority", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#browsing-context'] = {"text": "browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['#browsing-context-id'] = {"text": "browsing context id", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#browsing-context-id", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/#dfn-no-such-frame'] = {"text": "no such frame", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/#dfn-no-such-frame", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#nav-document'] = {"text": "active document", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#nav-document", "export": true, "normative": true, "for_": ["navigable"]};
+window.refsData['https://url.spec.whatwg.org/#concept-url-serializer'] = {"text": "url serializer", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-serializer", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-document-url'] = {"text": "url", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document-url", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['#get-the-descendent-browsing-contexts'] = {"text": "get the descendent browsing contexts", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#get-the-descendent-browsing-contexts", "export": true, "normative": true, "for_": []};
+window.refsData['#get-the-browsing-context-info'] = {"text": "get the browsing context info", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#get-the-browsing-context-info", "export": true, "normative": true, "for_": []};
+window.refsData['#emit-a-context-created-event'] = {"text": "emit a context created event", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#emit-a-context-created-event", "export": true, "normative": true, "for_": []};
+window.refsData['#recursively-emit-context-created-events'] = {"text": "recursively emit context created events", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#recursively-emit-context-created-events", "export": true, "normative": true, "for_": []};
+window.refsData['#emit-an-event'] = {"text": "emit an event", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#emit-an-event", "export": true, "normative": true, "for_": []};
+window.refsData['#remote-end-event-trigger'] = {"text": "remote end event trigger", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#remote-end-event-trigger", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/#creating-a-new-browsing-context'] = {"text": "create a new browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/#creating-a-new-browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['#browsing-context-tree-discarded'] = {"text": "browsing context tree discarded", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#browsing-context-tree-discarded", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.es/ecma262/#sec-code-realms'] = {"text": "realm", "type": "dfn", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.es/ecma262/#sec-code-realms", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#realm-execution-context'] = {"text": "realm execution context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#realm-execution-context", "export": true, "normative": true, "for_": ["environment settings object"]};
+window.refsData['#realm-id'] = {"text": "realm id", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#realm-id", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-color-3/#window'] = {"text": "window", "type": "dfn", "spec": "css-color-3", "shortname": "css-color", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-color-3/#window", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#dedicatedworkerglobalscope'] = {"text": "DedicatedWorkerGlobalScope", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/workers.html#dedicatedworkerglobalscope", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#sharedworkerglobalscope'] = {"text": "SharedWorkerGlobalScope", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/workers.html#sharedworkerglobalscope", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#serviceworkerglobalscope'] = {"text": "ServiceWorkerGlobalScope", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#serviceworkerglobalscope", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.css-houdini.org/css-paint-api-1/#paintworkletglobalscope'] = {"text": "PaintWorkletGlobalScope", "type": "interface", "spec": "css-paint-api-1", "shortname": "css-paint-api", "level": "1", "status": "current", "url": "https://drafts.css-houdini.org/css-paint-api-1/#paintworkletglobalscope", "export": true, "normative": true, "for_": []};
+window.refsData['https://webaudio.github.io/web-audio-api/#AudioWorkletGlobalScope'] = {"text": "AudioWorkletGlobalScope", "type": "interface", "spec": "webaudio", "shortname": "webaudio", "level": "1", "status": "current", "url": "https://webaudio.github.io/web-audio-api/#AudioWorkletGlobalScope", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/worklets.html#workletglobalscope'] = {"text": "WorkletGlobalScope", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/worklets.html#workletglobalscope", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#ascii-serialisation-of-an-origin'] = {"text": "serialization of an origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#ascii-serialisation-of-an-origin", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object'] = {"text": "environment settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-environment-execution-ready-flag'] = {"text": "execution ready flag", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-environment-execution-ready-flag", "export": true, "normative": true, "for_": ["environment"]};
+window.refsData['#get-the-realm-info'] = {"text": "get the realm info", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#get-the-realm-info", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#iteration-continue'] = {"text": "continue", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#iteration-continue", "export": true, "normative": true, "for_": ["iteration"]};
+window.refsData['https://html.spec.whatwg.org/#set-up-a-window-environment-settings-object'] = {"text": "set up a window environment settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/#set-up-a-window-environment-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/#set-up-a-worker-environment-settings-object'] = {"text": "set up a worker environment settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/#set-up-a-worker-environment-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['#get-related-browsing-contexts'] = {"text": "get related browsing contexts", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#get-related-browsing-contexts", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/document-lifecycle.html#unloading-document-cleanup-steps'] = {"text": "unloading document cleanup steps", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-lifecycle.html#unloading-document-cleanup-steps", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/#concept-document-worklet-global-scopes'] = {"text": "worklet global scopes", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/#concept-document-worklet-global-scopes", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm'] = {"text": "relevant realm", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/#worker-event-loop-2'] = {"text": "worker event loop", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/#worker-event-loop-2", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#terminate-a-worker'] = {"text": "terminate a worker", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/workers.html#terminate-a-worker", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#responsible-event-loop'] = {"text": "responsible event loop", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#responsible-event-loop", "export": true, "normative": true, "for_": ["environment settings object"]};
+window.refsData['https://html.spec.whatwg.org/#environment-settings-object's-realm'] = {"text": "environment settings object's realm", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/#environment-settings-object's-realm", "export": true, "normative": true, "for_": []};
+window.refsData['#log-event-buffer'] = {"text": "log event buffer", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#log-event-buffer", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.es/ecma262/#running-execution-context'] = {"text": "running execution context", "type": "dfn", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.es/ecma262/#running-execution-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-url'] = {"text": "url", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url", "export": true, "normative": true, "for_": []};
+window.refsData['#console-steps'] = {"text": "console steps", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#console-steps", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.es/ecma262/#sec-time-values-and-time-range'] = {"text": "time value", "type": "dfn", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.es/ecma262/#sec-time-values-and-time-range", "export": true, "normative": true, "for_": []};
+window.refsData['https://console.spec.whatwg.org#formatting-specifiers'] = {"text": "formatting specifier", "type": "dfn", "spec": "console", "shortname": "console", "level": "", "status": "anchor-block", "url": "https://console.spec.whatwg.org#formatting-specifiers", "export": true, "normative": true, "for_": []};
+window.refsData['https://console.spec.whatwg.org#formatter'] = {"text": "formatter", "type": "dfn", "spec": "console", "shortname": "console", "level": "", "status": "anchor-block", "url": "https://console.spec.whatwg.org#formatter", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.es/ecma262/#sec-primitive-value'] = {"text": "primitive value", "type": "dfn", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.es/ecma262/#sec-primitive-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.es/ecma262/#current-realm'] = {"text": "current realm record", "type": "dfn", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.es/ecma262/#current-realm", "export": true, "normative": true, "for_": []};
+window.refsData['#current-stack-trace'] = {"text": "current stack trace", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#current-stack-trace", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#current-settings-object'] = {"text": "current settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#current-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['#error-reporting-steps'] = {"text": "error reporting steps", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#error-reporting-steps", "export": true, "normative": true, "for_": []};
+window.refsData['#buffer-a-log-event'] = {"text": "buffer a log event", "type": "dfn", "spec": "webdriver-bidi-1", "shortname": "webdriver-bidi", "level": "1", "status": "local", "url": "#buffer-a-log-event", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/#a-browsing-context-is-discarded'] = {"text": "a browsing context is discarded", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/#a-browsing-context-is-discarded", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/#session-history'] = {"text": "session history", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/#session-history", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/#bcg-remove'] = {"text": "remove a browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/#bcg-remove", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/#report-the-error'] = {"text": "report an error", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/#report-the-error", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/#concept-error-handled'] = {"text": "handled", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/#concept-error-handled", "export": true, "normative": true, "for_": []};
+window.refsData['https://console.spec.whatwg.org/#namespacedef-console'] = {"text": "console", "type": "namespace", "spec": "console", "shortname": "console", "level": "1", "status": "current", "url": "https://console.spec.whatwg.org/#namespacedef-console", "export": true, "normative": true, "for_": []};
+window.refsData['https://console.spec.whatwg.org#printer'] = {"text": "printer", "type": "dfn", "spec": "console", "shortname": "console", "level": "", "status": "anchor-block", "url": "https://console.spec.whatwg.org#printer", "export": true, "normative": true, "for_": []};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

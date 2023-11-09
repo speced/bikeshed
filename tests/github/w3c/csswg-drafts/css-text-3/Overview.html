@@ -970,6 +970,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -8673,8 +8710,6 @@ Small Kana Mappings</span><a class="self-link" href="#small-kana"></a></h2>
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -8922,7 +8957,6 @@ Small Kana Mappings</span><a class="self-link" href="#small-kana"></a></h2>
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -9464,6 +9498,385 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#valdef-text-transform-full-width'] = {"text": "full-width", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-text-transform-full-width", "export": true, "normative": true, "for_": ["text-transform"]};
+window.refsData['#propdef-text-transform'] = {"text": "text-transform", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-text-transform", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-text-transform-full-size-kana'] = {"text": "full-size-kana", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-text-transform-full-size-kana", "export": true, "normative": true, "for_": ["text-transform"]};
+window.refsData['#propdef-tab-size'] = {"text": "tab-size", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-tab-size", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-justify'] = {"text": "text-justify", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-text-justify", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-hanging-punctuation'] = {"text": "hanging-punctuation", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-hanging-punctuation", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
+window.refsData['#content-language'] = {"text": "content language", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#content-language", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/selectors-4/#document-language'] = {"text": "document language", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#document-language", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/dom.html#language'] = {"text": "language", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dom.html#language", "export": true, "normative": true, "for_": ["Node"]};
+window.refsData['#character'] = {"text": "character", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#character", "export": true, "normative": true, "for_": []};
+window.refsData['#typographic-character-unit'] = {"text": "typographic character", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#typographic-character-unit", "export": true, "normative": true, "for_": []};
+window.refsData['#grapheme-cluster'] = {"text": "grapheme cluster", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#grapheme-cluster", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#valdef-text-orientation-upright'] = {"text": "upright", "type": "value", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#valdef-text-orientation-upright", "export": true, "normative": true, "for_": ["text-orientation"]};
+window.refsData['#unicode-general-category'] = {"text": "general category", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#unicode-general-category", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#inline-box'] = {"text": "inline box", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#inline-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#out-of-flow'] = {"text": "out-of-flow", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#out-of-flow", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-any'] = {"text": "||", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-any", "export": true, "normative": true, "for_": []};
+window.refsData['#typographic-letter-unit'] = {"text": "typographic letter unit", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#typographic-letter-unit", "export": true, "normative": true, "for_": []};
+window.refsData['#letter'] = {"text": "letter", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#letter", "export": true, "normative": true, "for_": []};
+window.refsData['#full-width'] = {"text": "full-width", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#full-width", "export": true, "normative": true, "for_": []};
+window.refsData['#kana-small'] = {"text": "small kana", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#kana-small", "export": true, "normative": true, "for_": ["kana"]};
+window.refsData['#kana-full-size'] = {"text": "full-size kana", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#kana-full-size", "export": true, "normative": true, "for_": ["kana"]};
+window.refsData['https://drafts.csswg.org/css-ruby-1/#ruby'] = {"text": "ruby", "type": "dfn", "spec": "css-ruby-1", "shortname": "css-ruby", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-ruby-1/#ruby", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-text-transform-capitalize'] = {"text": "capitalize", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-text-transform-capitalize", "export": true, "normative": true, "for_": ["text-transform"]};
+window.refsData['#content-writing-system'] = {"text": "writing system", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#content-writing-system", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-text-transform-uppercase'] = {"text": "uppercase", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-text-transform-uppercase", "export": true, "normative": true, "for_": ["text-transform"]};
+window.refsData['#valdef-text-transform-lowercase'] = {"text": "lowercase", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-text-transform-lowercase", "export": true, "normative": true, "for_": ["text-transform"]};
+window.refsData['#preserved-white-space'] = {"text": "preserved", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#preserved-white-space", "export": true, "normative": true, "for_": []};
+window.refsData['#white-space'] = {"text": "white space", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#white-space", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-white-space'] = {"text": "white-space", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-white-space", "export": true, "normative": true, "for_": []};
+window.refsData['#wrapping'] = {"text": "wrap", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#wrapping", "export": true, "normative": true, "for_": []};
+window.refsData['#soft-wrap-opportunity'] = {"text": "soft wrap opportunity", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#soft-wrap-opportunity", "export": true, "normative": true, "for_": []};
+window.refsData['#segment-break'] = {"text": "segment break", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#segment-break", "export": true, "normative": true, "for_": []};
+window.refsData['#forced-line-break'] = {"text": "forced line break", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#forced-line-break", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-white-space-normal'] = {"text": "normal", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-white-space-normal", "export": true, "normative": true, "for_": ["white-space"]};
+window.refsData['#valdef-white-space-pre'] = {"text": "pre", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-white-space-pre", "export": true, "normative": true, "for_": ["white-space"]};
+window.refsData['#valdef-white-space-pre-wrap'] = {"text": "pre-wrap", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-white-space-pre-wrap", "export": true, "normative": true, "for_": ["white-space"]};
+window.refsData['#other-space-separators'] = {"text": "other space separators", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#other-space-separators", "export": true, "normative": true, "for_": []};
+window.refsData['#hang'] = {"text": "hang", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#hang", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#intrinsic-sizing'] = {"text": "intrinsic sizing", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#intrinsic-sizing", "export": true, "normative": true, "for_": []};
+window.refsData['#spaces'] = {"text": "spaces", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#spaces", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-white-space-nowrap'] = {"text": "nowrap", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-white-space-nowrap", "export": true, "normative": true, "for_": ["white-space"]};
+window.refsData['#valdef-white-space-break-spaces'] = {"text": "break-spaces", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-white-space-break-spaces", "export": true, "normative": true, "for_": ["white-space"]};
+window.refsData['#valdef-white-space-pre-line'] = {"text": "pre-line", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-white-space-pre-line", "export": true, "normative": true, "for_": ["white-space"]};
+window.refsData['#tabs'] = {"text": "tabs", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#tabs", "export": true, "normative": true, "for_": []};
+window.refsData['#collapsible-white-space'] = {"text": "collapsible", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#collapsible-white-space", "export": true, "normative": true, "for_": []};
+window.refsData['#unicode-script'] = {"text": "unicode script", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#unicode-script", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#normalize-newlines'] = {"text": "normalize newlines", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#normalize-newlines", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#inline-formatting-context'] = {"text": "inline formatting context", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#inline-formatting-context", "export": true, "normative": true, "for_": []};
+window.refsData['#line-breaking-process'] = {"text": "line breaking", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#line-breaking-process", "export": true, "normative": true, "for_": []};
+window.refsData['#tab-size-dfn'] = {"text": "tab size", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#tab-size-dfn", "export": true, "normative": true, "for_": []};
+window.refsData['#tab-stop'] = {"text": "tab stop", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#tab-stop", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#ch'] = {"text": "ch", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#ch", "export": true, "normative": true, "for_": ["<length>"]};
+window.refsData['https://drafts.csswg.org/css-display-4/#block-container'] = {"text": "block container", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#block-container", "export": true, "normative": true, "for_": []};
+window.refsData['#conditionally-hang'] = {"text": "conditionally hang", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#conditionally-hang", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#number-value'] = {"text": "<number>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#number-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#length-value'] = {"text": "<length>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#length-value", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-letter-spacing'] = {"text": "letter-spacing", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-letter-spacing", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-word-spacing'] = {"text": "word-spacing", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-word-spacing", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-line-break'] = {"text": "line-break", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-line-break", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-word-break'] = {"text": "word-break", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-word-break", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-hyphens'] = {"text": "hyphens", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-hyphens", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-overflow-wrap'] = {"text": "overflow-wrap", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-overflow-wrap", "export": true, "normative": true, "for_": []};
+window.refsData['#line-break'] = {"text": "line break", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#line-break", "export": true, "normative": true, "for_": []};
+window.refsData['#word-separator'] = {"text": "word separator", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#word-separator", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#atomic-inline'] = {"text": "atomic inline", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#atomic-inline", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-word-break-normal'] = {"text": "normal", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-word-break-normal", "export": true, "normative": true, "for_": ["word-break"]};
+window.refsData['#valdef-line-break-anywhere'] = {"text": "anywhere", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-line-break-anywhere", "export": true, "normative": true, "for_": ["line-break"]};
+window.refsData['https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-wbr-element'] = {"text": "wbr", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-wbr-element", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-word-break-break-all'] = {"text": "break-all", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-word-break-break-all", "export": true, "normative": true, "for_": ["word-break"]};
+window.refsData['#valdef-line-break-loose'] = {"text": "loose", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-line-break-loose", "export": true, "normative": true, "for_": ["line-break"]};
+window.refsData['#valdef-line-break-normal'] = {"text": "normal", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-line-break-normal", "export": true, "normative": true, "for_": ["line-break"]};
+window.refsData['#valdef-line-break-strict'] = {"text": "strict", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-line-break-strict", "export": true, "normative": true, "for_": ["line-break"]};
+window.refsData['#writing-system-chinese'] = {"text": "chinese", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#writing-system-chinese", "export": true, "normative": true, "for_": ["writing-system"]};
+window.refsData['#writing-system-japanese'] = {"text": "japanese", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#writing-system-japanese", "export": true, "normative": true, "for_": ["writing-system"]};
+window.refsData['#unicode-east-asian-width'] = {"text": "east asian width property", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#unicode-east-asian-width", "export": true, "normative": true, "for_": []};
+window.refsData['#hyphenate'] = {"text": "hyphenation", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#hyphenate", "export": true, "normative": true, "for_": []};
+window.refsData['#hyphenation-opportunity'] = {"text": "hyphenation opportunity", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#hyphenation-opportunity", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#min-content'] = {"text": "min-content size", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#min-content", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-word-wrap'] = {"text": "word-wrap", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-word-wrap", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-overflow-wrap-anywhere'] = {"text": "anywhere", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-overflow-wrap-anywhere", "export": true, "normative": true, "for_": ["overflow-wrap"]};
+window.refsData['#valdef-overflow-wrap-break-word'] = {"text": "break-word", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-overflow-wrap-break-word", "export": true, "normative": true, "for_": ["overflow-wrap"]};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#legacy-name-alias'] = {"text": "legacy name alias", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#legacy-name-alias", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-align'] = {"text": "text-align", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-text-align", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#shorthand-property'] = {"text": "shorthand property", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#shorthand-property", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-align-all'] = {"text": "text-align-all", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-text-align-all", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-align-last'] = {"text": "text-align-last", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-text-align-last", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-text-align-justify-all'] = {"text": "justify-all", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-text-align-justify-all", "export": true, "normative": true, "for_": ["text-align"]};
+window.refsData['#valdef-text-align-match-parent'] = {"text": "match-parent", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-text-align-match-parent", "export": true, "normative": true, "for_": ["text-align"]};
+window.refsData['#valdef-text-align-last-auto'] = {"text": "auto", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-text-align-last-auto", "export": true, "normative": true, "for_": ["text-align-last"]};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#css-start'] = {"text": "start", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#css-start", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#css-end'] = {"text": "end", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#css-end", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#line-left'] = {"text": "line-left", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#line-left", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#propdef-writing-mode'] = {"text": "writing-mode", "type": "property", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#propdef-writing-mode", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#line-right'] = {"text": "line-right", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#line-right", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-text-align-start'] = {"text": "start", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-text-align-start", "export": true, "normative": true, "for_": ["text-align"]};
+window.refsData['#valdef-text-align-justify'] = {"text": "justify", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-text-align-justify", "export": true, "normative": true, "for_": ["text-align"]};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#valdef-all-inherit'] = {"text": "inherit", "type": "value", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#valdef-all-inherit", "export": true, "normative": true, "for_": ["all"]};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#inherited-value'] = {"text": "inherited value", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#inherited-value", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-text-align-end'] = {"text": "end", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-text-align-end", "export": true, "normative": true, "for_": ["text-align"]};
+window.refsData['https://drafts.csswg.org/css-display-4/#initial-containing-block'] = {"text": "initial containing block", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#initial-containing-block", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-3/#propdef-direction'] = {"text": "direction", "type": "property", "spec": "css-writing-modes-3", "shortname": "css-writing-modes", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-3/#propdef-direction", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#propdef-left'] = {"text": "left", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-left", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#propdef-right'] = {"text": "right", "type": "property", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#propdef-right", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-inline-3/#line-box'] = {"text": "line box", "type": "dfn", "spec": "css-inline-3", "shortname": "css-inline", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-inline-3/#line-box", "export": true, "normative": true, "for_": []};
+window.refsData['#justification-opportunity'] = {"text": "justification opportunity", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#justification-opportunity", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-text-justify-inter-word'] = {"text": "inter-word", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-text-justify-inter-word", "export": true, "normative": true, "for_": ["text-justify"]};
+window.refsData['#valdef-text-justify-inter-character'] = {"text": "inter-character", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-text-justify-inter-character", "export": true, "normative": true, "for_": ["text-justify"]};
+window.refsData['#valdef-text-align-center'] = {"text": "center", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-text-align-center", "export": true, "normative": true, "for_": ["text-align"]};
+window.refsData['#cursive-script'] = {"text": "cursive script", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#cursive-script", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-text-justify-auto'] = {"text": "auto", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-text-justify-auto", "export": true, "normative": true, "for_": ["text-justify"]};
+window.refsData['#block-scripts'] = {"text": "block scripts", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#block-scripts", "export": true, "normative": true, "for_": []};
+window.refsData['#clustered-scripts'] = {"text": "clustered scripts", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#clustered-scripts", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#resolved-value'] = {"text": "resolved value", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#resolved-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#dom-window-getcomputedstyle'] = {"text": "getComputedStyle(elt)", "type": "method", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#dom-window-getcomputedstyle", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#valdef-letter-spacing-normal'] = {"text": "normal", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-letter-spacing-normal", "export": true, "normative": true, "for_": ["letter-spacing"]};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font-feature-settings'] = {"text": "font-feature-settings", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-feature-settings", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#propdef-margin'] = {"text": "margin", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#propdef-margin", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border'] = {"text": "border", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#propdef-padding'] = {"text": "padding", "type": "property", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#propdef-padding", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-inline-3/#propdef-vertical-align'] = {"text": "vertical-align", "type": "property", "spec": "css-inline-3", "shortname": "css-inline", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-inline-3/#propdef-vertical-align", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-inline-3/#valdef-alignment-baseline-baseline'] = {"text": "baseline", "type": "value", "spec": "css-inline-3", "shortname": "css-inline", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-inline-3/#valdef-alignment-baseline-baseline", "export": true, "normative": true, "for_": ["alignment-baseline", "vertical-align"]};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#bidi-isolate'] = {"text": "bidi-isolate", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#bidi-isolate", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-indent'] = {"text": "text-indent", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-text-indent", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#typedef-length-percentage'] = {"text": "<length-percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#typedef-length-percentage", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-all'] = {"text": "&&", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-all", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-opt'] = {"text": "?", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#inline-axis'] = {"text": "inline-axis", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-axis", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#inner-size'] = {"text": "inner size", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#inner-size", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-text-indent-each-line'] = {"text": "each-line", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-text-indent-each-line", "export": true, "normative": true, "for_": ["text-indent"]};
+window.refsData['#valdef-text-indent-hanging'] = {"text": "hanging", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-text-indent-hanging", "export": true, "normative": true, "for_": ["text-indent"]};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#first-formatted-line'] = {"text": "first formatted line", "type": "dfn", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#first-formatted-line", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#logical-width'] = {"text": "logical width", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#logical-width", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#intrinsic-size-contribution'] = {"text": "intrinsic size contribution", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#intrinsic-size-contribution", "export": true, "normative": true, "for_": []};
+window.refsData['#soft-wrap-break'] = {"text": "soft wrap break", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#soft-wrap-break", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-3/#propdef-display'] = {"text": "display", "type": "property", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-display-3/#propdef-display", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#intrinsic-size'] = {"text": "intrinsic size", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#intrinsic-size", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#max-content'] = {"text": "max-content size", "type": "dfn", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#max-content", "export": true, "normative": true, "for_": []};
+window.refsData['#hanging-glyph'] = {"text": "hanging glyph", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#hanging-glyph", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#ink-overflow'] = {"text": "ink overflow", "type": "dfn", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#ink-overflow", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#scrollable-overflow'] = {"text": "scrollable overflow", "type": "dfn", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#scrollable-overflow", "export": true, "normative": true, "for_": []};
+window.refsData['#stop-or-comma'] = {"text": "stop or comma", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#stop-or-comma", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-hanging-punctuation-allow-end'] = {"text": "allow-end", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-hanging-punctuation-allow-end", "export": true, "normative": true, "for_": ["hanging-punctuation"]};
+window.refsData['#valdef-hanging-punctuation-force-end'] = {"text": "force-end", "type": "value", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#valdef-hanging-punctuation-force-end", "export": true, "normative": true, "for_": ["hanging-punctuation"]};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#inline-base-direction'] = {"text": "inline base direction", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#inline-base-direction", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#containing-block'] = {"text": "containing block", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#containing-block", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-4/#bidi-paragraph'] = {"text": "bidi paragraph", "type": "dfn", "spec": "css-writing-modes-4", "shortname": "css-writing-modes", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-4/#bidi-paragraph", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-3/#propdef-unicode-bidi'] = {"text": "unicode-bidi", "type": "property", "spec": "css-writing-modes-3", "shortname": "css-writing-modes", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-3/#propdef-unicode-bidi", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#block'] = {"text": "block", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#block", "export": true, "normative": true, "for_": []};
+window.refsData['#writing-system-korean'] = {"text": "korean", "type": "dfn", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#writing-system-korean", "export": true, "normative": true, "for_": ["writing-system"]};window.refsData['#propdef-hanging-punctuation'] = {"text": "hanging-punctuation", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-hanging-punctuation", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-hyphens'] = {"text": "hyphens", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-hyphens", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-letter-spacing'] = {"text": "letter-spacing", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-letter-spacing", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-line-break'] = {"text": "line-break", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-line-break", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-overflow-wrap'] = {"text": "overflow-wrap", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-overflow-wrap", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-tab-size'] = {"text": "tab-size", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-tab-size", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-align'] = {"text": "text-align", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-text-align", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-align-all'] = {"text": "text-align-all", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-text-align-all", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-align-last'] = {"text": "text-align-last", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-text-align-last", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-indent'] = {"text": "text-indent", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-text-indent", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-justify'] = {"text": "text-justify", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-text-justify", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-text-transform'] = {"text": "text-transform", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-text-transform", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-white-space'] = {"text": "white-space", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-white-space", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-word-break'] = {"text": "word-break", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-word-break", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-word-spacing'] = {"text": "word-spacing", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-word-spacing", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-word-wrap'] = {"text": "word-wrap", "type": "property", "spec": "css-text-3", "shortname": "css-text", "level": "3", "status": "local", "url": "#propdef-word-wrap", "export": true, "normative": true, "for_": []};
 </script>
 <script>/* Boilerplate: script-wpt */
 let wptPath = "/css/css-text/";

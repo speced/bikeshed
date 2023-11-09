@@ -708,6 +708,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -3554,8 +3591,6 @@ than being defined here. So merge this into the table there. <a class="issue-ret
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -3803,7 +3838,6 @@ than being defined here. So merge this into the table there. <a class="issue-ret
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -4411,6 +4445,436 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#dom-storagemanager-getdirectory'] = {"text": "getDirectory()", "type": "method", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-storagemanager-getdirectory", "export": true, "normative": true, "for_": ["StorageManager"]};
+window.refsData['#file'] = {"text": "file entry", "type": "dfn", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#file", "export": true, "normative": true, "for_": []};
+window.refsData['#directory'] = {"text": "directory entry", "type": "dfn", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#directory", "export": true, "normative": true, "for_": []};
+window.refsData['#entry'] = {"text": "entry", "type": "dfn", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#entry", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#string'] = {"text": "string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#string", "export": true, "normative": true, "for_": []};
+window.refsData['#valid-file-name'] = {"text": "valid file name", "type": "dfn", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#valid-file-name", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#code-point'] = {"text": "code point", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#code-point", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ascii-alphanumeric'] = {"text": "ascii alphanumeric", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-alphanumeric", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#byte-sequence'] = {"text": "byte sequence", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#byte-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/FileAPI/#UnixEpoch'] = {"text": "unix epoch", "type": "dfn", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#UnixEpoch", "export": false, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ordered-set'] = {"text": "set", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-set", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-contain'] = {"text": "contain", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-contain", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['#directory-entry-children'] = {"text": "children", "type": "dfn", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#directory-entry-children", "export": true, "normative": true, "for_": ["directory entry"]};
+window.refsData['#entry-parent'] = {"text": "parent", "type": "dfn", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#entry-parent", "export": true, "normative": true, "for_": ["entry"]};
+window.refsData['#local-file-system-handle-factories'] = {"text": "local file system handle factories", "type": "dfn", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#local-file-system-handle-factories", "export": true, "normative": true, "for_": []};
+window.refsData['#file-entry-binary-data'] = {"text": "binary data", "type": "dfn", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#file-entry-binary-data", "export": true, "normative": true, "for_": ["file entry"]};
+window.refsData['#file-entry-modification-timestamp'] = {"text": "modification timestamp", "type": "dfn", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#file-entry-modification-timestamp", "export": true, "normative": true, "for_": ["file entry"]};
+window.refsData['https://webidl.spec.whatwg.org/#a-new-promise'] = {"text": "a new promise", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#a-new-promise", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel'] = {"text": "in parallel", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel", "export": true, "normative": true, "for_": []};
+window.refsData['#entry-the-same-as'] = {"text": "the same as", "type": "dfn", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#entry-the-same-as", "export": true, "normative": true, "for_": ["entry"]};
+window.refsData['https://webidl.spec.whatwg.org/#resolve'] = {"text": "resolve", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#resolve", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-iterate'] = {"text": "for each", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-iterate", "export": true, "normative": true, "for_": ["list", "set"]};
+window.refsData['#filesystemhandle-entry'] = {"text": "entry", "type": "dfn", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#filesystemhandle-entry", "export": true, "normative": true, "for_": ["FileSystemHandle"]};
+window.refsData['#entry-resolve'] = {"text": "resolve", "type": "dfn", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#entry-resolve", "export": true, "normative": true, "for_": ["entry"]};
+window.refsData['https://infra.spec.whatwg.org/#list-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-append", "export": true, "normative": true, "for_": ["list"]};
+window.refsData['https://webidl.spec.whatwg.org/#upon-fulfillment'] = {"text": "upon fulfillment", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#upon-fulfillment", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-prepend'] = {"text": "prepend", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-prepend", "export": true, "normative": true, "for_": ["list"]};
+window.refsData['#entry-name'] = {"text": "name", "type": "dfn", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#entry-name", "export": true, "normative": true, "for_": ["entry"]};
+window.refsData['https://webidl.spec.whatwg.org/#wait-for-all'] = {"text": "wait for all", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#wait-for-all", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dfn-powerful-feature'] = {"text": "powerful feature", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-powerful-feature", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dfn-permission-descriptor-type'] = {"text": "permission descriptor type", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-permission-descriptor-type", "export": true, "normative": true, "for_": ["powerful feature"]};
+window.refsData['#dictdef-filesystempermissiondescriptor'] = {"text": "FileSystemPermissionDescriptor", "type": "dictionary", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dictdef-filesystempermissiondescriptor", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dom-permissiondescriptor'] = {"text": "PermissionDescriptor", "type": "dictionary", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dom-permissiondescriptor", "export": true, "normative": true, "for_": []};
+window.refsData['#filesystemhandle'] = {"text": "FileSystemHandle", "type": "interface", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#filesystemhandle", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-filesystempermissionmode'] = {"text": "FileSystemPermissionMode", "type": "enum", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#enumdef-filesystempermissionmode", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dfn-permission-state-constraints'] = {"text": "permission state constraints", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-permission-state-constraints", "export": true, "normative": true, "for_": ["powerful feature"]};
+window.refsData['#dom-filesystempermissiondescriptor-handle'] = {"text": "handle", "type": "dict-member", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filesystempermissiondescriptor-handle", "export": true, "normative": true, "for_": ["FileSystemPermissionDescriptor"]};
+window.refsData['#origin-private-file-system'] = {"text": "origin private file system", "type": "dfn", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#origin-private-file-system", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dfn-permission-state'] = {"text": "permission state", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-permission-state", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dom-permissionstate-granted'] = {"text": "granted", "type": "enum-value", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dom-permissionstate-granted", "export": true, "normative": true, "for_": ["PermissionState"]};
+window.refsData['#dom-filesystempermissiondescriptor-mode'] = {"text": "mode", "type": "dict-member", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filesystempermissiondescriptor-mode", "export": true, "normative": true, "for_": ["FileSystemPermissionDescriptor"]};
+window.refsData['#dom-filesystempermissionmode-readwrite'] = {"text": "\"readwrite\"", "type": "enum-value", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filesystempermissionmode-readwrite", "export": true, "normative": true, "for_": ["FileSystemPermissionMode"]};
+window.refsData['#dom-filesystempermissionmode-read'] = {"text": "\"read\"", "type": "enum-value", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filesystempermissionmode-read", "export": true, "normative": true, "for_": ["FileSystemPermissionMode"]};
+window.refsData['https://wicg.github.io/permissions-request/#permission-request-algorithm'] = {"text": "permission request algorithm", "type": "dfn", "spec": "permissions-request", "shortname": "permissions-request", "level": "1", "status": "current", "url": "https://wicg.github.io/permissions-request/#permission-request-algorithm", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dom-permissionstatus'] = {"text": "PermissionStatus", "type": "interface", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dom-permissionstatus", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dom-permissionstatus-state'] = {"text": "state", "type": "attribute", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dom-permissionstatus-state", "export": true, "normative": true, "for_": ["PermissionStatus"]};
+window.refsData['https://w3c.github.io/permissions/#dom-permissionstate-prompt'] = {"text": "prompt", "type": "enum-value", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dom-permissionstate-prompt", "export": true, "normative": true, "for_": ["PermissionState"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object'] = {"text": "relevant settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-global'] = {"text": "global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-global", "export": true, "normative": true, "for_": ["environment settings object"]};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#window'] = {"text": "Window", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#securityerror'] = {"text": "SecurityError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#securityerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#transient-activation'] = {"text": "transient activation", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/interaction.html#transient-activation", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin'] = {"text": "origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin", "export": true, "normative": true, "for_": ["environment settings object"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#same-origin'] = {"text": "same origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#same-origin", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-environment-top-level-origin'] = {"text": "top-level origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-environment-top-level-origin", "export": true, "normative": true, "for_": ["environment"]};
+window.refsData['https://w3c.github.io/permissions/#dfn-request-permission-to-use'] = {"text": "request permission to use", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-request-permission-to-use", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/permissions/#dom-permissiondescriptor-name'] = {"text": "name", "type": "dict-member", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dom-permissiondescriptor-name", "export": true, "normative": true, "for_": ["PermissionDescriptor"]};
+window.refsData['#dom-permissionname-file-system'] = {"text": "\"file-system\"", "type": "enum-value", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-permissionname-file-system", "export": true, "normative": true, "for_": ["PermissionName"]};
+window.refsData['https://w3c.github.io/permissions/#dfn-create-a-permissionstatus'] = {"text": "create a permissionstatus", "type": "dfn", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dfn-create-a-permissionstatus", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#SecureContext'] = {"text": "SecureContext", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SecureContext", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/structured-data.html#serializable'] = {"text": "Serializable", "type": "extended-attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/structured-data.html#serializable", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-filesystemhandlekind'] = {"text": "FileSystemHandleKind", "type": "enum", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#enumdef-filesystemhandlekind", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-filesystemhandle-kind'] = {"text": "kind", "type": "attribute", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filesystemhandle-kind", "export": true, "normative": true, "for_": ["FileSystemHandle"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-USVString'] = {"text": "USVString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-USVString", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-filesystemhandle-name'] = {"text": "name", "type": "attribute", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filesystemhandle-name", "export": true, "normative": true, "for_": ["FileSystemHandle"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-promise'] = {"text": "Promise", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-promise", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-filesystemhandle-issameentry'] = {"text": "isSameEntry(other)", "type": "method", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filesystemhandle-issameentry", "export": true, "normative": true, "for_": ["FileSystemHandle"]};
+window.refsData['https://w3c.github.io/permissions/#dom-permissionstate'] = {"text": "PermissionState", "type": "enum", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dom-permissionstate", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-filesystemhandle-querypermission'] = {"text": "queryPermission(descriptor)", "type": "method", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filesystemhandle-querypermission", "export": true, "normative": true, "for_": ["FileSystemHandle"]};
+window.refsData['#dictdef-filesystemhandlepermissiondescriptor'] = {"text": "FileSystemHandlePermissionDescriptor", "type": "dictionary", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dictdef-filesystemhandlepermissiondescriptor", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-filesystemhandle-requestpermission'] = {"text": "requestPermission(descriptor)", "type": "method", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filesystemhandle-requestpermission", "export": true, "normative": true, "for_": ["FileSystemHandle"]};
+window.refsData['https://html.spec.whatwg.org/multipage/structured-data.html#serializable-objects'] = {"text": "serializable object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/structured-data.html#serializable-objects", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/structured-data.html#serialization-steps'] = {"text": "serialization steps", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/structured-data.html#serialization-steps", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/structured-data.html#deserialization-steps'] = {"text": "deserialization steps", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/structured-data.html#deserialization-steps", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#datacloneerror'] = {"text": "DataCloneError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#datacloneerror", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-filesystemhandlekind-file'] = {"text": "\"file\"", "type": "enum-value", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filesystemhandlekind-file", "export": true, "normative": true, "for_": ["FileSystemHandleKind"]};
+window.refsData['#filesystemfilehandle'] = {"text": "FileSystemFileHandle", "type": "interface", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#filesystemfilehandle", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-filesystemhandlekind-directory'] = {"text": "\"directory\"", "type": "enum-value", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filesystemhandlekind-directory", "export": true, "normative": true, "for_": ["FileSystemHandleKind"]};
+window.refsData['#filesystemdirectoryhandle'] = {"text": "FileSystemDirectoryHandle", "type": "interface", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#filesystemdirectoryhandle", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#this'] = {"text": "this", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#this", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm'] = {"text": "relevant realm", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-filesystemhandlepermissiondescriptor-mode'] = {"text": "mode", "type": "dict-member", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filesystemhandlepermissiondescriptor-mode", "export": true, "normative": true, "for_": ["FileSystemHandlePermissionDescriptor"]};
+window.refsData['https://w3c.github.io/permissions/#dom-navigator-permissions'] = {"text": "permissions", "type": "attribute", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dom-navigator-permissions", "export": true, "normative": true, "for_": ["Navigator"]};
+window.refsData['https://w3c.github.io/permissions/#dom-permissions-query'] = {"text": "query()", "type": "method", "spec": "permissions", "shortname": "permissions", "level": "1", "status": "current", "url": "https://w3c.github.io/permissions/#dom-permissions-query", "export": true, "normative": true, "for_": ["Permissions"]};
+window.refsData['#querying-file-system-permission'] = {"text": "querying file system permission", "type": "dfn", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#querying-file-system-permission", "export": true, "normative": true, "for_": []};
+window.refsData['#requesting-file-system-permission'] = {"text": "requesting file system permission", "type": "dfn", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#requesting-file-system-permission", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#reject'] = {"text": "reject", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#reject", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/FileAPI/#dfn-file'] = {"text": "File", "type": "interface", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-file", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-filesystemfilehandle-getfile'] = {"text": "getFile()", "type": "method", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filesystemfilehandle-getfile", "export": true, "normative": true, "for_": ["FileSystemFileHandle"]};
+window.refsData['#filesystemwritablefilestream'] = {"text": "FileSystemWritableFileStream", "type": "interface", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#filesystemwritablefilestream", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-filesystemfilehandle-createwritable'] = {"text": "createWritable(options)", "type": "method", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filesystemfilehandle-createwritable", "export": true, "normative": true, "for_": ["FileSystemFileHandle"]};
+window.refsData['#dictdef-filesystemcreatewritableoptions'] = {"text": "FileSystemCreateWritableOptions", "type": "dictionary", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dictdef-filesystemcreatewritableoptions", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#notallowederror'] = {"text": "NotAllowedError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#notallowederror", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/FileAPI/#snapshot-state'] = {"text": "snapshot state", "type": "dfn", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#snapshot-state", "export": false, "normative": true, "for_": ["Blob"]};
+window.refsData['https://w3c.github.io/FileAPI/#dfn-name'] = {"text": "name", "type": "attribute", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-name", "export": true, "normative": true, "for_": ["File"]};
+window.refsData['https://w3c.github.io/FileAPI/#dfn-lastModified'] = {"text": "lastModified", "type": "attribute", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-lastModified", "export": true, "normative": true, "for_": ["File"]};
+window.refsData['https://w3c.github.io/FileAPI/#dfn-type'] = {"text": "type", "type": "attribute", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-type", "export": true, "normative": true, "for_": ["Blob"]};
+window.refsData['#dom-filesystemcreatewritableoptions-keepexistingdata'] = {"text": "keepExistingData", "type": "dict-member", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filesystemcreatewritableoptions-keepexistingdata", "export": true, "normative": true, "for_": ["FileSystemCreateWritableOptions"]};
+window.refsData['#create-a-new-filesystemwritablefilestream'] = {"text": "create a new filesystemwritablefilestream", "type": "dfn", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#create-a-new-filesystemwritablefilestream", "export": true, "normative": true, "for_": []};
+window.refsData['#filesystemwritablefilestream-buffer'] = {"text": "[[buffer]]", "type": "dfn", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#filesystemwritablefilestream-buffer", "export": true, "normative": true, "for_": ["FileSystemWritableFileStream"]};
+window.refsData['#dom-filesystemdirectoryhandle-getfilehandle'] = {"text": "getFileHandle(name, options)", "type": "method", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filesystemdirectoryhandle-getfilehandle", "export": true, "normative": true, "for_": ["FileSystemDirectoryHandle"]};
+window.refsData['#dictdef-filesystemgetfileoptions'] = {"text": "FileSystemGetFileOptions", "type": "dictionary", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dictdef-filesystemgetfileoptions", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-filesystemdirectoryhandle-getdirectoryhandle'] = {"text": "getDirectoryHandle(name, options)", "type": "method", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filesystemdirectoryhandle-getdirectoryhandle", "export": true, "normative": true, "for_": ["FileSystemDirectoryHandle"]};
+window.refsData['#dictdef-filesystemgetdirectoryoptions'] = {"text": "FileSystemGetDirectoryOptions", "type": "dictionary", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dictdef-filesystemgetdirectoryoptions", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-filesystemdirectoryhandle-removeentry'] = {"text": "removeEntry(name, options)", "type": "method", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filesystemdirectoryhandle-removeentry", "export": true, "normative": true, "for_": ["FileSystemDirectoryHandle"]};
+window.refsData['#dictdef-filesystemremoveoptions'] = {"text": "FileSystemRemoveOptions", "type": "dictionary", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dictdef-filesystemremoveoptions", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-filesystemdirectoryhandle-resolve'] = {"text": "resolve(possibleDescendant)", "type": "method", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filesystemdirectoryhandle-resolve", "export": true, "normative": true, "for_": ["FileSystemDirectoryHandle"]};
+window.refsData['https://webidl.spec.whatwg.org/#asynchronous-iterator-initialization-steps'] = {"text": "asynchronous iterator initialization steps", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#asynchronous-iterator-initialization-steps", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-get-the-next-iteration-result'] = {"text": "get the next iteration result", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-get-the-next-iteration-result", "export": true, "normative": true, "for_": []};
+window.refsData['#filesystemdirectoryhandle-iterator-past-results'] = {"text": "past results", "type": "dfn", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#filesystemdirectoryhandle-iterator-past-results", "export": true, "normative": true, "for_": ["FileSystemDirectoryHandle-iterator"]};
+window.refsData['https://infra.spec.whatwg.org/#set-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#set-append", "export": true, "normative": true, "for_": ["set"]};
+window.refsData['#dom-filesystemgetfileoptions-create'] = {"text": "create", "type": "dict-member", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filesystemgetfileoptions-create", "export": true, "normative": true, "for_": ["FileSystemGetFileOptions"]};
+window.refsData['https://webidl.spec.whatwg.org/#exceptiondef-typeerror'] = {"text": "TypeError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#exceptiondef-typeerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#typemismatcherror'] = {"text": "TypeMismatchError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#typemismatcherror", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#notfounderror'] = {"text": "NotFoundError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#notfounderror", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-filesystemgetdirectoryoptions-create'] = {"text": "create", "type": "dict-member", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filesystemgetdirectoryoptions-create", "export": true, "normative": true, "for_": ["FileSystemGetDirectoryOptions"]};
+window.refsData['#dom-filesystemremoveoptions-recursive'] = {"text": "recursive", "type": "dict-member", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filesystemremoveoptions-recursive", "export": true, "normative": true, "for_": ["FileSystemRemoveOptions"]};
+window.refsData['https://infra.spec.whatwg.org/#list-is-empty'] = {"text": "is empty", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-is-empty", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://webidl.spec.whatwg.org/#invalidmodificationerror'] = {"text": "InvalidModificationError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidmodificationerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-remove'] = {"text": "remove", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-remove", "export": true, "normative": true, "for_": ["list", "set"]};
+window.refsData['#enumdef-writecommandtype'] = {"text": "WriteCommandType", "type": "enum", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#enumdef-writecommandtype", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-long-long'] = {"text": "unsigned long long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long-long", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#BufferSource'] = {"text": "BufferSource", "type": "typedef", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#BufferSource", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/FileAPI/#dfn-Blob'] = {"text": "Blob", "type": "interface", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-Blob", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-writeparams'] = {"text": "WriteParams", "type": "dictionary", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dictdef-writeparams", "export": true, "normative": true, "for_": []};
+window.refsData['https://streams.spec.whatwg.org/#writablestream'] = {"text": "WritableStream", "type": "interface", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#writablestream", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-filesystemwritablefilestream-write'] = {"text": "write(data)", "type": "method", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filesystemwritablefilestream-write", "export": true, "normative": true, "for_": ["FileSystemWritableFileStream"]};
+window.refsData['#typedefdef-filesystemwritechunktype'] = {"text": "FileSystemWriteChunkType", "type": "typedef", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#typedefdef-filesystemwritechunktype", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-filesystemwritablefilestream-seek'] = {"text": "seek(position)", "type": "method", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filesystemwritablefilestream-seek", "export": true, "normative": true, "for_": ["FileSystemWritableFileStream"]};
+window.refsData['#dom-filesystemwritablefilestream-truncate'] = {"text": "truncate(size)", "type": "method", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filesystemwritablefilestream-truncate", "export": true, "normative": true, "for_": ["FileSystemWritableFileStream"]};
+window.refsData['https://streams.spec.whatwg.org/#default-writer-write'] = {"text": "write()", "type": "method", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#default-writer-write", "export": true, "normative": true, "for_": ["WritableStreamDefaultWriter"]};
+window.refsData['https://streams.spec.whatwg.org/#readablestream'] = {"text": "ReadableStream", "type": "interface", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#readablestream", "export": true, "normative": true, "for_": []};
+window.refsData['https://streams.spec.whatwg.org/#ws-get-writer'] = {"text": "getWriter()", "type": "method", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#ws-get-writer", "export": true, "normative": true, "for_": ["WritableStream"]};
+window.refsData['https://streams.spec.whatwg.org/#writablestreamdefaultwriter'] = {"text": "WritableStreamDefaultWriter", "type": "interface", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#writablestreamdefaultwriter", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#realm'] = {"text": "realm", "type": "dfn", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#realm", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#new'] = {"text": "new", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#new", "export": true, "normative": true, "for_": []};
+window.refsData['#filesystemwritablefilestream-file'] = {"text": "[[file]]", "type": "dfn", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#filesystemwritablefilestream-file", "export": true, "normative": true, "for_": ["FileSystemWritableFileStream"]};
+window.refsData['#write-a-chunk'] = {"text": "write a chunk", "type": "dfn", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#write-a-chunk", "export": true, "normative": true, "for_": []};
+window.refsData['#malware-scans-and-safe-browsing-checks'] = {"text": "malware scans and safe browsing checks", "type": "dfn", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#malware-scans-and-safe-browsing-checks", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#aborterror'] = {"text": "AbortError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#aborterror", "export": true, "normative": true, "for_": []};
+window.refsData['https://streams.spec.whatwg.org/#writablestream-set-up'] = {"text": "set up", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#writablestream-set-up", "export": true, "normative": true, "for_": ["WritableStream"]};
+window.refsData['https://streams.spec.whatwg.org/#writablestream-set-up-writealgorithm'] = {"text": "writealgorithm", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#writablestream-set-up-writealgorithm", "export": true, "normative": true, "for_": ["WritableStream/set up"]};
+window.refsData['https://streams.spec.whatwg.org/#writablestream-set-up-closealgorithm'] = {"text": "closealgorithm", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#writablestream-set-up-closealgorithm", "export": true, "normative": true, "for_": ["WritableStream/set up"]};
+window.refsData['https://streams.spec.whatwg.org/#writablestream-set-up-highwatermark'] = {"text": "highwatermark", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#writablestream-set-up-highwatermark", "export": true, "normative": true, "for_": ["WritableStream/set up"]};
+window.refsData['https://streams.spec.whatwg.org/#writablestream-set-up-sizealgorithm'] = {"text": "sizealgorithm", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#writablestream-set-up-sizealgorithm", "export": true, "normative": true, "for_": ["WritableStream/set up"]};
+window.refsData['https://infra.spec.whatwg.org/#javascript-string-convert'] = {"text": "convert", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#javascript-string-convert", "export": true, "normative": true, "for_": ["string", "JavaScript string"]};
+window.refsData['https://webidl.spec.whatwg.org/#a-promise-rejected-with'] = {"text": "a promise rejected with", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#a-promise-rejected-with", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-writeparams-type'] = {"text": "type", "type": "dict-member", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-writeparams-type", "export": true, "normative": true, "for_": ["WriteParams"]};
+window.refsData['#dom-writecommandtype-write'] = {"text": "\"write\"", "type": "enum-value", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-writecommandtype-write", "export": true, "normative": true, "for_": ["WriteCommandType"]};
+window.refsData['#dom-writeparams-data'] = {"text": "data", "type": "dict-member", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-writeparams-data", "export": true, "normative": true, "for_": ["WriteParams"]};
+window.refsData['#filesystemwritablefilestream-seekoffset'] = {"text": "[[seekoffset]]", "type": "dfn", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#filesystemwritablefilestream-seekoffset", "export": true, "normative": true, "for_": ["FileSystemWritableFileStream"]};
+window.refsData['#dom-writeparams-position'] = {"text": "position", "type": "dict-member", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-writeparams-position", "export": true, "normative": true, "for_": ["WriteParams"]};
+window.refsData['https://infra.spec.whatwg.org/#byte-sequence-length'] = {"text": "length", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#byte-sequence-length", "export": true, "normative": true, "for_": ["byte sequence"]};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-get-buffer-source-copy'] = {"text": "get a copy of the buffer source", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-get-buffer-source-copy", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/FileAPI/#readOperation'] = {"text": "read operation", "type": "dfn", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#readOperation", "export": false, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#assert'] = {"text": "assert", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#assert", "export": true, "normative": true, "for_": []};
+window.refsData['https://encoding.spec.whatwg.org/#utf-8-encode'] = {"text": "utf-8 encode", "type": "dfn", "spec": "encoding", "shortname": "encoding", "level": "1", "status": "current", "url": "https://encoding.spec.whatwg.org/#utf-8-encode", "export": true, "normative": true, "for_": []};
+window.refsData['https://storage.spec.whatwg.org/#storage-quota'] = {"text": "storage quota", "type": "dfn", "spec": "storage", "shortname": "storage", "level": "1", "status": "current", "url": "https://storage.spec.whatwg.org/#storage-quota", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#quotaexceedederror'] = {"text": "QuotaExceededError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#quotaexceedederror", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-writecommandtype-seek'] = {"text": "\"seek\"", "type": "enum-value", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-writecommandtype-seek", "export": true, "normative": true, "for_": ["WriteCommandType"]};
+window.refsData['#dom-writecommandtype-truncate'] = {"text": "\"truncate\"", "type": "enum-value", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-writecommandtype-truncate", "export": true, "normative": true, "for_": ["WriteCommandType"]};
+window.refsData['#dom-writeparams-size'] = {"text": "size", "type": "dict-member", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-writeparams-size", "export": true, "normative": true, "for_": ["WriteParams"]};
+window.refsData['https://streams.spec.whatwg.org/#writablestream-get-a-writer'] = {"text": "getting a writer", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#writablestream-get-a-writer", "export": true, "normative": true, "for_": ["WritableStream"]};
+window.refsData['https://streams.spec.whatwg.org/#writablestreamdefaultwriter-write-a-chunk'] = {"text": "writing a chunk", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#writablestreamdefaultwriter-write-a-chunk", "export": true, "normative": true, "for_": ["WritableStreamDefaultWriter"]};
+window.refsData['https://streams.spec.whatwg.org/#writablestreamdefaultwriter-release'] = {"text": "release", "type": "dfn", "spec": "streams", "shortname": "streams", "level": "1", "status": "current", "url": "https://streams.spec.whatwg.org/#writablestreamdefaultwriter-release", "export": true, "normative": true, "for_": ["WritableStreamDefaultWriter"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-record'] = {"text": "record", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-record", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-filepickeraccepttype'] = {"text": "FilePickerAcceptType", "type": "dictionary", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dictdef-filepickeraccepttype", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-filepickeroptions'] = {"text": "FilePickerOptions", "type": "dictionary", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dictdef-filepickeroptions", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-window-showopenfilepicker'] = {"text": "showOpenFilePicker(options)", "type": "method", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-window-showopenfilepicker", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#dictdef-openfilepickeroptions'] = {"text": "OpenFilePickerOptions", "type": "dictionary", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dictdef-openfilepickeroptions", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-window-showsavefilepicker'] = {"text": "showSaveFilePicker(options)", "type": "method", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-window-showsavefilepicker", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#dictdef-savefilepickeroptions'] = {"text": "SaveFilePickerOptions", "type": "dictionary", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dictdef-savefilepickeroptions", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-window-showdirectorypicker'] = {"text": "showDirectoryPicker(options)", "type": "method", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-window-showdirectorypicker", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#dictdef-directorypickeroptions'] = {"text": "DirectoryPickerOptions", "type": "dictionary", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dictdef-directorypickeroptions", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#concept-origin-opaque'] = {"text": "opaque origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-origin-opaque", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-openfilepickeroptions-multiple'] = {"text": "multiple", "type": "dict-member", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-openfilepickeroptions-multiple", "export": true, "normative": true, "for_": ["OpenFilePickerOptions"]};
+window.refsData['#process-accept-types'] = {"text": "process accept types", "type": "dfn", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#process-accept-types", "export": true, "normative": true, "for_": []};
+window.refsData['#is-allowed-to-show-a-file-picker'] = {"text": "is allowed to show a file picker", "type": "dfn", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#is-allowed-to-show-a-file-picker", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list'] = {"text": "list", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list", "export": true, "normative": true, "for_": []};
+window.refsData['#too-sensitive-or-dangerous'] = {"text": "too sensitive or dangerous", "type": "dfn", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#too-sensitive-or-dangerous", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#activation-notification'] = {"text": "activation notification", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/interaction.html#activation-notification", "export": false, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#window-bc'] = {"text": "browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window-bc", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#dom-filepickeroptions-types'] = {"text": "types", "type": "dict-member", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filepickeroptions-types", "export": true, "normative": true, "for_": ["FilePickerOptions"]};
+window.refsData['#dom-filepickeraccepttype-description'] = {"text": "description", "type": "dict-member", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filepickeraccepttype-description", "export": true, "normative": true, "for_": ["FilePickerAcceptType"]};
+window.refsData['#valid-suffix-code-point'] = {"text": "valid suffix code point", "type": "dfn", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#valid-suffix-code-point", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-filepickeroptions-excludeacceptalloption'] = {"text": "excludeAcceptAllOption", "type": "dict-member", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filepickeroptions-excludeacceptalloption", "export": true, "normative": true, "for_": ["FilePickerOptions"]};
+window.refsData['#dom-filepickeraccepttype-accept'] = {"text": "accept", "type": "dict-member", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-filepickeraccepttype-accept", "export": true, "normative": true, "for_": ["FilePickerAcceptType"]};
+window.refsData['https://infra.spec.whatwg.org/#map-iterate'] = {"text": "for each", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-iterate", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['https://mimesniff.spec.whatwg.org/#parse-a-mime-type'] = {"text": "parse a mime type", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "1", "status": "current", "url": "https://mimesniff.spec.whatwg.org/#parse-a-mime-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://mimesniff.spec.whatwg.org/#parameters'] = {"text": "parameters", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "1", "status": "current", "url": "https://mimesniff.spec.whatwg.org/#parameters", "export": true, "normative": true, "for_": ["MIME type"]};
+window.refsData['#validate-a-suffix'] = {"text": "validate a suffix", "type": "dfn", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#validate-a-suffix", "export": true, "normative": true, "for_": []};
+window.refsData['https://mimesniff.spec.whatwg.org/#mime-type'] = {"text": "mime type", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "1", "status": "current", "url": "https://mimesniff.spec.whatwg.org/#mime-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://mimesniff.spec.whatwg.org/#subtype'] = {"text": "subtype", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "1", "status": "current", "url": "https://mimesniff.spec.whatwg.org/#subtype", "export": true, "normative": true, "for_": ["MIME type"]};
+window.refsData['https://mimesniff.spec.whatwg.org/#type'] = {"text": "type", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "1", "status": "current", "url": "https://mimesniff.spec.whatwg.org/#type", "export": true, "normative": true, "for_": ["MIME type"]};
+window.refsData['https://mimesniff.spec.whatwg.org/#mime-type-essence'] = {"text": "essence", "type": "dfn", "spec": "mimesniff", "shortname": "mimesniff", "level": "1", "status": "current", "url": "https://mimesniff.spec.whatwg.org/#mime-type-essence", "export": true, "normative": true, "for_": ["MIME type"]};
+window.refsData['https://infra.spec.whatwg.org/#list-empty'] = {"text": "empty", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-empty", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://infra.spec.whatwg.org/#string-starts-with'] = {"text": "starts with", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#string-starts-with", "export": true, "normative": true, "for_": ["string"]};
+window.refsData['https://infra.spec.whatwg.org/#string-length'] = {"text": "length", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#string-length", "export": true, "normative": true, "for_": ["string", "JavaScript string", "scalar value string"]};
+window.refsData['https://html.spec.whatwg.org/multipage/dnd.html#datatransferitem'] = {"text": "DataTransferItem", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dnd.html#datatransferitem", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-datatransferitem-getasfilesystemhandle'] = {"text": "getAsFileSystemHandle()", "type": "method", "spec": "file-system-access-1", "shortname": "file-system-access", "level": "1", "status": "local", "url": "#dom-datatransferitem-getasfilesystemhandle", "export": true, "normative": true, "for_": ["DataTransferItem"]};
+window.refsData['https://html.spec.whatwg.org/multipage/dnd.html#concept-dnd-rw'] = {"text": "read/write mode", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dnd.html#concept-dnd-rw", "export": false, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/dnd.html#concept-dnd-ro'] = {"text": "read-only mode", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dnd.html#concept-dnd-ro", "export": false, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#a-promise-resolved-with'] = {"text": "a promise resolved with", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#a-promise-resolved-with", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/dnd.html#the-drag-data-item-kind'] = {"text": "the drag data item kind", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dnd.html#the-drag-data-item-kind", "export": false, "normative": true, "for_": []};
+window.refsData['https://storage.spec.whatwg.org/#storage-endpoint'] = {"text": "storage endpoint", "type": "dfn", "spec": "storage", "shortname": "storage", "level": "1", "status": "current", "url": "https://storage.spec.whatwg.org/#storage-endpoint", "export": true, "normative": true, "for_": []};
+window.refsData['https://storage.spec.whatwg.org/#storage-endpoint-identifier'] = {"text": "identifier", "type": "dfn", "spec": "storage", "shortname": "storage", "level": "1", "status": "current", "url": "https://storage.spec.whatwg.org/#storage-endpoint-identifier", "export": false, "normative": true, "for_": ["storage endpoint"]};
+window.refsData['https://storage.spec.whatwg.org/#storage-endpoint-types'] = {"text": "types", "type": "dfn", "spec": "storage", "shortname": "storage", "level": "1", "status": "current", "url": "https://storage.spec.whatwg.org/#storage-endpoint-types", "export": false, "normative": true, "for_": ["storage endpoint"]};
+window.refsData['https://storage.spec.whatwg.org/#storage-endpoint-quota'] = {"text": "quota", "type": "dfn", "spec": "storage", "shortname": "storage", "level": "1", "status": "current", "url": "https://storage.spec.whatwg.org/#storage-endpoint-quota", "export": false, "normative": true, "for_": ["storage endpoint"]};
+window.refsData['https://storage.spec.whatwg.org/#storagemanager'] = {"text": "StorageManager", "type": "interface", "spec": "storage", "shortname": "storage", "level": "1", "status": "current", "url": "https://storage.spec.whatwg.org/#storagemanager", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#current-settings-object'] = {"text": "current settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#current-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://storage.spec.whatwg.org/#obtain-a-local-storage-bottle-map'] = {"text": "obtain a local storage bottle map", "type": "dfn", "spec": "storage", "shortname": "storage", "level": "1", "status": "current", "url": "https://storage.spec.whatwg.org/#obtain-a-local-storage-bottle-map", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#map-exists'] = {"text": "exist", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-exists", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['https://storage.spec.whatwg.org/#site-storage'] = {"text": "storage", "type": "dfn", "spec": "storage", "shortname": "storage", "level": "", "status": "anchor-block", "url": "https://storage.spec.whatwg.org/#site-storage", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/indices.html#event-messageerror'] = {"text": "messageerror", "type": "event", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/indices.html#event-messageerror", "export": true, "normative": true, "for_": ["Window", "MessagePort", "BroadcastChannel", "DedicatedWorkerGlobalScope", "Worker", "ServiceWorkerContainer"]};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

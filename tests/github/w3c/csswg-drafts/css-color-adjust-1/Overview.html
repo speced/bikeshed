@@ -692,6 +692,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -1983,8 +2020,6 @@ svg|foreignObject { forced-color-adjust: auto; }
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -2232,7 +2267,6 @@ svg|foreignObject { forced-color-adjust: auto; }
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -2672,4 +2706,268 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#color-scheme'] = {"text": "color scheme", "type": "dfn", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#color-scheme", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-color-scheme'] = {"text": "color-scheme", "type": "property", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#propdef-color-scheme", "export": true, "normative": true, "for_": []};
+window.refsData['#forced-colors-mode'] = {"text": "forced colors mode", "type": "dfn", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#forced-colors-mode", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-forced-color-adjust'] = {"text": "forced-color-adjust", "type": "property", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#propdef-forced-color-adjust", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-color-adjust'] = {"text": "color-adjust", "type": "property", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#propdef-color-adjust", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/mediaqueries-5/#media-query'] = {"text": "media query", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#media-query", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
+window.refsData['#light-color-scheme'] = {"text": "light", "type": "dfn", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#light-color-scheme", "export": true, "normative": true, "for_": []};
+window.refsData['#dark-color-scheme'] = {"text": "dark color scheme", "type": "dfn", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#dark-color-scheme", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-color-4/#typedef-system-color'] = {"text": "<system-color>", "type": "type", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#typedef-system-color", "export": true, "normative": true, "for_": []};
+window.refsData['#preferred-color-scheme'] = {"text": "preferred color scheme", "type": "dfn", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#preferred-color-scheme", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/mediaqueries-5/#descdef-media-prefers-color-scheme'] = {"text": "prefers-color-scheme", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#descdef-media-prefers-color-scheme", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#identifier-value'] = {"text": "<custom-ident>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#identifier-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-one-plus'] = {"text": "+", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-one-plus", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-color-scheme-normal'] = {"text": "normal", "type": "value", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#valdef-color-scheme-normal", "export": true, "normative": true, "for_": ["color-scheme"]};
+window.refsData['#valdef-color-scheme-light'] = {"text": "light", "type": "value", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#valdef-color-scheme-light", "export": true, "normative": true, "for_": ["color-scheme"]};
+window.refsData['#valdef-color-scheme-dark'] = {"text": "dark", "type": "value", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#valdef-color-scheme-dark", "export": true, "normative": true, "for_": ["color-scheme"]};
+window.refsData['#used-color-scheme'] = {"text": "used color scheme", "type": "dfn", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#used-color-scheme", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-conditional-3/#at-ruledef-media'] = {"text": "@media", "type": "at-rule", "spec": "css-conditional-3", "shortname": "css-conditional", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-conditional-3/#at-ruledef-media", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/semantics.html#meta'] = {"text": "meta", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/semantics.html#meta", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-color-4/#propdef-color'] = {"text": "color", "type": "property", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#propdef-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element'] = {"text": "iframe", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-color-4/#valdef-system-color-canvas'] = {"text": "canvas", "type": "value", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#valdef-system-color-canvas", "export": true, "normative": true, "for_": ["<system-color>"]};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element'] = {"text": "img", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-pseudo-4/#selectordef-selection'] = {"text": "::selection", "type": "selector", "spec": "css-pseudo-4", "shortname": "css-pseudo", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-pseudo-4/#selectordef-selection", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/mediaqueries-5/#descdef-media-forced-colors'] = {"text": "forced-colors", "type": "descriptor", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#descdef-media-forced-colors", "export": true, "normative": true, "for_": ["@media"]};
+window.refsData['#valdef-forced-color-adjust-auto'] = {"text": "auto", "type": "value", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#valdef-forced-color-adjust-auto", "export": true, "normative": true, "for_": ["forced-color-adjust"]};
+window.refsData['https://drafts.fxtf.org/fill-stroke-3/#propdef-fill'] = {"text": "fill", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "current", "url": "https://drafts.fxtf.org/fill-stroke-3/#propdef-fill", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.fxtf.org/fill-stroke-3/#propdef-stroke'] = {"text": "stroke", "type": "property", "spec": "fill-stroke-3", "shortname": "fill-stroke", "level": "3", "status": "current", "url": "https://drafts.fxtf.org/fill-stroke-3/#propdef-stroke", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration-color'] = {"text": "text-decoration-color", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-decor-4/#propdef-text-decoration-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-decor-4/#propdef-text-emphasis-color'] = {"text": "text-emphasis-color", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-decor-4/#propdef-text-emphasis-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border-color'] = {"text": "border-color", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-ui-4/#propdef-outline-color'] = {"text": "outline-color", "type": "property", "spec": "css-ui-4", "shortname": "css-ui", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-ui-4/#propdef-outline-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-multicol-1/#propdef-column-rule-color'] = {"text": "column-rule-color", "type": "property", "spec": "css-multicol-1", "shortname": "css-multicol", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-multicol-1/#propdef-column-rule-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-scrollbars-1/#propdef-scrollbar-color'] = {"text": "scrollbar-color", "type": "property", "spec": "css-scrollbars-1", "shortname": "css-scrollbars", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-scrollbars-1/#propdef-scrollbar-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background-color'] = {"text": "background-color", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#computed-value'] = {"text": "computed value", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#computed-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-color-5/#funcdef-color'] = {"text": "color()", "type": "function", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-color-5/#funcdef-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-color-4/#system-color-pairings'] = {"text": "system color pairings", "type": "dfn", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#system-color-pairings", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-color-4/#valdef-system-color-canvastext'] = {"text": "canvastext", "type": "value", "spec": "css-color-4", "shortname": "css-color", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-color-4/#valdef-system-color-canvastext", "export": true, "normative": true, "for_": ["<system-color>"]};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#cascade-origin-author'] = {"text": "author style sheet", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#cascade-origin-author", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-box-shadow'] = {"text": "box-shadow", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-box-shadow", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-decor-4/#propdef-text-shadow'] = {"text": "text-shadow", "type": "property", "spec": "css-text-decor-4", "shortname": "css-text-decor", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-decor-4/#propdef-text-shadow", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#box-shadow-none'] = {"text": "none", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#box-shadow-none", "export": true, "normative": true, "for_": ["box-shadow"]};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background-image'] = {"text": "background-image", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-image", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#valdef-background-image-none'] = {"text": "none", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#valdef-background-image-none", "export": true, "normative": true, "for_": ["background-image"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#funcdef-url'] = {"text": "url()", "type": "function", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#funcdef-url", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-4/#valdef-all-revert'] = {"text": "revert", "type": "value", "spec": "css-cascade-4", "shortname": "css-cascade", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-cascade-4/#valdef-all-revert", "export": true, "normative": true, "for_": ["all"]};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#used-value'] = {"text": "used value", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#used-value", "export": true, "normative": true, "for_": []};window.refsData['#propdef-color-adjust'] = {"text": "color-adjust", "type": "property", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#propdef-color-adjust", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-color-scheme'] = {"text": "color-scheme", "type": "property", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#propdef-color-scheme", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-forced-color-adjust'] = {"text": "forced-color-adjust", "type": "property", "spec": "css-color-adjust-1", "shortname": "css-color-adjust", "level": "1", "status": "local", "url": "#propdef-forced-color-adjust", "export": true, "normative": true, "for_": []};
 </script>

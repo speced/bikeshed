@@ -516,6 +516,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -3036,8 +3073,6 @@ Until then, we roll our own. <a href="https://github.com/w3c/csswg-drafts/issues
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -3285,7 +3320,6 @@ Until then, we roll our own. <a href="https://github.com/w3c/csswg-drafts/issues
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -3741,6 +3775,329 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#dom-element-getspatialnavigationcontainer'] = {"text": "getSpatialNavigationContainer()", "type": "method", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#dom-element-getspatialnavigationcontainer", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['#dom-element-focusableareas'] = {"text": "focusableAreas()", "type": "method", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#dom-element-focusableareas", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['#propdef-spatial-navigation-contain'] = {"text": "spatial-navigation-contain", "type": "property", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#propdef-spatial-navigation-contain", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-spatial-navigation-action'] = {"text": "spatial-navigation-action", "type": "property", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#propdef-spatial-navigation-action", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-spatial-navigation-function'] = {"text": "spatial-navigation-function", "type": "property", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#propdef-spatial-navigation-function", "export": true, "normative": true, "for_": []};
+window.refsData['#spatial-navigation'] = {"text": "spatial navigation", "type": "dfn", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#spatial-navigation", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
+window.refsData['#spatial-navigation-containers'] = {"text": "spatial navigation containers", "type": "dfn", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#spatial-navigation-containers", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dom-event-preventdefault'] = {"text": "preventDefault()", "type": "method", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-event-preventdefault", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#dom-focus'] = {"text": "focus(options)", "type": "method", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/interaction.html#dom-focus", "export": true, "normative": true, "for_": ["HTMLOrSVGElement"]};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#scrollport'] = {"text": "scrollport", "type": "dfn", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#scrollport", "export": true, "normative": true, "for_": []};
+window.refsData['#spatial-navigation-steps'] = {"text": "spatial navigation steps", "type": "dfn", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#spatial-navigation-steps", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/uievents/#uievent'] = {"text": "UIEvent", "type": "interface", "spec": "uievents", "shortname": "uievents", "level": "1", "status": "current", "url": "https://w3c.github.io/uievents/#uievent", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#canceled-flag'] = {"text": "canceled flag", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#canceled-flag", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['https://w3c.github.io/uievents/#keydown'] = {"text": "keydown", "type": "event", "spec": "ui-events", "shortname": "ui-events", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/uievents/#keydown", "export": true, "normative": true, "for_": []};
+window.refsData['#navigationevent'] = {"text": "NavigationEvent", "type": "interface", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#navigationevent", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-window-navigate'] = {"text": "navigate(dir)", "type": "method", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#dom-window-navigate", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#window'] = {"text": "Window", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-spatialnavigationdirection'] = {"text": "SpatialNavigationDirection", "type": "enum", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#enumdef-spatialnavigationdirection", "export": true, "normative": true, "for_": []};
+window.refsData['#enumdef-focusableareasearchmode'] = {"text": "FocusableAreaSearchMode", "type": "enum", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#enumdef-focusableareasearchmode", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#node'] = {"text": "Node", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#node", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#element'] = {"text": "Element", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#element", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-focusableareasoption'] = {"text": "FocusableAreasOption", "type": "dictionary", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#dictdef-focusableareasoption", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-spatialnavigationsearchoptions'] = {"text": "SpatialNavigationSearchOptions", "type": "dictionary", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#dictdef-spatialnavigationsearchoptions", "export": true, "normative": true, "for_": []};
+window.refsData['#at-risk'] = {"text": "at-risk", "type": "dfn", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#at-risk", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-document'] = {"text": "document", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#propdef-all'] = {"text": "all", "type": "property", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#propdef-all", "export": true, "normative": true, "for_": []};
+window.refsData['#find-focusable-areas'] = {"text": "finding focusable areas", "type": "dfn", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#find-focusable-areas", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-focusableareasoption-mode'] = {"text": "mode", "type": "dict-member", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#dom-focusableareasoption-mode", "export": true, "normative": true, "for_": ["FocusableAreasOption"]};
+window.refsData['#dom-spatialnavigationsearchoptions-container'] = {"text": "container", "type": "dict-member", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#dom-spatialnavigationsearchoptions-container", "export": true, "normative": true, "for_": ["SpatialNavigationSearchOptions"]};
+window.refsData['#dom-spatialnavigationsearchoptions-candidates'] = {"text": "candidates", "type": "dict-member", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#dom-spatialnavigationsearchoptions-candidates", "export": true, "normative": true, "for_": ["SpatialNavigationSearchOptions"]};
+window.refsData['#select-the-best-candidate'] = {"text": "selecting the best candidate", "type": "dfn", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#select-the-best-candidate", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-navigationeventinit'] = {"text": "NavigationEventInit", "type": "dictionary", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#dictdef-navigationeventinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#eventtarget'] = {"text": "EventTarget", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#eventtarget", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/uievents/#dictdef-uieventinit'] = {"text": "UIEventInit", "type": "dictionary", "spec": "uievents", "shortname": "uievents", "level": "1", "status": "current", "url": "https://w3c.github.io/uievents/#dictdef-uieventinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#event'] = {"text": "Event", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#event", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dom-event-target'] = {"text": "target", "type": "attribute", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-event-target", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['https://html.spec.whatwg.org/multipage/dom.html#the-body-element-2'] = {"text": "the body element", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/dom.html#the-body-element-2", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-navigationevent-relatedtarget'] = {"text": "relatedTarget", "type": "attribute", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#dom-navigationevent-relatedtarget", "export": true, "normative": true, "for_": ["NavigationEvent"]};
+window.refsData['#dom-navigationevent-dir'] = {"text": "dir", "type": "attribute", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#dom-navigationevent-dir", "export": true, "normative": true, "for_": ["NavigationEvent"]};
+window.refsData['#eventdef-navigationevent-navbeforefocus'] = {"text": "navbeforefocus", "type": "event", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#eventdef-navigationevent-navbeforefocus", "export": true, "normative": true, "for_": ["NavigationEvent"]};
+window.refsData['https://w3c.github.io/uievents/#event-target'] = {"text": "event target", "type": "dfn", "spec": "ui-events", "shortname": "ui-events", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/uievents/#event-target", "export": true, "normative": true, "for_": []};
+window.refsData['#navigation-override'] = {"text": "navigation-override", "type": "dfn", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#navigation-override", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-node-document'] = {"text": "node document", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-node-document", "export": true, "normative": true, "for_": ["Node"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#concept-origin'] = {"text": "origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-origin", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#nav-document'] = {"text": "active document", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#nav-document", "export": true, "normative": true, "for_": ["navigable"]};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context'] = {"text": "top-level browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/uievents/#keyboardevent'] = {"text": "KeyboardEvent", "type": "interface", "spec": "uievents", "shortname": "uievents", "level": "1", "status": "current", "url": "https://w3c.github.io/uievents/#keyboardevent", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/uievents/#dom-keyboardevent-key'] = {"text": "key", "type": "attribute", "spec": "uievents", "shortname": "uievents", "level": "1", "status": "current", "url": "https://w3c.github.io/uievents/#dom-keyboardevent-key", "export": true, "normative": true, "for_": ["KeyboardEvent"]};
+window.refsData['#eventdef-navigationevent-navnotarget'] = {"text": "navnotarget", "type": "event", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#eventdef-navigationevent-navnotarget", "export": true, "normative": true, "for_": ["NavigationEvent"]};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#scroll-container'] = {"text": "scroll container", "type": "dfn", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#scroll-container", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webappsec-feature-policy/#policy-controlled-feature'] = {"text": "policy-controlled feature", "type": "dfn", "spec": "feature-policy", "shortname": "feature-policy", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webappsec-feature-policy/#policy-controlled-feature", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webappsec-feature-policy/#default-allowlist'] = {"text": "default allowlist", "type": "dfn", "spec": "feature-policy", "shortname": "feature-policy", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webappsec-feature-policy/#default-allowlist", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#box'] = {"text": "box", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#box", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://drafts.csswg.org/css-break-4/#box-fragment'] = {"text": "box fragment", "type": "dfn", "spec": "css-break-4", "shortname": "css-break", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-break-4/#box-fragment", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css2/box.html#x14'] = {"text": "border box", "type": "dfn", "spec": "css2", "shortname": "css2", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/css2/box.html#x14", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#focusable-area'] = {"text": "focusable area", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#focusable-area", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-scroll-snap-1/#optimal-viewing-region'] = {"text": "optimal viewing region", "type": "dfn", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-scroll-snap-1/#optimal-viewing-region", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#browsing-context'] = {"text": "browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['#boundary-box'] = {"text": "boundary box", "type": "dfn", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#boundary-box", "export": true, "normative": true, "for_": []};
+window.refsData['#inside-area'] = {"text": "inside area", "type": "dfn", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#inside-area", "export": true, "normative": true, "for_": []};
+window.refsData['#spatial-navigation-starting-point'] = {"text": "spatial navigation starting point", "type": "dfn", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#spatial-navigation-starting-point", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#sequential-focus-navigation-starting-point'] = {"text": "sequential focus navigation starting point", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#sequential-focus-navigation-starting-point", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-spatial-navigation-action-auto'] = {"text": "auto", "type": "value", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#valdef-spatial-navigation-action-auto", "export": true, "normative": true, "for_": ["spatial-navigation-action"]};
+window.refsData['#set-the-search-origin'] = {"text": "setting the search origin", "type": "dfn", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#set-the-search-origin", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#boundary-point-node'] = {"text": "node", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#boundary-point-node", "export": true, "normative": true, "for_": ["boundary point"]};
+window.refsData['https://infra.spec.whatwg.org/#assert'] = {"text": "assert", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#assert", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#document-element'] = {"text": "document element", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "", "status": "anchor-block", "url": "https://dom.spec.whatwg.org/#document-element", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-spatial-navigation-action-scroll'] = {"text": "scroll", "type": "value", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#valdef-spatial-navigation-action-scroll", "export": true, "normative": true, "for_": ["spatial-navigation-action"]};
+window.refsData['#can-be-manually-scrolled'] = {"text": "can be manually scrolled", "type": "dfn", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#can-be-manually-scrolled", "export": true, "normative": true, "for_": []};
+window.refsData['#directionally-scroll-an-element'] = {"text": "directionally scroll the element", "type": "dfn", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#directionally-scroll-an-element", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-spatial-navigation-action-focus'] = {"text": "focus", "type": "value", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#valdef-spatial-navigation-action-focus", "export": true, "normative": true, "for_": ["spatial-navigation-action"]};
+window.refsData['#dispatches-navbeforefocus-event'] = {"text": "dispatches navbeforefocus event", "type": "dfn", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#dispatches-navbeforefocus-event", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#focusing-steps'] = {"text": "focusing steps", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/interaction.html#focusing-steps", "export": true, "normative": true, "for_": []};
+window.refsData['#dispatches-navnotarget-event'] = {"text": "dispatches navnotarget event", "type": "dfn", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#dispatches-navnotarget-event", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-position-3/#relative-position'] = {"text": "relative position", "type": "dfn", "spec": "css-position-3", "shortname": "css-position", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-position-3/#relative-position", "export": true, "normative": true, "for_": []};
+window.refsData['#search-origin'] = {"text": "search origin", "type": "dfn", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#search-origin", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#dom-anchor'] = {"text": "dom anchor", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#dom-anchor", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#currently-focused-area-of-a-top-level-browsing-context'] = {"text": "currently focused area of a top-level browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#currently-focused-area-of-a-top-level-browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/semantics-other.html#concept-element-disabled'] = {"text": "actually disabled", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/semantics-other.html#concept-element-disabled", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#expressly-inert'] = {"text": "expressly inert", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#expressly-inert", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/rendering.html#being-rendered'] = {"text": "being rendered", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/rendering.html#being-rendered", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#nodes-are-removed'] = {"text": "removed", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#nodes-are-removed", "export": true, "normative": true, "for_": []};
+window.refsData['#update-the-search-origin'] = {"text": "update the search origin", "type": "dfn", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#update-the-search-origin", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ordered-set'] = {"text": "set", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-set", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-remove'] = {"text": "remove", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-remove", "export": true, "normative": true, "for_": ["list", "set"]};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#attr-tabindex'] = {"text": "tabindex", "type": "element-attr", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/interaction.html#attr-tabindex", "export": true, "normative": true, "for_": ["htmlsvg-global"]};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#sequential-focus-navigation-order'] = {"text": "sequential focus navigation order", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#sequential-focus-navigation-order", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-empty'] = {"text": "empty", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-empty", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['#dom-spatialnavigationdirection-down'] = {"text": "\"down\"", "type": "enum-value", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#dom-spatialnavigationdirection-down", "export": true, "normative": true, "for_": ["SpatialNavigationDirection"]};
+window.refsData['#dom-spatialnavigationdirection-up'] = {"text": "\"up\"", "type": "enum-value", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#dom-spatialnavigationdirection-up", "export": true, "normative": true, "for_": ["SpatialNavigationDirection"]};
+window.refsData['#dom-spatialnavigationdirection-left'] = {"text": "\"left\"", "type": "enum-value", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#dom-spatialnavigationdirection-left", "export": true, "normative": true, "for_": ["SpatialNavigationDirection"]};
+window.refsData['#dom-spatialnavigationdirection-right'] = {"text": "\"right\"", "type": "enum-value", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#dom-spatialnavigationdirection-right", "export": true, "normative": true, "for_": ["SpatialNavigationDirection"]};
+window.refsData['https://drafts.csswg.org/css2/zindex.html#painting-order'] = {"text": "painting order", "type": "dfn", "spec": "css2", "shortname": "css2", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/css2/zindex.html#painting-order", "export": true, "normative": true, "for_": []};
+window.refsData['#find-the-shortest-distance'] = {"text": "find the shortest distance", "type": "dfn", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#find-the-shortest-distance", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-one-plus'] = {"text": "+", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-one-plus", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-4/#principal-box'] = {"text": "principal box", "type": "dfn", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#principal-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#propdef-overflow-y'] = {"text": "overflow-y", "type": "property", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#propdef-overflow-y", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#valdef-overflow-hidden'] = {"text": "hidden", "type": "value", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#valdef-overflow-hidden", "export": true, "normative": true, "for_": ["overflow", "overflow-x", "overflow-y"]};
+window.refsData['https://drafts.csswg.org/css-overflow-3/#propdef-overflow-x'] = {"text": "overflow-x", "type": "property", "spec": "css-overflow-3", "shortname": "css-overflow", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-overflow-3/#propdef-overflow-x", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-overscroll-behavior-1/#scroll-boundary'] = {"text": "scroll boundary", "type": "dfn", "spec": "overscroll-behavior", "shortname": "overscroll-behavior", "level": "", "status": "anchor-block", "url": "https://drafts.csswg.org/css-overscroll-behavior-1/#scroll-boundary", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-scroll-snap-1/#valdef-scroll-snap-type-mandatory'] = {"text": "mandatory", "type": "value", "spec": "css-scroll-snap-1", "shortname": "css-scroll-snap", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-scroll-snap-1/#valdef-scroll-snap-type-mandatory", "export": true, "normative": true, "for_": ["scroll-snap-type"]};
+window.refsData['https://drafts.csswg.org/cssom-view-1/#scroll-an-element'] = {"text": "scroll an element", "type": "dfn", "spec": "cssom-view-1", "shortname": "cssom-view", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-view-1/#scroll-an-element", "export": false, "normative": true, "for_": []};
+window.refsData['#dom-element-spatialnavigationsearch'] = {"text": "spatialNavigationSearch(dir)", "type": "method", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#dom-element-spatialnavigationsearch", "export": true, "normative": true, "for_": ["Element"]};window.refsData['#propdef-spatial-navigation-action'] = {"text": "spatial-navigation-action", "type": "property", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#propdef-spatial-navigation-action", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-spatial-navigation-contain'] = {"text": "spatial-navigation-contain", "type": "property", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#propdef-spatial-navigation-contain", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-spatial-navigation-function'] = {"text": "spatial-navigation-function", "type": "property", "spec": "css-nav-1", "shortname": "css-nav", "level": "1", "status": "local", "url": "#propdef-spatial-navigation-function", "export": true, "normative": true, "for_": []};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

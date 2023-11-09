@@ -777,6 +777,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -6114,8 +6151,6 @@ annotation(&lt;feature-value-name>) || [ small-caps | all-small-caps | petite-ca
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -6363,7 +6398,6 @@ annotation(&lt;feature-value-name>) || [ small-caps | all-small-caps | petite-ca
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -6893,4 +6927,382 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#propdef-font-variant-position'] = {"text": "font-variant-position", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-variant-position", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-language-override'] = {"text": "font-language-override", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-language-override", "export": true, "normative": true, "for_": []};
+window.refsData['#character-map'] = {"text": "character map", "type": "dfn", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#character-map", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-family'] = {"text": "font-family", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-family", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#family-name-value'] = {"text": "<family-name>", "type": "type", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#family-name-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-generic-family'] = {"text": "<generic-family>", "type": "type", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#typedef-generic-family", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-comma'] = {"text": "#", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-comma", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-generic-family-serif'] = {"text": "serif", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-generic-family-serif", "export": true, "normative": true, "for_": ["<generic-family>"]};
+window.refsData['#valdef-generic-family-sans-serif'] = {"text": "sans-serif", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-generic-family-sans-serif", "export": true, "normative": true, "for_": ["<generic-family>"]};
+window.refsData['#valdef-generic-family-cursive'] = {"text": "cursive", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-generic-family-cursive", "export": true, "normative": true, "for_": ["<generic-family>"]};
+window.refsData['#valdef-generic-family-fantasy'] = {"text": "fantasy", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-generic-family-fantasy", "export": true, "normative": true, "for_": ["<generic-family>"]};
+window.refsData['#valdef-generic-family-monospace'] = {"text": "monospace", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-generic-family-monospace", "export": true, "normative": true, "for_": ["<generic-family>"]};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#valdef-all-inherit'] = {"text": "inherit", "type": "value", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#valdef-all-inherit", "export": true, "normative": true, "for_": ["all"]};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#valdef-all-initial'] = {"text": "initial", "type": "value", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#valdef-all-initial", "export": true, "normative": true, "for_": ["all"]};
+window.refsData['https://drafts.csswg.org/css-anchor-position-1/#valdef-anchor-scroll-default'] = {"text": "default", "type": "value", "spec": "css-anchor-position-1", "shortname": "css-anchor-position", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-anchor-position-1/#valdef-anchor-scroll-default", "export": true, "normative": true, "for_": ["anchor-scroll"]};
+window.refsData['#propdef-font-weight'] = {"text": "font-weight", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-weight", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-font-weight-400'] = {"text": "400", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-weight-400", "export": true, "normative": true, "for_": ["font-weight"]};
+window.refsData['#valdef-font-weight-700'] = {"text": "700", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-weight-700", "export": true, "normative": true, "for_": ["font-weight"]};
+window.refsData['#propdef-font-synthesis'] = {"text": "font-synthesis", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-synthesis", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-font-weight-bolder'] = {"text": "bolder", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-weight-bolder", "export": true, "normative": true, "for_": ["font-weight"]};
+window.refsData['#valdef-font-weight-lighter'] = {"text": "lighter", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-weight-lighter", "export": true, "normative": true, "for_": ["font-weight"]};
+window.refsData['#propdef-font-stretch'] = {"text": "font-stretch", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-stretch", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-style'] = {"text": "font-style", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-size'] = {"text": "font-size", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-size", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-font-size-absolute-size'] = {"text": "<absolute-size>", "type": "type", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#typedef-font-size-absolute-size", "export": true, "normative": true, "for_": ["font-size"]};
+window.refsData['#typedef-font-size-relative-size'] = {"text": "<relative-size>", "type": "type", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#typedef-font-size-relative-size", "export": true, "normative": true, "for_": ["font-size"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#typedef-length-percentage'] = {"text": "<length-percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#typedef-length-percentage", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-font-size-absolute-size-medium'] = {"text": "medium", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-size-absolute-size-medium", "export": true, "normative": true, "for_": ["font-size <absolute-size>"]};
+window.refsData['#valdef-relative-size-font-size-larger'] = {"text": "larger", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-relative-size-font-size-larger", "export": true, "normative": true, "for_": ["<relative-size> font-size"]};
+window.refsData['#valdef-font-size-absolute-size-large'] = {"text": "large", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-size-absolute-size-large", "export": true, "normative": true, "for_": ["font-size <absolute-size>"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#em'] = {"text": "em", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#em", "export": true, "normative": true, "for_": ["<length>"]};
+window.refsData['#propdef-font-size-adjust'] = {"text": "font-size-adjust", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-size-adjust", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#number-value'] = {"text": "<number>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#number-value", "export": true, "normative": true, "for_": []};
+window.refsData['#font-aspect-value'] = {"text": "aspect value", "type": "dfn", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#font-aspect-value", "export": true, "normative": true, "for_": []};
+window.refsData['#first-available-font'] = {"text": "first available font", "type": "dfn", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#first-available-font", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css2/#propdef-line-height'] = {"text": "line-height", "type": "property", "spec": "css22", "shortname": "css", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css2/#propdef-line-height", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font'] = {"text": "font", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-any'] = {"text": "||", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-any", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-font-variant-css21'] = {"text": "<font-variant-css21>", "type": "type", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#typedef-font-variant-css21", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-opt'] = {"text": "?", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-variant'] = {"text": "font-variant", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-variant", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-kerning'] = {"text": "font-kerning", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-kerning", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-font-variant-normal'] = {"text": "normal", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-variant-normal", "export": true, "normative": true, "for_": ["font-variant"]};
+window.refsData['#valdef-font-weight-bold'] = {"text": "bold", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-weight-bold", "export": true, "normative": true, "for_": ["font-weight"]};
+window.refsData['#valdef-font-face-font-style-italic'] = {"text": "italic", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-face-font-style-italic", "export": true, "normative": true, "for_": ["@font-face/font-style", "font-style"]};
+window.refsData['#valdef-font-variant-caps-small-caps'] = {"text": "small-caps", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-variant-caps-small-caps", "export": true, "normative": true, "for_": ["font-variant-caps"]};
+window.refsData['#valdef-font-face-font-style-normal'] = {"text": "normal", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-face-font-style-normal", "export": true, "normative": true, "for_": ["@font-face/font-style", "font-style"]};
+window.refsData['#valdef-font-caption'] = {"text": "caption", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-caption", "export": true, "normative": true, "for_": ["font"]};
+window.refsData['#valdef-font-small-caption'] = {"text": "small-caption", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-small-caption", "export": true, "normative": true, "for_": ["font"]};
+window.refsData['#at-ruledef-font-face'] = {"text": "@font-face", "type": "at-rule", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#at-ruledef-font-face", "export": true, "normative": true, "for_": []};
+window.refsData['#font_face_sym'] = {"text": "font_face_sym", "type": "dfn", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#font_face_sym", "export": true, "normative": true, "for_": []};
+window.refsData['#descriptor_declaration'] = {"text": "descriptor_declaration", "type": "dfn", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#descriptor_declaration", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#url-value'] = {"text": "<url>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#url-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#string-value'] = {"text": "<string>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#string-value", "export": true, "normative": true, "for_": []};
+window.refsData['#funcdef-font-face-src-local'] = {"text": "local()", "type": "function", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#funcdef-font-face-src-local", "export": true, "normative": true, "for_": ["@font-face/src", "src"]};
+window.refsData['#typedef-common-lig-values'] = {"text": "<common-lig-values>", "type": "type", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#typedef-common-lig-values", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-discretionary-lig-values'] = {"text": "<discretionary-lig-values>", "type": "type", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#typedef-discretionary-lig-values", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-historical-lig-values'] = {"text": "<historical-lig-values>", "type": "type", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#typedef-historical-lig-values", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-contextual-alt-values'] = {"text": "<contextual-alt-values>", "type": "type", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#typedef-contextual-alt-values", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-feature-value-name'] = {"text": "<feature-value-name>", "type": "type", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#typedef-feature-value-name", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-numeric-figure-values'] = {"text": "<numeric-figure-values>", "type": "type", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#typedef-numeric-figure-values", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-numeric-spacing-values'] = {"text": "<numeric-spacing-values>", "type": "type", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#typedef-numeric-spacing-values", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-numeric-fraction-values'] = {"text": "<numeric-fraction-values>", "type": "type", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#typedef-numeric-fraction-values", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-east-asian-variant-values'] = {"text": "<east-asian-variant-values>", "type": "type", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#typedef-east-asian-variant-values", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-east-asian-width-values'] = {"text": "<east-asian-width-values>", "type": "type", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#typedef-east-asian-width-values", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-feature-tag-value'] = {"text": "<feature-tag-value>", "type": "type", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#typedef-feature-tag-value", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-feature-settings'] = {"text": "font-feature-settings", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-feature-settings", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-font-stretch-normal'] = {"text": "normal", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-stretch-normal", "export": true, "normative": true, "for_": ["font-stretch"]};
+window.refsData['#valdef-font-face-font-style-oblique'] = {"text": "oblique", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-face-font-style-oblique", "export": true, "normative": true, "for_": ["@font-face/font-style", "font-style"]};
+window.refsData['#effective-character-map'] = {"text": "effective character map", "type": "dfn", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#effective-character-map", "export": true, "normative": true, "for_": []};
+window.refsData['#composite-face'] = {"text": "composite face", "type": "dfn", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#composite-face", "export": true, "normative": true, "for_": []};
+window.refsData['#default-face'] = {"text": "default face", "type": "dfn", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#default-face", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#font-relative-length'] = {"text": "font-relative lengths", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#font-relative-length", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-inline-3/#valdef-text-edge-ex'] = {"text": "ex", "type": "value", "spec": "css-inline-3", "shortname": "css-inline", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-inline-3/#valdef-text-edge-ex", "export": true, "normative": true, "for_": ["text-edge"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#ch'] = {"text": "ch", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#ch", "export": true, "normative": true, "for_": ["<length>"]};
+window.refsData['#system-font-fallback'] = {"text": "system font fallback", "type": "dfn", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#system-font-fallback", "export": true, "normative": true, "for_": []};
+window.refsData['#support'] = {"text": "support", "type": "dfn", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#support", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/selectors-4/#document-language'] = {"text": "document language", "type": "dfn", "spec": "selectors-4", "shortname": "selectors", "level": "4", "status": "current", "url": "https://drafts.csswg.org/selectors-4/#document-language", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-4/#propdef-letter-spacing'] = {"text": "letter-spacing", "type": "property", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#propdef-letter-spacing", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-font-kerning-auto'] = {"text": "auto", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-kerning-auto", "export": true, "normative": true, "for_": ["font-kerning"]};
+window.refsData['#valdef-font-kerning-normal'] = {"text": "normal", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-kerning-normal", "export": true, "normative": true, "for_": ["font-kerning"]};
+window.refsData['#propdef-font-variant-ligatures'] = {"text": "font-variant-ligatures", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-variant-ligatures", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-font-variant-ligatures-none'] = {"text": "none", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-variant-ligatures-none", "export": true, "normative": true, "for_": ["font-variant-ligatures"]};
+window.refsData['#valdef-font-variant-position-sub'] = {"text": "sub", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-variant-position-sub", "export": true, "normative": true, "for_": ["font-variant-position"]};
+window.refsData['#valdef-font-variant-position-super'] = {"text": "super", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-variant-position-super", "export": true, "normative": true, "for_": ["font-variant-position"]};
+window.refsData['https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-sub-element'] = {"text": "sub", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-sub-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-sup-element'] = {"text": "sup", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-sup-element", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-font-variant-position-normal'] = {"text": "normal", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-variant-position-normal", "export": true, "normative": true, "for_": ["font-variant-position"]};
+window.refsData['#propdef-font-variant-caps'] = {"text": "font-variant-caps", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-variant-caps", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-font-variant-caps-all-small-caps'] = {"text": "all-small-caps", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-variant-caps-all-small-caps", "export": true, "normative": true, "for_": ["font-variant-caps"]};
+window.refsData['#valdef-font-variant-caps-petite-caps'] = {"text": "petite-caps", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-variant-caps-petite-caps", "export": true, "normative": true, "for_": ["font-variant-caps"]};
+window.refsData['#valdef-font-variant-caps-all-petite-caps'] = {"text": "all-petite-caps", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-variant-caps-all-petite-caps", "export": true, "normative": true, "for_": ["font-variant-caps"]};
+window.refsData['#valdef-font-variant-caps-unicase'] = {"text": "unicase", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-variant-caps-unicase", "export": true, "normative": true, "for_": ["font-variant-caps"]};
+window.refsData['#valdef-font-variant-caps-titling-caps'] = {"text": "titling-caps", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-variant-caps-titling-caps", "export": true, "normative": true, "for_": ["font-variant-caps"]};
+window.refsData['https://drafts.csswg.org/css-text-4/#propdef-text-transform'] = {"text": "text-transform", "type": "property", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#propdef-text-transform", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-variant-numeric'] = {"text": "font-variant-numeric", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-variant-numeric", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-font-variant-numeric-ordinal'] = {"text": "ordinal", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-variant-numeric-ordinal", "export": true, "normative": true, "for_": ["font-variant-numeric"]};
+window.refsData['#propdef-font-variant-alternates'] = {"text": "font-variant-alternates", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-variant-alternates", "export": true, "normative": true, "for_": []};
+window.refsData['#at-ruledef-font-feature-values'] = {"text": "@font-feature-values", "type": "at-rule", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#at-ruledef-font-feature-values", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-feature-index'] = {"text": "<feature-index>", "type": "type", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#typedef-feature-index", "export": true, "normative": true, "for_": []};
+window.refsData['#font-specific'] = {"text": "font specific", "type": "dfn", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#font-specific", "export": true, "normative": true, "for_": []};
+window.refsData['#feature_value_block'] = {"text": "feature_value_block", "type": "dfn", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#feature_value_block", "export": true, "normative": true, "for_": []};
+window.refsData['#font_feature_values_sym'] = {"text": "font_feature_values_sym", "type": "dfn", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#font_feature_values_sym", "export": true, "normative": true, "for_": []};
+window.refsData['#font_family_name_list'] = {"text": "font_family_name_list", "type": "dfn", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#font_family_name_list", "export": true, "normative": true, "for_": []};
+window.refsData['#font_family_name'] = {"text": "font_family_name", "type": "dfn", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#font_family_name", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#string'] = {"text": "string", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#string", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#css-css-identifier'] = {"text": "ident", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-css-identifier", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['#feature_type'] = {"text": "feature_type", "type": "dfn", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#feature_type", "export": true, "normative": true, "for_": []};
+window.refsData['#feature_value_definition'] = {"text": "feature_value_definition", "type": "dfn", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#feature_value_definition", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#number'] = {"text": "number", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#number", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-font-variant-alternates-swash'] = {"text": "swash()", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-variant-alternates-swash", "export": true, "normative": true, "for_": ["font-variant-alternates"]};
+window.refsData['#valdef-font-variant-alternates-character-variant'] = {"text": "character-variant()", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-variant-alternates-character-variant", "export": true, "normative": true, "for_": ["font-variant-alternates"]};
+window.refsData['#valdef-font-variant-alternates-styleset'] = {"text": "styleset()", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-variant-alternates-styleset", "export": true, "normative": true, "for_": ["font-variant-alternates"]};
+window.refsData['#propdef-font-variant-east-asian'] = {"text": "font-variant-east-asian", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-variant-east-asian", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-font-variant-east-asian-east-asian-variant-values-simplified'] = {"text": "simplified", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-variant-east-asian-east-asian-variant-values-simplified", "export": true, "normative": true, "for_": ["font-variant-east-asian <east-asian-variant-values>"]};
+window.refsData['#valdef-font-variant-east-asian-east-asian-variant-values-traditional'] = {"text": "traditional", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-variant-east-asian-east-asian-variant-values-traditional", "export": true, "normative": true, "for_": ["font-variant-east-asian <east-asian-variant-values>"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#integer-value'] = {"text": "<integer>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#integer-value", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-font-variant-ligatures-common-lig-values-no-common-ligatures'] = {"text": "no-common-ligatures", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-variant-ligatures-common-lig-values-no-common-ligatures", "export": true, "normative": true, "for_": ["font-variant-ligatures <common-lig-values>"]};
+window.refsData['#valdef-font-variant-numeric-numeric-spacing-values-tabular-nums'] = {"text": "tabular-nums", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-variant-numeric-numeric-spacing-values-tabular-nums", "export": true, "normative": true, "for_": ["font-variant-numeric <numeric-spacing-values>"]};
+window.refsData['#valdef-font-variant-numeric-numeric-spacing-values-proportional-nums'] = {"text": "proportional-nums", "type": "value", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#valdef-font-variant-numeric-numeric-spacing-values-proportional-nums", "export": true, "normative": true, "for_": ["font-variant-numeric <numeric-spacing-values>"]};
+window.refsData['#cssfontfacerule'] = {"text": "CSSFontFaceRule", "type": "interface", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#cssfontfacerule", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#cssrule'] = {"text": "CSSRule", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssrule", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#cssomstring'] = {"text": "CSSOMString", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssomstring", "export": true, "normative": true, "for_": []};
+window.refsData['#cssfontfeaturevaluesrule'] = {"text": "CSSFontFeatureValuesRule", "type": "interface", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#cssfontfeaturevaluesrule", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-short'] = {"text": "unsigned short", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-short", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cssfontfeaturevaluesrule-fontfamily'] = {"text": "fontFamily", "type": "attribute", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#dom-cssfontfeaturevaluesrule-fontfamily", "export": true, "normative": true, "for_": ["CSSFontFeatureValuesRule"]};
+window.refsData['#cssfontfeaturevaluesmap'] = {"text": "CSSFontFeatureValuesMap", "type": "interface", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#cssfontfeaturevaluesmap", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cssfontfeaturevaluesrule-annotation'] = {"text": "annotation", "type": "attribute", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#dom-cssfontfeaturevaluesrule-annotation", "export": true, "normative": true, "for_": ["CSSFontFeatureValuesRule"]};
+window.refsData['#dom-cssfontfeaturevaluesrule-ornaments'] = {"text": "ornaments", "type": "attribute", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#dom-cssfontfeaturevaluesrule-ornaments", "export": true, "normative": true, "for_": ["CSSFontFeatureValuesRule"]};
+window.refsData['#dom-cssfontfeaturevaluesrule-stylistic'] = {"text": "stylistic", "type": "attribute", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#dom-cssfontfeaturevaluesrule-stylistic", "export": true, "normative": true, "for_": ["CSSFontFeatureValuesRule"]};
+window.refsData['#dom-cssfontfeaturevaluesrule-swash'] = {"text": "swash", "type": "attribute", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#dom-cssfontfeaturevaluesrule-swash", "export": true, "normative": true, "for_": ["CSSFontFeatureValuesRule"]};
+window.refsData['#dom-cssfontfeaturevaluesrule-charactervariant'] = {"text": "characterVariant", "type": "attribute", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#dom-cssfontfeaturevaluesrule-charactervariant", "export": true, "normative": true, "for_": ["CSSFontFeatureValuesRule"]};
+window.refsData['#dom-cssfontfeaturevaluesrule-styleset'] = {"text": "styleset", "type": "attribute", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#dom-cssfontfeaturevaluesrule-styleset", "export": true, "normative": true, "for_": ["CSSFontFeatureValuesRule"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-long'] = {"text": "unsigned long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-long", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cssfontfeaturevaluesmap-set'] = {"text": "set(featureValueName, values)", "type": "method", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#dom-cssfontfeaturevaluesmap-set", "export": true, "normative": true, "for_": ["CSSFontFeatureValuesMap"]};
+window.refsData['#dom-cssfontfeaturevaluesmap-set-featurevaluename-values-featurevaluename'] = {"text": "featureValueName", "type": "argument", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#dom-cssfontfeaturevaluesmap-set-featurevaluename-values-featurevaluename", "export": true, "normative": true, "for_": ["CSSFontFeatureValuesMap/set(featureValueName, values)"]};
+window.refsData['https://webidl.spec.whatwg.org/#invalidaccesserror'] = {"text": "InvalidAccessError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidaccesserror", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-regions-1/#dom-namedflowmap-get'] = {"text": "get()", "type": "method", "spec": "css-regions-1", "shortname": "css-regions", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-regions-1/#dom-namedflowmap-get", "export": true, "normative": true, "for_": ["NamedFlowMap"]};window.refsData['#propdef-font'] = {"text": "font", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-family'] = {"text": "font-family", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-family", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-feature-settings'] = {"text": "font-feature-settings", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-feature-settings", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-kerning'] = {"text": "font-kerning", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-kerning", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-language-override'] = {"text": "font-language-override", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-language-override", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-size'] = {"text": "font-size", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-size", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-size-adjust'] = {"text": "font-size-adjust", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-size-adjust", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-stretch'] = {"text": "font-stretch", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-stretch", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-style'] = {"text": "font-style", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-synthesis'] = {"text": "font-synthesis", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-synthesis", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-variant'] = {"text": "font-variant", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-variant", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-variant-alternates'] = {"text": "font-variant-alternates", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-variant-alternates", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-variant-caps'] = {"text": "font-variant-caps", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-variant-caps", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-variant-east-asian'] = {"text": "font-variant-east-asian", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-variant-east-asian", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-variant-ligatures'] = {"text": "font-variant-ligatures", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-variant-ligatures", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-variant-numeric'] = {"text": "font-variant-numeric", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-variant-numeric", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-variant-position'] = {"text": "font-variant-position", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-variant-position", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-font-weight'] = {"text": "font-weight", "type": "property", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#propdef-font-weight", "export": true, "normative": true, "for_": []};
+window.refsData['#at-ruledef-font-face'] = {"text": "@font-face", "type": "at-rule", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#at-ruledef-font-face", "export": true, "normative": true, "for_": []};
+window.refsData['#descdef-font-face-font-family'] = {"text": "font-family", "type": "descriptor", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#descdef-font-face-font-family", "export": true, "normative": true, "for_": ["@font-face"]};
+window.refsData['#descdef-font-face-font-feature-settings'] = {"text": "font-feature-settings", "type": "descriptor", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#descdef-font-face-font-feature-settings", "export": true, "normative": true, "for_": ["@font-face"]};
+window.refsData['#descdef-font-face-font-stretch'] = {"text": "font-stretch", "type": "descriptor", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#descdef-font-face-font-stretch", "export": true, "normative": true, "for_": ["@font-face"]};
+window.refsData['#descdef-font-face-font-style'] = {"text": "font-style", "type": "descriptor", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#descdef-font-face-font-style", "export": true, "normative": true, "for_": ["@font-face"]};
+window.refsData['#descdef-font-face-font-variant'] = {"text": "font-variant", "type": "descriptor", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#descdef-font-face-font-variant", "export": true, "normative": true, "for_": ["@font-face"]};
+window.refsData['#descdef-font-face-font-weight'] = {"text": "font-weight", "type": "descriptor", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#descdef-font-face-font-weight", "export": true, "normative": true, "for_": ["@font-face"]};
+window.refsData['#descdef-font-face-src'] = {"text": "src", "type": "descriptor", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#descdef-font-face-src", "export": true, "normative": true, "for_": ["@font-face"]};
+window.refsData['#descdef-font-face-unicode-range'] = {"text": "unicode-range", "type": "descriptor", "spec": "css-fonts-3", "shortname": "css-fonts", "level": "3", "status": "local", "url": "#descdef-font-face-unicode-range", "export": true, "normative": true, "for_": ["@font-face"]};
 </script>

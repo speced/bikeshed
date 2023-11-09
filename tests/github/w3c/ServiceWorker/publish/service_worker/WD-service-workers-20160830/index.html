@@ -471,6 +471,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -5566,8 +5603,6 @@ navigator<c- p>.</c->serviceWorker<c- p>.</c->register<c- p>(</c-><c- u>"/foo/ba
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -5815,7 +5850,6 @@ navigator<c- p>.</c->serviceWorker<c- p>.</c->register<c- p>(</c-><c- u>"/foo/ba
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -6567,6 +6601,565 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#workers'] = {"text": "web worker", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/workers.html#workers", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#shared-workers'] = {"text": "shared workers", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/workers.html#shared-workers", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#origin-2'] = {"text": "origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/browsers.html#origin-2", "export": true, "normative": true, "for_": ["resource"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-script'] = {"text": "script", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-script", "export": true, "normative": true, "for_": []};
+window.refsData['http://www.ecma-international.org/ecma-262/6.0/#sec-list-and-record-specification-type'] = {"text": "list", "type": "dfn", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "http://www.ecma-international.org/ecma-262/6.0/#sec-list-and-record-specification-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response-response'] = {"text": "response", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-response-response", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-event-listener'] = {"text": "event listener", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-event-listener", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/popover.html#popover-toggle-task-task'] = {"text": "task", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/popover.html#popover-toggle-task-task", "export": false, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-agent-event-loop'] = {"text": "event loop", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-agent-event-loop", "export": true, "normative": true, "for_": ["agent"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#task-queue'] = {"text": "task queue", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#task-queue", "export": true, "normative": true, "for_": ["event loop"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task'] = {"text": "queue a task", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object'] = {"text": "environment settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-realm-global'] = {"text": "global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-realm-global", "export": true, "normative": true, "for_": ["realm"]};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#window'] = {"text": "Window", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#dedicatedworkerglobalscope'] = {"text": "DedicatedWorkerGlobalScope", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/workers.html#dedicatedworkerglobalscope", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#sharedworkerglobalscope'] = {"text": "SharedWorkerGlobalScope", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/workers.html#sharedworkerglobalscope", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#non-subresource-request'] = {"text": "non-subresource request", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#non-subresource-request", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-url'] = {"text": "url", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-request-url", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#creation-url'] = {"text": "creation url", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#creation-url", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-fetch'] = {"text": "fetch", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-fetch", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#task-source'] = {"text": "task source", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#task-source", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-event-dispatch'] = {"text": "dispatch", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-event-dispatch", "export": true, "normative": true, "for_": []};
+window.refsData['#dfn-installing-worker'] = {"text": "installing worker", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dfn-installing-worker", "export": true, "normative": true, "for_": ["service worker registration"]};
+window.refsData['#dfn-waiting-worker'] = {"text": "waiting worker", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dfn-waiting-worker", "export": true, "normative": true, "for_": ["service worker registration"]};
+window.refsData['#service-worker-interface'] = {"text": "ServiceWorker", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-interface", "export": true, "normative": true, "for_": ["ServiceWorker"]};
+window.refsData['https://webidl.spec.whatwg.org/#SecureContext'] = {"text": "SecureContext", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SecureContext", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#eventtarget'] = {"text": "EventTarget", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#eventtarget", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-USVString'] = {"text": "USVString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-USVString", "export": true, "normative": true, "for_": []};
+window.refsData['#service-worker-url-attribute'] = {"text": "scriptURL", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-url-attribute", "export": true, "normative": true, "for_": ["ServiceWorker"]};
+window.refsData['#service-worker-state-enum'] = {"text": "ServiceWorkerState", "type": "enum", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-state-enum", "export": true, "normative": true, "for_": ["ServiceWorker"]};
+window.refsData['#service-worker-state-attribute'] = {"text": "state", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-state-attribute", "export": true, "normative": true, "for_": ["ServiceWorker"]};
+window.refsData['#service-worker-postmessage-method'] = {"text": "postMessage(message, transfer)", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-postmessage-method", "export": true, "normative": true, "for_": ["ServiceWorker"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-any'] = {"text": "any", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-any", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-object'] = {"text": "object", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler'] = {"text": "EventHandler", "type": "typedef", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler", "export": true, "normative": true, "for_": []};
+window.refsData['#service-worker-onstatechange-attribute'] = {"text": "onstatechange", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-onstatechange-attribute", "export": true, "normative": true, "for_": ["ServiceWorker"]};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#abstractworker'] = {"text": "AbstractWorker", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/workers.html#abstractworker", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-url-serializer'] = {"text": "serialized", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "anchor-block", "url": "https://url.spec.whatwg.org/#concept-url-serializer", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['https://heycam.github.io/webidl/#dfn-throw'] = {"text": "throw", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "", "status": "anchor-block", "url": "https://heycam.github.io/webidl/#dfn-throw", "export": true, "normative": true, "for_": []};
+window.refsData['https://heycam.github.io/webidl/#invalidstateerror'] = {"text": "InvalidStateError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "", "status": "anchor-block", "url": "https://heycam.github.io/webidl/#invalidstateerror", "export": true, "normative": true, "for_": []};
+window.refsData['#service-worker-global-scope-interface'] = {"text": "ServiceWorkerGlobalScope", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-global-scope-interface", "export": true, "normative": true, "for_": ["ServiceWorkerGlobalScope"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#incumbent-settings-object'] = {"text": "incumbent settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#incumbent-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#structuredclonewithtransfer'] = {"text": "structuredclonewithtransfer", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#structuredclonewithtransfer", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-frozen-array-type'] = {"text": "frozen array type", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-frozen-array-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/web-messaging.html#messageport'] = {"text": "MessagePort", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/web-messaging.html#messageport", "export": true, "normative": true, "for_": []};
+window.refsData['#extendablemessage-event-interface'] = {"text": "ExtendableMessageEvent", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#extendablemessage-event-interface", "export": true, "normative": true, "for_": ["ExtendableMessageEvent"]};
+window.refsData['#extendablemessage-event-data-attribute'] = {"text": "data", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#extendablemessage-event-data-attribute", "export": true, "normative": true, "for_": ["ExtendableMessageEvent"]};
+window.refsData['#extendablemessage-event-origin-attribute'] = {"text": "origin", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#extendablemessage-event-origin-attribute", "export": true, "normative": true, "for_": ["ExtendableMessageEvent"]};
+window.refsData['#extendablemessage-event-source-attribute'] = {"text": "source", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#extendablemessage-event-source-attribute", "export": true, "normative": true, "for_": ["ExtendableMessageEvent"]};
+window.refsData['#window-client-interface'] = {"text": "WindowClient", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#window-client-interface", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#browsing-context'] = {"text": "browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['#client-interface'] = {"text": "Client", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#client-interface", "export": true, "normative": true, "for_": []};
+window.refsData['#extendablemessage-event-ports-attribute'] = {"text": "ports", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#extendablemessage-event-ports-attribute", "export": true, "normative": true, "for_": ["ExtendableMessageEvent"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#dom-manipulation-task-source'] = {"text": "dom manipulation task source", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#dom-manipulation-task-source", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-handlers'] = {"text": "event handler", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handlers", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-event-type'] = {"text": "event handler event type", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-event-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-idl-attributes'] = {"text": "event handler idl attribute", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-idl-attributes", "export": true, "normative": true, "for_": []};
+window.refsData['#service-worker-registration-interface'] = {"text": "ServiceWorkerRegistration", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-registration-interface", "export": true, "normative": true, "for_": ["ServiceWorkerRegistration"]};
+window.refsData['#service-worker-registration-installing-attribute'] = {"text": "installing", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-registration-installing-attribute", "export": true, "normative": true, "for_": ["ServiceWorkerRegistration"]};
+window.refsData['#service-worker-registration-waiting-attribute'] = {"text": "waiting", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-registration-waiting-attribute", "export": true, "normative": true, "for_": ["ServiceWorkerRegistration"]};
+window.refsData['#service-worker-registration-active-attribute'] = {"text": "active", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-registration-active-attribute", "export": true, "normative": true, "for_": ["ServiceWorkerRegistration"]};
+window.refsData['#service-worker-registration-scope-attribute'] = {"text": "scope", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-registration-scope-attribute", "export": true, "normative": true, "for_": ["ServiceWorkerRegistration"]};
+window.refsData['https://webidl.spec.whatwg.org/#NewObject'] = {"text": "NewObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#NewObject", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-promise'] = {"text": "Promise", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-promise", "export": true, "normative": true, "for_": []};
+window.refsData['#service-worker-registration-update-method'] = {"text": "update()", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-registration-update-method", "export": true, "normative": true, "for_": ["ServiceWorkerRegistration"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['#service-worker-registration-unregister-method'] = {"text": "unregister()", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-registration-unregister-method", "export": true, "normative": true, "for_": ["ServiceWorkerRegistration"]};
+window.refsData['#service-worker-registration-onupdatefound-attribute'] = {"text": "onupdatefound", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-registration-onupdatefound-attribute", "export": true, "normative": true, "for_": ["ServiceWorkerRegistration"]};
+window.refsData['http://www.ecma-international.org/ecma-262/6.0/#sec-promise-objects'] = {"text": "promise", "type": "dfn", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "http://www.ecma-international.org/ecma-262/6.0/#sec-promise-objects", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object'] = {"text": "relevant settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['#dfn-job-worker-type'] = {"text": "worker type", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dfn-job-worker-type", "export": true, "normative": true, "for_": []};
+window.refsData['#dfn-type'] = {"text": "type", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dfn-type", "export": true, "normative": true, "for_": ["service worker"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsing-the-web.html#navigate'] = {"text": "navigate", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsing-the-web.html#navigate", "export": true, "normative": true, "for_": []};
+window.refsData['#navigator-service-worker-attribute'] = {"text": "serviceWorker", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#navigator-service-worker-attribute", "export": true, "normative": true, "for_": ["Navigator", "WorkerNavigator"]};
+window.refsData['https://html.spec.whatwg.org/multipage/system-state.html#navigator'] = {"text": "Navigator", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/system-state.html#navigator", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
+window.refsData['#service-worker-container-interface'] = {"text": "ServiceWorkerContainer", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-container-interface", "export": true, "normative": true, "for_": ["ServiceWorkerContainer"]};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#workernavigator'] = {"text": "WorkerNavigator", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/workers.html#workernavigator", "export": true, "normative": true, "for_": []};
+window.refsData['#service-worker-container-controller-attribute'] = {"text": "controller", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-container-controller-attribute", "export": true, "normative": true, "for_": ["ServiceWorkerContainer"]};
+window.refsData['#service-worker-container-ready-attribute'] = {"text": "ready", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-container-ready-attribute", "export": true, "normative": true, "for_": ["ServiceWorkerContainer"]};
+window.refsData['#service-worker-container-register-method'] = {"text": "register(scriptURL, options)", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-container-register-method", "export": true, "normative": true, "for_": ["ServiceWorkerContainer"]};
+window.refsData['#dictdef-serviceworkercontainer-registrationoptions'] = {"text": "RegistrationOptions", "type": "dictionary", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dictdef-serviceworkercontainer-registrationoptions", "export": true, "normative": true, "for_": ["ServiceWorkerContainer"]};
+window.refsData['#service-worker-container-getregistration-method'] = {"text": "getRegistration(clientURL)", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-container-getregistration-method", "export": true, "normative": true, "for_": ["ServiceWorkerContainer"]};
+window.refsData['#service-worker-container-getregistrations-method'] = {"text": "getRegistrations()", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-container-getregistrations-method", "export": true, "normative": true, "for_": ["ServiceWorkerContainer"]};
+window.refsData['#service-worker-container-startMessages-method'] = {"text": "startMessages()", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-container-startMessages-method", "export": true, "normative": true, "for_": ["ServiceWorkerContainer"]};
+window.refsData['#service-worker-container-oncontrollerchange-attribute'] = {"text": "oncontrollerchange", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-container-oncontrollerchange-attribute", "export": true, "normative": true, "for_": ["ServiceWorkerContainer"]};
+window.refsData['#service-worker-container-onmessage-attribute'] = {"text": "onmessage", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-container-onmessage-attribute", "export": true, "normative": true, "for_": ["ServiceWorkerContainer"]};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#workertype'] = {"text": "WorkerType", "type": "enum", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/workers.html#workertype", "export": true, "normative": true, "for_": []};
+window.refsData['#dfn-client-message-queue'] = {"text": "client message queue", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dfn-client-message-queue", "export": true, "normative": true, "for_": ["ServiceWorkerContainer"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global'] = {"text": "relevant global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel'] = {"text": "in parallel", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-url-parser'] = {"text": "parsing", "type": "dfn", "spec": "url", "shortname": "url", "level": "", "status": "anchor-block", "url": "https://url.spec.whatwg.org/#concept-url-parser", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#entry-settings-object'] = {"text": "entry settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#entry-settings-object", "export": false, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#api-base-url'] = {"text": "api base url", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#api-base-url", "export": true, "normative": true, "for_": ["environment settings object"]};
+window.refsData['#dom-registrationoptions-scope'] = {"text": "scope", "type": "dict-member", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dom-registrationoptions-scope", "export": true, "normative": true, "for_": ["RegistrationOptions"]};
+window.refsData['#dom-registrationoptions-type'] = {"text": "type", "type": "dict-member", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dom-registrationoptions-type", "export": true, "normative": true, "for_": ["RegistrationOptions"]};
+window.refsData['https://heycam.github.io/webidl/#securityerror'] = {"text": "SecurityError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "", "status": "anchor-block", "url": "https://heycam.github.io/webidl/#securityerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#same-origin'] = {"text": "same origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#same-origin", "export": true, "normative": true, "for_": []};
+window.refsData['#serviceworkermessage-event-interface'] = {"text": "ServiceWorkerMessageEvent", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#serviceworkermessage-event-interface", "export": true, "normative": true, "for_": ["ServiceWorkerMessageEvent"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-serviceworkermessageevent-serviceworkermessageeventinit'] = {"text": "ServiceWorkerMessageEventInit", "type": "dictionary", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dictdef-serviceworkermessageevent-serviceworkermessageeventinit", "export": true, "normative": true, "for_": ["ServiceWorkerMessageEvent"]};
+window.refsData['https://dom.spec.whatwg.org/#event'] = {"text": "Event", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#event", "export": true, "normative": true, "for_": []};
+window.refsData['#serviceworkermessage-event-data-attribute'] = {"text": "data", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#serviceworkermessage-event-data-attribute", "export": true, "normative": true, "for_": ["ServiceWorkerMessageEvent"]};
+window.refsData['#serviceworkermessage-event-origin-attribute'] = {"text": "origin", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#serviceworkermessage-event-origin-attribute", "export": true, "normative": true, "for_": ["ServiceWorkerMessageEvent"]};
+window.refsData['#serviceworkermessage-event-lasteventid-attribute'] = {"text": "lastEventId", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#serviceworkermessage-event-lasteventid-attribute", "export": true, "normative": true, "for_": ["ServiceWorkerMessageEvent"]};
+window.refsData['#serviceworkermessage-event-source-attribute'] = {"text": "source", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#serviceworkermessage-event-source-attribute", "export": true, "normative": true, "for_": ["ServiceWorkerMessageEvent"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-frozen-array'] = {"text": "FrozenArray", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "export": true, "normative": true, "for_": []};
+window.refsData['#serviceworkermessage-event-ports-attribute'] = {"text": "ports", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#serviceworkermessage-event-ports-attribute", "export": true, "normative": true, "for_": ["ServiceWorkerMessageEvent"]};
+window.refsData['https://dom.spec.whatwg.org/#dictdef-eventinit'] = {"text": "EventInit", "type": "dictionary", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dictdef-eventinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/indices.html#event-message'] = {"text": "message", "type": "event", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/indices.html#event-message", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['https://webidl.spec.whatwg.org/#Global'] = {"text": "Global", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Global", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#worker'] = {"text": "Worker", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/workers.html#worker", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#workerglobalscope'] = {"text": "WorkerGlobalScope", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/workers.html#workerglobalscope", "export": true, "normative": true, "for_": []};
+window.refsData['#clients-interface'] = {"text": "Clients", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#clients-interface", "export": true, "normative": true, "for_": ["Clients"]};
+window.refsData['#service-worker-global-scope-clients-attribute'] = {"text": "clients", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-global-scope-clients-attribute", "export": true, "normative": true, "for_": ["ServiceWorkerGlobalScope"]};
+window.refsData['#service-worker-global-scope-scope-attribute'] = {"text": "registration", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-global-scope-scope-attribute", "export": true, "normative": true, "for_": ["ServiceWorkerGlobalScope"]};
+window.refsData['#service-worker-global-scope-skipwaiting-method'] = {"text": "skipWaiting()", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-global-scope-skipwaiting-method", "export": true, "normative": true, "for_": ["ServiceWorkerGlobalScope"]};
+window.refsData['#service-worker-global-scope-oninstall-attribute'] = {"text": "oninstall", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-global-scope-oninstall-attribute", "export": true, "normative": true, "for_": ["ServiceWorkerGlobalScope"]};
+window.refsData['#service-worker-global-scope-onactivate-attribute'] = {"text": "onactivate", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-global-scope-onactivate-attribute", "export": true, "normative": true, "for_": ["ServiceWorkerGlobalScope"]};
+window.refsData['#service-worker-global-scope-onfetch-attribute'] = {"text": "onfetch", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-global-scope-onfetch-attribute", "export": true, "normative": true, "for_": ["ServiceWorkerGlobalScope"]};
+window.refsData['#dom-serviceworkerglobalscope-onforeignfetch'] = {"text": "onforeignfetch", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dom-serviceworkerglobalscope-onforeignfetch", "export": true, "normative": true, "for_": ["ServiceWorkerGlobalScope"]};
+window.refsData['#service-worker-global-scope-onmessage-attribute'] = {"text": "onmessage", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#service-worker-global-scope-onmessage-attribute", "export": true, "normative": true, "for_": ["ServiceWorkerGlobalScope"]};
+window.refsData['#client-url-attribute'] = {"text": "url", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#client-url-attribute", "export": true, "normative": true, "for_": ["Client"]};
+window.refsData['#contextframetype-enum'] = {"text": "FrameType", "type": "enum", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#contextframetype-enum", "export": true, "normative": true, "for_": []};
+window.refsData['#client-frametype-attribute'] = {"text": "frameType", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#client-frametype-attribute", "export": true, "normative": true, "for_": ["Client"]};
+window.refsData['#client-id-attribute'] = {"text": "id", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#client-id-attribute", "export": true, "normative": true, "for_": ["Client"]};
+window.refsData['#client-postmessage-method'] = {"text": "postMessage(message, transfer)", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#client-postmessage-method", "export": true, "normative": true, "for_": ["Client"]};
+window.refsData['https://www.w3.org/TR/page-visibility/#VisibilityState'] = {"text": "VisibilityState", "type": "enum", "spec": "page-visibility", "shortname": "page-visibility", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/page-visibility/#VisibilityState", "export": true, "normative": true, "for_": []};
+window.refsData['#client-visibilitystate-attribute'] = {"text": "visibilityState", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#client-visibilitystate-attribute", "export": true, "normative": true, "for_": ["WindowClient"]};
+window.refsData['#client-focused-attribute'] = {"text": "focused", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#client-focused-attribute", "export": true, "normative": true, "for_": ["WindowClient"]};
+window.refsData['#client-focus-method'] = {"text": "focus()", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#client-focus-method", "export": true, "normative": true, "for_": ["WindowClient"]};
+window.refsData['https://www.w3.org/TR/page-visibility/#dom-document-visibilitystate'] = {"text": "visibilityState", "type": "attribute", "spec": "page-visibility", "shortname": "page-visibility", "level": "", "status": "anchor-block", "url": "https://www.w3.org/TR/page-visibility/#dom-document-visibilitystate", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#auxiliary-browsing-context'] = {"text": "auxiliary browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#auxiliary-browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#bc-tlbc'] = {"text": "top-level browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#bc-tlbc", "export": false, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm'] = {"text": "relevant realm", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-realm", "export": true, "normative": true, "for_": []};
+window.refsData['https://heycam.github.io/webidl/#invalidaccesserror'] = {"text": "InvalidAccessError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "", "status": "anchor-block", "url": "https://heycam.github.io/webidl/#invalidaccesserror", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#responsible-event-loop'] = {"text": "responsible event loop", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#responsible-event-loop", "export": true, "normative": true, "for_": ["environment settings object"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#user-interaction-task-source'] = {"text": "user interaction task source", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#user-interaction-task-source", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#focusing-steps'] = {"text": "focusing steps", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/interaction.html#focusing-steps", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#active-document'] = {"text": "active document", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#active-document", "export": false, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#has-focus-steps'] = {"text": "has focus steps", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/interaction.html#has-focus-steps", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-windowclient-navigate'] = {"text": "navigate(url)", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dom-windowclient-navigate", "export": true, "normative": true, "for_": ["WindowClient"]};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#about:blank'] = {"text": "about:blank", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#about:blank", "export": false, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
+window.refsData['#clients-get-method'] = {"text": "get(id)", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#clients-get-method", "export": true, "normative": true, "for_": ["Clients"]};
+window.refsData['#clients-matchall-method'] = {"text": "matchAll(options)", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#clients-matchall-method", "export": true, "normative": true, "for_": ["Clients"]};
+window.refsData['#dictdef-clients-clientqueryoptions'] = {"text": "ClientQueryOptions", "type": "dictionary", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dictdef-clients-clientqueryoptions", "export": true, "normative": true, "for_": ["Clients"]};
+window.refsData['#clients-openwindow-method'] = {"text": "openWindow(url)", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#clients-openwindow-method", "export": true, "normative": true, "for_": ["Clients"]};
+window.refsData['#clients-claim-method'] = {"text": "claim()", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#clients-claim-method", "export": true, "normative": true, "for_": ["Clients"]};
+window.refsData['#enumdef-clients-clienttype'] = {"text": "ClientType", "type": "enum", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#enumdef-clients-clienttype", "export": true, "normative": true, "for_": ["Clients"]};
+window.refsData['https://w3c.github.io/webappsec/specs/powerfulfeatures/#secure-context'] = {"text": "secure context", "type": "dfn", "spec": "powerful-features", "shortname": "powerful-features", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webappsec/specs/powerfulfeatures/#secure-context", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-clientqueryoptions-includeuncontrolled'] = {"text": "includeUncontrolled", "type": "dict-member", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dom-clientqueryoptions-includeuncontrolled", "export": true, "normative": true, "for_": ["ClientQueryOptions"]};
+window.refsData['#dom-clientqueryoptions-type'] = {"text": "type", "type": "dict-member", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dom-clientqueryoptions-type", "export": true, "normative": true, "for_": ["ClientQueryOptions"]};
+window.refsData['#extendable-event-interface'] = {"text": "ExtendableEvent", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#extendable-event-interface", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-extendableeventinit'] = {"text": "ExtendableEventInit", "type": "dictionary", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dictdef-extendableeventinit", "export": true, "normative": true, "for_": []};
+window.refsData['#extendable-event-waituntil-method'] = {"text": "waitUntil(f)", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#extendable-event-waituntil-method", "export": true, "normative": true, "for_": ["ExtendableEvent"]};
+window.refsData['#dfn-extend-lifetime-promises'] = {"text": "extend lifetime promises", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dfn-extend-lifetime-promises", "export": true, "normative": true, "for_": []};
+window.refsData['#extensions-allowed-flag'] = {"text": "extensions allowed flag", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#extensions-allowed-flag", "export": true, "normative": true, "for_": []};
+window.refsData['#dfn-service-worker'] = {"text": "service worker", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dfn-service-worker", "export": true, "normative": true, "for_": []};
+window.refsData['#installevent-installevent'] = {"text": "InstallEvent", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#installevent-installevent", "export": true, "normative": true, "for_": ["InstallEvent"]};
+window.refsData['#dom-installevent-registerforeignfetch'] = {"text": "registerForeignFetch(options)", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dom-installevent-registerforeignfetch", "export": true, "normative": true, "for_": ["InstallEvent"]};
+window.refsData['#dictdef-installevent-foreignfetchoptions'] = {"text": "ForeignFetchOptions", "type": "dictionary", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dictdef-installevent-foreignfetchoptions", "export": true, "normative": true, "for_": ["InstallEvent"]};
+window.refsData['https://dom.spec.whatwg.org/#dispatch-flag'] = {"text": "dispatch flag", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dispatch-flag", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['#dom-foreignfetchoptions-origins'] = {"text": "origins", "type": "dict-member", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dom-foreignfetchoptions-origins", "export": true, "normative": true, "for_": ["ForeignFetchOptions"]};
+window.refsData['#dom-foreignfetchoptions-scopes'] = {"text": "scopes", "type": "dict-member", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dom-foreignfetchoptions-scopes", "export": true, "normative": true, "for_": ["ForeignFetchOptions"]};
+window.refsData['#dfn-service-worker-global-scope-service-worker'] = {"text": "service worker", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dfn-service-worker-global-scope-service-worker", "export": true, "normative": true, "for_": ["ServiceWorkerGlobalScope"]};
+window.refsData['#dfn-containing-service-worker-registration'] = {"text": "containing service worker registration", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dfn-containing-service-worker-registration", "export": true, "normative": true, "for_": ["service worker"]};
+window.refsData['#dfn-scope-url'] = {"text": "scope url", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dfn-scope-url", "export": true, "normative": true, "for_": ["service worker registration"]};
+window.refsData['#dfn-foreign-fetch-scopes'] = {"text": "list of foreign fetch scopes", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dfn-foreign-fetch-scopes", "export": true, "normative": true, "for_": ["service worker"]};
+window.refsData['#dfn-foreign-fetch-origins'] = {"text": "list of foreign fetch origins", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dfn-foreign-fetch-origins", "export": true, "normative": true, "for_": ["service worker"]};
+window.refsData['#fetch-event-interface'] = {"text": "FetchEvent", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#fetch-event-interface", "export": true, "normative": true, "for_": ["FetchEvent"]};
+window.refsData['#dictdef-fetchevent-fetcheventinit'] = {"text": "FetchEventInit", "type": "dictionary", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dictdef-fetchevent-fetcheventinit", "export": true, "normative": true, "for_": ["FetchEvent"]};
+window.refsData['https://fetch.spec.whatwg.org/#request'] = {"text": "Request", "type": "interface", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#request", "export": true, "normative": true, "for_": []};
+window.refsData['#fetch-event-request-attribute'] = {"text": "request", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#fetch-event-request-attribute", "export": true, "normative": true, "for_": ["FetchEvent"]};
+window.refsData['#fetch-event-clientid-attribute'] = {"text": "clientId", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#fetch-event-clientid-attribute", "export": true, "normative": true, "for_": ["FetchEvent"]};
+window.refsData['#fetch-event-isreload-attribute'] = {"text": "isReload", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#fetch-event-isreload-attribute", "export": true, "normative": true, "for_": ["FetchEvent"]};
+window.refsData['#fetch-event-respondwith-method'] = {"text": "respondWith(r)", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#fetch-event-respondwith-method", "export": true, "normative": true, "for_": ["FetchEvent"]};
+window.refsData['https://fetch.spec.whatwg.org/#response'] = {"text": "Response", "type": "interface", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#response", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response'] = {"text": "response", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-response", "export": true, "normative": true, "for_": ["fetch"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-event'] = {"text": "event", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-event", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-network-error'] = {"text": "network error", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-network-error", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-filtered-response'] = {"text": "filtered response", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-filtered-response", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#stop-propagation-flag'] = {"text": "stop propagation flag", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#stop-propagation-flag", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['https://dom.spec.whatwg.org/#stop-immediate-propagation-flag'] = {"text": "stop immediate propagation flag", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#stop-immediate-propagation-flag", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-body-disturbed'] = {"text": "disturbed", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-body-disturbed", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-body-locked'] = {"text": "locked", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-body-locked", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-get-reader'] = {"text": "get a reader", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-get-reader", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-body-stream'] = {"text": "stream", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-body-stream", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-read-chunk-from-readablestream'] = {"text": "read a chunk from a readablestream", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-read-chunk-from-readablestream", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-error-readablestream'] = {"text": "error readablestream", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-error-readablestream", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-cancel-readablestream'] = {"text": "cancel a readablestream", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-cancel-readablestream", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-construct-readablestream'] = {"text": "construct a readablestream", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-construct-readablestream", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-readablestream-errored'] = {"text": "errored", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-readablestream-errored", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-close-readablestream'] = {"text": "close readablestream", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-close-readablestream", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-enqueue-readablestream'] = {"text": "enqueue a chunk to readablestream", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-enqueue-readablestream", "export": true, "normative": true, "for_": []};
+window.refsData['#fetchevent-potential-response'] = {"text": "potential response", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#fetchevent-potential-response", "export": true, "normative": true, "for_": ["FetchEvent"]};
+window.refsData['#foreignfetchevent-foreignfetchevent'] = {"text": "ForeignFetchEvent", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#foreignfetchevent-foreignfetchevent", "export": true, "normative": true, "for_": ["ForeignFetchEvent"]};
+window.refsData['#dictdef-foreignfetchevent-foreignfetcheventinit'] = {"text": "ForeignFetchEventInit", "type": "dictionary", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dictdef-foreignfetchevent-foreignfetcheventinit", "export": true, "normative": true, "for_": ["ForeignFetchEvent"]};
+window.refsData['#dom-foreignfetchevent-request'] = {"text": "request", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dom-foreignfetchevent-request", "export": true, "normative": true, "for_": ["ForeignFetchEvent"]};
+window.refsData['#dom-foreignfetchevent-origin'] = {"text": "origin", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dom-foreignfetchevent-origin", "export": true, "normative": true, "for_": ["ForeignFetchEvent"]};
+window.refsData['#dom-foreignfetchevent-respondwith'] = {"text": "respondWith(r)", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dom-foreignfetchevent-respondwith", "export": true, "normative": true, "for_": ["ForeignFetchEvent"]};
+window.refsData['#dictdef-foreignfetchevent-foreignfetchresponse'] = {"text": "ForeignFetchResponse", "type": "dictionary", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dictdef-foreignfetchevent-foreignfetchresponse", "export": true, "normative": true, "for_": ["ForeignFetchEvent"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-ByteString'] = {"text": "ByteString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-ByteString", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-foreignfetchresponse-origin'] = {"text": "origin", "type": "dict-member", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dom-foreignfetchresponse-origin", "export": true, "normative": true, "for_": ["ForeignFetchResponse"]};
+window.refsData['#foreignfetchevent-list-of-exposed-headers'] = {"text": "list of exposed headers", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#foreignfetchevent-list-of-exposed-headers", "export": true, "normative": true, "for_": ["ForeignFetchEvent"]};
+window.refsData['#dom-foreignfetchresponse-headers'] = {"text": "headers", "type": "dict-member", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dom-foreignfetchresponse-headers", "export": true, "normative": true, "for_": ["ForeignFetchResponse"]};
+window.refsData['#dom-foreignfetchresponse-response'] = {"text": "response", "type": "dict-member", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dom-foreignfetchresponse-response", "export": true, "normative": true, "for_": ["ForeignFetchResponse"]};
+window.refsData['#foreignfetchevent-potential-response'] = {"text": "potential response", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#foreignfetchevent-potential-response", "export": true, "normative": true, "for_": ["ForeignFetchEvent"]};
+window.refsData['#dictdef-extendablemessageevent-extendablemessageeventinit'] = {"text": "ExtendableMessageEventInit", "type": "dictionary", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dictdef-extendablemessageevent-extendablemessageeventinit", "export": true, "normative": true, "for_": ["ExtendableMessageEvent"]};
+window.refsData['#extendablemessage-event-lasteventid-attribute'] = {"text": "lastEventId", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#extendablemessage-event-lasteventid-attribute", "export": true, "normative": true, "for_": ["ExtendableMessageEvent"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-http-fetch'] = {"text": "http fetch", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-http-fetch", "export": true, "normative": true, "for_": []};
+window.refsData['#cache-interface'] = {"text": "Cache", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#cache-interface", "export": true, "normative": true, "for_": ["Cache"]};
+window.refsData['https://fetch.spec.whatwg.org/#dom-global-fetch'] = {"text": "fetch(input, init)", "type": "method", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#dom-global-fetch", "export": true, "normative": true, "for_": ["GlobalFetch"]};
+window.refsData['https://html.spec.whatwg.org/multipage/semantics.html#the-link-element'] = {"text": "link", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/semantics.html#the-link-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/semantics.html#external-resource-link'] = {"text": "external resource link", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/semantics.html#external-resource-link", "export": true, "normative": true, "for_": []};
+window.refsData['#dfn-service-worker-registration'] = {"text": "service worker registration", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dfn-service-worker-registration", "export": true, "normative": true, "for_": []};
+window.refsData['#dfn-serviceworker-link'] = {"text": "serviceworker link", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dfn-serviceworker-link", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc5988#section-5.2'] = {"text": "context iri", "type": "dfn", "spec": "rfc5988", "shortname": "rfc5988", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc5988#section-5.2", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webappsec/specs/powerfulfeatures/#is-origin-trustworthy'] = {"text": "is origin potentially trustworthy", "type": "dfn", "spec": "powerful-features", "shortname": "powerful-features", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webappsec/specs/powerfulfeatures/#is-origin-trustworthy", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request'] = {"text": "request", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-request", "export": true, "normative": true, "for_": ["fetch"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-client'] = {"text": "client", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-request-client", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://tools.ietf.org/html/rfc5988#section-5.1'] = {"text": "target iri", "type": "dfn", "spec": "rfc5988", "shortname": "rfc5988", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc5988#section-5.1", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc5988#section-5.4'] = {"text": "target attribute", "type": "dfn", "spec": "rfc5988", "shortname": "rfc5988", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc5988#section-5.4", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#in-a-document'] = {"text": "in a document", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#in-a-document", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/semantics.html#attr-link-href'] = {"text": "href", "type": "element-attr", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/semantics.html#attr-link-href", "export": true, "normative": true, "for_": ["link"]};
+window.refsData['#element-attrdef-link-scope'] = {"text": "scope", "type": "element-attr", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#element-attrdef-link-scope", "export": true, "normative": true, "for_": ["link"]};
+window.refsData['#dfn-service-worker-container-interface-client'] = {"text": "service worker client", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dfn-service-worker-container-interface-client", "export": true, "normative": true, "for_": ["ServiceWorkerContainer"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#fire-a-simple-event'] = {"text": "fire a simple event", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#fire-a-simple-event", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/urls-and-fetching.html#document-base-url'] = {"text": "document base url", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/urls-and-fetching.html#document-base-url", "export": true, "normative": true, "for_": []};
+window.refsData['#element-attrdef-link-workertype'] = {"text": "workertype", "type": "element-attr", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#element-attrdef-link-workertype", "export": true, "normative": true, "for_": ["link"]};
+window.refsData['https://html.spec.whatwg.org/multipage/semantics.html#htmllinkelement'] = {"text": "HTMLLinkElement", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/semantics.html#htmllinkelement", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/custom-elements.html#cereactions'] = {"text": "CEReactions", "type": "extended-attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/custom-elements.html#cereactions", "export": true, "normative": true, "for_": []};
+window.refsData['#link-scope-attribute'] = {"text": "scope", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#link-scope-attribute", "export": true, "normative": true, "for_": ["HTMLLinkElement"]};
+window.refsData['#link-workertype-attribute'] = {"text": "workerType", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#link-workertype-attribute", "export": true, "normative": true, "for_": ["HTMLLinkElement"]};
+window.refsData['#global-caches-attribute'] = {"text": "caches", "type": "attribute", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#global-caches-attribute", "export": true, "normative": true, "for_": ["WindowOrWorkerGlobalScope"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#windoworworkerglobalscope'] = {"text": "WindowOrWorkerGlobalScope", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#windoworworkerglobalscope", "export": true, "normative": true, "for_": []};
+window.refsData['#cache-storage-interface'] = {"text": "CacheStorage", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#cache-storage-interface", "export": true, "normative": true, "for_": ["CacheStorage"]};
+window.refsData['#cache-match-method'] = {"text": "match(request, options)", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#cache-match-method", "export": true, "normative": true, "for_": ["Cache"]};
+window.refsData['https://fetch.spec.whatwg.org/#requestinfo'] = {"text": "RequestInfo", "type": "interface", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#requestinfo", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-cache-cachequeryoptions'] = {"text": "CacheQueryOptions", "type": "dictionary", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dictdef-cache-cachequeryoptions", "export": true, "normative": true, "for_": ["Cache"]};
+window.refsData['#cache-matchall-method'] = {"text": "matchAll(request, options)", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#cache-matchall-method", "export": true, "normative": true, "for_": ["Cache"]};
+window.refsData['#cache-add-method'] = {"text": "add(request)", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#cache-add-method", "export": true, "normative": true, "for_": ["Cache"]};
+window.refsData['#cache-addAll-method'] = {"text": "addAll(requests)", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#cache-addAll-method", "export": true, "normative": true, "for_": ["Cache"]};
+window.refsData['#cache-put-method'] = {"text": "put(request, response)", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#cache-put-method", "export": true, "normative": true, "for_": ["Cache"]};
+window.refsData['#cache-delete-method'] = {"text": "delete(request, options)", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#cache-delete-method", "export": true, "normative": true, "for_": ["Cache"]};
+window.refsData['#cache-keys-method'] = {"text": "keys(request, options)", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#cache-keys-method", "export": true, "normative": true, "for_": ["Cache"]};
+window.refsData['http://www.ecma-international.org/ecma-262/6.0/#sec-map-objects'] = {"text": "map objects", "type": "dfn", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "http://www.ecma-international.org/ecma-262/6.0/#sec-map-objects", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-request'] = {"text": "request", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-request-request", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-method'] = {"text": "method", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-request-method", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://www.w3.org/2001/tag/doc/promises-guide#transforming-by'] = {"text": "transforming", "type": "dfn", "spec": "promises-guide", "shortname": "promises-guide", "level": "", "status": "anchor-block", "url": "https://www.w3.org/2001/tag/doc/promises-guide#transforming-by", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-url-scheme'] = {"text": "scheme", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-scheme", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-fetch-terminate'] = {"text": "terminate", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-fetch-terminate", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-initiator'] = {"text": "initiator", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-request-initiator", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-destination'] = {"text": "destination", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-request-destination", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#process-response'] = {"text": "process response", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#process-response", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response-type'] = {"text": "type", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-response-type", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['https://fetch.spec.whatwg.org/#ok-status'] = {"text": "ok status", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#ok-status", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response-header-list'] = {"text": "header list", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-response-header-list", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-header'] = {"text": "header", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-header", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-header-name'] = {"text": "name", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-header-name", "export": true, "normative": true, "for_": ["header"]};
+window.refsData['https://tools.ietf.org/html/rfc7230#section-3.2'] = {"text": "field-value", "type": "dfn", "spec": "rfc7230", "shortname": "rfc7230", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc7230#section-3.2", "export": true, "normative": true, "for_": ["http"]};
+window.refsData['https://tools.ietf.org/html/rfc7231#section-7.1.4'] = {"text": "vary", "type": "dfn", "spec": "rfc7231", "shortname": "rfc7231", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc7231#section-7.1.4", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#headers'] = {"text": "Headers", "type": "interface", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#headers", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-headers-guard'] = {"text": "guard", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-headers-guard", "export": true, "normative": true, "for_": ["headers"]};
+window.refsData['https://fetch.spec.whatwg.org/#process-response-end-of-file'] = {"text": "process response end-of-file", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#process-response-end-of-file", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/2001/tag/doc/promises-guide#waiting-for-all'] = {"text": "waiting for all", "type": "dfn", "spec": "promises-guide", "shortname": "promises-guide", "level": "", "status": "anchor-block", "url": "https://www.w3.org/2001/tag/doc/promises-guide#waiting-for-all", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-cache-cachebatchoperation'] = {"text": "CacheBatchOperation", "type": "dictionary", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dictdef-cache-cachebatchoperation", "export": true, "normative": true, "for_": ["Cache"]};
+window.refsData['#dom-cachebatchoperation-type'] = {"text": "type", "type": "dict-member", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dom-cachebatchoperation-type", "export": true, "normative": true, "for_": ["CacheBatchOperation"]};
+window.refsData['#dom-cachebatchoperation-request'] = {"text": "request", "type": "dict-member", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dom-cachebatchoperation-request", "export": true, "normative": true, "for_": ["CacheBatchOperation"]};
+window.refsData['#dom-cachebatchoperation-response'] = {"text": "response", "type": "dict-member", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dom-cachebatchoperation-response", "export": true, "normative": true, "for_": ["CacheBatchOperation"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response-body'] = {"text": "body", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-response-body", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response-termination-reason'] = {"text": "termination reason", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-response-termination-reason", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-empty-readablestream'] = {"text": "empty", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-empty-readablestream", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-readablestream'] = {"text": "readablestream", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-readablestream", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-read-all-bytes-from-readablestream'] = {"text": "read all bytes", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-read-all-bytes-from-readablestream", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cachebatchoperation-options'] = {"text": "options", "type": "dict-member", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dom-cachebatchoperation-options", "export": true, "normative": true, "for_": ["CacheBatchOperation"]};
+window.refsData['#cache-storage-match-method'] = {"text": "match(request, options)", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#cache-storage-match-method", "export": true, "normative": true, "for_": ["CacheStorage"]};
+window.refsData['#cache-storage-has-method'] = {"text": "has(cacheName)", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#cache-storage-has-method", "export": true, "normative": true, "for_": ["CacheStorage"]};
+window.refsData['#cache-storage-open-method'] = {"text": "open(cacheName)", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#cache-storage-open-method", "export": true, "normative": true, "for_": ["CacheStorage"]};
+window.refsData['#cache-storage-delete-method'] = {"text": "delete(cacheName)", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#cache-storage-delete-method", "export": true, "normative": true, "for_": ["CacheStorage"]};
+window.refsData['#cache-storage-keys-method'] = {"text": "keys()", "type": "method", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#cache-storage-keys-method", "export": true, "normative": true, "for_": ["CacheStorage"]};
+window.refsData['#dom-cachequeryoptions-cachename'] = {"text": "cacheName", "type": "dict-member", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dom-cachequeryoptions-cachename", "export": true, "normative": true, "for_": ["CacheQueryOptions"]};
+window.refsData['http://www.ecma-international.org/ecma-262/6.0/#sec-ecmascript-function-objects-call-thisargument-argumentslist'] = {"text": "[[call]]", "type": "dfn", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "http://www.ecma-international.org/ecma-262/6.0/#sec-ecmascript-function-objects-call-thisargument-argumentslist", "export": true, "normative": true, "for_": []};
+window.refsData['https://heycam.github.io/webidl/#quotaexceedederror'] = {"text": "QuotaExceededError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "", "status": "anchor-block", "url": "https://heycam.github.io/webidl/#quotaexceedederror", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webappsec/specs/powerfulfeatures/#threat-risks'] = {"text": "risks associated with insecure contexts", "type": "dfn", "spec": "powerful-features", "shortname": "powerful-features", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webappsec/specs/powerfulfeatures/#threat-risks", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webappsec-csp/2/#enforce'] = {"text": "enforce", "type": "dfn", "spec": "csp2", "shortname": "csp2", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webappsec-csp/2/#enforce", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webappsec-csp/2/#monitor'] = {"text": "monitor", "type": "dfn", "spec": "csp2", "shortname": "csp2", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webappsec-csp/2/#monitor", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#import-scripts-into-worker-global-scope'] = {"text": "import scripts into worker global scope", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/workers.html#import-scripts-into-worker-global-scope", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/urls-and-fetching.html#unsafe-response'] = {"text": "unsafe response", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/urls-and-fetching.html#unsafe-response", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response-status'] = {"text": "status", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-response-status", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-filtered-response-basic'] = {"text": "basic filtered response", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-filtered-response-basic", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-filtered-response-cors'] = {"text": "cors filtered response", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-filtered-response-cors", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-filtered-response-opaque'] = {"text": "opaque filtered response", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-filtered-response-opaque", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#potential-navigation-or-subresource-request'] = {"text": "potential-navigation-or-subresource request", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#potential-navigation-or-subresource-request", "export": true, "normative": true, "for_": []};
+window.refsData['http://www.w3.org/TR/quota-api/#widl-ServiceWorkerGlobalScope-onbeforeevicted'] = {"text": "onbeforeevicted", "type": "attribute", "spec": "quota-api", "shortname": "quota-api", "level": "", "status": "anchor-block", "url": "http://www.w3.org/TR/quota-api/#widl-ServiceWorkerGlobalScope-onbeforeevicted", "export": true, "normative": true, "for_": ["ServiceWorkerGlobalScope"]};
+window.refsData['http://www.w3.org/TR/quota-api/#widl-ServiceWorkerGlobalScope-onevicted'] = {"text": "onevicted", "type": "attribute", "spec": "quota-api", "shortname": "quota-api", "level": "", "status": "anchor-block", "url": "http://www.w3.org/TR/quota-api/#widl-ServiceWorkerGlobalScope-onevicted", "export": true, "normative": true, "for_": ["ServiceWorkerGlobalScope"]};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-partial-interface'] = {"text": "partial interface", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-partial-interface", "export": true, "normative": true, "for_": []};
+window.refsData['#dfn-job'] = {"text": "job", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dfn-job", "export": true, "normative": true, "for_": []};
+window.refsData['#job-referrer'] = {"text": "referrer", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#job-referrer", "export": true, "normative": true, "for_": ["job"]};
+window.refsData['http://www.ecma-international.org/ecma-262/6.0/#sec-algorithm-conventions'] = {"text": "assert", "type": "dfn", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "http://www.ecma-international.org/ecma-262/6.0/#sec-algorithm-conventions", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/indices.html#event-domcontentloaded'] = {"text": "DOMContentLoaded", "type": "event", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/indices.html#event-domcontentloaded", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-exception'] = {"text": "exception", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-exception", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-url-path'] = {"text": "path", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-path", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['https://dom.spec.whatwg.org/#ascii-case-insensitive'] = {"text": "ascii case-insensitive", "type": "dfn", "spec": "dom-ls", "shortname": "dom-ls", "level": "", "status": "anchor-block", "url": "https://dom.spec.whatwg.org/#ascii-case-insensitive", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-url-equals'] = {"text": "equal", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-equals", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#fetch-a-classic-worker-script'] = {"text": "fetch a classic worker script", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#fetch-a-classic-worker-script", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-header-list'] = {"text": "header list", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-request-header-list", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#skip-service-worker-flag'] = {"text": "skip service worker flag", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#skip-service-worker-flag", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-redirect-mode'] = {"text": "redirect mode", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-request-redirect-mode", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-cache-mode'] = {"text": "cache mode", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-request-cache-mode", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-header-extract-mime-type'] = {"text": "extract a mime type", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-header-extract-mime-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-header-parse'] = {"text": "parsing", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-header-parse", "export": true, "normative": true, "for_": ["header"]};
+window.refsData['#dfn-script-resource'] = {"text": "script resource", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dfn-script-resource", "export": true, "normative": true, "for_": ["service worker"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#realm-execution-context'] = {"text": "realm execution context", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#realm-execution-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#api-url-character-encoding'] = {"text": "api url character encoding", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#api-url-character-encoding", "export": true, "normative": true, "for_": ["environment settings object"]};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#concept-workerglobalscope-url'] = {"text": "url", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/workers.html#concept-workerglobalscope-url", "export": true, "normative": true, "for_": ["workerglobalscope"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#https-state'] = {"text": "https state", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#https-state", "export": true, "normative": true, "for_": ["environment settings object"]};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#concept-workerglobalscope-https-state'] = {"text": "https state", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/workers.html#concept-workerglobalscope-https-state", "export": true, "normative": true, "for_": ["workerglobalscope"]};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#concept-workerglobalscope-type'] = {"text": "type", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/workers.html#concept-workerglobalscope-type", "export": true, "normative": true, "for_": ["workerglobalscope"]};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#workerlocation'] = {"text": "WorkerLocation", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/workers.html#workerlocation", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#classic-script'] = {"text": "classic script", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#classic-script", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#run-a-classic-script'] = {"text": "run a classic script", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#run-a-classic-script", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#module-script'] = {"text": "module script", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#module-script", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#run-a-module-script'] = {"text": "run a module script", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#run-a-module-script", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#kill-a-worker'] = {"text": "kill a worker", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/workers.html#kill-a-worker", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#terminate-a-worker'] = {"text": "terminate a worker", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/workers.html#terminate-a-worker", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#dom-request-headers'] = {"text": "headers", "type": "attribute", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#dom-request-headers", "export": true, "normative": true, "for_": ["Request"]};
+window.refsData['https://fetch.spec.whatwg.org/#navigation-request'] = {"text": "navigation request", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#navigation-request", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#subresource-request'] = {"text": "subresource request", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#subresource-request", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#canceled-flag'] = {"text": "canceled flag", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#canceled-flag", "export": true, "normative": true, "for_": ["Event"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-origin'] = {"text": "origin", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-request-origin", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['#foreign-fetch-respond-with-entered-flag'] = {"text": "respond-with entered flag", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#foreign-fetch-respond-with-entered-flag", "export": true, "normative": true, "for_": ["ForeignFetchEvent"]};
+window.refsData['#foreign-fetch-wait-to-respond-flag'] = {"text": "wait to respond flag", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#foreign-fetch-wait-to-respond-flag", "export": true, "normative": true, "for_": ["ForeignFetchEvent"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-internal-response'] = {"text": "internal response", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-internal-response", "export": true, "normative": true, "for_": []};
+window.refsData['#foreign-fetch-respond-with-error-flag'] = {"text": "respond-with error flag", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#foreign-fetch-respond-with-error-flag", "export": true, "normative": true, "for_": ["ForeignFetchEvent"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-filtered-response-opaque-redirect'] = {"text": "opaque-redirect filtered response", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-filtered-response-opaque-redirect", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-response-tainting'] = {"text": "response tainting", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-request-response-tainting", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-response-cors-exposed-header-name-list'] = {"text": "cors-exposed header-name list", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#concept-response-cors-exposed-header-name-list", "export": true, "normative": true, "for_": ["response"]};
+window.refsData['#dfn-handle-fetch-task-source'] = {"text": "handle fetch task source", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dfn-handle-fetch-task-source", "export": true, "normative": true, "for_": []};
+window.refsData['#dfn-active-worker'] = {"text": "active worker", "type": "dfn", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dfn-active-worker", "export": true, "normative": true, "for_": ["service worker registration"]};
+window.refsData['#dom-cachequeryoptions-ignoremethod'] = {"text": "ignoreMethod", "type": "dict-member", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dom-cachequeryoptions-ignoremethod", "export": true, "normative": true, "for_": ["CacheQueryOptions"]};
+window.refsData['https://url.spec.whatwg.org/#concept-url-query'] = {"text": "query", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-query", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['#dom-cachequeryoptions-ignoresearch'] = {"text": "ignoreSearch", "type": "dict-member", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dom-cachequeryoptions-ignoresearch", "export": true, "normative": true, "for_": ["CacheQueryOptions"]};
+window.refsData['#dom-cachequeryoptions-ignorevary'] = {"text": "ignoreVary", "type": "dict-member", "spec": "service-workers", "shortname": "service-workers", "level": "", "status": "local", "url": "#dom-cachequeryoptions-ignorevary", "export": true, "normative": true, "for_": ["CacheQueryOptions"]};
+window.refsData['https://fetch.spec.whatwg.org/#dom-headers-get'] = {"text": "get(name)", "type": "method", "spec": "fetch", "shortname": "fetch", "level": "", "status": "anchor-block", "url": "https://fetch.spec.whatwg.org/#dom-headers-get", "export": true, "normative": true, "for_": ["Headers"]};
 </script>
 <script>/* Boilerplate: script-var-click-highlighting */
 /*

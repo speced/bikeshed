@@ -706,6 +706,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -2758,8 +2795,6 @@ and all the rest of the <a href="http://lists.w3.org/Archives/Public/www-style/"
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -3007,7 +3042,6 @@ and all the rest of the <a href="http://lists.w3.org/Archives/Public/www-style/"
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -3478,4 +3512,300 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#computed-value'] = {"text": "computed value", "type": "dfn", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#computed-value", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-transition-property'] = {"text": "transition-property", "type": "property", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#propdef-transition-property", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background-image'] = {"text": "background-image", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-image", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
+window.refsData['#single-transition-property'] = {"text": "<single-transition-property>", "type": "type", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#single-transition-property", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-comma'] = {"text": "#", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-comma", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-transition-property-none'] = {"text": "none", "type": "value", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#valdef-transition-property-none", "export": true, "normative": true, "for_": ["transition-property"]};
+window.refsData['#valdef-transition-property-all'] = {"text": "all", "type": "value", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#valdef-transition-property-all", "export": true, "normative": true, "for_": ["transition-property"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#identifier-value'] = {"text": "<custom-ident>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#identifier-value", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-transition-duration'] = {"text": "transition-duration", "type": "property", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#propdef-transition-duration", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-transition-delay'] = {"text": "transition-delay", "type": "property", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#propdef-transition-delay", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-transition-timing-function'] = {"text": "transition-timing-function", "type": "property", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#propdef-transition-timing-function", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#valdef-all-inherit'] = {"text": "inherit", "type": "value", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#valdef-all-inherit", "export": true, "normative": true, "for_": ["all"]};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#valdef-all-initial'] = {"text": "initial", "type": "value", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#valdef-all-initial", "export": true, "normative": true, "for_": ["all"]};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#propdef-all'] = {"text": "all", "type": "property", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#propdef-all", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-3/#time-value'] = {"text": "<time>", "type": "type", "spec": "css-values-3", "shortname": "css-values", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-values-3/#time-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-easing-2/#input-progress-value'] = {"text": "input progress value", "type": "dfn", "spec": "css-easing-2", "shortname": "css-easing", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-easing-2/#input-progress-value", "export": false, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-easing-2/#output-progress-value'] = {"text": "output progress value", "type": "dfn", "spec": "css-easing-2", "shortname": "css-easing", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-easing-2/#output-progress-value", "export": false, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#interpolation'] = {"text": "interpolate", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#interpolation", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-easing-2/#typedef-easing-function'] = {"text": "<easing-function>", "type": "type", "spec": "css-easing-2", "shortname": "css-easing", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-easing-2/#typedef-easing-function", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-transition'] = {"text": "transition", "type": "property", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#propdef-transition", "export": true, "normative": true, "for_": []};
+window.refsData['#single-transition'] = {"text": "<single-transition>", "type": "type", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#single-transition", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-any'] = {"text": "||", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-any", "export": true, "normative": true, "for_": []};
+window.refsData['#transition-reversing-adjusted-start-value'] = {"text": "reversing-adjusted start value", "type": "dfn", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#transition-reversing-adjusted-start-value", "export": true, "normative": true, "for_": ["transition"]};
+window.refsData['#transition-reversing-shortening-factor'] = {"text": "reversing shortening factor", "type": "dfn", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#transition-reversing-shortening-factor", "export": true, "normative": true, "for_": ["transition"]};
+window.refsData['#running-transition'] = {"text": "running transition", "type": "dfn", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#running-transition", "export": true, "normative": true, "for_": []};
+window.refsData['#completed-transition'] = {"text": "completed transition", "type": "dfn", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#completed-transition", "export": true, "normative": true, "for_": []};
+window.refsData['#style-change-event'] = {"text": "style change event", "type": "dfn", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#style-change-event", "export": true, "normative": true, "for_": []};
+window.refsData['#before-change-style'] = {"text": "before-change style", "type": "dfn", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#before-change-style", "export": true, "normative": true, "for_": []};
+window.refsData['#after-change-style'] = {"text": "after-change style", "type": "dfn", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#after-change-style", "export": true, "normative": true, "for_": []};
+window.refsData['#matching-transition-duration'] = {"text": "matching transition duration", "type": "dfn", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#matching-transition-duration", "export": true, "normative": true, "for_": []};
+window.refsData['#matching-transition-delay'] = {"text": "matching transition delay", "type": "dfn", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#matching-transition-delay", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#animation-type'] = {"text": "animation type", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#animation-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#not-animatable'] = {"text": "not animatable", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#not-animatable", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#discrete'] = {"text": "discrete", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#discrete", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-box-shadow'] = {"text": "box-shadow", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-box-shadow", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/web-animations-1/#combining-shadow-lists'] = {"text": "combining shadow lists", "type": "dfn", "spec": "web-animations-1", "shortname": "web-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/web-animations-1/#combining-shadow-lists", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css3-background/#shadow-inset'] = {"text": "inset", "type": "value", "spec": "", "shortname": "css-transitions", "level": "1", "status": "anchor-block", "url": "https://www.w3.org/TR/css3-background/#shadow-inset", "export": true, "normative": true, "for_": ["shadow"]};
+window.refsData['#transitionable'] = {"text": "transitionable", "type": "dfn", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#transitionable", "export": true, "normative": true, "for_": []};
+window.refsData['#transition-end-value'] = {"text": "end value", "type": "dfn", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#transition-end-value", "export": true, "normative": true, "for_": ["transition"]};
+window.refsData['#matching-transition-property-value'] = {"text": "matching transition-property value", "type": "dfn", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#matching-transition-property-value", "export": true, "normative": true, "for_": []};
+window.refsData['#transition-combined-duration'] = {"text": "combined duration", "type": "dfn", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#transition-combined-duration", "export": true, "normative": true, "for_": ["transition"]};
+window.refsData['#transition-start-time'] = {"text": "start time", "type": "dfn", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#transition-start-time", "export": true, "normative": true, "for_": ["transition"]};
+window.refsData['#transition-end-time'] = {"text": "end time", "type": "dfn", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#transition-end-time", "export": true, "normative": true, "for_": ["transition"]};
+window.refsData['#transition-start-value'] = {"text": "start value", "type": "dfn", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#transition-start-value", "export": true, "normative": true, "for_": ["transition"]};
+window.refsData['#current-value'] = {"text": "current value", "type": "dfn", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#current-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#concept-event-dispatch'] = {"text": "dispatch", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#concept-event-dispatch", "export": true, "normative": true, "for_": []};
+window.refsData['#transitionevent'] = {"text": "TransitionEvent", "type": "interface", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#transitionevent", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#event'] = {"text": "Event", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#event", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-transitionevent-transitionevent'] = {"text": "TransitionEvent(type, transitionEventInitDict)", "type": "constructor", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#dom-transitionevent-transitionevent", "export": true, "normative": true, "for_": ["TransitionEvent"]};
+window.refsData['https://drafts.csswg.org/cssom-1/#cssomstring'] = {"text": "CSSOMString", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssomstring", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-transitioneventinit'] = {"text": "TransitionEventInit", "type": "dictionary", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#dictdef-transitioneventinit", "export": true, "normative": true, "for_": []};
+window.refsData['#Events-TransitionEvent-propertyName'] = {"text": "propertyName", "type": "attribute", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#Events-TransitionEvent-propertyName", "export": true, "normative": true, "for_": ["TransitionEvent"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-double'] = {"text": "double", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-double", "export": true, "normative": true, "for_": []};
+window.refsData['#Events-TransitionEvent-elapsedTime'] = {"text": "elapsedTime", "type": "attribute", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#Events-TransitionEvent-elapsedTime", "export": true, "normative": true, "for_": ["TransitionEvent"]};
+window.refsData['#Events-TransitionEvent-pseudoElement'] = {"text": "pseudoElement", "type": "attribute", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#Events-TransitionEvent-pseudoElement", "export": true, "normative": true, "for_": ["TransitionEvent"]};
+window.refsData['https://dom.spec.whatwg.org/#dictdef-eventinit'] = {"text": "EventInit", "type": "dictionary", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dictdef-eventinit", "export": true, "normative": true, "for_": []};
+window.refsData['http://w3c.github.io/dom/#constructing-events'] = {"text": "event constructor", "type": "dfn", "spec": "", "shortname": "css-transitions", "level": "1", "status": "anchor-block", "url": "http://w3c.github.io/dom/#constructing-events", "export": true, "normative": true, "for_": []};
+window.refsData['#transitionrun'] = {"text": "transitionrun", "type": "event", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#transitionrun", "export": true, "normative": true, "for_": ["transitionevent"]};
+window.refsData['#transitionstart'] = {"text": "transitionstart", "type": "event", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#transitionstart", "export": true, "normative": true, "for_": ["transitionevent"]};
+window.refsData['#transitionend'] = {"text": "transitionend", "type": "event", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#transitionend", "export": true, "normative": true, "for_": ["transitionevent"]};
+window.refsData['#transitioncancel'] = {"text": "transitioncancel", "type": "event", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#transitioncancel", "export": true, "normative": true, "for_": ["transitionevent"]};
+window.refsData['https://drafts.csswg.org/css-animations-1/#dom-animationevent-elapsedtime'] = {"text": "elapsedTime", "type": "attribute", "spec": "css-animations-1", "shortname": "css-animations", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-animations-1/#dom-animationevent-elapsedtime", "export": true, "normative": true, "for_": ["AnimationEvent"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-handlers'] = {"text": "event handlers", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handlers", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-event-type'] = {"text": "event handler event type", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-event-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#html-elements'] = {"text": "html elements", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#html-elements", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-content-attributes'] = {"text": "event handler content attributes", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-content-attributes", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-idl-attributes'] = {"text": "event handler idl attributes", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-idl-attributes", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#window'] = {"text": "Window", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-globaleventhandlers-ontransitionrun'] = {"text": "ontransitionrun", "type": "attribute", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#dom-globaleventhandlers-ontransitionrun", "export": true, "normative": true, "for_": ["GlobalEventHandlers"]};
+window.refsData['#dom-globaleventhandlers-ontransitionstart'] = {"text": "ontransitionstart", "type": "attribute", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#dom-globaleventhandlers-ontransitionstart", "export": true, "normative": true, "for_": ["GlobalEventHandlers"]};
+window.refsData['#dom-globaleventhandlers-ontransitionend'] = {"text": "ontransitionend", "type": "attribute", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#dom-globaleventhandlers-ontransitionend", "export": true, "normative": true, "for_": ["GlobalEventHandlers"]};
+window.refsData['#dom-globaleventhandlers-ontransitioncancel'] = {"text": "ontransitioncancel", "type": "attribute", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#dom-globaleventhandlers-ontransitioncancel", "export": true, "normative": true, "for_": ["GlobalEventHandlers"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#globaleventhandlers'] = {"text": "GlobalEventHandlers", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#globaleventhandlers", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler'] = {"text": "EventHandler", "type": "typedef", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-transforms-1/#propdef-transform'] = {"text": "transform", "type": "property", "spec": "css-transforms-1", "shortname": "css-transforms", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transforms-1/#propdef-transform", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-6/#cascade'] = {"text": "cascade", "type": "dfn", "spec": "css-cascade-6", "shortname": "css-cascade", "level": "6", "status": "current", "url": "https://drafts.csswg.org/css-cascade-6/#cascade", "export": true, "normative": true, "for_": []};window.refsData['#propdef-transition'] = {"text": "transition", "type": "property", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#propdef-transition", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-transition-delay'] = {"text": "transition-delay", "type": "property", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#propdef-transition-delay", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-transition-duration'] = {"text": "transition-duration", "type": "property", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#propdef-transition-duration", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-transition-property'] = {"text": "transition-property", "type": "property", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#propdef-transition-property", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-transition-timing-function'] = {"text": "transition-timing-function", "type": "property", "spec": "css-transitions-1", "shortname": "css-transitions", "level": "1", "status": "local", "url": "#propdef-transition-timing-function", "export": true, "normative": true, "for_": []};
 </script>

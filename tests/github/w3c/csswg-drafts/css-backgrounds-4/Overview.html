@@ -692,6 +692,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -2445,8 +2482,6 @@ border-clip-top: 3fr 10px 2fr 10px 1fr 10px 10px 10px 1fr 10px 2fr 10px 3fr;
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -2694,7 +2729,6 @@ border-clip-top: 3fr 10px 2fr 10px 1fr 10px 10px 10px 1fr 10px 2fr 10px 3fr;
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -3127,4 +3161,278 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#propdef-corner-shape'] = {"text": "corner-shape", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-corner-shape", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-clip'] = {"text": "border-clip", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-clip", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-position'] = {"text": "background-position", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-background-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-background-repeat'] = {"text": "background-repeat", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-background-repeat", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-position'] = {"text": "<position>", "type": "type", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#typedef-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-comma'] = {"text": "#", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-comma", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#typedef-length-percentage'] = {"text": "<length-percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#typedef-length-percentage", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-opt'] = {"text": "?", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-all'] = {"text": "&&", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-all", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#valdef-background-position-center'] = {"text": "center", "type": "value", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#valdef-background-position-center", "export": true, "normative": true, "for_": ["background-position"]};
+window.refsData['#propdef-background-position-inline'] = {"text": "background-position-inline", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-background-position-inline", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-position-block'] = {"text": "background-position-block", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-background-position-block", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-position-x'] = {"text": "background-position-x", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-background-position-x", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-position-y'] = {"text": "background-position-y", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-background-position-y", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-req'] = {"text": "!", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-req", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-border-limit-left'] = {"text": "left", "type": "value", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#valdef-border-limit-left", "export": true, "normative": true, "for_": ["border-limit"]};
+window.refsData['#valdef-border-limit-top'] = {"text": "top", "type": "value", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#valdef-border-limit-top", "export": true, "normative": true, "for_": ["border-limit"]};
+window.refsData['#propdef-background-clip'] = {"text": "background-clip", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-background-clip", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-bg-clip'] = {"text": "<bg-clip>", "type": "type", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#typedef-bg-clip", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#typedef-box'] = {"text": "<box>", "type": "type", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#typedef-box", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-background-clip-text'] = {"text": "text", "type": "value", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#valdef-background-clip-text", "export": true, "normative": true, "for_": ["<bg-clip>", "background-clip"]};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border-width'] = {"text": "border-width", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-width", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-backgrounds-3/#propdef-border-style'] = {"text": "border-style", "type": "property", "spec": "css-backgrounds-3", "shortname": "css-backgrounds", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-backgrounds-3/#propdef-border-style", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-color'] = {"text": "border-color", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-color-5/#typedef-color'] = {"text": "<color>", "type": "type", "spec": "css-color-5", "shortname": "css-color", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-color-5/#typedef-color", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-num-range'] = {"text": "{a,b}", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-num-range", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-tables-3/#propdef-border-collapse'] = {"text": "border-collapse", "type": "property", "spec": "css-tables-3", "shortname": "css-tables", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-tables-3/#propdef-border-collapse", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-text-4/#valdef-text-space-collapse-collapse'] = {"text": "collapse", "type": "value", "spec": "css-text-4", "shortname": "css-text", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-text-4/#valdef-text-space-collapse-collapse", "export": true, "normative": true, "for_": ["text-space-collapse"]};
+window.refsData['#valdef-corner-shape-round'] = {"text": "round", "type": "value", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#valdef-corner-shape-round", "export": true, "normative": true, "for_": ["corner-shape"]};
+window.refsData['#valdef-corner-shape-angle'] = {"text": "angle", "type": "value", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#valdef-corner-shape-angle", "export": true, "normative": true, "for_": ["corner-shape"]};
+window.refsData['#propdef-border-radius'] = {"text": "border-radius", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-radius", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-easing-2/#funcdef-cubic-bezier-easing-function-cubic-bezier'] = {"text": "cubic-bezier()", "type": "function", "spec": "css-easing-2", "shortname": "css-easing", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-easing-2/#funcdef-cubic-bezier-easing-function-cubic-bezier", "export": true, "normative": true, "for_": ["<cubic-bezier-easing-function>"]};
+window.refsData['#propdef-corners'] = {"text": "corners", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-corners", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-any'] = {"text": "||", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-any", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-limit'] = {"text": "border-limit", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-limit", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-border-limit-sides'] = {"text": "sides", "type": "value", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#valdef-border-limit-sides", "export": true, "normative": true, "for_": ["border-limit"]};
+window.refsData['#valdef-border-limit-corners'] = {"text": "corners", "type": "value", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#valdef-border-limit-corners", "export": true, "normative": true, "for_": ["border-limit"]};
+window.refsData['#valdef-border-limit-right'] = {"text": "right", "type": "value", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#valdef-border-limit-right", "export": true, "normative": true, "for_": ["border-limit"]};
+window.refsData['#valdef-border-limit-bottom'] = {"text": "bottom", "type": "value", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#valdef-border-limit-bottom", "export": true, "normative": true, "for_": ["border-limit"]};
+window.refsData['https://drafts.csswg.org/css-grid-2/#typedef-flex'] = {"text": "<flex>", "type": "type", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#typedef-flex", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-one-plus'] = {"text": "+", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-one-plus", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-grid-2/#valdef-flex-fr'] = {"text": "fr", "type": "value", "spec": "css-grid-2", "shortname": "css-grid", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-grid-2/#valdef-flex-fr", "export": true, "normative": true, "for_": ["<flex>"]};window.refsData['#propdef-background-clip'] = {"text": "background-clip", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-background-clip", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-position'] = {"text": "background-position", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-background-position", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-position-block'] = {"text": "background-position-block", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-background-position-block", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-position-inline'] = {"text": "background-position-inline", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-background-position-inline", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-position-x'] = {"text": "background-position-x", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-background-position-x", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-background-position-y'] = {"text": "background-position-y", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-background-position-y", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-bottom-color'] = {"text": "border-bottom-color", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-bottom-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-clip'] = {"text": "border-clip", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-clip", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-clip-bottom'] = {"text": "border-clip-bottom", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-clip-bottom", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-clip-left'] = {"text": "border-clip-left", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-clip-left", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-clip-right'] = {"text": "border-clip-right", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-clip-right", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-clip-top'] = {"text": "border-clip-top", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-clip-top", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-color'] = {"text": "border-color", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-left-color'] = {"text": "border-left-color", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-left-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-limit'] = {"text": "border-limit", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-limit", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-radius'] = {"text": "border-radius", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-radius", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-right-color'] = {"text": "border-right-color", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-right-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-border-top-color'] = {"text": "border-top-color", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-border-top-color", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-corner-shape'] = {"text": "corner-shape", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-corner-shape", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-corners'] = {"text": "corners", "type": "property", "spec": "css-backgrounds-4", "shortname": "css-backgrounds", "level": "4", "status": "local", "url": "#propdef-corners", "export": true, "normative": true, "for_": []};
 </script>

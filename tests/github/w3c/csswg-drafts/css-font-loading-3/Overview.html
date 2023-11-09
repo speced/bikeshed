@@ -692,6 +692,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -2962,8 +2999,6 @@ Is that always defined? <a class="issue-return" href="#issue-65bdbf2d" title="Ju
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -3211,7 +3246,6 @@ Is that always defined? <a class="issue-return" href="#issue-65bdbf2d" title="Ju
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -3699,4 +3733,314 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://drafts.csswg.org/css-fonts-5/#at-font-face-rule'] = {"text": "@font-face", "type": "at-rule", "spec": "css-fonts-5", "shortname": "css-fonts", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-fonts-5/#at-font-face-rule", "export": true, "normative": true, "for_": []};
+window.refsData['#fontface'] = {"text": "FontFace", "type": "interface", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#fontface", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-promise'] = {"text": "Promise", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-promise", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-ArrayBuffer'] = {"text": "ArrayBuffer", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-ArrayBuffer", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#ArrayBufferView'] = {"text": "ArrayBufferView", "type": "typedef", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#ArrayBufferView", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#cssomstring'] = {"text": "CSSOMString", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssomstring", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-fontface-fontface'] = {"text": "FontFace(family, source, descriptors)", "type": "constructor", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-fontface", "export": true, "normative": true, "for_": ["FontFace"]};
+window.refsData['#typedefdef-binarydata'] = {"text": "BinaryData", "type": "typedef", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#typedefdef-binarydata", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-fontfacedescriptors'] = {"text": "FontFaceDescriptors", "type": "dictionary", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dictdef-fontfacedescriptors", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-fontface-family'] = {"text": "family", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-family", "export": true, "normative": true, "for_": ["FontFace"]};
+window.refsData['#dom-fontface-style'] = {"text": "style", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-style", "export": true, "normative": true, "for_": ["FontFace"]};
+window.refsData['#dom-fontface-weight'] = {"text": "weight", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-weight", "export": true, "normative": true, "for_": ["FontFace"]};
+window.refsData['#dom-fontface-stretch'] = {"text": "stretch", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-stretch", "export": true, "normative": true, "for_": ["FontFace"]};
+window.refsData['#dom-fontface-unicoderange'] = {"text": "unicodeRange", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-unicoderange", "export": true, "normative": true, "for_": ["FontFace"]};
+window.refsData['#dom-fontface-variant'] = {"text": "variant", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-variant", "export": true, "normative": true, "for_": ["FontFace"]};
+window.refsData['#dom-fontface-featuresettings'] = {"text": "featureSettings", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-featuresettings", "export": true, "normative": true, "for_": ["FontFace"]};
+window.refsData['#dom-fontface-variationsettings'] = {"text": "variationSettings", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-variationsettings", "export": true, "normative": true, "for_": ["FontFace"]};
+window.refsData['#dom-fontface-display'] = {"text": "display", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-display", "export": true, "normative": true, "for_": ["FontFace"]};
+window.refsData['#dom-fontface-ascentoverride'] = {"text": "ascentOverride", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-ascentoverride", "export": true, "normative": true, "for_": ["FontFace"]};
+window.refsData['#dom-fontface-descentoverride'] = {"text": "descentOverride", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-descentoverride", "export": true, "normative": true, "for_": ["FontFace"]};
+window.refsData['#dom-fontface-linegapoverride'] = {"text": "lineGapOverride", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-linegapoverride", "export": true, "normative": true, "for_": ["FontFace"]};
+window.refsData['#enumdef-fontfaceloadstatus'] = {"text": "FontFaceLoadStatus", "type": "enum", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#enumdef-fontfaceloadstatus", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-fontface-status'] = {"text": "status", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-status", "export": true, "normative": true, "for_": ["FontFace"]};
+window.refsData['#dom-fontface-load'] = {"text": "load()", "type": "method", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-load", "export": true, "normative": true, "for_": ["FontFace"]};
+window.refsData['#dom-fontface-loaded'] = {"text": "loaded", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-loaded", "export": true, "normative": true, "for_": ["FontFace"]};
+window.refsData['https://drafts.csswg.org/css-syntax-3/#css-parse-something-according-to-a-css-grammar'] = {"text": "parse", "type": "dfn", "spec": "css-syntax-3", "shortname": "css-syntax", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-syntax-3/#css-parse-something-according-to-a-css-grammar", "export": true, "normative": true, "for_": ["CSS"]};
+window.refsData['https://webidl.spec.whatwg.org/#syntaxerror'] = {"text": "SyntaxError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#syntaxerror", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-fontface-fontstatuspromise-slot'] = {"text": "[[FontStatusPromise]]", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-fontstatuspromise-slot", "export": true, "normative": true, "for_": ["FontFace"]};
+window.refsData['#dom-fontface-fontface-family-source-descriptors-family'] = {"text": "family", "type": "argument", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-fontface-family-source-descriptors-family", "export": true, "normative": true, "for_": ["FontFace/FontFace(family, source)", "FontFace/FontFace(family, source, descriptors)", "FontFace/constructor(family, source)", "FontFace/constructor(family, source, descriptors)"]};
+window.refsData['#dom-fontface-fontface-family-source-descriptors-descriptors'] = {"text": "descriptors", "type": "argument", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-fontface-family-source-descriptors-descriptors", "export": true, "normative": true, "for_": ["FontFace/FontFace(family, source)", "FontFace/FontFace(family, source, descriptors)", "FontFace/constructor(family, source)", "FontFace/constructor(family, source, descriptors)"]};
+window.refsData['#dom-fontface-fontface-family-source-descriptors-source'] = {"text": "source", "type": "argument", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-fontface-family-source-descriptors-source", "export": true, "normative": true, "for_": ["FontFace/FontFace(family, source)", "FontFace/FontFace(family, source, descriptors)", "FontFace/constructor(family, source)", "FontFace/constructor(family, source, descriptors)"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#funcdef-url'] = {"text": "url()", "type": "function", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#funcdef-url", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-fontface-urls-slot'] = {"text": "[[Urls]]", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-urls-slot", "export": true, "normative": true, "for_": ["FontFace"]};
+window.refsData['#dom-fontface-data-slot'] = {"text": "[[Data]]", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontface-data-slot", "export": true, "normative": true, "for_": ["FontFace"]};
+window.refsData['#fontfaceset'] = {"text": "FontFaceSet", "type": "interface", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#fontfaceset", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-fontfaceset-loadingfonts-slot'] = {"text": "[[LoadingFonts]]", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-loadingfonts-slot", "export": true, "normative": true, "for_": ["FontFaceSet"]};
+window.refsData['#switch-the-fontfaceset-to-loading'] = {"text": "switch the fontfaceset to loading", "type": "dfn", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#switch-the-fontfaceset-to-loading", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-fontfaceset-loadedfonts-slot'] = {"text": "[[LoadedFonts]]", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-loadedfonts-slot", "export": true, "normative": true, "for_": ["FontFaceSet"]};
+window.refsData['#switch-the-fontfaceset-to-loaded'] = {"text": "switch the fontfaceset to loaded", "type": "dfn", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#switch-the-fontfaceset-to-loaded", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-fontfaceset-failedfonts-slot'] = {"text": "[[FailedFonts]]", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-failedfonts-slot", "export": true, "normative": true, "for_": ["FontFaceSet"]};
+window.refsData['#font-source'] = {"text": "font source", "type": "dfn", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#font-source", "export": true, "normative": true, "for_": []};
+window.refsData['#css-connected'] = {"text": "css-connected", "type": "dfn", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#css-connected", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#dictdef-eventinit'] = {"text": "EventInit", "type": "dictionary", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dictdef-eventinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-sequence'] = {"text": "sequence", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-sequence", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#event'] = {"text": "Event", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#event", "export": true, "normative": true, "for_": []};
+window.refsData['#dictdef-fontfacesetloadeventinit'] = {"text": "FontFaceSetLoadEventInit", "type": "dictionary", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dictdef-fontfacesetloadeventinit", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#SameObject'] = {"text": "SameObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SameObject", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-frozen-array'] = {"text": "FrozenArray", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-frozen-array", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#eventtarget'] = {"text": "EventTarget", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#eventtarget", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-fontfaceset-fontfaceset'] = {"text": "FontFaceSet(initialFaces)", "type": "constructor", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-fontfaceset", "export": true, "normative": true, "for_": ["FontFaceSet"]};
+window.refsData['#dom-fontfaceset-add'] = {"text": "add(font)", "type": "method", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-add", "export": true, "normative": true, "for_": ["FontFaceSet"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-fontfaceset-delete'] = {"text": "delete(font)", "type": "method", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-delete", "export": true, "normative": true, "for_": ["FontFaceSet"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-fontfaceset-clear'] = {"text": "clear()", "type": "method", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-clear", "export": true, "normative": true, "for_": ["FontFaceSet"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler'] = {"text": "EventHandler", "type": "typedef", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#eventhandler", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-fontfaceset-load'] = {"text": "load(font, text)", "type": "method", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-load", "export": true, "normative": true, "for_": ["FontFaceSet"]};
+window.refsData['#dom-fontfaceset-load-font-text-font'] = {"text": "font", "type": "argument", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-load-font-text-font", "export": true, "normative": true, "for_": ["FontFaceSet/load(font, text)"]};
+window.refsData['#dom-fontfaceset-load-font-text-text'] = {"text": "text", "type": "argument", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-load-font-text-text", "export": true, "normative": true, "for_": ["FontFaceSet/load(font, text)"]};
+window.refsData['#dom-fontfaceset-check'] = {"text": "check(font, text)", "type": "method", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-check", "export": true, "normative": true, "for_": ["FontFaceSet"]};
+window.refsData['#dom-fontfaceset-check-font-text-font'] = {"text": "font", "type": "argument", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-check-font-text-font", "export": true, "normative": true, "for_": ["FontFaceSet/check(font, text)"]};
+window.refsData['#dom-fontfaceset-check-font-text-text'] = {"text": "text", "type": "argument", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-check-font-text-text", "export": true, "normative": true, "for_": ["FontFaceSet/check(font, text)"]};
+window.refsData['#dom-fontfaceset-ready'] = {"text": "ready", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-ready", "export": true, "normative": true, "for_": ["FontFaceSet"]};
+window.refsData['#enumdef-fontfacesetloadstatus'] = {"text": "FontFaceSetLoadStatus", "type": "enum", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#enumdef-fontfacesetloadstatus", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-fontfaceset-readypromise-slot'] = {"text": "[[ReadyPromise]]", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-readypromise-slot", "export": true, "normative": true, "for_": ["FontFaceSet"]};
+window.refsData['#dom-fontfaceset-fontfaceset-initialfaces-initialfaces'] = {"text": "initialFaces", "type": "argument", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-fontfaceset-initialfaces-initialfaces", "export": true, "normative": true, "for_": ["FontFaceSet/FontFaceSet(initialFaces)", "FontFaceSet/constructor(initialFaces)"]};
+window.refsData['#fontfaceset-set-entries'] = {"text": "set entries", "type": "dfn", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#fontfaceset-set-entries", "export": true, "normative": true, "for_": ["FontFaceSet"]};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-set-entries'] = {"text": "set entries", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-set-entries", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#invalidmodificationerror'] = {"text": "InvalidModificationError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#invalidmodificationerror", "export": true, "normative": true, "for_": []};
+window.refsData['#fontfaceset-pending-on-the-environment'] = {"text": "pending on the environment", "type": "dfn", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#fontfaceset-pending-on-the-environment", "export": true, "normative": true, "for_": ["FontFaceSet"]};
+window.refsData['#dom-fontfaceset-onloading'] = {"text": "onloading", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-onloading", "export": true, "normative": true, "for_": ["FontFaceSet"]};
+window.refsData['#eventdef-fontfaceset-loading'] = {"text": "loading", "type": "event", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#eventdef-fontfaceset-loading", "export": true, "normative": true, "for_": ["FontFaceSet"]};
+window.refsData['#dom-fontfaceset-onloadingdone'] = {"text": "onloadingdone", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-onloadingdone", "export": true, "normative": true, "for_": ["FontFaceSet"]};
+window.refsData['#eventdef-fontfaceset-loadingdone'] = {"text": "loadingdone", "type": "event", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#eventdef-fontfaceset-loadingdone", "export": true, "normative": true, "for_": ["FontFaceSet"]};
+window.refsData['#dom-fontfaceset-onloadingerror'] = {"text": "onloadingerror", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-onloadingerror", "export": true, "normative": true, "for_": ["FontFaceSet"]};
+window.refsData['#eventdef-fontfaceset-loadingerror'] = {"text": "loadingerror", "type": "event", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#eventdef-fontfaceset-loadingerror", "export": true, "normative": true, "for_": ["FontFaceSet"]};
+window.refsData['#fontfacesetloadevent'] = {"text": "FontFaceSetLoadEvent", "type": "interface", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#fontfacesetloadevent", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-fontfacesetloadevent-fontfaces'] = {"text": "fontfaces", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfacesetloadevent-fontfaces", "export": true, "normative": true, "for_": ["FontFaceSetLoadEvent"]};
+window.refsData['#dom-fontfaceset-status'] = {"text": "status", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfaceset-status", "export": true, "normative": true, "for_": ["FontFaceSet"]};
+window.refsData['#fire-a-font-load-event'] = {"text": "fire a font load event", "type": "dfn", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#fire-a-font-load-event", "export": true, "normative": true, "for_": []};
+window.refsData['#fontfaceset-stuck-on-the-environment'] = {"text": "stuck on the environment", "type": "dfn", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#fontfaceset-stuck-on-the-environment", "export": true, "normative": true, "for_": ["FontFaceSet"]};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font'] = {"text": "font", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#valdef-font-weight-bolder'] = {"text": "bolder", "type": "value", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#valdef-font-weight-bolder", "export": true, "normative": true, "for_": ["font-weight"]};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#valdef-font-weight-normal'] = {"text": "normal", "type": "value", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#valdef-font-weight-normal", "export": true, "normative": true, "for_": ["font-weight"]};
+window.refsData['#available-font-faces'] = {"text": "available font faces", "type": "dfn", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#available-font-faces", "export": true, "normative": true, "for_": []};
+window.refsData['#find-the-matching-font-faces'] = {"text": "find the matching font faces", "type": "dfn", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#find-the-matching-font-faces", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetload-font'] = {"text": "font", "type": "argument", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetload-font", "export": true, "normative": true, "for_": ["FontFaceSet/load()"]};
+window.refsData['https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetload-text'] = {"text": "text", "type": "argument", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetload-text", "export": true, "normative": true, "for_": ["FontFaceSet/load()"]};
+window.refsData['https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetcheck-font'] = {"text": "font", "type": "argument", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetcheck-font", "export": true, "normative": true, "for_": ["FontFaceSet/check()"]};
+window.refsData['https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetcheck-text'] = {"text": "text", "type": "argument", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "snapshot", "url": "https://www.w3.org/TR/css-font-loading-3/#dom-fontfacesetcheck-text", "export": true, "normative": true, "for_": ["FontFaceSet/check()"]};
+window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
+window.refsData['#fontfacesource'] = {"text": "FontFaceSource", "type": "interface", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#fontfacesource", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#workerglobalscope'] = {"text": "WorkerGlobalScope", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/workers.html#workerglobalscope", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-fontfacesource-fonts'] = {"text": "fonts", "type": "attribute", "spec": "css-font-loading-3", "shortname": "css-font-loading", "level": "3", "status": "local", "url": "#dom-fontfacesource-fonts", "export": true, "normative": true, "for_": ["FontFaceSource"]};
+window.refsData['https://html.spec.whatwg.org/multipage/canvas.html#offscreencanvas'] = {"text": "OffscreenCanvas", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/canvas.html#offscreencanvas", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#documentorshadowroot-document-or-shadow-root-css-style-sheets'] = {"text": "document or shadow root css style sheets", "type": "dfn", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#documentorshadowroot-document-or-shadow-root-css-style-sheets", "export": true, "normative": true, "for_": ["DocumentOrShadowRoot"]};
 </script>

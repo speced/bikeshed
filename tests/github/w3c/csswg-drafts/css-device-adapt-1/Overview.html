@@ -727,6 +727,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -2638,8 +2675,6 @@ behavior per default (actual viewport is initial viewport). <a class="issue-retu
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -2887,7 +2922,6 @@ behavior per default (actual viewport is initial viewport). <a class="issue-retu
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -3314,4 +3348,264 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://drafts.csswg.org/mediaqueries-5/#continuous-media'] = {"text": "continuous media", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#continuous-media", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/mediaqueries-5/#paged-media'] = {"text": "paged media", "type": "dfn", "spec": "mediaqueries-5", "shortname": "mediaqueries", "level": "5", "status": "current", "url": "https://drafts.csswg.org/mediaqueries-5/#paged-media", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-page-3/#at-ruledef-page'] = {"text": "@page", "type": "at-rule", "spec": "css-page-3", "shortname": "css-page", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-page-3/#at-ruledef-page", "export": true, "normative": true, "for_": []};
+window.refsData['#at-ruledef-viewport'] = {"text": "@viewport", "type": "at-rule", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#at-ruledef-viewport", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-writing-modes-3/#propdef-direction'] = {"text": "direction", "type": "property", "spec": "css-writing-modes-3", "shortname": "css-writing-modes", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-writing-modes-3/#propdef-direction", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-cascade-5/#valdef-all-inherit'] = {"text": "inherit", "type": "value", "spec": "css-cascade-5", "shortname": "css-cascade", "level": "5", "status": "current", "url": "https://drafts.csswg.org/css-cascade-5/#valdef-all-inherit", "export": true, "normative": true, "for_": ["all"]};
+window.refsData['https://drafts.csswg.org/css-conditional-3/#conditional-group-rule'] = {"text": "conditional group rule", "type": "dfn", "spec": "css-conditional-3", "shortname": "css-conditional", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-conditional-3/#conditional-group-rule", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-conditional-3/#at-ruledef-media'] = {"text": "@media", "type": "at-rule", "spec": "css-conditional-3", "shortname": "css-conditional", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-conditional-3/#at-ruledef-media", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-conditional-3/#at-ruledef-supports'] = {"text": "@supports", "type": "at-rule", "spec": "css-conditional-3", "shortname": "css-conditional", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-conditional-3/#at-ruledef-supports", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-fonts-4/#propdef-font-size'] = {"text": "font-size", "type": "property", "spec": "css-fonts-4", "shortname": "css-fonts", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-fonts-4/#propdef-font-size", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#valdef-length-vw'] = {"text": "vw", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#valdef-length-vw", "export": true, "normative": true, "for_": ["<length>"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#valdef-length-vh'] = {"text": "vh", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#valdef-length-vh", "export": true, "normative": true, "for_": ["<length>"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#valdef-length-vmin'] = {"text": "vmin", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#valdef-length-vmin", "export": true, "normative": true, "for_": ["<length>"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#valdef-length-vmax'] = {"text": "vmax", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#valdef-length-vmax", "export": true, "normative": true, "for_": ["<length>"]};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-min-width'] = {"text": "min-width", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-min-width", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-max-width'] = {"text": "max-width", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-max-width", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-viewport-length'] = {"text": "<viewport-length>", "type": "type", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#typedef-viewport-length", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#length-value'] = {"text": "<length>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#length-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#percentage-value'] = {"text": "<percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#percentage-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-width'] = {"text": "width", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-width", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-num-range'] = {"text": "{a,b}", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-num-range", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-min-height'] = {"text": "min-height", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-min-height", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-max-height'] = {"text": "max-height", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-max-height", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-sizing-3/#propdef-height'] = {"text": "height", "type": "property", "spec": "css-sizing-3", "shortname": "css-sizing", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-sizing-3/#propdef-height", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#number-value'] = {"text": "<number>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#number-value", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-zoom-auto'] = {"text": "auto", "type": "value", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#valdef-zoom-auto", "export": true, "normative": true, "for_": ["zoom"]};
+window.refsData['#valdef-viewport-length-auto'] = {"text": "auto", "type": "value", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#valdef-viewport-length-auto", "export": true, "normative": true, "for_": ["viewport-length"]};
+window.refsData['https://drafts.csswg.org/cssom-1/#cssrule'] = {"text": "CSSRule", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssrule", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-unsigned-short'] = {"text": "unsigned short", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-unsigned-short", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['#cssviewportrule'] = {"text": "CSSViewportRule", "type": "interface", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#cssviewportrule", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/cssom-1/#cssstyledeclaration'] = {"text": "CSSStyleDeclaration", "type": "interface", "spec": "cssom-1", "shortname": "cssom", "level": "1", "status": "current", "url": "https://drafts.csswg.org/cssom-1/#cssstyledeclaration", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-cssviewportrule-style'] = {"text": "style", "type": "attribute", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#dom-cssviewportrule-style", "export": true, "normative": true, "for_": ["CSSViewportRule"]};
+window.refsData['#valdef-user-zoom-zoom'] = {"text": "zoom", "type": "value", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#valdef-user-zoom-zoom", "export": true, "normative": true, "for_": ["user-zoom"]};
+window.refsData['#valdef-user-zoom-fixed'] = {"text": "fixed", "type": "value", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#valdef-user-zoom-fixed", "export": true, "normative": true, "for_": ["user-zoom"]};
+window.refsData['#descdef-viewport-zoom'] = {"text": "zoom", "type": "descriptor", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#descdef-viewport-zoom", "export": true, "normative": true, "for_": ["@viewport"]};window.refsData['#at-ruledef-viewport'] = {"text": "@viewport", "type": "at-rule", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#at-ruledef-viewport", "export": true, "normative": true, "for_": []};
+window.refsData['#descdef-viewport-height'] = {"text": "height", "type": "descriptor", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#descdef-viewport-height", "export": true, "normative": true, "for_": ["@viewport"]};
+window.refsData['#descdef-viewport-max-height'] = {"text": "max-height", "type": "descriptor", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#descdef-viewport-max-height", "export": true, "normative": true, "for_": ["@viewport"]};
+window.refsData['#descdef-viewport-max-width'] = {"text": "max-width", "type": "descriptor", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#descdef-viewport-max-width", "export": true, "normative": true, "for_": ["@viewport"]};
+window.refsData['#descdef-viewport-max-zoom'] = {"text": "max-zoom", "type": "descriptor", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#descdef-viewport-max-zoom", "export": true, "normative": true, "for_": ["@viewport"]};
+window.refsData['#descdef-viewport-min-height'] = {"text": "min-height", "type": "descriptor", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#descdef-viewport-min-height", "export": true, "normative": true, "for_": ["@viewport"]};
+window.refsData['#descdef-viewport-min-width'] = {"text": "min-width", "type": "descriptor", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#descdef-viewport-min-width", "export": true, "normative": true, "for_": ["@viewport"]};
+window.refsData['#descdef-viewport-min-zoom'] = {"text": "min-zoom", "type": "descriptor", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#descdef-viewport-min-zoom", "export": true, "normative": true, "for_": ["@viewport"]};
+window.refsData['#descdef-viewport-orientation'] = {"text": "orientation", "type": "descriptor", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#descdef-viewport-orientation", "export": true, "normative": true, "for_": ["@viewport"]};
+window.refsData['#descdef-viewport-user-zoom'] = {"text": "user-zoom", "type": "descriptor", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#descdef-viewport-user-zoom", "export": true, "normative": true, "for_": ["@viewport"]};
+window.refsData['#descdef-viewport-width'] = {"text": "width", "type": "descriptor", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#descdef-viewport-width", "export": true, "normative": true, "for_": ["@viewport"]};
+window.refsData['#descdef-viewport-zoom'] = {"text": "zoom", "type": "descriptor", "spec": "css-device-adapt-1", "shortname": "css-device-adapt", "level": "1", "status": "local", "url": "#descdef-viewport-zoom", "export": true, "normative": true, "for_": ["@viewport"]};
 </script>

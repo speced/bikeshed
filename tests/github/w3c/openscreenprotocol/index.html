@@ -471,6 +471,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -3284,8 +3321,6 @@ it to a message. <a href="https://github.com/w3c/presentation-api/issues/471">[I
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -3533,7 +3568,6 @@ it to a message. <a href="https://github.com/w3c/presentation-api/issues/471">[I
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -3960,4 +3994,293 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#media-element'] = {"text": "media elements", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#media-element", "export": false, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/presentation-api/#dfn-controlling-user-agent'] = {"text": "controlling user agent", "type": "dfn", "spec": "presentation-api", "shortname": "presentation-api", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/presentation-api/#dfn-controlling-user-agent", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/presentation-api/#dfn-receiving-user-agent'] = {"text": "receiving user agent", "type": "dfn", "spec": "presentation-api", "shortname": "presentation-api", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/presentation-api/#dfn-receiving-user-agent", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/presentation-api/#dfn-presentation'] = {"text": "presentation", "type": "dfn", "spec": "presentation-api", "shortname": "presentation-api", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/presentation-api/#dfn-presentation", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/remote-playback/#dfn-remote-playback-devices'] = {"text": "remote playback devices", "type": "dfn", "spec": "remote-playback", "shortname": "remote-playback", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/remote-playback/#dfn-remote-playback-devices", "export": true, "normative": true, "for_": []};
+window.refsData['#receiver'] = {"text": "receiver", "type": "dfn", "spec": "openscreenprotocol-1", "shortname": "openscreenprotocol", "level": "1", "status": "local", "url": "#receiver", "export": true, "normative": true, "for_": []};
+window.refsData['#controller'] = {"text": "controller", "type": "dfn", "spec": "openscreenprotocol-1", "shortname": "openscreenprotocol", "level": "1", "status": "local", "url": "#controller", "export": true, "normative": true, "for_": []};
+window.refsData['#open-screen-protocol-agent'] = {"text": "open screen protocol agent", "type": "dfn", "spec": "openscreenprotocol-1", "shortname": "openscreenprotocol", "level": "1", "status": "local", "url": "#open-screen-protocol-agent", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/presentation-api/#dfn-presentation-request-url'] = {"text": "presentation request url", "type": "dfn", "spec": "presentation-api", "shortname": "presentation-api", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/presentation-api/#dfn-presentation-request-url", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/presentation-api/#dfn-presentation-id'] = {"text": "presentation id", "type": "dfn", "spec": "presentation-api", "shortname": "presentation-api", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/presentation-api/#dfn-presentation-id", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/presentation-api/#presentationconnection'] = {"text": "PresentationConnection", "type": "interface", "spec": "presentation-api", "shortname": "presentation-api", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/presentation-api/#presentationconnection", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#htmlmediaelement'] = {"text": "HTMLMediaElement", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#htmlmediaelement", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/remote-playback/#dfn-initiate-remote-playback'] = {"text": "initiate remote playback", "type": "dfn", "spec": "remote-playback", "shortname": "remote-playback", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/remote-playback/#dfn-initiate-remote-playback", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/remote-playback/#dfn-media-element-state'] = {"text": "media element state", "type": "dfn", "spec": "remote-playback", "shortname": "remote-playback", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/remote-playback/#dfn-media-element-state", "export": true, "normative": true, "for_": []};
+window.refsData['#listening-agent'] = {"text": "listening agent", "type": "dfn", "spec": "openscreenprotocol-1", "shortname": "openscreenprotocol", "level": "1", "status": "local", "url": "#listening-agent", "export": true, "normative": true, "for_": []};
+window.refsData['#advertising-agent'] = {"text": "advertising agent", "type": "dfn", "spec": "openscreenprotocol-1", "shortname": "openscreenprotocol", "level": "1", "status": "local", "url": "#advertising-agent", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc6763#section-7'] = {"text": "service name", "type": "dfn", "spec": "rfc6763", "shortname": "rfc6763", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc6763#section-7", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc6763#section-4.1.1'] = {"text": "instance name", "type": "dfn", "spec": "rfc6763", "shortname": "rfc6763", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc6763#section-4.1.1", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc6762#section-9'] = {"text": "conflict resolution", "type": "dfn", "spec": "rfc6762", "shortname": "rfc6762", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc6762#section-9", "export": true, "normative": true, "for_": []};
+window.refsData['#agent-certificate'] = {"text": "agent certificate", "type": "dfn", "spec": "openscreenprotocol-1", "shortname": "openscreenprotocol", "level": "1", "status": "local", "url": "#agent-certificate", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc8122#section-5'] = {"text": "sha-256", "type": "dfn", "spec": "rfc8122", "shortname": "rfc8122", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc8122#section-5", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/draft-ietf-quic-transport-34#section-16'] = {"text": "variable-length integer", "type": "dfn", "spec": "quic", "shortname": "quic", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/draft-ietf-quic-transport-34#section-16", "export": true, "normative": true, "for_": []};
+window.refsData['#agent-fingerprint'] = {"text": "agent fingerprint", "type": "dfn", "spec": "openscreenprotocol-1", "shortname": "openscreenprotocol", "level": "1", "status": "local", "url": "#agent-fingerprint", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc5646#section-2'] = {"text": "language tag", "type": "dfn", "spec": "rfc5646", "shortname": "rfc5646", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc5646#section-2", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/draft-ietf-quic-transport-34#section-18'] = {"text": "transport parameter encoding", "type": "dfn", "spec": "quic", "shortname": "quic", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/draft-ietf-quic-transport-34#section-18", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/draft-ietf-quic-transport-34#section-19.19'] = {"text": "connection_close frames", "type": "dfn", "spec": "quic", "shortname": "quic", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/draft-ietf-quic-transport-34#section-19.19", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/presentation-api/#dfn-available-presentation-display'] = {"text": "available presentation display", "type": "dfn", "spec": "presentation-api", "shortname": "presentation-api", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/presentation-api/#dfn-available-presentation-display", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/remote-playback/#dfn-compatible-remote-playback-device'] = {"text": "compatible remote playback device", "type": "dfn", "spec": "remote-playback", "shortname": "remote-playback", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/remote-playback/#dfn-compatible-remote-playback-device", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/remote-playback/#dfn-media-resources'] = {"text": "media resources", "type": "dfn", "spec": "remote-playback", "shortname": "remote-playback", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/remote-playback/#dfn-media-resources", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc4122#section-4.4'] = {"text": "uuid", "type": "dfn", "spec": "rfc4122", "shortname": "rfc4122", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc4122#section-4.4", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#attr-source-src'] = {"text": "src", "type": "element-attr", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#attr-source-src", "export": true, "normative": true, "for_": ["source"]};
+window.refsData['https://html.spec.whatwg.org/multipage/embedded-content.html#attr-source-type'] = {"text": "type", "type": "element-attr", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/embedded-content.html#attr-source-type", "export": true, "normative": true, "for_": ["source"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-media-fastseek'] = {"text": "fastSeek(time)", "type": "method", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-media-fastseek", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-media-pause'] = {"text": "pause()", "type": "method", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-media-pause", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-media-play'] = {"text": "play()", "type": "method", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-media-play", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-media-currentsrc'] = {"text": "currentSrc", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-media-currentsrc", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-media-networkstate'] = {"text": "networkState", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-media-networkstate", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-media-readystate'] = {"text": "readyState", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-media-readystate", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-media-error'] = {"text": "error", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-media-error", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-media-duration'] = {"text": "duration", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-media-duration", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-media-buffered'] = {"text": "buffered", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-media-buffered", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-media-seekable'] = {"text": "seekable", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-media-seekable", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-media-playbackrate'] = {"text": "playbackRate", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-media-playbackrate", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-media-paused'] = {"text": "paused", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-media-paused", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-media-seeking'] = {"text": "seeking", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-media-seeking", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-media-ended'] = {"text": "ended", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-media-ended", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-media-volume'] = {"text": "volume", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-media-volume", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-media-muted'] = {"text": "muted", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-media-muted", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-media-audiotracks'] = {"text": "audioTracks", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-media-audiotracks", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-media-videotracks'] = {"text": "videoTracks", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-media-videotracks", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-media-texttracks'] = {"text": "textTracks", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-media-texttracks", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-video-videowidth'] = {"text": "videoWidth", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-video-videowidth", "export": true, "normative": true, "for_": ["HTMLVideoElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-video-videoheight'] = {"text": "videoHeight", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-video-videoheight", "export": true, "normative": true, "for_": ["HTMLVideoElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#timeline-offset'] = {"text": "timeline offset", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/media.html#timeline-offset", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#event-media-stalled'] = {"text": "stalled", "type": "event", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#event-media-stalled", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-media-played'] = {"text": "played", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-media-played", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-media-currenttime'] = {"text": "currentTime", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-media-currenttime", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-media-src'] = {"text": "src", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-media-src", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-media-preload'] = {"text": "preload", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-media-preload", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-media-loop'] = {"text": "loop", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-media-loop", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#poster-frame'] = {"text": "poster frame", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/media.html#poster-frame", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-media-addtexttrack'] = {"text": "addTextTrack(kind, label, language)", "type": "method", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-media-addtexttrack", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-media-network_empty'] = {"text": "NETWORK_EMPTY", "type": "const", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-media-network_empty", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-media-have_nothing'] = {"text": "HAVE_NOTHING", "type": "const", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-media-have_nothing", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#concept-mediaerror-code'] = {"text": "media error code", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/media.html#concept-mediaerror-code", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#dom-media-getstartdate'] = {"text": "getStartDate()", "type": "method", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/media.html#dom-media-getstartdate", "export": true, "normative": true, "for_": ["HTMLMediaElement"]};
+window.refsData['https://html.spec.whatwg.org/multipage/media.html#official-playback-position'] = {"text": "official playback position", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/media.html#official-playback-position", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/remote-playback/#dfn-availability-sources-set'] = {"text": "availability sources set", "type": "dfn", "spec": "remote-playback", "shortname": "remote-playback", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/remote-playback/#dfn-availability-sources-set", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/remote-playback/#dfn-remote-playback-source'] = {"text": "remote playback source", "type": "dfn", "spec": "remote-playback", "shortname": "remote-playback", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/remote-playback/#dfn-remote-playback-source", "export": true, "normative": true, "for_": []};
+window.refsData['#media-sender'] = {"text": "media sender", "type": "dfn", "spec": "openscreenprotocol-1", "shortname": "openscreenprotocol", "level": "1", "status": "local", "url": "#media-sender", "export": true, "normative": true, "for_": []};
+window.refsData['#media-receiver'] = {"text": "media receiver", "type": "dfn", "spec": "openscreenprotocol-1", "shortname": "openscreenprotocol", "level": "1", "status": "local", "url": "#media-receiver", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc6381#section-3'] = {"text": "codecs parameter", "type": "dfn", "spec": "rfc6381", "shortname": "rfc6381", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc6381#section-3", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/web-messaging.html#dom-window-postmessage'] = {"text": "postMessage(message, targetOrigin, transfer)", "type": "method", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/web-messaging.html#dom-window-postmessage", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['#display-name'] = {"text": "display name", "type": "dfn", "spec": "openscreenprotocol-1", "shortname": "openscreenprotocol", "level": "1", "status": "local", "url": "#display-name", "export": true, "normative": true, "for_": []};
+window.refsData['#suspicious-agent'] = {"text": "suspicious agent", "type": "dfn", "spec": "openscreenprotocol-1", "shortname": "openscreenprotocol", "level": "1", "status": "local", "url": "#suspicious-agent", "export": true, "normative": true, "for_": []};
+window.refsData['#verified-display-name'] = {"text": "verified display name", "type": "dfn", "spec": "openscreenprotocol-1", "shortname": "openscreenprotocol", "level": "1", "status": "local", "url": "#verified-display-name", "export": true, "normative": true, "for_": []};
+window.refsData['https://tools.ietf.org/html/rfc8610#section-3'] = {"text": "concise data definition language", "type": "dfn", "spec": "rfc8610", "shortname": "rfc8610", "level": "", "status": "anchor-block", "url": "https://tools.ietf.org/html/rfc8610#section-3", "export": true, "normative": true, "for_": []};
 </script>

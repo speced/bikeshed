@@ -691,6 +691,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -3753,8 +3790,6 @@ to the <a data-link-type="dfn" href="#injection-sink" id="ref-for-injection-sink
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -4002,7 +4037,6 @@ to the <a data-link-type="dfn" href="#injection-sink" id="ref-for-injection-sink
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -4572,4 +4606,396 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#injection-sink'] = {"text": "injection sink", "type": "dfn", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#injection-sink", "export": true, "normative": true, "for_": []};
+window.refsData['#policies'] = {"text": "policies", "type": "dfn", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#policies", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webappsec-csp/#script-src'] = {"text": "script-src", "type": "dfn", "spec": "csp3", "shortname": "csp", "level": "3", "status": "current", "url": "https://w3c.github.io/webappsec-csp/#script-src", "export": true, "normative": true, "for_": []};
+window.refsData['#enforcement'] = {"text": "enforcement", "type": "dfn", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#enforcement", "export": true, "normative": true, "for_": []};
+window.refsData['#trusted-types-sink-group'] = {"text": "trusted-types-sink-group", "type": "dfn", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#trusted-types-sink-group", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-document-write'] = {"text": "write()", "type": "method", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dom-document-write", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-domparser-parsefromstring'] = {"text": "parseFromString(str, type)", "type": "method", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dom-domparser-parsefromstring", "export": true, "normative": true, "for_": ["DOMParser"]};
+window.refsData['https://dom.spec.whatwg.org/#element'] = {"text": "Element", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#element", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-htmlscriptelement-src'] = {"text": "src", "type": "attribute", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dom-htmlscriptelement-src", "export": true, "normative": true, "for_": ["HTMLScriptElement"]};
+window.refsData['#dom-htmlscriptelement-text'] = {"text": "text", "type": "attribute", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dom-htmlscriptelement-text", "export": true, "normative": true, "for_": ["HTMLScriptElement"]};
+window.refsData['#trustedtypepolicy'] = {"text": "TrustedTypePolicy", "type": "interface", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#trustedtypepolicy", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-trustedtypepolicy-createhtml'] = {"text": "createHTML(input)", "type": "method", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dom-trustedtypepolicy-createhtml", "export": true, "normative": true, "for_": ["TrustedTypePolicy"]};
+window.refsData['https://webidl.spec.whatwg.org/#Exposed'] = {"text": "Exposed", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Exposed", "export": true, "normative": true, "for_": []};
+window.refsData['#trustedhtml-stringification-behavior'] = {"text": "stringification behavior", "type": "dfn", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#trustedhtml-stringification-behavior", "export": true, "normative": true, "for_": ["TrustedHTML"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-DOMString'] = {"text": "DOMString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-DOMString", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-trustedhtml-tojson'] = {"text": "toJSON()", "type": "method", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dom-trustedhtml-tojson", "export": true, "normative": true, "for_": ["TrustedHTML"]};
+window.refsData['#dom-trustedtypepolicy-createscript'] = {"text": "createScript(input)", "type": "method", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dom-trustedtypepolicy-createscript", "export": true, "normative": true, "for_": ["TrustedTypePolicy"]};
+window.refsData['#trustedscript-stringification-behavior'] = {"text": "stringification behavior", "type": "dfn", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#trustedscript-stringification-behavior", "export": true, "normative": true, "for_": ["TrustedScript"]};
+window.refsData['#dom-trustedscript-tojson'] = {"text": "toJSON()", "type": "method", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dom-trustedscript-tojson", "export": true, "normative": true, "for_": ["TrustedScript"]};
+window.refsData['#dom-trustedtypepolicy-createscripturl'] = {"text": "createScriptURL(input)", "type": "method", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dom-trustedtypepolicy-createscripturl", "export": true, "normative": true, "for_": ["TrustedTypePolicy"]};
+window.refsData['#trustedscripturl-stringification-behavior'] = {"text": "stringification behavior", "type": "dfn", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#trustedscripturl-stringification-behavior", "export": true, "normative": true, "for_": ["TrustedScriptURL"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-USVString'] = {"text": "USVString", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-USVString", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-trustedscripturl-tojson'] = {"text": "toJSON()", "type": "method", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dom-trustedscripturl-tojson", "export": true, "normative": true, "for_": ["TrustedScriptURL"]};
+window.refsData['#trustedhtml'] = {"text": "TrustedHTML", "type": "interface", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#trustedhtml", "export": true, "normative": true, "for_": []};
+window.refsData['#trusted-type'] = {"text": "trusted type", "type": "dfn", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#trusted-type", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-global-object-realm'] = {"text": "realm", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-global-object-realm", "export": true, "normative": true, "for_": ["global object"]};
+window.refsData['#dom-trustedtypepolicyfactory-createpolicy'] = {"text": "createPolicy(policyName)", "type": "method", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dom-trustedtypepolicyfactory-createpolicy", "export": true, "normative": true, "for_": ["TrustedTypePolicyFactory"]};
+window.refsData['#dictdef-trustedtypepolicyoptions'] = {"text": "TrustedTypePolicyOptions", "type": "dictionary", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dictdef-trustedtypepolicyoptions", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-trustedtypepolicyfactory-ishtml'] = {"text": "isHTML(value)", "type": "method", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dom-trustedtypepolicyfactory-ishtml", "export": true, "normative": true, "for_": ["TrustedTypePolicyFactory"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-any'] = {"text": "any", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-any", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-trustedtypepolicyfactory-isscript'] = {"text": "isScript(value)", "type": "method", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dom-trustedtypepolicyfactory-isscript", "export": true, "normative": true, "for_": ["TrustedTypePolicyFactory"]};
+window.refsData['#dom-trustedtypepolicyfactory-isscripturl'] = {"text": "isScriptURL(value)", "type": "method", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dom-trustedtypepolicyfactory-isscripturl", "export": true, "normative": true, "for_": ["TrustedTypePolicyFactory"]};
+window.refsData['#dom-trustedtypepolicyfactory-emptyhtml'] = {"text": "emptyHTML", "type": "attribute", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dom-trustedtypepolicyfactory-emptyhtml", "export": true, "normative": true, "for_": ["TrustedTypePolicyFactory"]};
+window.refsData['#trustedscript'] = {"text": "TrustedScript", "type": "interface", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#trustedscript", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-trustedtypepolicyfactory-emptyscript'] = {"text": "emptyScript", "type": "attribute", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dom-trustedtypepolicyfactory-emptyscript", "export": true, "normative": true, "for_": ["TrustedTypePolicyFactory"]};
+window.refsData['#dom-trustedtypepolicyfactory-getattributetype'] = {"text": "getAttributeType(tagName, attribute, elementNs, attrNs)", "type": "method", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dom-trustedtypepolicyfactory-getattributetype", "export": true, "normative": true, "for_": ["TrustedTypePolicyFactory"]};
+window.refsData['#dom-trustedtypepolicyfactory-getpropertytype'] = {"text": "getPropertyType(tagName, property, elementNs)", "type": "method", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dom-trustedtypepolicyfactory-getpropertytype", "export": true, "normative": true, "for_": ["TrustedTypePolicyFactory"]};
+window.refsData['#dom-trustedtypepolicyfactory-defaultpolicy'] = {"text": "defaultPolicy", "type": "attribute", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dom-trustedtypepolicyfactory-defaultpolicy", "export": true, "normative": true, "for_": ["TrustedTypePolicyFactory"]};
+window.refsData['https://infra.spec.whatwg.org/#ordered-set'] = {"text": "ordered set", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-set", "export": true, "normative": true, "for_": []};
+window.refsData['#trusted-types-directive'] = {"text": "trusted-types-directive", "type": "dfn", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#trusted-types-directive", "export": true, "normative": true, "for_": []};
+window.refsData['#abstract-opdef-create-a-trusted-type-policy'] = {"text": "Create a Trusted Type Policy", "type": "abstract-op", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#abstract-opdef-create-a-trusted-type-policy", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global'] = {"text": "relevant global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-relevant-global", "export": true, "normative": true, "for_": []};
+window.refsData['#trustedscripturl'] = {"text": "TrustedScriptURL", "type": "interface", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#trustedscripturl", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ascii-lowercase'] = {"text": "ascii lowercase", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-lowercase", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#html-namespace'] = {"text": "html namespace", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#html-namespace", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-element-interface'] = {"text": "element interface", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-element-interface", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-attribute'] = {"text": "attribute", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-attribute", "export": true, "normative": true, "for_": []};
+window.refsData['#StringContext'] = {"text": "StringContext", "type": "extended-attribute", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#StringContext", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#interface-mixin'] = {"text": "interface mixin", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#interface-mixin", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#include'] = {"text": "include", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#include", "export": true, "normative": true, "for_": ["interface"]};
+window.refsData['https://html.spec.whatwg.org/multipage/common-dom-interfaces.html#reflect'] = {"text": "reflect", "type": "dfn", "spec": "html", "shortname": "html", "level": "", "status": "anchor-block", "url": "https://html.spec.whatwg.org/multipage/common-dom-interfaces.html#reflect", "export": true, "normative": true, "for_": []};
+window.refsData['#abstract-opdef-create-a-trusted-type'] = {"text": "Create a Trusted Type", "type": "abstract-op", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#abstract-opdef-create-a-trusted-type", "export": true, "normative": true, "for_": []};
+window.refsData['#callbackdef-createhtmlcallback'] = {"text": "CreateHTMLCallback", "type": "callback", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#callbackdef-createhtmlcallback", "export": true, "normative": true, "for_": []};
+window.refsData['#callbackdef-createscriptcallback'] = {"text": "CreateScriptCallback", "type": "callback", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#callbackdef-createscriptcallback", "export": true, "normative": true, "for_": []};
+window.refsData['#callbackdef-createscripturlcallback'] = {"text": "CreateScriptURLCallback", "type": "callback", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#callbackdef-createscripturlcallback", "export": true, "normative": true, "for_": []};
+window.refsData['#trustedtypepolicy-name'] = {"text": "name", "type": "dfn", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#trustedtypepolicy-name", "export": true, "normative": true, "for_": ["TrustedTypePolicy"]};
+window.refsData['#dom-windoworworkerglobalscope-trustedtypes'] = {"text": "trustedTypes", "type": "attribute", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dom-windoworworkerglobalscope-trustedtypes", "export": true, "normative": true, "for_": ["WindowOrWorkerGlobalScope"]};
+window.refsData['#require-trusted-types-for-directive'] = {"text": "require-trusted-types-for-directive", "type": "dfn", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#require-trusted-types-for-directive", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webappsec-csp/#header-content-security-policy-report-only'] = {"text": "content-security-policy-report-only", "type": "http-header", "spec": "csp3", "shortname": "csp", "level": "3", "status": "current", "url": "https://w3c.github.io/webappsec-csp/#header-content-security-policy-report-only", "export": true, "normative": true, "for_": []};
+window.refsData['#trustedtypepolicyfactory'] = {"text": "TrustedTypePolicyFactory", "type": "interface", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#trustedtypepolicyfactory", "export": true, "normative": true, "for_": []};
+window.refsData['#abstract-opdef-should-trusted-type-policy-creation-be-blocked-by-content-security-policy'] = {"text": "Should Trusted Type policy creation be blocked by Content Security Policy?", "type": "abstract-op", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#abstract-opdef-should-trusted-type-policy-creation-be-blocked-by-content-security-policy", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-trustedtypepolicyoptions-createhtml'] = {"text": "createHTML", "type": "dict-member", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dom-trustedtypepolicyoptions-createhtml", "export": true, "normative": true, "for_": ["TrustedTypePolicyOptions"]};
+window.refsData['#dom-trustedtypepolicyoptions-createscript'] = {"text": "createScript", "type": "dict-member", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dom-trustedtypepolicyoptions-createscript", "export": true, "normative": true, "for_": ["TrustedTypePolicyOptions"]};
+window.refsData['#dom-trustedtypepolicyoptions-createscripturl'] = {"text": "createScriptURL", "type": "dict-member", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dom-trustedtypepolicyoptions-createscripturl", "export": true, "normative": true, "for_": ["TrustedTypePolicyOptions"]};
+window.refsData['#abstract-opdef-get-trusted-type-compliant-string'] = {"text": "Get Trusted Type compliant string", "type": "abstract-op", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#abstract-opdef-get-trusted-type-compliant-string", "export": true, "normative": true, "for_": []};
+window.refsData['#typedefdef-trustedtype'] = {"text": "TrustedType", "type": "typedef", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#typedefdef-trustedtype", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webappsec-csp/#global-object-csp-list'] = {"text": "csp list", "type": "dfn", "spec": "csp3", "shortname": "csp", "level": "3", "status": "current", "url": "https://w3c.github.io/webappsec-csp/#global-object-csp-list", "export": false, "normative": true, "for_": ["global object"]};
+window.refsData['https://w3c.github.io/webappsec-csp/#content-security-policy-object'] = {"text": "content security policy object", "type": "dfn", "spec": "csp3", "shortname": "csp", "level": "3", "status": "current", "url": "https://w3c.github.io/webappsec-csp/#content-security-policy-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webappsec-csp/#policy-directive-set'] = {"text": "directive set", "type": "dfn", "spec": "csp3", "shortname": "csp", "level": "3", "status": "current", "url": "https://w3c.github.io/webappsec-csp/#policy-directive-set", "export": true, "normative": true, "for_": ["policy"]};
+window.refsData['https://w3c.github.io/webappsec-csp/#directives'] = {"text": "directives", "type": "dfn", "spec": "csp3", "shortname": "csp", "level": "3", "status": "current", "url": "https://w3c.github.io/webappsec-csp/#directives", "export": true, "normative": true, "for_": []};
+window.refsData['#abstract-opdef-process-value-with-a-default-policy'] = {"text": "Process value with a default policy", "type": "abstract-op", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#abstract-opdef-process-value-with-a-default-policy", "export": true, "normative": true, "for_": []};
+window.refsData['#abstract-opdef-should-sink-type-mismatch-violation-be-blocked-by-content-security-policy'] = {"text": "Should sink type mismatch violation be blocked by Content Security Policy?", "type": "abstract-op", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#abstract-opdef-should-sink-type-mismatch-violation-be-blocked-by-content-security-policy", "export": true, "normative": true, "for_": []};
+window.refsData['#window-trusted-type-policy-factory'] = {"text": "trusted type policy factory", "type": "dfn", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#window-trusted-type-policy-factory", "export": true, "normative": true, "for_": ["Window"]};
+window.refsData['https://html.spec.whatwg.org/multipage/scripting.html#htmlscriptelement'] = {"text": "HTMLScriptElement", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/scripting.html#htmlscriptelement", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/scripting.html#attr-script-src'] = {"text": "src", "type": "element-attr", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/scripting.html#attr-script-src", "export": true, "normative": true, "for_": ["script"]};
+window.refsData['#dom-htmlscriptelement-scripturl-slot'] = {"text": "[[ScriptURL]]", "type": "attribute", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dom-htmlscriptelement-scripturl-slot", "export": true, "normative": true, "for_": ["HTMLScriptElement"]};
+window.refsData['#dom-htmlscriptelement-scripttext-slot'] = {"text": "[[ScriptText]]", "type": "attribute", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dom-htmlscriptelement-scripttext-slot", "export": true, "normative": true, "for_": ["HTMLScriptElement"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-child-text-content'] = {"text": "child text content", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-child-text-content", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-extended-attribute'] = {"text": "extended attribute", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-extended-attribute", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-xattr-identifier'] = {"text": "takes an identifier", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-xattr-identifier", "export": true, "normative": true, "for_": ["extended attribute"]};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-identifier'] = {"text": "identifier", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-identifier", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-regular-attribute'] = {"text": "regular attribute", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-regular-attribute", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-regular-operation'] = {"text": "regular operation", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-regular-operation", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-read-only'] = {"text": "read only", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-read-only", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-idl-fragment'] = {"text": "idl fragment", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-idl-fragment", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-variadic'] = {"text": "variadic", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-variadic", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-operation'] = {"text": "operation", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-operation", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#AllowShared'] = {"text": "AllowShared", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#AllowShared", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Clamp'] = {"text": "Clamp", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Clamp", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#EnforceRange'] = {"text": "EnforceRange", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#EnforceRange", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#LegacyNullToEmptyString'] = {"text": "LegacyNullToEmptyString", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#LegacyNullToEmptyString", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-convert-ecmascript-to-idl-value'] = {"text": "converted to an idl value", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-convert-ecmascript-to-idl-value", "export": true, "normative": true, "for_": []};
+window.refsData['#dfn-validate-the-string-in-context'] = {"text": "validate the string in context", "type": "dfn", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dfn-validate-the-string-in-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://heycam.github.io/webidl/#this'] = {"text": "this", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "", "status": "anchor-block", "url": "https://heycam.github.io/webidl/#this", "export": true, "normative": true, "for_": []};
+window.refsData['#related-construct'] = {"text": "related construct", "type": "dfn", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#related-construct", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-tostring'] = {"text": "ToString", "type": "abstract-op", "spec": "ecma-262", "shortname": "ecma", "level": "262", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-tostring", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#dfn-platform-object'] = {"text": "platform object", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#dfn-platform-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#window'] = {"text": "Window", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#worker'] = {"text": "Worker", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/workers.html#worker", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#windoworworkerglobalscope'] = {"text": "WindowOrWorkerGlobalScope", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#windoworworkerglobalscope", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/custom-elements.html#cereactions'] = {"text": "CEReactions", "type": "extended-attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/custom-elements.html#cereactions", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['#typedefdef-htmlstring'] = {"text": "HTMLString", "type": "typedef", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#typedefdef-htmlstring", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/dom.html#dom-innertext'] = {"text": "innerText", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dom.html#dom-innertext", "export": true, "normative": true, "for_": ["HTMLElement"]};
+window.refsData['https://dom.spec.whatwg.org/#dom-node-textcontent'] = {"text": "textContent", "type": "attribute", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#dom-node-textcontent", "export": true, "normative": true, "for_": ["Node"]};
+window.refsData['#typedefdef-scriptstring'] = {"text": "ScriptString", "type": "typedef", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#typedefdef-scriptstring", "export": true, "normative": true, "for_": []};
+window.refsData['#typedefdef-scripturlstring'] = {"text": "ScriptURLString", "type": "typedef", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#typedefdef-scripturlstring", "export": true, "normative": true, "for_": []};
+window.refsData['#abstract-opdef-prepare-the-script-url-and-text'] = {"text": "Prepare the script URL and text", "type": "abstract-op", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#abstract-opdef-prepare-the-script-url-and-text", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/iframe-embed-object.html#htmliframeelement'] = {"text": "HTMLIFrameElement", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#htmliframeelement", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/iframe-embed-object.html#htmlembedelement'] = {"text": "HTMLEmbedElement", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#htmlembedelement", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/iframe-embed-object.html#htmlobjectelement'] = {"text": "HTMLObjectElement", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#htmlobjectelement", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#Function'] = {"text": "Function", "type": "callback", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#Function", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-long'] = {"text": "long", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-long", "export": true, "normative": true, "for_": []};
+window.refsData['#typedefdef-trustedtimerhandler'] = {"text": "TrustedTimerHandler", "type": "typedef", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#typedefdef-trustedtimerhandler", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-element-attributes-change-ext'] = {"text": "attribute change steps", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-element-attributes-change-ext", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#string-concatenate'] = {"text": "concatenate", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#string-concatenate", "export": true, "normative": true, "for_": ["string"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-element-local-name'] = {"text": "local name", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-element-local-name", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['#dom-workerglobalscope-importscripts'] = {"text": "importScripts()", "type": "method", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dom-workerglobalscope-importscripts", "export": true, "normative": true, "for_": ["WorkerGlobalScope"]};
+window.refsData['https://dom.spec.whatwg.org/#eventtarget'] = {"text": "EventTarget", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#eventtarget", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#workeroptions'] = {"text": "WorkerOptions", "type": "dictionary", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/workers.html#workeroptions", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#sharedworker'] = {"text": "SharedWorker", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/workers.html#sharedworker", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/workers.html#workerglobalscope'] = {"text": "WorkerGlobalScope", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/workers.html#workerglobalscope", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#SecureContext'] = {"text": "SecureContext", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#SecureContext", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#serviceworkercontainer'] = {"text": "ServiceWorkerContainer", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#serviceworkercontainer", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#NewObject'] = {"text": "NewObject", "type": "extended-attribute", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#NewObject", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-promise'] = {"text": "Promise", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-promise", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#serviceworkerregistration'] = {"text": "ServiceWorkerRegistration", "type": "interface", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#serviceworkerregistration", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/ServiceWorker/#dictdef-registrationoptions'] = {"text": "RegistrationOptions", "type": "dictionary", "spec": "service-workers", "shortname": "service-workers", "level": "1", "status": "current", "url": "https://w3c.github.io/ServiceWorker/#dictdef-registrationoptions", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/types.html#InterfaceSVGAnimatedString'] = {"text": "SVGAnimatedString", "type": "interface", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/types.html#InterfaceSVGAnimatedString", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-svganimatedstring-baseval'] = {"text": "baseVal", "type": "attribute", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#dom-svganimatedstring-baseval", "export": true, "normative": true, "for_": ["SVGAnimatedString"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-attribute'] = {"text": "attribute", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-attribute", "export": true, "normative": true, "for_": []};
+window.refsData['https://svgwg.org/svg2-draft/interact.html#InterfaceSVGScriptElement'] = {"text": "SVGScriptElement", "type": "interface", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/interact.html#InterfaceSVGScriptElement", "export": true, "normative": true, "for_": []};
+window.refsData['#concept-element-attributes-validation-ext'] = {"text": "attribute validation steps", "type": "dfn", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#concept-element-attributes-validation-ext", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#other-applicable-specifications'] = {"text": "other applicable specifications", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#other-applicable-specifications", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-element'] = {"text": "element", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#handle-attribute-changes'] = {"text": "handle attribute changes", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#handle-attribute-changes", "export": false, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-attribute-local-name'] = {"text": "local name", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-attribute-local-name", "export": true, "normative": true, "for_": ["Attr"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-attribute-namespace'] = {"text": "namespace", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-attribute-namespace", "export": true, "normative": true, "for_": ["Attr"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-node-append'] = {"text": "append", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-node-append", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#concept-attribute-value'] = {"text": "value", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-attribute-value", "export": true, "normative": true, "for_": ["Attr"]};
+window.refsData['https://infra.spec.whatwg.org/#list-append'] = {"text": "append", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-append", "export": true, "normative": true, "for_": ["list"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-element-attribute'] = {"text": "attribute list", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-element-attribute", "export": true, "normative": true, "for_": ["Element"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-attribute-element'] = {"text": "element", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-attribute-element", "export": true, "normative": true, "for_": ["Attr"]};
+window.refsData['https://w3c.github.io/DOM-Parsing/#dom-innerhtml'] = {"text": "InnerHTML", "type": "interface", "spec": "dom-parsing", "shortname": "dom-parsing", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/DOM-Parsing/#dom-innerhtml", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#range'] = {"text": "Range", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#range", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#documentfragment'] = {"text": "DocumentFragment", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#documentfragment", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/DOM-Parsing/#supportedtype'] = {"text": "SupportedType", "type": "enum", "spec": "dom-parsing", "shortname": "dom-parsing", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/DOM-Parsing/#supportedtype", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webappsec-csp/#directive-name'] = {"text": "name", "type": "dfn", "spec": "csp3", "shortname": "csp", "level": "3", "status": "current", "url": "https://w3c.github.io/webappsec-csp/#directive-name", "export": true, "normative": true, "for_": ["directive"]};
+window.refsData['https://w3c.github.io/webappsec-csp/#directive-value'] = {"text": "value", "type": "dfn", "spec": "csp3", "shortname": "csp", "level": "3", "status": "current", "url": "https://w3c.github.io/webappsec-csp/#directive-value", "export": true, "normative": true, "for_": ["directive"]};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request'] = {"text": "request", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webappsec-csp/#directive-pre-navigation-check'] = {"text": "pre-navigation check", "type": "dfn", "spec": "csp3", "shortname": "csp", "level": "3", "status": "current", "url": "https://w3c.github.io/webappsec-csp/#directive-pre-navigation-check", "export": true, "normative": true, "for_": ["directive"]};
+window.refsData['#default-policy'] = {"text": "default policy", "type": "dfn", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#default-policy", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-url'] = {"text": "url", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-url", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://url.spec.whatwg.org/#concept-url-scheme'] = {"text": "scheme", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-scheme", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['https://url.spec.whatwg.org/#concept-url-serializer'] = {"text": "url serializer", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-serializer", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#concept-request-client'] = {"text": "client", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#concept-request-client", "export": true, "normative": true, "for_": ["request"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-global'] = {"text": "global object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-global", "export": true, "normative": true, "for_": ["environment settings object"]};
+window.refsData['https://url.spec.whatwg.org/#concept-url-parser'] = {"text": "url parser", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-parser", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webappsec-csp/#directive-inline-check'] = {"text": "inline check", "type": "dfn", "spec": "csp3", "shortname": "csp", "level": "3", "status": "current", "url": "https://w3c.github.io/webappsec-csp/#directive-inline-check", "export": true, "normative": true, "for_": ["directive"]};
+window.refsData['#serialized-tt-configuration'] = {"text": "serialized-tt-configuration", "type": "dfn", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#serialized-tt-configuration", "export": true, "normative": true, "for_": []};
+window.refsData['#tt-expression'] = {"text": "tt-expression", "type": "dfn", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#tt-expression", "export": true, "normative": true, "for_": []};
+window.refsData['#tt-policy-name'] = {"text": "tt-policy-name", "type": "dfn", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#tt-policy-name", "export": true, "normative": true, "for_": []};
+window.refsData['#tt-keyword'] = {"text": "tt-keyword", "type": "dfn", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#tt-keyword", "export": true, "normative": true, "for_": []};
+window.refsData['#tt-wildcard'] = {"text": "tt-wildcard", "type": "dfn", "spec": "trusted-types", "shortname": "trusted-types", "level": "", "status": "local", "url": "#tt-wildcard", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webappsec-csp/#violation-resource'] = {"text": "resource", "type": "dfn", "spec": "csp3", "shortname": "csp", "level": "3", "status": "current", "url": "https://w3c.github.io/webappsec-csp/#violation-resource", "export": true, "normative": true, "for_": ["violation"]};
+window.refsData['https://w3c.github.io/webappsec-csp/#violation-sample'] = {"text": "sample", "type": "dfn", "spec": "csp3", "shortname": "csp", "level": "3", "status": "current", "url": "https://w3c.github.io/webappsec-csp/#violation-sample", "export": true, "normative": true, "for_": ["violation"]};
+window.refsData['https://w3c.github.io/webappsec-csp/#policy-disposition'] = {"text": "disposition", "type": "dfn", "spec": "csp3", "shortname": "csp", "level": "3", "status": "current", "url": "https://w3c.github.io/webappsec-csp/#policy-disposition", "export": true, "normative": true, "for_": ["policy"]};
+window.refsData['https://w3c.github.io/webappsec-csp/#violation'] = {"text": "violation", "type": "dfn", "spec": "csp3", "shortname": "csp", "level": "3", "status": "current", "url": "https://w3c.github.io/webappsec-csp/#violation", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#exceptiondef-evalerror'] = {"text": "EvalError", "type": "exception", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#exceptiondef-evalerror", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webappsec-csp/#source-expression'] = {"text": "source expression", "type": "dfn", "spec": "csp3", "shortname": "csp", "level": "3", "status": "current", "url": "https://w3c.github.io/webappsec-csp/#source-expression", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#ascii-case-insensitive'] = {"text": "ascii case-insensitive", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ascii-case-insensitive", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webappsec-csp/#grammardef-unsafe-eval'] = {"text": "'unsafe-eval'", "type": "grammar", "spec": "csp3", "shortname": "csp", "level": "3", "status": "current", "url": "https://w3c.github.io/webappsec-csp/#grammardef-unsafe-eval", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#list-contain'] = {"text": "contain", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#list-contain", "export": true, "normative": true, "for_": ["list", "stack", "queue", "set"]};
+window.refsData['https://w3c.github.io/webappsec-csp/#grammardef-report-sample'] = {"text": "'report-sample'", "type": "grammar", "spec": "csp3", "shortname": "csp", "level": "3", "status": "current", "url": "https://w3c.github.io/webappsec-csp/#grammardef-report-sample", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/FileAPI/#dfn-Blob'] = {"text": "Blob", "type": "interface", "spec": "fileapi", "shortname": "fileapi", "level": "1", "status": "current", "url": "https://w3c.github.io/FileAPI/#dfn-Blob", "export": true, "normative": true, "for_": []};
+window.refsData['https://fetch.spec.whatwg.org/#local-scheme'] = {"text": "local scheme", "type": "dfn", "spec": "fetch", "shortname": "fetch", "level": "1", "status": "current", "url": "https://fetch.spec.whatwg.org/#local-scheme", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-embed-src'] = {"text": "src", "type": "element-attr", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-embed-src", "export": true, "normative": true, "for_": ["embed"]};
+window.refsData['https://w3c.github.io/webappsec-csp/#object-src'] = {"text": "object-src", "type": "dfn", "spec": "csp3", "shortname": "csp", "level": "3", "status": "current", "url": "https://w3c.github.io/webappsec-csp/#object-src", "export": true, "normative": true, "for_": []};
 </script>

@@ -478,6 +478,43 @@ a[href].issue-return {
     margin-bottom: 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -1327,8 +1364,6 @@ and everyone who commented on <a href="https://github.com/whatwg/html/issues/333
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -1576,7 +1611,6 @@ and everyone who commented on <a href="https://github.com/whatwg/html/issues/333
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -1992,4 +2026,286 @@ function parseHTML(markup) {
 		return el.content;
 	}
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element'] = {"text": "iframe", "type": "element", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element", "export": true, "normative": true, "for_": []};
+window.refsData['https://dom.spec.whatwg.org/#document'] = {"text": "Document", "type": "interface", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#document", "export": true, "normative": true, "for_": []};
+window.refsData['#unpartitioned-data'] = {"text": "unpartitioned data", "type": "dfn", "spec": "storage-access", "shortname": "storage-access", "level": "", "status": "local", "url": "#unpartitioned-data", "export": true, "normative": true, "for_": []};
+window.refsData['#dom-document-hasstorageaccess'] = {"text": "hasStorageAccess()", "type": "method", "spec": "storage-access", "shortname": "storage-access", "level": "", "status": "local", "url": "#dom-document-hasstorageaccess", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['#dom-document-requeststorageaccess'] = {"text": "requestStorageAccess()", "type": "method", "spec": "storage-access", "shortname": "storage-access", "level": "", "status": "local", "url": "#dom-document-requeststorageaccess", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['#first-party-site-context'] = {"text": "first-party-site context", "type": "dfn", "spec": "storage-access", "shortname": "storage-access", "level": "", "status": "local", "url": "#first-party-site-context", "export": true, "normative": true, "for_": []};
+window.refsData['#third-party-context'] = {"text": "third party context", "type": "dfn", "spec": "storage-access", "shortname": "storage-access", "level": "", "status": "local", "url": "#third-party-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/dom.html#dom-document-cookie'] = {"text": "cookie", "type": "attribute", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/dom.html#dom-document-cookie", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#site'] = {"text": "site", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#site", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#nav-document'] = {"text": "active document", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#nav-document", "export": true, "normative": true, "for_": ["navigable"]};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context'] = {"text": "top-level browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#top-level-browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin'] = {"text": "origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin", "export": true, "normative": true, "for_": ["environment settings object"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#concept-environment-top-level-origin'] = {"text": "top-level origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#concept-environment-top-level-origin", "export": true, "normative": true, "for_": ["environment"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object'] = {"text": "relevant settings object", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#concept-site-same-site'] = {"text": "same site", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-site-same-site", "export": true, "normative": true, "for_": ["site"]};
+window.refsData['https://infra.spec.whatwg.org/#ordered-map'] = {"text": "map", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#ordered-map", "export": true, "normative": true, "for_": []};
+window.refsData['#partitioned-storage-key'] = {"text": "partitioned storage key", "type": "dfn", "spec": "storage-access", "shortname": "storage-access", "level": "", "status": "local", "url": "#partitioned-storage-key", "export": true, "normative": true, "for_": []};
+window.refsData['#storage-access-flag-set'] = {"text": "storage access flag set", "type": "dfn", "spec": "storage-access", "shortname": "storage-access", "level": "", "status": "local", "url": "#storage-access-flag-set", "export": true, "normative": true, "for_": []};
+window.refsData['#global-storage-access-map'] = {"text": "global storage access map", "type": "dfn", "spec": "storage-access", "shortname": "storage-access", "level": "", "status": "local", "url": "#global-storage-access-map", "export": true, "normative": true, "for_": []};
+window.refsData['https://tc39.github.io/ecma262/#sec-agent-clusters'] = {"text": "agent cluster", "type": "dfn", "spec": "ecmascript", "shortname": "ecmascript", "level": "", "status": "anchor-block", "url": "https://tc39.github.io/ecma262/#sec-agent-clusters", "export": true, "normative": true, "for_": []};
+window.refsData['#agent-cluster-storage-access-map'] = {"text": "storage access map", "type": "dfn", "spec": "storage-access", "shortname": "storage-access", "level": "", "status": "local", "url": "#agent-cluster-storage-access-map", "export": true, "normative": true, "for_": ["agent cluster"]};
+window.refsData['https://infra.spec.whatwg.org/#map-clone'] = {"text": "clone", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-clone", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['https://html.spec.whatwg.org/multipage/webappapis.html#relevant-agent'] = {"text": "relevant agent", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/webappapis.html#relevant-agent", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#tuple'] = {"text": "tuple", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#tuple", "export": true, "normative": true, "for_": []};
+window.refsData['#partitioned-storage-key-top-level-site'] = {"text": "top-level site", "type": "dfn", "spec": "storage-access", "shortname": "storage-access", "level": "", "status": "local", "url": "#partitioned-storage-key-top-level-site", "export": true, "normative": true, "for_": ["partitioned storage key"]};
+window.refsData['#partitioned-storage-key-embedded-site'] = {"text": "embedded site", "type": "dfn", "spec": "storage-access", "shortname": "storage-access", "level": "", "status": "local", "url": "#partitioned-storage-key-embedded-site", "export": true, "normative": true, "for_": ["partitioned storage key"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#obtain-a-site'] = {"text": "obtain a site", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#obtain-a-site", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/document-sequences.html#concept-document-bc'] = {"text": "browsing context", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/document-sequences.html#concept-document-bc", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['#storage-access-map'] = {"text": "storage access map", "type": "dfn", "spec": "storage-access", "shortname": "storage-access", "level": "", "status": "local", "url": "#storage-access-map", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#map-exists'] = {"text": "exist", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-exists", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['https://infra.spec.whatwg.org/#map-set'] = {"text": "set", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#map-set", "export": true, "normative": true, "for_": ["map"]};
+window.refsData['https://webidl.spec.whatwg.org/#idl-promise'] = {"text": "Promise", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-promise", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-boolean'] = {"text": "boolean", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-boolean", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#idl-undefined'] = {"text": "undefined", "type": "interface", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#idl-undefined", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#a-new-promise'] = {"text": "a new promise", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#a-new-promise", "export": true, "normative": true, "for_": []};
+window.refsData['#obtain-the-storage-access-map'] = {"text": "obtain the storage access map", "type": "dfn", "spec": "storage-access", "shortname": "storage-access", "level": "", "status": "local", "url": "#obtain-the-storage-access-map", "export": true, "normative": true, "for_": []};
+window.refsData['#generate-a-partitioned-storage-key'] = {"text": "generate a partitioned storage key", "type": "dfn", "spec": "storage-access", "shortname": "storage-access", "level": "", "status": "local", "url": "#generate-a-partitioned-storage-key", "export": true, "normative": true, "for_": []};
+window.refsData['https://webidl.spec.whatwg.org/#resolve'] = {"text": "resolve", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#resolve", "export": true, "normative": true, "for_": []};
+window.refsData['#obtain-a-storage-access-flag-set'] = {"text": "obtain a storage access flag set", "type": "dfn", "spec": "storage-access", "shortname": "storage-access", "level": "", "status": "local", "url": "#obtain-a-storage-access-flag-set", "export": true, "normative": true, "for_": []};
+window.refsData['#was-expressly-denied-storage-access-flag'] = {"text": "was expressly denied storage access flag", "type": "dfn", "spec": "storage-access", "shortname": "storage-access", "level": "", "status": "local", "url": "#was-expressly-denied-storage-access-flag", "export": true, "normative": true, "for_": ["storage access flag set"]};
+window.refsData['https://dom.spec.whatwg.org/#concept-document-origin'] = {"text": "origin", "type": "dfn", "spec": "dom", "shortname": "dom", "level": "1", "status": "current", "url": "https://dom.spec.whatwg.org/#concept-document-origin", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#concept-origin-opaque'] = {"text": "opaque origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#concept-origin-opaque", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#same-origin'] = {"text": "same origin", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#same-origin", "export": true, "normative": true, "for_": []};
+window.refsData['#determine-if-a-site-has-storage-access'] = {"text": "determine if a site has storage access", "type": "dfn", "spec": "storage-access", "shortname": "storage-access", "level": "", "status": "local", "url": "#determine-if-a-site-has-storage-access", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/infrastructure.html#enqueue-the-following-steps'] = {"text": "enqueue the following steps", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/infrastructure.html#enqueue-the-following-steps", "export": true, "normative": true, "for_": ["parallel queue"]};
+window.refsData['https://webidl.spec.whatwg.org/#reject'] = {"text": "reject", "type": "dfn", "spec": "webidl", "shortname": "webidl", "level": "1", "status": "current", "url": "https://webidl.spec.whatwg.org/#reject", "export": true, "normative": true, "for_": []};
+window.refsData['#has-storage-access-flag'] = {"text": "has storage access flag", "type": "dfn", "spec": "storage-access", "shortname": "storage-access", "level": "", "status": "local", "url": "#has-storage-access-flag", "export": true, "normative": true, "for_": ["storage access flag set"]};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#active-sandboxing-flag-set'] = {"text": "active sandboxing flag set", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#active-sandboxing-flag-set", "export": true, "normative": true, "for_": ["Document"]};
+window.refsData['#sandbox-storage-access-by-user-activation-flag'] = {"text": "sandbox storage access by user activation flag", "type": "dfn", "spec": "storage-access", "shortname": "storage-access", "level": "", "status": "local", "url": "#sandbox-storage-access-by-user-activation-flag", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/nav-history-apis.html#window'] = {"text": "Window", "type": "interface", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/nav-history-apis.html#window", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#transient-activation'] = {"text": "transient activation", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/interaction.html#transient-activation", "export": true, "normative": true, "for_": []};
+window.refsData['#determine-the-storage-access-policy'] = {"text": "determine the storage access policy", "type": "dfn", "spec": "storage-access", "shortname": "storage-access", "level": "", "status": "local", "url": "#determine-the-storage-access-policy", "export": true, "normative": true, "for_": []};
+window.refsData['#save-the-storage-access-flag-set'] = {"text": "save the storage access flag set", "type": "dfn", "spec": "storage-access", "shortname": "storage-access", "level": "", "status": "local", "url": "#save-the-storage-access-flag-set", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#boolean'] = {"text": "boolean", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "1", "status": "current", "url": "https://infra.spec.whatwg.org/#boolean", "export": true, "normative": true, "for_": []};
+window.refsData['https://infra.spec.whatwg.org/#implementation-defined'] = {"text": "implementation-defined", "type": "dfn", "spec": "infra", "shortname": "infra", "level": "", "status": "anchor-block", "url": "https://infra.spec.whatwg.org/#implementation-defined", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/interaction.html#consume-user-activation'] = {"text": "consume user activation", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/interaction.html#consume-user-activation", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#sandboxing-flag-set'] = {"text": "sandboxing flag set", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#sandboxing-flag-set", "export": true, "normative": true, "for_": []};
+window.refsData['https://html.spec.whatwg.org/multipage/browsers.html#parse-a-sandboxing-directive'] = {"text": "parse a sandboxing directive", "type": "dfn", "spec": "html", "shortname": "html", "level": "1", "status": "current", "url": "https://html.spec.whatwg.org/multipage/browsers.html#parse-a-sandboxing-directive", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/webdriver-spec.html#dfn-extension-commands'] = {"text": "extension command", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/webdriver-spec.html#dfn-extension-commands", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/webdriver-spec.html#dfn-current-browsing-context'] = {"text": "current browsing context", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/webdriver-spec.html#dfn-current-browsing-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/webdriver-spec.html#dfn-remote-end-steps'] = {"text": "remote end steps", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/webdriver-spec.html#dfn-remote-end-steps", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/webdriver-spec.html#dfn-getting-properties'] = {"text": "getting a property", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/webdriver-spec.html#dfn-getting-properties", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/webdriver-spec.html#dfn-error'] = {"text": "webdriver error", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/webdriver-spec.html#dfn-error", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/webdriver-spec.html#dfn-error-code'] = {"text": "webdriver error code", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/webdriver-spec.html#dfn-error-code", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/webdriver-spec.html#dfn-invalid-argument'] = {"text": "invalid argument", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/webdriver-spec.html#dfn-invalid-argument", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-url-parser'] = {"text": "url parser", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-parser", "export": true, "normative": true, "for_": []};
+window.refsData['https://url.spec.whatwg.org/#concept-url-origin'] = {"text": "origin", "type": "dfn", "spec": "url", "shortname": "url", "level": "1", "status": "current", "url": "https://url.spec.whatwg.org/#concept-url-origin", "export": true, "normative": true, "for_": ["url"]};
+window.refsData['https://w3c.github.io/webdriver/webdriver-spec.html#dfn-unsupported-operation'] = {"text": "unsupported operation", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/webdriver-spec.html#dfn-unsupported-operation", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/webdriver-spec.html#dfn-unknown-error'] = {"text": "unknown error", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/webdriver-spec.html#dfn-unknown-error", "export": true, "normative": true, "for_": []};
+window.refsData['https://w3c.github.io/webdriver/webdriver-spec.html#dfn-success'] = {"text": "success", "type": "dfn", "spec": "webdriver", "shortname": "webdriver", "level": "", "status": "anchor-block", "url": "https://w3c.github.io/webdriver/webdriver-spec.html#dfn-success", "export": true, "normative": true, "for_": []};
 </script>

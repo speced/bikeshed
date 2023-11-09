@@ -707,6 +707,43 @@ a[href].issue-return {
 	margin: -40px 0 0 0;
 }
 </style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: none;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint.on {
+    display: inline-block;
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
 <style>/* Boilerplate: style-selflinks */
 
 :root {
@@ -1994,8 +2031,6 @@ and <a class="production css" data-link-type="type" href="#typedef-shape-arc-siz
 <script>/* Boilerplate: script-dfn-panel */
 "use strict";
 {
-    const dfnsJson = window.dfnsJson || {};
-
     // Functions, divided by link type, that wrap an autolink's
     // contents with the appropriate outer syntax.
     // Alternately, a string naming another type they format
@@ -2243,7 +2278,6 @@ and <a class="production css" data-link-type="type" href="#typedef-shape-arc-siz
         for (const el of tabbable) {
             el.tabIndex = tabIndex++;
         }
-
     }
 
     function positionDfnPanel(dfnPanel) {
@@ -2698,4 +2732,282 @@ function cmpTops(a,b) {
 window.addEventListener("load", repositionAnnoPanels);
 window.addEventListener("resize", repositionAnnoPanels);
 }
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+    function genRefHint(link, ref) {
+        const linkText = link.textContent;
+        let dfnTextElements = '';
+        if (ref.text != linkText) {
+            dfnTextElements =
+                mk.li({},
+                    mk.b({}, "DFN: "),
+                    mk.code({ class: "dfn-text" }, ref.text)
+                );
+        }
+        const forList = ref.for_;
+        const forListElements = forList.length === 0 ? '' : mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, `${forItem}`)
+                    ),
+                ),
+            ),
+        );
+        const url = ref.url;
+        const safeUrl = encodeURIComponent(url);
+        const hintPanel = mk.aside({
+            class: "ref-hint",
+            id: `ref-hint-for-${safeUrl}`,
+            "data-for": url,
+            "aria-labelled-by": `ref-hint-for-${safeUrl}`,
+        },
+            mk.ul({},
+                dfnTextElements,
+                mk.li({},
+                    mk.b({}, "URL: "),
+                    mk.a({ href: url, class: "ref" }, url),
+                ),
+                mk.li({},
+                    mk.b({}, "Type: "),
+                    mk.span({}, `${ref.type}`),
+                ),
+                mk.li({},
+                    mk.b({}, "Spec: "),
+                    mk.span({}, `${ref.spec ? ref.spec : ''}`),
+                ),
+                forListElements
+            ),
+        );
+        hintPanel.forLink = link;
+        return hintPanel;
+    }
+    function genAllRefHints() {
+        for(const refData of Object.values(window.refsData)) {
+            const refUrl = refData.url;
+            const links = document.querySelectorAll(`a[href="${refUrl}"]`);
+            if (links.length == 0) {
+                console.log(`Can't find link href="${refUrl}".`, refData);
+                continue;
+            }
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const hint = genRefHint(link, refData);
+                append(document.body, hint);
+                insertLinkPopupAction(hint)
+            }
+        }
+    }
+
+    function hideAllRefHints() {
+        queryAll(".ref-hint.on").forEach(el=>hideRefHint(el));
+    }
+
+    function hideRefHint(refHint) {
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "false");
+        refHint.style.position = "absolute"; // unfix it
+        refHint.classList.remove("on");
+        const teardown = refHint.teardownEventListeners;
+        if (teardown) {
+            refHint.teardownEventListeners = undefined;
+            teardown();
+        }
+    }
+
+    function showRefHint(refHint) {
+        hideAllRefHints(); // Only display one at this time.
+
+        const link = refHint.forLink;
+        link.setAttribute("aria-expanded", "true");
+        refHint.classList.add("on");
+        positionRefHint(refHint);
+        setupRefHintEventListeners(refHint);
+    }
+
+    function setupRefHintEventListeners(refHint) {
+        if (refHint.teardownEventListeners) return;
+        const link = refHint.forLink;
+        // Add event handlers to hide the refHint after the user moves away
+        // from both the link and refHint, if not hovering either within one second.
+        let timeout = null;
+        const startHidingRefHint = (event) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => {
+                hideRefHint(refHint);
+            }, 1000);
+        }
+        const resetHidingRefHint = (event) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = null;
+        };
+        link.addEventListener("mouseleave", startHidingRefHint);
+        link.addEventListener("mouseenter", resetHidingRefHint);
+        link.addEventListener("blur", startHidingRefHint);
+        link.addEventListener("focus", resetHidingRefHint);
+        refHint.addEventListener("mouseleave", startHidingRefHint);
+        refHint.addEventListener("mouseenter", resetHidingRefHint);
+        refHint.addEventListener("blur", startHidingRefHint);
+        refHint.addEventListener("focus", resetHidingRefHint);
+
+        refHint.teardownEventListeners = () => {
+            // remove event listeners
+            resetHidingRefHint();
+            link.removeEventListener("mouseleave", startHidingRefHint);
+            link.removeEventListener("mouseenter", resetHidingRefHint);
+            link.removeEventListener("blur", startHidingRefHint);
+            link.removeEventListener("focus", resetHidingRefHint);
+            refHint.removeEventListener("mouseleave", startHidingRefHint);
+            refHint.removeEventListener("mouseenter", resetHidingRefHint);
+            refHint.removeEventListener("blur", startHidingRefHint);
+            refHint.removeEventListener("focus", resetHidingRefHint);
+        };
+    }
+
+    function positionRefHint(refHint) {
+        const link = refHint.forLink;
+        const linkPos = getRootLevelAbsolutePosition(link);
+        refHint.style.top = linkPos.bottom + "px";
+        refHint.style.left = linkPos.left + "px";
+
+        const panelPos = refHint.getBoundingClientRect();
+        const panelMargin = 8;
+        const maxRight = document.body.parentNode.clientWidth - panelMargin;
+        if (panelPos.right > maxRight) {
+            const overflowAmount = panelPos.right - maxRight;
+            const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+            refHint.style.left = newLeft + "px";
+        }
+    }
+
+    // TODO: shared util
+    // Returns the root-level absolute position {left and top} of element.
+    function getRootLevelAbsolutePosition(el) {
+        const boundsRect = el.getBoundingClientRect();
+        let xPos = 0;
+        let yPos = 0;
+
+        while (el) {
+            let xScroll = el.scrollLeft;
+            let yScroll = el.scrollTop;
+
+            // Ignore scrolling of body.
+            if (el.tagName === "BODY") {
+                xScroll = 0;
+                yScroll = 0;
+            }
+            xPos += (el.offsetLeft - xScroll + el.clientLeft);
+            yPos += (el.offsetTop - yScroll + el.clientTop);
+
+            el = el.offsetParent;
+        }
+        return {
+            left: xPos,
+            top: yPos,
+            right: xPos + boundsRect.width,
+            bottom: yPos + boundsRect.height,
+        };
+    }
+
+    function insertLinkPopupAction(refHint) {
+        const link = refHint.forLink;
+        // link.setAttribute('role', 'button');
+        link.setAttribute('aria-expanded', 'false')
+        link.classList.add('has-ref-hint');
+        link.addEventListener('mouseover', (event) => {
+            showRefHint(refHint);
+        });
+        link.addEventListener('focus', (event) => {
+            showRefHint(refHint);
+        })
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        genAllRefHints();
+
+        document.body.addEventListener("click", (e) => {
+            // If not handled already, just hide all link panels.
+            hideAllRefHints();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        // Hide any open ref hint.
+        hideAllRefHints();
+    });
+}
+</script>
+<script>/* Boilerplate: script-ref-hints-json */
+window.refsData = {};
+window.refsData['#float-area'] = {"text": "float area", "type": "dfn", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#float-area", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-shape-inside'] = {"text": "shape-inside", "type": "property", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#propdef-shape-inside", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#css-wide-keywords'] = {"text": "css-wide keywords", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#css-wide-keywords", "export": true, "normative": true, "for_": []};
+window.refsData['#exclusion-area'] = {"text": "exclusion area", "type": "dfn", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#exclusion-area", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#border-box'] = {"text": "border box", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#border-box", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-shapes-1/#propdef-shape-outside'] = {"text": "shape-outside", "type": "property", "spec": "css-shapes-1", "shortname": "css-shapes", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-shapes-1/#propdef-shape-outside", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-box-4/#margin-box'] = {"text": "margin box", "type": "dfn", "spec": "css-box-4", "shortname": "css-box", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-box-4/#margin-box", "export": true, "normative": true, "for_": []};
+window.refsData['#content-area'] = {"text": "content area", "type": "dfn", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#content-area", "export": true, "normative": true, "for_": []};
+window.refsData['#direction-agnostic-size'] = {"text": "direction-agnostic size", "type": "dfn", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#direction-agnostic-size", "export": true, "normative": true, "for_": []};
+window.refsData['#funcdef-shape'] = {"text": "shape()", "type": "function", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#funcdef-shape", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-path'] = {"text": "path()", "type": "function", "spec": "css-shapes-1", "shortname": "css-shapes", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-path", "export": true, "normative": true, "for_": ["<basic-shape>"]};
+window.refsData['https://drafts.csswg.org/css-variables-2/#funcdef-var'] = {"text": "var()", "type": "function", "spec": "css-variables-2", "shortname": "css-variables", "level": "2", "status": "current", "url": "https://drafts.csswg.org/css-variables-2/#funcdef-var", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#px'] = {"text": "px", "type": "value", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#px", "export": true, "normative": true, "for_": ["<length>"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-opt'] = {"text": "?", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-opt", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-shape-coordinate-pair'] = {"text": "<coordinate-pair>", "type": "type", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#typedef-shape-coordinate-pair", "export": true, "normative": true, "for_": ["shape()"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-comma'] = {"text": ",", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-comma", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-shape-command'] = {"text": "<shape-command>", "type": "type", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#typedef-shape-command", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-comma'] = {"text": "#", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-comma", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-shapes-1/#basic-shape-reference-box'] = {"text": "reference box", "type": "dfn", "spec": "css-shapes-1", "shortname": "css-shapes", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-shapes-1/#basic-shape-reference-box", "export": true, "normative": true, "for_": ["<basic-shape>"]};
+window.refsData['#typedef-shape-move-command'] = {"text": "<move-command>", "type": "type", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#typedef-shape-move-command", "export": true, "normative": true, "for_": ["shape()"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-one'] = {"text": "|", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-one", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-shape-line-command'] = {"text": "<line-command>", "type": "type", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#typedef-shape-line-command", "export": true, "normative": true, "for_": ["shape()"]};
+window.refsData['#typedef-shape-hv-line-command'] = {"text": "<hv-line-command>", "type": "type", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#typedef-shape-hv-line-command", "export": true, "normative": true, "for_": ["shape()"]};
+window.refsData['#typedef-shape-curve-command'] = {"text": "<curve-command>", "type": "type", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#typedef-shape-curve-command", "export": true, "normative": true, "for_": ["shape()"]};
+window.refsData['#typedef-shape-smooth-command'] = {"text": "<smooth-command>", "type": "type", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#typedef-shape-smooth-command", "export": true, "normative": true, "for_": ["shape()"]};
+window.refsData['#typedef-shape-arc-command'] = {"text": "<arc-command>", "type": "type", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#typedef-shape-arc-command", "export": true, "normative": true, "for_": ["shape()"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#typedef-length-percentage'] = {"text": "<length-percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#typedef-length-percentage", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-num'] = {"text": "{a}", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-num", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-shape-by-to'] = {"text": "<by-to>", "type": "type", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#typedef-shape-by-to", "export": true, "normative": true, "for_": ["shape()"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#mult-num-range'] = {"text": "{a,b}", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#mult-num-range", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-shape-arc-sweep'] = {"text": "<arc-sweep>", "type": "type", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#typedef-shape-arc-sweep", "export": true, "normative": true, "for_": ["shape()"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#comb-any'] = {"text": "||", "type": "grammar", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#comb-any", "export": true, "normative": true, "for_": []};
+window.refsData['#typedef-shape-arc-size'] = {"text": "<arc-size>", "type": "type", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#typedef-shape-arc-size", "export": true, "normative": true, "for_": ["shape()"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#angle-value'] = {"text": "<angle>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#angle-value", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-shape-to'] = {"text": "to", "type": "value", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#valdef-shape-to", "export": true, "normative": true, "for_": ["<by-to>", "shape()"]};
+window.refsData['#valdef-shape-by'] = {"text": "by", "type": "value", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#valdef-shape-by", "export": true, "normative": true, "for_": ["<by-to>", "shape()"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#percentage-value'] = {"text": "<percentage>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#percentage-value", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-shape-close'] = {"text": "close", "type": "value", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#valdef-shape-close", "export": true, "normative": true, "for_": ["shape()"]};
+window.refsData['#valdef-shape-hline'] = {"text": "hline", "type": "value", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#valdef-shape-hline", "export": true, "normative": true, "for_": ["shape()"]};
+window.refsData['#valdef-shape-vline'] = {"text": "vline", "type": "value", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#valdef-shape-vline", "export": true, "normative": true, "for_": ["shape()"]};
+window.refsData['#valdef-shape-line'] = {"text": "line", "type": "value", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#valdef-shape-line", "export": true, "normative": true, "for_": ["shape()"]};
+window.refsData['#valdef-shape-smooth'] = {"text": "smooth", "type": "value", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#valdef-shape-smooth", "export": true, "normative": true, "for_": ["shape()"]};
+window.refsData['#valdef-shape-curve'] = {"text": "curve", "type": "value", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#valdef-shape-curve", "export": true, "normative": true, "for_": ["shape()"]};
+window.refsData['https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-circle'] = {"text": "circle()", "type": "function", "spec": "css-shapes-1", "shortname": "css-shapes", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-circle", "export": true, "normative": true, "for_": ["<basic-shape>"]};
+window.refsData['https://drafts.csswg.org/css-transforms-1/#funcdef-transform-rotate'] = {"text": "rotate()", "type": "function", "spec": "css-transforms-1", "shortname": "css-transforms", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-transforms-1/#funcdef-transform-rotate", "export": true, "normative": true, "for_": ["transform"]};
+window.refsData['#valdef-shape-ccw'] = {"text": "ccw", "type": "value", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#valdef-shape-ccw", "export": true, "normative": true, "for_": ["arc", "shape()"]};
+window.refsData['#valdef-shape-cw'] = {"text": "cw", "type": "value", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#valdef-shape-cw", "export": true, "normative": true, "for_": ["arc", "shape()"]};
+window.refsData['#valdef-shape-small'] = {"text": "small", "type": "value", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#valdef-shape-small", "export": true, "normative": true, "for_": ["arc", "shape()"]};
+window.refsData['#valdef-shape-large'] = {"text": "large", "type": "value", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#valdef-shape-large", "export": true, "normative": true, "for_": ["arc", "shape()"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#interpolation'] = {"text": "interpolate", "type": "dfn", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#interpolation", "export": true, "normative": true, "for_": []};
+window.refsData['#valdef-shape-arc'] = {"text": "arc", "type": "value", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#valdef-shape-arc", "export": true, "normative": true, "for_": ["shape()"]};
+window.refsData['https://svgwg.org/svg2-draft/paths.html#elementdef-path'] = {"text": "path", "type": "element", "spec": "svg2", "shortname": "svg", "level": "2", "status": "current", "url": "https://svgwg.org/svg2-draft/paths.html#elementdef-path", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-shapes-1/#propdef-shape-margin'] = {"text": "shape-margin", "type": "property", "spec": "css-shapes-1", "shortname": "css-shapes", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-shapes-1/#propdef-shape-margin", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-shape-padding'] = {"text": "shape-padding", "type": "property", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#propdef-shape-padding", "export": true, "normative": true, "for_": []};
+window.refsData['https://www.w3.org/TR/css3-exclusions/#wrapping-context'] = {"text": "wrapping context", "type": "dfn", "spec": "css3-exclusions", "shortname": "css-exclusions", "level": "1", "status": "snapshot", "url": "https://www.w3.org/TR/css3-exclusions/#wrapping-context", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-shapes-1/#typedef-basic-shape'] = {"text": "<basic-shape>", "type": "type", "spec": "css-shapes-1", "shortname": "css-shapes", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-shapes-1/#typedef-basic-shape", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-images-3/#typedef-image'] = {"text": "<image>", "type": "type", "spec": "css-images-3", "shortname": "css-images", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-images-3/#typedef-image", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-values-4/#url-value'] = {"text": "<url>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#url-value", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-inset'] = {"text": "inset()", "type": "function", "spec": "css-shapes-1", "shortname": "css-shapes", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-inset", "export": true, "normative": true, "for_": ["<basic-shape>"]};
+window.refsData['https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-ellipse'] = {"text": "ellipse()", "type": "function", "spec": "css-shapes-1", "shortname": "css-shapes", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-ellipse", "export": true, "normative": true, "for_": ["<basic-shape>"]};
+window.refsData['https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-polygon'] = {"text": "polygon()", "type": "function", "spec": "css-shapes-1", "shortname": "css-shapes", "level": "1", "status": "current", "url": "https://drafts.csswg.org/css-shapes-1/#funcdef-basic-shape-polygon", "export": true, "normative": true, "for_": ["<basic-shape>"]};
+window.refsData['#valdef-shape-inside-auto'] = {"text": "auto", "type": "value", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#valdef-shape-inside-auto", "export": true, "normative": true, "for_": ["shape-inside"]};
+window.refsData['https://drafts.csswg.org/css-display-4/#propdef-display'] = {"text": "display", "type": "property", "spec": "css-display-4", "shortname": "css-display", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-display-4/#propdef-display", "export": true, "normative": true, "for_": []};
+window.refsData['https://drafts.csswg.org/css-display-3/#valdef-display-table'] = {"text": "table", "type": "value", "spec": "css-display-3", "shortname": "css-display", "level": "3", "status": "current", "url": "https://drafts.csswg.org/css-display-3/#valdef-display-table", "export": true, "normative": true, "for_": ["display", "<display-inside>"]};
+window.refsData['https://drafts.csswg.org/css-values-4/#length-value'] = {"text": "<length>", "type": "type", "spec": "css-values-4", "shortname": "css-values", "level": "4", "status": "current", "url": "https://drafts.csswg.org/css-values-4/#length-value", "export": true, "normative": true, "for_": []};window.refsData['#propdef-shape-inside'] = {"text": "shape-inside", "type": "property", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#propdef-shape-inside", "export": true, "normative": true, "for_": []};
+window.refsData['#propdef-shape-padding'] = {"text": "shape-padding", "type": "property", "spec": "css-shapes-2", "shortname": "css-shapes", "level": "2", "status": "local", "url": "#propdef-shape-padding", "export": true, "normative": true, "for_": []};
 </script>
