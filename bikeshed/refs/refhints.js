@@ -75,9 +75,9 @@
         link.setAttribute("aria-expanded", "false");
         refHint.style.position = "absolute"; // unfix it
         refHint.classList.remove("on");
-        const teardown = refHint.getAttribute('data-teardown-event-listeners');
+        const teardown = refHint.teardownEventListeners;
         if (teardown) {
-            refHint.removeAttribute('data-teardown-event-listeners');
+            refHint.teardownEventListeners = undefined;
             teardown();
         }
     }
@@ -93,7 +93,7 @@
     }
 
     function setupRefHintEventListeners(refHint) {
-        if (refHint.getAttribute('data-teardown-event-listeners')) return;
+        if (refHint.teardownEventListeners) return;
         const link = refHint.forLink;
         // Add event handlers to hide the refHint after the user moves away
         // from both the link and refHint, if not hovering either within one second.
@@ -119,8 +119,9 @@
         refHint.addEventListener("blur", startHidingRefHint);
         refHint.addEventListener("focus", resetHidingRefHint);
 
-        refHint.addAttribute('data-teardown-event-listeners', () => {
+        refHint.teardownEventListeners = () => {
             // remove event listeners
+            resetHidingRefHint();
             link.removeEventListener("mouseleave", startHidingRefHint);
             link.removeEventListener("mouseenter", resetHidingRefHint);
             link.removeEventListener("blur", startHidingRefHint);
@@ -129,7 +130,7 @@
             refHint.removeEventListener("mouseenter", resetHidingRefHint);
             refHint.removeEventListener("blur", startHidingRefHint);
             refHint.removeEventListener("focus", resetHidingRefHint);
-        });
+        };
     }
 
     function positionRefHint(refHint) {
